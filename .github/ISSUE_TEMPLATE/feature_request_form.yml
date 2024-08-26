@@ -24,7 +24,7 @@ body:
       value: |
         Thanks for taking the time to fill out this feature request!
         By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/NVIDIA/nv-ingest/blob/main/CODE_OF_CONDUCT.md)
-        You also have searched the [existing open doc issues](https://github.com/NVIDIA/nv-ingest/issues?q=is%3Aopen+is%3Aissue+label%3Afeature+request)
+        You also have searched the [existing open feature requests](https://github.com/NVIDIA/nv-ingest/issues?q=is%3Aopen+is%3Aissue+label%3Afeature+request)
 
   - type: dropdown
     id: new_or_improvement
