@@ -50,4 +50,4 @@ body:
     attributes:
       label: Where have you looked?
       placeholder: |
-       https://github.com/rapidsai/rapids-repo-template/blob/main/README.md
+       https://github.com/NVIDIA/nv-ingest/blob/main/README.md
