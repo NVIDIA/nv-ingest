@@ -5,15 +5,15 @@ SPDX-License-Identifier: Apache-2.0
 -->
 
 
-## NV-Ingest: GPU accelerated multi modal content extraction
+## NVIDIA-Ingest: Multi-modal data extraction
 
-NV-Ingest is a scalable, performance oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, nv-ingest uses specialized nvidia image NIMs to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
+NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
-Based on nvidia [Morpheus](https://github.com/nv-morpheus/Morpheus), nv-ingest parallelizes the process of splitting documents into pages who's contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized (OCR) into a well defined JSON schema. From there, nv-ingest can optionally manage computation of embeddings for the extracted content, and the process storing into a vector database [Milvus](https://milvus.io/).
+NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and the process storing into a vector database [Milvus](https://milvus.io/).
 
 ### What it is
 
-A service that:
+A microservice that:
 
 - Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that
   payload.
@@ -35,9 +35,9 @@ A service that:
 
 ## Quickstart
 
-To get started using nv-ingest, you need to do a few things:
-1. [Start supporting microservices and NIMs](#step-1-starting-containers)
-2. [Install the nv-ingest client dependencies in a Python environment](#step-2-installing-python-dependencies)
+To get started using NVIDIA Ingest, you need to do a few things:
+1. [Start supporting NIM microservices](#step-1-starting-containers)
+2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies)
 3. [Submit ingestion job(s)](#step-3-ingesting-documents)
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results)
 
@@ -50,19 +50,20 @@ If preferred, you can also [start services one by one](docs/deployment.md), or r
 First, git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
 
-For container images to be able to access to pre-built containers and NIMs, create a .env file and set up your API keys in it:
+For Docker container images to be able to access to pre-built containers and NIM microservices, create a .env file and set up your API keys in it:
 ```
 NIM_NGC_API_KEY=...
 NGC_API_KEY=...
 NGC_CLI_API_KEY=...
-DATASET_ROOT=/home/user/nv-ingest/data
+DATASET_ROOT=<PATH_TO_THIS_REPO>/data
+NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
 To build Docker images locally:
 
 `docker compose build`
 
-Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the YOLOx, Deplot, and Cached NIMs are each pinned to a dedicated GPU. The PaddleOCR and nv-embedqa-e5 NIMs and the nv-ingest-ms-runtime share a fourth. Thus our minimum requirements are 4 80GB A100 or H100 GPUs. 
+Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the YOLOX, DePlot, and CACHED NIM models are each pinned to a dedicated GPU. The PaddleOCR and nv-embedqa-e5 NIM models and the nv-ingest-ms-runtime share a fourth. Thus our minimum requirements are 4x NVIDIA A100 or H100 Tensor Core GPUs. 
 
 To start all services:
 `docker compose up`
@@ -87,9 +88,9 @@ When all services have fully started, `nvidia-smi` should show processes like th
 +---------------------------------------------------------------------------------------+
 
 ```
-If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is busy still busy setting up the models.
+If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is still busy setting up the models.
 
-Once it completes normally (less than a few seconds), the NIMs are ready.
+Once it completes normally (less than a few seconds), the NIM models are ready.
 
 ### Step 2: Installing Python dependencies
 
@@ -280,7 +281,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.meta
 
 Beyond inspecting the results, you can read them into something like a llama-index or langchain document query pipeline:
 
-Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ nv-ingest.
+Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 ## Third Party License Notice:
 
