@@ -1,0 +1,8 @@
+{{- if not .Values.extraEnvVarsCM }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "nv-ingest.fullname" . }}
+data:
+{{- end }}

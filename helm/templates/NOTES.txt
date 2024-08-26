@@ -1,0 +1,17 @@
+Installed {{ .Chart.Name }}-{{ .Chart.Version }}, named {{ .Release.Name }}.
+Visit the application via: 
+{{- if .Values.ingress.enabled }}
+{{- range $host := .Values.ingress.hosts }}
+  {{- range .paths }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ $host.host }}{{ .path }}
+  {{- end }}
+{{- end }}
+{{- else  if and .Values.virtualService .Values.virtualService.enabled }}
+  https://{{ .Values.virtualService.dnsName }}
+{{- end }}
+
+To learn more about the release, try:
+
+  $ helm status {{ .Release.Name }}
+  $ helm get {{ .Release.Name }}
+  $ helm test {{ .Release.Name }}

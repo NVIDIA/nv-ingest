@@ -1,0 +1,177 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "nv-ingest.fullname" . }}
+  labels:
+    {{- include "nv-ingest.labels" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "nv-ingest.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      {{- with .Values.podAnnotations }}
+      annotations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      labels:
+        {{- include "nv-ingest.labels" . | nindent 8 }}
+        {{- with .Values.podLabels }}
+        {{- toYaml . | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "nv-ingest.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+
+      initContainers:
+        - name: verify-tmpdir-permissions
+          image: busybox
+          command:
+            - "sh"
+            - "-c"
+            - "mkdir -p /scratch/.cache /scratch/tmp && chown -R {{ .Values.nemo.userID }}:{{ .Values.nemo.groupID }} /scratch"
+          volumeMounts:
+            - name: ephemeral
+              subPath: scratch
+              mountPath: /scratch
+
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.containerSecurityContext | nindent 12 }}
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          env:
+            - name: HOST_IP
+              valueFrom:
+                fieldRef:
+                  fieldPath: status.hostIP
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: NGC_API_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: ngc-api
+                  key: NGC_API_KEY
+
+            - name: HF_HOME
+              value: /scratch/.cache
+            - name: TMPDIR
+              value: /scratch/tmp
+
+            {{- if .Values.envVars }}
+            {{- range $k, $v := .Values.envVars }}
+            - name: "{{ $k }}"
+              value: "{{ $v }}"
+            {{- end }}
+            {{- end }}
+
+            # OpenTelemetry
+            {{- if .Values.otelEnabled }}
+            {{- range $k, $v := .Values.otelEnvVars }}
+            - name: "{{ $k }}"
+              value: "{{ $v }}"
+            {{- end }}
+            {{- if and .Values.otelEnabled ( not ( index .Values.otelEnvVars "OTEL_EXPORTER_OTLP_ENDPOINT" ) ) }}
+            - name: OTEL_EXPORTER_OTLP_ENDPOINT
+              value: "http://{{ .Release.Name }}-opentelemetry-collector:4318"
+            - name: OTEL_EXPORTER_OTLP_PROTOCOL
+              value: http/protobuf
+            {{- end }}
+            - name: CONSOLE_LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            - name: OTEL_LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            - name: LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            {{- else }}
+            - name: OTEL_TRACES_EXPORTER
+              value: none
+            - name: OTEL_METRICS_EXPORTER
+              value: none
+            - name: OTEL_LOGS_EXPORTER
+              value: none
+            - name: OTEL_PYTHON_LOGGING_AUTO_INSTRUMENTATION_ENABLED
+              value: "false"
+            - name: LOG_HANDLERS
+              value: console
+            - name: CONSOLE_LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            - name: LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            {{- end }}
+          envFrom:
+            {{- if .Values.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.extraEnvVarsCM "context" $) }}
+            {{ else }}
+            - configMapRef:
+                name: {{ include "nv-ingest.fullname" . }}
+            {{- end }}
+            {{- if .Values.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ include "common.tplvalues.render" (dict "value" .Values.extraEnvVarsSecret "context" $) }}
+            {{- end }}
+
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.port }}
+              protocol: TCP
+          {{- if .Values.livenessProbe.enabled }}
+          livenessProbe:
+            - toYaml .Values.livenessProbe | nindent 12
+          {{- end }}
+          {{- if .Values.readinessProbe.enabled }}
+          readinessProbe:
+            - toYaml .Values.readinessProbe | nindent 12
+          {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - mountPath: /dev/shm
+              name: dshm
+            - name: ephemeral
+              subPath: scratch
+              mountPath: /scratch
+          {{- if .Values.extraVolumeMounts }}
+          {{- range $k, $v := .Values.extraVolumeMounts }}
+            - name: {{ $k }}
+              {{- toYaml $v | nindent 12 }}
+          {{- end }}
+          {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      volumes:
+        - name: dshm
+          emptyDir:
+            medium: Memory
+        - name: ephemeral
+          emptyDir:
+            sizeLimit: "{{ .Values.tmpDirSize }}"
+      {{- if .Values.extraVolumes }}
+      {{- range $k, $v := .Values.extraVolumes }}
+        - name: {{ $k }}
+          {{- toYaml $v | nindent 10 }}
+      {{- end }}
+      {{- end }}

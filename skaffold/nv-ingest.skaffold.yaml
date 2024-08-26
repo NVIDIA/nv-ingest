@@ -1,0 +1,103 @@
+apiVersion: skaffold/v4beta9
+kind: Config
+metadata:
+  name: nv-ingest
+build:
+  # tell skaffold how to compute tags for container images
+  # ref: https://skaffold.dev/docs/taggers/
+  #
+  # NOTE: for hot-reloading to work, it's important that this strategy
+  #       exactly match the strategy you use for replacing image tags
+  #       with e.g. helm.releases.[].setValueTemplates
+  tagPolicy:
+    # tag every image with a digest of all of the input files to the image build
+    inputDigest: {}
+  artifacts:
+    # any reference to this image name in our manifests will be replaced by our newly build artifact
+    - image: nv-ingest-ms-runtime
+      # docker build context
+      context: ./
+      # docker builder details
+      docker:
+        dockerfile: Dockerfile
+        # dockerfile target layer
+        target: runtime
+        # do not attempt to pull a newer version of images referenced in FROM statements in Dockerfiles
+        pullParent: false
+      sync:
+        manual:
+          - src: "src/**/*.py"
+            dest: /app
+  # prevents pushing of our local build to remote container registry
+  local:
+    push: false
+    concurrency: 0
+    tryImportMissing: true
+    # use docker buildkit, for faster builds and better use of caching
+    # ref: https://github.com/docker/buildx
+    useBuildkit: true
+deploy:
+  statusCheckDeadlineSeconds: 300
+  tolerateFailuresUntilDeadline: true
+  kubectl: {}
+# deploys the helm chart
+manifests:
+  helm:
+    releases:
+      # - name: morpheus-sdk-client
+      #   chartPath: ./helm-nv/morpheus-sdk-client
+      #   valuesFiles:
+      #     - ./helm-nv/morpheus-sdk-client/values.yaml
+      #   namespace: morpheus
+      #   createNamespace: true
+      #   recreatePods: true
+      #   skipTests: true
+      # - name: morpheus-ai-engine
+      #   chartPath: ./helm-nv/morpheus-ai-engine
+      #   valuesFiles:
+      #     - ./helm-nv/morpheus-ai-engine/values.yaml
+      #   namespace: morpheus
+      #   createNamespace: true
+      #   recreatePods: true
+      #   skipTests: true
+      - name: nv-ingest
+        chartPath: ./helm
+        # pass the just-built-by-skaffold image URI through to the Helm chart
+        # ref: https://skaffold.dev/docs/deployers/helm/#fqn-strategy-single-fully-qualified-name-default
+        setValueTemplates:
+          image.repository: "{{.IMAGE_REPO_nv_ingest_ms_runtime}}"
+          image.tag: "{{.IMAGE_TAG_nv_ingest_ms_runtime}}"
+        setValues:
+          # run 'uvicorn --reload' so file changes are immediately reflected in the service
+          service.extraEntrypointArgs: "--reload"
+        valuesFiles:
+          - ./helm/values.yaml
+        recreatePods: true
+        # skip helm tests as they run too early in our dependencies, use verify instead
+        skipTests: true
+  # Additional k8s manifests to 'kubectl apply' up into the cluster.
+  rawYaml:
+    - ./skaffold/sensitive/imagepull.yaml
+    - ./skaffold/sensitive/ngcapi.yaml
+# 'skaffold verify' after 'skaffold dev' to run these tests
+verify:
+  - name: nv-ingest-health-check
+    container:
+      name: nv-ingest-alpine-wget
+      image: alpine:3.19
+      command: ["/bin/sh"]
+      args: ["-c", "wget http://nv-ingest:8000/health"]
+    executionMode:
+      kubernetesCluster: {}
+# port forwards our microservice to a random open port on the host
+portForward:
+  - resourceType: Service
+    resourceName: nv-ingest
+    port: http
+    address: 0.0.0.0
+    localPort: 8000
+  - resourceType: Service
+    resourceName: nv-ingest-redis-master
+    port: 6379
+    address: 0.0.0.0
+    localPort: 6379

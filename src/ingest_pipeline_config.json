@@ -1,0 +1,12 @@
+{
+  "image_caption_extraction_module": {},
+  "image_storage_module": {},
+  "metadata_injection_module": {},
+  "pdf_extractor_module": {},
+  "redis_task_sink": {},
+  "redis_task_source": {},
+  "text_splitting_module": {},
+  "otel_meter_module": {},
+  "embed_extractions_module": {},
+  "vdb_task_sink_module": {}
+}

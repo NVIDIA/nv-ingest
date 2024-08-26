@@ -1,0 +1,30 @@
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.service.name | default (include "nv-ingest.fullname" .) }}
+  labels:
+    {{- include "nv-ingest.labels" . | nindent 4 }}
+    {{- if .Values.service.labels }}
+    {{- toYaml .Values.service.labels | nindent 4 }}
+    {{- end }}
+  annotations:
+    {{- if .Values.service.annotations }}
+    {{- toYaml .Values.service.annotations | nindent 4 }}
+    {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    {{- if .Values.service.port }}
+    - port: {{ .Values.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+    {{- end }}
+    {{- if .Values.service.nodePort }}
+      {{- with .Values.service.nodePort }}
+      nodePort:  {{ . }}
+      {{- end }}
+      {{- end }}
+  selector:
+    {{- include "nv-ingest.selectorLabels" . | nindent 4 }}
