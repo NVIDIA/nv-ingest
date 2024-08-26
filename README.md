@@ -280,7 +280,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.meta
 
 Beyond inspecting the results, you can read them into something like a llama-index or langchain document query pipeline:
 
-Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.stg.ngc.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ nv-ingest.
+Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ nv-ingest.
 
 ## Third Party License Notice:
 
