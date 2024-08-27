@@ -37,7 +37,7 @@ services:
     runtime: nvidia
 
   deplot:
-    image: "gitlab-master.nvidia.com:5005/nim/nim-factory/google-deplot:24.08-17845175"
+    image: #placeholder
     ports:
       - "8003:8000"
       - "8004:8001"

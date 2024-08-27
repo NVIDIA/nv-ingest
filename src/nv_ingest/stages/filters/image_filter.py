@@ -171,9 +171,6 @@ def _filter_images(builder: mrc.Builder):
         raise_on_failure=validated_config.raise_on_failure,
     )
     def filter_images_fn(ctrl_msg: ControlMessage):
-        # based on this reference:
-        # https://gitlab-master.nvidia.com/daustin/govdocs_ingest/-/blob/main/govdocs_ingest.py?ref_type=heads#L258
-
         task_props = ctrl_msg.remove_task("filter")
         content_type = task_props.get("content_type")
         task_params = task_props.get("params", {})
@@ -211,9 +208,6 @@ def _filter_images(builder: mrc.Builder):
 
 
 def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
-    # based on this reference:
-    # https://gitlab-master.nvidia.com/daustin/govdocs_ingest/-/blob/main/govdocs_ingest.py?ref_type=heads#L258
-
     task_props.get("content_type")
     task_params = task_props.get("params", {})
     filter_flag = task_params.get("filter", True)
