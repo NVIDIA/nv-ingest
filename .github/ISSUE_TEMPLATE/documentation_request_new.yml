@@ -1,0 +1,53 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Documentation - New Documentation Request
+description: Request additions to NV-Ingest documentation
+title: "[DOC]: "
+labels: ["doc"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to improve our documentation!
+        By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/NVIDIA/nv-ingest/blob/main/CODE_OF_CONDUCT.md)
+        You also have searched the [existing open doc issues](https://github.com/NVIDIA/nv-ingest/issues?q=is%3Aopen+is%3Aissue+label%3Adoc)
+
+  - type: dropdown
+    id: criticality
+    attributes:
+      label: How would you describe the priority of this documentation request
+      options:
+        - Currently preventing usage
+        - Significant improvement
+        - Would be nice
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Describe the future/missing documentation
+      placeholder: A code snippet mentions function foo(args) but I cannot find any documentation on it.
+    validations:
+      required: true
+
+  - type: textarea
+    id: search_locs
+    attributes:
+      label: Where have you looked?
+      placeholder: |
+       https://github.com/NVIDIA/nv-ingest/blob/main/README.md

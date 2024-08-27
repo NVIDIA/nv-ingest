@@ -1,0 +1,450 @@
+## @section Deployment parameters
+## ref: https://kubernetes.io/docs/concepts/scheduling-eviction/assign-pod-node/#affinity-and-anti-affinity
+## @param affinity [object] [default: {}] Affinity settings for deployment.
+affinity: {}
+
+## @param nodeSelector [object] Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`
+nodeSelector: {}
+
+## @param logLevel Log level of NVIngest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL.
+logLevel: DEBUG
+
+## @param extraEnvVarsCM [string] [default: ""] A Config map holding Enviroment variables to include in the NVIngest containerextraEnvVarsCM: ""
+extraEnvVarsCM: ""
+
+## @param extraEnvVarsSecret [string] [default: ""] A K8S Secret to map to Enviroment variables to include in the NVIngest container
+extraEnvVarsSecret: ""
+
+## @param fullnameOverride [string] [default: ""] A name to force the fullname of the NVIngest container to have, defaults to the Helm Release Name
+fullnameOverride: ""
+
+## @param nameOverride [string] [default: ""] A name to base the objects created by this helm chart
+nameOverride: ""
+
+## @param image.repository [string] NIM Image Repository
+## @param image.tag [string] Image tag or version
+## @param image.pullPolicy [string] Image pull policy
+image:
+  pullPolicy: IfNotPresent
+  repository: #placeholder
+  tag: "24.08-rc2"
+
+## @param podAnnotations [object] Sets additional annotations on the main deployment pods
+podAnnotations:
+  traffic.sidecar.istio.io/excludeOutboundPorts: '8007'
+
+## @param podLabels [object] Specify extra labels to be add to on deployed pods.
+podLabels: {}
+
+## @extra podSecurityContext Specify privilege and access control settings for pod
+## @param podSecurityContext.fsGroup Specify file system owner group id.
+podSecurityContext:
+  fsGroup: 1000
+
+## @param extraVolumes [object] Adds arbitrary additional volumes to the deployment set definition
+extraVolumes: {}
+
+## @param extraVolumeMounts [object] Specify volume mounts to the main container from `extraVolumes`
+extraVolumeMounts: {}
+
+## @extra imagePullSecrets Specify list of secret names that are needed for the main container and any init containers.
+## @skip imagePullSecrets[0].name
+imagePullSecrets:
+  - name: nvcrimagepullsecret
+
+## @param containerSecurityContext [object] Sets privilege and access control settings for container (Only affects the main container, not pod-level)
+containerSecurityContext: {}
+
+## @skip tolerations
+## @extra tolerations [ default: Empty Array ] Specify tolerations for pod assignment. Allows the scheduler to schedule pods with matching taints.
+## @skip tolerations[0].key
+## @skip tolerations[0].operator
+## @skip tolerations[0].effect
+tolerations: []
+
+# TODO: jdyer - uncomment this when microservice is added, currently no /health endpoint exists to check ...
+
+## @param replicaCount [default: 1] The number of replicas for NVIngest when autoscaling is disabled
+replicaCount: 1
+
+## @skip resources Specify resources limits and requests for the running service.
+## @extra resources.limits."nvidia.com/gpu" Specify number of GPUs to present to the running service.
+## @param resources.limits.memory [default: 32Gi] Specify limit for memory
+## @param resources.requests.memory [default: 16Gi] Specify request for memory
+resources:
+  limits:
+    memory: 32Gi
+    nvidia.com/gpu: 1
+  requests:
+    memory: 16Gi
+
+
+## @param tmpDirSize [default: 8Gi] Specify the amount of space to reserve for temporary storage
+tmpDirSize: 8Gi
+
+
+## @section NIM Configuration
+## @descriptionStart
+## Define additional values to the dependent NIM helm charts by updating the "yolox-nim", "cached-nim", "deplot-nim", and "paddleocr-nim"
+## values. A sane set of configurations are already included in this value file and only the "image.repository" and "image.tag" fields are
+## explicitly called out here.
+## @descriptionEnd
+
+## @skip yoloxDeployed
+## @skip yolox-nim
+## @extra yolox-nim.image.repository The repository to override the location of the YOLOX
+## @extra yolox-nim.image.tag The tag override for YOLOX
+yoloxDeployed: true
+yolox-nim:
+  fullnameOverride: nv-ingest-yolox
+  image:
+    repository: #placeholder
+    tag: 24.07-17730459
+  service:
+    name: nv-ingest-yolox
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+
+## @skip cachedDeployed
+## @skip cached-nim
+## @extra cached-nim.image.repository The repository to override the location of the Cached Model NIM
+## @extra cached-nim.image.tag The tag override for Cached Model NIM
+cachedDeployed: true
+cached-nim:
+  fullnameOverride: nv-ingest-cached
+  image:
+    repository: #placeholder
+    tag: 24.07-17725282
+  service:
+    name: nv-ingest-cached
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+
+## @skip paddleocrDeployed
+## @skip paddleocr-nim
+## @extra paddleocr-nim.image.repository The repository to override the location of the Paddle OCR NIM
+## @extra paddleocr-nim.image.tag The tag override for Paddle OCR NIM
+paddleocrDeployed: true
+paddleocr-nim:
+  fullnameOverride: nv-ingest-paddle
+  image:
+    repository: #placeholder
+    tag: 24.07-17725325
+  service:
+    name: nv-ingest-paddle
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+
+## @skip deplotDeployed
+## @skip deplot-nim
+## @extra deplot-nim.image.repository The repository to override the location of the Deplot NIM
+## @extra deplot-nim.image.tag The tag override for Deplot NIM
+deplotDeployed: true
+deplot-nim:
+  fullnameOverride: nv-ingest-deplot
+  image:
+    repository: #placeholder
+    tag: 24.07-17733385
+  service:
+    name: nv-ingest-deplot
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+
+# Use this to load an image Pre NIM Factory via triton
+## @skip triton
+triton:
+  enabled: false
+
+## @section Autoscaling parameters
+## @descriptionStart
+## Values used for creating a `Horizontal Pod Autoscaler`. If autoscaling is not enabled, the rest are ignored.
+## NVIDIA recommends usage of the custom metrics API, commonly implemented with the prometheus-adapter.
+## Standard metrics of CPU and memory are of limited use in scaling NIM.
+## @descriptionEnd
+## @param autoscaling.enabled Enables horizontal pod autoscaler.
+## @param autoscaling.minReplicas Specify minimum replicas for autoscaling.
+## @param autoscaling.maxReplicas Specify maximum replicas for autoscaling.
+## @param autoscaling.metrics Array of metrics for autoscaling.
+autoscaling:
+  enabled: false
+  maxReplicas: 100
+  minReplicas: 1
+  metrics: []
+
+
+## @section Redis configurations
+## @descriptionStart
+## Include any redis configuration that you'd like with the deployed Redis
+## Find values at https://github.com/bitnami/charts/tree/main/bitnami/redis
+## @descriptionEnd
+## @param redisDeployed [default: true] Whether to deploy Redis from this helm chart
+redisDeployed: true
+## @param redis [default: sane {}] Find values at https://github.com/bitnami/charts/tree/main/bitnami/redis
+redis:
+  auth:
+    enabled: false
+
+## @section Environment Variables
+## @descriptionStart
+## Define environment variables as key/value dictionary pairs
+## @descriptionEnd
+## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
+## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value if disabling Redis deployment in this chart.
+## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value if disabling Redis deployment in this chart.
+## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
+envVars:
+  MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
+  MESSAGE_CLIENT_PORT: "6379"
+  REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
+  NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
+  TABLE_DETECTION_GRPC_TRITON: nvingest-yolox:8001
+  # The dependency for MINIO is missing
+  MINIO_INTERNAL_ADDRESS: minio:9000
+  MINIO_PUBLIC_ADDRESS: http://localhost:9000
+
+## @section Open Telemetry
+## @descriptionStart
+## Define environment variables as key/value dictionary pairs for configuring OTEL Deployments
+## A sane set of parameters is set for the deployed version of OpenTelemetry with this Helm Chart.
+## Override any values to the Open Telemetry helm chart by overriding the `open-telemetry` value.
+## @descriptionEnd
+
+## @param otelEnabled [default: false] Whether to enable OTEL collection
+otelEnabled: false
+## @param otelDeployed [default: false] Whether to deploy OTEL from this helm chart
+otelDeployed: false
+
+## @param otelEnvVars [default: sane {}] Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value
+## @param otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT [default:  "http://$(HOST_IP):4317" # sends to gRPC receiver on port 4317 ]
+## @param otelEnvVars.OTEL_SERVICE_NAME [default:  "nemo-retrieval-service" ]
+## @param otelEnvVars.OTEL_TRACES_EXPORTER [default: "otlp" ]
+## @param otelEnvVars.OTEL_METRICS_EXPORTER [default: "otlp" ]
+## @param otelEnvVars.OTEL_LOGS_EXPORTER [default: "none" ]
+## @param otelEnvVars.OTEL_PROPAGATORS [default: "tracecontext baggage" ]
+## @param otelEnvVars.OTEL_RESOURCE_ATTRIBUTES [default: "deployment.environment=$(NAMESPACE)" ]
+## @param otelEnvVars.OTEL_PYTHON_EXCLUDED_URLS [default: "health" ]
+otelEnvVars:
+  # OpenTelemetry
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://$(HOST_IP):4317" # sends to gRPC receiver on port 4317
+  OTEL_SERVICE_NAME: "nemo-retrieval-service"
+  OTEL_TRACES_EXPORTER: otlp
+  OTEL_METRICS_EXPORTER: otlp
+  OTEL_LOGS_EXPORTER: none
+  OTEL_PROPAGATORS: "tracecontext,baggage"
+  OTEL_RESOURCE_ATTRIBUTES: "deployment.environment=$(NAMESPACE)"
+  OTEL_PYTHON_EXCLUDED_URLS: "health"
+
+## @skip opentelemetry-collector
+## @extra opentelemetry-collector [default: sane {}] Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml
+opentelemetry-collector:
+  mode: deployment
+  config:
+    receivers:
+      otlp:
+        protocols:
+          grpc:
+          http:
+            cors:
+              allowed_origins:
+                - "*"
+    exporters:
+      # NOTE: Prior to v0.86.0 use `logging` instead of `debug`.
+      zipkin:
+        endpoint: "http://nv-ingest-ms-runtime-zipkin:9411/api/v2/spans"
+      debug:
+        verbosity: detailed
+    extensions:
+      health_check: {}
+      zpages:
+        endpoint: 0.0.0.0:55679
+    processors:
+      batch: {}
+      tail_sampling:
+        # filter out health checks
+        # https://github.com/open-telemetry/opentelemetry-collector/issues/2310#issuecomment-1268157484
+        policies:
+          - name: drop_noisy_traces_url
+            type: string_attribute
+            string_attribute:
+              key: http.target
+              values:
+                - \/health
+              enabled_regex_matching: true
+              invert_match: true
+      transform:
+        trace_statements:
+          - context: span
+            statements:
+              - set(status.code, 1) where attributes["http.path"] == "/health"
+
+              # after the http target has been anonymized, replace other aspects of the span
+              - replace_match(attributes["http.route"], "/v1", attributes["http.target"]) where attributes["http.target"] != nil
+
+              # replace the title of the span with the route to be more descriptive
+              - replace_pattern(name, "/v1", attributes["http.route"]) where attributes["http.route"] != nil
+
+              # set the route to equal the URL if it's nondescriptive (for the embedding case)
+              - set(name, Concat([name, attributes["http.url"]], " ")) where name == "POST"
+    service:
+      extensions: [zpages, health_check]
+      pipelines:
+        traces:
+          receivers: [otlp]
+          exporters: [debug, zipkin]
+          processors: [tail_sampling, transform]
+        metrics:
+          receivers: [otlp]
+          exporters: [debug]
+          processors: [batch]
+        logs:
+          receivers: [otlp]
+          exporters: [debug]
+          processors: [batch]
+
+## @param zipkinDeployed [default: false] Whether to deploy Zipkin with OpenTelemetry from this helm chart
+zipkinDeployed: false
+
+## @section Ingress parameters
+## @param ingress.enabled Enables ingress.
+## @param ingress.className Specify class name for Ingress.
+## @param ingress.annotations Specify additional annotations for ingress.
+## @extra ingress.hosts Specify list of hosts each containing lists of paths.
+## @param ingress.hosts[0].host Specify name of host.
+## @param ingress.hosts[0].paths[0].path Specify ingress path.
+## @param ingress.hosts[0].paths[0].pathType Specify path type.
+## @param ingress.tls Specify list of pairs of TLS `secretName` and hosts.
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+  - host: chart-example.local
+    paths:
+    - path: /
+      pathType: ImplementationSpecific
+  tls: []
+
+## @section Probe parameters
+## @param livenessProbe.enabled Enables `livenessProbe``
+## @param livenessProbe.httpGet.path `LivenessProbe`` endpoint path
+## @param livenessProbe.httpGet.port `LivenessProbe`` endpoint port
+## @param livenessProbe.initialDelaySeconds Initial delay seconds for `livenessProbe`
+## @param livenessProbe.timeoutSeconds Timeout seconds for `livenessProbe`
+## @param livenessProbe.periodSeconds Period seconds for `livenessProbe`
+## @param livenessProbe.successThreshold Success threshold for `livenessProbe`
+## @param livenessProbe.failureThreshold Failure threshold for `livenessProbe`
+livenessProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 10
+  timeoutSeconds: 20
+  failureThreshold: 20
+  successThreshold: 1
+
+## @section Probe parameters
+## @param startupProbe.enabled Enables `startupProbe``
+## @param startupProbe.httpGet.path `StartupProbe`` endpoint path
+## @param startupProbe.httpGet.port `StartupProbe`` endpoint port
+## @param startupProbe.initialDelaySeconds Initial delay seconds for `startupProbe`
+## @param startupProbe.timeoutSeconds Timeout seconds for `startupProbe`
+## @param startupProbe.periodSeconds Period seconds for `startupProbe`
+## @param startupProbe.successThreshold Success threshold for `startupProbe`
+## @param startupProbe.failureThreshold Failure threshold for `startupProbe`
+startupProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 220
+  successThreshold: 1
+
+## @section Probe parameters
+## @param readinessProbe.enabled Enables `readinessProbe``
+## @param readinessProbe.httpGet.path `ReadinessProbe`` endpoint path
+## @param readinessProbe.httpGet.port `ReadinessProbe`` endpoint port
+## @param readinessProbe.initialDelaySeconds Initial delay seconds for `readinessProbe`
+## @param readinessProbe.timeoutSeconds Timeout seconds for `readinessProbe`
+## @param readinessProbe.periodSeconds Period seconds for `readinessProbe`
+## @param readinessProbe.successThreshold Success threshold for `readinessProbe`
+## @param readinessProbe.failureThreshold Failure threshold for `readinessProbe`
+readinessProbe:
+  enabled: false
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 220
+  successThreshold: 1
+
+## @section Service parameters
+## @param service.type Specifies the service type for the deployment.
+## @param service.name Overrides the default service name
+## @param service.port Specifies the HTTP Port for the service.
+## @param service.nodePort Specifies an optional HTTP Node Port for the service.
+## @param service.annotations [object] Specify additional annotations to be added to service.
+## @param service.labels [object] Specifies additional labels to be added to service.
+service:
+  type: ClusterIP
+  port: 8000
+  annotations: {}
+  labels: {}
+  name: ""  # override the default service name
+  nodePort: null
+
+## @extra serviceAccount Options to specify service account for the deployment.
+## @param serviceAccount.create Specifies whether a service account should be created.
+## @param serviceAccount.annotations [object] Sets annotations to be added to the service account.
+## @param serviceAccount.name Specifies the name of the service account to use. If it is not set and create is "true", a name is generated using a "fullname" template.
+## @skip serviceAccount.automount
+serviceAccount:
+  annotations: {}
+  automount: true
+  create: true
+  name: ""
+
+## @section Secret Creation
+## @descriptionStart
+## Manage the creation of secrets used by the helm chart
+## @descriptionEnd
+## @param ngcSecret.create Specifies whether to create the ngc api secret
+## @param ngcSecret.password The password to use for the NGC Secret
+ngcSecret:
+  # If set to false, the chart expects a secret with name ngc-api to exist in the namespace
+  # credentials are needed.
+  create: false
+  password: ""
+
+## @param imagePullSecret.create Specifies whether to create the NVCR Image Pull secret
+## @param imagePullSecret.password The password to use for the NVCR Image Pull Secret
+## @skip imagePullSecret.registry
+## @skip imagePullSecret.name
+## @skip imagePullSecret.username
+imagePullSecret:
+  create: false
+  # Leave blank, if no imagePullSecret is needed.
+  registry: "nvcr.io"
+  name: "nvcrimagepullsecret"
+  # If set to false, the chart expects either a imagePullSecret
+  # with the name configured above to be present on the cluster or that no
+  # credentials are needed.
+
+  username: '$oauthtoken'
+  password: ""
+
+
+## @skip nemo
+nemo:
+  userID: "1000"
+  groupID: "1000"
