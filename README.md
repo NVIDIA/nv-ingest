@@ -7,7 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 
 ## NVIDIA-Ingest: Multi-modal data extraction
 
-NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
+NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word, and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and the process storing into a vector database [Milvus](https://milvus.io/).
 
@@ -63,7 +63,7 @@ To build Docker images locally:
 
 `docker compose build`
 
-Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the YOLOX, DePlot, and CACHED NIM models are each pinned to a dedicated GPU. The PaddleOCR and nv-embedqa-e5 NIM models and the nv-ingest-ms-runtime share a fourth. Thus our minimum requirements are 4x NVIDIA A100 or H100 Tensor Core GPUs. 
+Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the YOLOX, DePlot, and CACHED NIM models are each pinned to a dedicated GPU. The PaddleOCR, nv-embedqa-e5 NIM models, and the nv-ingest-ms-runtime share a fourth GPU. Thus our minimum requirements are 4x NVIDIA A100 or H100 Tensor Core GPUs. 
 
 To start all services:
 `docker compose up`
@@ -106,7 +106,7 @@ pip install e .
 
 ### Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or via the `nv-ingest-cli` tool.
 
 In Python (find the complete script [here](https://gitlab-master.nvidia.com/dl/ai-services/microservices/nv-ingest/-/blob/main/client/examples/sample_job.py?ref_type=heads#L124)):
 ```
@@ -280,7 +280,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.meta
 
 Beyond inspecting the results, you can read them into something like a llama-index or langchain document query pipeline:
 
-Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+Please also check out our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NVIDIA Ingest.
 
 ## Third Party License Notice:
 
