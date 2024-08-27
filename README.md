@@ -99,9 +99,8 @@ On the host, you'll need to create a Python environment and install dependencies
 ```
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
-pip install -r ./requirements.txt # global requirements
 cd client
-pip install -r ./requirements.txt # client specific requirements
+pip install -r ./requirements.txt
 pip install e .
 ```
 
