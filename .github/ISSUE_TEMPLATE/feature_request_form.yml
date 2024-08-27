@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Feature Request Form
+description: Request functionality or changes to existing functionality for NV-Ingest
+title: "[FEA]: "
+labels: ["feature request"]
+
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to fill out this feature request!
+        By submitting this issue, you agree to follow our [Code of Conduct](https://github.com/NVIDIA/nv-ingest/blob/main/CODE_OF_CONDUCT.md)
+        You also have searched the [existing open feature requests](https://github.com/NVIDIA/nv-ingest/issues?q=is%3Aopen+is%3Aissue+label%3Afeature+request)
+
+  - type: dropdown
+    id: new_or_improvement
+    attributes:
+      label: Is this a new feature, an improvement, or a change to existing functionality?
+      options:
+        - New Feature
+        - Improvement
+        - Change
+    validations:
+      required: true
+
+  - type: dropdown
+    id: criticality
+    attributes:
+      label: How would you describe the priority of this feature request
+      options:
+        - Currently preventing usage
+        - Significant improvement
+        - Would be nice
+    validations:
+      required: true
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Please provide a clear description of problem this feature solves
+      description: Real usage examples are especially helpful, non-code.
+    validations:
+      required: true
+
+  - type: textarea
+    id: solution
+    attributes:
+      label: Describe the feature, and optionally a solution or implementation and any alternatives
+      description: Please describe the functionality you would like added.
+      placeholder: >
+        A new function that takes in the information in this form, and triages the issue
+
+        def feature_request(form_info):
+            parse(form_info)
+            return triage_outcome
+    validations:
+      required: true
+
+  - type: textarea
+    id: misc
+    attributes:
+      label: Additional context
+      description: Add any other context, code examples, or references to existing implementations about the feature request here. If applicable, please list the modules affected.
