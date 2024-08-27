@@ -143,7 +143,10 @@ services:
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=""
       - DEPLOT_GRPC_ENDPOINT=""
-      - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      # build.nvidia.com hosted deplot
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      # self hosted deplot
+      - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       - ECLAIR_GRPC_TRITON=triton-eclair:8001
       - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
@@ -215,6 +218,7 @@ services:
     image: grafana/grafana
     ports:
       - "3000:3000"
+
 #  etcd:
 #    # Turn on to leverage the `vdb_upload` task
 #    restart: always
