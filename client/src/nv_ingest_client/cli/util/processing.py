@@ -186,7 +186,6 @@ def report_statistics(
     total_trace_elapsed = sum(sum(times) for times in stage_elapsed_times.values())
     report_stage_statistics(stage_elapsed_times, total_trace_elapsed, abs_elapsed)
     report_overall_speed(total_pages_processed, start_time_ns, total_files)
-    logger.info(f"Total timeouts: {total_timeouts}")
 
 
 def process_response(response, stage_elapsed_times):
@@ -266,6 +265,7 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict, client: NvIn
     for file_name in files_batch:
         try:
             file_content, file_type = extract_file_content(file_name)  # Assume these are defined
+            file_type = file_type.value
         except ValueError as ve:
             logger.error(f"Error extracting content from {file_name}: {ve}")
             continue
