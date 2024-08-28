@@ -53,6 +53,38 @@ kubectl create -n ${NAMESPACE} secret generic ngc-api --from-literal=NGC_API_KEY
 
 You can also use an External Secret Store like Vault, the name of the secret name expected for the NGC API is `ngc-api` and the secret name expected for NVCR is `nvcrimagepullsecret`.
 
+## Usage
+
+Jobs are submitted via the `nv-ingest-cli` command. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
+
+### Access To Redis
+
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
+You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
+
+Example:
+
+```bash
+kubectl port-forward -n ${NAMESPACE} nv-ingest-redis-master-0 6379:6379
+```
+
+### Executing jobs
+
+Here is a sample invocation of a PDF extraction task using the port forward above:
+
+```bash
+mkdir -p ./processed_docs
+
+nv-ingest-cli \
+  --doc /path/to/your/unique.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true}' \
+  --client_host=localhost \
+  --client_port=6379
+```
+
+Enjoy!
+
 ## Parameters
 
 ### Deployment parameters
