@@ -22,9 +22,9 @@ helm upgrade \
     --set imagePullSecret.password="${NGC_API_KEY}" \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
-    --set image.repository="#placeholder" \
-    --set image.tag="24.08-rc2" \
-    #placeholder
+    --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
+    --set image.tag="24.08" \
+    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.5.tgz
 
 ```
 
@@ -101,6 +101,17 @@ explicitly called out here.
 | `deplot-nim.image.repository`    | The repository to override the location of the Deplot NIM       |       |
 | `deplot-nim.image.tag`           | The tag override for Deplot NIM                                 |       |
 
+### Milvus Deployment parameters
+
+NVIngest uses Milvus and Minio to store extracted images from a document
+This chart by default sets up a Milvus standalone instance in the namespace using the
+Helm chart at found https://artifacthub.io/packages/helm/milvus-helm/milvus
+
+| Name             | Description                                                            | Value     |
+| ---------------- | ---------------------------------------------------------------------- | --------- |
+| `milvusDeployed` | Whether to deploy Milvus and Minio from this helm chart                | `true`    |
+| `milvus`         | Find values at https://artifacthub.io/packages/helm/milvus-helm/milvus | `sane {}` |
+
 ### Autoscaling parameters
 
 Values used for creating a `Horizontal Pod Autoscaler`. If autoscaling is not enabled, the rest are ignored.
@@ -134,6 +145,9 @@ Define environment variables as key/value dictionary pairs
 | `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
 | `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"6379"`                   |
 | `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NVIngest requests.                                                            | `"1234"`                   |
+| `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
+| `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |
+| `envVars.MINIO_BUCKET`                 | Override this for specific minio bucket to upload extracted images to                                     | `"nv-ingest"`              |
 
 ### Open Telemetry
 
@@ -141,21 +155,21 @@ Define environment variables as key/value dictionary pairs for configuring OTEL 
 A sane set of parameters is set for the deployed version of OpenTelemetry with this Helm Chart.
 Override any values to the Open Telemetry helm chart by overriding the `open-telemetry` value.
 
-| Name                                      | Description                                                                                                                                                    | Value                                                            |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------- |
-| `otelEnabled`                             | Whether to enable OTEL collection                                                                                                                              | `false`                                                          |
-| `otelDeployed`                            | Whether to deploy OTEL from this helm chart                                                                                                                    | `false`                                                          |
-| `otelEnvVars`                             | Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value                                                       | `sane {}`                                                        |
-| `otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT` |                                                                                                                                                                | `"http://$(HOST_IP):4317" # sends to gRPC receiver on port 4317` |
-| `otelEnvVars.OTEL_SERVICE_NAME`           |                                                                                                                                                                | `"nemo-retrieval-service"`                                       |
-| `otelEnvVars.OTEL_TRACES_EXPORTER`        |                                                                                                                                                                | `"otlp"`                                                         |
-| `otelEnvVars.OTEL_METRICS_EXPORTER`       |                                                                                                                                                                | `"otlp"`                                                         |
-| `otelEnvVars.OTEL_LOGS_EXPORTER`          |                                                                                                                                                                | `"none"`                                                         |
-| `otelEnvVars.OTEL_PROPAGATORS`            |                                                                                                                                                                | `"tracecontext baggage"`                                         |
-| `otelEnvVars.OTEL_RESOURCE_ATTRIBUTES`    |                                                                                                                                                                | `"deployment.environment=$(NAMESPACE)"`                          |
-| `otelEnvVars.OTEL_PYTHON_EXCLUDED_URLS`   |                                                                                                                                                                | `"health"`                                                       |
-| `opentelemetry-collector`                 | Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml |                                                                  |
-| `zipkinDeployed`                          | Whether to deploy Zipkin with OpenTelemetry from this helm chart                                                                                               | `false`                                                          |
+| Name                                      | Description                                                                                                                                                    | Value                                   |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
+| `otelEnabled`                             | Whether to enable OTEL collection                                                                                                                              | `true`                                  |
+| `otelDeployed`                            | Whether to deploy OTEL from this helm chart                                                                                                                    | `true`                                  |
+| `opentelemetry-collector`                 | Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml |                                         |
+| `otelEnvVars`                             | Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value                                                       | `sane {}`                               |
+| `otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT` | Default deployment target for GRPC otel - Default "http://{{ .Release.Name }}-opentelemetry-collector:4317"                                                    |                                         |
+| `otelEnvVars.OTEL_SERVICE_NAME`           |                                                                                                                                                                | `"nemo-retrieval-service"`              |
+| `otelEnvVars.OTEL_TRACES_EXPORTER`        |                                                                                                                                                                | `"otlp"`                                |
+| `otelEnvVars.OTEL_METRICS_EXPORTER`       |                                                                                                                                                                | `"otlp"`                                |
+| `otelEnvVars.OTEL_LOGS_EXPORTER`          |                                                                                                                                                                | `"none"`                                |
+| `otelEnvVars.OTEL_PROPAGATORS`            |                                                                                                                                                                | `"tracecontext baggage"`                |
+| `otelEnvVars.OTEL_RESOURCE_ATTRIBUTES`    |                                                                                                                                                                | `"deployment.environment=$(NAMESPACE)"` |
+| `otelEnvVars.OTEL_PYTHON_EXCLUDED_URLS`   |                                                                                                                                                                | `"health"`                              |
+| `zipkinDeployed`                          | Whether to deploy Zipkin with OpenTelemetry from this helm chart                                                                                               | `true`                                  |
 
 ### Ingress parameters
 

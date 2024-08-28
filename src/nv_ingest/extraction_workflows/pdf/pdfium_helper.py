@@ -5,6 +5,7 @@
 
 import io
 import logging
+import os
 from math import ceil
 from math import floor
 from math import log
@@ -23,6 +24,7 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.converters import bytetools
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.logging.configuration import configure_logging
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import ImageChart
 from nv_ingest.util.pdf.metadata_aggregators import ImageTable
@@ -53,6 +55,7 @@ from nv_ingest.util.triton.helpers import perform_model_inference
 
 
 logger = logging.getLogger(__name__)
+configure_logging(logger, os.getenv("INGEST_LOG_LEVEL", "INFO"))
 
 
 def extract_tables_and_charts_using_image_ensemble(

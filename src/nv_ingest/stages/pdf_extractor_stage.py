@@ -7,6 +7,7 @@ import base64
 import functools
 import io
 import logging
+import os
 import traceback
 from typing import Any
 from typing import Dict
@@ -18,8 +19,10 @@ from nv_ingest.extraction_workflows import pdf
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.exception_handlers.pdf import create_exception_tag
+from nv_ingest.util.logging.configuration import configure_logging
 
 logger = logging.getLogger(f"morpheus.{__name__}")
+configure_logging(logger, os.getenv("INGEST_LOG_LEVEL", "INFO"))
 
 
 def _process_pdf_bytes(df, task_props, validated_config):

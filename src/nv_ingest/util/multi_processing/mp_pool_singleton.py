@@ -212,6 +212,7 @@ class ProcessWorkerPoolSingleton:
                 result = process_fn(*args[0])
                 future.set_result(result)
             except Exception as e:
+                logger.error(f"Future result failure - {e}\n")
                 future.set_exception(e)
 
     def submit_task(self, process_fn: Callable, *args: Any) -> SimpleFuture:

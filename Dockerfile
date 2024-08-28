@@ -23,12 +23,9 @@ RUN apt-get update \
 # Copy the module code
 COPY setup.py setup.py
 # Don't copy full source here, pipelines won't be installed via setup anyway, and this allows us to rebuild more quickly if we're just changing the pipeline
-COPY src/nv_ingest src/nv_ingest
-COPY client client
+
 COPY ci ci
 COPY requirements.txt test-requirements.txt util-requirements.txt ./
-
-RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
 SHELL ["/bin/bash", "-c"]
 
@@ -51,6 +48,14 @@ RUN if [ -z "${VERSION}" ]; then \
 ENV NV_INGEST_RELEASE_TYPE=${RELEASE_TYPE}
 ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
+
+# Cache the requirements and install them before uploading source code changes
+RUN source activate morpheus \
+    && pip install -r requirements.txt
+
+COPY client client
+COPY src/nv_ingest src/nv_ingest
+RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
 # Run the build_pip_packages.sh script with the specified build type and library
 RUN chmod +x ./ci/scripts/build_pip_packages.sh \
