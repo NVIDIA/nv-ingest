@@ -230,7 +230,9 @@ class MultiProcessingBaseStage(SinglePortStage):
                 future = process_pool.submit_task(process_fn, (df, task_props))
 
                 # Get result from future
+
                 result = future.result()
+
                 work_package["payload"] = result
 
                 work_package_response_queue.put({"type": "on_next", "value": work_package})

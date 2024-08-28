@@ -50,6 +50,10 @@ spec:
             {{- toYaml .Values.containerSecurityContext | nindent 12 }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag | default .Chart.AppVersion }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if .Values.containerArgs }}
+          args:
+            {{- toYaml .Values.containerArgs | nindent 12 }}
+          {{- end }}
           env:
             - name: HOST_IP
               valueFrom:
@@ -70,6 +74,18 @@ spec:
             - name: TMPDIR
               value: /scratch/tmp
 
+            {{- if .Values.envVars.INGEST_LOG_LEVEL }}
+            - name: INGEST_LOG_LEVEL
+              value: "{{ .Values.envVars.INGEST_LOG_LEVEL }}"
+            {{- else }}
+            - name: INGEST_LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            {{- end }}
+            - name: CONSOLE_LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+            - name: LOG_LEVEL
+              value: "{{ .Values.logLevel }}"
+
             {{- if .Values.envVars }}
             {{- range $k, $v := .Values.envVars }}
             - name: "{{ $k }}"
@@ -85,15 +101,9 @@ spec:
             {{- end }}
             {{- if and .Values.otelEnabled ( not ( index .Values.otelEnvVars "OTEL_EXPORTER_OTLP_ENDPOINT" ) ) }}
             - name: OTEL_EXPORTER_OTLP_ENDPOINT
-              value: "http://{{ .Release.Name }}-opentelemetry-collector:4318"
-            - name: OTEL_EXPORTER_OTLP_PROTOCOL
-              value: http/protobuf
+              value: "http://{{ .Release.Name }}-opentelemetry-collector:4317"
             {{- end }}
-            - name: CONSOLE_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
             - name: OTEL_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            - name: LOG_LEVEL
               value: "{{ .Values.logLevel }}"
             {{- else }}
             - name: OTEL_TRACES_EXPORTER
@@ -106,10 +116,6 @@ spec:
               value: "false"
             - name: LOG_HANDLERS
               value: console
-            - name: CONSOLE_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            - name: LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
             {{- end }}
           envFrom:
             {{- if .Values.extraEnvVarsCM }}

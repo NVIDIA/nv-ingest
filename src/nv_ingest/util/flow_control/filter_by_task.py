@@ -43,10 +43,12 @@ def filter_by_task(required_tasks, forward_func=None):
                 for required_task in required_tasks:
                     if isinstance(required_task, str) and (required_task in tasks):
                         return func(*args, **kwargs)
+
                     if isinstance(required_task, tuple) or isinstance(required_task, list):
                         required_task_name, *required_task_props_list = required_task
                         if required_task_name not in tasks:
                             continue
+
                         task_props_list = tasks.get(required_task_name, [])
                         for task_props in task_props_list:
                             if all(
@@ -54,6 +56,7 @@ def filter_by_task(required_tasks, forward_func=None):
                                 for required_task_props in required_task_props_list
                             ):
                                 return func(*args, **kwargs)
+
                 if forward_func:
                     # If a forward function is provided, call it with the ControlMessage
                     return forward_func(message)

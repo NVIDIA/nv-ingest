@@ -40,10 +40,11 @@ from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.logging.configuration import LogLevel
+from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+configure_local_logging(logger, os.getenv("INGEST_LOG_LEVEL", "INFO"))
 
 
 def validate_positive(ctx, param, value):
@@ -572,8 +573,6 @@ def setup_ingestion_pipeline(
     pipe.add_edge(otel_meter_stage, otel_tracer_stage)
     pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)
 
-    return sink_stage
-
 
 def pipeline(morpheus_pipeline_config, ingest_config) -> float:
     logger.info("Starting pipeline setup")
@@ -674,7 +673,7 @@ def cli(
     CppConfig.set_should_use_cpp(use_cpp)
 
     morpheus_pipeline_config = Config()
-    morpheus_pipeline_config.debug = False
+    morpheus_pipeline_config.debug = True if log_level == "DEBUG" else False
     morpheus_pipeline_config.log_level = log_level
     morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
     morpheus_pipeline_config.enable_monitor = enable_monitor
