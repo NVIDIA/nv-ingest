@@ -14,7 +14,7 @@ services:
 #      - "9998:9998"
 
   yolox:
-    image: #placeholder
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -37,7 +37,7 @@ services:
     runtime: nvidia
 
   deplot:
-    image: #placeholder
+    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -60,7 +60,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: #placeholder
+    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -84,7 +84,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: #placeholder
+    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -109,7 +109,7 @@ services:
 
   embedding:
     # NIM ON
-    image: #placeholder
+    image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.0
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -130,7 +130,7 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: "nv-ingest:latest"
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08
     build:
       context: ${NV_INGEST_ROOT}
       dockerfile: "./Dockerfile"
