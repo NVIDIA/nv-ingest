@@ -51,7 +51,26 @@ kubectl create -n ${NAMESPACE} secret generic ngc-api --from-literal=NGC_API_KEY
 
 ```
 
-You can also use an External Secret Store like Vault, the name of the secret name expected for the NGC API is `ngc-api` and the secret name expected for NVCR is `nvcrimagepullsecret`.
+Alternatively, you can also use an External Secret Store like Vault, the name of the secret name expected for the NGC API is `ngc-api` and the secret name expected for NVCR is `nvcrimagepullsecret`.
+
+In this case, make sure to remove the following from your helm commmand:
+
+```bash
+    --set imagePullSecret.create=true \
+    --set imagePullSecret.password="${NGC_API_KEY}" \
+    --set ngcSecret.create=true \
+    --set ngcSecret.password="${NGC_API_KEY}" \
+```
+
+### Minikube Setup
+
+The PVC setup for minikube requires a little bit more configuraiton. Please follow the steps below if you are using minikube.
+
+```bash
+minikube start --driver docker --container-runtime docker --gpus all --nodes 3
+minikube addons enable nvidia-gpu-device-plugin
+minikube addons enable storage-provisioner-rancher
+```
 
 ## Usage
 
