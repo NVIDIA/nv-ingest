@@ -22,6 +22,11 @@ services:
     volumes:
       - ${HOME}/.cache:/home/nvs/.cache
     user: root
+    healthcheck:
+      test: curl --fail http://yolox:8000/v1/health/ready || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -45,6 +50,11 @@ services:
     volumes:
       - ${HOME}/.cache:/opt/nim/.cache
     user: root
+    healthcheck:
+      test: curl --fail http://deplot:8000/v1/health/ready || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -69,6 +79,11 @@ services:
     volumes:
       - ${HOME}/.cache:/home/nvs/.cache
     user: root
+    healthcheck:
+      test: curl --fail http://cached:8000/v1/health/ready || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -93,6 +108,11 @@ services:
     volumes:
       - ${HOME}/.cache:/home/nvs/.cache
     user: root
+    healthcheck:
+      test: curl --fail http://paddle:8000/v1/health/ready || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -115,6 +135,11 @@ services:
       - "8012:8000"
       - "8013:8001"
       - "8014:8002"
+    healthcheck:
+      test: curl --fail http://embedding:8000/v1/health/ready || exit 1
+      interval: 30s
+      timeout: 5s
+      retries: 5
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
@@ -131,6 +156,17 @@ services:
 
   nv-ingest-ms-runtime:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08
+    depends_on:
+      yolox:
+        condition: service_healthy
+      deplot:
+        condition: service_healthy
+      cached:
+        condition: service_healthy
+      paddle:
+        condition: service_healthy
+      embedding:
+        condition: service_healthy
     build:
       context: ${NV_INGEST_ROOT}
       dockerfile: "./Dockerfile"
