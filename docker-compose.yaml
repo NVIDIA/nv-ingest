@@ -27,6 +27,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
       - CUDA_VISIBLE_DEVICES=0
+    healthcheck:
+      test: curl --fail http://yolox:8000/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -50,6 +55,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
       - CUDA_VISIBLE_DEVICES=1
+    healthcheck:
+      test: curl --fail http://deplot:8000/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -74,6 +84,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
       - CUDA_VISIBLE_DEVICES=2
+    healthcheck:
+      test: curl --fail http://cached:8000/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -98,6 +113,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
       - CUDA_VISIBLE_DEVICES=3
+    healthcheck:
+      test: curl --fail http://paddle:8000/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -120,6 +140,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
       - CUDA_VISIBLE_DEVICES=3
+    healthcheck:
+      test: curl --fail http://embedding:8000/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -139,6 +164,21 @@ services:
       - ${DATASET_ROOT}:/workspace/data
     cap_add:
       - sys_nice
+    depends_on:
+      yolox:
+        condition: service_healthy
+    depends_on:
+      deplot:
+        condition: service_healthy
+    depends_on:
+      cached:
+        condition: service_healthy
+    depends_on:
+      paddle:
+        condition: service_healthy
+    depends_on:
+      embedding:
+        condition: service_healthy
     environment:
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=""
