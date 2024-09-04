@@ -691,8 +691,6 @@ def handle_future_result(
     save_response_data : Function to save the result to a directory.
     """
 
-    job_id = futures_dict[future]
-
     result, _ = future.result()[0]
     if ("annotations" in result) and result["annotations"]:
         annotations = result["annotations"]
@@ -702,7 +700,7 @@ def handle_future_result(
     valid_result, description = check_ingest_result(result)
 
     if valid_result:
-        raise RuntimeError(f"Failed to process job {job_id}: {description}")
+        raise RuntimeError(f"{description}")
 
     if output_directory:
         save_response_data(result, output_directory)
@@ -844,23 +842,20 @@ def create_and_process_jobs(
                     retry = True
                 except json.JSONDecodeError as e:
                     source_name = job_id_map[job_id]
-                    logger.error(f"Decoding error for job {job_id}::{source_name} {e}")
+                    logger.error(f"Decoding while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except RuntimeError as e:
                     source_name = job_id_map[job_id]
-                    logger.error(f"Processing error was reported for {job_id}::{source_name} {e}")
+                    logger.error(f"Error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except Exception as e:
                     source_name = job_id_map[job_id]
-                    logger.error(f"Unhandled error occurred processing {job_id}:{source_name} {e}")
+                    logger.error(f"Unhandled error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 finally:
                     # Don't update progress bar if we're going to retry the job
                     if not retry:
                         pbar.update(1)
-
-    if failed_jobs:
-        logger.error(f"Failed jobs due to decoding or other errors: {failed_jobs}")
 
     return total_files, trace_times, total_pages_processed
 
