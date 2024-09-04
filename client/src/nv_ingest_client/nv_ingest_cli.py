@@ -238,7 +238,7 @@ def main(
             )
 
             start_time_ns = time.time_ns()
-            (total_files, trace_times, pages_processed, total_timeouts) = create_and_process_jobs(
+            (total_files, trace_times, pages_processed) = create_and_process_jobs(
                 files=docs,
                 client=ingest_client,
                 tasks=task,
@@ -248,7 +248,7 @@ def main(
                 fail_on_error=fail_on_error,
             )
 
-            report_statistics(start_time_ns, trace_times, pages_processed, total_files, total_timeouts)
+            report_statistics(start_time_ns, trace_times, pages_processed, total_files)
 
     except Exception as err:
         logging.error(f"Error: {err}")
