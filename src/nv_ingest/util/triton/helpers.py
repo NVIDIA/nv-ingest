@@ -86,8 +86,9 @@ def call_image_inference_model(client, model_name: str, image_data):
             result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
             return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
         except Exception as e:
-            logger.error(f"Inference failed for model {model_name}: {str(e)}")
-            return None
+            err_msg = f"Inference failed for model {model_name}: {str(e)}"
+            logger.error(err_msg)
+            raise RuntimeError(err_msg)
     else:
         image = Image.fromarray(image_data)
         with io.BytesIO() as buffer:

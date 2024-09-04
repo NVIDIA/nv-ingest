@@ -13,6 +13,7 @@ import uuid
 from datetime import datetime
 from functools import partial
 
+import cudf
 import mrc
 import pandas as pd
 from morpheus.config import Config
@@ -23,9 +24,6 @@ from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
 from mrc.core import operators as ops
 from mrc.core.subscriber import Observer
-
-import cudf
-
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
@@ -46,7 +44,7 @@ def trace_message(ctrl_msg, task_desc):
     """
     ts_fetched = datetime.now()
     do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-        ctrl_msg.get_metadata("config::add_trace_tagging") is True
+            ctrl_msg.get_metadata("config::add_trace_tagging") is True
     )
 
     if do_trace_tagging:
@@ -132,14 +130,14 @@ class MultiProcessingBaseStage(SinglePortStage):
     # TODO implement dataframe filter_fn support for splitting like stages.
 
     def __init__(
-        self,
-        c: Config,
-        task: str,
-        task_desc: str,
-        pe_count: int,
-        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        document_type: str = None,
-        filter_properties: dict = None,
+            self,
+            c: Config,
+            task: str,
+            task_desc: str,
+            pe_count: int,
+            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+            document_type: str = None,
+            filter_properties: dict = None,
     ):
         super().__init__(c)
         self._document_type = document_type
@@ -182,11 +180,11 @@ class MultiProcessingBaseStage(SinglePortStage):
 
     @staticmethod
     def work_package_input_handler(
-        work_package_input_queue: mp.Queue,
-        work_package_response_queue: mp.Queue,
-        cancellation_token: mp.Value,
-        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        process_pool: ProcessWorkerPoolSingleton,
+            work_package_input_queue: mp.Queue,
+            work_package_response_queue: mp.Queue,
+            cancellation_token: mp.Value,
+            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+            process_pool: ProcessWorkerPoolSingleton,
     ):
         """
         Processes work packages received from the recv_queue, applies the process_fn to each package,
@@ -220,33 +218,41 @@ class MultiProcessingBaseStage(SinglePortStage):
                 work_package = event["value"]
                 df = work_package["payload"]
                 task_props = work_package["task_props"]
+
                 # logger.debug(
                 #    "Work package input handler got event:"
                 #    f"\nPAYLOAD: {work_package['payload']}"
                 #    f"\nTASK_PROPS: {work_package['task_props']}"
                 #    f"\nCM_ID: {work_package['cm_id']}")
+                try:
+                    # Submit to the process pool and get the future
+                    future = process_pool.submit_task(process_fn, (df, task_props))
 
-                # Submit to the process pool and get the future
-                future = process_pool.submit_task(process_fn, (df, task_props))
+                    # This can return/raise an exception
+                    result = future.result()
 
-                # Get result from future
+                    work_package["payload"] = result
 
-                result = future.result()
+                    work_package_response_queue.put({"type": "on_next", "value": work_package})
+                except Exception as e:
+                    logger.error(f"child_receive_thread error: {e}")
+                    work_package["error"] = True
+                    work_package["error_message"] = str(e)
 
-                work_package["payload"] = result
+                    work_package_response_queue.put({"type": "on_error", "value": work_package})
 
-                work_package_response_queue.put({"type": "on_next", "value": work_package})
-                # logger.debug(f"child_receive_thread processed and sent work_package: {work_package}")
                 continue
 
             if event["type"] == "on_error":
                 work_package_response_queue.put(event)
                 logger.debug(f"child_receive_thread sending error: {event}")
-                break
+
+                continue
 
             if event["type"] == "on_completed":
                 work_package_response_queue.put(event)
                 logger.debug("child_receive_thread sending completed")
+
                 break
 
         # Send completion event
@@ -255,13 +261,13 @@ class MultiProcessingBaseStage(SinglePortStage):
 
     @staticmethod
     def work_package_response_handler(
-        mp_context,
-        max_queue_size,
-        work_package_input_queue: mp.Queue,
-        sub: mrc.Subscriber,
-        cancellation_token: mp.Value,
-        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        process_pool: ProcessWorkerPoolSingleton,
+            mp_context,
+            max_queue_size,
+            work_package_input_queue: mp.Queue,
+            sub: mrc.Subscriber,
+            cancellation_token: mp.Value,
+            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+            process_pool: ProcessWorkerPoolSingleton,
     ):
         """
         Manages child threads and collects results, forwarding them to the subscriber.
@@ -301,27 +307,24 @@ class MultiProcessingBaseStage(SinglePortStage):
             try:
                 # Get completed work
                 event = work_package_response_queue.get(timeout=0.1)
-                # logger.debug(
-                #    "Work package response handler got event:"
-                #    f"\nPAYLOAD: {result_dict['payload']}"
-                #    f"\nTASK_PROPS: {result_dict['task_props']}"
-                #    f"\nCM_ID: {result_dict['cm_id']}")
             except queue.Empty:
                 continue
 
             if event["type"] == "on_next":
                 sub.on_next(event["value"])
-                # logger.debug(f"parent_receive sent on_next: {event['value']}")
+                logger.debug(f"Work package input handler sent on_next: {event['value']}")
+
                 continue
 
             if event["type"] == "on_error":
                 sub.on_next(event["value"])
-                logger.debug(f"parent_receive sent on_error: {event['value']}")
-                break
+                logger.error(f"Got error from work package handler: {event['value']['error_message']}")
+
+                continue
 
             if event["type"] == "on_completed":
                 sub.on_completed()
-                logger.debug("parent_receive sent on_completed")
+                logger.info("parent_receive sent on_completed")
                 break
 
         sub.on_completed()
@@ -392,8 +395,6 @@ class MultiProcessingBaseStage(SinglePortStage):
             annotation_id=self.task_desc, raise_on_failure=False, forward_func=forward_fn
         )
         def on_next(ctrl_msg: ControlMessage):
-            logger.debug(f"base on_next {self.name}")
-            datetime.now()
             """
             Handles the receipt of a new control message, traces the message, processes it,
             and submits it to the child process for further handling.
@@ -403,7 +404,7 @@ class MultiProcessingBaseStage(SinglePortStage):
             ctrl_msg : ControlMessage
                 The control message to handle.
             """
-            # logger.debug(f"base on_next {self.name}")
+            datetime.now()
 
             # Trace the control message
             trace_message(ctrl_msg, self._task_desc)
@@ -463,6 +464,9 @@ class MultiProcessingBaseStage(SinglePortStage):
                 raise_on_failure=False,
             )
             def cm_func(ctrl_msg: ControlMessage, work_package: dict):
+                if (work_package.get("error", False)):
+                    raise RuntimeError(work_package["error_message"])
+
                 gdf = cudf.from_pandas(work_package["payload"])
                 ctrl_msg.payload(MessageMeta(df=gdf))
                 return ctrl_msg
@@ -504,7 +508,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                 The control message with updated tracing metadata.
             """
             do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-                ctrl_msg.get_metadata("config::add_trace_tagging") is True
+                    ctrl_msg.get_metadata("config::add_trace_tagging") is True
             )
 
             if do_trace_tagging:

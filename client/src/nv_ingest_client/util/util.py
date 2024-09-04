@@ -189,6 +189,7 @@ def load_data_from_path(path: str) -> Dict:
 
 def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
     # Check if the 'data' key exists and if 'status' within 'data' is 'failed'
+    logger.info(f"Checking ingest result:\n Status: {json_payload.get('status', None)}\n Description: {json_payload.get('description', None)}")
     is_failed = json_payload.get("status", "") in "failed"
     description = json_payload.get("description", "")
 
