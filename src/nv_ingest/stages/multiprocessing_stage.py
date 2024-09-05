@@ -404,8 +404,6 @@ class MultiProcessingBaseStage(SinglePortStage):
             ctrl_msg : ControlMessage
                 The control message to handle.
             """
-            datetime.now()
-
             # Trace the control message
             trace_message(ctrl_msg, self._task_desc)
 

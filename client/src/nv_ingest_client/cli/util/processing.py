@@ -223,8 +223,6 @@ def report_statistics(
         The total number of pages processed during the session.
     total_files : int
         The total number of files processed during the session.
-    total_timeouts : int
-        The total number of timeouts that occurred during processing.
 
     Notes
     -----
@@ -594,7 +592,6 @@ def generate_job_batch_for_iteration(
     if retry_job_ids:
         job_ids.extend(retry_job_ids)
         cur_job_count = len(job_ids)
-        retry_job_ids = []
 
     if (cur_job_count < batch_size) and (processed < len(files)):
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
@@ -622,8 +619,7 @@ def generate_job_batch_for_iteration(
 def handle_future_result(
         future: concurrent.futures.Future,
         futures_dict: Dict[concurrent.futures.Future, str],
-        output_directory: str
-) -> Tuple[Dict[str, Any], List[str]]:
+) -> Dict[str, Any]:
     """
     Handle the result of a completed future job, process annotations, and save the result.
 
@@ -641,19 +637,9 @@ def handle_future_result(
         A dictionary mapping future objects to job IDs. The job ID associated with the
         provided future is retrieved from this dictionary.
 
-    job_id_map : Dict[str, Any]
-        A mapping of job IDs to additional metadata or job-specific information. This is used
-        to track jobs and associate results with their original job requests.
-
-    output_directory : str
-        The path to the directory where the response data should be saved, if the result is
-        valid. If this parameter is None or an empty string, the result will not be saved.
-
     Returns
     -------
-    Tuple[Dict[str, Any], List[str]]
-        - The first element of the tuple is the result of the completed job (as a dictionary).
-        - The second element is a list of job IDs that need to be retried, based on the result.
+    Dict[str, Any]
 
     Raises
     ------
@@ -697,13 +683,10 @@ def handle_future_result(
         for key, value in annotations.items():
             logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
 
-    valid_result, description = check_ingest_result(result)
+    failed, description = check_ingest_result(result)
 
-    if valid_result:
+    if failed:
         raise RuntimeError(f"{description}")
-
-    if output_directory:
-        save_response_data(result, output_directory)
 
     return result
 
@@ -796,7 +779,6 @@ def create_and_process_jobs(
 
     total_files = len(files)
     total_pages_processed = 0
-    total_timeouts = 0
     trace_times = defaultdict(list)
     failed_jobs = []
     retry_job_ids = []
@@ -822,23 +804,22 @@ def create_and_process_jobs(
                 job_id = futures_dict[future]
                 source_name = job_id_map[job_id]
                 try:
-                    result = handle_future_result(future, futures_dict, output_directory)
+                    future_response = handle_future_result(future, futures_dict)
 
-                    total_timeouts += 1 if timeout else 0
-                    retry = False
+                    if output_directory:
+                        save_response_data(future_response, output_directory)
 
                     total_pages_processed += file_page_counts[source_name]
                     elapsed_time = (time.time_ns() - start_time_ns) / 1e9
                     pages_per_sec = total_pages_processed / elapsed_time if elapsed_time > 0 else 0
                     pbar.set_postfix(pages_per_sec=f"{pages_per_sec:.2f}")
 
-                    process_response(result, trace_times)
+                    process_response(future_response, trace_times)
 
                 except TimeoutError:
                     source_name = job_id_map[job_id]
                     retry_counts[source_name] += 1
                     retry_job_ids.append(job_id)  # Add job_id back to retry list
-                    total_timeouts += 1
                     retry = True
                 except json.JSONDecodeError as e:
                     source_name = job_id_map[job_id]

@@ -7,7 +7,6 @@ import base64
 import functools
 import io
 import logging
-import traceback
 from typing import Any
 from typing import Dict
 
@@ -16,7 +15,6 @@ from morpheus.config import Config
 from nv_ingest.extraction_workflows import pdf
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.exception_handlers.pdf import create_exception_tag
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -67,6 +65,7 @@ def decode_and_extract(base64_row, task_props, validated_config, default="pdfium
 
     # Propagate error back and tag message as failed.
     # exception_tag = create_exception_tag(error_message=log_error_message, source_id=source_id)
+
 
 def process_pdf_bytes(df, task_props, validated_config):
     """
