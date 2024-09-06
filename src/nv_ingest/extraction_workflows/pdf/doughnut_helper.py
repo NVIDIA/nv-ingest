@@ -48,7 +48,7 @@ from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 
 logger = logging.getLogger(__name__)
 
-ECLAIR_GRPC_TRITON = os.environ.get("ECLAIR_GRPC_TRITON", "triton:8001")
+DOUGHNUT_GRPC_TRITON = os.environ.get("DOUGHNUT_GRPC_TRITON", "triton:8001")
 DEFAULT_BATCH_SIZE = 16
 
 
@@ -77,7 +77,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     """
     logger.debug("Extracting PDF with Eclair backend.")
 
-    doughnut_triton_url = kwargs.get("doughnut_grpc_triton", ECLAIR_GRPC_TRITON)
+    doughnut_triton_url = kwargs.get("doughnut_grpc_triton", DOUGHNUT_GRPC_TRITON)
 
     batch_size = int(kwargs.get("doughnut_batch_size", DEFAULT_BATCH_SIZE))
 
