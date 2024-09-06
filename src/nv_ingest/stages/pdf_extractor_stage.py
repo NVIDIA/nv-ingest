@@ -19,8 +19,42 @@ from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
-def decode_and_extract(base64_row, task_props, validated_config, default="pdfium"):
-    # Base64 content to extract
+def decode_and_extract(
+        base64_row: Dict[str, Any],
+        task_props: Dict[str, Any],
+        validated_config: Any,
+        default: str = "pdfium"
+) -> Any:
+    """
+    Decodes base64 content from a row and extracts data from it using the specified extraction method.
+
+    Parameters
+    ----------
+    base64_row : dict
+        A dictionary containing the base64-encoded content and other relevant data.
+        The key "content" should contain the base64 string, and the key "source_id" is optional.
+    task_props : dict
+        A dictionary containing task properties. It should have the keys:
+        - "method" (str): The extraction method to use (e.g., "pdfium").
+        - "params" (dict): Parameters to pass to the extraction function.
+    validated_config : Any
+        Configuration object that contains `pdfium_config`. Used if the `pdfium` method is selected.
+    default : str, optional
+        The default extraction method to use if the specified method in `task_props` is not available (default is "pdfium").
+
+    Returns
+    -------
+    Any
+        The extracted data from the decoded content. The exact return type depends on the extraction method used.
+
+    Raises
+    ------
+    KeyError
+        If the "content" key is missing from `base64_row`.
+    Exception
+        For any other unhandled exceptions during extraction, an error is logged, and the exception is re-raised.
+    """
+
     try:
         base64_content = base64_row["content"]
     except KeyError:

@@ -105,29 +105,48 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
 
 class MultiProcessingBaseStage(SinglePortStage):
     """
-    A ControlMessage oriented base multiprocessing stage to increase parallelism of stages written in Python.
+    A ControlMessage-oriented base multiprocessing stage to increase parallelism of stages written in Python.
 
     Parameters
     ----------
     c : Config
-        Morpheus global configuration object
+        Morpheus global configuration object.
     task : str
         The task name to match for the stage worker function.
     task_desc : str
         A descriptor to be used in latency tracing.
     pe_count : int
-        Integer for how many process engines to use
+        The number of process engines to use.
     process_fn : typing.Callable[[pd.DataFrame, dict], pd.DataFrame]
-        The function that will be executed in each process engineer. The function will
-        accept a pandas dataframe from a ControlMessage payload and dictionary of task arguments.
+        The function that will be executed in each process engine. The function will
+        accept a pandas DataFrame from a ControlMessage payload and a dictionary of task arguments.
 
     Returns
     -------
     cudf.DataFrame
-        A cuDF dataframe.
-    """
+        A cuDF DataFrame containing the processed results.
 
-    # TODO implement dataframe filter_fn support for splitting like stages.
+    Notes
+    -----
+    The data flows through this class in the following way:
+
+    1. **Input Stream Termination**: The input stream is terminated by storing off the `ControlMessage` to a ledger.
+       This acts as a record for the incoming message.
+
+    2. **Work Queue**: The core work content of the `ControlMessage` is pushed to a work queue. This queue
+       forwards the task to a global multi-process worker pool where the heavy-lifting occurs.
+
+    3. **Global Worker Pool**: The work is executed in parallel across multiple process engines via the worker pool.
+       Each process engine applies the `process_fn` to the task data, which includes a pandas DataFrame and task-specific arguments.
+
+    4. **Response Queue**: After the work is completed by the worker pool, the results are pushed into a response queue.
+
+    5. **Post-Processing and Emission**: The results from the response queue are post-processed, reconstructed into their
+       original format, and emitted from an observable source for further downstream processing or final output.
+
+    This design enhances parallelism and resource utilization across multiple processes, especially for tasks that involve
+    heavy computations, such as large DataFrame operations.
+    """
 
     def __init__(
             self,
@@ -219,11 +238,6 @@ class MultiProcessingBaseStage(SinglePortStage):
                 df = work_package["payload"]
                 task_props = work_package["task_props"]
 
-                # logger.debug(
-                #    "Work package input handler got event:"
-                #    f"\nPAYLOAD: {work_package['payload']}"
-                #    f"\nTASK_PROPS: {work_package['task_props']}"
-                #    f"\nCM_ID: {work_package['cm_id']}")
                 try:
                     # Submit to the process pool and get the future
                     future = process_pool.submit_task(process_fn, (df, task_props))
@@ -462,6 +476,8 @@ class MultiProcessingBaseStage(SinglePortStage):
                 raise_on_failure=False,
             )
             def cm_func(ctrl_msg: ControlMessage, work_package: dict):
+                # This is the first location where we have access to both the control message and the work package,
+                # if we had any errors in the processing, raise them here.
                 if (work_package.get("error", False)):
                     raise RuntimeError(work_package["error_message"])
 
@@ -485,6 +501,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                     ctrl_msg = self._pass_thru_recv_queue.get(timeout=0.1)
                 except queue.Empty:
                     continue
+
                 yield ctrl_msg
 
         @nv_ingest_node_failure_context_manager(
