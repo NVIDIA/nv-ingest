@@ -560,6 +560,9 @@ def _embed_extractions(builder: mrc.Builder):
                     embedding_dataframes.append(df_tables)
                     content_masks.append(table_mask)
 
+            if len(content_masks) == 0:
+                return message
+
             message = _concatenate_extractions(message, embedding_dataframes, content_masks)
 
             return message
