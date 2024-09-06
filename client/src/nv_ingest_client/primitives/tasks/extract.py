@@ -45,7 +45,7 @@ _DEFAULT_EXTRACTOR_MAP = {
 
 _Type_Extract_Method_PDF = Literal[
     "pdfium",
-    "eclair",
+    "doughnut",
     "haystack",
     "tika",
     "unstructured_io",
@@ -198,13 +198,13 @@ class ExtractTask(Task):
                 "unstructured_url": "",  # TODO(Devin): Should be an environment variable
             }
             task_properties["params"].update(unstructured_properties)
-        elif self._extract_method == "eclair":
-            eclair_properties = {
-                "eclair_triton_host": os.environ.get("ECLAIR_TRITON_HOST", ECLAIR_TRITON_HOST),
-                "eclair_triton_port": os.environ.get("ECLAIR_TRITON_PORT", ECLAIR_TRITON_PORT),
-                "eclair_batch_size": os.environ.get("ECLAIR_BATCH_SIZE", ECLAIR_BATCH_SIZE),
+        elif self._extract_method == "doughnut":
+            doughnut_properties = {
+                "doughnut_triton_host": os.environ.get("ECLAIR_TRITON_HOST", ECLAIR_TRITON_HOST),
+                "doughnut_triton_port": os.environ.get("ECLAIR_TRITON_PORT", ECLAIR_TRITON_PORT),
+                "doughnut_batch_size": os.environ.get("ECLAIR_BATCH_SIZE", ECLAIR_BATCH_SIZE),
             }
-            task_properties["params"].update(eclair_properties)
+            task_properties["params"].update(doughnut_properties)
         elif self._extract_method == "unstructured_io":
             unstructured_properties = {
                 "unstructured_api_key": os.environ.get("UNSTRUCTURED_API_KEY", UNSTRUCTURED_API_KEY),

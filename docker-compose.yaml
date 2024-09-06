@@ -147,7 +147,7 @@ services:
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
-      - ECLAIR_GRPC_TRITON=triton-eclair:8001
+      - ECLAIR_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
       - MESSAGE_CLIENT_PORT=6379

@@ -6,12 +6,12 @@ import numpy as np
 import PIL
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.eclair_utils import convert_mmd_to_plain_text_ours
-from nv_ingest.extraction_workflows.pdf.eclair_utils import crop_image
-from nv_ingest.extraction_workflows.pdf.eclair_utils import extract_classes_bboxes
-from nv_ingest.extraction_workflows.pdf.eclair_utils import pad_image
-from nv_ingest.extraction_workflows.pdf.eclair_utils import reverse_transform_bbox
-from nv_ingest.extraction_workflows.pdf.eclair_utils import postprocess_text
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import convert_mmd_to_plain_text_ours
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import extract_classes_bboxes
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import pad_image
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import reverse_transform_bbox
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import postprocess_text
 
 
 def test_pad_image_same_size():

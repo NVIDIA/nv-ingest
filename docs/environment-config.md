@@ -37,7 +37,7 @@ SPDX-License-Identifier: Apache-2.0
 - **`ECLAIR_TRITON_HOST`**:
 
   - **Description**: The hostname or IP address of the ECLAIR model service.
-  - **Example**: `triton-eclair`
+  - **Example**: `triton-doughnut`
 
 - **`ECLAIR_TRITON_PORT`**:
 

@@ -28,7 +28,7 @@ import numpy as np
 import pypdfium2 as pdfium
 import tritonclient.grpc as grpcclient
 
-from nv_ingest.extraction_workflows.pdf import eclair_utils
+from nv_ingest.extraction_workflows.pdf import doughnut_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -53,7 +53,7 @@ DEFAULT_BATCH_SIZE = 16
 
 
 # Define a helper function to use Eclair to extract text from a base64 encoded bytestram PDF
-def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
     """
     Helper function to use Eclair to extract text from a bytestream PDF.
 
@@ -77,9 +77,9 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     """
     logger.debug("Extracting PDF with Eclair backend.")
 
-    eclair_triton_url = kwargs.get("eclair_grpc_triton", ECLAIR_GRPC_TRITON)
+    doughnut_triton_url = kwargs.get("doughnut_grpc_triton", ECLAIR_GRPC_TRITON)
 
-    batch_size = int(kwargs.get("eclair_batch_size", DEFAULT_BATCH_SIZE))
+    batch_size = int(kwargs.get("doughnut_batch_size", DEFAULT_BATCH_SIZE))
 
     row_data = kwargs.get("row_data")
     # get source_id
@@ -140,7 +140,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     accumulated_tables = []
     accumulated_images = []
 
-    triton_client = grpcclient.InferenceServerClient(url=eclair_triton_url)
+    triton_client = grpcclient.InferenceServerClient(url=doughnut_triton_url)
 
     for batch, batch_page_offset in zip(batches, batch_page_offsets):
         responses = preprocess_and_send_requests(triton_client, batch, batch_page_offset)
@@ -148,7 +148,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         for page_idx, raw_text, bbox_offset in responses:
             page_image = None
 
-            classes, bboxes, texts = eclair_utils.extract_classes_bboxes(raw_text)
+            classes, bboxes, texts = doughnut_utils.extract_classes_bboxes(raw_text)
 
             page_nearby_blocks = {
                 "text": {"content": [], "bbox": []},
@@ -158,10 +158,10 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
 
             for cls, bbox, txt in zip(classes, bboxes, texts):
                 if extract_text:
-                    txt = eclair_utils.postprocess_text(txt, cls)
+                    txt = doughnut_utils.postprocess_text(txt, cls)
 
                     if extract_images and identify_nearby_objects:
-                        bbox = eclair_utils.reverse_transform_bbox(bbox, bbox_offset)
+                        bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
                         page_nearby_blocks["text"]["content"].append(txt)
                         page_nearby_blocks["text"]["bbox"].append(bbox)
 
@@ -172,14 +172,14 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
                         txt = txt.encode().decode("unicode_escape")  # remove double backlashes
                     except UnicodeDecodeError:
                         pass
-                    bbox = eclair_utils.reverse_transform_bbox(bbox, bbox_offset)
+                    bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
                     table = LatexTable(latex=txt, bbox=bbox)
                     accumulated_tables.append(table)
 
                 elif extract_images and (cls == "Picture"):
                     if page_image is None:
-                        scale_tuple = (eclair_utils.DEFAULT_MAX_WIDTH, eclair_utils.DEFAULT_MAX_HEIGHT)
-                        padding_tuple = (eclair_utils.DEFAULT_MAX_WIDTH, eclair_utils.DEFAULT_MAX_HEIGHT)
+                        scale_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
+                        padding_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
                         page_image, *_ = pdfium_pages_to_numpy(
                             [pages[page_idx]], scale_tuple=scale_tuple, padding_tuple=padding_tuple
                         )
@@ -188,7 +188,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
                     img_numpy = crop_image(page_image, bbox)
                     if img_numpy is not None:
                         base64_img = numpy_to_base64(img_numpy)
-                        bbox = eclair_utils.reverse_transform_bbox(bbox, bbox_offset)
+                        bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
                         image = Base64Image(
                             image=base64_img, bbox=bbox, width=img_numpy.shape[1], height=img_numpy.shape[0]
                         )
@@ -272,8 +272,8 @@ def preprocess_and_send_requests(
         return []
 
     render_dpi = 300
-    scale_tuple = (eclair_utils.DEFAULT_MAX_WIDTH, eclair_utils.DEFAULT_MAX_HEIGHT)
-    padding_tuple = (eclair_utils.DEFAULT_MAX_WIDTH, eclair_utils.DEFAULT_MAX_HEIGHT)
+    scale_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
+    padding_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
 
     page_images, bbox_offsets = pdfium_pages_to_numpy(
         batch, render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
@@ -288,7 +288,7 @@ def preprocess_and_send_requests(
     outputs = [grpcclient.InferRequestedOutput("text")]
 
     query_response = triton_client.infer(
-        model_name="eclair",
+        model_name="doughnut",
         inputs=input_tensors,
         outputs=outputs,
     )
@@ -302,7 +302,7 @@ def preprocess_and_send_requests(
     return list(zip(page_numbers, text, bbox_offsets))
 
 
-@pdfium_exception_handler(descriptor="eclair")
+@pdfium_exception_handler(descriptor="doughnut")
 def _construct_table_metadata(
     table: LatexTable,
     page_idx: int,
