@@ -677,16 +677,20 @@ def handle_future_result(
     save_response_data : Function to save the result to a directory.
     """
 
-    result, _ = future.result()[0]
-    if ("annotations" in result) and result["annotations"]:
-        annotations = result["annotations"]
-        for key, value in annotations.items():
-            logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
+    try:
+        result, _ = future.result()[0]
+        if ("annotations" in result) and result["annotations"]:
+            annotations = result["annotations"]
+            for key, value in annotations.items():
+                logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
 
-    failed, description = check_ingest_result(result)
+        failed, description = check_ingest_result(result)
 
-    if failed:
-        raise RuntimeError(f"{description}")
+        if failed:
+            raise RuntimeError(f"{description}")
+    except Exception as e:
+        logger.debug(f"Error processing future result: {e}")
+        raise e
 
     return result
 
