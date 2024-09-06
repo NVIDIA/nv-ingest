@@ -50,26 +50,6 @@ logger = logging.getLogger(__name__)
 
 ECLAIR_GRPC_TRITON = os.environ.get("ECLAIR_GRPC_TRITON", "triton:8001")
 DEFAULT_BATCH_SIZE = 16
-ACCEPTED_CLASSES = set(
-    [
-        "Text",
-        "Title",
-        "Section-header",
-        "List-item",
-        "TOC",
-        "Bibliography",
-        "Formula",
-    ]
-)
-IGNORED_CLASSES = set(
-    [
-        "Page-header",
-        "Page-footer",
-        "Caption",
-        "Footnote",
-        "Floating-text",
-    ]
-)
 
 
 # Define a helper function to use Eclair to extract text from a base64 encoded bytestram PDF
@@ -177,8 +157,15 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
             }
 
             for cls, bbox, txt in zip(classes, bboxes, texts):
-                if cls in IGNORED_CLASSES:
-                    continue
+                if extract_text:
+                    txt = eclair_utils.postprocess_text(txt, cls)
+
+                    if extract_images and identify_nearby_objects:
+                        bbox = eclair_utils.reverse_transform_bbox(bbox, bbox_offset)
+                        page_nearby_blocks["text"]["content"].append(txt)
+                        page_nearby_blocks["text"]["bbox"].append(bbox)
+
+                    accumulated_text.append(txt)
 
                 elif extract_tables and (cls == "Table"):
                     try:
@@ -206,17 +193,6 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
                             image=base64_img, bbox=bbox, width=img_numpy.shape[1], height=img_numpy.shape[0]
                         )
                         accumulated_images.append(image)
-
-                elif extract_text and (cls in ACCEPTED_CLASSES):
-                    txt = txt.replace("<tbc>", "").strip()  # remove <tbc> tokens (continued paragraphs)
-                    txt = eclair_utils.convert_mmd_to_plain_text_ours(txt)
-
-                    if extract_images and identify_nearby_objects:
-                        bbox = eclair_utils.reverse_transform_bbox(bbox, bbox_offset)
-                        page_nearby_blocks["text"]["content"].append(txt)
-                        page_nearby_blocks["text"]["bbox"].append(bbox)
-
-                    accumulated_text.append(txt)
 
             # Construct tables
             if extract_tables:

@@ -385,9 +385,9 @@ def create_and_process_jobs(
                         for key, value in annotations.items():
                             logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
 
-                    valid_result, description = check_ingest_result(result)
+                    failed, description = check_ingest_result(result)
 
-                    if valid_result:
+                    if failed:
                         raise RuntimeError(f"Failed to process job {job_id}: {description}")
 
                     source_name = job_id_map[job_id]

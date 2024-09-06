@@ -14,10 +14,32 @@ import numpy as np
 from PIL import Image
 
 from nv_ingest.util.converters import bytetools
+from nv_ingest.util.pdf.metadata_aggregators import LatexTable
 
 DEFAULT_DPI = 300
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
+
+ACCEPTED_CLASSES = set(
+    [
+        "Text",
+        "Title",
+        "Section-header",
+        "List-item",
+        "TOC",
+        "Bibliography",
+        "Formula",
+    ]
+)
+IGNORED_CLASSES = set(
+    [
+        "Page-header",
+        "Page-footer",
+        "Caption",
+        "Footnote",
+        "Floating-text",
+    ]
+)
 
 _re_extract_class_bbox = re.compile(
     r"<x_(\d+)><y_(\d+)>(.*?)<x_(\d+)><y_(\d+)><class_([^>]+)>", re.MULTILINE | re.DOTALL
@@ -133,3 +155,13 @@ def reverse_transform_bbox(
     h2 = int((h2 - bbox_offset[1]) / height_ratio)
 
     return (w1, h1, w2, h2)
+
+
+def postprocess_text(txt: str, cls: str):
+    if cls in ACCEPTED_CLASSES:
+        txt = txt.replace("<tbc>", "").strip()  # remove <tbc> tokens (continued paragraphs)
+        txt = convert_mmd_to_plain_text_ours(txt)
+    else:
+        txt = ""
+
+    return txt

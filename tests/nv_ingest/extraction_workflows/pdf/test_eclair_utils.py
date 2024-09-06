@@ -11,6 +11,7 @@ from nv_ingest.extraction_workflows.pdf.eclair_utils import crop_image
 from nv_ingest.extraction_workflows.pdf.eclair_utils import extract_classes_bboxes
 from nv_ingest.extraction_workflows.pdf.eclair_utils import pad_image
 from nv_ingest.extraction_workflows.pdf.eclair_utils import reverse_transform_bbox
+from nv_ingest.extraction_workflows.pdf.eclair_utils import postprocess_text
 
 
 def test_pad_image_same_size():
@@ -296,3 +297,37 @@ def test_reverse_transform_bbox_zero_dimension():
     original_height = 0
     with pytest.raises(ZeroDivisionError):
         reverse_transform_bbox(bbox, bbox_offset, original_width, original_height)
+
+
+def test_postprocess_text_with_unaccepted_class():
+    # Input text that should not be processed
+    txt = "This text should not be processed"
+    cls = "InvalidClass"  # Not in ACCEPTED_CLASSES
+
+    result = postprocess_text(txt, cls)
+
+    assert result == ""
+
+
+def test_postprocess_text_removes_tbc_and_processes_text():
+    # Input text containing "<tbc>"
+    txt = "<tbc>Some text"
+    cls = "Title"  # An accepted class
+
+    expected_output = "Some text"
+
+    result = postprocess_text(txt, cls)
+
+    assert result == expected_output
+
+
+def test_postprocess_text_no_tbc_but_accepted_class():
+    # Input text without "<tbc>"
+    txt = "This is a test **without** tbc"
+    cls = "Section-header"  # An accepted class
+
+    expected_output = "This is a test without tbc"
+
+    result = postprocess_text(txt, cls)
+
+    assert result == expected_output
