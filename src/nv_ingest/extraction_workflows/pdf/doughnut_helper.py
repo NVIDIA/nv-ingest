@@ -52,10 +52,10 @@ DOUGHNUT_GRPC_TRITON = os.environ.get("DOUGHNUT_GRPC_TRITON", "triton:8001")
 DEFAULT_BATCH_SIZE = 16
 
 
-# Define a helper function to use Eclair to extract text from a base64 encoded bytestram PDF
+# Define a helper function to use doughnut to extract text from a base64 encoded bytestram PDF
 def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
     """
-    Helper function to use Eclair to extract text from a bytestream PDF.
+    Helper function to use doughnut to extract text from a bytestream PDF.
 
     Parameters
     ----------
@@ -75,7 +75,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     str
         A string of extracted text.
     """
-    logger.debug("Extracting PDF with Eclair backend.")
+    logger.debug("Extracting PDF with doughnut backend.")
 
     doughnut_triton_url = kwargs.get("doughnut_grpc_triton", DOUGHNUT_GRPC_TRITON)
 
