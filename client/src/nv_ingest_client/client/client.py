@@ -19,6 +19,7 @@ from typing import Tuple
 from typing import Union
 
 from nv_ingest_client.message_clients.redis.redis_client import RedisClient
+from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
@@ -115,12 +116,18 @@ class NvIngestClient:
         Returns
         -------
         str
-            A unique job ID in the format of "<UUID>_<Redis incremented value>".
+            A unique job ID in the format of "<UUID>_<Redis incremented value>".  IF the client
+            is a RedisClient. In the case of a RestClient it is simply the UUID.
         """
         uid = uuid.uuid4()
         redis_msg_id = self._message_client.get_client().incr(self._message_counter_id)
+        job_id = str(uid)
 
-        return f"{uid}_{redis_msg_id}"
+        if not isinstance(self._message_client, RestClient):
+            redis_msg_id = self._message_client.get_client().incr(self._message_counter_id)
+            job_id = f"{job_id}_{redis_msg_id}"
+
+        return job_id
 
     def _pop_job_state(self, job_id: str) -> JobState:
         """
@@ -159,7 +166,7 @@ class NvIngestClient:
     def job_count(self):
         return len(self._job_states)
 
-    def add_job(self, job_spec: JobSpec = None):
+    def add_job(self, job_spec: JobSpec = None) -> str:
         job_id = job_spec.job_id or self._generate_job_id()
         if job_id and job_id in self._job_states:
             raise ValueError(f"Cannot create Job with ID {job_id}: already exists")
@@ -281,7 +288,7 @@ class NvIngestClient:
 
         try:
             job_state = self._get_and_check_job_state(job_id, required_state=[JobStateEnum.SUBMITTED])
-            response = self._message_client.fetch_message(job_state.response_channel, timeout)
+            response = self._message_client.fetch_message(job_state, timeout)
 
             if response is not None:
                 try:

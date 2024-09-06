@@ -9,6 +9,7 @@ import time
 import traceback
 
 import redis
+from client.src.nv_ingest_client.primitives.jobs.job_state import JobState
 from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
@@ -63,11 +64,12 @@ class RedisClient:
         except (RedisError, AttributeError):
             return False
 
-    def fetch_message(self, task_queue):
+    def fetch_message(self, job_state: JobState, timeout: float):
         retries = 0
+        task_queue = job_state.response_channel
         while True:
             try:
-                _, job_payload = self.get_client().blpop([task_queue])
+                _, job_payload = self.get_client().blpop([task_queue], timeout)
                 return job_payload
             except RedisError as err:
                 retries += 1

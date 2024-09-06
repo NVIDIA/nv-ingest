@@ -137,6 +137,8 @@ services:
       target: runtime
     volumes:
       - ${DATASET_ROOT}:/workspace/data
+    ports:
+      - "7670:7670"
     cap_add:
       - sys_nice
     environment:

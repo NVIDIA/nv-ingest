@@ -25,6 +25,7 @@ from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.message_clients.redis import RedisClient
+from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from pkg_resources import DistributionNotFound
 from pkg_resources import VersionConflict
 
@@ -227,7 +228,11 @@ def main(
             logging.debug(
                 f"Creating message client: {client} with host: {client_host} and port: {client_port} -> {client_kwargs}"
             )
-            client_allocator = RedisClient
+            
+            if client.lower() == "rest":
+                client_allocator = RestClient
+            else:
+                client_allocator = RedisClient
 
             ingest_client = NvIngestClient(
                 message_client_allocator=client_allocator,

@@ -12,6 +12,9 @@ from typing import Optional
 from typing import Union
 from uuid import UUID
 
+from pydantic import BaseModel
+from pydantic import Field
+
 from .job_spec import JobSpec
 
 logger = logging.getLogger(__name__)
@@ -35,7 +38,7 @@ _TERMINAL_STATES = {JobStateEnum.COMPLETED, JobStateEnum.FAILED, JobStateEnum.CA
 _PREFLIGHT_STATES = {JobStateEnum.PENDING, JobStateEnum.SUBMITTED_ASYNC}
 
 
-class JobState:
+class JobState(BaseModel):
     """
     Encapsulates the state information for a job managed by the NvIngestClient.
 
@@ -59,20 +62,17 @@ class JobState:
         Initializes a new instance of JobState.
     """
 
-    def __init__(
-        self,
-        job_spec: JobSpec,
-        state: JobStateEnum = JobStateEnum.PENDING,
-        future: Optional[Future] = None,
-        response: Optional[Dict] = None,
-        response_channel: Optional[str] = None,
-    ) -> None:
-        self._job_spec = job_spec
-        self._state = state
-        self._future = future
-        self._response = response  # TODO(Devin): Not currently used
-        self._response_channel = response_channel
-        self._telemetry = {}
+    _job_spec: JobSpec = Field(default=JobSpec(), alias="job_spec")
+    _state: JobStateEnum = Field(default=JobStateEnum.PENDING, alias="state")
+    _future: Optional[Future] = Field(default=None, alias="future")
+    # TODO(Devin): Not currently used.
+    # jdyer @ 8-22-2024: comment ^^ Was in pre-pydantic class. Copying just for future viz.
+    _response: Optional[Dict] = Field(default=None, alias="response")
+    _response_channel: Optional[str] = Field(default=None, alias="response_channel")
+
+    class Config:
+        # Allow population by field name as well as alias
+        allow_population_by_field_name = True
 
     @property
     def job_spec(self) -> JobSpec:

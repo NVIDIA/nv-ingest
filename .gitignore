@@ -196,6 +196,10 @@ mlruns/*
 notebooks/output
 triton_models/**/*.engine
 triton_models/**/*.onnx
+triton_models/**/*.plan
+triton_models/cached
+triton_models/deplot
+triton_models/paddle
 
 # Explicitly ignore .vscode/. Shared settings should go in morpheus.code-workspace
 # and user settings will go in .vscode/

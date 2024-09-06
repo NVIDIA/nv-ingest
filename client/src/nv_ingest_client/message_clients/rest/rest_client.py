@@ -1,92 +1,83 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
-# All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
+#
+# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
+# property and proprietary rights in and to this material, related
+# documentation and any modifications thereto. Any use, reproduction,
+# disclosure or distribution of this material and related documentation
+# without an express license agreement from NVIDIA CORPORATION or
+# its affiliates is strictly prohibited.
 
 # pylint: skip-file
 
+import json
 import logging
 import time
 from typing import Any
 from typing import Optional
 
-import redis
+import httpx
+import requests
 from nv_ingest_client.message_clients import MessageClientBase
 from nv_ingest_client.primitives.jobs.job_state import JobState
-from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
 
 
-class RedisClient(MessageClientBase):
+class RestClient(MessageClientBase):
     """
-    A client for interfacing with Redis, providing mechanisms for sending and receiving messages
+    A client for interfacing with the nv-ingest HTTP endpoint, providing mechanisms for sending and receiving messages
     with retry logic and connection management.
 
     Parameters
     ----------
     host : str
-        The hostname of the Redis server.
+        The hostname of the HTTP server.
     port : int
-        The port number of the Redis server.
-    db : int, optional
-        The database number to connect to. Default is 0.
+        The port number of the HTTP server.
     max_retries : int, optional
         The maximum number of retry attempts for operations. Default is 0 (no retries).
     max_backoff : int, optional
         The maximum backoff delay between retries in seconds. Default is 32 seconds.
     connection_timeout : int, optional
         The timeout in seconds for connecting to the Redis server. Default is 300 seconds.
-    max_pool_size : int, optional
-        The maximum number of connections in the Redis connection pool. Default is 128.
-    use_ssl : bool, optional
-        Specifies if SSL should be used for the connection. Default is False.
-    redis_allocator : Any, optional
-        The Redis client allocator, allowing for custom Redis client instances. Default is redis.Redis.
+    http_allocator : Any, optional
+        The HTTP client allocator.
 
     Attributes
     ----------
     client : Any
-        The Redis client instance used for operations.
+        The HTTP client instance used for operations.
     """
 
     def __init__(
         self,
         host: str,
         port: int,
-        db: int = 0,
         max_retries: int = 0,
         max_backoff: int = 32,
         connection_timeout: int = 300,
-        max_pool_size: int = 128,
-        use_ssl: bool = False,
-        redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
+        http_allocator: Any = httpx.AsyncClient,
     ):
         self._host = host
         self._port = port
-        self._db = db
         self._max_retries = max_retries
         self._max_backoff = max_backoff
         self._connection_timeout = connection_timeout
-        self._use_ssl = use_ssl
-        self._pool = redis.ConnectionPool(
-            host=self._host,
-            port=self._port,
-            db=self._db,
-            socket_connect_timeout=self._connection_timeout,
-            max_connections=max_pool_size,
-        )
-        self._redis_allocator = redis_allocator
-        self._client = self._redis_allocator(connection_pool=self._pool)
+        self._http_allocator = http_allocator
+        self._client = self._http_allocator()
         self._retries = 0
+
+        self._submit_endpoint = "/v1/submit_job"
+        self._fetch_endpoint = "/v1/fetch_job"
 
     def _connect(self) -> None:
         """
-        Attempts to reconnect to the Redis server if the current connection is not responsive.
+        Attempts to reconnect to the HTTP server if the current connection is not responsive.
         """
         if not self.ping():
-            logger.debug("Reconnecting to Redis")
-            self._client = self._redis_allocator(connection_pool=self._pool)
+            logger.debug("Reconnecting to HTTP server")
+            self._client = self._http_allocator()
 
     @property
     def max_retries(self) -> int:
@@ -98,12 +89,12 @@ class RedisClient(MessageClientBase):
 
     def get_client(self) -> Any:
         """
-        Returns a Redis client instance, reconnecting if necessary.
+        Returns a HTTP client instance, reconnecting if necessary.
 
         Returns
         -------
         Any
-            The Redis client instance.
+            The HTTP client instance.
         """
         if self._client is None or not self.ping():
             self._connect()
@@ -121,7 +112,7 @@ class RedisClient(MessageClientBase):
         try:
             self._client.ping()
             return True
-        except (RedisError, AttributeError):
+        except (httpx.HTTPError, AttributeError):
             return False
 
     def fetch_message(self, job_state: JobState, timeout: float = 10) -> Optional[str]:
@@ -131,7 +122,7 @@ class RedisClient(MessageClientBase):
         Parameters
         ----------
         job_state : JobState
-            The JobState of the message to be fetched
+            The JobState of the message to be fetched.
         timeout : float
             The timeout in seconds for blocking until a message is available.
 
@@ -148,37 +139,40 @@ class RedisClient(MessageClientBase):
         retries = 0
         while True:
             try:
-                response = self.get_client().blpop([channel_name], timeout)
-                if response and response[1]:
-                    return response[1]
-                return None
-            except RedisError as err:
+                # Fetch via HTTP
+                url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_id}"
+                print(f"Fetch message at URL: {url}")
+                result = requests.get(url)
+                logger.debug(f"Fetch Message submitted to http endpoint {self._submit_endpoint}")
+                print(f"RestClient fetch Result: {result}")
+                break
+            except httpx.HTTPError as err:
                 retries += 1
-                logger.error(f"Redis error during fetch: {err}")
+                logger.error(f"REST error during fetch: {err}")
                 backoff_delay = min(2**retries, self._max_backoff)
 
                 if self.max_retries > 0 and retries <= self.max_retries:
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
                     time.sleep(backoff_delay)
                 else:
-                    logger.error(f"Failed to fetch message from {channel_name} after {retries} attempts.")
-                    raise ValueError(f"Failed to fetch message from Redis queue after {retries} attempts: {err}")
+                    logger.error(f"Failed to fetch message from {job_state.channel_name} after {retries} attempts.")
+                    raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {err}")
 
                 # Invalidate client to force reconnection on the next try
                 self._client = None
             except Exception as e:
-                # Handle non-Redis specific exceptions
-                logger.error(f"Unexpected error during fetch from {channel_name}: {e}")
+                # Handle non-http specific exceptions
+                logger.error(f"Unexpected error during fetch from {job_state.channel_name}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, channel_name: str, message: str) -> None:
+    def submit_message(self, _: str, message: str) -> str:
         """
-        Submits a message to a specified Redis queue with retries on failure.
+        Submits a message to a specified HTTP endpoint with retries on failure.
 
         Parameters
         ----------
         channel_name : str
-            The name of the queue to submit the message to.
+            Not used as part of RestClient
         message : str
             The message to submit.
 
@@ -190,11 +184,16 @@ class RedisClient(MessageClientBase):
         retries = 0
         while True:
             try:
-                self.get_client().rpush(channel_name, message)
-                logger.debug(f"Message submitted to {channel_name}")
+                # Submit via HTTP
+                url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
+                result = requests.post(url, json=json.loads(message), headers={"Content-Type": "application/json"})
+                logger.debug(f"Message submitted to http endpoint {self._submit_endpoint}")
+                print(f"RestClient submission Result: {result}")
+                print(f"Response.text: {result.text}")
+                print(f"Response.json: {result.json()}")
                 break
-            except RedisError as e:
-                logger.error(f"Failed to submit message, retrying... Error: {e}")
+            except httpx.HTTPError as e:
+                logger.error(f"Failed to submit job, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
                 retries += 1
                 backoff_delay = min(2**retries, self._max_backoff)
@@ -203,5 +202,7 @@ class RedisClient(MessageClientBase):
                     logger.error(f"Submit attempt failed, retrying in {backoff_delay}s...")
                     time.sleep(backoff_delay)
                 else:
-                    logger.error(f"Failed to submit message to {channel_name} after {retries} attempts.")
+                    logger.error(
+                        f"Failed to submit message to http endpoint {self._submit_endpoint} after {retries} attempts."
+                    )
                     raise

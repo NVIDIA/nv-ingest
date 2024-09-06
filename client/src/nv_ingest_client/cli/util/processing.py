@@ -14,10 +14,12 @@ from statistics import mean
 from statistics import median
 from typing import Dict
 from typing import List
+from typing import Tuple
 from typing import Type
 
 from click import style
 from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.util.util import check_ingest_result
@@ -257,10 +259,13 @@ def save_response_data(response, output_directory):
             f.write(json.dumps(documents, indent=2))
 
 
-def create_job_specs_for_batch(files_batch: List[str], tasks: Dict, client: NvIngestClient) -> List[str]:
+def create_job_specs_for_batch(
+        files_batch: List[str], tasks: Dict, client: NvIngestClient
+) -> Tuple[List[JobSpec], List[str]]:
     """
-    Creates JobSpecs for a batch of files and submits them, returning job IDs.
+    Creates JobSpecs for a batch of files
     """
+    job_specs = []
     job_ids = []
     for file_name in files_batch:
         try:
@@ -309,8 +314,9 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict, client: NvIn
 
         job_id = client.add_job(job_spec)
         job_ids.append(job_id)
+        job_specs.append(job_spec)
 
-    return job_ids
+    return job_specs, job_ids
 
 
 # TODO(Devin): Circle back on this, we can refactor to be better at keeping as many jobs in-flight as possible.
@@ -355,7 +361,7 @@ def create_and_process_jobs(
                 new_job_count = min(batch_size - cur_job_count, len(files) - processed)
                 batch_files = files[processed : processed + new_job_count]  # noqa: E203
 
-                new_job_ids = create_job_specs_for_batch(batch_files, tasks, client)
+                _, new_job_ids = create_job_specs_for_batch(batch_files, tasks, client)
                 if len(new_job_ids) != new_job_count:
                     missing_jobs = new_job_count - len(new_job_ids)
                     error_msg = (

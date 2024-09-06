@@ -5,6 +5,8 @@
 from abc import ABC
 from abc import abstractmethod
 
+from nv_ingest_client.primitives.jobs.job_state import JobState
+
 
 class MessageClientBase(ABC):
     """
@@ -49,12 +51,12 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def fetch_message(self, channel_name: str, timeout: float = 0) -> str:
+    def fetch_message(self, job_state: JobState, timeout: float = 0) -> str:
         """
         Fetches a message from the specified queue with retries on failure.
 
         Parameters:
-            channel_name (str): The name of the task queue to fetch messages from.
+            job_state (JobState): The JobState of the message to be fetched.
             timeout (float): The timeout in seconds for blocking until a message is available.
 
         Returns:
@@ -62,7 +64,7 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str):
+    def submit_message(self, channel_name: str, message: str) -> str:
         """
         Submits a message to a specified queue with retries on failure.
 
