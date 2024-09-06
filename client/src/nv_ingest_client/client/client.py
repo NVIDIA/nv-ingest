@@ -120,10 +120,10 @@ class NvIngestClient:
             is a RedisClient. In the case of a RestClient it is simply the UUID.
         """
         uid = uuid.uuid4()
-        redis_msg_id = self._message_client.get_client().incr(self._message_counter_id)
         job_id = str(uid)
 
-        if not isinstance(self._message_client, RestClient):
+        # Include the redis_msg_id IF the client is a Redis client. Other clients do not support this.
+        if isinstance(self._message_client, RedisClient):
             redis_msg_id = self._message_client.get_client().incr(self._message_counter_id)
             job_id = f"{job_id}_{redis_msg_id}"
 

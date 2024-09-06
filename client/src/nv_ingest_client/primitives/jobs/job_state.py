@@ -62,96 +62,90 @@ class JobState(BaseModel):
         Initializes a new instance of JobState.
     """
 
-    _job_spec: JobSpec = Field(default=JobSpec(), alias="job_spec")
-    _state: JobStateEnum = Field(default=JobStateEnum.PENDING, alias="state")
-    _future: Optional[Future] = Field(default=None, alias="future")
-    # TODO(Devin): Not currently used.
-    # jdyer @ 8-22-2024: comment ^^ Was in pre-pydantic class. Copying just for future viz.
-    _response: Optional[Dict] = Field(default=None, alias="response")
-    _response_channel: Optional[str] = Field(default=None, alias="response_channel")
-
-    class Config:
-        # Allow population by field name as well as alias
-        allow_population_by_field_name = True
+    job_spec: JobSpec
+    state: JobStateEnum = JobStateEnum.PENDING
+    future: Optional[Future]
+    response: Optional[Dict]
+    response_channel: Optional[str] = None
 
     @property
     def job_spec(self) -> JobSpec:
         """Gets the job specification associated with the state."""
-        return self._job_spec
+        return self.job_spec
 
     @job_spec.setter
     def job_spec(self, value: JobSpec) -> None:
         """Sets the job specification associated with the state."""
         if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change job_spec after job submission: {self._state.name}"
+            err_msg = f"Attempt to change job_spec after job submission: {self.state.name}"
             logger.error(err_msg)
 
             raise ValueError(err_msg)
 
-        self._job_spec = value
+        self.job_spec = value
 
     @property
     def job_id(self) -> Union[UUID, str]:
         """Gets the job's unique identifier."""
-        return self._job_spec.job_id
+        return self.job_spec.job_id
 
     @job_id.setter
     def job_id(self, value: str) -> None:
         """Sets the job's unique identifier, with constraints."""
-        if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change job_id after job submission: {self._state.name}"
+        if self.state not in _PREFLIGHT_STATES:
+            err_msg = f"Attempt to change job_id after job submission: {self.state.name}"
             logger.error(err_msg)
             raise ValueError(err_msg)
-        self._job_spec.job_id = value
+        self.job_spec.job_id = value
 
     @property
     def state(self) -> JobStateEnum:
         """Gets the current state of the job."""
-        return self._state
+        return self.state
 
     @state.setter
     def state(self, value: JobStateEnum) -> None:
         """Sets the current state of the job with transition constraints."""
-        if self._state in _TERMINAL_STATES:
-            logger.error(f"Attempt to change state from {self._state.name} to {value.name} denied.")
-            raise ValueError(f"Cannot change state from {self._state.name} to {value.name}.")
-        if value.value < self._state.value:
-            logger.error(f"Invalid state transition attempt from {self._state.name} to {value.name}.")
-            raise ValueError(f"State can only transition forward, from {self._state.name} to {value.name} not allowed.")
-        self._state = value
+        if self.state in _TERMINAL_STATES:
+            logger.error(f"Attempt to change state from {self.state.name} to {value.name} denied.")
+            raise ValueError(f"Cannot change state from {self.state.name} to {value.name}.")
+        if value.value < self.state.value:
+            logger.error(f"Invalid state transition attempt from {self.state.name} to {value.name}.")
+            raise ValueError(f"State can only transition forward, from {self.state.name} to {value.name} not allowed.")
+        self.state = value
 
     @property
     def future(self) -> Optional[Future]:
         """Gets the future object associated with the job's asynchronous operation."""
-        return self._future
+        return self.future
 
     @future.setter
     def future(self, value: Future) -> None:
         """Sets the future object associated with the job's asynchronous operation, with constraints."""
-        self._future = value
+        self.future = value
 
     # TODO(Devin): Not convinced we need 'response' probably remove.
     @property
     def response(self) -> Optional[Dict]:
         """Gets the response data received for the job."""
-        return self._response
+        return self.response
 
     @response.setter
     def response(self, value: Dict) -> None:
         """Sets the response data received for the job, with constraints."""
-        self._response = value
+        self.response = value
 
     @property
     def response_channel(self) -> Optional[str]:
         """Gets the channel through which responses for the job are received."""
-        return self._response_channel
+        return self.response_channel
 
     @response_channel.setter
     def response_channel(self, value: str) -> None:
         """Sets the channel through which responses for the job are received, with constraints."""
-        if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change response_channel after job submission: {self._state.name}"
+        if self.state not in _PREFLIGHT_STATES:
+            err_msg = f"Attempt to change response_channel after job submission: {self.state.name}"
             logger.error(err_msg)
             raise ValueError(err_msg)
 
-        self._response_channel = value
+        self.response_channel = value
