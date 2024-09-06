@@ -140,7 +140,7 @@ class RestClient(MessageClientBase):
         while True:
             try:
                 # Fetch via HTTP
-                url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_id}"
+                url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_spec.job_id}"
                 print(f"Fetch message at URL: {url}")
                 result = requests.get(url)
                 logger.debug(f"Fetch Message submitted to http endpoint {self._submit_endpoint}")
@@ -155,14 +155,14 @@ class RestClient(MessageClientBase):
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
                     time.sleep(backoff_delay)
                 else:
-                    logger.error(f"Failed to fetch message from {job_state.channel_name} after {retries} attempts.")
+                    logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
                     raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {err}")
 
                 # Invalidate client to force reconnection on the next try
                 self._client = None
             except Exception as e:
                 # Handle non-http specific exceptions
-                logger.error(f"Unexpected error during fetch from {job_state.channel_name}: {e}")
+                logger.error(f"Unexpected error during fetch from {job_state.response_channel}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
     def submit_message(self, _: str, message: str) -> str:
