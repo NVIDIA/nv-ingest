@@ -468,14 +468,13 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
         An updated control message with metadata enriched with embeddings.
     """
 
-    # build unified mask
-    for idx, mask in enumerate(masks):
-        if idx == 0:
-            unified_mask = mask
-        else:
+    with ctrl_msg.payload().mutable_dataframe() as mdf:
+
+        # build unified mask
+        unified_mask = cudf.Series(False, index=mdf.index)
+        for mask in masks:
             unified_mask = unified_mask | mask
 
-    with ctrl_msg.payload().mutable_dataframe() as mdf:
         df_no_text = mdf.loc[~unified_mask].to_pandas()
         df_no_text["_contains_embeddings"] = False
 
