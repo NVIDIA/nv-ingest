@@ -188,8 +188,75 @@ def load_data_from_path(path: str) -> Dict:
 
 
 def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
-    # Check if the 'data' key exists and if 'status' within 'data' is 'failed'
+    """
+    Check the ingest result to determine if the process failed and extract a description.
+
+    This function examines the provided JSON payload to check whether the ingest operation
+    has failed. If it has failed and failure annotations are present, the function augments
+    the failure description with information about the specific event that caused the failure.
+
+    Parameters
+    ----------
+    json_payload : Dict
+        A dictionary containing the result of the ingest operation. The dictionary should
+        have at least the following fields:
+        - 'status' (str): The status of the ingest operation. A status of "failed" indicates
+          a failure.
+        - 'description' (str): A textual description of the result.
+        - 'annotations' (Dict): (optional) A dictionary of annotations, where each annotation
+          may contain details about the failure.
+
+    Returns
+    -------
+    Tuple[bool, str]
+        A tuple containing:
+        - A boolean indicating whether the ingest operation failed (`True` if it failed,
+          `False` otherwise).
+        - A string containing the description of the result or the failure, augmented with
+          details from the annotations if available.
+
+    Notes
+    -----
+    - The function logs the 'status' and 'description' fields from the payload for debugging.
+    - If the 'status' field contains "failed" and the 'annotations' field contains entries
+      indicating failure, the function updates the description with the annotation details.
+    - The function breaks after processing the first relevant annotation.
+
+    Examples
+    --------
+    Suppose the JSON payload contains the following structure:
+
+    >>> json_payload = {
+    ...     "status": "failed",
+    ...     "description": "Ingest operation failed",
+    ...     "annotations": {
+    ...         "task1": {"task_result": "FAILURE", "message": "Network error"},
+    ...         "task2": {"task_result": "SUCCESS"}
+    ...     }
+    ... }
+    >>> is_failed, description = check_ingest_result(json_payload)
+    >>> print(is_failed)
+    True
+    >>> print(description)
+    ↪ Event that caused this failure: task1 -> Network error
+
+    In this example, the function detects a failure and augments the description with the
+    message from the failing task.
+    """
+
+    logger.debug(
+        f"Checking ingest result:\n Status: {json_payload.get('status', None)}"
+        f"\n Description: {json_payload.get('description', None)}")
+
     is_failed = json_payload.get("status", "") in "failed"
     description = json_payload.get("description", "")
+
+    # Look to see if we have any failure annotations to augment the description
+    if (is_failed and 'annotations' in json_payload):
+        for annot_id, value in json_payload['annotations'].items():
+            if ('task_result' in value and value['task_result'] == "FAILURE"):
+                message = value.get('message', "Unknown")
+                description = f"\n↪ Event that caused this failure: {annot_id} -> {message}"
+                break
 
     return is_failed, description
