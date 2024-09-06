@@ -21,6 +21,9 @@ DATASET_ROOT=...
 REDIS_HOST=...
 REDIS_PORT=...
 TASK_QUEUE="morpheus_task_queue"
+# Used to connect to minio object store, not needed if not using this option
+MINIO_ACCESS_KEY=...
+MINIO_SECRET_KEY=...
 ```
 
 ## Step 2: Build the NV-Ingest client container
@@ -36,10 +39,12 @@ Please modify the port mapping if you would like to expose jupyer on a different
 
 ```bash
 docker run -it --rm \
-    -v ${DATASET_ROOT}:/workspace/client-examples/data \
+    -v ${DATASET_ROOT}:/workspace/client_examples/data \
     -e REDIS_HOST=${REDIS_HOST} \
     -e REDIS_PORT=${REDIS_PORT} \
     -e TASK_QUEUE=${TASK_QUEUE} \
+    -e MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY} \
+    -e MINIO_SECRET_KEY=${MINIO_SECRET_KEY} \
     -p 8888:8888 \
     --name nv-ingest-client \
     nv-ingest-client:latest bash
@@ -51,10 +56,10 @@ There are two usage examples included:
 
 - Illustrates usage of the NV-Ingest client CLI: 
 
-    `/workspace/client-examples/examples/cli_client_usage.ipynb`
+    `/workspace/client_examples/examples/cli_client_usage.ipynb`
 
 - Illustrates usage of the NV-Ingest client Python API:
 
-    `/workspace/client-examples/examples/python_client_usage.ipynb`
+    `/workspace/client_examples/examples/python_client_usage.ipynb`
 
 Note, the default examples use sample data files provided in the NV-Ingest github project. You will need to change these output indices to work with custom pdf source files.

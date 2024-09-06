@@ -22,11 +22,11 @@ RUN cd /workspace \
     && cd /workspace/nv-ingest/client \
     && pip install -r ./requirements.txt \
     && pip install .
-COPY examples /workspace/client-examples/examples
+COPY examples /workspace/client_examples/examples
 
 # Install jupyter lab
 RUN pip install jupyterlab
 
-WORKDIR /workspace/client-examples
+WORKDIR /workspace/client_examples
 
 ENTRYPOINT [ "/bin/tini", "--", "/workspace/docker/entrypoint.sh" ]
