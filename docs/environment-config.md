@@ -34,14 +34,14 @@ SPDX-License-Identifier: Apache-2.0
   - **Description**: The name of the task queue in Redis where tasks are stored and processed.
   - **Example**: `morpheus_task_queue`
 
-- **`ECLAIR_TRITON_HOST`**:
+- **`DOUGHNUT_TRITON_HOST`**:
 
-  - **Description**: The hostname or IP address of the ECLAIR model service.
-  - **Example**: `triton-eclair`
+  - **Description**: The hostname or IP address of the DOUGHNUT model service.
+  - **Example**: `triton-doughnut`
 
-- **`ECLAIR_TRITON_PORT`**:
+- **`DOUGHNUT_TRITON_PORT`**:
 
-  - **Description**: The port number on which the ECLAIR model service is listening.
+  - **Description**: The port number on which the DOUGHNUT model service is listening.
   - **Example**: `8001`
 
 - **`OTEL_EXPORTER_OTLP_ENDPOINT`**:

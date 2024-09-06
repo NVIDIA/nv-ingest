@@ -30,7 +30,7 @@ docker compose up -d otel-collector prometheus grafana zipkin
 docker compose up -d embedding
 
 # Optional (Triton) See below for Triton setup we need Triton for any model inference
-# This is only needed for captioning or ECLAIR based extraction.
+# This is only needed for captioning or DOUGHNUT based extraction.
 docker compose up -d triton
 
 # Ingest service

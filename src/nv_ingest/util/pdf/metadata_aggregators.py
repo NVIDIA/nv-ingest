@@ -148,9 +148,6 @@ def construct_text_metadata(
     source_metadata,
     base_unified_metadata,
 ):
-    if len(accumulated_text) < 1:
-        return []
-
     extracted_text = " ".join(accumulated_text)
 
     content_metadata = {
