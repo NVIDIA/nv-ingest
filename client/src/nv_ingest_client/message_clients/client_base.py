@@ -5,6 +5,7 @@
 from abc import ABC
 from abc import abstractmethod
 
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.jobs.job_state import JobState
 
 
@@ -64,11 +65,11 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str) -> str:
+    def submit_message(self, channel_name: str, message: JobSpec) -> str:
         """
         Submits a message to a specified queue with retries on failure.
 
         Parameters:
             channel_name (str): The name of the queue to submit the message to.
-            message (str): The message to submit.
+            message (JobSpec): The message to submit.
         """

@@ -11,6 +11,7 @@ from typing import List
 from typing import Optional
 from uuid import UUID
 
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest_client.primitives.tasks import Task
 from pydantic import BaseModel
 
@@ -59,6 +60,21 @@ class JobSpec(BaseModel):
     source_id: Optional[str]
     source_name: Optional[str]
     tasks: Optional[List] = []
+
+    class Config:
+        # Allow population by field name as well as alias
+        allow_population_by_field_name = True
+        # Allow arbitrary types
+        arbitrary_types_allowed = True
+
+        json_encoders = {
+            ExtractTask: lambda v: "Jeremy"
+        }
+
+        # Fields that should be ignored as part of JSON serialization
+        # fields = {
+        #     'future': {'exclude': True}
+        # }
 
     def __str__(self) -> str:
         task_info = "\n".join(str(task) for task in self.tasks)

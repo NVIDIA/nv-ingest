@@ -9,7 +9,8 @@ import time
 import traceback
 
 import redis
-from client.src.nv_ingest_client.primitives.jobs.job_state import JobState
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest_client.primitives.jobs.job_state import JobState
 from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
@@ -85,7 +86,7 @@ class RedisClient:
 
                 self.client = None  # Invalidate client to force reconnection
 
-    def submit_message(self, queue_name, message):
+    def submit_message(self, queue_name, message: JobSpec):
         """
         Updated method to submit a message to a specified Redis queue with retries on failure.
 
@@ -95,7 +96,7 @@ class RedisClient:
         retries = 0
         while True:
             try:
-                self.get_client().rpush(queue_name, message)
+                self.get_client().rpush(queue_name, message.json())
                 logger.debug(f"Message submitted to {queue_name}")
                 return
             except RedisError as e:

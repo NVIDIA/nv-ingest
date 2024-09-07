@@ -12,6 +12,7 @@ from typing import Optional
 from typing import Union
 from uuid import UUID
 
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from pydantic import BaseModel
 
 from .job_spec import JobSpec
@@ -72,6 +73,14 @@ class JobState(BaseModel):
         allow_population_by_field_name = True
         # Allow arbitrary types
         arbitrary_types_allowed = True
+
+        json_encoders = {
+            ExtractTask: lambda v: "Jeremy"
+        }
+
+        fields = {
+            'future': {'exclude': True}
+        }
 
 
     # @property

@@ -362,6 +362,7 @@ def create_and_process_jobs(
                 batch_files = files[processed : processed + new_job_count]  # noqa: E203
 
                 _, new_job_ids = create_job_specs_for_batch(batch_files, tasks, client)
+                
                 if len(new_job_ids) != new_job_count:
                     missing_jobs = new_job_count - len(new_job_ids)
                     error_msg = (

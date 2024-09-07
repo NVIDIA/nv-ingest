@@ -13,121 +13,121 @@ services:
 #    ports:
 #      - "9998:9998"
 
-  yolox:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
-    ports:
-      - "8000:8000"
-      - "8001:8001"
-      - "8002:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=$NIM_NGC_API_KEY
-      - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+  # yolox:
+  #   image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+  #   ports:
+  #     - "8000:8000"
+  #     - "8001:8001"
+  #     - "8002:8002"
+  #   volumes:
+  #     - ${HOME}/.cache:/home/nvs/.cache
+  #   user: root
+  #   environment:
+  #     - NIM_HTTP_API_PORT=8000
+  #     - NIM_TRITON_LOG_VERBOSE=1
+  #     - NGC_API_KEY=$NIM_NGC_API_KEY
+  #     - CUDA_VISIBLE_DEVICES=0
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   runtime: nvidia
 
-  deplot:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
-    ports:
-      - "8003:8000"
-      - "8004:8001"
-      - "8005:8002"
-    volumes:
-      - ${HOME}/.cache:/opt/nim/.cache
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=$NIM_NGC_API_KEY
-      - CUDA_VISIBLE_DEVICES=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+  # deplot:
+  #   image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
+  #   ports:
+  #     - "8003:8000"
+  #     - "8004:8001"
+  #     - "8005:8002"
+  #   volumes:
+  #     - ${HOME}/.cache:/opt/nim/.cache
+  #   user: root
+  #   environment:
+  #     - NIM_HTTP_API_PORT=8000
+  #     - NIM_TRITON_LOG_VERBOSE=1
+  #     - NGC_API_KEY=$NIM_NGC_API_KEY
+  #     - CUDA_VISIBLE_DEVICES=1
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   runtime: nvidia
 
-  cached:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
-    shm_size: 2gb
-    ports:
-      - "8006:8000"
-      - "8007:8001"
-      - "8008:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=$NIM_NGC_API_KEY
-      - CUDA_VISIBLE_DEVICES=2
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+  # cached:
+  #   image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
+  #   shm_size: 2gb
+  #   ports:
+  #     - "8006:8000"
+  #     - "8007:8001"
+  #     - "8008:8002"
+  #   volumes:
+  #     - ${HOME}/.cache:/home/nvs/.cache
+  #   user: root
+  #   environment:
+  #     - NIM_HTTP_API_PORT=8000
+  #     - NIM_TRITON_LOG_VERBOSE=1
+  #     - NGC_API_KEY=$NIM_NGC_API_KEY
+  #     - CUDA_VISIBLE_DEVICES=2
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   runtime: nvidia
 
-  paddle:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
-    shm_size: 2gb
-    ports:
-      - "8009:8000"
-      - "8010:8001"
-      - "8011:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=$NIM_NGC_API_KEY
-      - CUDA_VISIBLE_DEVICES=3
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+  # paddle:
+  #   image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
+  #   shm_size: 2gb
+  #   ports:
+  #     - "8009:8000"
+  #     - "8010:8001"
+  #     - "8011:8002"
+  #   volumes:
+  #     - ${HOME}/.cache:/home/nvs/.cache
+  #   user: root
+  #   environment:
+  #     - NIM_HTTP_API_PORT=8000
+  #     - NIM_TRITON_LOG_VERBOSE=1
+  #     - NGC_API_KEY=$NIM_NGC_API_KEY
+  #     - CUDA_VISIBLE_DEVICES=3
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   runtime: nvidia
 
-  embedding:
-    # NIM ON
-    image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.0
-    shm_size: 16gb
-    ports:
-      - "8012:8000"
-      - "8013:8001"
-      - "8014:8002"
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=$NIM_NGC_API_KEY
-      - CUDA_VISIBLE_DEVICES=3
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
+  # embedding:
+  #   # NIM ON
+  #   image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.0
+  #   shm_size: 16gb
+  #   ports:
+  #     - "8012:8000"
+  #     - "8013:8001"
+  #     - "8014:8002"
+  #   environment:
+  #     - NIM_HTTP_API_PORT=8000
+  #     - NIM_TRITON_LOG_VERBOSE=1
+  #     - NGC_API_KEY=$NIM_NGC_API_KEY
+  #     - CUDA_VISIBLE_DEVICES=3
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             count: all
+  #             capabilities: [gpu]
+  #   runtime: nvidia
 
   nv-ingest-ms-runtime:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08

@@ -11,6 +11,7 @@ from typing import Any
 from typing import Optional
 
 import redis
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.message_clients import MessageClientBase
 from nv_ingest_client.primitives.jobs.job_state import JobState
 from redis.exceptions import RedisError
@@ -171,7 +172,7 @@ class RedisClient(MessageClientBase):
                 logger.error(f"Unexpected error during fetch from {job_state.response_channel}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, channel_name: str, message: str) -> None:
+    def submit_message(self, channel_name: str, message: JobSpec) -> None:
         """
         Submits a message to a specified Redis queue with retries on failure.
 

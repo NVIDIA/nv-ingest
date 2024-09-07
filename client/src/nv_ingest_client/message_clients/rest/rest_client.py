@@ -16,6 +16,7 @@ import time
 from typing import Any
 from typing import Optional
 
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 import httpx
 import requests
 from nv_ingest_client.message_clients import MessageClientBase
@@ -165,7 +166,7 @@ class RestClient(MessageClientBase):
                 logger.error(f"Unexpected error during fetch from {job_state.response_channel}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, _: str, message: str) -> str:
+    def submit_message(self, _: str, message: JobSpec) -> str:
         """
         Submits a message to a specified HTTP endpoint with retries on failure.
 
@@ -185,12 +186,15 @@ class RestClient(MessageClientBase):
         while True:
             try:
                 # Submit via HTTP
+                print("Entering submit_message of rest_client.py")
                 url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
-                result = requests.post(url, json=json.loads(message), headers={"Content-Type": "application/json"})
+                result = requests.post(url, data=message.json(), headers={"Content-Type": "application/json"})
                 logger.debug(f"Message submitted to http endpoint {self._submit_endpoint}")
                 print(f"RestClient submission Result: {result}")
                 print(f"Response.text: {result.text}")
                 print(f"Response.json: {result.json()}")
+                breakpoint()
+                print("result ....")
                 break
             except httpx.HTTPError as e:
                 logger.error(f"Failed to submit job, retrying... Error: {e}")

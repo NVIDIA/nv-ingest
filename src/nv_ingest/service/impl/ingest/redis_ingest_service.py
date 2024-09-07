@@ -58,7 +58,6 @@ class RedisIngestService(IngestServiceMeta):
     async def submit_job(self, job_spec: JobSpec) -> str:
         try:
             job_id = self._ingest_client.add_job(job_spec)
-            print(f"Type of JobSpec: {type(job_spec)}")
             _ = self._ingest_client.submit_job(job_id, self._redis_task_queue)
             self._pending_jobs.extend(job_id)
             return job_id
@@ -86,12 +85,3 @@ class RedisIngestService(IngestServiceMeta):
             raise RuntimeError(f"Failed to process job {job_id}: {description}")
 
         return result
-
-    # def get_jobs(self) -> Any:
-    #     """Retrieve the results from submitted jobs"""
-    #     results = []
-    #     for job_id in self._pending_jobs:
-    #         result = self._ingest_client.fetch_job_result(job_id, data_only=False)
-    #         results.append(result)
-    #         self._pending_jobs.remove(job_id)
-    #     return results

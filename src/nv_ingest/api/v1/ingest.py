@@ -22,10 +22,6 @@ from fastapi import HTTPException
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 
-# from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-# from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
-# from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
-
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
@@ -54,18 +50,16 @@ INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
     summary="submit jobs to the core nv ingestion service for processing",
     operation_id="submit_job",
 )
-async def submit_job(job_spec_json: dict, ingest_service: INGEST_SERVICE_T):
+async def submit_job(job_spec: JobSpec, ingest_service: INGEST_SERVICE_T):
     try:
-        job_spec = JobSpec.from_dict(job_spec_json)
         submitted_job_id = await ingest_service.submit_job(job_spec)
-        print(f"Submitted Job_Id: {submitted_job_id}")
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
-# POST /fetch_job
+# GET /fetch_job
 @router.get(
     "/fetch_job/{job_id}",
     responses={
@@ -78,10 +72,11 @@ async def submit_job(job_spec_json: dict, ingest_service: INGEST_SERVICE_T):
     operation_id="fetch_job",
 )
 async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
-    logger.info(f"!!!! Entering fetch_job endpoint: {job_id}")
     print(f"!!!! Entering fetch_job endpoint: {job_id}")
     try:
         job_response = await ingest_service.fetch_job(job_id)
         return job_response
     except Exception as ex:
+        traceback.print_exc()
+        breakpoint()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")

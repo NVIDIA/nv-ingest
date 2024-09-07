@@ -155,7 +155,7 @@ class NvIngestClient:
         job_state = self._job_states.get(job_id)
 
         if not job_state:
-            raise ValueError(f"Job with ID {job_state} does not exist")
+            raise ValueError(f"Job with ID {job_id} does not exist")
         if required_state and (job_state.state not in required_state):
             raise ValueError(
                 f"Job with ID {job_state.job_id} has invalid state {job_state.state}, expected {required_state}"
@@ -168,6 +168,8 @@ class NvIngestClient:
 
     def add_job(self, job_spec: JobSpec = None) -> str:
         job_id = job_spec.job_id or self._generate_job_id()
+        if isinstance(job_id, uuid.UUID):
+            job_id = str(job_id)
         if job_id and job_id in self._job_states:
             raise ValueError(f"Cannot create Job with ID {job_id}: already exists")
 
@@ -397,11 +399,13 @@ class NvIngestClient:
             job_id, required_state=[JobStateEnum.PENDING, JobStateEnum.SUBMITTED_ASYNC]
         )
 
-        job_spec_str = json.dumps(job_state.job_spec.to_dict())
-        response_channel = f"response_{job_id}"
-
         try:
-            self._message_client.submit_message(job_queue_id, job_spec_str)
+            # job_spec_str = json.dumps(job_state.job_spec.to_dict())
+            # job_spec_str = job_state.job_spec
+            response_channel = f"response_{job_id}"
+
+            # self._message_client.submit_message(job_queue_id, job_spec_str)
+            self._message_client.submit_message(job_queue_id, job_state.job_spec)
             job_state.response_channel = response_channel
             job_state.state = JobStateEnum.SUBMITTED
             # job_state.future = None
@@ -409,6 +413,7 @@ class NvIngestClient:
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
         except Exception as err:
+            breakpoint()
             logger.error(f"Failed to submit job {job_id} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise
@@ -445,6 +450,8 @@ class NvIngestClient:
         - Ensure that each job is in the proper state before submission.
         """
 
+        print(f"Invoking submit_job_async for job_ids: {job_ids}")
+        breakpoint()
         if isinstance(job_ids, str):
             job_ids = [job_ids]  # Convert single job_id to a list
 
