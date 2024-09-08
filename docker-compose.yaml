@@ -26,7 +26,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
-      # - CUDA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
@@ -49,7 +49,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
-      # - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -73,7 +73,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
-      # - CUDA_VISIBLE_DEVICES=2
+      - CUDA_VISIBLE_DEVICES=2
     deploy:
       resources:
         reservations:
@@ -97,7 +97,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
-      # - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=3
     deploy:
       resources:
         reservations:
@@ -119,7 +119,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=$NIM_NGC_API_KEY
-      # - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=3
     deploy:
       resources:
         reservations:
@@ -150,7 +150,7 @@ services:
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - INGEST_LOG_LEVEL=DEBUG
+      - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
       - MESSAGE_CLIENT_PORT=6379
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
@@ -164,7 +164,7 @@ services:
       - TABLE_DETECTION_HTTP_TRITON=""
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=""
-      # - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=3
     deploy:
       resources:
         reservations:
