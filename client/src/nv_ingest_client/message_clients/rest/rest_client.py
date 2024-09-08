@@ -142,8 +142,8 @@ class RestClient(MessageClientBase):
             try:
                 # Fetch via HTTP
                 url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_spec.job_id}"
+                logger.debug(f"Invoking fetch_message http endpoint @ '{self._submit_endpoint}'")
                 result = requests.get(url)
-                logger.debug(f"Fetch Message submitted to http endpoint {self._submit_endpoint}")
                 
                 # If the result contains a 200 then return the raw JSON string response
                 if result.status_code == 200:
@@ -152,13 +152,16 @@ class RestClient(MessageClientBase):
                     # Follow the established backoff approach
                     retries += 1
                     backoff_delay = min(2**retries, self._max_backoff)
+                    logger.debug(f"fetch_message received HTTP Status Code: {result.status_code} & message: '{result.text}'")
+                    logger.debug(f"Retry #: {retries} of max_retries: {self.max_retries} \
+                                 | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}")
                     
                     if self.max_retries > 0 and retries <= self.max_retries:
                         logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
                         time.sleep(backoff_delay)
                     else:
                         logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
-                        raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {err}")
+                        raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {result}")
 
             except httpx.HTTPError as err:
                 retries += 1
