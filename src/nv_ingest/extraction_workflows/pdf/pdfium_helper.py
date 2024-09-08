@@ -33,9 +33,9 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-from nv_ingest.util.triton.helpers import call_image_inference_model
-from nv_ingest.util.triton.helpers import create_inference_client
-from nv_ingest.util.triton.helpers import perform_model_inference
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import perform_model_inference
 
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
