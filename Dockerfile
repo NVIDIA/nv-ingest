@@ -57,6 +57,8 @@ RUN rm -rf ./src/nv_ingest/dist ./client/dist
 RUN source activate morpheus \
     && pip install -e client
 
+# TODO: Moved to after uploading source code changes so that client code can be installed first
+# which is needed in requirements.txt
 # Cache the requirements and install them before uploading source code changes
 RUN source activate morpheus \
     && pip install -r requirements.txt

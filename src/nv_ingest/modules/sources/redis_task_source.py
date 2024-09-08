@@ -108,7 +108,6 @@ def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
 
             control_message.set_timestamp("latency::ts_send", datetime.now())
     except Exception as e:
-        print(f"#### Exception in redis_task_source: {e}")
         if "job_id" in job:
             job_id = job["job_id"]
             response_channel = f"response_{job_id}"
@@ -119,7 +118,6 @@ def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
         else:
             raise
 
-    print(f"!!!!! redis_task_source")
     return control_message
 
 

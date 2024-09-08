@@ -399,12 +399,9 @@ class NvIngestClient:
             job_id, required_state=[JobStateEnum.PENDING, JobStateEnum.SUBMITTED_ASYNC]
         )
 
-        try:
-            # job_spec_str = json.dumps(job_state.job_spec.to_dict())
-            # job_spec_str = job_state.job_spec
-            response_channel = f"response_{job_id}"
+        response_channel = f"response_{job_id}"
 
-            # self._message_client.submit_message(job_queue_id, job_spec_str)
+        try:
             self._message_client.submit_message(job_queue_id, job_state.job_spec)
             job_state.response_channel = response_channel
             job_state.state = JobStateEnum.SUBMITTED

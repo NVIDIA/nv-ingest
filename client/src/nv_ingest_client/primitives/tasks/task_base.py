@@ -67,12 +67,6 @@ class Task:
         """
         return {}
 
-    @staticmethod
-    def from_dict(d: dict) -> str:
-        print(f"Task Type: {type(d)}")
-        print(f"Task in from_dict: {d}")
-        print(f"len(tasks): {len(d)}")
-        print(f"Type [0]: {type(d[0])}")
 
 
 # class ExtractUnstructuredTask(ExtractTask):

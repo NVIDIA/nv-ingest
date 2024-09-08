@@ -52,14 +52,6 @@ class JobSpec(BaseModel):
         Adds a task to the job specification.
     """
 
-    # _document_type: Optional[str] = Field(default=None, alias="document_type")
-    # _extended_options: Optional[Dict] = Field(default={}, alias="extended_options")
-    # _job_id: Optional[typing.Union[UUID, str]] = Field(default=None, alias="job_id")
-    # _payload: str = Field(default=None, alias="payload")
-    # _source_id: Optional[str] = Field(default=None, alias="source_id")
-    # _source_name: Optional[str] = Field(default=None, alias="source_name")
-    # _tasks: Optional[List] = Field(default=[], alias="tasks")
-
     document_type: Optional[str]
     extended_options: Optional[Dict] = {}
     job_id: Optional[typing.Union[UUID, str]]
