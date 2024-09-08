@@ -10,6 +10,7 @@ from typing import Any
 from typing import Dict
 from typing import Tuple
 
+from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 import mrc
 from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -19,7 +20,6 @@ from redis import RedisError
 
 from nv_ingest.schemas.redis_task_sink_schema import RedisTaskSinkSchema
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
-from nv_ingest.util.redis import RedisClient
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
 

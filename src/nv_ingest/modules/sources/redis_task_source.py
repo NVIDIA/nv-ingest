@@ -9,6 +9,7 @@ import traceback
 from datetime import datetime
 from functools import partial
 
+from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 import mrc
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
@@ -22,7 +23,6 @@ import cudf
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.redis_task_source_schema import RedisTaskSourceSchema
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
-from nv_ingest.util.redis import RedisClient
 from nv_ingest.util.tracing.logging import annotate_cm
 
 logger = logging.getLogger(__name__)
@@ -37,7 +37,7 @@ def fetch_and_process_messages(redis_client: RedisClient, validated_config: Redi
 
     while True:
         try:
-            job_payload = redis_client.fetch_message(validated_config.task_queue)
+            job_payload = redis_client.fetch_message_morpheus(validated_config.task_queue)
             ts_fetched = datetime.now()
             yield process_message(job_payload, ts_fetched)  # process_message remains unchanged
         except RedisError:
@@ -53,14 +53,15 @@ def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
     """
     Fetch messages from the Redis list (task queue) and yield as ControlMessage.
     """
-    ts_entry = datetime.now()
-
-    job = json.loads(job_payload)
-    # no_payload = copy.deepcopy(job)
-    # no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
-    # logger.debug("Job: %s", json.dumps(no_payload, indent=2))
-    control_message = ControlMessage()
     try:
+        ts_entry = datetime.now()
+
+        job = json.loads(job_payload)
+        # no_payload = copy.deepcopy(job)
+        # no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
+        # logger.debug("Job: %s", json.dumps(no_payload, indent=2))
+        control_message = ControlMessage()
+        
         validate_ingest_job(job)
         job_id = job.pop("job_id")
         job_payload = job.pop("job_payload", {})
@@ -107,6 +108,7 @@ def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
 
             control_message.set_timestamp("latency::ts_send", datetime.now())
     except Exception as e:
+        print(f"#### Exception in redis_task_source: {e}")
         if "job_id" in job:
             job_id = job["job_id"]
             response_channel = f"response_{job_id}"
@@ -117,6 +119,7 @@ def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
         else:
             raise
 
+    print(f"!!!!! redis_task_source")
     return control_message
 
 

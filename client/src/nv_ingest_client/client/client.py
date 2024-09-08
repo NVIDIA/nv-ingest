@@ -155,10 +155,10 @@ class NvIngestClient:
         job_state = self._job_states.get(job_id)
 
         if not job_state:
-            raise ValueError(f"Job with ID {job_id} does not exist")
+            raise ValueError(f"Job with ID {job_id} does not exist in JobStates: {self._job_states}")
         if required_state and (job_state.state not in required_state):
             raise ValueError(
-                f"Job with ID {job_state.job_id} has invalid state {job_state.state}, expected {required_state}"
+                f"Job with ID {job_state.job_spec.job_id} has invalid state {job_state.state}, expected {required_state}"
             )
 
         return job_state
@@ -270,7 +270,7 @@ class NvIngestClient:
 
         return self.add_task(job_id, task_factory(task_type, **task_params))
 
-    def _fetch_job_result(self, job_id: str, timeout: float = 10, data_only: bool = True) -> Tuple[Dict, str]:
+    def _fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True) -> Tuple[Dict, str]:
         """
         Fetches the job result from a message client, handling potential errors and state changes.
 
@@ -315,7 +315,7 @@ class NvIngestClient:
             logger.error(f"Unexpected error while fetching job result for job ID {job_id}: {err}")
             raise
 
-    def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True):
+    def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
@@ -413,7 +413,6 @@ class NvIngestClient:
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
         except Exception as err:
-            breakpoint()
             logger.error(f"Failed to submit job {job_id} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise
@@ -450,8 +449,6 @@ class NvIngestClient:
         - Ensure that each job is in the proper state before submission.
         """
 
-        print(f"Invoking submit_job_async for job_ids: {job_ids}")
-        breakpoint()
         if isinstance(job_ids, str):
             job_ids = [job_ids]  # Convert single job_id to a list
 

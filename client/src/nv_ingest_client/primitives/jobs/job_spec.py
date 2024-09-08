@@ -11,6 +11,13 @@ from typing import List
 from typing import Optional
 from uuid import UUID
 
+from nv_ingest_client.primitives.tasks.caption import CaptionTask
+from nv_ingest_client.primitives.tasks.dedup import DedupTask
+from nv_ingest_client.primitives.tasks.embed import EmbedTask
+from nv_ingest_client.primitives.tasks.filter import FilterTask
+from nv_ingest_client.primitives.tasks.split import SplitTask
+from nv_ingest_client.primitives.tasks.store import StoreTask
+from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTask
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest_client.primitives.tasks import Task
 from pydantic import BaseModel
@@ -68,13 +75,15 @@ class JobSpec(BaseModel):
         arbitrary_types_allowed = True
 
         json_encoders = {
-            ExtractTask: lambda v: "Jeremy"
+            CaptionTask: lambda v: v.to_dict(),
+            DedupTask: lambda v: v.to_dict(),
+            EmbedTask: lambda v: v.to_dict(),
+            ExtractTask: lambda v: v.to_dict(),
+            FilterTask: lambda v: v.to_dict(),
+            SplitTask: lambda v: v.to_dict(),
+            StoreTask: lambda v: v.to_dict(),
+            VdbUploadTask: lambda v: v.to_dict()
         }
-
-        # Fields that should be ignored as part of JSON serialization
-        # fields = {
-        #     'future': {'exclude': True}
-        # }
 
     def __str__(self) -> str:
         task_info = "\n".join(str(task) for task in self.tasks)
@@ -88,42 +97,28 @@ class JobSpec(BaseModel):
             f"extended-options: {self.extended_options}\n"
             f"{task_info}"
         )
-
-    # @property
-    # def tasks(self) -> Any:
-    #     """Gets the job specification associated with the state."""
-    #     return self._tasks
     
-    # @tasks.setter
-    # def job_spec(self, value: JobSpec) -> None:
-    #     """Sets the job specification associated with the state."""
-    #     if self._state not in _PREFLIGHT_STATES:
-    #         err_msg = f"Attempt to change job_spec after job submission: {self._state.name}"
-    #         logger.error(err_msg)
+    def to_dict(self) -> Dict:
+        """
+        Converts the job specification instance into a dictionary suitable for JSON serialization.
 
-    # @property
-    # def job_id(self) -> UUID:
-    #     return self._job_id
+        Returns
+        -------
+        Dict
+            A dictionary representation of the job specification.
+        """
+        return {
+            "job_payload": {
+                "source_name": [self.source_name],
+                "source_id": [self.source_id],
+                "content": [self.payload],
+                "document_type": [self.document_type],
+            },
+            "job_id": str(self.job_id),
+            "tasks": [task if isinstance(task, dict) else task.to_dict() for task in self.tasks],
+            "tracing_options": self.extended_options.get("tracing_options", {}),
+        }
 
-    # @job_id.setter
-    # def job_id(self, job_id: UUID) -> None:
-    #     self._job_id = job_id
-
-    # @property
-    # def source_id(self) -> str:
-    #     return self._source_id
-
-    # @source_id.setter
-    # def source_id(self, source_id: str) -> None:
-    #     self._source_id = source_id
-
-    # @property
-    # def source_name(self) -> str:
-    #     return self._source_name
-
-    # @source_name.setter
-    # def source_name(self, source_name: str) -> None:
-    #     self._source_name = source_name
 
     def add_task(self, task) -> None:
         """

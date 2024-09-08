@@ -75,7 +75,7 @@ class JobState(BaseModel):
         arbitrary_types_allowed = True
 
         json_encoders = {
-            ExtractTask: lambda v: "Jeremy"
+            ExtractTask: lambda v: v.to_dict()
         }
 
         fields = {

@@ -49,13 +49,17 @@ ENV NV_INGEST_RELEASE_TYPE=${RELEASE_TYPE}
 ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
-# Cache the requirements and install them before uploading source code changes
-RUN source activate morpheus \
-    && pip install -r requirements.txt
-
 COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
+
+# TODO: Temp fix to install the nv-ingest-client Python package so pip install -r requirements.txt can resolve it
+RUN source activate morpheus \
+    && pip install -e client
+
+# Cache the requirements and install them before uploading source code changes
+RUN source activate morpheus \
+    && pip install -r requirements.txt
 
 # Run the build_pip_packages.sh script with the specified build type and library
 RUN chmod +x ./ci/scripts/build_pip_packages.sh \

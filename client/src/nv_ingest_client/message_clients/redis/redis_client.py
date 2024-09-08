@@ -5,6 +5,7 @@
 
 # pylint: skip-file
 
+import json
 import logging
 import time
 from typing import Any
@@ -124,8 +125,29 @@ class RedisClient(MessageClientBase):
             return True
         except (RedisError, AttributeError):
             return False
+        
+    def fetch_message_morpheus(self, task_queue):
+        retries = 0
+        while True:
+            try:
+                _, job_payload = self.get_client().blpop([task_queue])
+                return job_payload
+            except RedisError as err:
+                retries += 1
+                logger.error(f"Redis error during fetch: {err}")
+                backoff_delay = min(2**retries, self.max_backoff)
 
-    def fetch_message(self, job_state: JobState, timeout: float = 10) -> Optional[str]:
+                if self.max_retries == 0 or retries <= self.max_retries:
+                    logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
+                    time.sleep(backoff_delay)
+                else:
+                    logger.error(f"Failed to fetch message from {task_queue} after {retries} attempts.")
+                    raise
+
+                self.client = None  # Invalidate client to force reconnection
+
+
+    def fetch_message(self, job_state: JobState, timeout: float = 300) -> Optional[str]:
         """
         Fetches a message from the specified queue with retries on failure.
 
@@ -191,7 +213,7 @@ class RedisClient(MessageClientBase):
         retries = 0
         while True:
             try:
-                self.get_client().rpush(channel_name, message)
+                self.get_client().rpush(channel_name, json.dumps(message.to_dict()))
                 logger.debug(f"Message submitted to {channel_name}")
                 break
             except RedisError as e:

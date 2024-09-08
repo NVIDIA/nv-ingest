@@ -8,6 +8,7 @@ import re
 import traceback
 from datetime import datetime
 
+from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 import mrc
 from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -24,7 +25,6 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
-from nv_ingest.util.redis import RedisClient
 from nv_ingest.util.telemetry.global_stats import GlobalStats
 
 logger = logging.getLogger(__name__)

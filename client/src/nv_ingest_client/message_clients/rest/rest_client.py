@@ -142,11 +142,24 @@ class RestClient(MessageClientBase):
             try:
                 # Fetch via HTTP
                 url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_spec.job_id}"
-                print(f"Fetch message at URL: {url}")
                 result = requests.get(url)
                 logger.debug(f"Fetch Message submitted to http endpoint {self._submit_endpoint}")
-                print(f"RestClient fetch Result: {result}")
-                break
+                
+                # If the result contains a 200 then return the raw JSON string response
+                if result.status_code == 200:
+                    return result.text
+                else:
+                    # Follow the established backoff approach
+                    retries += 1
+                    backoff_delay = min(2**retries, self._max_backoff)
+                    
+                    if self.max_retries > 0 and retries <= self.max_retries:
+                        logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
+                        time.sleep(backoff_delay)
+                    else:
+                        logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
+                        raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {err}")
+
             except httpx.HTTPError as err:
                 retries += 1
                 logger.error(f"REST error during fetch: {err}")
@@ -186,15 +199,9 @@ class RestClient(MessageClientBase):
         while True:
             try:
                 # Submit via HTTP
-                print("Entering submit_message of rest_client.py")
                 url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
                 result = requests.post(url, data=message.json(), headers={"Content-Type": "application/json"})
                 logger.debug(f"Message submitted to http endpoint {self._submit_endpoint}")
-                print(f"RestClient submission Result: {result}")
-                print(f"Response.text: {result.text}")
-                print(f"Response.json: {result.json()}")
-                breakpoint()
-                print("result ....")
                 break
             except httpx.HTTPError as e:
                 logger.error(f"Failed to submit job, retrying... Error: {e}")

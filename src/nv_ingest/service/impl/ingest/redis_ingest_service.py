@@ -13,12 +13,12 @@ import logging
 import os
 from typing import Any
 
+from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.util.util import check_ingest_result
 
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
-from nv_ingest.util.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
@@ -70,8 +70,6 @@ class RedisIngestService(IngestServiceMeta):
 
         futures = list(futures_dict.keys())
         result = futures[0].result()
-        if len(result) > 1:
-            logger.error(f"Need to figure out what is going on here .... {result} len: {len(result)}")
         result = result[0]  # List, get first element
         result = result[0]  # Tuple (response, job_id), get response
         if ("annotations" in result) and result["annotations"]:

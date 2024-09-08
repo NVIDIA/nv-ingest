@@ -72,11 +72,9 @@ async def submit_job(job_spec: JobSpec, ingest_service: INGEST_SERVICE_T):
     operation_id="fetch_job",
 )
 async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
-    print(f"!!!! Entering fetch_job endpoint: {job_id}")
     try:
         job_response = await ingest_service.fetch_job(job_id)
         return job_response
     except Exception as ex:
         traceback.print_exc()
-        breakpoint()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
