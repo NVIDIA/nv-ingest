@@ -1,18 +1,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
-# pylint: skip-file
-
+import json
 import logging
 import time
-from typing import Any
+import traceback
+from typing import Any, List, Dict, Union
 from typing import Optional
 
 import redis
-from nv_ingest_client.message_clients import MessageClientBase
 from redis.exceptions import RedisError
+
+from nv_ingest_client.message_clients import MessageClientBase
+
+# pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
@@ -50,16 +51,16 @@ class RedisClient(MessageClientBase):
     """
 
     def __init__(
-        self,
-        host: str,
-        port: int,
-        db: int = 0,
-        max_retries: int = 0,
-        max_backoff: int = 32,
-        connection_timeout: int = 300,
-        max_pool_size: int = 128,
-        use_ssl: bool = False,
-        redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
+            self,
+            host: str,
+            port: int,
+            db: int = 0,
+            max_retries: int = 0,
+            max_backoff: int = 32,
+            connection_timeout: int = 300,
+            max_pool_size: int = 128,
+            use_ssl: bool = False,
+            redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
     ):
         self._host = host
         self._port = port
@@ -123,38 +124,92 @@ class RedisClient(MessageClientBase):
         except (RedisError, AttributeError):
             return False
 
-    def fetch_message(self, channel_name: str, timeout: float = 10) -> Optional[str]:
+    def _check_response(self, channel_name: str, timeout: float):
+        response = self.get_client().blpop([channel_name], timeout)
+
+        if (response and len(response) > 1 and response[1]):
+            try:
+                message = json.loads(response[1])
+                fragment = message.get('fragment', 0)
+                fragment_count = message.get('fragment_count', 1)
+
+                return message, fragment, fragment_count
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to decode message: {e}")
+                raise ValueError(f"Failed to decode message from Redis: {e}")
+
+        return None, None, None
+
+    def fetch_message(self, channel_name: str, timeout: float = 10) -> Optional[Union[str, Dict]]:
         """
-        Fetches a message from the specified queue with retries on failure.
+        Fetches a message from the specified queue with retries on failure. If the message is fragmented, it will
+        continue fetching fragments until all parts have been collected.
 
         Parameters
         ----------
         channel_name : str
             The name of the task queue to fetch messages from.
         timeout : float
-            The timeout in seconds for blocking until a message is available.
+            The timeout in seconds for blocking until a message is available. If we receive a multi-part message, this
+            value will be temporarily extended in order to collect all fragments.
 
         Returns
         -------
         Optional[str]
-            The fetched message, or None if no message could be fetched.
+            The full fetched message, or None if no message could be fetched after retries.
 
         Raises
         ------
         ValueError
             If fetching the message fails after the specified number of retries or due to other critical errors.
         """
+        accumulated_time = 0
+        collected_fragments = []
+        fragment_count = None
         retries = 0
+
         while True:
             try:
-                response = self.get_client().blpop([channel_name], timeout)
-                if response and response[1]:
-                    return response[1]
-                return None
+                # Attempt to fetch a message from the Redis queue
+                message, fragment, fragment_count = self._check_response(channel_name, timeout)
+
+                if (message is not None):
+                    if (fragment_count == 1):
+                        # No fragmentation, return the message as is
+                        return message
+
+                    collected_fragments.append(message)
+
+                    # If we have collected all fragments, combine and return
+                    if (len(collected_fragments) == fragment_count):
+                        # Sort fragments by the 'fragment' field to ensure correct order
+                        collected_fragments.sort(key=lambda x: x['fragment'])
+
+                        # Combine fragments (assuming they are part of a larger payload)
+                        reconstructed_message = self._combine_fragments(collected_fragments)
+
+                        return reconstructed_message
+
+                else:
+                    # Return None if the response is empty
+                    return message
+
+            except TimeoutError:
+                # TODO(Devin) Once we start accumulating fragments, we can no longer fully recover from a timeout, so
+                #  we should consider this a failure. Look into caching partial results for retries in the future.
+                if (fragment_count and fragment_count > 1):
+                    accumulated_time += timeout
+                    if (accumulated_time >= (timeout * fragment_count)):
+                        err_msg = f"Failed to reconstruct message from {channel_name} after {accumulated_time} sec."
+                        logger.error(err_msg)
+                        raise ValueError(err_msg)
+                else:
+                    raise  # This is expected in many cases, so re-raise it
+
             except RedisError as err:
                 retries += 1
                 logger.error(f"Redis error during fetch: {err}")
-                backoff_delay = min(2**retries, self._max_backoff)
+                backoff_delay = min(2 ** retries, self._max_backoff)
 
                 if self.max_retries > 0 and retries <= self.max_retries:
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
@@ -165,10 +220,44 @@ class RedisClient(MessageClientBase):
 
                 # Invalidate client to force reconnection on the next try
                 self._client = None
+
             except Exception as e:
                 # Handle non-Redis specific exceptions
                 logger.error(f"Unexpected error during fetch from {channel_name}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
+
+    def _combine_fragments(self, fragments: List[Dict[str, Any]]) -> str:
+        """
+        Combines multiple message fragments into a single message by extending the 'data' elements,
+        retaining the 'status' and 'description' of the first fragment, and removing 'fragment' and 'fragment_counts'.
+
+        Parameters
+        ----------
+        fragments : List[Dict[str, Any]]
+            A list of fragments to be combined.
+
+        Returns
+        -------
+        str
+            The combined message as a JSON string, containing 'status', 'description', and combined 'data'.
+        """
+        if not fragments:
+            raise ValueError("Fragments list is empty")
+
+        # Use 'status' and 'description' from the first fragment
+        combined_message = {
+            'status': fragments[0]['status'],
+            'description': fragments[0]['description'],
+            'data': [],
+            'trace': fragments[0].get('trace', {})
+        }
+
+        # Combine the 'data' elements from all fragments
+        for fragment in fragments:
+            combined_message['data'].extend(fragment['data'])
+
+        # Return the combined message as a JSON string
+        return combined_message
 
     def submit_message(self, channel_name: str, message: str) -> None:
         """
@@ -196,7 +285,7 @@ class RedisClient(MessageClientBase):
                 logger.error(f"Failed to submit message, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
                 retries += 1
-                backoff_delay = min(2**retries, self._max_backoff)
+                backoff_delay = min(2 ** retries, self._max_backoff)
 
                 if self.max_retries == 0 or retries < self.max_retries:
                     logger.error(f"Submit attempt failed, retrying in {backoff_delay}s...")
