@@ -5,7 +5,7 @@ import json
 import logging
 import time
 import traceback
-from typing import Any, List, Dict, Union
+from typing import Any, List, Dict, Union, Tuple
 from typing import Optional
 
 import redis
@@ -124,7 +124,31 @@ class RedisClient(MessageClientBase):
         except (RedisError, AttributeError):
             return False
 
-    def _check_response(self, channel_name: str, timeout: float):
+    def _check_response(self, channel_name: str, timeout: float) -> Tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+        """
+        Checks for a response from the Redis queue and processes it into a message, fragment, and fragment count.
+
+        Parameters
+        ----------
+        channel_name : str
+            The name of the Redis channel from which to receive the response.
+        timeout : float
+            The time in seconds to wait for a response from the Redis queue before timing out.
+
+        Returns
+        -------
+        Tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]
+            A tuple containing:
+                - message: A dictionary containing the decoded message if successful, or None if no message was retrieved.
+                - fragment: An integer representing the fragment number of the message, or None if no fragment was found.
+                - fragment_count: An integer representing the total number of message fragments, or None if no fragment count was found.
+
+        Raises
+        ------
+        ValueError
+            If the message retrieved from Redis cannot be decoded from JSON.
+        """
+
         response = self.get_client().blpop([channel_name], timeout)
 
         if (response and len(response) > 1 and response[1]):
@@ -226,7 +250,8 @@ class RedisClient(MessageClientBase):
                 logger.error(f"Unexpected error during fetch from {channel_name}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def _combine_fragments(self, fragments: List[Dict[str, Any]]) -> str:
+    @staticmethod
+    def _combine_fragments(fragments: List[Dict[str, Any]]) -> Dict:
         """
         Combines multiple message fragments into a single message by extending the 'data' elements,
         retaining the 'status' and 'description' of the first fragment, and removing 'fragment' and 'fragment_counts'.
@@ -256,7 +281,6 @@ class RedisClient(MessageClientBase):
         for fragment in fragments:
             combined_message['data'].extend(fragment['data'])
 
-        # Return the combined message as a JSON string
         return combined_message
 
     def submit_message(self, channel_name: str, message: str) -> None:
