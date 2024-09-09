@@ -10,7 +10,6 @@
 
 # pylint: skip-file
 
-import json
 import logging
 import time
 from typing import Any
@@ -23,6 +22,15 @@ from nv_ingest_client.message_clients import MessageClientBase
 from nv_ingest_client.primitives.jobs.job_state import JobState
 
 logger = logging.getLogger(__name__)
+
+# HTTP Response Statuses that result in marking submission as failed
+# 4XX - Any 4XX status is considered a client derived error and will result in failure
+# 5XX - Not all 500's are terminal but most are. Those which are listed below
+_TERMINAL_RESPONSE_STATUSES = [
+    400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
+    414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451,
+    500, 501, 503, 505, 506, 507, 508, 510, 511
+]
 
 
 class RestClient(MessageClientBase):
@@ -142,81 +150,136 @@ class RestClient(MessageClientBase):
             try:
                 # Fetch via HTTP
                 url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_state.job_spec.job_id}"
-                logger.debug(f"Invoking fetch_message http endpoint @ '{self._submit_endpoint}'")
+                logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
                 result = requests.get(url)
-                
-                # If the result contains a 200 then return the raw JSON string response
-                if result.status_code == 200:
-                    return result.text
+
+                response_code = result.status_code
+                if response_code in _TERMINAL_RESPONSE_STATUSES:
+                    # Any terminal response code results in a RuntimeError
+                    raise RuntimeError(f"A terminal response code: {response_code} was received \
+                                       when fetching JobSpec: {job_state.job_spec} with server response \
+                                        '{result.text}'")
                 else:
-                    # Follow the established backoff approach
-                    retries += 1
-                    backoff_delay = min(2**retries, self._max_backoff)
-                    logger.debug(f"fetch_message received HTTP Status Code: {result.status_code} & message: '{result.text}'")
-                    logger.debug(f"Retry #: {retries} of max_retries: {self.max_retries} \
-                                 | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}")
-                    
-                    if self.max_retries > 0 and retries <= self.max_retries:
-                        logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
-                        time.sleep(backoff_delay)
+                    # If the result contains a 200 then return the raw JSON string response
+                    if response_code == 200:
+                        return result.text
                     else:
-                        logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
-                        raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {result}")
+                        # We could just let this exception bubble but we capture for clarity
+                        # we may also choose to use more specific exceptions in the future
+                        try:
+                            retries = self.perform_retry_backoff(retries, job_state.job_spec)
+                        except RuntimeError as rte:
+                            raise rte
 
             except httpx.HTTPError as err:
-                retries += 1
-                logger.error(f"REST error during fetch: {err}")
-                backoff_delay = min(2**retries, self._max_backoff)
-
-                if self.max_retries > 0 and retries <= self.max_retries:
-                    logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
-                    time.sleep(backoff_delay)
-                else:
-                    logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
-                    raise ValueError(f"Failed to fetch message from HTTP endpoint after {retries} attempts: {err}")
-
-                # Invalidate client to force reconnection on the next try
-                self._client = None
+                logger.error(f"Error during fetching, retrying... Error: {err}")
+                self._client = None  # Invalidate client to force reconnection
+                try:
+                    retries = self.perform_retry_backoff(retries, job_state.job_spec)
+                except RuntimeError:
+                    # This RuntimeError is captured from reaching max number of retries
+                    # however, we are in an except for httpx error so we should raise
+                    # that exception to ensure the most visibility to the root cause
+                    raise err
             except Exception as e:
                 # Handle non-http specific exceptions
-                logger.error(f"Unexpected error during fetch from {job_state.response_channel}: {e}")
+                logger.error(f"Unexpected error during fetch from {url}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, _: str, message: JobSpec) -> str:
+    def submit_message(self, _: str, job_spec: JobSpec) -> str:
         """
-        Submits a message to a specified HTTP endpoint with retries on failure.
+        Submits a JobSpec to a specified HTTP endpoint with retries on failure.
 
         Parameters
         ----------
         channel_name : str
-            Not used as part of RestClient
-        message : str
-            The message to submit.
+            Not used as part of RestClient but defined in MessageClientBase
+        job_spec : JobSpec
+            The JobSpec to be submitted to the REST interface for processing
 
         Raises
         ------
-        RedisError
-            If submitting the message fails after the specified number of retries.
+        httpx.HTTPError
+            Any HTTP related errors that occur while attempting to submit the JobSpec
+
+        RuntimeError
+            Raised if the maximum number of retry attempts has been reached for a submission
         """
         retries = 0
         while True:
             try:
                 # Submit via HTTP
                 url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
-                result = requests.post(url, data=message.json(), headers={"Content-Type": "application/json"})
-                logger.debug(f"Message submitted to http endpoint {self._submit_endpoint}")
-                break
+                result = requests.post(url, data=job_spec.json(), headers={"Content-Type": "application/json"})
+
+                response_code = result.status_code
+                if response_code in _TERMINAL_RESPONSE_STATUSES:
+                    # Any terminal response code results in a RuntimeError
+                    raise RuntimeError(f"A terminal response code: {response_code} was received \
+                                       when submitting JobSpec: {job_spec} with server response \
+                                        '{result.text}'")
+                else:
+                    # If 200 we are good, otherwise lets try again
+                    if response_code == 200:
+                        logger.debug(f"JobSpec successfully submitted to http \
+                                     endpoint {self._submit_endpoint}, Resulting JobId: {result.json()}")
+                        # The REST interface returns a JobId so we capture that here
+                        return result.json()
+                    else:
+                        # We could just let this exception bubble but we capture for clarity
+                        # we may also choose to use more specific exceptions in the future
+                        try:
+                            retries = self.perform_retry_backoff(retries, job_spec)
+                        except RuntimeError as rte:
+                            raise rte
+
             except httpx.HTTPError as e:
                 logger.error(f"Failed to submit job, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
-                retries += 1
-                backoff_delay = min(2**retries, self._max_backoff)
+                try:
+                    retries = self.perform_retry_backoff(retries, job_spec)
+                except RuntimeError:
+                    # This RuntimeError is captured from reaching max number of retries
+                    # however, we are in an except for httpx error so we should raise
+                    # that exception to ensure the most visibility to the root cause
+                    raise e
+            except Exception as e:
+                # Handle non-http specific exceptions
+                logger.error(f"Unexpected error during submission of JobSpec to {url}: {e}")
+                raise ValueError(f"Unexpected error during JobSpec submission: {e}")
 
-                if self.max_retries == 0 or retries < self.max_retries:
-                    logger.error(f"Submit attempt failed, retrying in {backoff_delay}s...")
-                    time.sleep(backoff_delay)
-                else:
-                    logger.error(
-                        f"Failed to submit message to http endpoint {self._submit_endpoint} after {retries} attempts."
-                    )
-                    raise
+    def perform_retry_backoff(self, existing_retries, job_spec: JobSpec) -> int:
+        """
+        Attempts to perform a backoff retry delay. This function accepts the
+        current number of retries that have been attempted and compares
+        that with the maximum number of retries allowed. If the current
+        number of retries excedes the max then a RuntimeError is raised.
+
+        Parameters
+        ----------
+        existing_retries : int
+            The number of retries that have been attempting for this submission thus far
+        job_spec : JobSpec
+            The JobSpec that is in question for either submission or fetching
+
+        Returns
+        -------
+        int
+            The updated number of retry attempts that have been made for this submission
+
+        Raises
+        ------
+        RuntimeError
+            Raised if the maximum number of retry attempts has been reached.
+        """
+        backoff_delay = min(2**existing_retries, self._max_backoff)
+        logger.debug(f"Retry #: {existing_retries} of max_retries: {self.max_retries} \
+                        | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}")
+
+        if self.max_retries > 0 and existing_retries <= self.max_retries:
+            logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
+            time.sleep(backoff_delay)
+        else:
+            raise RuntimeError(f"Max retry attempts of {self.max_retries} reached for JobId: {job_spec.job_id}")
+
+        return existing_retries + 1
