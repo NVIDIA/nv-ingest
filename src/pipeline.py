@@ -88,6 +88,9 @@ def get_yolox_service_table_detection():
         "",
     )
     auth_token = os.environ.get(
+        "NGC_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
         "NGC_API_KEY",
         "",
     )
@@ -108,6 +111,9 @@ def get_paddle_service_table_detection():
         "",
     )
     auth_token = os.environ.get(
+        "NGC_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
         "NGC_API_KEY",
         "",
     )
@@ -128,6 +134,9 @@ def get_deplot_service_table_detection():
         "",
     )
     auth_token = os.environ.get(
+        "NGC_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
         "NGC_API_KEY",
         "",
     )
@@ -148,6 +157,9 @@ def get_cached_service_table_detection():
         "",
     )
     auth_token = os.environ.get(
+        "NGC_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
         "NGC_API_KEY",
         "",
     )

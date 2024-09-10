@@ -50,7 +50,7 @@ If preferred, you can also [start services one by one](docs/deployment.md), or r
 First, git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
 
-To access pre-built containers and NIM microservices, [generate API keys](docs/ngc_api_key.md) and authenticate with NGC with the `docker login` command:
+To access pre-built containers and NIM microservices, [generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 $ docker login nvcr.io
 Username: $oauthtoken

@@ -63,3 +63,11 @@ SPDX-License-Identifier: Apache-2.0
 
   - **Description**: The log level for the ingest service, which controls the verbosity of the logging output.
   - **Example**: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
+
+- **`NVIDIA_BUILD_API_KEY`**:
+  - **Description**: This key is for when you are using the build.nvidia.com endpoint instead of a self hosted Deplot NIM
+    This is necessary only in some cases when it is different from `NGC_API_KEY`.
+
+- **`NIM_NGC_API_KEY`**:
+  - **Description**: This key is by NIM microservices inside docker containers to access NGC resources.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`.
