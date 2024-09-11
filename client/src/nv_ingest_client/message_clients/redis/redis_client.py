@@ -5,17 +5,15 @@
 
 # pylint: skip-file
 
-import json
 import logging
 import time
 from typing import Any
 from typing import Optional
 
 import redis
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.message_clients import MessageClientBase
-from nv_ingest_client.primitives.jobs.job_state import JobState
 from redis.exceptions import RedisError
+
+from nv_ingest_client.message_clients import MessageClientBase
 
 logger = logging.getLogger(__name__)
 
@@ -53,16 +51,16 @@ class RedisClient(MessageClientBase):
     """
 
     def __init__(
-        self,
-        host: str,
-        port: int,
-        db: int = 0,
-        max_retries: int = 0,
-        max_backoff: int = 32,
-        connection_timeout: int = 300,
-        max_pool_size: int = 128,
-        use_ssl: bool = False,
-        redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
+            self,
+            host: str,
+            port: int,
+            db: int = 0,
+            max_retries: int = 0,
+            max_backoff: int = 32,
+            connection_timeout: int = 300,
+            max_pool_size: int = 128,
+            use_ssl: bool = False,
+            redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
     ):
         self._host = host
         self._port = port
@@ -125,7 +123,7 @@ class RedisClient(MessageClientBase):
             return True
         except (RedisError, AttributeError):
             return False
-        
+
     def fetch_message_morpheus(self, task_queue):
         retries = 0
         while True:
@@ -135,7 +133,7 @@ class RedisClient(MessageClientBase):
             except RedisError as err:
                 retries += 1
                 logger.error(f"Redis error during fetch: {err}")
-                backoff_delay = min(2**retries, self.max_backoff)
+                backoff_delay = min(2 ** retries, self.max_backoff)
 
                 if self.max_retries == 0 or retries <= self.max_retries:
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
@@ -146,15 +144,15 @@ class RedisClient(MessageClientBase):
 
                 self.client = None  # Invalidate client to force reconnection
 
-
-    def fetch_message(self, job_state: JobState, timeout: float = 300) -> Optional[str]:
+    def fetch_message(self, fetch_channel: str, timeout: float = 300) -> Optional[str]:
         """
         Fetches a message from the specified queue with retries on failure.
 
         Parameters
         ----------
-        job_state : JobState
-            The JobState of the message to be fetched
+        fetch_channel: str
+            Channel to fetch the message from.
+
         timeout : float
             The timeout in seconds for blocking until a message is available.
 
@@ -171,30 +169,30 @@ class RedisClient(MessageClientBase):
         retries = 0
         while True:
             try:
-                response = self.get_client().blpop([job_state.response_channel], timeout)
+                response = self.get_client().blpop([fetch_channel], timeout)
                 if response and response[1]:
                     return response[1]
                 return None
             except RedisError as err:
                 retries += 1
                 logger.error(f"Redis error during fetch: {err}")
-                backoff_delay = min(2**retries, self._max_backoff)
+                backoff_delay = min(2 ** retries, self._max_backoff)
 
                 if self.max_retries > 0 and retries <= self.max_retries:
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
                     time.sleep(backoff_delay)
                 else:
-                    logger.error(f"Failed to fetch message from {job_state.response_channel} after {retries} attempts.")
+                    logger.error(f"Failed to fetch message from {fetch_channel} after {retries} attempts.")
                     raise ValueError(f"Failed to fetch message from Redis queue after {retries} attempts: {err}")
 
                 # Invalidate client to force reconnection on the next try
                 self._client = None
             except Exception as e:
                 # Handle non-Redis specific exceptions
-                logger.error(f"Unexpected error during fetch from {job_state.response_channel}: {e}")
+                logger.error(f"Unexpected error during fetch from {fetch_channel}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, channel_name: str, message: JobSpec) -> None:
+    def submit_message(self, channel_name: str, message: str) -> None:
         """
         Submits a message to a specified Redis queue with retries on failure.
 
@@ -213,14 +211,14 @@ class RedisClient(MessageClientBase):
         retries = 0
         while True:
             try:
-                self.get_client().rpush(channel_name, json.dumps(message.to_dict()))
+                self.get_client().rpush(channel_name, message)
                 logger.debug(f"Message submitted to {channel_name}")
                 break
             except RedisError as e:
                 logger.error(f"Failed to submit message, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
                 retries += 1
-                backoff_delay = min(2**retries, self._max_backoff)
+                backoff_delay = min(2 ** retries, self._max_backoff)
 
                 if self.max_retries == 0 or retries < self.max_retries:
                     logger.error(f"Submit attempt failed, retrying in {backoff_delay}s...")
