@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import io
 import logging
 from math import ceil
 from math import floor
@@ -14,15 +13,16 @@ from typing import Tuple
 import numpy as np
 import pypdfium2 as libpdfium
 import tritonclient.grpc as grpcclient
-from PIL import Image
 
 from nv_ingest.extraction_workflows.pdf import yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.converters import bytetools
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import ImageChart
 from nv_ingest.util.pdf.metadata_aggregators import ImageTable
@@ -33,9 +33,6 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-from nv_ingest.util.nim.helpers import call_image_inference_model
-from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
 
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
@@ -309,10 +306,7 @@ def handle_table_chart_extraction(
             h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
             cropped = original_image[floor(w1) : ceil(w2), floor(h1) : ceil(h2)]  # noqa: E203
 
-            img = Image.fromarray(cropped.astype(np.uint8))
-            with io.BytesIO() as buffer:
-                img.save(buffer, format="PNG")
-                base64_img = bytetools.base64frombytes(buffer.getvalue())
+            base64_img = numpy_to_base64(cropped)
 
             if label == "table":
                 table_content = call_image_inference_model(paddle_client, "paddle", cropped)
