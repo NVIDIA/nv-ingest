@@ -4,13 +4,11 @@
 
 
 import logging
-import typing
 from typing import Dict
 from typing import List
 from typing import Optional
 from uuid import UUID
 
-from nv_ingest.schemas import validate_ingest_job
 from nv_ingest_client.primitives.tasks import Task
 
 logger = logging.getLogger(__name__)
@@ -103,9 +101,6 @@ class JobSpec:
             "tasks": [task.to_dict() for task in self._tasks],
             "tracing_options": self._extended_options.get("tracing_options", {}),
         }
-
-    def render_as_pydantic(self) -> typing.Any:
-        return validate_ingest_job(**self.to_dict())
 
     @property
     def payload(self) -> Dict:

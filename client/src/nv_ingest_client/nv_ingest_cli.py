@@ -24,7 +24,6 @@ from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.redis import RedisClient
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from pkg_resources import DistributionNotFound
 from pkg_resources import VersionConflict

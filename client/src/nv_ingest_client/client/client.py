@@ -56,6 +56,7 @@ class NvIngestClient:
             message_client_allocator: Callable[..., RestClient] = RestClient,
             message_client_hostname: Optional[str] = "localhost",
             message_client_port: Optional[int] = 6379,
+            message_client_kwargs: Optional[Dict] = None,
             msg_counter_id: Optional[str] = "nv-ingest-message-id",
             worker_pool_size: int = 1,
     ) -> None:
@@ -130,7 +131,7 @@ class NvIngestClient:
 
         Parameters
         ----------
-        job_id : str
+        job_index : str
             The ID of the job to delete.
         """
 
@@ -388,10 +389,11 @@ class NvIngestClient:
         response_channel = f"response_{job_index}"
 
         try:
-            # TODO(Devin): Testing
             message = json.dumps(job_state.job_spec.to_dict())
 
-            self._message_client.submit_message(job_queue_id, message)
+            result_json = self._message_client.submit_message(job_queue_id, message)
+            # TODO(Devin): Not clear this actually returns JSON.
+            logger.info(f"Result JSON: {result_json}")
             job_state.response_channel = response_channel
             job_state.state = JobStateEnum.SUBMITTED
             # job_state.future = None

@@ -11,20 +11,22 @@
 import json
 import logging
 import os
+import uuid
+from json import JSONDecodeError
 from typing import Any
 
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
-from nv_ingest_client.client.client import NvIngestClient
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.util import check_ingest_result
+from redis import RedisError
 
+from nv_ingest.schemas import validate_ingest_job
+from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
 
 class RedisIngestService(IngestServiceMeta):
-    """Submits Jobs to Morpheus via Redis"""
+    """Submits Jobs to via Redis"""
 
     _concurrency_level = os.getenv("CONCURRENCY_LEVEL", 10)
     _client_kwargs = "{}"
@@ -40,6 +42,7 @@ class RedisIngestService(IngestServiceMeta):
             redis_port = os.getenv("MESSAGE_CLIENT_PORT", "6379")
             redis_task_queue = os.getenv("REDIS_MORPHEUS_TASK_QUEUE", "morpheus_task_queue")
             RedisIngestService.__shared_instance = RedisIngestService(redis_host, redis_port, redis_task_queue)
+
         return RedisIngestService.__shared_instance
 
     def __init__(self, redis_hostname: str, redis_port: int, redis_task_queue: str):
@@ -48,38 +51,50 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_task_queue = redis_task_queue
 
         # Create the ingest client
-        self._ingest_client = NvIngestClient(
-            message_client_allocator=RedisClient,
-            message_client_hostname=self._redis_hostname,
-            message_client_port=self._redis_port,
-            worker_pool_size=self._concurrency_level,
-        )
+        self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
+                                          max_pool_size=self._concurrency_level)
+        # self._ingest_client = NvIngestClient(
+        #     message_client_allocator=RedisClient,
+        #     message_client_hostname=self._redis_hostname,
+        #     message_client_port=self._redis_port,
+        #     worker_pool_size=self._concurrency_level,
+        # )
 
-    async def submit_job(self, job_spec: JobSpec) -> str:
+    async def submit_job(self, job_spec: MessageWrapper) -> str:
         try:
-            job_id = self._ingest_client.add_job(job_spec)
-            _ = self._ingest_client.submit_job(job_id, self._redis_task_queue)
-            self._pending_jobs.extend(job_id)
+            json_data = job_spec.dict()["payload"]
+            job_spec = json.loads(json_data)
+            validate_ingest_job(job_spec)
+
+            job_id = str(uuid.uuid4())
+            job_spec["job_id"] = job_id
+
+            self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
+
             return job_id
+
+        except JSONDecodeError as err:
+            logger.error("Error: %s", err)
+            raise
+
         except Exception as err:
             logger.error("Error: %s", err)
             raise
 
     async def fetch_job(self, job_id: str) -> Any:
-        futures_dict = self._ingest_client.fetch_job_result_async(job_id, timeout=60, data_only=False)
-
-        futures = list(futures_dict.keys())
-        result = futures[0].result()
-        result = result[0]  # List, get first element
-        result = result[0]  # Tuple (response, job_id), get response
-        if ("annotations" in result) and result["annotations"]:
-            annotations = result["annotations"]
-            for key, value in annotations.items():
-                logger.debug(f"Annotation: {key} -> {json.dumps(value, indent=2)}")
-
-        valid_result, description = check_ingest_result(result)
-
-        if valid_result:
-            raise RuntimeError(f"Failed to process job {job_id}: {description}")
-
-        return result
+        try:
+            # Fetch message with a timeout
+            message = self._ingest_client.fetch_message(job_id, timeout=5)
+            return message
+        except TimeoutError:
+            # Handle TimeoutError (allow it to bubble up to the caller)
+            raise
+        except RedisError:
+            # Handle RedisError (allow it to bubble up to the caller)
+            raise
+        except ValueError:
+            # Handle ValueError (allow it to bubble up to the caller)
+            raise
+        except Exception as ex:
+            # Handle general exceptions (allow it to bubble up to the caller)
+            raise ex

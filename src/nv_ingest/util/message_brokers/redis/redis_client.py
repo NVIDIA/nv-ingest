@@ -11,12 +11,13 @@ from typing import Optional
 import redis
 from redis.exceptions import RedisError
 
-from nv_ingest_client.message_clients import MessageClientBase
+from nv_ingest.util.message_brokers.client_base import MessageClientBase
 
 # pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
+# TODO(Devin): Duplicate code with client side, consider moving to a shared location
 
 class RedisClient(MessageClientBase):
     """
@@ -125,7 +126,7 @@ class RedisClient(MessageClientBase):
             return False
 
     def _check_response(self, channel_name: str, timeout: float) -> Tuple[
-        Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+            Optional[Dict[str, Any]], Optional[int], Optional[int]]:
         """
         Checks for a response from the Redis queue and processes it into a message, fragment, and fragment count.
 
@@ -172,7 +173,7 @@ class RedisClient(MessageClientBase):
 
         Parameters
         ----------
-        fetch_channel: str
+        channel_name: str
             Channel to fetch the message from.
 
         timeout : float

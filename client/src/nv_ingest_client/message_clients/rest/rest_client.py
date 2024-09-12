@@ -163,11 +163,13 @@ class RestClient(MessageClientBase):
                     # If the result contains a 200 then return the raw JSON string response
                     if response_code == 200:
                         return result.text
+                    # elif response_code == 202:
+                    #    raise TimeoutError("Job is not ready yet. Retry later.")
                     else:
                         # We could just let this exception bubble, but we capture for clarity
                         # we may also choose to use more specific exceptions in the future
                         try:
-                            retries = self.perform_retry_backoff(retries, job_id)
+                            retries = self.perform_retry_backoff(retries)
                         except RuntimeError as rte:
                             raise rte
 
@@ -175,18 +177,19 @@ class RestClient(MessageClientBase):
                 logger.error(f"Error during fetching, retrying... Error: {err}")
                 self._client = None  # Invalidate client to force reconnection
                 try:
-                    retries = self.perform_retry_backoff(retries, job_id)
+                    retries = self.perform_retry_backoff(retries)
                 except RuntimeError:
                     # This RuntimeError is captured from reaching max number of retries
                     # however, we are in an except for httpx error, so we should raise
                     # that exception to ensure the most visibility to the root cause
-                    raise err
+                    raise
+            except TimeoutError:
+                raise
             except Exception as e:
                 # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during fetch from {url}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    # TODO(Devin): update submit_message to use the IngestJobSchema
     def submit_message(self, _: str, message: str) -> str:
         """
         Submits a JobSpec to a specified HTTP endpoint with retries on failure.
@@ -211,7 +214,7 @@ class RestClient(MessageClientBase):
             try:
                 # Submit via HTTP
                 url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
-                result = requests.post(url, data=message, headers={"Content-Type": "application/json"})
+                result = requests.post(url, json={"payload": message}, headers={"Content-Type": "application/json"})
 
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
