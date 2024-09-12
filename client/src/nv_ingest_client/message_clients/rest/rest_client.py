@@ -245,7 +245,7 @@ class RestClient(MessageClientBase):
                     retries = self.perform_retry_backoff(retries)
                 except RuntimeError:
                     # This RuntimeError is captured from reaching max number of retries
-                    # however, we are in an except for httpx error so we should raise
+                    # however, we are in an except for httpx error, so we should raise
                     # that exception to ensure the most visibility to the root cause
                     raise e
             except Exception as e:

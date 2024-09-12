@@ -152,8 +152,10 @@ class RedisClient(MessageClientBase):
         """
 
         response = self.get_client().blpop([channel_name], timeout)
+        if (response is None):
+            raise TimeoutError("No response was received in the specified timeout period")
 
-        if (response and len(response) > 1 and response[1]):
+        if (len(response) > 1 and response[1]):
             try:
                 message = json.loads(response[1])
                 fragment = message.get('fragment', 0)

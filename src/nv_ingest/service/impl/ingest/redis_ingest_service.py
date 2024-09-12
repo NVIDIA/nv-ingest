@@ -75,21 +75,9 @@ class RedisIngestService(IngestServiceMeta):
             raise
 
     async def fetch_job(self, job_id: str) -> Any:
-        logger.info(f"Fetching job with job_id: {job_id}")
-        try:
-            # Fetch message with a timeout
-            message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=60)
+        # Fetch message with a timeout
+        message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=5)
+        if message is None:
+            raise TimeoutError()
 
-            return message
-        except TimeoutError:
-            # Handle TimeoutError (allow it to bubble up to the caller)
-            raise
-        except RedisError:
-            # Handle RedisError (allow it to bubble up to the caller)
-            raise
-        except ValueError:
-            # Handle ValueError (allow it to bubble up to the caller)
-            raise
-        except Exception as ex:
-            # Handle general exceptions (allow it to bubble up to the caller)
-            raise ex
+        return message

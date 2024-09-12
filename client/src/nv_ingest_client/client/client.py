@@ -397,9 +397,6 @@ class NvIngestClient:
             job_state.state = JobStateEnum.SUBMITTED
             job_state.job_id = job_id
 
-            logger.info(f"Job ID: {job_id}")
-            # job_state.future = None
-
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
         except Exception as err:
