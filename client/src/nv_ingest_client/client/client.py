@@ -135,7 +135,7 @@ class NvIngestClient:
             The ID of the job to delete.
         """
 
-        job_state, _ = self._get_and_check_job_state(job_index)
+        job_state = self._get_and_check_job_state(job_index)
         self._job_states.pop(job_index)
 
         return job_state
@@ -391,11 +391,13 @@ class NvIngestClient:
         try:
             message = json.dumps(job_state.job_spec.to_dict())
 
-            result_json = self._message_client.submit_message(job_queue_id, message)
-            # TODO(Devin): Not clear this actually returns JSON.
-            logger.info(f"Result JSON: {result_json}")
+            job_id = self._message_client.submit_message(job_queue_id, message)
+
             job_state.response_channel = response_channel
             job_state.state = JobStateEnum.SUBMITTED
+            job_state.job_id = job_id
+
+            logger.info(f"Job ID: {job_id}")
             # job_state.future = None
 
             # Free up memory -- payload should never be used again, and we don't want to keep it around.

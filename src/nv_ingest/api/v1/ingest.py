@@ -23,7 +23,7 @@ from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 router = APIRouter()
 

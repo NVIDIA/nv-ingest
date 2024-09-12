@@ -163,8 +163,8 @@ class RestClient(MessageClientBase):
                     # If the result contains a 200 then return the raw JSON string response
                     if response_code == 200:
                         return result.text
-                    # elif response_code == 202:
-                    #    raise TimeoutError("Job is not ready yet. Retry later.")
+                    elif response_code == 202:
+                        raise TimeoutError("Job is not ready yet. Retry later.")
                     else:
                         # We could just let this exception bubble, but we capture for clarity
                         # we may also choose to use more specific exceptions in the future

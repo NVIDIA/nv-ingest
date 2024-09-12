@@ -22,7 +22,7 @@ from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger("uvicorn")
 
 
 class RedisIngestService(IngestServiceMeta):
@@ -50,15 +50,8 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
 
-        # Create the ingest client
         self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
                                           max_pool_size=self._concurrency_level)
-        # self._ingest_client = NvIngestClient(
-        #     message_client_allocator=RedisClient,
-        #     message_client_hostname=self._redis_hostname,
-        #     message_client_port=self._redis_port,
-        #     worker_pool_size=self._concurrency_level,
-        # )
 
     async def submit_job(self, job_spec: MessageWrapper) -> str:
         try:
@@ -82,9 +75,11 @@ class RedisIngestService(IngestServiceMeta):
             raise
 
     async def fetch_job(self, job_id: str) -> Any:
+        logger.info(f"Fetching job with job_id: {job_id}")
         try:
             # Fetch message with a timeout
-            message = self._ingest_client.fetch_message(job_id, timeout=5)
+            message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=60)
+
             return message
         except TimeoutError:
             # Handle TimeoutError (allow it to bubble up to the caller)

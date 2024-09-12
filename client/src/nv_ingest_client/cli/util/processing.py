@@ -7,6 +7,7 @@ import logging
 import os
 import re
 import time
+import traceback
 from collections import defaultdict
 from concurrent.futures import as_completed
 from statistics import mean
@@ -836,6 +837,7 @@ def create_and_process_jobs(
                     logger.error(f"Error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except Exception as e:
+                    traceback.print_exc()
                     source_name = job_id_map[job_id]
                     logger.error(f"Unhandled error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")

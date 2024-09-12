@@ -98,10 +98,6 @@ class JobState:
     @job_id.setter
     def job_id(self, value: str) -> None:
         """Sets the job's unique identifier, with constraints."""
-        if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change job_id after job submission: {self._state.name}"
-            logger.error(err_msg)
-            raise ValueError(err_msg)
         self._job_spec.job_id = value
 
     @property
