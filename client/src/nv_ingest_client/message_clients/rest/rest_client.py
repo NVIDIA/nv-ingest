@@ -19,7 +19,6 @@ import httpx
 import requests
 
 from nv_ingest_client.message_clients import MessageClientBase
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 
 logger = logging.getLogger(__name__)
 
