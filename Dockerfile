@@ -25,7 +25,7 @@ COPY setup.py setup.py
 # Don't copy full source here, pipelines won't be installed via setup anyway, and this allows us to rebuild more quickly if we're just changing the pipeline
 
 COPY ci ci
-COPY requirements.txt test-requirements.txt util-requirements.txt ./
+COPY requirements.txt extra-requirements.txt test-requirements.txt util-requirements.txt ./
 
 SHELL ["/bin/bash", "-c"]
 
@@ -49,19 +49,18 @@ ENV NV_INGEST_RELEASE_TYPE=${RELEASE_TYPE}
 ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
+# Cache the requirements and install them before uploading source code changes
+RUN source activate morpheus \
+    && pip install -r requirements.txt
+
 COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
-# TODO: Temp fix to install the nv-ingest-client Python package so pip install -r requirements.txt can resolve it
+# Build the client and install it in the conda cache so that the later nv-ingest build can locate it
 RUN source activate morpheus \
-    && pip install -e client
-
-# TODO: Moved to after uploading source code changes so that client code can be installed first
-# which is needed in requirements.txt
-# Cache the requirements and install them before uploading source code changes
-RUN source activate morpheus \
-    && pip install -r requirements.txt
+    && pip install -e client \
+    && pip install -r extra-requirements.txt
 
 # Run the build_pip_packages.sh script with the specified build type and library
 RUN chmod +x ./ci/scripts/build_pip_packages.sh \

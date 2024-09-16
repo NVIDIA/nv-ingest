@@ -8,10 +8,39 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+from opentelemetry import trace
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from fastapi import FastAPI
 
 from .v1.ingest import router as IngestApiRouter
 
+# Set up the tracer provider and add a processor for exporting traces
+trace.set_tracer_provider(TracerProvider())
+tracer_provider = trace.get_tracer_provider()
+exporter = OTLPSpanExporter(endpoint="otel-collector:4317", insecure=True)
+span_processor = BatchSpanProcessor(exporter)
+tracer_provider.add_span_processor(span_processor)
+
+# nv-ingest FastAPI app declaration
 app = FastAPI()
 
 app.include_router(IngestApiRouter)
+
+# Instrument FastAPI with OpenTelemetry
+FastAPIInstrumentor.instrument_app(app)
+
+
+@app.middleware("http")
+async def add_trace_id_header(request, call_next):
+    response = await call_next(request)
+
+    # Get the current span and trace ID
+    span = trace.get_current_span()
+    if span:
+        # trace_id = format(span.get_span_context().trace_id, '032x')
+        response.headers["x-trace-id"] = span.get_span_context().trace_id
+
+    return response
