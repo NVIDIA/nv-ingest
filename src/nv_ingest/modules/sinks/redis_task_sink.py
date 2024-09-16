@@ -6,11 +6,11 @@
 import json
 import logging
 import sys
-from typing import Any
+import traceback
+from typing import Any, List
 from typing import Dict
 from typing import Tuple
 
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 import mrc
 from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -19,6 +19,7 @@ from mrc.core import operators as ops
 from redis import RedisError
 
 from nv_ingest.schemas.redis_task_sink_schema import RedisTaskSinkSchema
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
@@ -54,9 +55,51 @@ def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
         return None, None
 
 
-def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Dict[str, Any]:
+def split_large_dict(json_data: List[Dict[str, Any]], size_limit: int) -> List[List[Dict[str, Any]]]:
     """
-    Creates a JSON payload based on message status and data, including optional trace and annotation data.
+    Splits a large list of dictionaries into smaller fragments, each less than the specified size limit (in bytes).
+
+    Parameters
+    ----------
+    json_data : List[Dict[str, Any]]
+        The list of dictionaries to split.
+    size_limit : int
+        The maximum size in bytes for each fragment.
+
+    Returns
+    -------
+    List[List[Dict[str, Any]]]
+        A list of fragments, each fragment being a list of dictionaries, within the size limit.
+    """
+
+    fragments = []
+    current_fragment = []
+    current_size = sys.getsizeof(json.dumps(current_fragment))
+
+    for item in json_data:
+        item_size = sys.getsizeof(json.dumps(item))
+
+        # If adding this item exceeds the size limit, start a new fragment
+        if current_size + item_size > size_limit:
+            fragments.append(current_fragment)  # Store the current fragment
+            current_fragment = []  # Start a new fragment
+            current_size = sys.getsizeof(json.dumps(current_fragment))
+
+        # Add the item (dict) to the current fragment
+        current_fragment.append(item)
+        current_size += item_size
+
+    # Append the last fragment if it has data
+    if current_fragment:
+        fragments.append(current_fragment)
+
+    return fragments
+
+
+def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+    """
+    Creates JSON payloads based on message status and data. If the size of df_json exceeds 256 MB, splits it into
+    multiple fragments, each less than 256 MB. Adds optional trace and annotation data to the first fragment.
 
     Parameters
     ----------
@@ -67,31 +110,60 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Dic
 
     Returns
     -------
-    Dict[str, Any]
-        The JSON payload to be forwarded.
+    List[Dict[str, Any]]
+        A list of JSON payloads, possibly split into multiple fragments.
     """
-    message_status = "success" if not message.get_metadata("cm_failed", False) else "failed"
-    description = (
-        "Successfully processed the message." if message_status == "success" else "Failed to process the message."
-    )
-    ret_val_json = {
-        "status": message_status,
-        "description": description,
-        "data": df_json,
-    }
+    # Convert df_json to a JSON string to check its size
+    df_json_str = json.dumps(df_json)
+    df_json_size = sys.getsizeof(df_json_str)
 
-    if message.get_metadata("add_trace_tagging", True):
-        ret_val_json["trace"] = {
-            key: message.get_timestamp(key).timestamp() * 1e9 for key in message.filter_timestamp("trace::")
+    # 256 MB size limit (in bytes)
+    size_limit = 256 * 1024 * 1024
+
+    # If df_json is larger than the size limit, split it into chunks
+    if df_json_size > size_limit:
+        # Split df_json into fragments, ensuring each is a valid JSON object
+        data_fragments = split_large_dict(df_json, size_limit)
+        fragment_count = len(data_fragments)
+    else:
+        # No splitting needed, treat the whole thing as one fragment
+        data_fragments = [df_json]
+        fragment_count = 1
+
+    # Initialize list to store multiple ret_val_json payloads
+    ret_val_json_list = []
+
+    # Process each fragment and add necessary metadata
+    for i, fragment_data in enumerate(data_fragments):
+        ret_val_json = {
+            "status": "success" if not message.get_metadata("cm_failed", False) else "failed",
+            "description": (
+                "Successfully processed the message." if not message.get_metadata("cm_failed",
+                                                                                  False) else "Failed to process the message."
+            ),
+            "data": fragment_data,  # Fragmented data
+            "fragment": i,
+            "fragment_count": fragment_count,
         }
-        ret_val_json["annotations"] = {
-            key: message.get_metadata(key) for key in message.list_metadata() if key.startswith("annotation::")
-        }
 
-    return ret_val_json
+        # Only add trace tagging and annotations to the first fragment (i.e., fragment=0)
+        if i == 0 and message.get_metadata("add_trace_tagging", True):
+            ret_val_json["trace"] = {
+                key: message.get_timestamp(key).timestamp() * 1e9 for key in message.filter_timestamp("trace::")
+            }
+            ret_val_json["annotations"] = {
+                key: message.get_metadata(key) for key in message.list_metadata() if key.startswith("annotation::")
+            }
+
+        ret_val_json_list.append(ret_val_json)
+
+    logger.debug(f"Redis Sink Created {len(ret_val_json_list)} JSON payloads.")
+
+    return ret_val_json_list
 
 
-def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload: str, retry_count: int = 2) -> None:
+def push_to_redis(redis_client: RedisClient, response_channel: str, json_payloads: List[str],
+                  retry_count: int = 2) -> None:
     """
     Attempts to push a JSON payload to a Redis channel, retrying on failure up to a specified number of attempts.
 
@@ -115,14 +187,19 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
     RedisError
         If pushing to Redis fails after the specified number of retries.
     """
-    payload_size = sys.getsizeof(json_payload)
-    size_limit = 2**28  # 256 MB
-    if payload_size > size_limit:
-        raise RedisError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
+
+    for json_payload in json_payloads:
+        payload_size = sys.getsizeof(json_payload)
+        size_limit = 2 ** 28  # 256 MB
+
+        if payload_size > size_limit:
+            raise RedisError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
 
     for attempt in range(retry_count):
         try:
-            redis_client.get_client().rpush(response_channel, json_payload)
+            for json_payload in json_payloads:
+                redis_client.get_client().rpush(response_channel, json_payload)
+
             logger.debug(f"Redis Sink Forwarded message to Redis channel '{response_channel}'.")
             return
         except RedisError as e:
@@ -131,19 +208,63 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
                 raise
 
 
-def handle_failure(redis_client, response_channel, ret_val_json, e, mdf_size):
+def handle_failure(
+        redis_client: Any,
+        response_channel: str,
+        json_result_fragments: List[Dict[str, Any]],
+        e: Exception,
+        mdf_size: int
+) -> None:
+    """
+    Handles failure scenarios by logging the error and pushing a failure message to a Redis channel.
+
+    Parameters
+    ----------
+    redis_client : Any
+        A Redis client instance capable of interacting with Redis.
+        It should have a `get_client()` method that returns a client object with an `rpush()` method.
+    response_channel : str
+        The Redis channel to which the failure message will be sent.
+    json_result_fragments : List[Dict[str, Any]]
+        A list of JSON result fragments, where each fragment is a dictionary containing the results of the operation.
+        The first fragment is used to extract trace data in the failure message.
+    e : Exception
+        The exception object that triggered the failure.
+    mdf_size : int
+        The number of rows in the message data frame (mdf) being processed.
+
+    Returns
+    -------
+    None
+        This function does not return any value. It handles the failure by logging the error and sending a message to Redis.
+
+    Notes
+    -----
+    The failure message includes the error description, the size of the first JSON result fragment in MB,
+    and the number of rows in the data being processed. If trace information is available in the first
+    fragment of `json_result_fragments`, it is included in the failure message.
+
+    Examples
+    --------
+    >>> redis_client = SomeRedisClient()
+    >>> response_channel = "response_channel_name"
+    >>> json_result_fragments = [{"trace": {"event_1": 123456789}}]
+    >>> e = Exception("Network failure")
+    >>> mdf_size = 1000
+    >>> handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
+    """
     error_description = (
         f"Failed to forward message to Redis after retries: {e}. "
-        f"Payload size: {sys.getsizeof(json.dumps(ret_val_json)) / 1e6} MB, Rows: {mdf_size}"
+        f"Payload size: {sys.getsizeof(json.dumps(json_result_fragments)) / 1e6} MB, Rows: {mdf_size}"
     )
     logger.error(error_description)
 
-    # Construct a failure message and push it
+    # Construct a failure message and push it to Redis
     fail_msg = {
         "data": None,
         "status": "failed",
         "description": error_description,
-        "trace": ret_val_json.get("trace", {}),
+        "trace": json_result_fragments[0].get("trace", {}),
     }
     redis_client.get_client().rpush(response_channel, json.dumps(fail_msg))
 
@@ -169,23 +290,30 @@ def process_and_forward(message: ControlMessage, redis_client: RedisClient) -> C
     Exception
         If a critical error occurs during processing.
     """
+    mdf = None
+    json_result_fragments = []
+    response_channel = message.get_metadata("response_channel")
+
     try:
         cm_failed = message.get_metadata("cm_failed", False)
         if not cm_failed:
             mdf, df_json = extract_data_frame(message)
-            ret_val_json = create_json_payload(message, df_json)
+            json_result_fragments = create_json_payload(message, df_json)
         else:
-            ret_val_json = create_json_payload(message, None)
+            json_result_fragments = create_json_payload(message, None)
 
-        json_payload = json.dumps(ret_val_json)
+        json_payloads = [json.dumps(fragment) for fragment in json_result_fragments]
         annotate_cm(message, message="Pushed")
-        response_channel = message.get_metadata("response_channel")
-        push_to_redis(redis_client, response_channel, json_payload)
+        push_to_redis(redis_client, response_channel, json_payloads)
     except RedisError as e:
         mdf_size = len(mdf) if mdf else 0
-        handle_failure(redis_client, response_channel, ret_val_json, e, mdf_size)
+        handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
+        traceback.print_exc()
         logger.error(f"Critical error processing message: {e}")
+
+        mdf_size = len(mdf) if mdf else 0
+        handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
 
     return message
 

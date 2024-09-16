@@ -3,13 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import json
 import logging
 import traceback
 from datetime import datetime
 from functools import partial
+from typing import Dict
 
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
+import cudf
 import mrc
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
@@ -18,10 +18,9 @@ from morpheus.utils.module_utils import register_module
 from opentelemetry.trace.span import format_trace_id
 from redis.exceptions import RedisError
 
-import cudf
-
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.redis_task_source_schema import RedisTaskSourceSchema
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import annotate_cm
 
@@ -37,9 +36,9 @@ def fetch_and_process_messages(redis_client: RedisClient, validated_config: Redi
 
     while True:
         try:
-            job_payload = redis_client.fetch_message_morpheus(validated_config.task_queue)
+            job = redis_client.fetch_message(validated_config.task_queue, 0)
             ts_fetched = datetime.now()
-            yield process_message(job_payload, ts_fetched)  # process_message remains unchanged
+            yield process_message(job, ts_fetched)  # process_message remains unchanged
         except RedisError:
             continue  # Reconnection will be attempted on the next fetch
         except Exception as err:
@@ -49,20 +48,20 @@ def fetch_and_process_messages(redis_client: RedisClient, validated_config: Redi
             traceback.print_exc()
 
 
-def process_message(job_payload: str, ts_fetched: datetime) -> ControlMessage:
+def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     """
     Fetch messages from the Redis list (task queue) and yield as ControlMessage.
     """
+
+    validate_ingest_job(job)
+    # no_payload = copy.deepcopy(job)
+    # no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
+    # logger.debug("Job: %s", json.dumps(no_payload, indent=2))
+    control_message = ControlMessage()
+
     try:
         ts_entry = datetime.now()
 
-        job = json.loads(job_payload)
-        # no_payload = copy.deepcopy(job)
-        # no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
-        # logger.debug("Job: %s", json.dumps(no_payload, indent=2))
-        control_message = ControlMessage()
-        
-        validate_ingest_job(job)
         job_id = job.pop("job_id")
         job_payload = job.pop("job_payload", {})
         job_tasks = job.pop("tasks", [])

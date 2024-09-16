@@ -11,12 +11,12 @@
 from abc import ABC
 from abc import abstractmethod
 
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 
 
 class IngestServiceMeta(ABC):
     @abstractmethod
-    async def submit_job(self, job_spec: JobSpec) -> str:
+    async def submit_job(self, job_spec: MessageWrapper) -> str:
         """Abstract method for submitting one or more jobs to the ingestion pipeline"""
 
     @abstractmethod

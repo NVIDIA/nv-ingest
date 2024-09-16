@@ -7,7 +7,6 @@
 
 import json
 import logging
-import uuid
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -18,7 +17,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
@@ -54,13 +52,13 @@ class NvIngestClient:
     """
 
     def __init__(
-        self,
-        message_client_allocator: Callable[..., RedisClient] = RedisClient,
-        message_client_hostname: Optional[str] = "localhost",
-        message_client_port: Optional[int] = 6379,
-        message_client_kwargs: Optional[Dict] = None,
-        msg_counter_id: Optional[str] = "nv-ingest-message-id",
-        worker_pool_size: int = 1,
+            self,
+            message_client_allocator: Callable[..., RestClient] = RestClient,
+            message_client_hostname: Optional[str] = "localhost",
+            message_client_port: Optional[int] = 6379,
+            message_client_kwargs: Optional[Dict] = None,
+            msg_counter_id: Optional[str] = "nv-ingest-message-id",
+            worker_pool_size: int = 1,
     ) -> None:
         """
         Initializes the NvIngestClient with a client allocator, Redis configuration, a message counter ID,
@@ -80,6 +78,7 @@ class NvIngestClient:
             The number of worker processes in the pool. Defaults to 1.
         """
 
+        self._current_message_id = 0
         self._job_states = {}
         self._message_client_hostname = message_client_hostname or "localhost"
         self._message_client_port = message_client_port or 6379
@@ -107,9 +106,10 @@ class NvIngestClient:
         info = "NvIngestClient:\n"
         info += f" message_client_host: {self._message_client_hostname}\n"
         info += f" message_client_port: {self._message_client_port}\n"
+
         return info
 
-    def _generate_job_id(self) -> str:
+    def _generate_job_index(self) -> str:
         """
         Generates a unique job ID by combining a UUID with an incremented value from Redis.
 
@@ -119,43 +119,39 @@ class NvIngestClient:
             A unique job ID in the format of "<UUID>_<Redis incremented value>".  IF the client
             is a RedisClient. In the case of a RestClient it is simply the UUID.
         """
-        uid = uuid.uuid4()
-        job_id = str(uid)
 
-        # Include the redis_msg_id IF the client is a Redis client. Other clients do not support this.
-        if isinstance(self._message_client, RedisClient):
-            redis_msg_id = self._message_client.get_client().incr(self._message_counter_id)
-            job_id = f"{job_id}_{redis_msg_id}"
+        job_index = str(self._current_message_id)
+        self._current_message_id += 1
 
-        return job_id
+        return job_index
 
-    def _pop_job_state(self, job_id: str) -> JobState:
+    def _pop_job_state(self, job_index: str) -> JobState:
         """
         Deletes the job with the specified ID from the job tracking dictionary.
 
         Parameters
         ----------
-        job_id : str
+        job_index : str
             The ID of the job to delete.
         """
 
-        job_state = self._get_and_check_job_state(job_id)
-        self._job_states.pop(job_id)
+        job_state = self._get_and_check_job_state(job_index)
+        self._job_states.pop(job_index)
 
         return job_state
 
     def _get_and_check_job_state(
-        self,
-        job_id: str,
-        required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
+            self,
+            job_index: str,
+            required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
     ) -> JobState:
         if required_state and not isinstance(required_state, list):
             required_state = [required_state]
 
-        job_state = self._job_states.get(job_id)
+        job_state = self._job_states.get(job_index)
 
         if not job_state:
-            raise ValueError(f"Job with ID {job_id} does not exist in JobStates: {self._job_states}")
+            raise ValueError(f"Job with ID {job_index} does not exist in JobStates: {self._job_states}")
         if required_state and (job_state.state not in required_state):
             raise ValueError(
                 f"Job with ID {job_state.job_spec.job_id} has invalid state {job_state.state}, expected {required_state}"
@@ -167,26 +163,20 @@ class NvIngestClient:
         return len(self._job_states)
 
     def add_job(self, job_spec: JobSpec = None) -> str:
-        job_id = job_spec.job_id or self._generate_job_id()
-        if isinstance(job_id, uuid.UUID):
-            job_id = str(job_id)
-        if job_id and job_id in self._job_states:
-            raise ValueError(f"Cannot create Job with ID {job_id}: already exists")
+        job_index = self._generate_job_index()
 
-        job_spec.job_id = job_id
-        self._job_states[job_id] = JobState(job_spec=job_spec)
+        self._job_states[job_index] = JobState(job_spec=job_spec)
 
-        return job_id
+        return job_index
 
     def create_job(
-        self,
-        payload: str,
-        source_id: str,
-        source_name: str,
-        document_type: str = None,
-        tasks: Optional[list] = None,
-        job_id: Optional[Union[uuid.UUID, str]] = None,
-        extended_options: Optional[dict] = None,
+            self,
+            payload: str,
+            source_id: str,
+            source_name: str,
+            document_type: str = None,
+            tasks: Optional[list] = None,
+            extended_options: Optional[dict] = None,
     ) -> str:
         """
         Creates a new job with the specified parameters and adds it to the job tracking dictionary.
@@ -219,14 +209,9 @@ class NvIngestClient:
             If a job with the specified `job_id` already exists.
         """
 
-        if job_id and job_id in self._job_states:
-            raise ValueError(f"Cannot create Job with ID {job_id}: already exists")
-
         document_type = document_type or source_name.split(".")[-1]
-        job_id = str(job_id) if job_id else self._generate_job_id()
         job_spec = JobSpec(
             payload=payload or {},
-            job_id=job_id,
             tasks=tasks,
             document_type=document_type,
             source_id=source_id,
@@ -236,25 +221,24 @@ class NvIngestClient:
 
         return self.add_job(job_spec)
 
-    def add_task(self, job_id: str, task: Task) -> None:
-        job_state = self._get_and_check_job_state(job_id, required_state=JobStateEnum.PENDING)
+    def add_task(self, job_index: str, task: Task) -> None:
+        job_state = self._get_and_check_job_state(job_index, required_state=JobStateEnum.PENDING)
 
         job_state.job_spec.add_task(task)
 
     def create_task(
-        self,
-        job_id: Union[uuid.UUID, str],
-        task_type: TaskType,
-        task_params: dict = None,
+            self,
+            job_index: Union[str, int],
+            task_type: TaskType,
+            task_params: dict = None,
     ) -> None:
         """
         Creates a task of the specified type with given parameters and associates it with the existing job.
 
         Parameters
         ----------
-        job_id : Union[uuid.UUID, str]
-            The unique identifier of the job to which the task will be added. This can be a UUID object or its string
-            representation.
+        job_index: Union[str, int]
+            The unique identifier of the job to which the task will be added. This can be either a string or an integer.
         task_type : TaskType
             The type of the task to be created, defined as an enum value.
         task_params : dict
@@ -268,14 +252,14 @@ class NvIngestClient:
         """
         task_params = task_params or {}
 
-        return self.add_task(job_id, task_factory(task_type, **task_params))
+        return self.add_task(job_index, task_factory(task_type, **task_params))
 
-    def _fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True) -> Tuple[Dict, str]:
+    def _fetch_job_result(self, job_index: str, timeout: float = 100, data_only: bool = True) -> Tuple[Dict, str]:
         """
         Fetches the job result from a message client, handling potential errors and state changes.
 
         Args:
-            job_id (str): The identifier of the job.
+            job_index (str): The identifier of the job.
             timeout (float): Timeout for the fetch operation in seconds.
             data_only (bool): If True, only returns the data part of the job result.
 
@@ -289,8 +273,8 @@ class NvIngestClient:
         """
 
         try:
-            job_state = self._get_and_check_job_state(job_id, required_state=[JobStateEnum.SUBMITTED])
-            response = self._message_client.fetch_message(job_state, timeout)
+            job_state = self._get_and_check_job_state(job_index, required_state=[JobStateEnum.SUBMITTED])
+            response = self._message_client.fetch_message(job_state.job_id, timeout)
 
             if response is not None:
                 try:
@@ -299,20 +283,23 @@ class NvIngestClient:
                     if data_only:
                         response_json = response_json["data"]
 
-                    return response_json, job_id
+                    return response_json, job_index
                 except json.JSONDecodeError as err:
-                    logger.error(f"Error decoding job result for job ID {job_id}: {err}")
+                    logger.error(f"Error decoding job result for job ID {job_index}: {err}")
                     raise ValueError(f"Error decoding job result: {err}") from err
                 finally:
                     # Only pop once we know we've successfully decoded the response or errored out
-                    _ = self._pop_job_state(job_id)
+                    _ = self._pop_job_state(job_index)
             else:
-                raise TimeoutError(f"Timeout: No response within {timeout} seconds for job ID {job_id}")
+                raise TimeoutError(f"Timeout: No response within {timeout} seconds for job ID {job_index}")
 
         except TimeoutError:
             raise
+        except RuntimeError as err:
+            logger.error(f"Unexpected error while fetching job result for job ID {job_index}: {err}")
+            raise
         except Exception as err:
-            logger.error(f"Unexpected error while fetching job result for job ID {job_id}: {err}")
+            logger.error(f"Unexpected error while fetching job result for job ID {job_index}: {err}")
             raise
 
     def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
@@ -340,7 +327,7 @@ class NvIngestClient:
             job_state.future = None
 
     def fetch_job_result_async(
-        self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
+            self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
     ) -> Dict[Future, str]:
         """
         Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.
@@ -370,16 +357,16 @@ class NvIngestClient:
         return future_to_job_id
 
     def _submit_job(
-        self,
-        job_id: str,
-        job_queue_id: str,
+            self,
+            job_index: str,
+            job_queue_id: str,
     ) -> Optional[Dict]:
         """
         Submits a job to a specified job queue and optionally waits for a response if blocking is True.
 
         Parameters
         ----------
-        job_id : str
+        job_index : str
             The unique identifier of the job to be submitted.
         job_queue_id : str
             The ID of the job queue where the job will be submitted.
@@ -396,40 +383,40 @@ class NvIngestClient:
         """
 
         job_state = self._get_and_check_job_state(
-            job_id, required_state=[JobStateEnum.PENDING, JobStateEnum.SUBMITTED_ASYNC]
+            job_index, required_state=[JobStateEnum.PENDING, JobStateEnum.SUBMITTED_ASYNC]
         )
 
-        response_channel = f"response_{job_id}"
-
         try:
-            self._message_client.submit_message(job_queue_id, job_state.job_spec)
-            job_state.response_channel = response_channel
+            message = json.dumps(job_state.job_spec.to_dict())
+
+            job_id = self._message_client.submit_message(job_queue_id, message)
+
             job_state.state = JobStateEnum.SUBMITTED
-            # job_state.future = None
+            job_state.job_id = job_id
 
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
         except Exception as err:
-            logger.error(f"Failed to submit job {job_id} to queue {job_queue_id}: {err}")
+            logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise
 
         return None
 
-    def submit_job(self, job_ids: Union[str, List[str]], job_queue_id: str) -> List[Union[Dict, None]]:
-        if isinstance(job_ids, str):
-            job_ids = [job_ids]
+    def submit_job(self, job_indices: Union[str, List[str]], job_queue_id: str) -> List[Union[Dict, None]]:
+        if isinstance(job_indices, str):
+            job_indices = [job_indices]
 
-        return [self._submit_job(job_id, job_queue_id) for job_id in job_ids]
+        return [self._submit_job(job_id, job_queue_id) for job_id in job_indices]
 
-    def submit_job_async(self, job_ids: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
+    def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
         """
         Asynchronously submits one or more jobs to a specified job queue using a thread pool.
         This method handles both single job ID or a list of job IDs.
 
         Parameters
         ----------
-        job_ids : Union[str, List[str]]
+        job_indices : Union[str, List[str]]
             A single job ID or a list of job IDs to be submitted.
         job_queue_id : str
             The ID of the job queue where the jobs will be submitted.
@@ -446,16 +433,16 @@ class NvIngestClient:
         - Ensure that each job is in the proper state before submission.
         """
 
-        if isinstance(job_ids, str):
-            job_ids = [job_ids]  # Convert single job_id to a list
+        if isinstance(job_indices, str):
+            job_indices = [job_indices]  # Convert single job_id to a list
 
-        future_to_job_id = {}
-        for job_id in job_ids:
-            job_state = self._get_and_check_job_state(job_id, JobStateEnum.PENDING)
+        future_to_job_index = {}
+        for job_index in job_indices:
+            job_state = self._get_and_check_job_state(job_index, JobStateEnum.PENDING)
             job_state.state = JobStateEnum.SUBMITTED_ASYNC
 
-            future = self._worker_pool.submit(self.submit_job, job_id, job_queue_id)
+            future = self._worker_pool.submit(self.submit_job, job_index, job_queue_id)
             job_state.future = future
-            future_to_job_id[future] = job_id
+            future_to_job_index[future] = job_index
 
-        return future_to_job_id
+        return future_to_job_index

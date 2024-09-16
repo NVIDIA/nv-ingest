@@ -4,92 +4,83 @@
 
 
 import logging
-import typing
-from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
 from uuid import UUID
 
-from nv_ingest_client.primitives.tasks.caption import CaptionTask
-from nv_ingest_client.primitives.tasks.dedup import DedupTask
-from nv_ingest_client.primitives.tasks.embed import EmbedTask
-from nv_ingest_client.primitives.tasks.filter import FilterTask
-from nv_ingest_client.primitives.tasks.split import SplitTask
-from nv_ingest_client.primitives.tasks.store import StoreTask
-from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTask
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest_client.primitives.tasks import Task
-from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class JobSpec(BaseModel):
+class JobSpec:
     """
     Specification for creating a job for submission to the nv-ingest microservice.
 
+    Parameters
+    ----------
+    payload : Dict
+        The payload data for the job.
+    tasks : Optional[List], optional
+        A list of tasks to be added to the job, by default None.
+    source_id : Optional[str], optional
+        An identifier for the source of the job, by default None.
+    job_id : Optional[UUID], optional
+        A unique identifier for the job, by default a new UUID is generated.
+    extended_options : Optional[Dict], optional
+        Additional options for job processing, by default None.
+
     Attributes
     ----------
-    document_type: str
-        Type of document that is being submitted.
-    extended_options : Dict
-        Storage for the additional options.
-    job_id : UUID
-        Storage for the job's unique identifier.
-    payload : str
-         Storage for the payload data.
-    source_id : str
-         Storage for the source identifier.
-    source_name: str
-        Storage for the source name.
-    tasks : List
+    _payload : Dict
+        Storage for the payload data.
+    _tasks : List
         Storage for the list of tasks.
+    _source_id : str
+        Storage for the source identifier.
+    _job_id : UUID
+        Storage for the job's unique identifier.
+    _extended_options : Dict
+        Storage for the additional options.
 
     Methods
     -------
+    to_dict() -> Dict:
+        Converts the job specification to a dictionary.
     add_task(task):
         Adds a task to the job specification.
     """
 
-    document_type: Optional[str]
-    extended_options: Optional[Dict] = {}
-    job_id: Optional[typing.Union[UUID, str]]
-    payload: Optional[str]
-    source_id: Optional[str]
-    source_name: Optional[str]
-    tasks: Optional[List] = []
-
-    class Config:
-        # Allow population by field name as well as alias
-        allow_population_by_field_name = True
-        # Allow arbitrary types
-        arbitrary_types_allowed = True
-
-        json_encoders = {
-            CaptionTask: lambda v: v.to_dict(),
-            DedupTask: lambda v: v.to_dict(),
-            EmbedTask: lambda v: v.to_dict(),
-            ExtractTask: lambda v: v.to_dict(),
-            FilterTask: lambda v: v.to_dict(),
-            SplitTask: lambda v: v.to_dict(),
-            StoreTask: lambda v: v.to_dict(),
-            VdbUploadTask: lambda v: v.to_dict()
-        }
+    def __init__(
+            self,
+            payload: str = None,
+            tasks: Optional[List] = None,
+            source_id: Optional[str] = None,
+            source_name: Optional[str] = None,
+            document_type: Optional[str] = None,
+            extended_options: Optional[Dict] = None,
+    ) -> None:
+        self._document_type = document_type or "txt"
+        self._extended_options = extended_options or {}
+        self._job_id = None
+        self._payload = payload
+        self._source_id = source_id
+        self._source_name = source_name
+        self._tasks = tasks or []
 
     def __str__(self) -> str:
-        task_info = "\n".join(str(task) for task in self.tasks)
+        task_info = "\n".join(str(task) for task in self._tasks)
         return (
-            f"job-id: {self.job_id}\n"
-            f"source-id: {self.source_id}\n"
-            f"source-name: {self.source_name}\n"
-            f"document-type: {self.document_type}\n"
-            f"task count: {len(self.tasks)}\n"
-            f"payload: {'<*** ' + str(len(self.payload)) + ' ***>' if self.payload else 'Empty'}\n"
-            f"extended-options: {self.extended_options}\n"
+            f"source-id: {self._source_id}\n"
+            f"source-name: {self._source_name}\n"
+            f"document-type: {self._document_type}\n"
+            f"task count: {len(self._tasks)}\n"
+            f"payload: {'<*** ' + str(len(self._payload)) + ' ***>' if self._payload else 'Empty'}\n"
+            f"extended-options: {self._extended_options}\n"
             f"{task_info}"
         )
-    
+
     def to_dict(self) -> Dict:
         """
         Converts the job specification instance into a dictionary suitable for JSON serialization.
@@ -101,16 +92,47 @@ class JobSpec(BaseModel):
         """
         return {
             "job_payload": {
-                "source_name": [self.source_name],
-                "source_id": [self.source_id],
-                "content": [self.payload],
-                "document_type": [self.document_type],
+                "source_name": [self._source_name],
+                "source_id": [self._source_id],
+                "content": [self._payload],
+                "document_type": [self._document_type],
             },
-            "job_id": str(self.job_id),
-            "tasks": [task if isinstance(task, dict) else task.to_dict() for task in self.tasks],
-            "tracing_options": self.extended_options.get("tracing_options", {}),
+            "job_id": str(self._job_id),
+            "tasks": [task.to_dict() for task in self._tasks],
+            "tracing_options": self._extended_options.get("tracing_options", {}),
         }
 
+    @property
+    def payload(self) -> Dict:
+        return self._payload
+
+    @payload.setter
+    def payload(self, payload: Dict) -> None:
+        self._payload = payload
+
+    @property
+    def job_id(self) -> UUID:
+        return self._job_id
+
+    @job_id.setter
+    def job_id(self, job_id: UUID) -> None:
+        self._job_id = job_id
+
+    @property
+    def source_id(self) -> str:
+        return self._source_id
+
+    @source_id.setter
+    def source_id(self, source_id: str) -> None:
+        self._source_id = source_id
+
+    @property
+    def source_name(self) -> str:
+        return self._source_name
+
+    @source_name.setter
+    def source_name(self, source_name: str) -> None:
+        self._source_name = source_name
 
     def add_task(self, task) -> None:
         """
@@ -129,4 +151,4 @@ class JobSpec(BaseModel):
         if not isinstance(task, Task):
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
-        self.tasks.append(task)
+        self._tasks.append(task)

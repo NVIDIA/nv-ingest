@@ -617,13 +617,6 @@ def pipeline(morpheus_pipeline_config, ingest_config) -> float:
     help="Number of captions to process in a batch. Must be a positive integer.",
 )
 @click.option(
-    "--extract_workers",
-    default=os.cpu_count(),
-    callback=validate_positive,
-    type=int,
-    help="Number of worker processes for extraction.",
-)
-@click.option(
     "--mode",
     type=click.Choice([mode.value for mode in PipelineModes], case_sensitive=False),
     default=PipelineModes.NLP.value,
@@ -642,7 +635,6 @@ def cli(
     use_cpp,
     pipeline_batch_size,
     enable_monitor,
-    extract_workers,
     feature_length,
     num_threads,
     model_max_batch_size,
