@@ -4,7 +4,6 @@
 
 
 import logging
-import typing
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -54,18 +53,17 @@ class JobSpec:
     """
 
     def __init__(
-        self,
-        payload: str = None,
-        tasks: Optional[List] = None,
-        source_id: Optional[str] = None,
-        source_name: Optional[str] = None,
-        document_type: Optional[str] = None,
-        job_id: Optional[typing.Union[UUID, str]] = None,
-        extended_options: Optional[Dict] = None,
+            self,
+            payload: str = None,
+            tasks: Optional[List] = None,
+            source_id: Optional[str] = None,
+            source_name: Optional[str] = None,
+            document_type: Optional[str] = None,
+            extended_options: Optional[Dict] = None,
     ) -> None:
         self._document_type = document_type or "txt"
         self._extended_options = extended_options or {}
-        self._job_id = job_id
+        self._job_id = None
         self._payload = payload
         self._source_id = source_id
         self._source_name = source_name
@@ -74,9 +72,12 @@ class JobSpec:
     def __str__(self) -> str:
         task_info = "\n".join(str(task) for task in self._tasks)
         return (
-            f"job-id: {self._job_id}\n"
             f"source-id: {self._source_id}\n"
+            f"source-name: {self._source_name}\n"
+            f"document-type: {self._document_type}\n"
             f"task count: {len(self._tasks)}\n"
+            f"payload: {'<*** ' + str(len(self._payload)) + ' ***>' if self._payload else 'Empty'}\n"
+            f"extended-options: {self._extended_options}\n"
             f"{task_info}"
         )
 

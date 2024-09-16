@@ -19,8 +19,8 @@ from mrc.core import operators as ops
 from redis import RedisError
 
 from nv_ingest.schemas.redis_task_sink_schema import RedisTaskSinkSchema
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
-from nv_ingest.util.redis import RedisClient
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
 

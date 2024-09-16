@@ -142,6 +142,7 @@ nv-ingest-cli \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
+  --client REDIS \
   --client_host=localhost \
   --client_port=6379
 ```

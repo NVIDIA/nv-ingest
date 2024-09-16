@@ -1,22 +1,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import json
 import logging
 import time
-import traceback
 from typing import Any, List, Dict, Union, Tuple
 from typing import Optional
 
 import redis
 from redis.exceptions import RedisError
 
-from nv_ingest_client.message_clients import MessageClientBase
+from nv_ingest.util.message_brokers.client_base import MessageClientBase
 
 # pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
+# TODO(Devin): Duplicate code with client side, consider moving to a shared location
 
 class RedisClient(MessageClientBase):
     """
@@ -124,7 +125,8 @@ class RedisClient(MessageClientBase):
         except (RedisError, AttributeError):
             return False
 
-    def _check_response(self, channel_name: str, timeout: float) -> Tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+    def _check_response(self, channel_name: str, timeout: float) -> Tuple[
+            Optional[Dict[str, Any]], Optional[int], Optional[int]]:
         """
         Checks for a response from the Redis queue and processes it into a message, fragment, and fragment count.
 
@@ -150,8 +152,10 @@ class RedisClient(MessageClientBase):
         """
 
         response = self.get_client().blpop([channel_name], timeout)
+        if (response is None):
+            raise TimeoutError("No response was received in the specified timeout period")
 
-        if (response and len(response) > 1 and response[1]):
+        if (len(response) > 1 and response[1]):
             try:
                 message = json.loads(response[1])
                 fragment = message.get('fragment', 0)
@@ -171,8 +175,9 @@ class RedisClient(MessageClientBase):
 
         Parameters
         ----------
-        channel_name : str
-            The name of the task queue to fetch messages from.
+        channel_name: str
+            Channel to fetch the message from.
+
         timeout : float
             The timeout in seconds for blocking until a message is available. If we receive a multi-part message, this
             value will be temporarily extended in order to collect all fragments.
