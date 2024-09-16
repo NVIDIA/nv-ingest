@@ -60,9 +60,9 @@ def extract_tables_and_charts_using_image_ensemble(
     config: PDFiumConfigSchema,
     max_batch_size: int = 8,
     num_classes: int = 3,
-    conf_thresh: float = 0.48,
+    conf_thresh: float = 0.1,
     iou_thresh: float = 0.5,
-    min_score: float = 0.1,
+    min_score: float = 0.48,
 ) -> List[Tuple[int, ImageTable]]:
     """
     Extract tables and charts from a series of document pages using an ensemble of image-based models.
@@ -83,11 +83,11 @@ def extract_tables_and_charts_using_image_ensemble(
     num_classes : int, optional
         The number of classes the model is trained to detect (default is 3).
     conf_thresh : float, optional
-        The confidence threshold for detection (default is 0.48).
+        The confidence threshold for detection (default is 0.1).
     iou_thresh : float, optional
         The Intersection Over Union (IoU) threshold for non-maximum suppression (default is 0.5).
     min_score : float, optional
-        The minimum score threshold for considering a detection valid (default is 0.1).
+        The minimum score threshold for considering a detection valid (default is 0.48).
 
     Returns
     -------
