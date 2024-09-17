@@ -108,7 +108,7 @@ pip install e .
 
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
-In Python (find the complete script [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/examples/sample_job.py)):
+In Python (find the complete example [here](./client/client_examples/examples/python_client_usage.ipynb)):
 ```
 # create and submit a multi modal extraction job
     job_spec = JobSpec(
@@ -135,7 +135,7 @@ In Python (find the complete script [here](https://github.com/NVIDIA/nv-ingest/b
     print(f"Got {len(result)} results")
 ```
 
-Using the the `nv-ingest-cli`:
+Using the the `nv-ingest-cli` (find the complete example [here](./client/client_examples/examples/cli_client_usage.ipynb)):
 
 ```shell
 nv-ingest-cli \
