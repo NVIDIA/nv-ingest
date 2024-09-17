@@ -11,6 +11,7 @@
 # pylint: skip-file
 
 import base64
+import json
 from io import BytesIO
 import logging
 import time
@@ -18,6 +19,7 @@ import traceback
 from typing import Annotated
 import uuid
 
+from opentelemetry import trace
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from fastapi import File, UploadFile
 from fastapi import APIRouter
@@ -27,8 +29,10 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
+from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 
 logger = logging.getLogger("uvicorn")
+tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
@@ -64,14 +68,13 @@ async def submit_job_curl_friendly(
     the nv-ingest service through tools like Curl easier.
     """
     try:
-        print(f"Creating JobSpec from multipart/form-data file: {file}")
-        print(f"File size: {file.size}")
         file_stream = BytesIO(file.file.read())
         pdf_content = base64.b64encode(file_stream.read()).decode("utf-8")
+
+        print(f"Current Trace Span in ingest.py: {trace.get_current_span()}")
+
         # Construct the JobSpec from the HTTP supplied form-data
         job_spec = JobSpec(
-            job_id=str(uuid.uuid4()),
-            # document_type=file.content_type,
             document_type="pdf",
             payload=pdf_content,
             source_id=file.filename,
@@ -89,8 +92,7 @@ async def submit_job_curl_friendly(
 
         job_spec.add_task(extract_task)
 
-        print(f"Created JobSpec instance: {job_spec}")
-        submitted_job_id = await ingest_service.submit_job(job_spec)
+        submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()

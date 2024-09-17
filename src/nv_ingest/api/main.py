@@ -19,10 +19,11 @@ from .v1.ingest import router as IngestApiRouter
 
 # Set up the tracer provider and add a processor for exporting traces
 trace.set_tracer_provider(TracerProvider())
-tracer_provider = trace.get_tracer_provider()
+tracer = trace.get_tracer(__name__)
+
 exporter = OTLPSpanExporter(endpoint="otel-collector:4317", insecure=True)
 span_processor = BatchSpanProcessor(exporter)
-tracer_provider.add_span_processor(span_processor)
+trace.get_tracer_provider().add_span_processor(span_processor)
 
 # nv-ingest FastAPI app declaration
 app = FastAPI()
@@ -35,12 +36,13 @@ FastAPIInstrumentor.instrument_app(app)
 
 @app.middleware("http")
 async def add_trace_id_header(request, call_next):
-    response = await call_next(request)
+    with tracer.start_as_current_span("uvicorn-endpoint"):
+        response = await call_next(request)
 
-    # Get the current span and trace ID
-    span = trace.get_current_span()
-    if span:
-        # trace_id = format(span.get_span_context().trace_id, '032x')
-        response.headers["x-trace-id"] = span.get_span_context().trace_id
+        # Inject the current x-trace-id into the HTTP headers response
+        span = trace.get_current_span()
+        if span:
+            trace_id = format(span.get_span_context().trace_id, '032x')
+            response.headers["x-trace-id"] = trace_id
 
-    return response
+        return response
