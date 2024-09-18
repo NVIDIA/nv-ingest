@@ -101,38 +101,57 @@ conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
 pip install -r ./requirements.txt
-pip install e .
+pip install .
 ```
 
 ### Step 3: Ingesting Documents
 
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
-In Python (find the complete script [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/examples/sample_job.py)):
+In the below examples, we are doing text, chart, table, and image extraction:
+`extract_text`, - uses PDFium to find and extract text from pages
+`extract_images` - uses PDFium to extract images
+`extract_tables_and_charts` - uses YOLOX to find tables and charts. Uses Deplot for chart extraction, and CACHED and PaddleOCR for table extraction
+
+In Python:
 ```
-# create and submit a multi modal extraction job
-    job_spec = JobSpec(
-        document_type=file_type,
-        payload=file_content[0],
-        source_id=file_name,
-        source_name=file_name,
-        extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
-    )
+from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.primitives import JobSpec
+from nv_ingest_client.primitives.tasks import ExtractTask
+from nv_ingest_client.primitives.tasks import SplitTask
+from nv_ingest_client.util.file_processing.extract import extract_file_content
 
-    extract_task = ExtractTask(
-        document_type=file_type,
-        extract_text=True,
-        extract_images=True,
-    )
+import logging, time
 
-    job_spec.add_task(extract_task)
-    job_id = client.add_job(job_spec)
+logger = logging.getLogger("nv_ingest_client")
 
-    client.submit_job(job_id, "morpheus_task_queue")
+file_name = "data/multimodal_test.pdf"
+file_content, file_type = extract_file_content(file_name)
 
-    result = client.fetch_job_result(job_id)
-    # Get back the extracted pdf data
-    print(f"Got {len(result)} results")
+job_spec = JobSpec(
+    document_type=file_type,
+    payload=file_content,
+    source_id=file_name,
+    source_name=file_name,
+    extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
+)
+
+# configure desired extraction modes here
+extract_task = ExtractTask(
+    document_type=file_type,
+    extract_text=True,
+    extract_images=True,
+    extract_tables=True
+)
+
+
+job_spec.add_task(extract_task)
+client = NvIngestClient()
+job_id = client.add_job(job_spec)
+
+client.submit_job(job_id, "morpheus_task_queue")
+result = client.fetch_job_result(job_id, timeout=60)
+print(f"Got {len(result)} results")
 ```
 
 Using the the `nv-ingest-cli`:
@@ -141,10 +160,9 @@ Using the the `nv-ingest-cli`:
 nv-ingest-cli \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
-  --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
-  --client REDIS \
+  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_tables": "true", "extract_images": "true"}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
 You should notice output indicating document processing status:

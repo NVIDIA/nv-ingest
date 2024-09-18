@@ -55,7 +55,7 @@ class NvIngestClient:
             self,
             message_client_allocator: Callable[..., RestClient] = RestClient,
             message_client_hostname: Optional[str] = "localhost",
-            message_client_port: Optional[int] = 6379,
+            message_client_port: Optional[int] = 7670,
             message_client_kwargs: Optional[Dict] = None,
             msg_counter_id: Optional[str] = "nv-ingest-message-id",
             worker_pool_size: int = 1,
@@ -71,7 +71,7 @@ class NvIngestClient:
         message_client_hostname : str, optional
             The hostname of the Redis server. Defaults to "localhost".
         message_client_port : int, optional
-            The port number of the Redis server. Defaults to 6379.
+            The port number of the Redis server. Defaults to 7670.
         msg_counter_id : str, optional
             The Redis key for tracking message counts. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
@@ -81,7 +81,7 @@ class NvIngestClient:
         self._current_message_id = 0
         self._job_states = {}
         self._message_client_hostname = message_client_hostname or "localhost"
-        self._message_client_port = message_client_port or 6379
+        self._message_client_port = message_client_port or 7670
         self._message_counter_id = msg_counter_id or "nv-ingest-message-id"
 
         logger.debug("Instantiate NvIngestClient:\n%s", str(self))
