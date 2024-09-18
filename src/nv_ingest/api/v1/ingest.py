@@ -71,18 +71,25 @@ async def submit_job_curl_friendly(
         file_stream = BytesIO(file.file.read())
         pdf_content = base64.b64encode(file_stream.read()).decode("utf-8")
 
-        print(f"Current Trace Span in ingest.py: {trace.get_current_span()}")
-
         # Construct the JobSpec from the HTTP supplied form-data
         job_spec = JobSpec(
+            # TOOD: Update this to look at the uploaded content-type, currently that is not working
             document_type="pdf",
             payload=pdf_content,
             source_id=file.filename,
             source_name=file.filename,
             # TODO: Update this to accept user defined options
-            extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}}
+            extended_options={
+                "tracing_options":
+                {
+                    "trace": True,
+                    "ts_send": time.time_ns(),
+                    "trace_id": trace.get_current_span().get_span_context().trace_id
+                }
+            }
         )
 
+        # This is the "easy submission path" just default to extracting everything
         extract_task = ExtractTask(
             document_type="pdf",
             extract_text=True,
@@ -92,7 +99,11 @@ async def submit_job_curl_friendly(
 
         job_spec.add_task(extract_task)
 
-        submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
+        submitted_job_id = await ingest_service.submit_job(
+            MessageWrapper(
+                payload=json.dumps(job_spec.to_dict())
+            )
+        )
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()
