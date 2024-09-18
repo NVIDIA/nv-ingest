@@ -27,9 +27,9 @@ from fastapi import Depends
 from fastapi import HTTPException
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
+from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
-from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -69,13 +69,13 @@ async def submit_job_curl_friendly(
     """
     try:
         file_stream = BytesIO(file.file.read())
-        pdf_content = base64.b64encode(file_stream.read()).decode("utf-8")
+        doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
 
         # Construct the JobSpec from the HTTP supplied form-data
         job_spec = JobSpec(
             # TOOD: Update this to look at the uploaded content-type, currently that is not working
             document_type="pdf",
-            payload=pdf_content,
+            payload=doc_content,
             source_id=file.filename,
             source_name=file.filename,
             # TODO: Update this to accept user defined options
