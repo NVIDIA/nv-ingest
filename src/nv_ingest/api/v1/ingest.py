@@ -10,20 +10,29 @@
 
 # pylint: skip-file
 
+import base64
+import json
+from io import BytesIO
 import logging
+import time
 import traceback
 from typing import Annotated
+import uuid
 
+from opentelemetry import trace
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from fastapi import File, UploadFile
 from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import HTTPException
-from redis import RedisError
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 
 logger = logging.getLogger("uvicorn")
+tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
@@ -37,6 +46,68 @@ async def _get_ingest_service() -> IngestServiceMeta:
 
 
 INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
+
+
+# POST /submit
+@router.post(
+    "/submit",
+    responses={
+        200: {"description": "Submission was successful"},
+        500: {"description": "Error encountered during submission"},
+    },
+    tags=["Ingestion"],
+    summary="submit document to the core nv ingestion service for processing",
+    operation_id="submit",
+)
+async def submit_job_curl_friendly(
+    ingest_service: INGEST_SERVICE_T,
+    file: UploadFile = File(...)
+):
+    """
+    A multipart/form-data friendly Job submission endpoint that makes interacting with
+    the nv-ingest service through tools like Curl easier.
+    """
+    try:
+        file_stream = BytesIO(file.file.read())
+        doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+
+        # Construct the JobSpec from the HTTP supplied form-data
+        job_spec = JobSpec(
+            # TOOD: Update this to look at the uploaded content-type, currently that is not working
+            document_type="pdf",
+            payload=doc_content,
+            source_id=file.filename,
+            source_name=file.filename,
+            # TODO: Update this to accept user defined options
+            extended_options={
+                "tracing_options":
+                {
+                    "trace": True,
+                    "ts_send": time.time_ns(),
+                    "trace_id": trace.get_current_span().get_span_context().trace_id
+                }
+            }
+        )
+
+        # This is the "easy submission path" just default to extracting everything
+        extract_task = ExtractTask(
+            document_type="pdf",
+            extract_text=True,
+            extract_images=True,
+            extract_tables=True
+        )
+
+        job_spec.add_task(extract_task)
+
+        submitted_job_id = await ingest_service.submit_job(
+            MessageWrapper(
+                payload=json.dumps(job_spec.to_dict())
+            )
+        )
+        return submitted_job_id
+    except Exception as ex:
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
 # POST /submit_job
