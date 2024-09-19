@@ -115,43 +115,77 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 In Python:
 ```
+import logging, time
+import concurrent.futures
+
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.util.file_processing.extract import extract_file_content
 
-import logging, time
-
 logger = logging.getLogger("nv_ingest_client")
 
 file_name = "data/multimodal_test.pdf"
 file_content, file_type = extract_file_content(file_name)
 
+# A JobSpec is an object that defines a document and how it should
+# be processed by the nv-ingest service.
 job_spec = JobSpec(
-    document_type=file_type,
-    payload=file_content,
-    source_id=file_name,
-    source_name=file_name,
-    extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
+  document_type=file_type,
+  payload=file_content,
+  source_id=file_name,
+  source_name=file_name,
+  extended_options=
+    {
+      "tracing_options":
+      {
+        "trace": True,
+        "ts_send": time.time_ns()
+      }
+    }
 )
 
-# configure desired extraction modes here
+# configure desired extraction modes here. Multiple extraction
+# methods can be defined for a single JobSpec
 extract_task = ExtractTask(
-    document_type=file_type,
-    extract_text=True,
-    extract_images=True,
-    extract_tables=True
+  document_type=file_type,
+  extract_text=True,
+  extract_images=True,
+  extract_tables=True
 )
-
 
 job_spec.add_task(extract_task)
+
+# Create the client and inform it about the JobSpec we want to process.
 client = NvIngestClient()
 job_id = client.add_job(job_spec)
-
 client.submit_job(job_id, "morpheus_task_queue")
-result = client.fetch_job_result(job_id, timeout=60)
-print(f"Got {len(result)} results")
+
+
+# Nv-Ingest jobs are often "long running". Therefore after
+# submission we intermittently check if the job is completed.
+def fetch_wait_completed_results(job_id):
+  while True:
+    try:
+      result = client.fetch_job_result(job_id, timeout=60)
+      return result
+    except TimeoutError:
+      print("Job still processing ... aka HTTP 202 received")
+
+# Results are fetched in an async manner. If the job is still running a
+# HTTP 202 response is returned and interpreted as a TimeoutError.
+# We continue retrying here until our timeout is reached
+timeout_seconds = 60
+with concurrent.futures.ThreadPoolExecutor() as executor:
+  future = executor.submit(fetch_results, job_id)
+  
+  try:
+      # Wait for the result within the specified timeout
+      result = future.result(timeout=timeout_seconds)
+      print(f"Got {len(result)} results")
+  except concurrent.futures.TimeoutError:
+      print(f"Job processing did not complete within the specified {timeout_seconds} seconds")
 ```
 
 Using the the `nv-ingest-cli`:
