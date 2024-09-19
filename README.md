@@ -61,14 +61,19 @@ To get started using NVIDIA Ingest, you need to do a few things:
 
 ### Step 1: Starting containers
 
-This example demonstrates how to use the provided [docker-compose.yml](docker-compose.yaml) to build and start all needed services with two commands.
+This example demonstrates how to use the provided [docker-compose.yml](docker-compose.yaml) to start all needed services with a few commands.
 
 If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
 
 First, git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
 
-For Docker container images to be able to access to pre-built containers and NIM microservices, create a .env file and set up your API keys in it:
+Make sure your docker daemon is logged into nvcr.io:
+```
+docker login nvcr.io
+```
+
+When NIM containers first startup, they'll need auth keys to download the necessary model files. Create a .env file and set up your API keys in it:
 ```
 NIM_NGC_API_KEY=...
 NGC_API_KEY=...
@@ -77,11 +82,7 @@ DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
-To build Docker images locally:
-
-`docker compose build`
-
-Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the YOLOX, DePlot, and CACHED NIM models are each pinned to a dedicated GPU. The PaddleOCR and nv-embedqa-e5 NIM models and the nv-ingest-ms-runtime share a fourth. Thus our minimum requirements are 4x NVIDIA A100 or H100 Tensor Core GPUs. 
+Note: As configured by default in [docker-compose.yml](docker-compose.yaml), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second.
 
 To start all services:
 `docker compose up`
@@ -119,12 +120,17 @@ conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
 pip install -r ./requirements.txt
-pip install e .
+pip install .
 ```
 
 ### Step 3: Ingesting Documents
 
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
+
++In the below examples, we are doing text, chart, table, and image extraction:
++`extract_text`, - uses PDFium to find and extract text from pages
++`extract_images` - uses PDFium to extract images
++`extract_tables` - uses YOLOX to find tables and charts. Uses PaddleOCR for table extraction, and Deplot, CACHED, and PaddleOCR for chart extraction
 
 In Python (find the complete example [here](./client/client_examples/examples/python_client_usage.ipynb)):
 ```
@@ -141,6 +147,7 @@ In Python (find the complete example [here](./client/client_examples/examples/py
         document_type=file_type,
         extract_text=True,
         extract_images=True,
+        extract_tables=True
     )
 
     job_spec.add_task(extract_task)
@@ -157,12 +164,11 @@ Using the the `nv-ingest-cli` (find the complete example [here](./client/client_
 
 ```shell
 nv-ingest-cli \
-  --doc ./data/test.pdf \
+  --doc ./data/multimodal_test.pdf \
   --output_directory ./processed_docs \
-  --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
-  --client REDIS \
+  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_tables": "true", "extract_images": "true"}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
 You should notice output indicating document processing status:
@@ -241,7 +247,7 @@ cat ./processed_docs/text/test.pdf.metadata.json
       "text_type": "document"
     }
   }
-]]```
+}]```
 
 Expected image extracts:
 ```shell
@@ -292,8 +298,11 @@ $ cat ./processed_docs/image/test.pdf.metadata.json
 }]
 ```
 
+You can find the metadata definitions [here](https://github.com/NVIDIA/nv-ingest/blob/main/docs/content-metadata.md).
+
 We also provide a script for inspecting [extracted images](#image_viewerpy)
 ```shell
+pip install tkinter
 python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.metadata.json
 ```
 
