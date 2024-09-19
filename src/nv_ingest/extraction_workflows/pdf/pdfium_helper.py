@@ -60,9 +60,10 @@ def extract_tables_and_charts_using_image_ensemble(
     config: PDFiumConfigSchema,
     max_batch_size: int = 8,
     num_classes: int = 3,
-    conf_thresh: float = 0.1,
+    conf_thresh: float = 0.01,
     iou_thresh: float = 0.5,
-    min_score: float = 0.48,
+    min_score: float = 0.1,
+    final_thresh: float = 0.48,
 ) -> List[Tuple[int, ImageTable]]:
     """
     Extract tables and charts from a series of document pages using an ensemble of image-based models.
@@ -83,11 +84,14 @@ def extract_tables_and_charts_using_image_ensemble(
     num_classes : int, optional
         The number of classes the model is trained to detect (default is 3).
     conf_thresh : float, optional
-        The confidence threshold for detection (default is 0.1).
+        The confidence threshold for detection (default is 0.01).
     iou_thresh : float, optional
         The Intersection Over Union (IoU) threshold for non-maximum suppression (default is 0.5).
     min_score : float, optional
-        The minimum score threshold for considering a detection valid (default is 0.48).
+        The minimum score threshold for considering a detection valid (default is 0.1).
+    final_thresh: float, optional
+        Threshold for keeping a bounding box applied after postprocessing. (default is 0.48)
+
 
     Returns
     -------
@@ -143,7 +147,7 @@ def extract_tables_and_charts_using_image_ensemble(
 
             output_array = perform_model_inference(yolox_client, "yolox", input_array)
             results = process_inference_results(
-                output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score
+                output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
             )
 
             for annotation_dict, original_image in zip(results, original_images):
@@ -214,6 +218,7 @@ def process_inference_results(
     conf_thresh: float,
     iou_thresh: float,
     min_score: float,
+    final_thresh: float,
 ):
     """
     Process the model output to generate detection results and expand bounding boxes.
@@ -232,6 +237,9 @@ def process_inference_results(
         The Intersection Over Union (IoU) threshold for non-maximum suppression.
     min_score : float
         The minimum score for keeping a detection.
+    final_thresh: float
+        Threshold for keeping a bounding box applied after postprocessing.
+
 
     Returns
     -------
@@ -256,7 +264,20 @@ def process_inference_results(
     )
     results = yolox_utils.postprocess_results(pred, original_image_shapes, min_score=min_score)
 
-    return [yolox_utils.expand_chart_bboxes(annotation_dict) for annotation_dict in results]
+    annotation_dicts = [yolox_utils.expand_chart_bboxes(annotation_dict) for annotation_dict in results]
+    inference_results = []
+
+    for annotation_dict in annotation_dicts:
+        new_dict = {}
+        if 'table' in annotation_dict:
+            new_dict['table'] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+        if 'chart' in annotation_dict:
+            new_dict['chart'] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+        if 'title' in annotation_dict:
+            new_dict['title'] = annotation_dict["title"]
+        inference_results.append(new_dict)
+
+    return inference_results 
 
 
 # Handle individual table/chart extraction and model inference
