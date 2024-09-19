@@ -158,7 +158,10 @@ extract_task = ExtractTask(
 job_spec.add_task(extract_task)
 
 # Create the client and inform it about the JobSpec we want to process.
-client = NvIngestClient()
+client = NvIngestClient(
+  message_client_hostname="localhost", # Host where nv-ingest-ms-runtime is running
+  message_client_port=7670 # REST port, defaults to 7670
+)
 job_id = client.add_job(job_spec)
 client.submit_job(job_id, "morpheus_task_queue")
 
@@ -178,7 +181,7 @@ def fetch_wait_completed_results(job_id):
 # We continue retrying here until our timeout is reached
 timeout_seconds = 60
 with concurrent.futures.ThreadPoolExecutor() as executor:
-  future = executor.submit(fetch_results, job_id)
+  future = executor.submit(fetch_wait_completed_results, job_id)
   
   try:
       # Wait for the result within the specified timeout
