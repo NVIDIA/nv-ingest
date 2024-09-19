@@ -7,6 +7,7 @@
 
 import json
 import logging
+import concurrent.futures
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -317,7 +318,7 @@ class NvIngestClient:
     def _fetch_job_result_wait(self, job_id: str, timeout: float = 60, data_only: bool = True):
         while True:
             try:
-                return self._fetch_job_result(job_id, timeout, data_only)
+                return [self._fetch_job_result(job_id, timeout, data_only)]
             except TimeoutError:
                 logger.debug("Job still processing ... aka HTTP 202 received")
     
