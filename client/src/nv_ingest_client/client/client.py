@@ -7,6 +7,7 @@
 
 import json
 import logging
+import concurrent.futures
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -55,25 +56,25 @@ class NvIngestClient:
             self,
             message_client_allocator: Callable[..., RestClient] = RestClient,
             message_client_hostname: Optional[str] = "localhost",
-            message_client_port: Optional[int] = 6379,
+            message_client_port: Optional[int] = 7670,
             message_client_kwargs: Optional[Dict] = None,
             msg_counter_id: Optional[str] = "nv-ingest-message-id",
             worker_pool_size: int = 1,
     ) -> None:
         """
-        Initializes the NvIngestClient with a client allocator, Redis configuration, a message counter ID,
+        Initializes the NvIngestClient with a client allocator, REST configuration, a message counter ID,
         and a worker pool for parallel processing.
 
         Parameters
         ----------
-        message_client_allocator : Callable[..., RedisClient]
+        message_client_allocator : Callable[..., RestClient]
             A callable that when called returns an instance of the client used for communication.
         message_client_hostname : str, optional
-            The hostname of the Redis server. Defaults to "localhost".
+            The hostname of the REST server. Defaults to "localhost".
         message_client_port : int, optional
-            The port number of the Redis server. Defaults to 6379.
+            The port number of the REST server. Defaults to 7670.
         msg_counter_id : str, optional
-            The Redis key for tracking message counts. Defaults to "nv-ingest-message-id".
+            The key for tracking message counts. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
             The number of worker processes in the pool. Defaults to 1.
         """
@@ -81,7 +82,7 @@ class NvIngestClient:
         self._current_message_id = 0
         self._job_states = {}
         self._message_client_hostname = message_client_hostname or "localhost"
-        self._message_client_port = message_client_port or 6379
+        self._message_client_port = message_client_port or 7670
         self._message_counter_id = msg_counter_id or "nv-ingest-message-id"
 
         logger.debug("Instantiate NvIngestClient:\n%s", str(self))
@@ -317,7 +318,7 @@ class NvIngestClient:
     def _fetch_job_result_wait(self, job_id: str, timeout: float = 60, data_only: bool = True):
         while True:
             try:
-                return self._fetch_job_result(job_id, timeout, data_only)
+                return [self._fetch_job_result(job_id, timeout, data_only)]
             except TimeoutError:
                 logger.debug("Job still processing ... aka HTTP 202 received")
     
