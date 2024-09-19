@@ -44,20 +44,20 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 ## Example text extracts for multimodal_test.pdf
 ```json
 {
-    "include": "example_processed_docs/text/multimodal_test.pdf.metadata.json
+    "include": "./example_processed_docs/text/multimodal_test.pdf.metadata.json
 }
 ```
 
 ## Example image extracts for multimodal_test.pdf
 ```json
 {
-    "include": "example_processed_docs/image/multimodal_test.pdf.metadata.json
+    "include": "./example_processed_docs/image/multimodal_test.pdf.metadata.json
 }
 ```
 
 ## Example chart and table extracts for multimodal_test.pdf
 ```json
 {
-    "include": "example_processed_docs/structured/multimodal_test.pdf.metadata.json
+    "include": "./example_processed_docs/structured/multimodal_test.pdf.metadata.json
 }
 ```
