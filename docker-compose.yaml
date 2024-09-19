@@ -26,7 +26,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -49,7 +49,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
@@ -73,7 +73,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=2
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -97,7 +97,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -119,7 +119,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -164,7 +164,7 @@ services:
       - TABLE_DETECTION_HTTP_TRITON=""
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=""
-      - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
