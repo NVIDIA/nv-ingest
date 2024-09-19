@@ -11,19 +11,22 @@ NVIDIA-Ingest is a scalable, performance-oriented document content and metadata 
 
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and the process storing into a vector database [Milvus](https://milvus.io/).
 
+### Table of Contents
+1. [Introduction](#what-it-is)
+2. [Prerequisites](#prerequisites)
+3. [Quickstart](#quickstart)
+4. [Repo Structure](#repo-structure)
+4. [Notices](#notices)
+
 ### What it is
 
 A microservice that:
 
-- Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that
-  payload.
-- Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing
-  objects extracted from the base document, as well as processing annotations and timing/trace data.
+- Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
+- Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, as well as processing annotations and timing/trace data.
 - Supports PDF, Docx, pptx, and images.
-- Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and
-  accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
-- Supports various types of pre and post processing operations, including text splitting and chunking; 
-  transform, and filtering; embedding generation, and image offloading to storage.
+- Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
+- Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
 
 ### What it is not
 
@@ -256,11 +259,13 @@ pip install tkinter
 python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.metadata.json
 ```
 
-Beyond inspecting the results, you can read them into something like a llama-index or langchain document query pipeline:
+Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 
 Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
-## Third Party License Notice:
+## Notices
+
+### Third Party License Notice:
 
 If configured to do so, this project will download and install additional third-party open source software projects.
 Review the license terms of these open source projects before use:
@@ -274,7 +279,7 @@ https://pypi.org/project/pdfservices-sdk/
     pdfservices-sdk before enabling this option.
 
 
-## Contributing
+### Contributing
 
 We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original
 work, or you have rights to submit it under the same license, or a compatible license.
@@ -293,7 +298,7 @@ This will append the following to your commit message:
 Signed-off-by: Your Name <your@email.com>
 ```
 
-### Full text of the DCO:
+#### Full text of the DCO:
 
 ```
   Developer Certificate of Origin
