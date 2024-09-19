@@ -52,7 +52,7 @@ SPDX-License-Identifier: Apache-2.0
 - **`NGC_API_KEY`**:
 
   - **Description**: An authorized NGC API key, used to interact with hosted NIMs and can be generated here: https://org.ngc.nvidia.com/setup/personal-keys.
-  - **Example**: `hFFVc4XzxR***********WUzKYOCtZE`
+  - **Example**: `nvapi-*************`
 
 - **`MINIO_BUCKET`**:
 
@@ -65,5 +65,9 @@ SPDX-License-Identifier: Apache-2.0
   - **Example**: `DEBUG`, `INFO`, `WARNING`, `ERROR`, `CRITICAL`
 
 - **`NVIDIA_BUILD_API_KEY`**:
-  
-  - **Description**: This is required if you are using the build.nvidia.com endpoint instead of a self hosted Deplot NIM
+  - **Description**: This key is for when you are using the build.nvidia.com endpoint instead of a self hosted Deplot NIM.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used for bulid.nvidia.com.
+
+- **`NIM_NGC_API_KEY`**:
+  - **Description**: This key is by NIM microservices inside docker containers to access NGC resources.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used to access NGC resources.

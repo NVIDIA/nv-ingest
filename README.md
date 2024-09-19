@@ -68,16 +68,16 @@ If preferred, you can also [start services one by one](docs/deployment.md), or r
 First, git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
 
-Make sure your docker daemon is logged into nvcr.io:
-```
-docker login nvcr.io
+To access pre-built containers and NIM microservices, [generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+```shell
+$ docker login nvcr.io
+Username: $oauthtoken
+Password: <Your Key>
 ```
 
-When NIM containers first startup, they'll need auth keys to download the necessary model files. Create a .env file and set up your API keys in it:
+For Docker container images to be able to access NGC resources, create a .env file, and set up your API key in it:
 ```
-NIM_NGC_API_KEY=...
 NGC_API_KEY=...
-NGC_CLI_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
