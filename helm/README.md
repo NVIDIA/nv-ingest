@@ -1,5 +1,22 @@
 # NVIDIA NVIngest
 
+## Prerequisites
+
+### Hardware
+
+| GPU | Family | Memory | # of GPUs |
+| ------ | ------ | ------ | ------ |
+| H100 | SXM/NVLink or PCIe | 80GB | 2 |
+| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+
+### Software
+
+- Linux operating systems (Ubuntu 20.04 or later recommended)
+- [Docker](https://docs.docker.com/engine/install/)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= 535)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
+
 ## Setup Environment
 
 - First create your namespace
