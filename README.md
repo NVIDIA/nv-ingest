@@ -271,9 +271,9 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](https://github.com/NVIDIA/nv-ingest/blob/main/docs/content-metadata.md).
+You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
-We also provide a script for inspecting [extracted images](#image_viewerpy)
+We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 ```shell
 pip install tkinter
 python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.metadata.json
@@ -292,9 +292,9 @@ https://pypi.org/project/pdfservices-sdk/
 
 - **`INSTALL_ADOBE_SDK`**:
   - **Description**: If set to `true`, the Adobe SDK will be installed in the container at launch time. This is
-    required if you want to use the Adobe extraction service for PDF decomposition. Please review the "
-    "[license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
-    pdfservices-sdk before enabling this option."
+    required if you want to use the Adobe extraction service for PDF decomposition. Please review the 
+    [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
+    pdfservices-sdk before enabling this option.
 
 
 ## Contributing
