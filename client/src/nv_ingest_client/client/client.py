@@ -314,7 +314,7 @@ class NvIngestClient:
     
     # Nv-Ingest jobs are often "long running". Therefore after
     # submission we intermittently check if the job is completed.
-    def _fetch_job_result_wait(job_id: str, timeout: float = 60, data_only: bool = True):
+    def _fetch_job_result_wait(self, job_id: str, timeout: float = 60, data_only: bool = True):
         while True:
             try:
                 return self._fetch_job_result(job_id, timeout, data_only)
@@ -324,13 +324,10 @@ class NvIngestClient:
     # This is the direct Python approach function for retrieving jobs which handles the timeouts directly
     # in the function itself instead of expecting the user to handle it themselves
     # Note this method only supports fetching a single job result synchronously
-    def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
-        if isinstance(job_ids, str):
-            job_ids = [job_ids]
-        
+    def fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True):        
         # A thread pool executor is a simple approach to performing an action with a timeout
         with ThreadPoolExecutor() as executor:
-            future = executor.submit(_fetch_job_result_wait, job_id, timeout, data_only)
+            future = executor.submit(self._fetch_job_result_wait, job_id, timeout, data_only)
             try:
                 # Wait for the result within the specified timeout
                 return future.result(timeout=timeout)

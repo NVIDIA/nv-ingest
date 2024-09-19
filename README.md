@@ -135,9 +135,7 @@ You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 Note that `extract_tables` controls extraction for both tables and charts.
 
 In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
-```
 import logging, time
-import concurrent.futures
 
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
@@ -185,31 +183,8 @@ client = NvIngestClient(
 )
 job_id = client.add_job(job_spec)
 client.submit_job(job_id, "morpheus_task_queue")
-
-
-# Nv-Ingest jobs are often "long running". Therefore after
-# submission we intermittently check if the job is completed.
-def fetch_wait_completed_results(job_id):
-  while True:
-    try:
-      result = client.fetch_job_result(job_id, timeout=60)
-      return result
-    except TimeoutError:
-      print("Job still processing ... aka HTTP 202 received")
-
-# Results are fetched in an async manner. If the job is still running a
-# HTTP 202 response is returned and interpreted as a TimeoutError.
-# We continue retrying here until our timeout is reached
-timeout_seconds = 60
-with concurrent.futures.ThreadPoolExecutor() as executor:
-  future = executor.submit(fetch_wait_completed_results, job_id)
-  
-  try:
-      # Wait for the result within the specified timeout
-      result = future.result(timeout=timeout_seconds)
-      print(f"Got {len(result)} results")
-  except concurrent.futures.TimeoutError:
-      print(f"Job processing did not complete within the specified {timeout_seconds} seconds")
+result = client.fetch_job_result(job_id, timeout=60)
+print(f"Got {len(result)} results")
 ```
 
 Using the the `nv-ingest-cli` (find the complete example [here](./client/client_examples/examples/cli_client_usage.ipynb)):
