@@ -1,0 +1,258 @@
+[
+  {
+    "document_type": "structured",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Structured table extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 0,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 0,
+        "subtype": "table",
+        "type": "structured"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": null,
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": {
+        "caption": "",
+        "table_content": "locations. Animal Activity Place Giraffe Driving a car At the beach Lion Putting on sunscreen At the park Cat Jumping onto a laptop In a home office Dog Chasing a squirrel In the front yard",
+        "table_format": "image",
+        "table_location": [
+          533.1456000000001,
+          135.5554,
+          717.7728,
+          1051.0884999999998
+        ],
+        "uploaded_image_uri": ""
+      },
+      "text_metadata": null
+    }
+  },
+  {
+    "document_type": "structured",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Structured chart extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 0,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 0,
+        "subtype": "chart",
+        "type": "structured"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": null,
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": {
+        "caption": "",
+        "table_content": "This chart shows some gadgets, and some very fictitious costs. >\\n7938.758 ext. Print & Maroon Bookshelf Fine Art Poems Collection dla Cemicon Diamth\u00e1hn | Gadgets and their cost\nSollywood for Coasters | 19875.075     t158.281 \n Hammer | 19871.55 \n Powerdrill | 12044.625 \n Bluetooth speaker | 7598.07 \n Minifridge | 9916.305 \n Premium desk    Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost    Chart 1 - Gadgets and their cost",
+        "table_format": "image",
+        "table_location": [
+          713.2876739501953,
+          115.37342704087496,
+          1244.4979248046875,
+          1077.6802427768707
+        ],
+        "uploaded_image_uri": ""
+      },
+      "text_metadata": null
+    }
+  },
+  {
+    "document_type": "structured",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Structured table extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 1,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 1,
+        "subtype": "table",
+        "type": "structured"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": null,
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": {
+        "caption": "",
+        "table_content": "This table shows some popular colors that cars might come in. Car Color1 Color2 Color3 Coupe White Silver Flat Gray Sedan White Metallic Gray Matte Gray Minivan Gray Beige Black Truck Dark Gray Titanium Gray Charcoal Convertible Light Gray Graphite Slate Gray",
+        "table_format": "image",
+        "table_location": [
+          640.3584,
+          134.3684,
+          870.2976,
+          1051.5633
+        ],
+        "uploaded_image_uri": ""
+      },
+      "text_metadata": null
+    }
+  },
+  {
+    "document_type": "structured",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Structured chart extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 2,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 2,
+        "subtype": "chart",
+        "type": "structured"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": null,
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": {
+        "caption": "",
+        "table_content": "This chart shows some average frequency ranges for speaker drivers TITLE | Chart 2 \n Frequency Range Start (Hz) | Frequency Range Start (Hz) | Frequency Range End (Hz) \n Twitter | 12800 | 12700 \n Midrange | 13900 | 13000 \n Midwoofer | 9600 | 13000 \n Subwoofer | 0.00 | 13000    Tweeter - Midrange - Midwoofer - Subwoofer Hertz (log scale) 10 - 100 - 1000 - 10000 - 100000 Frequency Range Start (Hz) - Frequency Range End (Hz)    This chart shows some average frequency ranges for speaker drivers - Frequency Ranges of Speaker Drivers",
+        "table_format": "image",
+        "table_location": [
+          119.02463150024414,
+          114.27842709422112,
+          693.8265838623047,
+          1082.6923648118973
+        ],
+        "uploaded_image_uri": ""
+      },
+      "text_metadata": null
+    }
+  }
+]
