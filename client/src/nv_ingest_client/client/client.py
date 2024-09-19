@@ -302,11 +302,42 @@ class NvIngestClient:
             logger.error(f"Unexpected error while fetching job result for job ID {job_index}: {err}")
             raise
 
-    def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
+    # The Pythonic invocation and the CLI invocation approach currently have different approaches to timeouts
+    # This distinction is made obvious by provided two separate functions. One for "_cli" and one for
+    # direct Python use. This is the "_cli" approach
+    def fetch_job_result_cli(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
         return [self._fetch_job_result(job_id, timeout, data_only) for job_id in job_ids]
+    
+    
+    # Nv-Ingest jobs are often "long running". Therefore after
+    # submission we intermittently check if the job is completed.
+    def _fetch_job_result_wait(job_id: str, timeout: float = 60, data_only: bool = True):
+        while True:
+            try:
+                return self._fetch_job_result(job_id, timeout, data_only)
+            except TimeoutError:
+                logger.debug("Job still processing ... aka HTTP 202 received")
+    
+    # This is the direct Python approach function for retrieving jobs which handles the timeouts directly
+    # in the function itself instead of expecting the user to handle it themselves
+    # Note this method only supports fetching a single job result synchronously
+    def fetch_job_result(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
+        if isinstance(job_ids, str):
+            job_ids = [job_ids]
+        
+        # A thread pool executor is a simple approach to performing an action with a timeout
+        with ThreadPoolExecutor() as executor:
+            future = executor.submit(_fetch_job_result_wait, job_id, timeout, data_only)
+            try:
+                # Wait for the result within the specified timeout
+                return future.result(timeout=timeout)
+            except concurrent.futures.TimeoutError:
+                # Raise a standard Python TimeoutError which the client will be expecting
+                raise TimeoutError(f"Job processing did not complete within the specified {timeout} seconds")
+        
 
     def _ensure_submitted(self, job_ids: List[str]):
         if isinstance(job_ids, str):
@@ -350,7 +381,7 @@ class NvIngestClient:
         for job_id in job_ids:
             job_state = self._get_and_check_job_state(job_id)
 
-            future = self._worker_pool.submit(self.fetch_job_result, job_id, timeout, data_only)
+            future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, timeout, data_only)
             job_state.future = future
             future_to_job_id[future] = job_id
 
