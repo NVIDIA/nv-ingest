@@ -133,6 +133,16 @@ extract_tables=False)`
     methods and document types.
   - **Returns**: `Dict`: Dictionary containing task type and properties.
 
+- **Example**:
+  ```python
+  extract_task = ExtractTask(
+    document_type=file_type,
+    extract_text=True,
+    extract_images=True,
+    extract_tables=True
+  )
+  ```
+
 #### SplitTask
 
 Object for document splitting tasks, extending the `Task` class.
@@ -149,6 +159,17 @@ sentence_window_size=None)`
 - **Method: `to_dict()`**
   - **Description**: Converts task details to a dictionary for submission to message client.
   - **Returns**: `Dict`: Dictionary containing task type and properties.
+
+- **Example**:
+  ```python
+  split_task = SplitTask(
+      split_by="word",
+      split_length=300,
+      split_overlap=10,
+      max_character_length=5000,
+      sentence_window_size=0,
+  )
+  ```
 
 ### nv_ingest_client.client.client
 
@@ -167,6 +188,14 @@ efficiently. Below are the public methods available:
     - `msg_counter_id`: Redis key for tracking message counts. Defaults to "nv-ingest-message-id".
     - `worker_pool_size`: Number of worker processes in the pool. Defaults to 1.
 
+- **Example**:
+  ```python
+  client = NvIngestClient(
+    message_client_hostname="localhost", # Host where nv-ingest-ms-runtime is running
+    message_client_port=7670 # REST port, defaults to 7670
+  )
+  ```
+
 ## Submission Methods
 
 ### submit_job
@@ -181,6 +210,11 @@ Submits a job to a specified job queue. This method can optionally wait for a re
 - **Raises**:
   - Exception: If submitting the job fails.
 
+- **Example**:
+  ```python
+  client.submit_job(job_id, "morpheus_task_queue")
+  ```
+
 ### submit_jobs
 
 Submits multiple jobs to a specified job queue. This method does not wait for any of the jobs to complete.
@@ -191,6 +225,11 @@ Submits multiple jobs to a specified job queue. This method does not wait for an
 - **Returns**:
   - List[Union[Dict, None]]: A list of job results if blocking is True and results are available before the timeout,
     otherwise None.
+
+- **Example**:
+  ```python
+  client.submit_jobs([job_id0, job_id1], "morpheus_task_queue")
+  ```
 
 ### submit_job_async
 
@@ -206,6 +245,11 @@ job ID or a list of job IDs.
   - This method queues the jobs for asynchronous submission and returns a mapping of futures to job IDs.
   - It does not wait for any of the jobs to complete.
   - Ensure that each job is in the proper state before submission.
+
+- **Example**:
+  ```python
+  client.submit_job_async(job_id, "morpheus_task_queue")
+  ```
 
 ## Job Retrieval
 
@@ -224,6 +268,15 @@ job ID or a list of job IDs.
   - `TimeoutError`: If the fetch operation times out.
   - `Exception`: For all other unexpected issues.
 
+- **Example**:
+  ```python
+  job_id = client.add_job(job_spec)
+  client.submit_job(job_id, TASK_QUEUE)
+  generated_metadata = client.fetch_job_result(
+      job_id, timeout=DEFAULT_JOB_TIMEOUT
+  )
+  ```
+
 ### fetch_job_result_async
 
 - **Description**: Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to
@@ -238,6 +291,15 @@ job ID or a list of job IDs.
 - **Raises**:
   - No explicit exceptions raised but leverages the exceptions from `fetch_job_result`.
 
+- **Example**:
+  ```python
+  job_id = client.add_job(job_spec)
+  client.submit_job(job_id, TASK_QUEUE)
+  generated_metadata = client.fetch_job_result_async(
+      job_id, timeout=DEFAULT_JOB_TIMEOUT
+  )
+  ```
+
 ## Job and Task Management
 
 ### job_count
@@ -245,6 +307,11 @@ job ID or a list of job IDs.
 - **Description**: Returns the number of jobs currently tracked by the client.
 - **Method**: `job_count()`
 - **Returns**: Integer representing the total number of jobs.
+
+- **Example**:
+  ```python
+  client.job_count()
+  ```
 
 ### add_job
 
@@ -255,6 +322,20 @@ job ID or a list of job IDs.
 - **Returns**: String representing the job ID of the added job.
 - **Raises**:
   - `ValueError`: If a job with the specified job ID already exists.
+
+- **Example**:
+  ```python
+  extract_task = ExtractTask(
+    document_type=file_type,
+    extract_text=True,
+    extract_images=True,
+    extract_tables=True,
+    text_depth="document",
+    extract_tables_method="yolox",
+  )
+  job_spec.add_task(extract_task)
+  job_id = client.add_job(job_spec)
+  ```
 
 ### create_job
 
@@ -282,6 +363,31 @@ job ID or a list of job IDs.
 - **Raises**:
   - `ValueError`: If the job does not exist or is not in the correct state.
 
+- **Example**:
+  ```python
+  job_spec = JobSpec(
+      document_type=file_type,
+      payload=file_content,
+      source_id=SAMPLE_PDF,
+      source_name=SAMPLE_PDF,
+      extended_options={
+          "tracing_options": {
+              "trace": True,
+              "ts_send": time.time_ns(),
+          }
+      },
+  )
+  extract_task = ExtractTask(
+      document_type=file_type,
+      extract_text=True,
+      extract_images=True,
+      extract_tables=True,
+      text_depth="document",
+      extract_tables_method="yolox",
+  )
+  job_spec.add_task(extract_task)
+  ```
+
 ### create_task
 
 - **Description**: Creates a task with specified parameters and adds it to an existing job.
@@ -292,6 +398,12 @@ job ID or a list of job IDs.
   - `task_params` (dict, optional): Parameters for the task.
 - **Raises**:
   - `ValueError`: If the job does not exist or if an attempt is made to modify a job after its submission.
+
+- **Example**:
+  ```python
+  job_id = client.add_job(job_spec)
+  client.create_task(job_id, DedupTask, {content_type: "image", filter: True})
+  ```
 
 ## CLI Tool
 
