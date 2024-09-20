@@ -85,7 +85,7 @@ DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
-Note: As configured by default in [docker-compose.yaml](docker-compose.yaml), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second.
+Note: As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device. You can change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
 
 4. To start all services:
 `docker compose up`
