@@ -16,7 +16,7 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#quickstart)
 4. [Repo Structure](#repo-structure)
-4. [Notices](#notices)
+5. [Notices](#notices)
 
 ### What it is
 
@@ -262,6 +262,23 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.meta
 Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 
 Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+
+## Repo Structure
+
+Beyond the relevant documentation, examples, and other links above, below is a description of contents in this repo's folders:
+
+1. [.github](.github): GitHub repo configuration files
+2. [ci](ci): scripts used to build the nv-ingest container and other packages
+3. [client](client): docs and source code for the nv-ingest-cli utility
+4. [config](config): various yaml files defining configuration for OTEL, Prometheus
+5. [data](data): Sample PDFs provided for testing convenience
+6. [docker](docker): houses scripts used by the nv-ingest docker container
+7. [docs](docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
+8. [examples](examples): Example notebooks, scripts, and longer form tutorial content
+9. [helm](helm): Documentation for deploying nv-ingest to a Kubernetes cluster via Helm chart
+10. [skaffold](skaffold): Skaffold configuration
+11. [src](src): source code for the nv-ingest pipelines and service
+12. [tests](tests): unit tests for nv-ingest
 
 ## Notices
 
