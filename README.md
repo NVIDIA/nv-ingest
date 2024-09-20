@@ -203,7 +203,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-Using the the `nv-ingest-cli` (find the complete example [here](./client/client_examples/examples/cli_client_usage.ipynb)):
+Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
 
 ```shell
 nv-ingest-cli \
