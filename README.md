@@ -90,7 +90,7 @@ Note: As configured by default in [docker-compose.yaml](docker-compose.yaml#L52)
 4. To start all services:
 `docker compose up`
 
-Please note, NIM containers on their first startup can take 10-15 minutes to pull and fully load models. Also note that by default we have [configured log levels to be verbose](docker-compose.yaml#L31) so it's possible to observe service startup proceeding. You will notice _many_ log messages. You can control this on a per service level via each service's environment variables as defined in [docker-compose.yaml](docker-compose.yaml).
+Please note, NIM containers on their first startup can take 10-15 minutes to pull and fully load models. Also note that by default we have [configured log levels to be verbose](docker-compose.yaml#L27) so it's possible to observe service startup proceeding. You will notice _many_ log messages. You can turn down this logging for each NIM via its `NIM_TRITON_LOG_VERBOSE` variables in [docker-compose.yaml](docker-compose.yaml).
 
 5. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
