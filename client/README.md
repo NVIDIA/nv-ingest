@@ -19,9 +19,6 @@ a Python API and a command-line interface to cater to various ingestion needs.
    - [Command Overview](#command-overview)
    - [Options](#options)
 4. [Examples](#examples)
-5. [Configuration](#configuration)
-6. [Contributing](#contributing)
-7. [License](#license)
 
 ## Installation
 
@@ -33,10 +30,6 @@ pip install [REPO_ROOT]/client
 
 This command installs both the API libraries and the `nv-ingest-cli` tool which can subsequently be called from the
 command line.
-
-## Usage
-
-TODO(Devin): Need to shift to sphinx, but for now, we can provide a brief overview of the API and CLI.
 
 ## API Libraries
 
@@ -325,16 +318,4 @@ Here are the options provided by the CLI, explained:
 
 ## Examples
 
-Examples of using the CLI tool will be provided here, showing how to execute different tasks.
-
-## Configuration
-
-Details on how to configure the client and customize the behavior of the NV-Ingest-Client.
-
-## Contributing
-
-Information on how to contribute to the development of NV-Ingest-Client.
-
-## License
-
-NVIDIA Proprietary
+You can find a notebook with examples using the client [here](client_examples/examples/cli_client_usage.ipynb).
