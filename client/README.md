@@ -183,7 +183,7 @@ efficiently. Below are the public methods available:
   - **Parameters**:
     - `message_client_allocator`: A callable that returns an instance of the client used for communication.
     - `message_client_hostname`: Hostname of the message client server. Defaults to "localhost".
-    - `message_client_port`: Port number of the message client server. Defaults to 6379.
+    - `message_client_port`: Port number of the message client server. Defaults to 7670.
     - `message_client_kwargs`: Additional keyword arguments for the message client.
     - `msg_counter_id`: Redis key for tracking message counts. Defaults to "nv-ingest-message-id".
     - `worker_pool_size`: Number of worker processes in the pool. Defaults to 1.

@@ -115,7 +115,7 @@ nv-ingest-cli \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
 Enjoy!
@@ -210,7 +210,7 @@ Define environment variables as key/value dictionary pairs
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `envVars`                              | Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value | `sane {}`                  |
 | `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
-| `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"6379"`                   |
+| `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"7670"`                   |
 | `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NVIngest requests.                                                            | `"1234"`                   |
 | `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
 | `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |
