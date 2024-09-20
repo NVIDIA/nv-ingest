@@ -49,7 +49,7 @@ Optionally you can create your own versions of the `Secrets` if you do not want 
 
 ```bash
 
-NAMESPACE=nvidia-nims
+NAMESPACE=nv-ingest
 DOCKER_CONFIG='{"auths":{"nvcr.io":{"username":"$oauthtoken", "password":"'${NGC_API_KEY}'" }}}'
 echo -n $DOCKER_CONFIG | base64 -w0
 NGC_REGISTRY_PASSWORD=$(echo -n $DOCKER_CONFIG | base64 -w0 )
