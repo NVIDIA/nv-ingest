@@ -150,7 +150,7 @@ Note that `extract_tables` controls extraction for both tables and charts.
 
 In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
 
-```
+```python
 import logging, time
 
 from nv_ingest_client.client import NvIngestClient
