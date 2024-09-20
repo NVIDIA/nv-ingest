@@ -8,14 +8,14 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 | Content | Content | Content extracted from Source  | Extracted |
 | Source Metadata | Source Name | Name of source | Extracted |
 |  | Source ID | ID of source  | Extracted |
-|  | Source location | URL, URI, pointer to storage location | ? |
+|  | Source location | URL, URI, pointer to storage location | N/A  |
 |  | Source Type | PDF, HTML, Docx, TXT, PPTx | Extracted |
-|  | Collection ID | Collection in which the source is contained | ? |
-|  | Date Created | Date source was created | Extracted | ? |
-|  | Last Modified | Date source was last modified | Extracted | ? |
+|  | Collection ID | Collection in which the source is contained | N/A |
+|  | Date Created | Date source was created | Extracted |   |
+|  | Last Modified | Date source was last modified | Extracted |   |
 |  | Summary | Summarization of Source Doc | Generated | Pending Research |
 |  | Partition ID | Offset of this data fragment within a larger set of fragments | Generated |
-|  | Access Level | Dictates RBAC | ? | N |
+|  | Access Level | Dictates RBAC | N/A |
 | Content Metadata (applicable to all content types) | Type | Text, Image, Structured, Table, Chart | Generated |
 |  | Description | Text Description of the content object (Image/Table) | Generated |
 |  | Page \# | Page \# where content is contained in source | Extracted |
