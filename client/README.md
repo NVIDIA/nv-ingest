@@ -6,8 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 # NV-Ingest-Client
 
-NV-Ingest-Client is a powerful tool designed for efficient ingestion and processing of large datasets. It provides both
-a Python API and a command-line interface to cater to various ingestion needs.
+NV-Ingest-Client is a tool designed for efficient ingestion and processing of large datasets. It provides both a Python API and a command-line interface to cater to various ingestion needs.
 
 ## Table of Contents
 
