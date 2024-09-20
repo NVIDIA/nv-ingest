@@ -92,6 +92,13 @@ Note: As configured by default in [docker-compose.yaml](docker-compose.yaml#L52)
 
 Please note, NIM containers on their first startup can take 10-15 minutes to pull and fully load models. Also note that by default we have [configured log levels to be verbose](docker-compose.yaml#L27) so it's possible to observe service startup proceeding. You will notice _many_ log messages. You can turn off verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 
+Also note that nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+```
+docker compose build
+```
+
+After the image is built, run `docker compose up` as above.
+
 5. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
 +---------------------------------------------------------------------------------------+
