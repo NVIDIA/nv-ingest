@@ -244,8 +244,8 @@ redis:
 ## Define environment variables as key/value dictionary pairs
 ## @descriptionEnd
 ## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
-## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value if disabling Redis deployment in this chart.
-## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value if disabling Redis deployment in this chart.
+## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-ms-runtime"] Override this value to specify a differeing REST endpoint host.
+## @param envVars.MESSAGE_CLIENT_PORT [default: "7670"] Override this value to specify a differing REST endpoint port.
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
@@ -262,8 +262,8 @@ redis:
 ## @skip envVars.DEPLOT_GRPC_ENDPOINT
 ## @skip envVars.DEPLOT_HTTP_ENDPOINT
 envVars:
-  MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
-  MESSAGE_CLIENT_PORT: "6379"
+  MESSAGE_CLIENT_HOST: "nv-ingest-ms-runtime"
+  MESSAGE_CLIENT_PORT: "7670"
   REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
   NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
 
