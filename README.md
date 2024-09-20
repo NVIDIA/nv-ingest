@@ -203,7 +203,7 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status:
+You should notice output indicating document processing status, followed by a breakdown of time spent during job execution:
 ```
 INFO:nv_ingest_client.nv_ingest_cli:Processing 1 documents.
 INFO:nv_ingest_client.nv_ingest_cli:Output will be written to: ./processed_docs
