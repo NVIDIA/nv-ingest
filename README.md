@@ -78,7 +78,7 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 
-3. For Docker container images to be able to access NGC resources, create a .env file, and set up your API key in it:
+3. Container images must access resources from NGC. Create a .env file containing your NGC API key, and the following paths:
 ```
 NGC_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
