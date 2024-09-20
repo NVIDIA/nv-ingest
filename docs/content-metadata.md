@@ -39,7 +39,6 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | Subtitle | TODO | Extracted |  |
 |  | Axis | TODO | Extracted |  |
 |  | uploaded\_image\_uri | Mirrors source\_metadata.source\_location | Generated |  |
-| Chart Metadata | TODO |  |  |  |
 
 ## Example text extracts for multimodal_test.pdf:
 1. [text](example_processed_docs/text/multimodal_test.pdf.metadata.json)
