@@ -1,0 +1,203 @@
+[
+  {
+    "document_type": "image",
+    "metadata": {
+      "content": "<<Base64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Image extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 0,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 0,
+        "subtype": "",
+        "type": "image"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": {
+        "caption": "",
+        "height": 429,
+        "image_location": [
+          72.0,
+          159.42269897460938,
+          540.0,
+          376.47271728515625
+        ],
+        "image_type": "PNG",
+        "structured_image_type": "image_type_1",
+        "text": "",
+        "uploaded_image_url": "",
+        "width": 925
+      },
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": null,
+      "text_metadata": null
+    }
+  },
+  {
+    "document_type": "image",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Image extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 1,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 1,
+        "subtype": "",
+        "type": "image"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": {
+        "caption": "",
+        "height": 365,
+        "image_location": [
+          72.0,
+          80.9671630859375,
+          540.0,
+          270.3671569824219
+        ],
+        "image_type": "PNG",
+        "structured_image_type": "image_type_1",
+        "text": "",
+        "uploaded_image_url": "",
+        "width": 902
+      },
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": null,
+      "text_metadata": null
+    }
+  },
+  {
+    "document_type": "image",
+    "metadata": {
+      "content": "<<BASE64 IMAGE CONTENT REMOVED>>",
+      "content_metadata": {
+        "description": "Image extracted from PDF document.",
+        "hierarchy": {
+          "block": -1,
+          "line": -1,
+          "nearby_objects": {
+            "images": {
+              "bbox": [],
+              "content": []
+            },
+            "structured": {
+              "bbox": [],
+              "content": []
+            },
+            "text": {
+              "bbox": [],
+              "content": []
+            }
+          },
+          "page": 2,
+          "page_count": 3,
+          "span": -1
+        },
+        "page_number": 2,
+        "subtype": "",
+        "type": "image"
+      },
+      "debug_metadata": null,
+      "embedding": null,
+      "error_metadata": null,
+      "image_metadata": {
+        "caption": "",
+        "height": 385,
+        "image_location": [
+          72.0,
+          443.4678649902344,
+          539.960205078125,
+          685.649169921875
+        ],
+        "image_type": "PNG",
+        "structured_image_type": "image_type_1",
+        "text": "",
+        "uploaded_image_url": "",
+        "width": 744
+      },
+      "info_message_metadata": null,
+      "raise_on_failure": false,
+      "source_metadata": {
+        "access_level": 1,
+        "collection_id": "",
+        "date_created": "2024-09-19T13:16:39.200821",
+        "last_modified": "2024-09-19T13:16:39.200477",
+        "partition_id": -1,
+        "source_id": "./data/multimodal_test.pdf",
+        "source_location": "",
+        "source_name": "./data/multimodal_test.pdf",
+        "source_type": "PDF",
+        "summary": ""
+      },
+      "table_metadata": null,
+      "text_metadata": null
+    }
+  }
+]

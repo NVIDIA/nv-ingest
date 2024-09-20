@@ -25,7 +25,7 @@ COPY setup.py setup.py
 # Don't copy full source here, pipelines won't be installed via setup anyway, and this allows us to rebuild more quickly if we're just changing the pipeline
 
 COPY ci ci
-COPY requirements.txt test-requirements.txt util-requirements.txt ./
+COPY requirements.txt extra-requirements.txt test-requirements.txt util-requirements.txt ./
 
 SHELL ["/bin/bash", "-c"]
 
@@ -57,6 +57,11 @@ COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
+# Build the client and install it in the conda cache so that the later nv-ingest build can locate it
+RUN source activate morpheus \
+    && pip install -e client \
+    && pip install -r extra-requirements.txt
+
 # Run the build_pip_packages.sh script with the specified build type and library
 RUN chmod +x ./ci/scripts/build_pip_packages.sh \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
@@ -86,7 +91,8 @@ COPY src/pipeline.py ./
 COPY pyproject.toml ./
 COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
 
-CMD ["python", "/workspace/pipeline.py"]
+# Start both the core nv-ingest pipeline service and teh FastAPI microservice in parallel
+CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM base AS development
 

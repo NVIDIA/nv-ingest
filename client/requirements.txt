@@ -8,3 +8,5 @@ pypdfium2
 python-docx
 python-pptx==0.6.23
 tqdm
+httpx
+requests

@@ -2,29 +2,31 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 import concurrent
-import copy
 import json
 import logging
 import os
 import re
 import time
+import traceback
 from collections import defaultdict
 from concurrent.futures import as_completed
 from statistics import mean
 from statistics import median
-from typing import Dict, Any, Tuple
+from typing import Dict, Any
 from typing import List
+from typing import Tuple
 from typing import Type
 
 from click import style
+from pydantic import BaseModel
+from pydantic import ValidationError
+from tqdm import tqdm
+
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.util.util import check_ingest_result
 from nv_ingest_client.util.util import estimate_page_count
-from pydantic import BaseModel
-from pydantic import ValidationError
-from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -446,9 +448,9 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict[str, Any], cl
 
     Returns
     -------
-    List[str]
-        A list of job IDs corresponding to the submitted jobs. Each job ID is returned by the
-        client's `add_job` method.
+    Tuple[List[JobSpec], List[str]]
+        A Tuple containing the list of JobSpecs and list of job IDs corresponding to the submitted jobs.
+        Each job ID is returned by the client's `add_job` method.
 
     Raises
     ------
@@ -585,21 +587,21 @@ def generate_job_batch_for_iteration(
         If `fail_on_error` is True and there are missing job specifications, a RuntimeError is raised.
     """
 
-    job_ids = []
-    job_id_map_updates = {}
+    job_indices = []
+    job_index_map_updates = {}
     cur_job_count = 0
 
     if retry_job_ids:
-        job_ids.extend(retry_job_ids)
-        cur_job_count = len(job_ids)
+        job_indices.extend(retry_job_ids)
+        cur_job_count = len(job_indices)
 
     if (cur_job_count < batch_size) and (processed < len(files)):
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
         batch_files = files[processed: processed + new_job_count]  # noqa: E203
 
-        new_job_ids = create_job_specs_for_batch(batch_files, tasks, client)
-        if len(new_job_ids) != new_job_count:
-            missing_jobs = new_job_count - len(new_job_ids)
+        new_job_indices = create_job_specs_for_batch(batch_files, tasks, client)
+        if len(new_job_indices) != new_job_count:
+            missing_jobs = new_job_count - len(new_job_indices)
             error_msg = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"
             logger.warning(error_msg)
 
@@ -608,12 +610,12 @@ def generate_job_batch_for_iteration(
 
             pbar.update(missing_jobs)
 
-        job_id_map_updates = {job_id: file for job_id, file in zip(new_job_ids, batch_files)}
+        job_index_map_updates = {job_index: file for job_index, file in zip(new_job_indices, batch_files)}
         processed += new_job_count
-        _ = client.submit_job_async(new_job_ids, "morpheus_task_queue")
-        job_ids.extend(new_job_ids)
+        _ = client.submit_job_async(new_job_indices, "morpheus_task_queue")
+        job_indices.extend(new_job_indices)
 
-    return job_ids, job_id_map_updates, processed
+    return job_indices, job_index_map_updates, processed
 
 
 def handle_future_result(
@@ -834,6 +836,7 @@ def create_and_process_jobs(
                     logger.error(f"Error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except Exception as e:
+                    traceback.print_exc()
                     source_name = job_id_map[job_id]
                     logger.error(f"Unhandled error while processing {job_id}({source_name}) {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")

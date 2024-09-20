@@ -1,5 +1,21 @@
 # NVIDIA NVIngest
 
+## Prerequisites
+
+### Hardware
+
+| GPU | Family | Memory | # of GPUs |
+| ------ | ------ | ------ | ------ |
+| H100 | SXM/NVLink or PCIe | 80GB | 2 |
+| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+
+### Software
+
+- Linux operating systems (Ubuntu 20.04 or later recommended)
+- [Docker](https://docs.docker.com/engine/install/)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= 535)
+- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+
 ## Setup Environment
 
 - First create your namespace
@@ -33,7 +49,7 @@ Optionally you can create your own versions of the `Secrets` if you do not want 
 
 ```bash
 
-NAMESPACE=nvidia-nims
+NAMESPACE=nv-ingest
 DOCKER_CONFIG='{"auths":{"nvcr.io":{"username":"$oauthtoken", "password":"'${NGC_API_KEY}'" }}}'
 echo -n $DOCKER_CONFIG | base64 -w0
 NGC_REGISTRY_PASSWORD=$(echo -n $DOCKER_CONFIG | base64 -w0 )
@@ -99,10 +115,10 @@ nv-ingest-cli \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
-Enjoy!
+You can also use nv-ingest's python client API to interact with the service running in the cluster. Use the same host and port as in the above nv-ingest-cli example.
 
 ## Parameters
 
@@ -194,7 +210,7 @@ Define environment variables as key/value dictionary pairs
 | -------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------- |
 | `envVars`                              | Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value | `sane {}`                  |
 | `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
-| `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"6379"`                   |
+| `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"7670"`                   |
 | `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NVIngest requests.                                                            | `"1234"`                   |
 | `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
 | `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |

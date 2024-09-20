@@ -13,7 +13,7 @@ docker compose up -d redis
 # `yolox`, `deplot`, `cached`, and `paddle` are NIMs used to perform table and chart extraction.
 docker compose up -d yolox deplot cached paddle
 
-# Optional (MinIO) is an opject store to store extracted images, tables, and charts, by default it is commented out in the docker compose file.
+# Optional (MinIO) is an object store to store extracted images, tables, and charts, by default it is commented out in the docker compose file.
 # The `store` task will not be functional without this service or external s3 compliant object store.
 docker compose up -d minio
 

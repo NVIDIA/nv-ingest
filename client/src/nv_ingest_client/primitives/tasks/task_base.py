@@ -68,6 +68,7 @@ class Task:
         return {}
 
 
+
 # class ExtractUnstructuredTask(ExtractTask):
 #    """
 #    Object for document unstructured extraction task

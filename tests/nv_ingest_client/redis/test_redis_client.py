@@ -7,8 +7,9 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 from redis import RedisError
+
+from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 
 MODULE_UNDER_TEST = "nv_ingest.util.redis.redis_client"
 
@@ -69,7 +70,7 @@ def test_fetch_message_successful(mock_redis_client, mock_redis):
     Test fetch_message method successfully fetches a message.
     """
     job_payload = mock_redis_client.fetch_message("queue")
-    assert job_payload == TEST_PAYLOAD
+    assert job_payload == json.loads(TEST_PAYLOAD)
     mock_redis.blpop.assert_called_once_with(["queue"], 10)
 
 
@@ -86,7 +87,7 @@ def test_fetch_message_with_retries(mock_time, mock_redis_client, mock_redis):
     mock_redis_client.max_backoff = 1
 
     job_payload = mock_redis_client.fetch_message("queue")
-    assert job_payload == TEST_PAYLOAD
+    assert job_payload == json.loads(TEST_PAYLOAD)
     # Assert blpop was called twice due to the retry logic
     assert mock_redis.blpop.call_count == 2
 
@@ -170,8 +171,65 @@ def test_submit_and_fetch_message_success(mock_json_loads, mock_json_dumps, mock
     # Simulate fetching the response
     response = mock_redis_client.fetch_message("response_channel", timeout=90)
 
-    assert response == json.dumps({"data": "result"})
+    assert response == {"data": "result"}
 
+
+def test_submit_and_fetch_message_multi_part_success(mock_redis_client, mock_redis):
+    return_payload_1 = {
+        "status": "success",
+        "description": "...",
+        "data": [{"result": "abc"}],
+        "fragment": 0,
+        "fragment_count": 2,
+    }
+
+    return_payload_2 = {
+        "status": "success",
+        "description": "...",
+        "data": [{"result": "123"}],
+        "fragment": 1,
+        "fragment_count": 2,
+    }
+
+    mock_redis.blpop.side_effect = [
+        ("response_channel", json.dumps(return_payload_1)),
+        ("response_channel", json.dumps(return_payload_2)),
+    ]
+
+    rval = mock_redis_client.fetch_message("response_channel", timeout=10)
+    assert (len(rval['data']) == 2)
+
+def test_submit_and_fetch_message_multi_part_timeout_failure(mock_redis_client, mock_redis):
+    return_payload_1 = {
+        "status": "success",
+        "description": "...",
+        "data": [{"result": "abc"}],
+        "fragment": 0,
+        "fragment_count": 2,
+    }
+
+    return_payload_2 = {
+        "status": "success",
+        "description": "...",
+        "data": [{"result": "123"}],
+        "fragment": 1,
+        "fragment_count": 2,
+    }
+
+    mock_redis.blpop.side_effect = [
+        TimeoutError("Timeout"),
+        ("response_channel", json.dumps(return_payload_1)),
+        TimeoutError("Timeout"),
+        TimeoutError("Timeout"),
+        TimeoutError("Timeout"),
+        ("response_channel", json.dumps(return_payload_2)),
+    ]
+
+    with pytest.raises(TimeoutError):
+        mock_redis_client.fetch_message("response_channel", timeout=10)
+
+    with pytest.raises(ValueError):
+        mock_redis_client.fetch_message("response_channel", timeout=10)
 
 # Test case for handling timeouts during message fetch
 def test_fetch_message_timeout(mock_redis_client, mock_redis):
@@ -193,3 +251,9 @@ def test_submit_message_error(mock_redis_client, mock_redis):
 
     # Ensure clean up if job submission fails
     mock_redis.delete.assert_not_called()
+
+def test_fetch_malformed_json_error(mock_redis_client, mock_redis):
+    mock_redis.blpop.side_effect = ("response_channel", "[{data: 'result'}")
+
+    with pytest.raises(Exception):
+        mock_redis_client.fetch_message("response_channel", timeout=10)
