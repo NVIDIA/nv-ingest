@@ -68,17 +68,17 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 
 If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
 
-First, git clone the repo:
+1. First, git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
 
-To access pre-built containers and NIM microservices, [generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+2. To access pre-built containers and NIM microservices, [generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 $ docker login nvcr.io
 Username: $oauthtoken
 Password: <Your Key>
 ```
 
-For Docker container images to be able to access NGC resources, create a .env file, and set up your API key in it:
+3. For Docker container images to be able to access NGC resources, create a .env file, and set up your API key in it:
 ```
 NGC_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
@@ -87,12 +87,12 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 
 Note: As configured by default in [docker-compose.yaml](docker-compose.yaml), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second.
 
-To start all services:
+4. To start all services:
 `docker compose up`
 
 Please note, NIM containers on their first startup can take 10-15 minutes to pull and fully load models. Also note that by default we have [configured log levels to be verbose](docker-compose.yaml#L31) so it's possible to observe service startup proceeding. You will notice _many_ log messages. You can control this on a per service level via each service's environment variables as defined in [docker-compose.yaml](docker-compose.yaml).
 
-When all services have fully started, `nvidia-smi` should show processes like the following:
+5. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
 +---------------------------------------------------------------------------------------+
 | Processes:                                                                            |
@@ -108,11 +108,22 @@ When all services have fully started, `nvidia-smi` should show processes like th
 |    3   N/A  N/A   1355929      C   ...s/python/triton_python_backend_stub      424MiB |
 |    3   N/A  N/A   1373202      C   tritonserver                                414MiB |
 +---------------------------------------------------------------------------------------+
-
 ```
 If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is still busy setting up the models.
 
 Once it completes normally (less than a few seconds), the NIM models are ready.
+
+You can observe the started containers with `docker ps`:
+```
+CONTAINER ID   IMAGE                                                  COMMAND                  CREATED       STATUS                 PORTS                                                                                                                                                                                                                                                                                NAMES
+de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0            "/otelcol-contrib --…"   2 hours ago   Up 2 hours             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32848->9411/tcp, :::32847->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
+5b7a174a0a85   nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0      "/opt/nvidia/nvidia_…"   2 hours ago   Up 2 hours             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
+37d680d06ac1   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08   "/opt/conda/bin/tini…"   2 hours ago   Up 2 hours             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
+8e587b45821b   grafana/grafana                                        "/run.sh"                2 hours ago   Up 2 hours             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
+aa2c0ec387e2   redis/redis-stack                                      "/entrypoint.sh"         2 hours ago   Up 2 hours             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
+bda9a2a9c8b5   openzipkin/zipkin                                      "start-zipkin"           2 hours ago   Up 2 hours (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
+ac27e5297d57   prom/prometheus:latest                                 "/bin/prometheus --w…"   2 hours ago   Up 2 hours             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
+```
 
 ### Step 2: Installing Python dependencies
 
