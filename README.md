@@ -142,9 +142,9 @@ pip install .
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
 +In the below examples, we are doing text, chart, table, and image extraction:
-+`extract_text`, - uses PDFium to find and extract text from pages
-+`extract_images` - uses PDFium to extract images
-+`extract_tables` - uses YOLOX to find tables and charts. Uses PaddleOCR for table extraction, and Deplot, CACHED, and PaddleOCR for chart extraction
+- `extract_text`, - uses PDFium to find and extract text from pages
+- `extract_images` - uses PDFium to extract images
+- `extract_tables` - uses YOLOX to find tables and charts. Uses PaddleOCR for table extraction, and Deplot, CACHED, and PaddleOCR for chart extraction
 
 Note that `extract_tables` controls extraction for both tables and charts.
 
