@@ -269,7 +269,7 @@ You can view the full JSON extracts and the metadata definitions [here](docs/con
 We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 ```shell
 pip install tkinter
-python src/util/image_viewer.py --file_path ./processed_docs/image/test.pdf.metadata.json
+python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
 Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
