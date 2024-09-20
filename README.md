@@ -131,8 +131,9 @@ ac27e5297d57   prom/prometheus:latest                                           
 
 ### Step 2: Installing Python dependencies
 
+To interact with the nv-ingest service, you can do so from the host, or by `docker exec`ing into the nv-ingest container.
 
-On the host, you'll need a Python environment and install the client dependencies:
+To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required, but makes it easy to create a fresh python environment
 conda create --name nv-ingest-dev python=3.10
@@ -141,6 +142,21 @@ cd client
 pip install -r ./requirements.txt
 pip install .
 ```
+
+Note that interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+
+If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
+
+To interact within the container:
+```
+docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
+```
+You'll be in the `/workspace` directory, which has `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the python client libraries pre-installed:
+```
+(morpheus) root@aba77e2a4bde:/workspace#
+```
+
+From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
 ### Step 3: Ingesting Documents
 
