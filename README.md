@@ -247,9 +247,11 @@ INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.10
 
 After the ingestion steps above have completed, you should be able to find `text` and `image` subfolders inside your processed docs folder. Each will contain JSON formatted extracted content and metadata.
 
-When processing has completed, you'll have separate result files for text and image data.
+When processing has completed, you'll have separate result files for text and image data:
 ```shell
 ls -R processed_docs/
+```
+```shell
 processed_docs/:
 image  structured  text
 
