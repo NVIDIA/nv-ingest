@@ -24,3 +24,13 @@ jobs:
       - name: Build Docker image
         run: |
           docker build -t nv-ingest:latest .
+
+      - name: Run Pytest inside Docker container
+        run: |
+          docker run nv-ingest:latest pytest --junitxml=report.xml
+  
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-report
+          path: report.xml
