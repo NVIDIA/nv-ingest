@@ -1,0 +1,28 @@
+name: Build NV-Ingest Runtime Image
+
+# Trigger for pull requests and pushing to main
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    types: [opened, synchronize, reopened]
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      # Set up Docker Buildx, useful for building multi-platform images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v2
+
+      # Build the Docker image using the Dockerfile
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ github.repository }}:latest .
