@@ -3,6 +3,10 @@ name: Build NV-Ingest Runtime Image
 # Trigger for pull requests and pushing to main
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   build:
