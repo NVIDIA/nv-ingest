@@ -23,4 +23,4 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build -t ${{ github.repository }}:latest .
+          docker build -t nv-ingest:latest .
