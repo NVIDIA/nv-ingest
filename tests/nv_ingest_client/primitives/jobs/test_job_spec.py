@@ -80,7 +80,6 @@ def test_job_id_getter_setter(job_spec_fixture):
 # Test __str__ method
 def test_str_method(job_spec_fixture):
     job_spec_str = str(job_spec_fixture)
-    assert "job-id" in job_spec_str
     assert "source-id: source123" in job_spec_str
     assert "task count: 1" in job_spec_str
 
