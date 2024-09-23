@@ -54,6 +54,7 @@ RUN source activate morpheus \
     && pip install -r requirements.txt
 
 COPY tests tests
+COPY data data
 COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist

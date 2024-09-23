@@ -24,7 +24,6 @@ def job_spec_fixture() -> JobSpec:
         tasks=[MockTask()],
         source_id="source123",
         source_name="source123.pdf",
-        job_id=uuid.uuid4(),
         extended_options={"tracing_options": {"option1": "value1"}},
     )
 

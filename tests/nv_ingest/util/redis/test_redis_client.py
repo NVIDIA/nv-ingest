@@ -12,9 +12,9 @@ from redis import RedisError
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 
 
-MODULE_UNDER_TEST = "nv_ingest.util.redis.redis_client"
+MODULE_UNDER_TEST = "nv_ingest.util.message_brokers.redis.redis_client"
 
-TEST_PAYLOAD = '{"job_id": 123, "job_payload": "abc"}'
+TEST_PAYLOAD = "{'job_id': 123, 'job_payload': 'abc'}"
 
 
 @pytest.fixture
