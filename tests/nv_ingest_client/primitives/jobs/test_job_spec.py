@@ -30,19 +30,16 @@ def job_spec_fixture() -> JobSpec:
 
 # Test initialization
 def test_job_spec_initialization():
-    job_id = uuid.uuid4()
     job_spec = JobSpec(
         payload={"key": "value"},
         tasks=[MockTask()],
         source_id="source123",
-        job_id=job_id,
         extended_options={"option1": "value1"},
     )
 
     assert job_spec.payload == {"key": "value"}
     assert len(job_spec._tasks) == 1
     assert job_spec.source_id == "source123"
-    assert job_spec.job_id == job_id
     assert job_spec._extended_options == {"option1": "value1"}
 
 
@@ -50,7 +47,6 @@ def test_job_spec_initialization():
 def test_to_dict(job_spec_fixture):
     job_dict = job_spec_fixture.to_dict()
     assert job_dict["job_payload"]["content"] == [{"key": "value"}]
-    assert isinstance(job_dict["job_id"], str)
     assert len(job_dict["tasks"]) == 1
     assert job_dict["tracing_options"] == {"option1": "value1"}
 
