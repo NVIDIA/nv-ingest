@@ -6,9 +6,10 @@ import json
 from unittest.mock import Mock
 from unittest.mock import patch
 
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient
 import pytest
 from redis import RedisError
+
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 
 
 MODULE_UNDER_TEST = "nv_ingest.util.redis.redis_client"
