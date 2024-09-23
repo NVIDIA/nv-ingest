@@ -55,7 +55,8 @@ RUN source activate morpheus \
 
 COPY client client
 COPY src/nv_ingest src/nv_ingest
-RUN rm -rf ./src/nv_ingest/dist ./client/dist
+COPY tests tests
+RUN rm -rf ./src/nv_ingest/dist ./client/dist ./tests/dist
 
 # Build the client and install it in the conda cache so that the later nv-ingest build can locate it
 RUN source activate morpheus \
