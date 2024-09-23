@@ -13,14 +13,13 @@ from nv_ingest_client.primitives.jobs import JobStateEnum
 
 # Helper function to create a JobState instance with default parameters
 def create_job_state(
-    job_id=str(uuid4()),
     state=JobStateEnum.PENDING,
     future=None,
     response=None,
     response_channel=None,
 ):
     return JobState(
-        job_spec=JobSpec(job_id=job_id),
+        job_spec=JobSpec(),
         state=state,
         future=future,
         response=response,
