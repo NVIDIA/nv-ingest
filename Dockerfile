@@ -55,8 +55,7 @@ RUN source activate morpheus \
 
 COPY client client
 COPY src/nv_ingest src/nv_ingest
-COPY tests tests
-RUN rm -rf ./src/nv_ingest/dist ./client/dist ./tests/dist
+RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
 # Build the client and install it in the conda cache so that the later nv-ingest build can locate it
 RUN source activate morpheus \
@@ -88,6 +87,7 @@ RUN source activate morpheus \
     && pip install ./client/dist/*.whl \
     && rm -rf client/dist
 
+COPY tests tests
 COPY src/pipeline.py ./
 COPY pyproject.toml ./
 COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source

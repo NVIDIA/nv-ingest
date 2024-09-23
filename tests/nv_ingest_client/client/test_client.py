@@ -98,16 +98,15 @@ def nv_ingest_client_with_jobs(extended_mock_client_allocator):
 
     job_id = "12345678-1234-5678-1234-567812345678"
     client._job_states = {
-        "job1": JobState(JobSpec(job_id="job1"), state=JobStateEnum.PENDING),
-        "job_completed": JobState(JobSpec(job_id="job_completed"), state=JobStateEnum.COMPLETED),
-        "job2": JobState(JobSpec(job_id="job3"), state=JobStateEnum.PENDING),
-        "job3": JobState(JobSpec(job_id="job4"), state=JobStateEnum.PENDING),
-        "async_job": JobState(JobSpec(job_id="async_job"), state=JobStateEnum.SUBMITTED),
-        "no_submit": JobState(JobSpec(job_id="no_submit"), state=JobStateEnum.CANCELLED),
+        "job1": JobState(JobSpec(), state=JobStateEnum.PENDING),
+        "job_completed": JobState(JobSpec(), state=JobStateEnum.COMPLETED),
+        "job2": JobState(JobSpec(), state=JobStateEnum.PENDING),
+        "job3": JobState(JobSpec(), state=JobStateEnum.PENDING),
+        "async_job": JobState(JobSpec(), state=JobStateEnum.SUBMITTED),
+        "no_submit": JobState(JobSpec(), state=JobStateEnum.CANCELLED),
         job_id: JobState(
             job_spec=JobSpec(
                 payload={},
-                job_id=job_id,
                 tasks=[],
                 source_id="source",
                 extended_options={},
@@ -120,19 +119,19 @@ def nv_ingest_client_with_jobs(extended_mock_client_allocator):
 
 @pytest.fixture
 def job_state_submitted_async():
-    job_state = JobState(JobSpec(job_id="async_job"), state=JobStateEnum.SUBMITTED)
+    job_state = JobState(JobSpec(), state=JobStateEnum.SUBMITTED)
     job_state.future = MagicMock()
     return job_state
 
 
 @pytest.fixture
 def job_state_processing():
-    return JobState(JobSpec(job_id="processing_job"), state=JobStateEnum.PROCESSING)
+    return JobState(JobSpec(), state=JobStateEnum.PROCESSING)
 
 
 @pytest.fixture
 def job_state_invalid():
-    return JobState(JobSpec(job_id="invalid_job"), state=JobStateEnum.COMPLETED)
+    return JobState(JobSpec(), state=JobStateEnum.COMPLETED)
 
 
 def test_init(nv_ingest_client, mock_client_allocator):
