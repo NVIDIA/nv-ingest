@@ -13,14 +13,13 @@ from nv_ingest_client.primitives.jobs import JobStateEnum
 
 # Helper function to create a JobState instance with default parameters
 def create_job_state(
-    job_id=str(uuid4()),
     state=JobStateEnum.PENDING,
     future=None,
     response=None,
     response_channel=None,
 ):
     return JobState(
-        job_spec=JobSpec(job_id=job_id),
+        job_spec=JobSpec(),
         state=state,
         future=future,
         response=response,
@@ -30,19 +29,17 @@ def create_job_state(
 
 # Test initialization and property getters
 def test_job_state_initialization():
-    job_id = str(uuid4())
     state = JobStateEnum.SUBMITTED
     future = Future()
     response = {"result": "success"}
     response_channel = "channel1"
 
-    job_state = JobState(JobSpec(job_id=job_id), state, future, response, response_channel)
+    job_state = JobState(JobSpec(), state, future, response, response_channel)
 
-    assert job_state.job_id == job_id
     assert job_state.state == state
     assert job_state.future is future
     assert job_state.response == response
-    assert job_state.response_channel == response_channel
+    assert job_state._response_channel == response_channel
 
 
 # Test state transition rules
@@ -73,20 +70,6 @@ def test_invalid_state_transitions(initial_state, invalid_next_state):
     job_state = create_job_state(state=initial_state)
     with pytest.raises(ValueError):
         job_state.state = invalid_next_state
-
-
-# Test setting job_id and response_channel in non-PENDING states
-@pytest.mark.parametrize(
-    "attribute, value",
-    [
-        ("job_id", str(uuid4())),
-        ("response_channel", "new_channel"),
-    ],
-)
-def test_setting_job_id_and_response_channel_in_non_pending_state(attribute, value):
-    job_state = create_job_state(state=JobStateEnum.PROCESSING)
-    with pytest.raises(ValueError):
-        setattr(job_state, attribute, value)
 
 
 # Test setting future and response in terminal states

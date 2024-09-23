@@ -3,10 +3,14 @@ name: Build NV-Ingest Runtime Image
 # Trigger for pull requests and pushing to main
 on:
   pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: linux-large-disk
 
     steps:
       - name: Checkout code
@@ -19,4 +23,14 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build -t ${{ github.repository }}:latest .
+          docker build -t nv-ingest:latest .
+
+      - name: Run Pytest inside Docker container
+        run: |
+          docker run nv-ingest:latest pytest -rs --cov nv_ingest --cov nv_ingest_client --cov-report term --cov-report xml:coverage.xml tests/nv_ingest tests/nv_ingest_client
+  
+      - name: Upload test report
+        uses: actions/upload-artifact@v3
+        with:
+          name: pytest-report
+          path: report.xml
