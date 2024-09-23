@@ -53,6 +53,7 @@ ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 RUN source activate morpheus \
     && pip install -r requirements.txt
 
+COPY tests tests
 COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
@@ -87,7 +88,6 @@ RUN source activate morpheus \
     && pip install ./client/dist/*.whl \
     && rm -rf client/dist
 
-COPY tests tests
 COPY src/pipeline.py ./
 COPY pyproject.toml ./
 COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
