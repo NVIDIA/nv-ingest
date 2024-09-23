@@ -108,7 +108,7 @@ a NO-OP, but the returned data will be wrapped in the appropriate metadata struc
 nv-ingest-cli \
   --doc ./data/test.pdf \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
 Submit a PDF file with only a splitting task.
@@ -119,7 +119,7 @@ nv-ingest-cli \
   --output_directory ./processed_docs \
   --task='split' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 ```
 
 Submit a PDF file with splitting and extraction tasks.
@@ -135,7 +135,7 @@ nv-ingest-cli \
   --task='extract:{"document_type": "docx", "extract_method": "python_docx"}' \
   --task='split' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 
 ```
 
@@ -147,7 +147,7 @@ nv-ingest-cli \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 
 ```
 
@@ -160,7 +160,7 @@ nv-ingest-cli \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
   --task='store:{"endpoint":"minio:9000","access_key":"minioadmin","secret_key":"minioadmin"}' \
   --client_host=localhost \
-  --client_port=6379
+  --client_port=7670
 
 ```
 
