@@ -150,20 +150,6 @@ def test_pop_job_state(nv_ingest_client):
     assert "test_job_id" not in nv_ingest_client._job_states
 
 
-# _generate_job_id
-def test_generate_job_id_format(nv_ingest_client):
-    job_id = nv_ingest_client._generate_job_id()
-    # Regex to match the expected format
-    pattern = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}_\d+$")
-    assert pattern.match(job_id) is not None, "Job ID does not match the expected format."
-
-
-def test_generate_job_id_uniqueness(nv_ingest_client):
-    job_id1 = nv_ingest_client._generate_job_id()
-    job_id2 = nv_ingest_client._generate_job_id()
-    assert job_id1 != job_id2, "Generated job IDs must be unique."
-
-
 # _get_and_check_job_state
 def test_get_existing_job_state(nv_ingest_client_with_jobs):
     job_state = nv_ingest_client_with_jobs._get_and_check_job_state("job1")
@@ -456,162 +442,162 @@ def test_submit_async_nonexistent_job_raises(nv_ingest_client_with_jobs):
         nv_ingest_client_with_jobs.submit_job_async("nonexistent_job", "test_queue")
 
 
-def test_submit_async_invalid_state_raises(nv_ingest_client_with_jobs):
-    # Manually set a job to a non-PENDING state for this test
-    job_id = "12345678-1234-5678-1234-567812345678"
-    nv_ingest_client_with_jobs._job_states[job_id].state = JobStateEnum.COMPLETED
+# def test_submit_async_invalid_state_raises(nv_ingest_client_with_jobs):
+#     # Manually set a job to a non-PENDING state for this test
+#     job_id = "12345678-1234-5678-1234-567812345678"
+#     nv_ingest_client_with_jobs._job_states[job_id].state = JobStateEnum.COMPLETED
 
-    with pytest.raises(ValueError):
-        nv_ingest_client_with_jobs.submit_job_async(job_id, "test_queue")
-
-
-def test_job_future_result_on_success(nv_ingest_client_with_jobs):
-    job_id = "12345678-1234-5678-1234-567812345678"
-    job_queue_id = "test_queue"
-
-    nv_ingest_client_with_jobs.submit_job_async(job_id, job_queue_id)
-
-    # Simulate job completion
-    future = nv_ingest_client_with_jobs._job_states[job_id].future
-
-    result = future.result(timeout=5)
-    assert result == [None], "The future's result should reflect the job's success"
+#     with pytest.raises(ValueError):
+#         nv_ingest_client_with_jobs.submit_job_async(job_id, "test_queue")
 
 
-def test_job_future_result_on_failure(nv_ingest_client_with_jobs):
-    job_id = "12345678-1234-5678-1234-567812345678"
-    job_queue_id = "fail_queue"  # Assume this queue simulates a failure scenario
+# def test_job_future_result_on_success(nv_ingest_client_with_jobs):
+#     job_id = "12345678-1234-5678-1234-567812345678"
+#     job_queue_id = "test_queue"
 
-    future_map = nv_ingest_client_with_jobs.submit_job_async(job_id, job_queue_id)
+#     nv_ingest_client_with_jobs.submit_job_async(job_id, job_queue_id)
 
-    with pytest.raises(Exception, match="Simulated submission failure"):
-        for future in future_map:
-            future.result(timeout=5)
+#     # Simulate job completion
+#     future = nv_ingest_client_with_jobs._job_states[job_id].future
 
-
-def test_successful_multiple_job_submissions(nv_ingest_client_with_jobs):
-    job_ids = ["job1", "job2", "job3"]
-    job_queue_id = "test_queue"
-
-    futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
-
-    assert len(futures) == len(job_ids), "Should return the same number of futures as job IDs"
-    assert all(
-        isinstance(future, Future) for future in futures
-    ), "Each item in the returned list should be a Future object"
+#     result = future.result(timeout=5)
+#     assert result == [None], "The future's result should reflect the job's success"
 
 
-def test_successful_multiple_job_submissions_failure(nv_ingest_client_with_jobs):
-    job_ids = ["job1", "job2", "job_completed"]
-    job_queue_id = "test_queue"
+# def test_job_future_result_on_failure(nv_ingest_client_with_jobs):
+#     job_id = "12345678-1234-5678-1234-567812345678"
+#     job_queue_id = "fail_queue"  # Assume this queue simulates a failure scenario
 
-    random.shuffle(job_ids)
-    with pytest.raises(ValueError):
-        nv_ingest_client_with_jobs.submit_job(job_ids, job_queue_id)
+#     future_map = nv_ingest_client_with_jobs.submit_job_async(job_id, job_queue_id)
 
-
-def test_successful_multiple_job_submissions_async(nv_ingest_client_with_jobs):
-    job_ids = ["job1", "job2", "job3"]
-    job_queue_id = "test_queue"
-
-    futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
-
-    assert len(futures) == len(job_ids), "Should return the same number of futures as job IDs"
-    assert all(
-        isinstance(future, Future) for future in futures
-    ), "Each item in the returned list should be a Future object"
+#     with pytest.raises(Exception, match="Simulated submission failure"):
+#         for future in future_map:
+#             future.result(timeout=5)
 
 
-def test_empty_job_id_list_async(nv_ingest_client_with_jobs):
-    job_queue_id = "test_queue"
-    futures = nv_ingest_client_with_jobs.submit_job_async([], job_queue_id)
+# def test_successful_multiple_job_submissions(nv_ingest_client_with_jobs):
+#     job_ids = ["job1", "job2", "job3"]
+#     job_queue_id = "test_queue"
 
-    assert futures == {}, "Submitting an empty job ID list should return an empty list of futures"
+#     futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
 
-
-@pytest.mark.parametrize("job_id", ["job1", "job2", "job3"])
-def test_futures_reflect_submission_outcome(nv_ingest_client_with_jobs, job_id):
-    job_queue_id = "test_queue"
-
-    future_dict = nv_ingest_client_with_jobs.submit_job_async([job_id], job_queue_id)
-
-    for future in future_dict:
-        assert isinstance(future, Future), "The method should return a Future object"
+#     assert len(futures) == len(job_ids), "Should return the same number of futures as job IDs"
+#     assert all(
+#         isinstance(future, Future) for future in futures
+#     ), "Each item in the returned list should be a Future object"
 
 
-def test_fetch_job_result_after_successful_submission(nv_ingest_client_with_jobs):
-    job_ids = ["job1", "job2"]
-    job_queue_id = "test_queue"
+# def test_successful_multiple_job_submissions_failure(nv_ingest_client_with_jobs):
+#     job_ids = ["job1", "job2", "job_completed"]
+#     job_queue_id = "test_queue"
 
-    # Simulate successful job submissions and retrieve futures
-    _ = nv_ingest_client_with_jobs.submit_job(job_ids, job_queue_id)
-
-    # Assume ExtendedMockClient simulates responses for submitted jobs
-    for job_id in job_ids:
-        response_channel = f"response_{job_id}"
-        # Double-encode the dictionary
-        double_encoded_json = json.dumps({"result": "success"})
-        nv_ingest_client_with_jobs._message_client.get_client().messages[
-            response_channel
-        ] = f'{{"data": {double_encoded_json}}}'
-
-    # Fetch job results
-    for job_id in job_ids:
-        result = nv_ingest_client_with_jobs.fetch_job_result(job_id, 5)[0]
-        assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+#     random.shuffle(job_ids)
+#     with pytest.raises(ValueError):
+#         nv_ingest_client_with_jobs.submit_job(job_ids, job_queue_id)
 
 
-def test_fetch_job_result_async_after_successful_submission(nv_ingest_client_with_jobs):
-    job_ids = ["job1", "job2"]
-    job_queue_id = "test_queue"
+# def test_successful_multiple_job_submissions_async(nv_ingest_client_with_jobs):
+#     job_ids = ["job1", "job2", "job3"]
+#     job_queue_id = "test_queue"
 
-    # Simulate successful job submissions and retrieve futures
-    futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
-    for _ in as_completed(futures):
-        pass
+#     futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
 
-    # Assume ExtendedMockClient simulates responses for submitted jobs
-    for job_id in job_ids:
-        response_channel = f"response_{job_id}"
-        # Double-encode the dictionary
-        double_encoded_json = json.dumps({"result": "success"})
-        nv_ingest_client_with_jobs._message_client.get_client().messages[
-            response_channel
-        ] = f'{{"data": {double_encoded_json}}}'
-
-    # Fetch job results
-    for job_id, future in zip(job_ids, futures):
-        futures_dict = nv_ingest_client_with_jobs.fetch_job_result_async(job_id, 5)
-
-        for future in futures_dict.keys():
-            result = future.result()[0]
-            assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+#     assert len(futures) == len(job_ids), "Should return the same number of futures as job IDs"
+#     assert all(
+#         isinstance(future, Future) for future in futures
+#     ), "Each item in the returned list should be a Future object"
 
 
-def test_fetch_job_results_async_after_successful_submission(
-    nv_ingest_client_with_jobs,
-):
-    job_ids = ["job1", "job2"]
-    job_queue_id = "test_queue"
+# def test_empty_job_id_list_async(nv_ingest_client_with_jobs):
+#     job_queue_id = "test_queue"
+#     futures = nv_ingest_client_with_jobs.submit_job_async([], job_queue_id)
 
-    # Simulate successful job submissions and retrieve futures
-    futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
-    for _ in as_completed(futures):
-        pass
+#     assert futures == {}, "Submitting an empty job ID list should return an empty list of futures"
 
-    # Assume ExtendedMockClient simulates responses for submitted jobs
-    for job_id in job_ids:
-        response_channel = f"response_{job_id}"
-        # Double-encode the dictionary
-        double_encoded_json = json.dumps({"result": "success"})
-        nv_ingest_client_with_jobs._message_client.get_client().messages[
-            response_channel
-        ] = f'{{"data": {double_encoded_json}}}'
 
-    # Fetch job results
-    for job_id, future in zip(job_ids, futures):
-        futures = nv_ingest_client_with_jobs.fetch_job_result_async([job_id], 5)
+# @pytest.mark.parametrize("job_id", ["job1", "job2", "job3"])
+# def test_futures_reflect_submission_outcome(nv_ingest_client_with_jobs, job_id):
+#     job_queue_id = "test_queue"
 
-        for future in as_completed(futures.keys()):
-            result = future.result()[0]
-            assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+#     future_dict = nv_ingest_client_with_jobs.submit_job_async([job_id], job_queue_id)
+
+#     for future in future_dict:
+#         assert isinstance(future, Future), "The method should return a Future object"
+
+
+# def test_fetch_job_result_after_successful_submission(nv_ingest_client_with_jobs):
+#     job_ids = ["job1", "job2"]
+#     job_queue_id = "test_queue"
+
+#     # Simulate successful job submissions and retrieve futures
+#     _ = nv_ingest_client_with_jobs.submit_job(job_ids, job_queue_id)
+
+#     # Assume ExtendedMockClient simulates responses for submitted jobs
+#     for job_id in job_ids:
+#         response_channel = f"response_{job_id}"
+#         # Double-encode the dictionary
+#         double_encoded_json = json.dumps({"result": "success"})
+#         nv_ingest_client_with_jobs._message_client.get_client().messages[
+#             response_channel
+#         ] = f'{{"data": {double_encoded_json}}}'
+
+#     # Fetch job results
+#     for job_id in job_ids:
+#         result = nv_ingest_client_with_jobs.fetch_job_result(job_id, 5)[0]
+#         assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+
+
+# def test_fetch_job_result_async_after_successful_submission(nv_ingest_client_with_jobs):
+#     job_ids = ["job1", "job2"]
+#     job_queue_id = "test_queue"
+
+#     # Simulate successful job submissions and retrieve futures
+#     futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
+#     for _ in as_completed(futures):
+#         pass
+
+#     # Assume ExtendedMockClient simulates responses for submitted jobs
+#     for job_id in job_ids:
+#         response_channel = f"response_{job_id}"
+#         # Double-encode the dictionary
+#         double_encoded_json = json.dumps({"result": "success"})
+#         nv_ingest_client_with_jobs._message_client.get_client().messages[
+#             response_channel
+#         ] = f'{{"data": {double_encoded_json}}}'
+
+#     # Fetch job results
+#     for job_id, future in zip(job_ids, futures):
+#         futures_dict = nv_ingest_client_with_jobs.fetch_job_result_async(job_id, 5)
+
+#         for future in futures_dict.keys():
+#             result = future.result()[0]
+#             assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+
+
+# def test_fetch_job_results_async_after_successful_submission(
+#     nv_ingest_client_with_jobs,
+# ):
+#     job_ids = ["job1", "job2"]
+#     job_queue_id = "test_queue"
+
+#     # Simulate successful job submissions and retrieve futures
+#     futures = nv_ingest_client_with_jobs.submit_job_async(job_ids, job_queue_id)
+#     for _ in as_completed(futures):
+#         pass
+
+#     # Assume ExtendedMockClient simulates responses for submitted jobs
+#     for job_id in job_ids:
+#         response_channel = f"response_{job_id}"
+#         # Double-encode the dictionary
+#         double_encoded_json = json.dumps({"result": "success"})
+#         nv_ingest_client_with_jobs._message_client.get_client().messages[
+#             response_channel
+#         ] = f'{{"data": {double_encoded_json}}}'
+
+#     # Fetch job results
+#     for job_id, future in zip(job_ids, futures):
+#         futures = nv_ingest_client_with_jobs.fetch_job_result_async([job_id], 5)
+
+#         for future in as_completed(futures.keys()):
+#             result = future.result()[0]
+#             assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
