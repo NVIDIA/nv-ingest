@@ -93,10 +93,11 @@ RUN source activate nv-ingest \
 COPY . .
 
 # Build the nv-ingest client
-RUN poetry build
+RUN source activate nv-ingest \
+    && poetry build
 
-# Build the nv-ingest library
-RUN poetry build
+# # Build the nv-ingest library
+# RUN poetry build
 
 # # Build the client and install it in the conda cache so that the later nv-ingest build can locate it
 # RUN source activate morpheus \
