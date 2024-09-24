@@ -1,3 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+
+# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+
 [tool.poetry]
 name = "nv-ingest"
 version = "0.1.0"
@@ -23,7 +30,8 @@ build-backend = "poetry.core.masonary.api"
 
 # https://python-poetry.org/docs/dependency-specification/
 [tool.poetry.dependencies]
-python = "3.11.10"
+# python = "3.11.10" we want to use this version once we move away from the base Morpheus image
+python = "3.10.14"
 aiohttp = "3.9.4"
 charset-normalizer = "^3.3.2"
 click = "*"
@@ -100,8 +108,8 @@ skip_glob = ["src/ingest_pipeline_config.json"]
 [tool.mypy]
 files = [
     "src/",
-    "tests/"
-    "client/"
+    "tests/",
+    "client/",
 ]
 check_untyped_defs = true
 disallow_untyped_defs = true

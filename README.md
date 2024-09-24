@@ -158,7 +158,7 @@ To interact with the nv-ingest service, you can do so from the host, or by `dock
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required, but makes it easy to create a fresh python environment
-conda create --name nv-ingest-dev python=3.10
+conda create --name nv-ingest-dev python=$(cat .python-version)
 conda activate nv-ingest-dev
 cd client
 pip install -r ./requirements.txt
