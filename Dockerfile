@@ -87,7 +87,7 @@ ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
 # Cache the dependencies and install them before uploading source code changes
 RUN source activate nv-ingest \
-    && poetry install
+    && poetry install --with dev
 
 # Copy the rest of the project files not omitted by the .dockerignore file
 COPY . .
