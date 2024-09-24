@@ -12,13 +12,15 @@ NVIDIA-Ingest is a scalable, performance-oriented document content and metadata 
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 ### Table of Contents
-1. [Introduction](#what-it-is)
+1. [Introduction](#introduction)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#quickstart)
 4. [Repo Structure](#repo-structure)
 5. [Notices](#notices)
 
-### What it is
+## Introduction
+
+### What NVIDIA-Ingest is ✔️
 
 A microservice that:
 
@@ -28,7 +30,7 @@ A microservice that:
 - Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
 - Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
 
-### What it is not
+### What NVIDIA-Ingest is not ✖️
 
 A service that:
 
@@ -40,67 +42,74 @@ A service that:
 
 ### Hardware
 
-| GPU | Family | Memory | # of GPUs |
+| GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
 | H100 | SXM/NVLink or PCIe | 80GB | 2 |
 | A100 | SXM/NVLink or PCIe | 80GB | 2 |
 
 ### Software
 
-- Linux operating systems (Ubuntu 20.04 or later recommended)
+- Linux operating systems (Ubuntu 22.04 or later recommended)
 - [Docker](https://docs.docker.com/engine/install/)
 - [Docker Compose](https://docs.docker.com/compose/install/)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= 535)
+- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 
 ## Quickstart
 
 To get started using NVIDIA Ingest, you need to do a few things:
-1. [Start supporting NIM microservices](#step-1-starting-containers)
-2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies)
-3. [Submit ingestion job(s)](#step-3-ingesting-documents)
-4. [Inspect and consume results](#step-4-inspecting-and-consuming-results)
+1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
+2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
+3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
+4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 ### Step 1: Starting containers
 
 This example demonstrates how to use the provided [docker-compose.yaml](docker-compose.yaml) to start all needed services with a few commands.
 
+> [!IMPORTANT]
+> NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
+
 If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
 
-1. First, git clone the repo:
-`git clone https://github.com/nvidia/nv-ingest` and `cd nv-ingest`.
+1. Git clone the repo:
+`git clone https://github.com/nvidia/nv-ingest`
+2. Change directory to the cloned repo
+`cd nv-ingest`.
 
-2. To access pre-built containers and NIM microservices, [generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
+# This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
 Username: $oauthtoken
 Password: <Your Key>
 ```
 
-3. Container images must access resources from NGC. Create a .env file containing your NGC API key, and the following paths:
+4. Create a .env file containing your NGC API key, and the following paths:
 ```
+# Container images must access resources from NGC. 
 NGC_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
-Note: As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device. You can change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
+> [!NOTE]
+> As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
+>
+> Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
 
-4. To start all services:
+5. Start all services:
 `docker compose up`
 
-Please note, NIM containers on their first startup can take 10-15 minutes to pull and fully load models. Also note that by default we have [configured log levels to be verbose](docker-compose.yaml#L27) so it's possible to observe service startup proceeding. You will notice _many_ log messages. You can turn off verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+> [!TIP]
+> By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
+>
+> It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 
-Also note that nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
-docker compose build
-```
-
-After the image is built, run `docker compose up` as above.
-
-5. When all services have fully started, `nvidia-smi` should show processes like the following:
-```
+# If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is still busy setting up the models.
 +---------------------------------------------------------------------------------------+
 | Processes:                                                                            |
 |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
@@ -116,11 +125,9 @@ After the image is built, run `docker compose up` as above.
 |    3   N/A  N/A   1373202      C   tritonserver                                414MiB |
 +---------------------------------------------------------------------------------------+
 ```
-If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is still busy setting up the models.
 
-Once it completes normally (less than a few seconds), the NIM models are ready.
 
-You can observe the started containers with `docker ps`:
+Observe the started containers with `docker ps`:
 ```
 CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
 0f2f86615ea5   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
@@ -136,9 +143,17 @@ bda9a2a9c8b5   openzipkin/zipkin                                                
 ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
 ```
 
+> [!TIP]
+> nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+> ```
+> docker compose build
+> ```
+> 
+> After the image is built, run `docker compose up` per item 5 above.
+
 ### Step 2: Installing Python dependencies
 
-To interact with the nv-ingest service, you can do so from the host, or by `docker exec`ing into the nv-ingest container.
+To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
@@ -150,33 +165,35 @@ pip install -r ./requirements.txt
 pip install .
 ```
 
-Note that interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
-
-If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
-
-To interact within the container:
-```
-docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
-```
-You'll be in the `/workspace` directory, which has `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the python client libraries pre-installed:
-```
-(morpheus) root@aba77e2a4bde:/workspace#
-```
-
-From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
+> [!NOTE]
+> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+> 
+> If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
+> 
+> To interact within the container:
+> ```
+> docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
+> ```
+> You'll be in the `/workspace` directory, which has `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the python client libraries pre-installed:
+> ```
+> (morpheus) root@aba77e2a4bde:/workspace#
+> ```
+> 
+> From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
 ### Step 3: Ingesting Documents
 
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
 In the below examples, we are doing text, chart, table, and image extraction:
-- `extract_text`, - uses PDFium to find and extract text from pages
-- `extract_images` - uses PDFium to extract images
-- `extract_tables` - uses YOLOX to find tables and charts. Uses PaddleOCR for table extraction, and Deplot, CACHED, and PaddleOCR for chart extraction
+- `extract_text`, - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages
+- `extract_images` - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images
+- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot), CACHED, and [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for chart extraction
 
-Note that `extract_tables` controls extraction for both tables and charts.
+> [!IMPORTANT]
+> `extract_tables` controls extraction for both tables and charts.
 
-In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
+#### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
 
 ```python
 import logging, time
@@ -231,7 +248,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
+#### Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
 
 ```shell
 nv-ingest-cli \
@@ -275,7 +292,7 @@ INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.10
 
 After the ingestion steps above have completed, you should be able to find `text` and `image` subfolders inside your processed docs folder. Each will contain JSON formatted extracted content and metadata.
 
-When processing has completed, you'll have separate result files for text and image data:
+#### When processing has completed, you'll have separate result files for text and image data:
 ```shell
 ls -R processed_docs/
 ```
@@ -294,15 +311,16 @@ multimodal_test.pdf.metadata.json
 ```
 You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
-We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+#### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 ```shell
 pip install tkinter
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
-Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
-
-Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+> [!TIP]
+> Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
+>
+> Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 ## Repo Structure
 

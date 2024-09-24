@@ -53,6 +53,8 @@ ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 RUN source activate morpheus \
     && pip install -r requirements.txt
 
+COPY tests tests
+COPY data data
 COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
