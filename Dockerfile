@@ -96,30 +96,6 @@ COPY . .
 RUN source activate nv-ingest \
     && poetry build
 
-# # Build the nv-ingest library
-# RUN poetry build
-
-# # Build the client and install it in the conda cache so that the later nv-ingest build can locate it
-# RUN source activate morpheus \
-#     && pip install -e client \
-#     && pip install -r extra-requirements.txt
-
-# # Run the build_pip_packages.sh script with the specified build type and library
-# RUN chmod +x ./ci/scripts/build_pip_packages.sh \
-#     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
-#     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
-
-# RUN source activate morpheus \
-#     && pip install ./dist/*.whl
-
-# # # Interim pyarrow backport until folded into upstream dependency tree
-# # RUN source activate morpheus \
-# #     && conda install https://anaconda.org/conda-forge/pyarrow/14.0.2/download/linux-64/pyarrow-14.0.2-py310h188ebfb_19_cuda.conda
-
-# # # Upgrade setuptools to mitigate https://github.com/advisories/GHSA-cx63-2mw6-8hw5
-# # RUN source activate base \
-# #     && conda install setuptools==70.0.0
-
 FROM base AS runtime
 
 # Install the client and library built by Poetry into the conda environment
