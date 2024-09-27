@@ -146,6 +146,12 @@ def numpy_to_base64(array: np.ndarray) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
+    # If the array represents a grayscale image, drop the redundant axis in
+    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
+    # a grayscale image.
+    if array.ndim == 3 and array.shape[2] == 1:
+        array = np.squeeze(array, axis=2)
+
     # Check if the array is valid and can be converted to an image
     try:
         # Convert the NumPy array to a PIL image
