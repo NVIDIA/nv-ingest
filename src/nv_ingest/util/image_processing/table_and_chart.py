@@ -4,6 +4,9 @@
 
 
 import json
+import logging
+
+logger = logging.getLogger(__name__)
 
 
 def join_cached_and_deplot_output(cached_text, deplot_text):
@@ -38,13 +41,33 @@ def join_cached_and_deplot_output(cached_text, deplot_text):
     """
     chart_content = ""
 
-    if (cached_text is not None) and (deplot_text is not None):
+    if (cached_text is not None):
         try:
             cached_text_dict = json.loads(cached_text)
             chart_content += cached_text_dict.get("chart_title", "")
+
+            if (deplot_text is not None):
+                chart_content += f" {deplot_text}"
+
+            chart_content += " " + cached_text_dict.get("caption", "")
+            chart_content += " " + cached_text_dict.get("info_deplot", "")
+            chart_content += " " + cached_text_dict.get("x_title", "")
+            chart_content += " " + cached_text_dict.get("xlabel", "")
+            chart_content += " " + cached_text_dict.get("y_title", "")
+            chart_content += " " + cached_text_dict.get("ylabel", "")
+            chart_content += " " + cached_text_dict.get("legend_label", "")
+            chart_content += " " + cached_text_dict.get("legend_title", "")
+            chart_content += " " + cached_text_dict.get("mark_label", "")
+            chart_content += " " + cached_text_dict.get("value_label", "")
+            chart_content += " " + cached_text_dict.get("other", "")
         except json.JSONDecodeError:
             chart_content += cached_text
 
-        chart_content += f" {deplot_text}"
+            if (deplot_text is not None):
+                chart_content += f" {deplot_text}"
+
+    else:
+        if (deplot_text is not None):
+            chart_content += f" {deplot_text}"
 
     return chart_content

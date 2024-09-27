@@ -24,7 +24,7 @@ from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.redis import RedisClient
+from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from pkg_resources import DistributionNotFound
 from pkg_resources import VersionConflict
 
@@ -64,13 +64,6 @@ logger = logging.getLogger(__name__)
     default=None,
     help="Path to a dataset definition file.",
     callback=click_validate_file_exists,
-)
-@click.option(
-    "--client",
-    type=click.Choice([client.value for client in ClientType], case_sensitive=False),
-    default="REDIS",
-    show_default=True,
-    help="Client type.",
 )
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
 @click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
@@ -181,7 +174,6 @@ def main(
     client_host: str,
     client_kwargs: str,
     client_port: int,
-    client: str,
     concurrency_n: int,
     dataset: str,
     doc: List[str],
@@ -225,9 +217,10 @@ def main(
 
         if not dry_run:
             logging.debug(
-                f"Creating message client: {client} with host: {client_host} and port: {client_port} -> {client_kwargs}"
+                f"Creating REST message client: {client_host} and port: {client_port} -> {client_kwargs}"
             )
-            client_allocator = RedisClient
+            
+            client_allocator = RestClient
 
             ingest_client = NvIngestClient(
                 message_client_allocator=client_allocator,

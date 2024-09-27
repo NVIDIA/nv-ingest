@@ -98,10 +98,6 @@ class JobState:
     @job_id.setter
     def job_id(self, value: str) -> None:
         """Sets the job's unique identifier, with constraints."""
-        if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change job_id after job submission: {self._state.name}"
-            logger.error(err_msg)
-            raise ValueError(err_msg)
         self._job_spec.job_id = value
 
     @property
@@ -140,18 +136,3 @@ class JobState:
     def response(self, value: Dict) -> None:
         """Sets the response data received for the job, with constraints."""
         self._response = value
-
-    @property
-    def response_channel(self) -> Optional[str]:
-        """Gets the channel through which responses for the job are received."""
-        return self._response_channel
-
-    @response_channel.setter
-    def response_channel(self, value: str) -> None:
-        """Sets the channel through which responses for the job are received, with constraints."""
-        if self._state not in _PREFLIGHT_STATES:
-            err_msg = f"Attempt to change response_channel after job submission: {self._state.name}"
-            logger.error(err_msg)
-            raise ValueError(err_msg)
-
-        self._response_channel = value

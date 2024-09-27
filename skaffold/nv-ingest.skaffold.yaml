@@ -97,7 +97,7 @@ portForward:
     address: 0.0.0.0
     localPort: 8000
   - resourceType: Service
-    resourceName: nv-ingest-redis-master
-    port: 6379
+    resourceName: nv-ingest-ms-runtime
+    port: 7670
     address: 0.0.0.0
-    localPort: 6379
+    localPort: 7670
