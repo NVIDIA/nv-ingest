@@ -99,6 +99,10 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 >
 > Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
 
+> [!IMPORTANT]
+> Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+> `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
+
 5. Start all services:
 `docker compose up`
 

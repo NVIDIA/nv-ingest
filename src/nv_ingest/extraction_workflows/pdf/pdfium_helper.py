@@ -2,41 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-import io
-import logging
-from math import ceil
-from math import floor
-from math import log
-from typing import List
-from typing import Tuple
-
-import numpy as np
-import pypdfium2 as libpdfium
-import tritonclient.grpc as grpcclient
-from PIL import Image
-
-from nv_ingest.extraction_workflows.pdf import yolox_utils
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.converters import bytetools
-from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import ImageChart
-from nv_ingest.util.pdf.metadata_aggregators import ImageTable
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
-from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-from nv_ingest.util.nim.helpers import call_image_inference_model
-from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
-
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -51,6 +16,47 @@ from nv_ingest.util.nim.helpers import perform_model_inference
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+from math import log
+from typing import List
+from typing import Tuple
+
+import numpy as np
+import pypdfium2 as libpdfium
+import tritonclient.grpc as grpcclient
+
+from nv_ingest.extraction_workflows.pdf import yolox_utils
+from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.schemas.metadata_schema import TextTypeEnum
+from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
+from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
+from nv_ingest.util.image_processing.transforms import crop_image
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import perform_model_inference
+from nv_ingest.util.pdf.metadata_aggregators import Base64Image
+from nv_ingest.util.pdf.metadata_aggregators import ImageChart
+from nv_ingest.util.pdf.metadata_aggregators import ImageTable
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
+from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
+from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
+from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
+
+
+PADDLE_MIN_WIDTH = 32
+PADDLE_MIN_HEIGHT = 32
+YOLOX_MAX_BATCH_SIZE = 8
+YOLOX_MAX_WIDTH = 1536
+YOLOX_MAX_HEIGHT = 1536
+YOLOX_NUM_CLASSES = 3
+YOLOX_CONF_THRESHOLD = 0.01
+YOLOX_IOU_THRESHOLD = 0.5
+YOLOX_MIN_SCORE = 0.1
+YOLOX_FINAL_SCORE = 0.48
 
 logger = logging.getLogger(__name__)
 
@@ -58,12 +64,12 @@ logger = logging.getLogger(__name__)
 def extract_tables_and_charts_using_image_ensemble(
     pages: List[libpdfium.PdfPage],
     config: PDFiumConfigSchema,
-    max_batch_size: int = 8,
-    num_classes: int = 3,
-    conf_thresh: float = 0.01,
-    iou_thresh: float = 0.5,
-    min_score: float = 0.1,
-    final_thresh: float = 0.48,
+    max_batch_size: int = YOLOX_MAX_BATCH_SIZE,
+    num_classes: int = YOLOX_NUM_CLASSES,
+    conf_thresh: float = YOLOX_CONF_THRESHOLD,
+    iou_thresh: float = YOLOX_IOU_THRESHOLD,
+    min_score: float = YOLOX_MIN_SCORE,
+    final_thresh: float = YOLOX_FINAL_SCORE,
 ) -> List[Tuple[int, ImageTable]]:
     """
     Extract tables and charts from a series of document pages using an ensemble of image-based models.
@@ -140,7 +146,7 @@ def extract_tables_and_charts_using_image_ensemble(
 
         page_idx = 0
         for batch in batches:
-            original_images, _ = pdfium_pages_to_numpy(batch, scale_tuple=(1536, 1536))
+            original_images, _ = pdfium_pages_to_numpy(batch, scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT))
 
             original_image_shapes = [image.shape for image in original_images]
             input_array = prepare_images_for_inference(original_images)
@@ -269,15 +275,15 @@ def process_inference_results(
 
     for annotation_dict in annotation_dicts:
         new_dict = {}
-        if 'table' in annotation_dict:
-            new_dict['table'] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
-        if 'chart' in annotation_dict:
-            new_dict['chart'] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
-        if 'title' in annotation_dict:
-            new_dict['title'] = annotation_dict["title"]
+        if "table" in annotation_dict:
+            new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+        if "chart" in annotation_dict:
+            new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+        if "title" in annotation_dict:
+            new_dict["title"] = annotation_dict["title"]
         inference_results.append(new_dict)
 
-    return inference_results 
+    return inference_results
 
 
 # Handle individual table/chart extraction and model inference
@@ -328,18 +334,24 @@ def handle_table_chart_extraction(
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
             h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
-            cropped = original_image[floor(w1) : ceil(w2), floor(h1) : ceil(h2)]  # noqa: E203
-
-            img = Image.fromarray(cropped.astype(np.uint8))
-            with io.BytesIO() as buffer:
-                img.save(buffer, format="PNG")
-                base64_img = bytetools.base64frombytes(buffer.getvalue())
 
             if label == "table":
+                # PaddleOCR NIM enforces minimum dimensions for TRT engines.
+                cropped = crop_image(
+                    original_image,
+                    (h1, w1, h2, w2),
+                    min_width=PADDLE_MIN_WIDTH,
+                    min_height=PADDLE_MIN_HEIGHT,
+                )
+                base64_img = numpy_to_base64(cropped)
+
                 table_content = call_image_inference_model(paddle_client, "paddle", cropped)
                 table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))
                 tables_and_charts.append((page_idx, table_data))
             elif label == "chart":
+                cropped = crop_image(original_image, (h1, w1, h2, w2))
+                base64_img = numpy_to_base64(cropped)
+
                 deplot_result = call_image_inference_model(deplot_client, "google/deplot", cropped)
                 cached_result = call_image_inference_model(cached_client, "cached", cropped)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
