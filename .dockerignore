@@ -1,0 +1,12 @@
+# Ignore all __pycache__ directories recursively
+**/__pycache__/
+
+# Output from examples
+processed_docs
+
+# Build and test output
+.pytest_cache
+.coverage
+
+# Sensitive environment variables
+.env
