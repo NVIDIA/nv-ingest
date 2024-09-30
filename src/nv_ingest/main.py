@@ -9,14 +9,42 @@
 # its affiliates is strictly prohibited.
 
 from fastapi import FastAPI
-from fastapi import status
+import datetime
+import os
+import re
 
 from .api.main import app as app_v1
+
+
+# TODO: Lets move this to a common utility, this is also used in both client and runtime setup.py files ...
+def get_version():
+    release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
+    version = os.getenv("NV_INGEST_VERSION")
+    rev = os.getenv("NV_INGEST_REV", "0")
+
+    if not version:
+        version = f"{datetime.datetime.now().strftime('%Y.%m.%d')}"
+
+    # Ensure the version is PEP 440 compatible
+    pep440_regex = r"^\d{4}\.\d{1,2}\.\d{1,2}$"
+    if not re.match(pep440_regex, version):
+        raise ValueError(f"Version '{version}' is not PEP 440 compatible")
+
+    # Construct the final version string
+    if release_type == "dev":
+        final_version = f"{version}.dev{rev}"
+    elif release_type == "release":
+        final_version = f"{version}.post{rev}" if int(rev) > 0 else version
+    else:
+        raise ValueError(f"Invalid release type: {release_type}")
+
+    return final_version
+
 
 app = FastAPI(
     title="NV-Ingest Microservice",
     description="Service for ingesting heterogenous datatypes",
-    version="0.1.0",
+    version=get_version(),
     contact={
         "name": "NVIDIA Corporation",
         "url": "https://nvidia.com",
@@ -28,20 +56,3 @@ app = FastAPI(
 
 
 app.mount("/v1", app_v1)
-
-
-@app.get(
-    "/health",
-    tags=["Health"],
-    summary="Perform a Health Check",
-    description="""
-        Immediately returns 200 when service is up.
-        This does not check the health of downstream
-        services.
-    """,
-    response_description="Return HTTP Status Code 200 (OK)",
-    status_code=status.HTTP_200_OK,
-)
-def get_health() -> str:
-    # Perform a health check
-    return "OK"
