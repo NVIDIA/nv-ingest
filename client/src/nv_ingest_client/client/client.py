@@ -416,7 +416,10 @@ class NvIngestClient:
         )
 
         try:
+            print(f"Serializing and sending JobSpec: {job_state.job_spec}")
             message = json.dumps(job_state.job_spec.to_dict())
+            for key, data in job_state.job_spec.to_dict().enumerate():
+                print(f"Key: {key}")
 
             x_trace_id, job_id = self._message_client.submit_message(job_queue_id, message)
 

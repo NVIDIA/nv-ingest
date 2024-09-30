@@ -17,7 +17,6 @@ import logging
 import time
 import traceback
 from typing import Annotated
-import uuid
 
 from opentelemetry import trace
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
@@ -32,7 +31,7 @@ from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestServic
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 
 logger = logging.getLogger("uvicorn")
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("uvicorn-endpoint-tracer")
 
 router = APIRouter()
 
@@ -70,10 +69,13 @@ async def submit_job_curl_friendly(
     try:
         file_stream = BytesIO(file.file.read())
         doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+        
+        current_trace_id = trace.get_current_span().get_span_context().trace_id
+        print(f"Current Trace-Id in Curl is: {current_trace_id}")
 
         # Construct the JobSpec from the HTTP supplied form-data
         job_spec = JobSpec(
-            # TOOD: Update this to look at the uploaded content-type, currently that is not working
+            # TODO: Update this to look at the uploaded content-type, currently that is not working
             document_type="pdf",
             payload=doc_content,
             source_id=file.filename,
@@ -124,6 +126,24 @@ async def submit_job_curl_friendly(
 )
 async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
     try:
+        
+        # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
+        # will be able to trace across uvicorn -> morpheus
+        # current_trace_id = format(trace.get_current_span().get_span_context().trace_id, '032x')
+        current_trace_id = trace.get_current_span().get_span_context().trace_id
+        print(f"Current Trace Id in regular submit is: {current_trace_id}")
+        
+        job_spec_dict = json.loads(job_spec.payload)
+        tracing_options = job_spec_dict.get("tracing_options", {})
+        print(f"Tracing Options Before: {tracing_options}")
+        tracing_options["trace_id"] = current_trace_id
+        print(f"Tracing Options After: {tracing_options}")
+        job_spec_dict["tracing_options"] = tracing_options
+        print(f"Job Spec Dict tracing_options: {job_spec_dict['tracing_options']}")
+        
+        # Serialize back to the payload
+        job_spec.payload = json.dumps(job_spec_dict)
+        
         submitted_job_id = await ingest_service.submit_job(job_spec)
         return submitted_job_id
     except Exception as ex:

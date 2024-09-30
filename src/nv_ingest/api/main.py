@@ -19,7 +19,7 @@ from .v1.ingest import router as IngestApiRouter
 
 # Set up the tracer provider and add a processor for exporting traces
 trace.set_tracer_provider(TracerProvider())
-tracer = trace.get_tracer(__name__)
+tracer = trace.get_tracer("uvicorn-endpoint-tracer")
 
 exporter = OTLPSpanExporter(endpoint="otel-collector:4317", insecure=True)
 span_processor = BatchSpanProcessor(exporter)
