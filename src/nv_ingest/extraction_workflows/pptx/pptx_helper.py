@@ -190,8 +190,6 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
 
                                 if is_list_block(shape):
                                     text = "  " * paragraph.level + "* " + text
-                                else:
-                                    text = text
 
                         accumulated_text.append(text)
 
