@@ -28,7 +28,7 @@ jobs:
 
       # Login to NGC
       - name: Log in to NGC Registry
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "${{ secrets.DOCKER_USERNAME }}" --password-stdin
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
