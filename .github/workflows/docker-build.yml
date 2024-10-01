@@ -29,7 +29,7 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build -t nv-ingest:latest .
+          docker build --target runtime -t nv-ingest:latest .
 
       - name: Run Pytest inside Docker container
         run: |
