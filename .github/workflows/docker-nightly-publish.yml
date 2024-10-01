@@ -1,4 +1,4 @@
-name: Build NV-Ingest Runtime Image
+name: Nv-Ingest Nightly Container Publish
 
 # Trigger for pull requests and pushing to main
 on:
@@ -24,14 +24,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      # Login to NGC
-      - name: Log in to NGC Registry
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
-
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
           docker build -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
+
+      # Login to NGC
+      - name: Log in to NGC Registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
       # Push the container to NGC
       - name: Upload nv-ingest container
