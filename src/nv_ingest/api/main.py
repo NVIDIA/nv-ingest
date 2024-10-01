@@ -42,7 +42,10 @@ async def add_trace_id_header(request, call_next):
         # Inject the current x-trace-id into the HTTP headers response
         span = trace.get_current_span()
         if span:
+            raw_trace_id = span.get_span_context().trace_id
+            print(f"MIDDLEWARE - Raw Trace Id: {raw_trace_id}")
             trace_id = format(span.get_span_context().trace_id, '032x')
+            print(f"MIDDLEWARE Formatted Trace Id: {trace_id}")
             response.headers["x-trace-id"] = trace_id
 
         return response

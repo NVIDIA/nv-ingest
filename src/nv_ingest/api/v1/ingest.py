@@ -111,7 +111,6 @@ async def submit_job_curl_friendly(
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
-
 # POST /submit_job
 @router.post(
     "/submit_job",
@@ -133,6 +132,10 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         current_trace_id = trace.get_current_span().get_span_context().trace_id
         print(f"Current Trace Id in regular submit is: {current_trace_id}")
         
+        # updated_job_spec = JobSpec(**json.loads(job_spec.payload))
+        # print(f"JobSpec extended_options: {updated_job_spec._extended_options}")
+        
+        
         job_spec_dict = json.loads(job_spec.payload)
         tracing_options = job_spec_dict.get("tracing_options", {})
         print(f"Tracing Options Before: {tracing_options}")
@@ -141,10 +144,16 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         job_spec_dict["tracing_options"] = tracing_options
         print(f"Job Spec Dict tracing_options: {job_spec_dict['tracing_options']}")
         
-        # Serialize back to the payload
-        job_spec.payload = json.dumps(job_spec_dict)
+        for idx, key in enumerate(job_spec_dict.keys()):
+            print(f"JobSpec Key: {key}")
         
-        submitted_job_id = await ingest_service.submit_job(job_spec)
+        # Serialize back to the payload
+        # job_spec.payload = json.dumps(job_spec_dict)
+        updated_job_spec = MessageWrapper(
+            payload=json.dumps(job_spec_dict)
+        )
+        
+        submitted_job_id = await ingest_service.submit_job(updated_job_spec)
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()
