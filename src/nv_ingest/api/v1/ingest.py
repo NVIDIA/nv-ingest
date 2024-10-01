@@ -126,69 +126,13 @@ async def submit_job_curl_friendly(
 )
 async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
     try:
-        
         # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
         # will be able to trace across uvicorn -> morpheus
-        # current_trace_id = format(trace.get_current_span().get_span_context().trace_id, '032x')
         current_trace_id = trace.get_current_span().get_span_context().trace_id
-        print(f"Current Trace Id in regular submit is: {current_trace_id}")
-        
-        # updated_job_spec = JobSpec(**json.loads(job_spec.payload))
-        # print(f"JobSpec extended_options: {updated_job_spec._extended_options}")
-        
-        
-        # job_spec_dict = json.loads(job_spec.payload)
-        # tracing_options = job_spec_dict.get("tracing_options", {})
-        # print(f"Tracing Options Before: {tracing_options}")
-        # tracing_options["trace_id"] = current_trace_id
-        # print(f"Tracing Options After: {tracing_options}")
-        # job_spec_dict["tracing_options"] = tracing_options
-        # print(f"Job Spec Dict tracing_options: {job_spec_dict['tracing_options']}")
-        
-        # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
-        
-        for idx, key in enumerate(job_spec_dict.keys()):
-            print(f"JobSpec Key: {key} - Type: {type(job_spec_dict[key])}")
-            val = job_spec_dict[key]
-            print(f"Value: {val}")
-
-        print(f"Content Type: {type(job_spec_dict['job_payload']['content'])}")
-        print(f"Source ID Type: {type(job_spec_dict['job_payload']['source_id'])}")
-        print(f"Source Name Type: {type(job_spec_dict['job_payload']['source_name'])}")
-        
-        job_spec = JobSpec(
-            document_type=DocumentTypeEnum.pdf,
-            payload=job_spec_dict['job_payload']['content'][0],
-            source_id=job_spec_dict['job_payload']['source_id'][0],
-            source_name=job_spec_dict['job_payload']['source_name'][0],
-            extended_options={
-                "tracing_options":
-                {
-                    "trace": True,
-                    "ts_send": time.time_ns(),
-                    "trace_id": trace.get_current_span().get_span_context().trace_id
-                }
-            }
-        )
-
-        # This is the "easy submission path" just default to extracting everything
-        extract_task = ExtractTask(
-            document_type=DocumentTypeEnum.pdf,
-            extract_text=True,
-            extract_images=True,
-            extract_tables=True
-        )
-
-        job_spec.add_task(extract_task)
-        
-        # Serialize back to the payload
-        # job_spec.payload = json.dumps(job_spec_dict)
-        # updated_job_spec = MessageWrapper(
-        #     payload=json.dumps(job_spec_dict)
-        # )
+        job_spec_dict['tracing_options']['trace_id'] = current_trace_id
         updated_job_spec = MessageWrapper(
-            payload=json.dumps(job_spec.to_dict())
+            payload=json.dumps(job_spec_dict)
         )
         
         submitted_job_id = await ingest_service.submit_job(updated_job_spec)
