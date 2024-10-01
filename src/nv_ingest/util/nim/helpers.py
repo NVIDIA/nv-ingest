@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from datetime import datetime
-from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -13,6 +11,7 @@ import requests
 import tritonclient.grpc as grpcclient
 
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +48,8 @@ def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str
         return {"endpoint_url": endpoints[1], "headers": headers}
 
 
-def call_image_inference_model(client, model_name: str, image_data, trace_info=None):
+@traceable_func(trace_name="pdf_content_extractor::{model_name}")
+def call_image_inference_model(client, model_name: str, image_data):
     """
     Calls an image inference model using the provided client.
 
@@ -74,13 +74,6 @@ def call_image_inference_model(client, model_name: str, image_data, trace_info=N
     RuntimeError
         If the HTTP request fails or if the response format is not as expected.
     """
-    if isinstance(trace_info, dict):
-        key = "trace::entry::pdf_content_extractor::{}_{}"
-        i = 0
-        while key.format(model_name, i) in trace_info:
-            i += 1
-        trace_info[key.format(model_name, i)] = datetime.now()
-
     if isinstance(client, grpcclient.InferenceServerClient):
         if image_data.ndim == 3:
             image_data = np.expand_dims(image_data, axis=0)
@@ -91,7 +84,7 @@ def call_image_inference_model(client, model_name: str, image_data, trace_info=N
 
         try:
             result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-            output = " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+            return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
         except Exception as e:
             err_msg = f"Inference failed for model {model_name}: {str(e)}"
             logger.error(err_msg)
@@ -130,7 +123,7 @@ def call_image_inference_model(client, model_name: str, image_data, trace_info=N
             if "choices" not in json_response or not json_response["choices"]:
                 raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
 
-            output = json_response["choices"][0]["message"]["content"]
+            return json_response["choices"][0]["message"]["content"]
 
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"HTTP request failed: {e}")
@@ -139,18 +132,10 @@ def call_image_inference_model(client, model_name: str, image_data, trace_info=N
         except Exception as e:
             raise RuntimeError(f"An error occurred during inference: {e}")
 
-    if isinstance(trace_info, dict):
-        key = "trace::exit::pdf_content_extractor::{}_{}"
-        i = 0
-        while key.format(model_name, i) in trace_info:
-            i += 1
-        trace_info[key.format(model_name, i)] = datetime.now()
-
-    return output
-
 
 # Perform inference and return predictions
-def perform_model_inference(client, model_name: str, input_array: np.ndarray, trace_info: Optional[List]):
+@traceable_func(trace_name="pdf_content_extractor::{model_name}")
+def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     """
     Perform inference using the provided model and input data.
 
@@ -176,25 +161,11 @@ def perform_model_inference(client, model_name: str, input_array: np.ndarray, tr
     >>> output.shape
     (2, 1000)
     """
-    if isinstance(trace_info, dict):
-        key = "trace::entry::pdf_content_extractor::{}_{}"
-        i = 0
-        while key.format(model_name, i) in trace_info:
-            i += 1
-        trace_info[key.format(model_name, i)] = datetime.now()
-
     input_tensors = [grpcclient.InferInput("input", input_array.shape, datatype="FP32")]
     input_tensors[0].set_data_from_numpy(input_array)
 
     outputs = [grpcclient.InferRequestedOutput("output")]
     query_response = client.infer(model_name=model_name, inputs=input_tensors, outputs=outputs)
     logger.debug(query_response)
-
-    if isinstance(trace_info, dict):
-        key = "trace::exit::pdf_content_extractor::{}_{}"
-        i = 0
-        while key.format(model_name, i) in trace_info:
-            i += 1
-        trace_info[key.format(model_name, i)] = datetime.now()
 
     return query_response.as_numpy("output")
