@@ -26,6 +26,9 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      - name: Test output
+        run: echo "Docker Registry: ${{ secrets.DOCKER_REGISTRY }}"
+
       # Login to NGC
       - name: Log in to NGC Registry
         run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
