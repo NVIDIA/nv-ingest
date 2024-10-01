@@ -71,29 +71,7 @@ def _trace(builder: mrc.Builder) -> None:
             trace_id = int(trace_id, 16)
         span_id = RandomIdGenerator().generate_span_id()
 
-        timestamps = {}
-        for key, val in message.filter_timestamp("trace::exit::").items():
-            exit_key = key
-            entry_key = exit_key.replace("trace::exit::", "trace::entry::")
-            ts_entry = message.get_timestamp(entry_key)
-            ts_exit = message.get_timestamp(exit_key)
-            job_name = key.replace("trace::exit::", "")
-
-            ts_entry_ns = int(ts_entry.timestamp() * 1e9)
-            ts_exit_ns = int(ts_exit.timestamp() * 1e9)
-
-            timestamps[job_name] = (ts_entry_ns, ts_exit_ns)
-
-        task_results = {}
-        for key in message.list_metadata():
-            if not key.startswith("annotation::"):
-                continue
-            task = message.get_metadata(key)
-            if not (("task_id" in task) and ("task_result" in task)):
-                continue
-            task_id = task["task_id"]
-            task_result = task["task_result"]
-            task_results[task_id] = task_result
+        timestamps = extract_timestamps_from_message(message)
 
         flattened = [x for t in timestamps.values() for x in t]
         start_time = min(flattened)
@@ -107,20 +85,8 @@ def _trace(builder: mrc.Builder) -> None:
         )
         parent_ctx = trace.set_span_in_context(NonRecordingSpan(span_context))
         parent_span = tracer.start_span(job_id, context=parent_ctx, start_time=start_time)
-        child_ctx = trace.set_span_in_context(parent_span)
-        for job_name, (ts_entry, ts_exit) in timestamps.items():
-            span = tracer.start_span(job_name, context=child_ctx, start_time=ts_entry)
-            if job_name in task_results:
-                task_result = task_results[job_name]
-                if task_result == TaskResultStatus.SUCCESS.value:
-                    span.set_status(Status(StatusCode.OK))
-                if task_result == TaskResultStatus.FAILURE.value:
-                    span.set_status(Status(StatusCode.ERROR))
-            try:
-                span.add_event("entry", timestamp=ts_entry)
-                span.add_event("exit", timestamp=ts_exit)
-            finally:
-                span.end(end_time=ts_exit)
+
+        create_span_with_timestamps(tracer, parent_span, message)
 
         if message.has_metadata("cm_failed") and message.get_metadata("cm_failed"):
             parent_span.set_status(Status(StatusCode.ERROR))
@@ -157,3 +123,65 @@ def _trace(builder: mrc.Builder) -> None:
 
     builder.register_module_input("input", aggregate_node)
     builder.register_module_output("output", aggregate_node)
+
+
+def extract_timestamps_from_message(message):
+    timestamps = {}
+    dedup_counter = {}
+
+    for key, val in message.filter_timestamp("trace::exit::").items():
+        exit_key = key
+        entry_key = exit_key.replace("trace::exit::", "trace::entry::")
+
+        task_name = key.replace("trace::exit::", "")
+        if task_name in dedup_counter:
+            dedup_counter[task_name] += 1
+            task_name = task_name + '_' + str(dedup_counter[task_name])
+        else:
+            dedup_counter[task_name] = 0
+
+        ts_entry = message.get_timestamp(entry_key)
+        ts_exit = message.get_timestamp(exit_key)
+        ts_entry_ns = int(ts_entry.timestamp() * 1e9)
+        ts_exit_ns = int(ts_exit.timestamp() * 1e9)
+
+        timestamps[task_name] = (ts_entry_ns, ts_exit_ns)
+
+    return timestamps
+
+
+def extract_annotated_task_results(message):
+    task_results = {}
+    for key in message.list_metadata():
+        if not key.startswith("annotation::"):
+            continue
+        task = message.get_metadata(key)
+        if not (("task_id" in task) and ("task_result" in task)):
+            continue
+        task_id = task["task_id"]
+        task_result = task["task_result"]
+        task_results[task_id] = task_result
+
+    return task_results
+
+
+def create_span_with_timestamps(tracer, parent_span, message):
+    timestamps = extract_timestamps_from_message(message)
+    task_results = extract_annotated_task_results(message)
+
+    child_ctx = trace.set_span_in_context(parent_span)
+    for task_name, (ts_entry, ts_exit) in sorted(timestamps.items(), key=lambda x: x[1]):
+        span = tracer.start_span(task_name, context=child_ctx, start_time=ts_entry)
+        # Set success/failure status.
+        if task_name in task_results:
+            task_result = task_results[task_name]
+            if task_result == TaskResultStatus.SUCCESS.value:
+                span.set_status(Status(StatusCode.OK))
+            if task_result == TaskResultStatus.FAILURE.value:
+                span.set_status(Status(StatusCode.ERROR))
+        # Add timestamps.
+        try:
+            span.add_event("entry", timestamp=ts_entry)
+            span.add_event("exit", timestamp=ts_exit)
+        finally:
+            span.end(end_time=ts_exit)

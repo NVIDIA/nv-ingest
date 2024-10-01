@@ -243,9 +243,12 @@ class MultiProcessingBaseStage(SinglePortStage):
                     future = process_pool.submit_task(process_fn, (df, task_props))
 
                     # This can return/raise an exception
-                    result = future.result()
+                    result, *extra_results = future.result()
 
                     work_package["payload"] = result
+                    for extra_result in extra_results:
+                        for key, value in extra_result.items():
+                            work_package[key] = value
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:
@@ -483,6 +486,15 @@ class MultiProcessingBaseStage(SinglePortStage):
 
                 gdf = cudf.from_pandas(work_package["payload"])
                 ctrl_msg.payload(MessageMeta(df=gdf))
+
+                do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
+                        ctrl_msg.get_metadata("config::add_trace_tagging") is True
+                )
+                if do_trace_tagging:
+                    trace_info = work_package["trace_info"]
+                    for key, ts in trace_info.items():
+                        ctrl_msg.set_timestamp(key, ts)
+
                 return ctrl_msg
 
             return cm_func(ctrl_msg, work_package)

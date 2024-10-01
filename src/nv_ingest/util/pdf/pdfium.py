@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from datetime import datetime
 from typing import Any
 from typing import List
 from typing import Optional
@@ -120,6 +121,7 @@ def pdfium_pages_to_numpy(
     render_dpi=300,
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
+    trace_info: Optional[List] = None,
 ) -> tuple[list[ndarray | ndarray[Any, dtype[Any]]], list[tuple[int, int]]]:
     """
     Converts a list of PdfPage objects to a list of NumPy arrays, where each array
@@ -155,6 +157,13 @@ def pdfium_pages_to_numpy(
     IOError
         If there is an error saving the image to disk.
     """
+    if isinstance(trace_info, dict):
+        key = "trace::entry::pdf_content_extractor::pdfium_pages_to_numpy_{}"
+        i = 0
+        while key.format(i) in trace_info:
+            i += 1
+        trace_info[key.format(i)] = datetime.now()
+
     if not (50 <= render_dpi <= 1200):
         raise ValueError("render_dpi must be between 50 and 1200.")
 
@@ -184,5 +193,12 @@ def pdfium_pages_to_numpy(
             padding_offsets.append((0, 0))
 
         images.append(img_arr)
+
+    if isinstance(trace_info, dict):
+        key = "trace::exit::pdf_content_extractor::pdfium_pages_to_numpy_{}"
+        i = 0
+        while key.format(i) in trace_info:
+            i += 1
+        trace_info[key.format(i)] = datetime.now()
 
     return images, padding_offsets

@@ -5,10 +5,12 @@
 
 import io
 import logging
+from datetime import datetime
 from math import ceil
 from math import floor
 from math import log
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 import numpy as np
@@ -64,6 +66,7 @@ def extract_tables_and_charts_using_image_ensemble(
     iou_thresh: float = 0.5,
     min_score: float = 0.1,
     final_thresh: float = 0.48,
+    trace_info: Optional[List] = None,
 ) -> List[Tuple[int, ImageTable]]:
     """
     Extract tables and charts from a series of document pages using an ensemble of image-based models.
@@ -139,13 +142,15 @@ def extract_tables_and_charts_using_image_ensemble(
             i += batch_size
 
         page_idx = 0
-        for batch in batches:
-            original_images, _ = pdfium_pages_to_numpy(batch, scale_tuple=(1536, 1536))
+        for batch_idx, batch in enumerate(batches):
+
+            original_images, _ = pdfium_pages_to_numpy(batch, scale_tuple=(1536, 1536), trace_info=trace_info)
 
             original_image_shapes = [image.shape for image in original_images]
             input_array = prepare_images_for_inference(original_images)
 
-            output_array = perform_model_inference(yolox_client, "yolox", input_array)
+            output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
+
             results = process_inference_results(
                 output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
             )
@@ -159,6 +164,7 @@ def extract_tables_and_charts_using_image_ensemble(
                     deplot_client,
                     cached_client,
                     tables_and_charts,
+                    trace_info=trace_info,
                 )
 
                 page_idx += 1
@@ -282,7 +288,7 @@ def process_inference_results(
 
 # Handle individual table/chart extraction and model inference
 def handle_table_chart_extraction(
-    annotation_dict, original_image, page_idx, paddle_client, deplot_client, cached_client, tables_and_charts
+    annotation_dict, original_image, page_idx, paddle_client, deplot_client, cached_client, tables_and_charts, trace_info=None,
 ):
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -336,12 +342,12 @@ def handle_table_chart_extraction(
                 base64_img = bytetools.base64frombytes(buffer.getvalue())
 
             if label == "table":
-                table_content = call_image_inference_model(paddle_client, "paddle", cropped)
+                table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
                 table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))
                 tables_and_charts.append((page_idx, table_data))
             elif label == "chart":
-                deplot_result = call_image_inference_model(deplot_client, "google/deplot", cropped)
-                cached_result = call_image_inference_model(cached_client, "cached", cropped)
+                deplot_result = call_image_inference_model(deplot_client, "google/deplot", cropped, trace_info=trace_info)
+                cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
                 chart_data = ImageChart(chart_content, base64_img, (w1, h1, w2, h2))
                 tables_and_charts.append((page_idx, chart_data))
@@ -349,7 +355,7 @@ def handle_table_chart_extraction(
 
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestram PDF
-def pdfium(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+def pdfium(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, trace_info = None, **kwargs):
     """
     Helper function to use pdfium to extract text from a bytestream PDF.
 
@@ -373,7 +379,6 @@ def pdfium(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     str
         A string of extracted text.
     """
-
     logger.debug("Extracting PDF with pdfium backend.")
 
     row_data = kwargs.get("row_data")
@@ -494,10 +499,10 @@ def pdfium(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         extracted_data.append(text_extraction)
 
     if extract_tables:
-        for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(pages, pdfium_config):
+        for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info):
             extracted_data.append(
                 construct_table_and_chart_metadata(
-                    table_and_charts, page_idx, pdf_metadata.page_count, source_metadata, base_unified_metadata
+                    table_and_charts, page_idx, pdf_metadata.page_count, source_metadata, base_unified_metadata,
                 )
             )
 
