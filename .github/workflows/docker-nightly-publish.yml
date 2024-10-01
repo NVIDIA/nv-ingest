@@ -1,4 +1,4 @@
-name: Build NV-Ingest Runtime Image
+name: Nv-Ingest Nightly Container Publish
 
 # Trigger for pull requests and pushing to main
 on:
