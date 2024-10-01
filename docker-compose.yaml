@@ -8,11 +8,6 @@ services:
     ports:
       - "6379:6379"
 
-#  tika:
-#    image: apache/tika:latest
-#    ports:
-#      - "9998:9998"
-
   yolox:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
     ports:

@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import io
 import logging
 from datetime import datetime
 from typing import List
@@ -12,9 +11,8 @@ from typing import Tuple
 import numpy as np
 import requests
 import tritonclient.grpc as grpcclient
-from PIL import Image
 
-from nv_ingest.util.converters import bytetools
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
@@ -100,10 +98,7 @@ def call_image_inference_model(client, model_name: str, image_data, trace_info=N
             raise RuntimeError(err_msg)
 
     else:
-        image = Image.fromarray(image_data)
-        with io.BytesIO() as buffer:
-            image.save(buffer, format="PNG")
-            base64_img = bytetools.base64frombytes(buffer.getvalue())
+        base64_img = numpy_to_base64(image_data)
 
         try:
             url = client["endpoint_url"]

@@ -15,7 +15,7 @@ SPDX-License-Identifier: Apache-2.0
 - **`MESSAGE_CLIENT_PORT`**:
 
   - **Description**: Specifies the port number on which the message broker is listening.
-  - **Example**: `6379`, `5672`
+  - **Example**: `7670`, `6379`
 
 - **`CAPTION_CLASSIFIER_GRPC_TRITON`**:
 

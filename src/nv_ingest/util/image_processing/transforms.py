@@ -74,7 +74,9 @@ def pad_image(
     return canvas, (pad_width, pad_height)
 
 
-def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
+def crop_image(
+    array: np.array, bbox: Tuple[int, int, int, int], min_width: int = 1, min_height: int = 1
+) -> Optional[np.ndarray]:
     """
     Crops a NumPy array representing an image according to the specified bounding box.
 
@@ -84,6 +86,12 @@ def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.
         The image as a NumPy array.
     bbox : Tuple[int, int, int, int]
         The bounding box to crop the image to, given as (w1, h1, w2, h2).
+    min_width : int, optional
+        The minimum allowable width for the cropped image. If the cropped width is smaller than this value,
+        the function returns None. Default is 1.
+    min_height : int, optional
+        The minimum allowable height for the cropped image. If the cropped height is smaller than this value,
+        the function returns None. Default is 1.
 
     Returns
     -------
@@ -96,7 +104,7 @@ def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.
     w1 = max(floor(w1), 0)
     w2 = min(ceil(w2), array.shape[1])
 
-    if (w2 - w1 <= 0) or (h2 - h1 <= 0):
+    if (w2 - w1 < min_width) or (h2 - h1 < min_height):
         return None
 
     # Crop the image using the bounding box
@@ -138,6 +146,12 @@ def numpy_to_base64(array: np.ndarray) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
+    # If the array represents a grayscale image, drop the redundant axis in
+    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
+    # a grayscale image.
+    if array.ndim == 3 and array.shape[2] == 1:
+        array = np.squeeze(array, axis=2)
+
     # Check if the array is valid and can be converted to an image
     try:
         # Convert the NumPy array to a PIL image
