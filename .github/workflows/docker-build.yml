@@ -27,7 +27,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Test output
-        run: echo "Docker Registry: ${{ secrets.DOCKER_REGISTRY }}"
+        run: echo "${{ secrets.DOCKER_REGISTRY }}"
 
       # Login to NGC
       - name: Log in to NGC Registry
