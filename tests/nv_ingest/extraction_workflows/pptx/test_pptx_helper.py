@@ -74,6 +74,31 @@ def pptx_stream_with_text():
 
 
 @pytest.fixture
+def pptx_stream_with_multiple_runs_in_title():
+    prs = Presentation()
+    title_slide_layout = prs.slide_layouts[0]
+    slide = prs.slides.add_slide(title_slide_layout)
+    title = slide.shapes.title
+    subtitle = slide.placeholders[1]
+
+    p = title.text_frame.paragraphs[0]
+    run1 = p.add_run()
+    run1.text = "Hello, "
+    run2 = p.add_run()
+    run2.text = "World!"
+
+    p = subtitle.text_frame.paragraphs[0]
+    run1 = p.add_run()
+    run1.text = "Subtitle "
+    run2 = p.add_run()
+    run2.text = "here."
+
+    pptx_stream = BytesIO()
+    prs.save(pptx_stream)
+    return pptx_stream
+
+
+@pytest.fixture
 def pptx_stream_with_group():
     prs = Presentation()
 
@@ -236,6 +261,38 @@ def test_pptx(pptx_stream_with_text, document_df):
     assert extracted_data[1][1]["content"].rstrip() == expected_1.rstrip()
 
 
+def test_pptx_with_multiple_runs_in_title(pptx_stream_with_multiple_runs_in_title, document_df):
+    extracted_data = python_pptx(
+        pptx_stream_with_multiple_runs_in_title,
+        extract_text=True,
+        extract_images=False,
+        extract_tables=False,
+        row_data=document_df.iloc[0],
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 1
+
+    for data in extracted_data:
+        assert len(data) == 3
+        assert data[0] == "text"
+        assert data[1]["source_metadata"]["source_id"] == "source1"
+        assert data[1]["text_metadata"]["text_type"] == "page"
+        assert isinstance(data[2], str)
+
+    # validate parsed text
+    expected_0 = dedent(
+        """\
+    Hello, World!
+    =============
+
+    Subtitle here.
+    --------------
+    """
+    )
+    assert extracted_data[0][1]["content"].rstrip() == expected_0.rstrip()
+
+
 def test_pptx_text_depth_presentation(pptx_stream_with_text, document_df):
     extracted_data = python_pptx(
         pptx_stream_with_text,
@@ -275,6 +332,9 @@ def test_pptx_text_depth_presentation(pptx_stream_with_text, document_df):
         """
     )
     assert extracted_data[0][1]["content"].rstrip() == expected_0.rstrip()
+
+    # Make sure there are no execssive newline characters. (Max is two characters \n\n.)
+    assert "\n\n\n" not in extracted_data[0][1]["content"]
 
 
 def test_pptx_text_depth_shape(pptx_stream_with_text, document_df):
