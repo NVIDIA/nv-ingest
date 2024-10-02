@@ -90,9 +90,29 @@ minikube addons enable storage-provisioner-rancher
 
 ## Usage
 
-Jobs are submitted via the `nv-ingest-cli` command. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
+Jobs are submitted via the `nv-ingest-cli` command. Installation methods differ depending on your version of nv-ingest. Please see more detailed instructions in either the <= 24.08 or > 24.08 subsections below.
 
-### Access To Redis
+### Versions <= 24.08
+
+Nv-Ingest versions <= 24.08 exposed Redis directly to the client. This means that the setup for the `nv-ingest-cli` differs slightly than
+in newer versions as a specific version of the `nv-ingest-cli` must be used and different ports must be opened.
+
+#### Nv-Ingest CLI Installation <= 24.08
+
+You can find the Python wheel for the `nv-ingest-cli` located in our [nv-ingest 24.08 release artifacts](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08). Installation of the `nv-ingest-cli` goes as follows.
+
+```shell
+# Just to be cautious we remove any existing installation
+pip uninstall nv-ingest-cli
+
+# Download the 24.08 .whl
+wget https://github.com/NVIDIA/nv-ingest/releases/download/24.08/nv_ingest_client-24.08-py3-none-any.whl
+
+# Pip install that .whl
+pip install nv_ingest_client-24.08-py3-none-any.whl
+```
+
+#### Access To Redis <= 24.08
 
 It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
 You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
@@ -103,7 +123,76 @@ Example:
 kubectl port-forward -n ${NAMESPACE} nv-ingest-redis-master-0 6379:6379
 ```
 
-### Executing jobs
+#### Executing jobs <= 24.08
+
+Here is a sample invocation of a PDF extraction task using the port forward above:
+
+```bash
+mkdir -p ./processed_docs
+
+nv-ingest-cli \
+  --doc /path/to/your/unique.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true}' \
+  --client_host=localhost \
+  --client_port=6379
+```
+
+### Versions > 24.08
+
+Nv-Ingest versions <= 24.08 exposed Redis directly to the client. This means that the setup for the `nv-ingest-cli` differs slightly than
+in newer versions as a specific version of the `nv-ingest-cli` must be used and different ports must be opened.
+
+#### Nv-Ingest CLI Installation > 24.08
+
+For versions > 24.08 we recommend building `nv-ingest-cli` from source to ensure you have the latest code. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
+
+```bash
+# Just to be cautious we remove any existing installation
+pip uninstall nv-ingest-cli
+
+# Download the 24.08 .whl
+wget https://github.com/NVIDIA/nv-ingest/releases/download/24.08/nv_ingest_client-24.08-py3-none-any.whl
+
+# Pip install that .whl
+pip install nv_ingest_client-24.08-py3-none-any.whl
+```
+
+#### Rest Endpoint Ingress > 24.08
+
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the nv-ingest pod.
+You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the nv-ingest pod to your local environment.
+
+Example:
+
+You can find the name of your nv-ingest pod that you want to forward traffic to by running.
+
+```bash
+kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
+```
+
+The output will look something like this with different auto generated sequences.
+
+```
+nv-ingest-674f6b7477-65nvm
+nv-ingest-cached-0
+nv-ingest-deplot-0
+nv-ingest-etcd-0
+nv-ingest-milvus-standalone-7f8ffbdfbc-jpmlj
+nv-ingest-minio-7cbd4f5b9d-99hl4
+nv-ingest-opentelemetry-collector-7bb59d57fc-4h59q
+nv-ingest-paddle-0
+nv-ingest-redis-master-0
+nv-ingest-redis-replicas-0
+nv-ingest-yolox-0
+nv-ingest-zipkin-77b5fc459f-ptsj6
+```
+
+```bash
+kubectl port-forward -n ${NAMESPACE} nv-ingest-674f6b7477-65nvm 7670:7670
+```
+
+#### Executing jobs > 24.08
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
 
