@@ -17,6 +17,7 @@ from typing import Optional
 
 import httpx
 import requests
+import re
 
 from nv_ingest_client.message_clients import MessageClientBase
 
@@ -123,6 +124,26 @@ class RestClient(MessageClientBase):
         except (httpx.HTTPError, AttributeError):
             return False
 
+    def generate_url(self, user_provided_url, user_provided_port) -> str:
+        """Examines the user defined URL for http*://. If that
+        pattern is detected the URL is used as provided by the user.
+        If that pattern does not exist then the assumption is made that
+        the endpoint is simply `http://` and that is prepended
+        to the user supplied endpoint.
+
+        Args:
+            user_provided_url str: Endpoint where the Rest service is running
+
+        Returns:
+            str: Fully validated URL
+        """
+        if not re.match(r'^https?://', user_provided_url):
+            # Add the default `http://` if its not already present in the URL
+            user_provided_url = f"http://{user_provided_url}:{user_provided_port}"
+        else:
+            user_provided_url = f"{user_provided_url}:{user_provided_port}"
+        return user_provided_url
+
     def fetch_message(self, job_id: str, timeout: float = 10) -> Optional[str]:
         """
         Fetches a message from the specified queue with retries on failure.
@@ -148,7 +169,7 @@ class RestClient(MessageClientBase):
         while True:
             try:
                 # Fetch via HTTP
-                url = f"http://{self._host}:{self._port}{self._fetch_endpoint}/{job_id}"
+                url = f"{self.generate_url(self._host, self._port)}{self._fetch_endpoint}/{job_id}"
                 logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
                 result = requests.get(url)
 
@@ -212,7 +233,7 @@ class RestClient(MessageClientBase):
         while True:
             try:
                 # Submit via HTTP
-                url = f"http://{self._host}:{self._port}{self._submit_endpoint}"
+                url = f"{self.generate_url(self._host, self._port)}{self._submit_endpoint}"
                 result = requests.post(url, json={"payload": message}, headers={"Content-Type": "application/json"})
 
                 response_code = result.status_code

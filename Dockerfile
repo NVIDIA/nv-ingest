@@ -13,6 +13,10 @@ ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
 
+# We require Python 3.10.15 but base image currently comes with 3.10.14, update here.
+RUN source activate morpheus \
+    && conda install python=3.10.15
+
 # Set the working directory in the container
 WORKDIR /workspace
 
