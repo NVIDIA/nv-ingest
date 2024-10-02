@@ -247,7 +247,9 @@ class MultiProcessingBaseStage(SinglePortStage):
 
                     work_package["payload"] = result
                     if extra_results:
-                        work_package["trace_info"] = extra_results.get("trace_info")
+                        for extra_result in extra_results:
+                            if isinstance(extra_result, dict) and ("trace_info" in extra_result):
+                               work_package["trace_info"] = extra_result["trace_info"]
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:
