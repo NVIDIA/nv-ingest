@@ -136,7 +136,7 @@ def extract_timestamps_from_message(message):
         task_name = key.replace("trace::exit::", "")
         if task_name in dedup_counter:
             dedup_counter[task_name] += 1
-            task_name = task_name + '_' + str(dedup_counter[task_name])
+            task_name = task_name + "_" + str(dedup_counter[task_name])
         else:
             dedup_counter[task_name] = 0
 
@@ -169,19 +169,37 @@ def create_span_with_timestamps(tracer, parent_span, message):
     timestamps = extract_timestamps_from_message(message)
     task_results = extract_annotated_task_results(message)
 
+    ctx_store = {}
     child_ctx = trace.set_span_in_context(parent_span)
     for task_name, (ts_entry, ts_exit) in sorted(timestamps.items(), key=lambda x: x[1]):
-        span = tracer.start_span(task_name, context=child_ctx, start_time=ts_entry)
+        main_task, *subtask = task_name.split("::", 1)
+        subtask = "::".join(subtask)
+
+        if not subtask:
+            span = tracer.start_span(main_task, context=child_ctx, start_time=ts_entry)
+        else:
+            subtask_ctx = trace.set_span_in_context(ctx_store[main_task][0])
+            span = tracer.start_span(subtask, context=subtask_ctx, start_time=ts_entry)
+
+        span.add_event("entry", timestamp=ts_entry)
+        span.add_event("exit", timestamp=ts_exit)
+
         # Set success/failure status.
         if task_name in task_results:
-            task_result = task_results[task_name]
+            task_result = task_results[main_task]
             if task_result == TaskResultStatus.SUCCESS.value:
                 span.set_status(Status(StatusCode.OK))
             if task_result == TaskResultStatus.FAILURE.value:
                 span.set_status(Status(StatusCode.ERROR))
+
         # Add timestamps.
-        try:
-            span.add_event("entry", timestamp=ts_entry)
-            span.add_event("exit", timestamp=ts_exit)
-        finally:
-            span.end(end_time=ts_exit)
+        span.add_event("entry", timestamp=ts_entry)
+        span.add_event("exit", timestamp=ts_exit)
+
+        # Cache span and exit time.
+        # Spans are used for looking up the main task's span when creating a subtask's span.
+        # Exit timestamps are used for closing each span at the very end.
+        ctx_store[task_name] = (span, ts_exit)
+
+    for _, (span, ts_exit) in ctx_store.items():
+        span.end(end_time=ts_exit)
