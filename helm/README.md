@@ -140,8 +140,7 @@ nv-ingest-cli \
 
 ### Versions > 24.08
 
-Nv-Ingest versions <= 24.08 exposed Redis directly to the client. This means that the setup for the `nv-ingest-cli` differs slightly than
-in newer versions as a specific version of the `nv-ingest-cli` must be used and different ports must be opened.
+Nv-Ingest versions > 24.08 have switched from Redis to a HTTP/Rest based submission method. By default the Rest service runs on port 7670. This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.
 
 #### Nv-Ingest CLI Installation > 24.08
 
