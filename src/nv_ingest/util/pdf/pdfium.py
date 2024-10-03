@@ -15,6 +15,7 @@ from numpy import ndarray
 from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import pad_image
+from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
@@ -115,6 +116,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
     return img_array
 
 
+@traceable_func(trace_name="pdf_content_extractor::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
     render_dpi=300,

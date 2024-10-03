@@ -1,12 +1,10 @@
-name: Build NV-Ingest Runtime Image
+name: Nv-Ingest Nightly Container Publish
 
 # Trigger for pull requests and pushing to main
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  schedule:
+    # Runs every day at 11:30PM (UTC)
+    - cron: "30 23 * * *"
   push:
     branches:
       - main
@@ -29,14 +27,12 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build --target runtime -t nv-ingest:latest .
+          docker build --target runtime -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }} .
 
-      - name: Run Pytest inside Docker container
-        run: |
-          docker run nv-ingest:latest pytest -rs --cov nv_ingest --cov nv_ingest_client --cov-report term --cov-report xml:coverage.xml tests/nv_ingest tests/nv_ingest_client
-  
-      - name: Upload test report
-        uses: actions/upload-artifact@v4
-        with:
-          name: pytest-report
-          path: report.xml
+      # Login to NGC
+      - name: Log in to NGC Registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
+
+      # Push the container to NGC
+      - name: Upload nv-ingest container
+        run: docker push ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.CURRENT_DATE }}
