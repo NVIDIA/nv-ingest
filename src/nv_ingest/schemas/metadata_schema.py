@@ -252,6 +252,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     caption: str = ""
     text: str = ""
     image_location: tuple = (0, 0, 0, 0)
+    image_location_max_dimensions: tuple = (0, 0)
     uploaded_image_url: str = ""
     width: int = 0
     height: int = 0
@@ -262,6 +263,7 @@ class TableMetadataSchema(BaseModelNoExt):
     table_format: TableFormatEnum
     table_content: str = ""
     table_location: tuple = (0, 0, 0, 0)
+    table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
 
 
