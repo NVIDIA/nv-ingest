@@ -128,11 +128,49 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
     try:
         # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
         # will be able to trace across uvicorn -> morpheus
+        # current_trace_id = format(trace.get_current_span().get_span_context().trace_id, '032x')
         current_trace_id = trace.get_current_span().get_span_context().trace_id
+        print(f"Current Trace Id in regular submit is: {current_trace_id}")
+        
+        # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
-        job_spec_dict['tracing_options']['trace_id'] = current_trace_id
+        
+        for idx, key in enumerate(job_spec_dict.keys()):
+            print(f"JobSpec Key: {key} - Type: {type(job_spec_dict[key])}")
+            val = job_spec_dict[key]
+            print(f"Value: {val}")
+
+        print(f"Content Type: {type(job_spec_dict['job_payload']['content'])}")
+        print(f"Source ID Type: {type(job_spec_dict['job_payload']['source_id'])}")
+        print(f"Source Name Type: {type(job_spec_dict['job_payload']['source_name'])}")
+        
+        job_spec = JobSpec(
+            document_type=DocumentTypeEnum.pdf,
+            payload=job_spec_dict['job_payload']['content'][0],
+            source_id=job_spec_dict['job_payload']['source_id'][0],
+            source_name=job_spec_dict['job_payload']['source_name'][0],
+            extended_options={
+                "tracing_options":
+                {
+                    "trace": True,
+                    "ts_send": time.time_ns(),
+                    "trace_id": current_trace_id
+                }
+            }
+        )
+
+        # This is the "easy submission path" just default to extracting everything
+        extract_task = ExtractTask(
+            document_type=DocumentTypeEnum.pdf,
+            extract_text=True,
+            extract_images=True,
+            extract_tables=True
+        )
+
+        job_spec.add_task(extract_task)
+        
         updated_job_spec = MessageWrapper(
-            payload=json.dumps(job_spec_dict)
+            payload=json.dumps(job_spec.to_dict())
         )
         
         submitted_job_id = await ingest_service.submit_job(updated_job_spec)

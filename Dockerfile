@@ -12,6 +12,7 @@ FROM $BASE_IMG:$BASE_IMG_TAG AS base
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
+ARG UVICORN_WORKERS="1"
 
 # We require Python 3.10.15 but base image currently comes with 3.10.14, update here.
 RUN source activate morpheus \
@@ -98,7 +99,7 @@ COPY pyproject.toml ./
 COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
 
 # Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
-CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --host 0.0.0.0 --port 7670 & wait"]
+CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --host 0.0.0.0 --workers 1 --port 7670 & wait"]
 
 FROM base AS development
 
