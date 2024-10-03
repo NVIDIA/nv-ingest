@@ -188,11 +188,11 @@ def extract_tables_and_charts_using_image_ensemble(
         logger.error(f"Error during table/chart extraction: {str(e)}")
         raise
     finally:
-        if extract_tables and isinstance(paddle_client, grpcclient.InferenceServerClient):
+        if isinstance(paddle_client, grpcclient.InferenceServerClient):
             paddle_client.close()
-        if extract_charts and isinstance(cached_client, grpcclient.InferenceServerClient):
+        if isinstance(cached_client, grpcclient.InferenceServerClient):
             cached_client.close()
-        if extract_charts and isinstance(deplot_client, grpcclient.InferenceServerClient):
+        if isinstance(deplot_client, grpcclient.InferenceServerClient):
             deplot_client.close()
         if isinstance(yolox_client, grpcclient.InferenceServerClient):
             yolox_client.close()
