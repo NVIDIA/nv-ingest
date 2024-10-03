@@ -11,6 +11,7 @@ import requests
 import tritonclient.grpc as grpcclient
 
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
@@ -47,6 +48,7 @@ def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str
         return {"endpoint_url": endpoints[1], "headers": headers}
 
 
+@traceable_func(trace_name="pdf_content_extractor::{model_name}")
 def call_image_inference_model(client, model_name: str, image_data):
     """
     Calls an image inference model using the provided client.
@@ -87,6 +89,7 @@ def call_image_inference_model(client, model_name: str, image_data):
             err_msg = f"Inference failed for model {model_name}: {str(e)}"
             logger.error(err_msg)
             raise RuntimeError(err_msg)
+
     else:
         base64_img = numpy_to_base64(image_data)
 
@@ -131,6 +134,7 @@ def call_image_inference_model(client, model_name: str, image_data):
 
 
 # Perform inference and return predictions
+@traceable_func(trace_name="pdf_content_extractor::{model_name}")
 def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     """
     Perform inference using the provided model and input data.
