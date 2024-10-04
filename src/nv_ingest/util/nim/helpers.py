@@ -7,6 +7,7 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
+import re
 import requests
 import tritonclient.grpc as grpcclient
 
@@ -165,3 +166,65 @@ def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     logger.debug(query_response)
 
     return query_response.as_numpy("output")
+
+
+def generate_url(url) -> str:
+    """Examines the user defined URL for http*://. If that
+    pattern is detected the URL is used as provided by the user.
+    If that pattern does not exist then the assumption is made that
+    the endpoint is simply `http://` and that is prepended
+    to the user supplied endpoint.
+
+    Args:
+        url str: Endpoint where the Rest service is running
+
+    Returns:
+        str: Fully validated URL
+    """
+    if not re.match(r'^https?://', url):
+        # Add the default `http://` if its not already present in the URL
+        url = f"http://{url}"
+    else:
+        url = f"{url}"
+    return url
+
+
+def is_ready(http_endpoint, ready_endpoint) -> bool:
+    url = generate_url(http_endpoint)
+
+    if not ready_endpoint.startswith('/') and not url.endswith('/'):
+        ready_endpoint = '/' + ready_endpoint
+
+    url = url + ready_endpoint
+
+    # Call the ready endpoint of the NIM
+    try:
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems resonable
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            # The NIM is saying it is ready to serve
+            return True
+        elif resp.status_code == 503:
+            # NIM is explicitly saying it is not ready.
+            return False
+        else:
+            # Any other code is confusing. We should log it with a warning
+            # as it could be something that might hold up ready state
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.json()}")
+            return False
+    except requests.HTTPError as http_err:
+        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
+        return False
+    except requests.Timeout:
+        logger.warning(f"'{url}' request timed out")
+        return False
+    except ConnectionError:
+        logger.warning(f"A connection error for '{url}' occurred")
+        return False
+    except requests.RequestException as err:
+        logger.warning(f"An error occurred: {err} for '{url}'")
+        return False
+    except Exception as ex:
+        # Don't let anything squeeze by
+        logger.warning(f"Exception: {ex}")
+        return False

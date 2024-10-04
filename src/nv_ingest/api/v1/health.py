@@ -9,14 +9,15 @@
 # its affiliates is strictly prohibited.
 
 import logging
+import os
 
-from opentelemetry import trace
 from fastapi import APIRouter
 from fastapi import status
 from fastapi.responses import JSONResponse
 
+from nv_ingest.util.nim.helpers import is_ready
+
 logger = logging.getLogger("uvicorn")
-tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
@@ -45,5 +46,49 @@ async def get_live_state() -> dict:
     status_code=status.HTTP_200_OK,
 )
 async def get_ready_state() -> dict:
-    ready_content = {"ready": True}
-    return JSONResponse(content=ready_content, status_code=200)
+    # "Ready" to use means this.
+    # 1. nv-ingest FastAPI is live, check you are here nothing to do.
+    # 2. Morpheus pipeline is up and running
+    # 3. Yolox NIM "ready" health endpoint returns 200 status code
+    # 4. Deplot NIM "ready" health endpoint returns 200 status code
+    # 5. Cached NIM "ready" health endpoint returns 200 status code
+    # 6. PaddleOCR NIM "ready" health endpoint returns 200 status code
+    # 7. Embedding NIM "ready" health endpoint returns 200 status code
+    # After all of those are "ready" this service returns "ready" as well
+    # Otherwise a HTTP 503 Service not Available response is returned.
+
+    ingest_ready = True
+    # Need to explore options for process checking here.
+    # We cannot guarantee this process is local to check.
+    # If it is not local and we cannot find a running version
+    # locally we could be blocking processing with our
+    # readiness endpoint which is really bad. I think it safe
+    # for now to assume that if nv-ingest is running so is
+    # the pipeline.
+    morpheus_pipeline_ready = True
+    yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", "yolox:8000"), "/v1/health/ready")
+    # deplot_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", "yolox:8000"), "/v1/health/ready")
+    deplot_ready = True
+    cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", "cached:8000"), "/v1/health/ready")
+    paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", "paddle:8000"), "/v1/health/ready")
+    embedding_ready = is_ready(os.getenv("EMBEDDING_HTTP_ENDPOINT", "embedding:8000"), "/v1/health/ready")
+
+    if (ingest_ready
+            and morpheus_pipeline_ready
+            and yolox_ready
+            and deplot_ready
+            and cached_ready
+            and paddle_ready
+            and embedding_ready):
+        return JSONResponse(content={"ready": True}, status_code=200)
+    else:
+        ready_statuses = {
+            ingest_ready: ingest_ready,
+            morpheus_pipeline_ready: morpheus_pipeline_ready,
+            yolox_ready: yolox_ready,
+            deplot_ready: deplot_ready,
+            cached_ready: cached_ready,
+            paddle_ready: paddle_ready,
+            embedding_ready: embedding_ready
+        }
+        return JSONResponse(content=ready_statuses, status_code=503)
