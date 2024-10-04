@@ -137,7 +137,7 @@ services:
     cap_add:
       - sys_nice
     environment:
-      - CACHED_GRPC_ENDPOINT=cached:8000
+      - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=""
       - CACHED_HEALTH_ENDPOINT=cached:8000
       - DEPLOT_GRPC_ENDPOINT=""
