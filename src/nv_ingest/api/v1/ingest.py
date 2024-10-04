@@ -32,7 +32,7 @@ from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 
 logger = logging.getLogger("uvicorn")
-tracer = trace.get_tracer("uvicorn-endpoint-tracer")
+tracer = trace.get_tracer(__name__)
 
 router = APIRouter()
 
