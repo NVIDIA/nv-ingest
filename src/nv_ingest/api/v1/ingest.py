@@ -141,6 +141,42 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         #     payload=json.dumps(job_spec_dict)
         # )
         
+        # BEFORE ADDING TRACE_ID
+        # {
+        # 'job_payload': 
+        #     {'source_name': ['/media/jeremy/storage/ingest_smoke_test/1230070.pdf'],
+        #      'source_id': ['/media/jeremy/storage/ingest_smoke_test/1230070.pdf'],
+        #      'content': '<empty so we can read it>',
+        #      'document_type': ['pdf']
+        #     }, 
+        # 'job_id': 'None',
+        # 'tasks': [
+        #     {
+        #         'type': 'extract',
+        #         'task_properties': 
+        #             {
+        #                 'method': 'pdfium',
+        #                 'document_type': 'pdf',
+        #                 'params':
+        #                     {'extract_text': True,
+        #                      'extract_images': True,
+        #                      'extract_tables': True,
+        #                      'extract_tables_method': 'yolox',
+        #                      'text_depth': 'document'
+        #                     }
+        #             }
+        #     }
+        # ],
+        # 'tracing_options': 
+        #     {
+        #         'trace': True,
+        #         'ts_send': 1728073869539601313
+        #     }
+        # }
+        
+        job_spec_dict_copy['tracing_options']['trace_id'] = current_trace_id
+        print(f"JobSpec: {job_spec_dict_copy}")
+        
         job_spec = JobSpec(
             document_type=DocumentTypeEnum.pdf,
             payload=job_spec_dict['job_payload']['content'][0],
