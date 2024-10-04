@@ -71,15 +71,13 @@ async def get_ready_state() -> dict:
     deplot_ready = True
     cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", ""), "/v1/health/ready")
     paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", ""), "/v1/health/ready")
-    embedding_ready = is_ready(os.getenv("EMBEDDING_HTTP_ENDPOINT", ""), "/v1/health/ready")
 
     if (ingest_ready
             and morpheus_pipeline_ready
             and yolox_ready
             and deplot_ready
             and cached_ready
-            and paddle_ready
-            and embedding_ready):
+            and paddle_ready):
         return JSONResponse(content={"ready": True}, status_code=200)
     else:
         ready_statuses = {
