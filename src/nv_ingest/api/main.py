@@ -8,6 +8,8 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
+import logging
+
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.trace import TracerProvider
@@ -24,6 +26,8 @@ tracer = trace.get_tracer(__name__)
 exporter = OTLPSpanExporter(endpoint="otel-collector:4317", insecure=True)
 span_processor = BatchSpanProcessor(exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
+
+logger = logging.getLogger("uvicorn")
 
 # nv-ingest FastAPI app declaration
 app = FastAPI()
@@ -43,9 +47,9 @@ async def add_trace_id_header(request, call_next):
         span = trace.get_current_span()
         if span:
             raw_trace_id = span.get_span_context().trace_id
-            print(f"MIDDLEWARE - Raw Trace Id: {raw_trace_id}")
-            trace_id = format(span.get_span_context().trace_id, '032x')
-            print(f"MIDDLEWARE Formatted Trace Id: {trace_id}")
+            trace_id = format(raw_trace_id, '032x')
+            logger.debug(f"MIDDLEWARE add_trace_id_header Raw \
+                Trace Id: {raw_trace_id} - Formatted Trace Id: {trace_id}")
             response.headers["x-trace-id"] = trace_id
 
         return response

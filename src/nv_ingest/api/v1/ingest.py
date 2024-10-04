@@ -70,13 +70,10 @@ async def submit_job_curl_friendly(
     try:
         file_stream = BytesIO(file.file.read())
         doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
-        
-        current_trace_id = trace.get_current_span().get_span_context().trace_id
-        print(f"Current Trace-Id in Curl is: {current_trace_id}")
 
         # Construct the JobSpec from the HTTP supplied form-data
         job_spec = JobSpec(
-            # TODO: Update this to look at the uploaded content-type, currently that is not working
+            # TOOD: Update this to look at the uploaded content-type, currently that is not working
             document_type="pdf",
             payload=doc_content,
             source_id=file.filename,
@@ -128,21 +125,16 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
     try:
         # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
         # will be able to trace across uvicorn -> morpheus
-        # current_trace_id = format(trace.get_current_span().get_span_context().trace_id, '032x')
         current_trace_id = trace.get_current_span().get_span_context().trace_id
-        print(f"Current Trace Id in regular submit is: {current_trace_id}")
         
         # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
         
-        for idx, key in enumerate(job_spec_dict.keys()):
-            print(f"JobSpec Key: {key} - Type: {type(job_spec_dict[key])}")
-            val = job_spec_dict[key]
-            print(f"Value: {val}")
-
-        print(f"Content Type: {type(job_spec_dict['job_payload']['content'])}")
-        print(f"Source ID Type: {type(job_spec_dict['job_payload']['source_id'])}")
-        print(f"Source Name Type: {type(job_spec_dict['job_payload']['source_name'])}")
+        # Why in the world will this not work and I have to recreate the entire object??
+        # job_spec_dict['tracing_options']['trace_id'] = current_trace_id
+        # updated_job_spec = MessageWrapper(
+        #     payload=json.dumps(job_spec.to_dict())
+        # )
         
         job_spec = JobSpec(
             document_type=DocumentTypeEnum.pdf,
