@@ -169,7 +169,7 @@ services:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
       timeout: 5s
-      retries: 500
+      retries: 5
     deploy:
       resources:
         reservations:
