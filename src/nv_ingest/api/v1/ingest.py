@@ -17,7 +17,6 @@ import logging
 import time
 import traceback
 from typing import Annotated
-import uuid
 
 from opentelemetry import trace
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
