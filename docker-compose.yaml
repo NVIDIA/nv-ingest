@@ -160,6 +160,7 @@ services:
       - YOLOX_GRPC_ENDPOINT=""
       - YOLOX_HTTP_ENDPOINT=yolox:8000
       - CUDA_VISIBLE_DEVICES=1
+      - READY_CHECK_ALL_COMPONENTS=True
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s

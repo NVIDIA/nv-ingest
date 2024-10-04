@@ -66,26 +66,32 @@ async def get_ready_state() -> dict:
     # for now to assume that if nv-ingest is running so is
     # the pipeline.
     morpheus_pipeline_ready = True
-    yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", None), "/v1/health/ready")
-    deplot_ready = is_ready(os.getenv("DEPLOT_HTTP_ENDPOINT", None), "/v1/health/ready")
-    cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", None), "/v1/health/ready")
-    paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", None), "/v1/health/ready")
+    
+    # We give the users an option to disable checking all distributed services for "readiness"
+    check_all_components = os.getenv("READY_CHECK_ALL_COMPONENTS", "True").lower()
+    if check_all_components in ['1', 'true', 'yes']:
+        yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", None), "/v1/health/ready")
+        deplot_ready = is_ready(os.getenv("DEPLOT_HTTP_ENDPOINT", None), "/v1/health/ready")
+        cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", None), "/v1/health/ready")
+        paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", None), "/v1/health/ready")
 
-    if (ingest_ready
-            and morpheus_pipeline_ready
-            and yolox_ready
-            and deplot_ready
-            and cached_ready
-            and paddle_ready):
-        return JSONResponse(content={"ready": True}, status_code=200)
+        if (ingest_ready
+                and morpheus_pipeline_ready
+                and yolox_ready
+                and deplot_ready
+                and cached_ready
+                and paddle_ready):
+            return JSONResponse(content={"ready": True}, status_code=200)
+        else:
+            ready_statuses = {
+                "ingest_ready": ingest_ready,
+                "morpheus_pipeline_ready": morpheus_pipeline_ready,
+                "yolox_ready": yolox_ready,
+                "deplot_ready": deplot_ready,
+                "cached_ready": cached_ready,
+                "paddle_ready": paddle_ready,
+            }
+            logger.debug(f"Ready Statuses: {ready_statuses}")
+            return JSONResponse(content=ready_statuses, status_code=503)
     else:
-        ready_statuses = {
-            "ingest_ready": ingest_ready,
-            "morpheus_pipeline_ready": morpheus_pipeline_ready,
-            "yolox_ready": yolox_ready,
-            "deplot_ready": deplot_ready,
-            "cached_ready": cached_ready,
-            "paddle_ready": paddle_ready,
-        }
-        logger.debug(f"Ready Statuses: {ready_statuses}")
-        return JSONResponse(content=ready_statuses, status_code=503)
+        return JSONResponse(content={"ready": True}, status_code=200)
