@@ -70,10 +70,10 @@ async def get_ready_state() -> dict:
     # We give the users an option to disable checking all distributed services for "readiness"
     check_all_components = os.getenv("READY_CHECK_ALL_COMPONENTS", "True").lower()
     if check_all_components in ['1', 'true', 'yes']:
-        yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", None), "/v1/health/ready")
-        deplot_ready = is_ready(os.getenv("DEPLOT_HTTP_ENDPOINT", None), "/v1/health/ready")
-        cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", None), "/v1/health/ready")
-        paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", None), "/v1/health/ready")
+        yolox_ready = is_ready(os.getenv("YOLOX_HEALTH_ENDPOINT", None), "/v1/health/ready")
+        deplot_ready = is_ready(os.getenv("DEPLOT_HEALTH_ENDPOINT", None), "/v1/health/ready")
+        cached_ready = is_ready(os.getenv("CACHED_HEALTH_ENDPOINT", None), "/v1/health/ready")
+        paddle_ready = is_ready(os.getenv("PADDLE_HEALTH_ENDPOINT", None), "/v1/health/ready")
 
         if (ingest_ready
                 and morpheus_pipeline_ready
