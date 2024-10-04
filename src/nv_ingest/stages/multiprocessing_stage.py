@@ -243,7 +243,10 @@ class MultiProcessingBaseStage(SinglePortStage):
                     future = process_pool.submit_task(process_fn, (df, task_props))
 
                     # This can return/raise an exception
-                    result, *extra_results = future.result()
+                    result = future.result()
+                    extra_results = []
+                    if isinstance(result, tuple):
+                        result, *extra_results = result
 
                     work_package["payload"] = result
                     if extra_results:
