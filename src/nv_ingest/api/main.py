@@ -17,6 +17,7 @@ from opentelemetry.sdk.trace.export import BatchSpanProcessor
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from fastapi import FastAPI
 
+from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
 
 # Set up the tracer provider and add a processor for exporting traces
@@ -33,6 +34,7 @@ logger = logging.getLogger("uvicorn")
 app = FastAPI()
 
 app.include_router(IngestApiRouter)
+app.include_router(HealthApiRouter)
 
 # Instrument FastAPI with OpenTelemetry
 FastAPIInstrumentor.instrument_app(app)
