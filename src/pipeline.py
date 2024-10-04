@@ -424,7 +424,6 @@ def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config, message_provid
 
 def add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config):
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
-    print(f"Morpheus Pipeline OTEL Endpoint: {endpoint}")
 
     otel_tracer_loader = OpenTelemetryTracerLoaderFactory.get_instance(
         module_name="otel_tracer",
