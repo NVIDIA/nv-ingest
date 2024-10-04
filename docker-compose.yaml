@@ -9,7 +9,8 @@ services:
       - "6379:6379"
 
   yolox:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    # image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    image: nvcr.io/nvstaging/nim/nv-yolox:24.09-18559495
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -44,7 +45,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=2
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
@@ -55,7 +56,8 @@ services:
     runtime: nvidia
 
   cached:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
+    # image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
+    image: nvcr.io/nvstaging/nim/cached:24.09-18699919
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -68,7 +70,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=3
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -79,7 +81,8 @@ services:
     runtime: nvidia
 
   paddle:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
+    # image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
+    image: nvcr.io/nvstaging/nim/paddleocr:24.09-18708780
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -92,7 +95,7 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=4
+      - CUDA_VISIBLE_DEVICES=1
     deploy:
       resources:
         reservations:
@@ -104,7 +107,8 @@ services:
 
   embedding:
     # NIM ON
-    image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.1
+    # image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.1
+    image: nvcr.io/nvstaging/nim/nv-embedqa-e5-v5:24.09-18699992
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -145,7 +149,7 @@ services:
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - INGEST_LOG_LEVEL=DEBUG
+      - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
       - MESSAGE_CLIENT_PORT=6379
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
@@ -295,3 +299,4 @@ services:
 #      - "3001:3000"
 #    depends_on:
 #      - "milvus"
+
