@@ -133,7 +133,7 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         # Why in the world will this not work and I have to recreate the entire object??
         # job_spec_dict['tracing_options']['trace_id'] = current_trace_id
         # updated_job_spec = MessageWrapper(
-        #     payload=json.dumps(job_spec.to_dict())
+        #     payload=json.dumps(job_spec_dict)
         # )
         
         job_spec = JobSpec(
