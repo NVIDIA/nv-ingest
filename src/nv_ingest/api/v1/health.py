@@ -67,15 +67,9 @@ async def get_ready_state() -> dict:
     # the pipeline.
     morpheus_pipeline_ready = True
     yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", None), "/v1/health/ready")
-    # deplot_ready = is_ready(os.getenv("DEPLOT_HTTP_ENDPOINT", None), "/v1/health/ready")
-    deplot_ready = True
+    deplot_ready = is_ready(os.getenv("DEPLOT_HTTP_ENDPOINT", None), "/v1/health/ready")
     cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", None), "/v1/health/ready")
     paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", None), "/v1/health/ready")
-    
-    print(f"ingest_ready: {ingest_ready} - morpheus_pipeline_ready: \
-        {morpheus_pipeline_ready} - yolox_ready: {yolox_ready} - \
-            deplot_ready: {deplot_ready} - cached_ready: {cached_ready} - \
-                paddle_ready: {paddle_ready}")
 
     if (ingest_ready
             and morpheus_pipeline_ready
@@ -93,5 +87,5 @@ async def get_ready_state() -> dict:
             "cached_ready": cached_ready,
             "paddle_ready": paddle_ready,
         }
-        print(f"Ready Statuses: {ready_statuses}")
+        logger.debug(f"Ready Statuses: {ready_statuses}")
         return JSONResponse(content=ready_statuses, status_code=503)

@@ -168,6 +168,25 @@ def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     return query_response.as_numpy("output")
 
 
+def remove_url_endpoints(url) -> str:
+    """Some configurations provide the full endpoint in the URL.
+    Ex: http://deplot:8000/v1/chat/completions. For hitting the
+    health endpoint we need to get just the hostname:port combo
+    that we can append the health/ready endpoint to so we attempt
+    to parse that information here.
+
+    Args:
+        url str: Incoming URL
+
+    Returns:
+        str: URL with just the hostname:port portion remaining
+    """
+    if '/v1' in url:
+        url = url.split('/v1')[0]
+
+    return url
+
+
 def generate_url(url) -> str:
     """Examines the user defined URL for http*://. If that
     pattern is detected the URL is used as provided by the user.
@@ -185,16 +204,18 @@ def generate_url(url) -> str:
         # Add the default `http://` if its not already present in the URL
         url = f"http://{url}"
 
+    url = remove_url_endpoints(url)
+
     return url
 
 
 def is_ready(http_endpoint, ready_endpoint) -> bool:
-    
+
     # IF the url is empty or None that means the service was not configured
     # and is therefore automatically marked as "ready"
     if http_endpoint is None or http_endpoint == '':
         return True
-    
+
     url = generate_url(http_endpoint)
 
     if not ready_endpoint.startswith('/') and not url.endswith('/'):
