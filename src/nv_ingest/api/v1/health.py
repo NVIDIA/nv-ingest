@@ -66,12 +66,12 @@ async def get_ready_state() -> dict:
     # for now to assume that if nv-ingest is running so is
     # the pipeline.
     morpheus_pipeline_ready = True
-    yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", "yolox:8000"), "/v1/health/ready")
+    yolox_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", ""), "/v1/health/ready")
     # deplot_ready = is_ready(os.getenv("YOLOX_HTTP_ENDPOINT", "yolox:8000"), "/v1/health/ready")
     deplot_ready = True
-    cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", "cached:8000"), "/v1/health/ready")
-    paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", "paddle:8000"), "/v1/health/ready")
-    embedding_ready = is_ready(os.getenv("EMBEDDING_HTTP_ENDPOINT", "embedding:8000"), "/v1/health/ready")
+    cached_ready = is_ready(os.getenv("CACHED_HTTP_ENDPOINT", ""), "/v1/health/ready")
+    paddle_ready = is_ready(os.getenv("PADDLE_HTTP_ENDPOINT", ""), "/v1/health/ready")
+    embedding_ready = is_ready(os.getenv("EMBEDDING_HTTP_ENDPOINT", ""), "/v1/health/ready")
 
     if (ingest_ready
             and morpheus_pipeline_ready

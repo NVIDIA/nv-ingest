@@ -189,6 +189,12 @@ def generate_url(url) -> str:
 
 
 def is_ready(http_endpoint, ready_endpoint) -> bool:
+    
+    # IF the url is empty or None that means the service was not configured
+    # and is therefore automatically marked as "ready"
+    if http_endpoint is None or http_endpoint == '':
+        return True
+    
     url = generate_url(http_endpoint)
 
     if not ready_endpoint.startswith('/') and not url.endswith('/'):
