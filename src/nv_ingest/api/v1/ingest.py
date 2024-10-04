@@ -130,81 +130,10 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         
         # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
-        
-        # job_spec_dict_copy = copy.deepcopy(job_spec_dict)
-        # job_spec_dict_copy['job_payload']['content'] = "<empty so we can read it>"
-        # print(f"JobSpec: {job_spec_dict_copy}")
-        
-        # Why in the world will this not work and I have to recreate the entire object??
         job_spec_dict['tracing_options']['trace_id'] = current_trace_id
         updated_job_spec = MessageWrapper(
             payload=json.dumps(job_spec_dict)
         )
-        
-        # BEFORE ADDING TRACE_ID
-        # {
-        # 'job_payload': 
-        #     {'source_name': ['/media/jeremy/storage/ingest_smoke_test/1230070.pdf'],
-        #      'source_id': ['/media/jeremy/storage/ingest_smoke_test/1230070.pdf'],
-        #      'content': '<empty so we can read it>',
-        #      'document_type': ['pdf']
-        #     }, 
-        # 'job_id': 'None',
-        # 'tasks': [
-        #     {
-        #         'type': 'extract',
-        #         'task_properties': 
-        #             {
-        #                 'method': 'pdfium',
-        #                 'document_type': 'pdf',
-        #                 'params':
-        #                     {'extract_text': True,
-        #                      'extract_images': True,
-        #                      'extract_tables': True,
-        #                      'extract_tables_method': 'yolox',
-        #                      'text_depth': 'document'
-        #                     }
-        #             }
-        #     }
-        # ],
-        # 'tracing_options': 
-        #     {
-        #         'trace': True,
-        #         'ts_send': 1728073869539601313
-        #     }
-        # }
-        
-        # job_spec_dict_copy['tracing_options']['trace_id'] = current_trace_id
-        # print(f"JobSpec: {job_spec_dict_copy}")
-        
-        # job_spec = JobSpec(
-        #     document_type=DocumentTypeEnum.pdf,
-        #     payload=job_spec_dict['job_payload']['content'][0],
-        #     source_id=job_spec_dict['job_payload']['source_id'][0],
-        #     source_name=job_spec_dict['job_payload']['source_name'][0],
-        #     extended_options={
-        #         "tracing_options":
-        #         {
-        #             "trace": True,
-        #             "ts_send": time.time_ns(),
-        #             "trace_id": current_trace_id
-        #         }
-        #     }
-        # )
-
-        # # This is the "easy submission path" just default to extracting everything
-        # extract_task = ExtractTask(
-        #     document_type=DocumentTypeEnum.pdf,
-        #     extract_text=True,
-        #     extract_images=True,
-        #     extract_tables=True
-        # )
-
-        # job_spec.add_task(extract_task)
-        
-        # updated_job_spec = MessageWrapper(
-        #     payload=json.dumps(job_spec.to_dict())
-        # )
         
         submitted_job_id = await ingest_service.submit_job(updated_job_spec)
         return submitted_job_id
