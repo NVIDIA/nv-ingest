@@ -184,8 +184,7 @@ def generate_url(url) -> str:
     if not re.match(r'^https?://', url):
         # Add the default `http://` if its not already present in the URL
         url = f"http://{url}"
-    else:
-        url = f"{url}"
+
     return url
 
 
