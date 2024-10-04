@@ -81,12 +81,11 @@ async def get_ready_state() -> dict:
         return JSONResponse(content={"ready": True}, status_code=200)
     else:
         ready_statuses = {
-            ingest_ready: ingest_ready,
-            morpheus_pipeline_ready: morpheus_pipeline_ready,
-            yolox_ready: yolox_ready,
-            deplot_ready: deplot_ready,
-            cached_ready: cached_ready,
-            paddle_ready: paddle_ready,
-            embedding_ready: embedding_ready
+            "ingest_ready": ingest_ready,
+            "morpheus_pipeline_ready": morpheus_pipeline_ready,
+            "yolox_ready": yolox_ready,
+            "deplot_ready": deplot_ready,
+            "cached_ready": cached_ready,
+            "paddle_ready": paddle_ready,
         }
         return JSONResponse(content=ready_statuses, status_code=503)
