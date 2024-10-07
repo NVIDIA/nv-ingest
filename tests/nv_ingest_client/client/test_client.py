@@ -40,14 +40,17 @@ class ExtendedMockClient(MockClient):
 
     def submit_message(self, job_queue_id, job_spec_str):
         # Simulate message submission by storing it
+        random_x_trace_id = "123456789"
+        job_id = 0
         self.submitted_messages.append((job_queue_id, job_spec_str))
+        return random_x_trace_id, job_id
 
 
 class ExtendedMockClientWithFailure(ExtendedMockClient):
     def submit_message(self, job_queue_id, job_spec_str):
         if "fail_queue" in job_queue_id:
             raise Exception("Simulated submission failure")
-        super().submit_message(job_queue_id, job_spec_str)
+        return super().submit_message(job_queue_id, job_spec_str)
 
 
 class ExtendedMockClientWithFetch(ExtendedMockClientWithFailure):
@@ -407,7 +410,7 @@ def test_job_future_result_on_success(nv_ingest_client_with_jobs):
     future = nv_ingest_client_with_jobs._job_states[job_id].future
 
     result = future.result(timeout=5)
-    assert result == [None], "The future's result should reflect the job's success"
+    assert result == ["123456789"], "The future's result should reflect the job's success"
 
 
 def test_job_future_result_on_failure(nv_ingest_client_with_jobs):

@@ -139,11 +139,13 @@ services:
     environment:
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=""
+      - CACHED_HEALTH_ENDPOINT=cached:8000
       - DEPLOT_GRPC_ENDPOINT=""
       # build.nvidia.com hosted deplot
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
+      - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
@@ -154,12 +156,20 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - PADDLE_GRPC_ENDPOINT=paddle:8001
       - PADDLE_HTTP_ENDPOINT=""
+      - PADDLE_HEALTH_ENDPOINT=paddle:8000
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       - TABLE_DETECTION_GRPC_TRITON=yolox:8001
       - TABLE_DETECTION_HTTP_TRITON=""
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=""
+      - YOLOX_HEALTH_ENDPOINT=yolox:8000
       - CUDA_VISIBLE_DEVICES=1
+      - READY_CHECK_ALL_COMPONENTS=True
+    healthcheck:
+      test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
+      interval: 10s
+      timeout: 5s
+      retries: 5
     deploy:
       resources:
         reservations:
@@ -295,3 +305,4 @@ services:
 #      - "3001:3000"
 #    depends_on:
 #      - "milvus"
+

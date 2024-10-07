@@ -130,6 +130,7 @@ Tasks and Options:
     - extract_text (bool): Enables text extraction. Default: False.
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_tables (bool): Enables table extraction. Default: False.
+    - extract_charts (bool): Enables chart extraction. Default: False.
 \b
 - store: Stores any images extracted from documents.
     Options:
@@ -216,10 +217,8 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(
-                f"Creating REST message client: {client_host} and port: {client_port} -> {client_kwargs}"
-            )
-            
+            logging.debug(f"Creating REST message client: {client_host} and port: {client_port} -> {client_kwargs}")
+
             client_allocator = RestClient
 
             ingest_client = NvIngestClient(

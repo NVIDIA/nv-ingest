@@ -418,19 +418,19 @@ class NvIngestClient:
         try:
             message = json.dumps(job_state.job_spec.to_dict())
 
-            job_id = self._message_client.submit_message(job_queue_id, message)
+            x_trace_id, job_id = self._message_client.submit_message(job_queue_id, message)
 
             job_state.state = JobStateEnum.SUBMITTED
             job_state.job_id = job_id
 
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
+            
+            return x_trace_id
         except Exception as err:
             logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise
-
-        return None
 
     def submit_job(self, job_indices: Union[str, List[str]], job_queue_id: str) -> List[Union[Dict, None]]:
         if isinstance(job_indices, str):
