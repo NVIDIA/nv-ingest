@@ -94,10 +94,7 @@ def call_image_inference_model(client, model_name: str, image_data):
     else:
         base64_img = numpy_to_base64(image_data)
 
-        try:
-            url = client["endpoint_url"]
-            headers = client["headers"]
-
+        if model_name == "google/deplot":
             messages = [
                 {
                     "role": "user",
@@ -113,6 +110,18 @@ def call_image_inference_model(client, model_name: str, image_data):
                 "temperature": 1.0,
                 "top_p": 1.0,
             }
+        elif model_name in {"paddle", "cached"}:
+            image_url = f"data:image/png;base64,{base64_img}"
+            image = {"type": "image_url", "image_url": {"url": image_url}}
+
+            message = {"content": [image]}
+            payload = {"messages": [message]}
+        else:
+            raise ValueError(f"Model {model_name} is not supported.")
+
+        try:
+            url = client["endpoint_url"]
+            headers = client["headers"]
 
             response = requests.post(url, json=payload, headers=headers)
             response.raise_for_status()  # Raise an exception for HTTP errors
@@ -120,18 +129,24 @@ def call_image_inference_model(client, model_name: str, image_data):
             # Parse the JSON response
             json_response = response.json()
 
-            # Validate the response structure
-            if "choices" not in json_response or not json_response["choices"]:
-                raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
-
-            return json_response["choices"][0]["message"]["content"]
-
         except requests.exceptions.RequestException as e:
             raise RuntimeError(f"HTTP request failed: {e}")
         except KeyError as e:
             raise RuntimeError(f"Missing expected key in response: {e}")
         except Exception as e:
             raise RuntimeError(f"An error occurred during inference: {e}")
+
+        if model_name == "google/deplot":
+            # Validate the response structure
+            if "choices" not in json_response or not json_response["choices"]:
+                raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+            return json_response["choices"][0]["message"]["content"]
+        else:
+            if "data" not in json_response or not json_response["data"]:
+                raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
+
+            return json_response["data"][0]["content"]
 
 
 # Perform inference and return predictions
