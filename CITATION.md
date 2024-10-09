@@ -14,7 +14,7 @@ If you use NVIDIA Ingest in a publication, please use citations in the following
 
 ## Sample Citations:
 
-Using [RAPIDS](rapids.ai) citations for reference.
+Using [RAPIDS](https://rapids.ai/) citations for reference.
 
 ### Bringing UMAP Closer to the Speed of Light <br> with GPU Acceleration
 ```tex
