@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 import mrc
 from morpheus.messages import ControlMessage
-from morpheus.service.vdb.milvus_client import DATA_TYPE_MAP
-from morpheus.service.vdb.utils import VectorDBServiceFactory
-from morpheus.service.vdb.vector_db_service import VectorDBService
+from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
+from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
+from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
