@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.6.1-runtime-ubi8
+ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -13,17 +13,12 @@ ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
 
-# Install necessary dependencies
-RUN yum install -y \
+# Install necessary dependencies using apt-get
+RUN apt-get update && apt-get install -y \
       wget \
       bzip2 \
       ca-certificates \
-    && yum clean all
-
-# Install Tini (small init system for containers) by downloading from GitHub
-RUN wget -q https://github.com/krallin/tini/releases/download/v0.19.0/tini \
-    && chmod +x tini \
-    && mv tini /usr/local/bin/tini
+    && apt-get clean
 
 # Install miniconda
 RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
@@ -45,15 +40,21 @@ RUN echo "source activate nv_ingest" >> ~/.bashrc
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
 
+# Install Tini via conda from the conda-forge channel
+RUN source activate nv_ingest \
+    && mamba install -y -c conda-forge tini
+
+# Install Morpheus dependencies
 RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
      -c rapidsai -c pytorch -c nvidia -c conda-forge
 
-RUN yum install -y \
-    mesa-libGL \
-    && yum clean all
+# Install additional dependencies using apt-get
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    && apt-get clean
 
 # Set the working directory in the container
 WORKDIR /workspace
@@ -141,8 +142,9 @@ COPY src/pipeline.py ./
 COPY pyproject.toml ./
 
 RUN chmod +x /workspace/docker/entrypoint.sh
+
 # Set entrypoint to tini with a custom entrypoint script
-ENTRYPOINT ["/usr/local/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
+ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
 # Start the pipeline and services
 CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
