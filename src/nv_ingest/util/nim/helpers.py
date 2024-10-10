@@ -277,7 +277,7 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if paddle_version and packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1"):
+    if (not paddle_version) or (packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1")):
         return array
 
     height, width = array.shape[:2]
