@@ -126,6 +126,43 @@ def normalize_image(
     g_std: float = 0.224,
     b_std: float = 0.225,
 ) -> np.ndarray:
+    """
+    Normalizes an RGB image by applying a mean and standard deviation to each channel.
+
+    Parameters:
+    ----------
+    array : np.ndarray
+        The input image array, which can be either grayscale or RGB. The image should have a shape of
+        (height, width, 3) for RGB images, or (height, width) or (height, width, 1) for grayscale images.
+        If a grayscale image is provided, it will be converted to RGB format by repeating the grayscale values
+        across all three channels (R, G, B).
+    r_mean : float, optional
+        The mean to be subtracted from the red channel (default is 0.485).
+    g_mean : float, optional
+        The mean to be subtracted from the green channel (default is 0.456).
+    b_mean : float, optional
+        The mean to be subtracted from the blue channel (default is 0.406).
+    r_std : float, optional
+        The standard deviation to divide the red channel by (default is 0.229).
+    g_std : float, optional
+        The standard deviation to divide the green channel by (default is 0.224).
+    b_std : float, optional
+        The standard deviation to divide the blue channel by (default is 0.225).
+
+    Returns:
+    -------
+    np.ndarray
+        A normalized image array with the same shape as the input, where the RGB channels have been normalized
+        by the given means and standard deviations.
+
+    Notes:
+    -----
+    The input pixel values should be in the range [0, 255], and the function scales these values to [0, 1]
+    before applying normalization.
+
+    If the input image is grayscale, it is converted to an RGB image by duplicating the grayscale values
+    across the three color channels.
+    """
     # If the input is a grayscale image with shape (height, width) or (height, width, 1),
     # convert it to RGB with shape (height, width, 3).
     if array.ndim == 2 or array.shape[2] == 1:
