@@ -45,7 +45,7 @@ from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
-if (local_log_level in ("DEFAULT")):
+if (local_log_level in ("DEFAULT",)):
     local_log_level = "INFO"
 configure_local_logging(logger, local_log_level)
 
@@ -672,7 +672,7 @@ def cli(
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
     if env_log_level:
         log_level = env_log_level
-        if (log_level in ("DEFAULT")):
+        if (log_level in ("DEFAULT",)):
             log_level = "INFO"
 
     log_level = log_level_mapping.get(log_level.upper(), logging.INFO)

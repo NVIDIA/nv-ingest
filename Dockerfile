@@ -116,15 +116,9 @@ RUN source activate nv_ingest \
 RUN source activate nv_ingest \
     && rm -rf src requirements.txt test-requirements.txt util-requirements.txt
 
-# Interim pyarrow backport until folded into upstream dependency tree
-RUN source activate nv_ingest \
-    && conda install https://anaconda.org/conda-forge/pyarrow/14.0.2/download/linux-64/pyarrow-14.0.2-py310h188ebfb_19_cuda.conda
-
 # Upgrade setuptools to mitigate https://github.com/advisories/GHSA-cx63-2mw6-8hw5
 RUN source activate base \
     && conda install setuptools==70.0.0
-
-FROM nv_ingest_install AS runtime
 
 RUN source activate nv_ingest \
     && pip install ./client/dist/*.whl \
@@ -137,6 +131,12 @@ RUN source activate nv_ingest \
     && pip install --no-input google-search-results==2.4 \
     && pip install --no-input nemollm==0.3.5 \
     && rm -rf client/dist
+
+# Install patched MRC version to circumvent NUMA node issue -- remove after Morpheus 10.24 release
+RUN source activate nv_ingest \
+    && conda install -y -c nvidia/label/dev mrc=24.10.00a=cuda_12.5_py310_h5ae46af_10
+
+FROM nv_ingest_install AS runtime
 
 COPY src/pipeline.py ./
 COPY pyproject.toml ./
