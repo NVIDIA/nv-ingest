@@ -280,6 +280,10 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
     if http_endpoint is None or http_endpoint == "":
         return True
 
+    # If the url is for build.nvidia.com, it is automatically assumed "ready"
+    if "ai.api.nvidia.com" in http_endpoint:
+        return True
+
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)
 
