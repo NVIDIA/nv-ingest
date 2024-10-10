@@ -9,13 +9,11 @@ services:
       - "6379:6379"
 
   yolox:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    image: <placeholder>
     ports:
       - "8000:8000"
       - "8001:8001"
       - "8002:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
@@ -37,8 +35,6 @@ services:
       - "8003:8000"
       - "8004:8001"
       - "8005:8002"
-    volumes:
-      - ${HOME}/.cache:/opt/nim/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
@@ -55,14 +51,12 @@ services:
     runtime: nvidia
 
   cached:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
+    image: <placeholder>
     shm_size: 2gb
     ports:
       - "8006:8000"
       - "8007:8001"
       - "8008:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
@@ -79,14 +73,12 @@ services:
     runtime: nvidia
 
   paddle:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
+    image: <placeholder>
     shm_size: 2gb
     ports:
       - "8009:8000"
       - "8010:8001"
       - "8011:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000

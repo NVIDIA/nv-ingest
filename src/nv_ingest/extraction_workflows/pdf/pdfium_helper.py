@@ -22,6 +22,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import cv2
 import numpy as np
 import pypdfium2 as libpdfium
 import tritonclient.grpc as grpcclient
@@ -32,7 +33,9 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import crop_image
+from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.nim.helpers import call_image_inference_model
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import perform_model_inference
@@ -46,7 +49,6 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-
 
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
@@ -368,13 +370,38 @@ def handle_table_chart_extraction(
                     min_width=PADDLE_MIN_WIDTH,
                     min_height=PADDLE_MIN_HEIGHT,
                 )
+                if cropped is None:
+                    continue
+
                 base64_img = numpy_to_base64(cropped)
 
-                table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
+                cropped_height, cropped_width = cropped.shape[:2]
+                scale_factor = 960 / max(cropped_height, cropped_width)
+                new_height = int(cropped_height * scale_factor)
+                new_width = int(cropped_width * scale_factor)
+                resized = cv2.resize(cropped, (new_width, new_height))
+
+                normalized = normalize_image(resized)
+
+                # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
+                new_height = (normalized.shape[0] + 31) // 32 * 32
+                new_width = (normalized.shape[1] + 31) // 32 * 32
+                padded, _ = pad_image(
+                    normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
+                )
+
+                # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
+                transposed = padded.transpose((2, 0, 1))
+
+                table_content = call_image_inference_model(paddle_client, "paddle", transposed, trace_info=trace_info)
                 table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))
                 tables_and_charts.append((page_idx, table_data))
+
             elif extract_charts and label == "chart":
                 cropped = crop_image(original_image, (h1, w1, h2, w2))
+                if cropped is None:
+                    continue
+
                 base64_img = numpy_to_base64(cropped)
 
                 deplot_result = call_image_inference_model(
