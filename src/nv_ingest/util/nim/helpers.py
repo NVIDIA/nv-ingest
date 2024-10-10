@@ -4,6 +4,8 @@
 
 import logging
 import re
+from typing import Any
+from typing import Dict
 from typing import Optional
 from typing import Tuple
 
@@ -19,6 +21,10 @@ from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
+
+DEPLOT_MAX_TOKENS = 128
+DEPLOT_TEMPERATURE = 1.0
+DEPLOT_TOP_P = 1.0
 
 
 def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str]):
@@ -82,62 +88,113 @@ def call_image_inference_model(client, model_name: str, image_data):
         If the HTTP request fails or if the response format is not as expected.
     """
     if isinstance(client, grpcclient.InferenceServerClient):
-        if image_data.ndim == 3:
-            image_data = np.expand_dims(image_data, axis=0)
-        inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
-        inputs[0].set_data_from_numpy(image_data.astype(np.float32))
-
-        outputs = [grpcclient.InferRequestedOutput("output")]
-
-        try:
-            result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-            return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
-        except Exception as e:
-            err_msg = f"Inference failed for model {model_name}: {str(e)}"
-            logger.error(err_msg)
-            raise RuntimeError(err_msg)
-
+        response = _call_image_inference_grpc_client(client, model_name, image_data)
     else:
-        base64_img = numpy_to_base64(image_data)
+        response = _call_image_inference_http_client(client, model_name, image_data)
 
-        try:
-            url = client["endpoint_url"]
-            headers = client["headers"]
+    return response
 
-            messages = [
-                {
-                    "role": "user",
-                    "content": f"Generate the underlying data table of the figure below: "
-                    f'<img src="data:image/png;base64,{base64_img}" />',
-                }
-            ]
-            payload = {
-                "model": model_name,
-                "messages": messages,
-                "max_tokens": 128,
-                "stream": False,
-                "temperature": 1.0,
-                "top_p": 1.0,
-            }
 
-            response = requests.post(url, json=payload, headers=headers)
-            response.raise_for_status()  # Raise an exception for HTTP errors
+def _call_image_inference_grpc_client(client, model_name: str, image_data):
+    if image_data.ndim == 3:
+        image_data = np.expand_dims(image_data, axis=0)
+    inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
+    inputs[0].set_data_from_numpy(image_data.astype(np.float32))
 
-            # Parse the JSON response
-            json_response = response.json()
+    outputs = [grpcclient.InferRequestedOutput("output")]
 
-            # Validate the response structure
-            if "choices" not in json_response or not json_response["choices"]:
-                raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+    try:
+        result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
+        return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+    except Exception as e:
+        err_msg = f"Inference failed for model {model_name}: {str(e)}"
+        logger.error(err_msg)
+        raise RuntimeError(err_msg)
 
-            return json_response["choices"][0]["message"]["content"]
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"HTTP request failed: {e}")
-        except KeyError as e:
-            raise RuntimeError(f"Missing expected key in response: {e}")
-        except Exception as e:
-            raise RuntimeError(f"An error occurred during inference: {e}")
+def _call_image_inference_http_client(client, model_name: str, image_data):
+    base64_img = numpy_to_base64(image_data)
+
+    if model_name == "deplot":
+        payload = _prepare_deplot_payload(base64_img)
+    elif model_name in {"paddle", "cached", "yolox"}:
+        payload = _prepare_nim_payload(base64_img)
+    else:
+        raise ValueError(f"Model {model_name} is not supported.")
+
+    try:
+        url = client["endpoint_url"]
+        headers = client["headers"]
+
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+
+        # Parse the JSON response
+        json_response = response.json()
+
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"HTTP request failed: {e}")
+    except KeyError as e:
+        raise RuntimeError(f"Missing expected key in response: {e}")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred during inference: {e}")
+
+    if model_name == "deplot":
+        result = _extract_content_from_deplot_response(json_response)
+    else:
+        result = _extract_content_from_nim_response(json_response)
+
+    return result
+
+
+def _prepare_deplot_payload(
+    base64_img: str,
+    max_tokens: int = DEPLOT_MAX_TOKENS,
+    temperature: float = DEPLOT_TEMPERATURE,
+    top_p: float = DEPLOT_TOP_P,
+) -> Dict[str, Any]:
+    messages = [
+        {
+            "role": "user",
+            "content": f"Generate the underlying data table of the figure below: "
+            f'<img src="data:image/png;base64,{base64_img}" />',
+        }
+    ]
+    payload = {
+        "model": "google/deplot",
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "stream": False,
+        "temperature": temperature,
+        "top_p": top_p,
+    }
+
+    return payload
+
+
+def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
+    image_url = f"data:image/png;base64,{base64_img}"
+    image = {"type": "image_url", "image_url": {"url": image_url}}
+
+    message = {"content": [image]}
+    payload = {"messages": [message]}
+
+    return payload
+
+
+def _extract_content_from_deplot_response(json_response):
+    # Validate the response structure
+    if "choices" not in json_response or not json_response["choices"]:
+        raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+    return json_response["choices"][0]["message"]["content"]
+
+
+def _extract_content_from_nim_response(json_response):
+    if "data" not in json_response or not json_response["data"]:
+        raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
+
+    return json_response["data"][0]["content"]
 
 
 # Perform inference and return predictions

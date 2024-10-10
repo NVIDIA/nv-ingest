@@ -392,7 +392,7 @@ def handle_table_chart_extraction(
                 base64_img = numpy_to_base64(cropped)
 
                 deplot_result = call_image_inference_model(
-                    deplot_client, "google/deplot", cropped, trace_info=trace_info
+                    deplot_client, "deplot", cropped, trace_info=trace_info
                 )
                 cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
