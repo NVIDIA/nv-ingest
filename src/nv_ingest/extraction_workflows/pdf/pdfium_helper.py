@@ -373,9 +373,10 @@ def handle_table_chart_extraction(
 
                 base64_img = numpy_to_base64(cropped)
 
-                paddle_input = preprocess_image_for_paddle(cropped)
+                if isinstance(paddle_client, grpcclient.InferenceServerClient):
+                    cropped = preprocess_image_for_paddle(cropped)
 
-                table_content = call_image_inference_model(paddle_client, "paddle", paddle_input, trace_info=trace_info)
+                table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
                 table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))
                 tables_and_charts.append((page_idx, table_data))
 
