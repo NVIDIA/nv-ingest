@@ -64,6 +64,11 @@ class PDFiumConfigSchema(BaseModel):
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
 
+    cached_infer_protocol: str = ""
+    deplot_infer_protocol: str = ""
+    paddle_infer_protocol: str = ""
+    yolox_infer_protocol: str = ""
+
     identify_nearby_objects: bool = False
 
     @root_validator(pre=True)
@@ -93,7 +98,8 @@ class PDFiumConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["cached_endpoints", "deplot_endpoints", "paddle_endpoints", "yolox_endpoints"]:
+        for model_name in ["cached", "deplot", "paddle", "yolox"]:
+            endpoint_name = f"{model_name}_endpoints"
             grpc_service, http_service = values.get(endpoint_name)
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
@@ -102,6 +108,9 @@ class PDFiumConfigSchema(BaseModel):
                 raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
 
             values[endpoint_name] = (grpc_service, http_service)
+
+            protocol_name = f"{model_name}_infer_protocol"
+            values[protocol_name] = "grpc" if grpc_service else "http" if http_service else ""
 
         return values
 

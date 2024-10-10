@@ -35,6 +35,7 @@ from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import call_image_inference_model
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
@@ -143,6 +144,7 @@ def extract_tables_and_charts_using_image_ensemble(
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
         if extract_tables:
             paddle_client = create_inference_client(config.paddle_endpoints, config.auth_token)
+            paddle_version = get_version(config.paddle_endpoints[1])
         if extract_charts:
             cached_client = create_inference_client(config.cached_endpoints, config.auth_token)
             deplot_client = create_inference_client(config.deplot_endpoints, config.auth_token)
@@ -180,6 +182,7 @@ def extract_tables_and_charts_using_image_ensemble(
                     tables_and_charts,
                     extract_tables=extract_tables,
                     extract_charts=extract_charts,
+                    paddle_version=paddle_version,
                     trace_info=trace_info,
                 )
 
@@ -313,6 +316,7 @@ def handle_table_chart_extraction(
     tables_and_charts,
     extract_tables=True,
     extract_charts=True,
+    paddle_version=None,
     trace_info=None,
 ):
     """
@@ -374,7 +378,7 @@ def handle_table_chart_extraction(
                 base64_img = numpy_to_base64(cropped)
 
                 if isinstance(paddle_client, grpcclient.InferenceServerClient):
-                    cropped = preprocess_image_for_paddle(cropped)
+                    cropped = preprocess_image_for_paddle(cropped, paddle_version=paddle_version)
 
                 table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
                 table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))

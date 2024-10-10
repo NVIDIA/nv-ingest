@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: <placeholder>
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -51,7 +51,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: <placeholder>
+    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -73,7 +73,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: <placeholder>
+    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -129,12 +129,12 @@ services:
     cap_add:
       - sys_nice
     environment:
+      - CACHED_INFER_PROTOCOL=grpc
       - CACHED_GRPC_ENDPOINT=cached:8001
-      - CACHED_HTTP_ENDPOINT=""
-      - CACHED_HEALTH_ENDPOINT=cached:8000
-      - DEPLOT_GRPC_ENDPOINT=""
+      - CACHED_HTTP_ENDPOINT=http://cached:8000
+      - DEPLOT_INFER_PROTOCOL=http
       # build.nvidia.com hosted deplot
-      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      # - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
@@ -146,15 +146,13 @@ services:
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - PADDLE_INFER_PROTOCOL=grpc
       - PADDLE_GRPC_ENDPOINT=paddle:8001
-      - PADDLE_HTTP_ENDPOINT=""
-      - PADDLE_HEALTH_ENDPOINT=paddle:8000
+      - PADDLE_HTTP_ENDPOINT=http://paddle:8000
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
-      - TABLE_DETECTION_GRPC_TRITON=yolox:8001
-      - TABLE_DETECTION_HTTP_TRITON=""
+      - YOLOX_INFER_PROTOCOL=grpc
       - YOLOX_GRPC_ENDPOINT=yolox:8001
-      - YOLOX_HTTP_ENDPOINT=""
-      - YOLOX_HEALTH_ENDPOINT=yolox:8000
+      - YOLOX_HTTP_ENDPOINT=http://yolox:8000
       - CUDA_VISIBLE_DEVICES=1
       - READY_CHECK_ALL_COMPONENTS=True
     healthcheck:

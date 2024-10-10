@@ -9,6 +9,7 @@ from typing import Tuple
 
 import cv2
 import numpy as np
+import packaging
 import requests
 import tritonclient.grpc as grpcclient
 
@@ -43,13 +44,15 @@ def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str
         logger.debug(f"Creating gRPC client with {endpoints}")
         return grpcclient.InferenceServerClient(url=endpoints[0])
     else:
+        url = generate_url(endpoints[1])
+
         logger.debug(f"Creating HTTP client with {endpoints}")
         headers = {"accept": "application/json", "content-type": "application/json"}
 
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
 
-        return {"endpoint_url": endpoints[1], "headers": headers}
+        return {"endpoint_url": url, "headers": headers}
 
 
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
@@ -175,7 +178,7 @@ def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     return query_response.as_numpy("output")
 
 
-def preprocess_image_for_paddle(array: np.ndarray) -> np.ndarray:
+def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -208,6 +211,9 @@ def preprocess_image_for_paddle(array: np.ndarray) -> np.ndarray:
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
+    if paddle_version and packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1"):
+        return array
+
     height, width = array.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
@@ -265,8 +271,6 @@ def generate_url(url) -> str:
         # Add the default `http://` if its not already present in the URL
         url = f"http://{url}"
 
-    url = remove_url_endpoints(url)
-
     return url
 
 
@@ -277,6 +281,7 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
         return True
 
     url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
 
     if not ready_endpoint.startswith("/") and not url.endswith("/"):
         ready_endpoint = "/" + ready_endpoint
@@ -314,3 +319,43 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
         return False
+
+
+def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
+    if http_endpoint is None or http_endpoint == "":
+        return
+
+    url = generate_url(http_endpoint)
+
+    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
+        metadata_endpoint = "/" + metadata_endpoint
+
+    url = url + metadata_endpoint
+
+    # Call the metadata endpoint of the NIM
+    try:
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems resonable
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            return resp.json()[version_field]
+        else:
+            # Any other code is confusing. We should log it with a warning
+            # as it could be something that might hold up ready state
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.json()}")
+            return
+    except requests.HTTPError as http_err:
+        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
+        return
+    except requests.Timeout:
+        logger.warning(f"'{url}' request timed out")
+        return
+    except ConnectionError:
+        logger.warning(f"A connection error for '{url}' occurred")
+        return
+    except requests.RequestException as err:
+        logger.warning(f"An error occurred: {err} for '{url}'")
+        return
+    except Exception as ex:
+        # Don't let anything squeeze by
+        logger.warning(f"Exception: {ex}")
+        return
