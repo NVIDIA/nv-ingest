@@ -400,11 +400,13 @@ def save_response_data(response, output_directory):
     """
 
     if ("data" not in response) or (not response["data"]):
+        logger.debug("Data is not in the response or response.data is empty")
         return
 
     response_data = response["data"]
 
     if not isinstance(response_data, list) or len(response_data) == 0:
+        logger.debug("Response data is not a list or the list is empty.")
         return
 
     doc_meta_base = response_data[0]["metadata"]
