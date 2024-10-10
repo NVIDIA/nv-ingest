@@ -131,13 +131,12 @@ services:
     environment:
       - CACHED_INFER_PROTOCOL=grpc
       - CACHED_GRPC_ENDPOINT=cached:8001
-      - CACHED_HTTP_ENDPOINT=http://cached:8000
+      - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
       - DEPLOT_INFER_PROTOCOL=http
       # build.nvidia.com hosted deplot
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
-      - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=INFO
       - MESSAGE_CLIENT_HOST=redis
@@ -148,11 +147,11 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - PADDLE_INFER_PROTOCOL=grpc
       - PADDLE_GRPC_ENDPOINT=paddle:8001
-      - PADDLE_HTTP_ENDPOINT=http://paddle:8000
+      - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       - YOLOX_INFER_PROTOCOL=grpc
       - YOLOX_GRPC_ENDPOINT=yolox:8001
-      - YOLOX_HTTP_ENDPOINT=http://yolox:8000
+      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - CUDA_VISIBLE_DEVICES=1
       - READY_CHECK_ALL_COMPONENTS=True
     healthcheck:

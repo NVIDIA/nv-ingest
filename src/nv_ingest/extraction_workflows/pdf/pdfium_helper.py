@@ -141,13 +141,19 @@ def extract_tables_and_charts_using_image_ensemble(
 
     yolox_client = paddle_client = deplot_client = cached_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token, config.yolox_infer_protocol)
         if extract_tables:
-            paddle_client = create_inference_client(config.paddle_endpoints, config.auth_token)
+            paddle_client = create_inference_client(
+                config.paddle_endpoints, config.auth_token, config.paddle_infer_protocol
+            )
             paddle_version = get_version(config.paddle_endpoints[1])
         if extract_charts:
-            cached_client = create_inference_client(config.cached_endpoints, config.auth_token)
-            deplot_client = create_inference_client(config.deplot_endpoints, config.auth_token)
+            cached_client = create_inference_client(
+                config.cached_endpoints, config.auth_token, config.cached_infer_protocol
+            )
+            deplot_client = create_inference_client(
+                config.deplot_endpoints, config.auth_token, config.deplot_infer_protocol
+            )
 
         batches = []
         i = 0
@@ -166,7 +172,6 @@ def extract_tables_and_charts_using_image_ensemble(
             input_array = prepare_images_for_inference(original_images)
 
             output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
-
             results = process_inference_results(
                 output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
             )
@@ -391,9 +396,7 @@ def handle_table_chart_extraction(
 
                 base64_img = numpy_to_base64(cropped)
 
-                deplot_result = call_image_inference_model(
-                    deplot_client, "deplot", cropped, trace_info=trace_info
-                )
+                deplot_result = call_image_inference_model(deplot_client, "deplot", cropped, trace_info=trace_info)
                 cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
                 chart_data = ImageChart(chart_content, base64_img, (w1, h1, w2, h2))

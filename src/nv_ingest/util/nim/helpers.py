@@ -27,7 +27,11 @@ DEPLOT_TEMPERATURE = 1.0
 DEPLOT_TOP_P = 1.0
 
 
-def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str]):
+def create_inference_client(
+    endpoints: Tuple[str, str],
+    auth_token: Optional[str] = None,
+    infer_protocol: Optional[str] = None,
+):
     """
     Creates an inference client based on the provided endpoints.
 
@@ -46,13 +50,18 @@ def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str
     grpcclient.InferenceServerClient or dict
         A gRPC client if the gRPC endpoint is provided, otherwise a dictionary containing the HTTP client details.
     """
-    if endpoints[0] and endpoints[0].strip():
-        logger.debug(f"Creating gRPC client with {endpoints}")
-        return grpcclient.InferenceServerClient(url=endpoints[0])
-    else:
-        url = generate_url(endpoints[1])
+    grpc_endpoint, http_endpoint = endpoints
 
-        logger.debug(f"Creating HTTP client with {endpoints}")
+    if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
+        infer_protocol = "grpc"
+
+    if infer_protocol == "grpc":
+        logger.debug(f"Creating gRPC client with {grpc_endpoint}")
+        return grpcclient.InferenceServerClient(url=grpc_endpoint)
+    elif infer_protocol == "http":
+        url = generate_url(http_endpoint)
+
+        logger.debug(f"Creating HTTP client with {http_endpoint}")
         headers = {"accept": "application/json", "content-type": "application/json"}
 
         if auth_token:
@@ -384,9 +393,10 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
 
 def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
     if http_endpoint is None or http_endpoint == "":
-        return
+        return ""
 
     url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
 
     if not metadata_endpoint.startswith("/") and not url.endswith("/"):
         metadata_endpoint = "/" + metadata_endpoint
@@ -398,25 +408,25 @@ def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="
         # Use a short timeout to prevent long hanging calls. 5 seconds seems resonable
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            return resp.json()[version_field]
+            return resp.json().get(version_field, "")
         else:
             # Any other code is confusing. We should log it with a warning
             # as it could be something that might hold up ready state
             logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.json()}")
-            return
+            return ""
     except requests.HTTPError as http_err:
         logger.warning(f"'{url}' produced a HTTP error: {http_err}")
-        return
+        return ""
     except requests.Timeout:
         logger.warning(f"'{url}' request timed out")
-        return
+        return ""
     except ConnectionError:
         logger.warning(f"A connection error for '{url}' occurred")
-        return
+        return ""
     except requests.RequestException as err:
         logger.warning(f"An error occurred: {err} for '{url}'")
-        return
+        return ""
     except Exception as ex:
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
-        return
+        return ""
