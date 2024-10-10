@@ -43,7 +43,13 @@ def join_cached_and_deplot_output(cached_text, deplot_text):
 
     if (cached_text is not None):
         try:
-            cached_text_dict = json.loads(cached_text)
+            if isinstance(cached_text, str):
+                cached_text_dict = json.loads(cached_text)
+            elif isinstance(cached_text, dict):
+                cached_text_dict = cached_text
+            else:
+                cached_text_dict = {}
+
             chart_content += cached_text_dict.get("chart_title", "")
 
             if (deplot_text is not None):
