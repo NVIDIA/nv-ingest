@@ -251,16 +251,12 @@ redis:
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
 ## @skip envVars.REDIS_MORPHEUS_TASK_QUEUE
-## @skip envVars.CACHED_INFER_PROTOCOL
 ## @skip envVars.CACHED_GRPC_ENDPOINT
 ## @skip envVars.CACHED_HTTP_ENDPOINT
-## @skip envVars.PADDLE_INFER_PROTOCOL
 ## @skip envVars.PADDLE_GRPC_ENDPOINT
 ## @skip envVars.PADDLE_HTTP_ENDPOINT
-## @skip envVars.YOLOX_INFER_PROTOCOL
 ## @skip envVars.YOLOX_GRPC_ENDPOINT
 ## @skip envVars.YOLOX_HTTP_ENDPOINT
-## @skip envVars.DEPLOT_INFER_PROTOCOL
 ## @skip envVars.DEPLOT_GRPC_ENDPOINT
 ## @skip envVars.DEPLOT_HTTP_ENDPOINT
 envVars:
@@ -273,16 +269,12 @@ envVars:
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
 
-  CACHED_INFER_PROTOCOL: grpc
   CACHED_GRPC_ENDPOINT: nv-ingest-cached:8001
-  CACHED_HTTP_ENDPOINT: http://nv-ingest-cached:8000
-  PADDLE_INFER_PROTOCOL: grpc
+  CACHED_HTTP_ENDPOINT: ""
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000
-  YOLOX_INFER_PROTOCOL: grpc
+  PADDLE_HTTP_ENDPOINT: ""
   YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
-  YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000
-  DEPLOT_INFER_PROTOCOL: http
+  YOLOX_HTTP_ENDPOINT: ""
   DEPLOT_GRPC_ENDPOINT: ""
   DEPLOT_HTTP_ENDPOINT: http://nv-ingest-deplot:8000/v1/chat/completions
 

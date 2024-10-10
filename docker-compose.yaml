@@ -134,7 +134,7 @@ services:
       - CACHED_HTTP_ENDPOINT=http://cached:8000
       - DEPLOT_INFER_PROTOCOL=http
       # build.nvidia.com hosted deplot
-      # - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       # self hosted deplot
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
