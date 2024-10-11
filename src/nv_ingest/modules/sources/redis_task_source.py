@@ -69,6 +69,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         tracing_options = job.pop("tracing_options", {})
         do_trace_tagging = tracing_options.get("trace", False)
         ts_send = tracing_options.get("ts_send", None)
+        ts_http_done = tracing_options.get("ts_http_done", None)
         if ts_send is not None:
             # ts_send is in nanoseconds
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
@@ -96,6 +97,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             control_message.set_timestamp(f"trace::exit::{MODULE_NAME}", ts_exit)
 
             if ts_send is not None:
+                control_message.set_timestamp(f"trace::entry::http_network_in", ts_send)
+                control_message.set_timestamp(f"trace::exit::http_network_in", ts_http_done)
                 control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
                 control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
 
