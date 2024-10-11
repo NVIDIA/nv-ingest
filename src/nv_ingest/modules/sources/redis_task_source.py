@@ -97,8 +97,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             control_message.set_timestamp(f"trace::exit::{MODULE_NAME}", ts_exit)
 
             if ts_send is not None:
-                control_message.set_timestamp(f"trace::entry::http_network_in", ts_send)
-                control_message.set_timestamp(f"trace::exit::http_network_in", ts_http_done)
+                control_message.set_timestamp("trace::entry::http_network_in", ts_send)
+                control_message.set_timestamp("trace::exit::http_network_in", ts_http_done)
                 control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
                 control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
 
