@@ -73,6 +73,9 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         if ts_send is not None:
             # ts_send is in nanoseconds
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
+        if ts_http_done is not None:
+            # ts_send is in nanoseconds
+            ts_http_done = datetime.fromtimestamp(ts_http_done / 1e9)
         trace_id = tracing_options.get("trace_id", None)
 
         response_channel = f"response_{job_id}"
@@ -99,8 +102,10 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             if ts_send is not None:
                 control_message.set_timestamp("trace::entry::http_network_in", ts_send)
                 control_message.set_timestamp("trace::exit::http_network_in", ts_http_done)
-                control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
-                control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
+                # control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
+                # control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
+                control_message.set_timestamp("trace::entry::redis_source_network_in", ts_fetched)
+                control_message.set_timestamp("trace::exit::redis_source_network_in", ts_exit)
 
             if trace_id is not None:
                 # C++ layer in set_metadata errors out due to size of trace_id if it's an integer.
