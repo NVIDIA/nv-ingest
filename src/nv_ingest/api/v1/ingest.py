@@ -12,6 +12,7 @@
 
 import base64
 import copy
+import datetime
 import json
 from io import BytesIO
 import logging
@@ -131,6 +132,8 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
         job_spec_dict['tracing_options']['trace_id'] = current_trace_id
+        job_spec_dict['tracing_options']['ts_http_done'] = datetime.now()
+
         updated_job_spec = MessageWrapper(
             payload=json.dumps(job_spec_dict)
         )
