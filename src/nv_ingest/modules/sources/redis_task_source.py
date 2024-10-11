@@ -104,8 +104,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
                 control_message.set_timestamp("trace::exit::http_network_in", ts_http_done)
                 # control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
                 # control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
-                control_message.set_timestamp("trace::entry::redis_source_network_in", ts_fetched)
-                control_message.set_timestamp("trace::exit::redis_source_network_in", ts_exit)
+                control_message.set_timestamp("trace::entry::redis_source_network_in", ts_http_done)
+                control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
 
             if trace_id is not None:
                 # C++ layer in set_metadata errors out due to size of trace_id if it's an integer.
