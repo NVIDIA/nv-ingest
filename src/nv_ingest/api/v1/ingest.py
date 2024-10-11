@@ -12,7 +12,7 @@
 
 import base64
 import copy
-import datetime
+from datetime import datetime
 import json
 from io import BytesIO
 import logging
