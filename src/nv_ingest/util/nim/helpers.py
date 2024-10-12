@@ -9,6 +9,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import backoff
 import cv2
 import numpy as np
 import packaging
@@ -391,6 +392,7 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
         return False
 
 
+@backoff.on_predicate(backoff.expo, max_value=5)
 def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
     if http_endpoint is None or http_endpoint == "":
         return ""
