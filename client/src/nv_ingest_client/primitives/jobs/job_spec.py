@@ -3,13 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import os
 import logging
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
+from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
 
@@ -152,3 +155,100 @@ class JobSpec:
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
         self._tasks.append(task)
+
+
+class BatchJobSpec:
+    """
+    A class representing a batch of job specifications, allowing for batch processing of multiple jobs.
+
+    Parameters
+    ----------
+    job_specs : Optional[Union[List[JobSpec], List[str]]], optional
+        Either a list of JobSpec objects or a list of file paths. If file paths are provided, JobSpec
+        instances will be created from the file paths, by default None.
+
+    Attributes
+    ----------
+    _job_specs : List[JobSpec]
+        A list of JobSpec objects that are part of this batch.
+
+    Methods
+    -------
+    from_files(files: List[str]):
+        Generates a list of JobSpec instances from the given list of file paths.
+    add_job_spec(job_spec: JobSpec):
+        Adds a single JobSpec to the batch.
+    to_dict() -> List[Dict]:
+        Converts all JobSpec objects in the batch to a list of dictionaries for serialization.
+    """
+
+    def __init__(self, job_specs: Optional[Union[List[JobSpec], List[str]]] = None) -> None:
+        """
+        Initialize the BatchJobSpec with either a list of JobSpec objects or a list of file paths.
+
+        Parameters
+        ----------
+        job_specs : Optional[Union[List[JobSpec], List[str]]], optional
+            Either a list of JobSpec objects or a list of file paths, by default None.
+        """
+        self._job_specs = []
+
+        if job_specs:
+            if isinstance(job_specs[0], JobSpec):
+                self._job_specs = job_specs
+            elif isinstance(job_specs[0], str):
+                self.from_files(job_specs)
+            else:
+                raise ValueError("Invalid input type for job_specs. Must be a list of JobSpec or file paths.")
+
+    def from_files(self, files: Union[str, List[str]]) -> None:
+        """
+        Generates JobSpec instances from a list of file paths.
+
+        Parameters
+        ----------
+        files : List[str]
+            A list of file paths to generate JobSpec instances from.
+        """
+        if isinstance(files, str):
+            files = [files]
+
+        matching_files = list(generate_matching_files(files))
+        if not matching_files:
+            logger.warning(f"No files found matching {files}.")
+            return
+
+        self._job_specs.append(job_spec)
+
+    def add_job_spec(self, job_spec: JobSpec) -> None:
+        """
+        Adds a single JobSpec to the batch.
+
+        Parameters
+        ----------
+        job_spec : JobSpec
+            The JobSpec instance to add to the batch.
+        """
+        self._job_specs.append(job_spec)
+
+    def to_dict(self) -> List[Dict]:
+        """
+        Converts the batch of JobSpec instances into a list of dictionaries for serialization.
+
+        Returns
+        -------
+        List[Dict]
+            A list of dictionaries representing the JobSpec objects in the batch.
+        """
+        return [job_spec.to_dict() for job_spec in self._job_specs]
+
+    def __str__(self) -> str:
+        """
+        Provides a string representation of the BatchJobSpec, listing all JobSpec instances.
+
+        Returns
+        -------
+        str
+            A string representation of the batch.
+        """
+        return "\n".join(str(job_spec) for job_spec in self._job_specs)

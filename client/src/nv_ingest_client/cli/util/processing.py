@@ -24,7 +24,6 @@ from tqdm import tqdm
 
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
-from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.util.util import check_ingest_result
 from nv_ingest_client.util.util import estimate_page_count
 
@@ -425,124 +424,6 @@ def save_response_data(response, output_directory):
             f.write(json.dumps(documents, indent=2))
 
 
-def create_job_specs_for_batch(files_batch: List[str], tasks: Dict[str, Any], client: NvIngestClient) -> List[str]:
-    """
-    Create and submit job specifications (JobSpecs) for a batch of files, returning the job IDs.
-
-    This function takes a batch of files, processes each file to extract its content and type,
-    creates a job specification (JobSpec) for each file, and adds tasks from the provided task
-    list. It then submits the jobs to the client and collects their job IDs.
-
-    Parameters
-    ----------
-    files_batch : List[str]
-        A list of file paths to be processed. Each file is assumed to be in a format compatible
-        with the `extract_file_content` function, which extracts the file's content and type.
-
-    tasks : Dict[str, Any]
-        A dictionary of tasks to be added to each job. The keys represent task names, and the
-        values represent task specifications or configurations. Standard tasks include "split",
-        "extract", "store", "caption", "dedup", "filter", "embed", and "vdb_upload".
-
-    client : NvIngestClient
-        An instance of NvIngestClient, which handles the job submission. The `add_job` method of
-        the client is used to submit each job specification.
-
-    Returns
-    -------
-    Tuple[List[JobSpec], List[str]]
-        A Tuple containing the list of JobSpecs and list of job IDs corresponding to the submitted jobs.
-        Each job ID is returned by the client's `add_job` method.
-
-    Raises
-    ------
-    ValueError
-        If there is an error extracting the file content or type from any of the files, a
-        ValueError will be logged, and the corresponding file will be skipped.
-
-    Notes
-    -----
-    - The function assumes that a utility function `extract_file_content` is defined elsewhere,
-      which extracts the content and type from the provided file paths.
-    - For each file, a `JobSpec` is created with relevant metadata, including document type and
-      file content. Various tasks are conditionally added based on the provided `tasks` dictionary.
-    - The job specification includes tracing options with a timestamp (in nanoseconds) for
-      diagnostic purposes.
-
-    Examples
-    --------
-    Suppose you have a batch of files and tasks to process:
-
-    >>> files_batch = ["file1.txt", "file2.pdf"]
-    >>> tasks = {"split": ..., "extract_txt": ..., "store": ...}
-    >>> client = NvIngestClient()
-    >>> job_ids = create_job_specs_for_batch(files_batch, tasks, client)
-    >>> print(job_ids)
-    ['job_12345', 'job_67890']
-
-    In this example, jobs are created and submitted for the files in `files_batch`, with the
-    tasks in `tasks` being added to each job specification. The returned job IDs are then
-    printed.
-
-    See Also
-    --------
-    extract_file_content : Function that extracts the content and type of a file.
-    JobSpec : The class representing a job specification.
-    NvIngestClient : Client class used to submit jobs to a job processing system.
-    """
-
-    job_ids = []
-    for file_name in files_batch:
-        try:
-            file_content, file_type = extract_file_content(file_name)  # Assume these are defined
-            file_type = file_type.value
-        except ValueError as ve:
-            logger.error(f"Error extracting content from {file_name}: {ve}")
-            continue
-
-        job_spec = JobSpec(
-            document_type=file_type,
-            payload=file_content,
-            source_id=file_name,
-            source_name=file_name,
-            extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
-        )
-
-        logger.debug(f"Tasks: {tasks.keys()}")
-        for task in tasks:
-            logger.debug(f"Task: {task}")
-
-        # TODO(Devin): Formalize this later, don't have time right now.
-        if "split" in tasks:
-            job_spec.add_task(tasks["split"])
-
-        if f"extract_{file_type}" in tasks:
-            job_spec.add_task(tasks[f"extract_{file_type}"])
-
-        if "store" in tasks:
-            job_spec.add_task(tasks["store"])
-
-        if "caption" in tasks:
-            job_spec.add_task(tasks["caption"])
-
-        if "dedup" in tasks:
-            job_spec.add_task(tasks["dedup"])
-
-        if "filter" in tasks:
-            job_spec.add_task(tasks["filter"])
-
-        if "embed" in tasks:
-            job_spec.add_task(tasks["embed"])
-
-        if "vdb_upload" in tasks:
-            job_spec.add_task(tasks["vdb_upload"])
-
-        job_id = client.add_job(job_spec)
-        job_ids.append(job_id)
-
-    return job_ids
-
-
 def generate_job_batch_for_iteration(
         client: Any,
         pbar: Any,
@@ -601,7 +482,7 @@ def generate_job_batch_for_iteration(
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
         batch_files = files[processed: processed + new_job_count]  # noqa: E203
 
-        new_job_indices = create_job_specs_for_batch(batch_files, tasks, client)
+        new_job_indices = client.create_job_specs_and_submit_jobs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
             missing_jobs = new_job_count - len(new_job_indices)
             error_msg = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"

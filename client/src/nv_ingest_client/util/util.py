@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
+import glob
 import logging
 import os
 import traceback
@@ -260,3 +260,34 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
                 break
 
     return is_failed, description
+
+
+def generate_matching_files(file_sources):
+    """
+    Generates a list of file paths that match the given patterns specified in file_sources.
+
+    Parameters
+    ----------
+    file_sources : list of str
+        A list containing the file source patterns to match against.
+
+    Returns
+    -------
+    generator
+        A generator yielding paths to files that match the specified patterns.
+
+    Notes
+    -----
+    This function utilizes glob pattern matching to find files that match the specified patterns.
+    It yields each matching file path, allowing for efficient processing of potentially large
+    sets of files.
+    """
+
+    files = [
+        file_path
+        for pattern in file_sources
+        for file_path in glob.glob(pattern, recursive=True)
+        if os.path.isfile(file_path)
+    ]
+    for file_path in files:
+        yield file_path
