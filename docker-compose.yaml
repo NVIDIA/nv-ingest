@@ -22,37 +22,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=1
-      - NIM_OTEL_SERVICE_NAME_ENV_NAME = "NIM_OTEL_SERVICE_NAME"
-      - NIM_OTEL_SERVICE_NAME_ENV_NAME_DEFAULT = "yolox"
-
-      # Should be either "console" or "otlp".
-      # "console" for stdout logs and "otlp" for OTLP endpoint logs.
-      - NIM_OTEL_TRACES_EXPORTER_ENV_NAME = "NIM_OTEL_TRACES_EXPORTER"
-      - NIM_OTEL_TRACES_EXPORTER_ENV_NAME_DEFAULT = "otlp"
-
-      # Should be either "console" or "otlp".
-      # "console" for stdout logs and "otlp" for OTLP endpoint logs.
-      - NIM_OTEL_METRICS_EXPORTER_ENV_NAME = "NIM_OTEL_METRICS_EXPORTER"
-      - NIM_OTEL_METRICS_EXPORTER_ENV_NAME_DEFAULT = "otlp"
-
-      # URL of OTLP endpoint
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT_ENV_NAME = "NIM_OTEL_EXPORTER_OTLP_ENDPOINT"
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT_ENV_NAME_DEFAULT = "otel-collector:4317"
-
-      - NIM_ENABLE_OTEL_ENV_NAME = "NIM_ENABLE_OTEL"
-      - NIM_ENABLE_OTEL_ENV_NAME_DEFAULT = "true"
-
-      # Time interval in milliseconds between two consecutive metrics reports
-      - NIM_OTEL_METRICS_EXPORTER_MILLIS = "NIM_OTEL_METRICS_EXPORTER_MILLIS"
-      - NIM_OTEL_METRICS_EXPORTER_MILLIS_DEFAULT = 60000
-
-      # NIM Traces exporter verbose?
-      - NIM_OTEL_TRACES_VERBOSE_ENV_NAME = "NIM_OTEL_TRACES_VERBOSE"
-      - NIM_OTEL_TRACES_VERBOSE_ENV_NAME_DEFAULT = "true"
-
-      # NIM Metrics exporter verbose?
-      - NIM_OTEL_METRICS_VERBOSE_ENV_NAME = "NIM_OTEL_METRICS_VERBOSE"
-      - NIM_OTEL_METRICS_VERBOSE_ENV_NAME_DEFAULT = "false"
+      - NIM_OTEL_SERVICE_NAME: yolox
+      - NIM_OTEL_TRACES_EXPORTER: otlp
+      - NIM_OTEL_METRICS_EXPORTER: otlp
+      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT: otel-collector:4317
+      - NIM_ENABLE_OTEL: true
     deploy:
       resources:
         reservations:
