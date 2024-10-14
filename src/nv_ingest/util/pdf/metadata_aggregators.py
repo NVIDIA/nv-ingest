@@ -26,23 +26,33 @@ from nv_ingest.util.detectors.language import detect_language
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 
 
+# TODO(Devin): Shift to this, since there is no difference between ImageTable and ImageChart
 @dataclass
-class ImageTable:
+class CroppedImageWithContent:
     content: str
     image: str
     bbox: Tuple[int, int, int, int]
     max_width: int
     max_height: int
+    type_string: str
 
 
-@dataclass
-class ImageChart:
-    content: str
-    image: str
-    bbox: Tuple[int, int, int, int]
-    max_width: int
-    max_height: int
-
+# @dataclass
+# class ImageTable:
+#    content: str
+#    image: str
+#    bbox: Tuple[int, int, int, int]
+#    max_width: int
+#    max_height: int
+#
+#
+# @dataclass
+# class ImageChart:
+#    content: str
+#    image: str
+#    bbox: Tuple[int, int, int, int]
+#    max_width: int
+#    max_height: int
 
 @dataclass
 class LatexTable:
@@ -139,16 +149,16 @@ def extract_pdf_metadata(doc: pdfium.PdfDocument, source_id: str) -> PDFMetadata
 
 
 def construct_text_metadata(
-    accumulated_text,
-    keywords,
-    page_idx,
-    block_idx,
-    line_idx,
-    span_idx,
-    page_count,
-    text_depth,
-    source_metadata,
-    base_unified_metadata,
+        accumulated_text,
+        keywords,
+        page_idx,
+        block_idx,
+        line_idx,
+        span_idx,
+        page_count,
+        text_depth,
+        source_metadata,
+        base_unified_metadata,
 ):
     extracted_text = " ".join(accumulated_text)
 
@@ -195,11 +205,11 @@ def construct_text_metadata(
 
 
 def construct_image_metadata(
-    image_base64: Base64Image,
-    page_idx: int,
-    page_count: int,
-    source_metadata: Dict[str, Any],
-    base_unified_metadata: Dict[str, Any],
+        image_base64: Base64Image,
+        page_idx: int,
+        page_count: int,
+        source_metadata: Dict[str, Any],
+        base_unified_metadata: Dict[str, Any],
 ) -> List[Any]:
     """
     Extracts image data from a PdfImage object, converts it to a base64-encoded string,
@@ -277,11 +287,11 @@ def construct_image_metadata(
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_table_and_chart_metadata(
-    table: Union[ImageTable, ImageChart],
-    page_idx: int,
-    page_count: int,
-    source_metadata: Dict,
-    base_unified_metadata: Dict,
+        table: CroppedImageWithContent,
+        page_idx: int,
+        page_count: int,
+        source_metadata: Dict,
+        base_unified_metadata: Dict,
 ):
     """
     +--------------------------------+--------------------------+------------+---+
@@ -311,14 +321,14 @@ def construct_table_and_chart_metadata(
     +--------------------------------+--------------------------+------------+---+
     """
 
-    if isinstance(table, ImageTable):
+    if (table.type_string in ("table",)):
         content = table.image
         structured_content_text = table.content
         table_format = TableFormatEnum.IMAGE
         subtype = ContentSubtypeEnum.TABLE
         description = StdContentDescEnum.PDF_TABLE
 
-    elif isinstance(table, ImageChart):
+    elif (table.type_string in ("chart",)):
         content = table.image
         structured_content_text = table.content
         table_format = TableFormatEnum.IMAGE
@@ -326,7 +336,7 @@ def construct_table_and_chart_metadata(
         description = StdContentDescEnum.PDF_CHART
 
     else:
-        raise ValueError("Unknown table/chart type.")
+        raise ValueError(f"Unknown table/chart type: {table.type_string}")
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
