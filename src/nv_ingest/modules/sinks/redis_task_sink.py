@@ -50,8 +50,9 @@ def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
         with message.payload().mutable_dataframe() as mdf:
             logger.debug(f"Redis Sink Received DataFrame with {len(mdf)} rows.")
             keep_cols = ["document_type", "metadata"]
-            return mdf, mdf[keep_cols].to_dict(orient="records")
-    except Exception:
+            return mdf, mdf[keep_cols].to_pandas().to_dict(orient="records")
+    except Exception as err:
+        logger.warning(f"Failed to extract DataFrame from message payload: {err}")
         return None, None
 
 

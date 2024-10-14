@@ -248,8 +248,8 @@ class RestClient(MessageClientBase):
                         logger.debug(f"JobSpec successfully submitted to http \
                                      endpoint {self._submit_endpoint}, Resulting JobId: {result.json()}")
                         # The REST interface returns a JobId, so we capture that here
-
-                        return result.json()
+                        x_trace_id = result.headers['x-trace-id']
+                        return x_trace_id, result.json()
                     else:
                         # We could just let this exception bubble, but we capture for clarity
                         # we may also choose to use more specific exceptions in the future

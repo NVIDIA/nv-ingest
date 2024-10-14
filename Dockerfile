@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 
-ARG BASE_IMG=nvcr.io/nvidia/morpheus/morpheus
-ARG BASE_IMG_TAG=v24.06.01-runtime
+ARG BASE_IMG=nvcr.io/nvidia/cuda
+ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -13,27 +13,62 @@ ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
 
-# We require Python 3.10.15 but base image currently comes with 3.10.14, update here.
-RUN source activate morpheus \
-    && conda install python=3.10.15
+# Install necessary dependencies using apt-get
+RUN apt-get update && apt-get install -y \
+      wget \
+      bzip2 \
+      ca-certificates \
+    && apt-get clean
+
+# Install miniconda
+RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
+    && bash /tmp/miniconda.sh -b -p /opt/conda \
+    && rm /tmp/miniconda.sh
+
+# Add conda to the PATH
+ENV PATH=/opt/conda/bin:$PATH
+
+# Install Mamba, a faster alternative to conda, within the base environment
+RUN conda install -y mamba -n base -c conda-forge
+
+# Create nv_ingest base environment
+RUN conda create -y --name nv_ingest python=3.10.15
+
+# Activate the environment (make it default for subsequent commands)
+RUN echo "source activate nv_ingest" >> ~/.bashrc
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Install Tini via conda from the conda-forge channel
+RUN source activate nv_ingest \
+    && mamba install -y -c conda-forge tini
+
+# Install Morpheus dependencies
+RUN source activate nv_ingest \
+    && mamba install -y \
+     nvidia/label/dev::morpheus-core \
+     nvidia/label/dev::morpheus-llm \
+     -c rapidsai -c pytorch -c nvidia -c conda-forge
+
+# Install additional dependencies using apt-get
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    && apt-get clean
 
 # Set the working directory in the container
 WORKDIR /workspace
 
-RUN apt-get update \
-    && apt-get install --yes \
-    libgl1-mesa-glx
+# Copy custom entrypoint script
+COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
+FROM base as nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
-# Don't copy full source here, pipelines won't be installed via setup anyway, and this allows us to rebuild more quickly if we're just changing the pipeline
-
 COPY ci ci
 COPY requirements.txt extra-requirements.txt test-requirements.txt util-requirements.txt ./
 
-SHELL ["/bin/bash", "-c"]
-
-# Prevent haystack from ending telemetry data
+# Prevent haystack from sending telemetry data
 ENV HAYSTACK_TELEMETRY_ENABLED=False
 
 # Ensure the NV_INGEST_VERSION is PEP 440 compatible
@@ -53,8 +88,10 @@ ENV NV_INGEST_RELEASE_TYPE=${RELEASE_TYPE}
 ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
+SHELL ["/bin/bash", "-c"]
+
 # Cache the requirements and install them before uploading source code changes
-RUN source activate morpheus \
+RUN source activate nv_ingest \
     && pip install -r requirements.txt
 
 COPY tests tests
@@ -63,8 +100,8 @@ COPY client client
 COPY src/nv_ingest src/nv_ingest
 RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
-# Build the client and install it in the conda cache so that the later nv-ingest build can locate it
-RUN source activate morpheus \
+# Build the client and install it in the conda cache
+RUN source activate nv_ingest \
     && pip install -e client \
     && pip install -r extra-requirements.txt
 
@@ -73,36 +110,48 @@ RUN chmod +x ./ci/scripts/build_pip_packages.sh \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
 
-RUN source activate morpheus \
+RUN source activate nv_ingest \
     && pip install ./dist/*.whl
 
-RUN source activate morpheus \
+RUN source activate nv_ingest \
     && rm -rf src requirements.txt test-requirements.txt util-requirements.txt
-
-# Interim pyarrow backport until folded into upstream dependency tree
-RUN source activate morpheus \
-    && conda install https://anaconda.org/conda-forge/pyarrow/14.0.2/download/linux-64/pyarrow-14.0.2-py310h188ebfb_19_cuda.conda
 
 # Upgrade setuptools to mitigate https://github.com/advisories/GHSA-cx63-2mw6-8hw5
 RUN source activate base \
     && conda install setuptools==70.0.0
 
-FROM base AS runtime
-
-RUN source activate morpheus \
+RUN source activate nv_ingest \
     && pip install ./client/dist/*.whl \
+    ## Installations below can be removed after the next Morpheus release
+    && pip install --no-input milvus==2.3.5 \
+    && pip install --no-input pymilvus==2.3.6 \
+    && pip install --no-input langchain==0.1.16 \
+    && pip install --no-input langchain-nvidia-ai-endpoints==0.0.11 \
+    && pip install --no-input faiss-gpu==1.7.* \
+    && pip install --no-input google-search-results==2.4 \
+    && pip install --no-input nemollm==0.3.5 \
     && rm -rf client/dist
+
+# Install patched MRC version to circumvent NUMA node issue -- remove after Morpheus 10.24 release
+RUN source activate nv_ingest \
+    && conda install -y -c nvidia/label/dev mrc=24.10.00a=cuda_12.5_py310_h5ae46af_10
+
+FROM nv_ingest_install AS runtime
 
 COPY src/pipeline.py ./
 COPY pyproject.toml ./
-COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
 
-# Start both the core nv-ingest pipeline service and teh FastAPI microservice in parallel
+RUN chmod +x /workspace/docker/entrypoint.sh
+
+# Set entrypoint to tini with a custom entrypoint script
+ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
+
+# Start the pipeline and services
 CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
-FROM base AS development
+FROM nv_ingest_install AS development
 
-RUN source activate morpheus && \
+RUN source activate nv_ingest && \
     pip install -e ./client
 
 CMD ["/bin/bash"]
