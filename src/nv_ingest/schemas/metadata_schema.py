@@ -266,6 +266,14 @@ class TableMetadataSchema(BaseModelNoExt):
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
 
+class ChartMetadataSchema(BaseModelNoExt):
+    caption: str = ""
+    table_format: TableFormatEnum
+    table_content: str = ""
+    table_location: tuple = (0, 0, 0, 0)
+    table_location_max_dimensions: tuple = (0, 0)
+    uploaded_image_uri: str = ""
+
 
 # TODO consider deprecating this in favor of info msg...
 class ErrorMetadataSchema(BaseModelNoExt):
@@ -291,6 +299,7 @@ class MetadataSchema(BaseModelNoExt):
     text_metadata: Optional[TextMetadataSchema] = None
     image_metadata: Optional[ImageMetadataSchema] = None
     table_metadata: Optional[TableMetadataSchema] = None
+    chart_metadata: Optional[ChartMetadataSchema] = None
     error_metadata: Optional[ErrorMetadataSchema] = None
     info_message_metadata: Optional[InfoMessageMetadataSchema] = None
     debug_metadata: Optional[Dict[str, Any]] = None

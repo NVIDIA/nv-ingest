@@ -32,15 +32,11 @@ from nv_ingest.extraction_workflows.pdf import yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import call_image_inference_model
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image, CroppedImageWithContent
-# from nv_ingest.util.pdf.metadata_aggregators import ImageChart
-# from nv_ingest.util.pdf.metadata_aggregators import ImageTable
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
@@ -49,6 +45,7 @@ from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 
+# TODO (Devin): All of these should move to configuration parameters in the NIM caller Stage
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 YOLOX_MAX_BATCH_SIZE = 8
@@ -72,8 +69,6 @@ def extract_tables_and_charts_using_image_ensemble(
         iou_thresh: float = YOLOX_IOU_THRESHOLD,
         min_score: float = YOLOX_MIN_SCORE,
         final_thresh: float = YOLOX_FINAL_SCORE,
-        # extract_tables: bool = True,
-        # extract_charts: bool = True,
         trace_info: Optional[List] = None,
 ) -> List[Tuple[int, CroppedImageWithContent]]:
     """
@@ -135,19 +130,9 @@ def extract_tables_and_charts_using_image_ensemble(
     """
     tables_and_charts = []
 
-    # if not extract_tables and not extract_charts:
-    #    logger.debug("Nothing to do since both extract_tables and extract_charts are set to false.")
-    #    return tables_and_charts
-
-    # yolox_client = paddle_client = deplot_client = cached_client = None
     yolox_client = None
     try:
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
-        # if extract_tables:
-        #    paddle_client = create_inference_client(config.paddle_endpoints, config.auth_token)
-        # if extract_charts:
-        #    cached_client = create_inference_client(config.cached_endpoints, config.auth_token)
-        #    deplot_client = create_inference_client(config.deplot_endpoints, config.auth_token)
 
         batches = []
         i = 0
@@ -174,17 +159,11 @@ def extract_tables_and_charts_using_image_ensemble(
             )
 
             for annotation_dict, original_image in zip(yolox_annotated_detections, original_images):
-                handle_table_chart_extraction(
+                extract_table_and_chart_images(
                     annotation_dict,
                     original_image,
                     page_index,
-                    # paddle_client,
-                    # deplot_client,
-                    # cached_client,
                     tables_and_charts,
-                    # extract_tables=extract_tables,
-                    # extract_charts=extract_charts,
-                    # trace_info=trace_info,
                 )
 
                 page_index += 1
@@ -194,12 +173,6 @@ def extract_tables_and_charts_using_image_ensemble(
         traceback.print_exc()
         raise e
     finally:
-        # if isinstance(paddle_client, grpcclient.InferenceServerClient):
-        #    paddle_client.close()
-        # if isinstance(cached_client, grpcclient.InferenceServerClient):
-        #    cached_client.close()
-        # if isinstance(deplot_client, grpcclient.InferenceServerClient):
-        #    deplot_client.close()
         if isinstance(yolox_client, grpcclient.InferenceServerClient):
             yolox_client.close()
 
@@ -310,17 +283,11 @@ def process_inference_results(
 
 
 # Handle individual table/chart extraction and model inference
-def handle_table_chart_extraction(
+def extract_table_and_chart_images(
         annotation_dict,
         original_image,
         page_idx,
-        # paddle_client,
-        # deplot_client,
-        # cached_client,
         tables_and_charts,
-        # extract_tables=True,
-        # extract_charts=True,
-        # trace_info=None,
 ):
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -354,7 +321,7 @@ def handle_table_chart_extraction(
     >>> original_image = np.random.rand(1536, 1536, 3)
     >>> tables_and_charts = []
     #>>> handle_table_chart_extraction(annotation_dict, original_image, 0, paddle_client, deplot_client, cached_client,
-    >>> handle_table_chart_extraction(annotation_dict, original_image, 0, tables_and_charts)
+    >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
     """
 
     width, height, *_ = original_image.shape
@@ -367,7 +334,6 @@ def handle_table_chart_extraction(
             *bbox, _ = bboxes
             h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
 
-            # if extract_tables and label == "table":
             cropped = crop_image(original_image, (h1, w1, h2, w2))
             base64_img = numpy_to_base64(cropped)
 
@@ -376,38 +342,6 @@ def handle_table_chart_extraction(
                 max_height=height, type_string=label
             )
             tables_and_charts.append((page_idx, table_data))
-
-            # if (label == "table"):
-                # PaddleOCR NIM enforces minimum dimensions for TRT engines.
-                # TODO (Devin): Shift subsequent image crops to the PaddleNIMStage -- dont' do it here.
-                # cropped = crop_image(
-                #     original_image,
-                #     (h1, w1, h2, w2),
-                #     # min_width=PADDLE_MIN_WIDTH,
-                #     # min_height=PADDLE_MIN_HEIGHT,
-                # )
-                # base64_img = numpy_to_base64(cropped)
-
-                # table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
-                # table_data = ImageTable(
-                #     content=table_content, image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
-                # )
-                # tables_and_charts.append((page_idx, table_data))
-            # elif extract_charts and label == "chart":
-                # cropped = crop_image(original_image, (h1, w1, h2, w2))
-                # base64_img = numpy_to_base64(cropped)
-
-                # deplot_result = call_image_inference_model(
-                #     deplot_client, "google/deplot", cropped, trace_info=trace_info
-                # )
-                # cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
-                # chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
-                #chart_data = CroppedImageWithContent(
-                #    # content=chart_content, image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
-                #    content="TODO(Devin): Handled Downstream", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
-                #)
-                #tables_and_charts.append((page_idx, chart_data))
-
 
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestream PDF
@@ -573,8 +507,6 @@ def pdfium(
         for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
                 pages,
                 pdfium_config, # TODO(Devin) : Fix this
-                # extract_tables=extract_tables,
-                # extract_charts=extract_charts,
                 trace_info=trace_info,
         ):
             extracted_data.append(

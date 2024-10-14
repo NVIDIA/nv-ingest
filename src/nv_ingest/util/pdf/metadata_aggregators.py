@@ -10,7 +10,6 @@ from typing import Any
 from typing import Dict
 from typing import List
 from typing import Tuple
-from typing import Union
 
 import pandas as pd
 import pypdfium2 as pdfium
@@ -36,23 +35,6 @@ class CroppedImageWithContent:
     max_height: int
     type_string: str
 
-
-# @dataclass
-# class ImageTable:
-#    content: str
-#    image: str
-#    bbox: Tuple[int, int, int, int]
-#    max_width: int
-#    max_height: int
-#
-#
-# @dataclass
-# class ImageChart:
-#    content: str
-#    image: str
-#    bbox: Tuple[int, int, int, int]
-#    max_width: int
-#    max_height: int
 
 @dataclass
 class LatexTable:
@@ -287,7 +269,7 @@ def construct_image_metadata(
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_table_and_chart_metadata(
-        table: CroppedImageWithContent,
+        structured_image: CroppedImageWithContent,
         page_idx: int,
         page_count: int,
         source_metadata: Dict,
@@ -321,22 +303,25 @@ def construct_table_and_chart_metadata(
     +--------------------------------+--------------------------+------------+---+
     """
 
-    if (table.type_string in ("table",)):
-        content = table.image
-        structured_content_text = table.content
+    if (structured_image.type_string in ("table",)):
+        content = structured_image.image
+        structured_content_text = structured_image.content
         table_format = TableFormatEnum.IMAGE
         subtype = ContentSubtypeEnum.TABLE
         description = StdContentDescEnum.PDF_TABLE
+        meta_name = "table_metadata"
 
-    elif (table.type_string in ("chart",)):
-        content = table.image
-        structured_content_text = table.content
+    elif (structured_image.type_string in ("chart",)):
+        content = structured_image.image
+        structured_content_text = structured_image.content
         table_format = TableFormatEnum.IMAGE
         subtype = ContentSubtypeEnum.CHART
         description = StdContentDescEnum.PDF_CHART
+        # TODO(Devin) swap this to chart_metadata after we confirm metadata schema changes.
+        meta_name = "table_metadata"
 
     else:
-        raise ValueError(f"Unknown table/chart type: {table.type_string}")
+        raise ValueError(f"Unknown table/chart type: {structured_image.type_string}")
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
@@ -351,12 +336,12 @@ def construct_table_and_chart_metadata(
         "subtype": subtype,
     }
 
-    table_metadata = {
+    structured_metadata = {
         "caption": "",
         "table_format": table_format,
         "table_content": structured_content_text,
-        "table_location": table.bbox,
-        "table_location_max_dimensions": (table.max_width, table.max_height),
+        "table_location": structured_image.bbox,
+        "table_location_max_dimensions": (structured_image.max_width, structured_image.max_height),
     }
 
     ext_unified_metadata = base_unified_metadata.copy()
@@ -366,7 +351,7 @@ def construct_table_and_chart_metadata(
             "content": content,
             "source_metadata": source_metadata,
             "content_metadata": content_metadata,
-            "table_metadata": table_metadata,
+            meta_name: structured_metadata,
         }
     )
 
