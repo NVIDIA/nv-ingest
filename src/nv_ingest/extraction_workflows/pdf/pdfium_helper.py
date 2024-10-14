@@ -371,7 +371,9 @@ def handle_table_chart_extraction(
                 base64_img = numpy_to_base64(cropped)
 
                 table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
-                table_data = ImageTable(table_content, base64_img, (w1, h1, w2, h2))
+                table_data = ImageTable(
+                    content=table_content, image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
+                )
                 tables_and_charts.append((page_idx, table_data))
             elif extract_charts and label == "chart":
                 cropped = crop_image(original_image, (h1, w1, h2, w2))
@@ -382,7 +384,9 @@ def handle_table_chart_extraction(
                 )
                 cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
-                chart_data = ImageChart(chart_content, base64_img, (w1, h1, w2, h2))
+                chart_data = ImageChart(
+                    content=chart_content, image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
+                )
                 tables_and_charts.append((page_idx, chart_data))
 
 
@@ -472,6 +476,7 @@ def pdfium(
     text_depth = text_depth if text_depth == TextTypeEnum.PAGE else TextTypeEnum.DOCUMENT
     for page_idx in range(pdf_metadata.page_count):
         page = doc.get_page(page_idx)
+        page_width, page_height = doc.get_page_size(page_idx)
 
         # https://pypdfium2.readthedocs.io/en/stable/python_api.html#module-pypdfium2._helpers.textpage
         if extract_text:
@@ -507,7 +512,9 @@ def pdfium(
                         image_base64: str = numpy_to_base64(image_numpy)
                         image_bbox = obj.get_pos()
                         image_size = obj.get_size()
-                        image_data = Base64Image(image_base64, image_bbox, image_size[0], image_size[1])
+                        image_data = Base64Image(
+                            image=image_base64, bbox=image_bbox, width=image_size[0], height=image_size[1], max_width=page_width, max_height=page_height
+                        )
 
                         extracted_image_data = construct_image_metadata(
                             image_data,
