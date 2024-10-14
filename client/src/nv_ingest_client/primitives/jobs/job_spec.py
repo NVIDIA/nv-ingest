@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import os
 import logging
 from typing import Dict
 from typing import List
@@ -12,7 +11,6 @@ from typing import Union
 from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
-from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +54,13 @@ class JobSpec:
     """
 
     def __init__(
-            self,
-            payload: str = None,
-            tasks: Optional[List] = None,
-            source_id: Optional[str] = None,
-            source_name: Optional[str] = None,
-            document_type: Optional[str] = None,
-            extended_options: Optional[Dict] = None,
+        self,
+        payload: str = None,
+        tasks: Optional[List] = None,
+        source_id: Optional[str] = None,
+        source_name: Optional[str] = None,
+        document_type: Optional[str] = None,
+        extended_options: Optional[Dict] = None,
     ) -> None:
         self._document_type = document_type or "txt"
         self._extended_options = extended_options or {}
@@ -137,6 +135,14 @@ class JobSpec:
     def source_name(self, source_name: str) -> None:
         self._source_name = source_name
 
+    @property
+    def document_type(self) -> str:
+        return self._document_type
+
+    @source_name.setter
+    def document_type(self, document_type: str) -> None:
+        self._document_type = document_type
+
     def add_task(self, task) -> None:
         """
         Adds a task to the job specification.
@@ -210,6 +216,9 @@ class BatchJobSpec:
         files : List[str]
             A list of file paths to generate JobSpec instances from.
         """
+        from nv_ingest_client.client.util import create_job_specs_for_batch
+        from nv_ingest_client.util.util import generate_matching_files
+
         if isinstance(files, str):
             files = [files]
 
@@ -218,7 +227,9 @@ class BatchJobSpec:
             logger.warning(f"No files found matching {files}.")
             return
 
-        self._job_specs.append(job_spec)
+        job_specs = create_job_specs_for_batch(matching_files)
+        for job_spec in job_specs:
+            self.add_job_spec(job_spec)
 
     def add_job_spec(self, job_spec: JobSpec) -> None:
         """
@@ -230,6 +241,26 @@ class BatchJobSpec:
             The JobSpec instance to add to the batch.
         """
         self._job_specs.append(job_spec)
+
+    def add_task(self, task) -> None:
+        """
+        Adds a task to the job specification.
+
+        Parameters
+        ----------
+        task
+            The task to add to the job specification. Assumes the task has a to_dict method.
+
+        Raises
+        ------
+        ValueError
+            If the task does not have a to_dict method.
+        """
+        if not isinstance(task, Task):
+            raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
+
+        for job_spec in self._job_specs:
+            job_spec.add_task(task)
 
     def to_dict(self) -> List[Dict]:
         """
@@ -252,3 +283,7 @@ class BatchJobSpec:
             A string representation of the batch.
         """
         return "\n".join(str(job_spec) for job_spec in self._job_specs)
+
+    @property
+    def job_specs(self):
+        return self._job_specs

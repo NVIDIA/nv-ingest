@@ -2,8 +2,9 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .job_spec import JobSpec
-from .job_state import JobState
-from .job_state import JobStateEnum
+from nv_ingest_client.primitives.jobs.job_spec import BatchJobSpec
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest_client.primitives.jobs.job_state import JobState
+from nv_ingest_client.primitives.jobs.job_state import JobStateEnum
 
-__all__ = ["JobSpec", "JobState", "JobStateEnum"]
+__all__ = ["BatchJobSpec", "JobSpec", "JobState", "JobStateEnum"]

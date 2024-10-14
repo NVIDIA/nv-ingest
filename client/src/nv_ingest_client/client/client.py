@@ -5,10 +5,10 @@
 
 # pylint: disable=broad-except
 
+import concurrent.futures
 import json
 import logging
 import time
-import concurrent.futures
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -20,14 +20,15 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from nv_ingest_client.client.util import create_job_specs_for_batch
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
+from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import task_factory
-from nv_ingest_client.util.file_processing.extract import extract_file_content
 
 logger = logging.getLogger(__name__)
 
@@ -56,13 +57,13 @@ class NvIngestClient:
     """
 
     def __init__(
-            self,
-            message_client_allocator: Callable[..., RestClient] = RestClient,
-            message_client_hostname: Optional[str] = "localhost",
-            message_client_port: Optional[int] = 7670,
-            message_client_kwargs: Optional[Dict] = None,
-            msg_counter_id: Optional[str] = "nv-ingest-message-id",
-            worker_pool_size: int = 1,
+        self,
+        message_client_allocator: Callable[..., RestClient] = RestClient,
+        message_client_hostname: Optional[str] = "localhost",
+        message_client_port: Optional[int] = 7670,
+        message_client_kwargs: Optional[Dict] = None,
+        msg_counter_id: Optional[str] = "nv-ingest-message-id",
+        worker_pool_size: int = 1,
     ) -> None:
         """
         Initializes the NvIngestClient with a client allocator, REST configuration, a message counter ID,
@@ -145,9 +146,9 @@ class NvIngestClient:
         return job_state
 
     def _get_and_check_job_state(
-            self,
-            job_index: str,
-            required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
+        self,
+        job_index: str,
+        required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
     ) -> JobState:
         if required_state and not isinstance(required_state, list):
             required_state = [required_state]
@@ -166,21 +167,34 @@ class NvIngestClient:
     def job_count(self):
         return len(self._job_states)
 
-    def add_job(self, job_spec: JobSpec = None) -> str:
+    def _add_single_job(self, job_spec: JobSpec) -> str:
         job_index = self._generate_job_index()
 
         self._job_states[job_index] = JobState(job_spec=job_spec)
 
         return job_index
 
+    def add_job(self, job_spec: Union[BatchJobSpec, JobSpec]) -> str:
+        if isinstance(job_spec, JobSpec):
+            job_index = self._add_single_job(job_spec)
+            return job_index
+        elif isinstance(job_spec, BatchJobSpec):
+            job_indexes = []
+            for js in job_spec.job_specs:
+                job_index = self._add_single_job(js)
+                job_indexes.append(job_index)
+            return job_indexes
+        else:
+            raise ValueError(f"Unexpected type: {type(job_spec)}")
+
     def create_job(
-            self,
-            payload: str,
-            source_id: str,
-            source_name: str,
-            document_type: str = None,
-            tasks: Optional[list] = None,
-            extended_options: Optional[dict] = None,
+        self,
+        payload: str,
+        source_id: str,
+        source_name: str,
+        document_type: str = None,
+        tasks: Optional[list] = None,
+        extended_options: Optional[dict] = None,
     ) -> str:
         """
         Creates a new job with the specified parameters and adds it to the job tracking dictionary.
@@ -231,10 +245,10 @@ class NvIngestClient:
         job_state.job_spec.add_task(task)
 
     def create_task(
-            self,
-            job_index: Union[str, int],
-            task_type: TaskType,
-            task_params: dict = None,
+        self,
+        job_index: Union[str, int],
+        task_type: TaskType,
+        task_params: dict = None,
     ) -> None:
         """
         Creates a task of the specified type with given parameters and associates it with the existing job.
@@ -314,8 +328,7 @@ class NvIngestClient:
             job_ids = [job_ids]
 
         return [self._fetch_job_result(job_id, timeout, data_only) for job_id in job_ids]
-    
-    
+
     # Nv-Ingest jobs are often "long running". Therefore after
     # submission we intermittently check if the job is completed.
     def _fetch_job_result_wait(self, job_id: str, timeout: float = 60, data_only: bool = True):
@@ -324,11 +337,11 @@ class NvIngestClient:
                 return [self._fetch_job_result(job_id, timeout, data_only)]
             except TimeoutError:
                 logger.debug("Job still processing ... aka HTTP 202 received")
-    
+
     # This is the direct Python approach function for retrieving jobs which handles the timeouts directly
     # in the function itself instead of expecting the user to handle it themselves
     # Note this method only supports fetching a single job result synchronously
-    def fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True):        
+    def fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True):
         # A thread pool executor is a simple approach to performing an action with a timeout
         with ThreadPoolExecutor() as executor:
             future = executor.submit(self._fetch_job_result_wait, job_id, timeout, data_only)
@@ -338,7 +351,6 @@ class NvIngestClient:
             except concurrent.futures.TimeoutError:
                 # Raise a standard Python TimeoutError which the client will be expecting
                 raise TimeoutError(f"Job processing did not complete within the specified {timeout} seconds")
-        
 
     def _ensure_submitted(self, job_ids: List[str]):
         if isinstance(job_ids, str):
@@ -359,7 +371,7 @@ class NvIngestClient:
             job_state.future = None
 
     def fetch_job_result_async(
-            self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
+        self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
     ) -> Dict[Future, str]:
         """
         Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.
@@ -389,9 +401,9 @@ class NvIngestClient:
         return future_to_job_id
 
     def _submit_job(
-            self,
-            job_index: str,
-            job_queue_id: str,
+        self,
+        job_index: str,
+        job_queue_id: str,
     ) -> Optional[Dict]:
         """
         Submits a job to a specified job queue and optionally waits for a response if blocking is True.
@@ -428,7 +440,7 @@ class NvIngestClient:
 
             # Free up memory -- payload should never be used again, and we don't want to keep it around.
             job_state.job_spec.payload = None
-            
+
             return x_trace_id
         except Exception as err:
             logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
@@ -480,119 +492,41 @@ class NvIngestClient:
         return future_to_job_index
 
     def create_job_specs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[JobSpec]:
-        """
-        Create job specifications (JobSpecs) for a batch of files.
-    
-        This function takes a batch of files, processes each file to extract its content and type,
-        creates a job specification (JobSpec) for each file, and adds tasks from the provided task
-        list.
-    
-        Parameters
-        ----------
-        files_batch : List[str]
-            A list of file paths to be processed. Each file is assumed to be in a format compatible
-            with the `extract_file_content` function, which extracts the file's content and type.
-    
-        tasks : Dict[str, Any]
-            A dictionary of tasks to be added to each job. The keys represent task names, and the
-            values represent task specifications or configurations. Standard tasks include "split",
-            "extract", "store", "caption", "dedup", "filter", "embed", and "vdb_upload".
-    
-        Returns
-        -------
-        List[JobSpec]
-            A list of created JobSpec objects for the batch of files.
-    
-        Raises
-        ------
-        ValueError
-            If there is an error extracting the file content or type from any of the files, a
-            ValueError will be logged, and the corresponding file will be skipped.
-    
-        Notes
-        -----
-        - The function assumes that a utility function `extract_file_content` is defined elsewhere,
-          which extracts the content and type from the provided file paths.
-        - For each file, a `JobSpec` is created with relevant metadata, including document type and
-          file content. Various tasks are conditionally added based on the provided `tasks` dictionary.
-        - The job specification includes tracing options with a timestamp (in nanoseconds) for
-          diagnostic purposes.
-    
-        Examples
-        --------
-        Suppose you have a batch of files and tasks to process:
-    
-        >>> files_batch = ["file1.txt", "file2.pdf"]
-        >>> tasks = {"split": ..., "extract_txt": ..., "store": ...}
-        >>> client = NvIngestClient()
-        >>> job_specs = client.create_job_specs_for_batch(files_batch, tasks)
-        >>> print(job_specs)
-    
-        In this example, jobs are created and submitted for the files in `files_batch`, with the
-        tasks in `tasks` being added to each job specification.
-    
-        See Also
-        --------
-        extract_file_content : Function that extracts the content and type of a file.
-        JobSpec : The class representing a job specification.
-        """
-    
-        job_specs = []
-        for file_name in files_batch:
-            try:
-                file_content, file_type = extract_file_content(file_name)  # Assume these are defined
-                file_type = file_type.value
-            except ValueError as ve:
-                logger.error(f"Error extracting content from {file_name}: {ve}")
-                continue
-    
-            job_spec = JobSpec(
-                document_type=file_type,
-                payload=file_content,
-                source_id=file_name,
-                source_name=file_name,
-                extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
-            )
-
-            logger.debug(f"Tasks: {tasks.keys()}")
-            for task in tasks:
-                logger.debug(f"Task: {task}")
-    
-            # TODO(Devin): Formalize this later, don't have time right now.
-            if "split" in tasks:
-                job_spec.add_task(tasks["split"])
-    
-            if f"extract_{file_type}" in tasks:
-                job_spec.add_task(tasks[f"extract_{file_type}"])
-    
-            if "store" in tasks:
-                job_spec.add_task(tasks["store"])
-    
-            if "caption" in tasks:
-                job_spec.add_task(tasks["caption"])
-    
-            if "dedup" in tasks:
-                job_spec.add_task(tasks["dedup"])
-    
-            if "filter" in tasks:
-                job_spec.add_task(tasks["filter"])
-    
-            if "embed" in tasks:
-                job_spec.add_task(tasks["embed"])
-    
-            if "vdb_upload" in tasks:
-                job_spec.add_task(tasks["vdb_upload"])
-
-            job_specs.append(job_spec)
-
-        return job_specs
-
-    def create_job_specs_and_submit_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[str]:
-        job_specs = self.create_job_specs_for_batch(files_batch, tasks)
+        job_specs = create_job_specs_for_batch(files_batch)
 
         job_ids = []
         for job_spec in job_specs:
+            logger.debug(f"Tasks: {tasks.keys()}")
+            for task in tasks:
+                logger.debug(f"Task: {task}")
+
+            file_type = job_spec.document_type
+            # TODO(Devin): Formalize this later, don't have time right now.
+            if "split" in tasks:
+                job_spec.add_task(tasks["split"])
+
+            if f"extract_{file_type}" in tasks:
+                job_spec.add_task(tasks[f"extract_{file_type}"])
+
+            if "store" in tasks:
+                job_spec.add_task(tasks["store"])
+
+            if "caption" in tasks:
+                job_spec.add_task(tasks["caption"])
+
+            if "dedup" in tasks:
+                job_spec.add_task(tasks["dedup"])
+
+            if "filter" in tasks:
+                job_spec.add_task(tasks["filter"])
+
+            if "embed" in tasks:
+                job_spec.add_task(tasks["embed"])
+
+            if "vdb_upload" in tasks:
+                job_spec.add_task(tasks["vdb_upload"])
+
             job_id = self.add_job(job_spec)
             job_ids.append(job_id)
-    
+
         return job_ids

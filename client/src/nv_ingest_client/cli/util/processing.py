@@ -12,7 +12,8 @@ from collections import defaultdict
 from concurrent.futures import as_completed
 from statistics import mean
 from statistics import median
-from typing import Dict, Any
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Tuple
 from typing import Type
@@ -130,7 +131,7 @@ def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_
 
 
 def report_stage_statistics(
-        stage_elapsed_times: defaultdict(list), total_trace_elapsed: float, abs_elapsed: float
+    stage_elapsed_times: defaultdict(list), total_trace_elapsed: float, abs_elapsed: float
 ) -> None:
     """
     Reports the statistics for each processing stage, including average, median, total time spent,
@@ -205,10 +206,10 @@ def report_overall_speed(total_pages_processed: int, start_time_ns: int, total_f
 
 
 def report_statistics(
-        start_time_ns: int,
-        stage_elapsed_times: defaultdict,
-        total_pages_processed: int,
-        total_files: int,
+    start_time_ns: int,
+    stage_elapsed_times: defaultdict,
+    total_pages_processed: int,
+    total_files: int,
 ) -> None:
     """
     Aggregates and reports statistics for the entire processing session.
@@ -425,14 +426,14 @@ def save_response_data(response, output_directory):
 
 
 def generate_job_batch_for_iteration(
-        client: Any,
-        pbar: Any,
-        files: List[str],
-        tasks: Dict,
-        processed: int,
-        batch_size: int,
-        retry_job_ids: List[str],
-        fail_on_error: bool = False
+    client: Any,
+    pbar: Any,
+    files: List[str],
+    tasks: Dict,
+    processed: int,
+    batch_size: int,
+    retry_job_ids: List[str],
+    fail_on_error: bool = False,
 ) -> Tuple[List[str], Dict[str, str], int]:
     """
     Generates a batch of job specifications for the current iteration of file processing. This function handles retrying failed jobs and creating new jobs for unprocessed files. The job specifications are then submitted for processing.
@@ -480,9 +481,9 @@ def generate_job_batch_for_iteration(
 
     if (cur_job_count < batch_size) and (processed < len(files)):
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
-        batch_files = files[processed: processed + new_job_count]  # noqa: E203
+        batch_files = files[processed : processed + new_job_count]  # noqa: E203
 
-        new_job_indices = client.create_job_specs_and_submit_jobs_for_batch(batch_files, tasks)
+        new_job_indices = client.create_job_specs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
             missing_jobs = new_job_count - len(new_job_indices)
             error_msg = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"
@@ -502,8 +503,8 @@ def generate_job_batch_for_iteration(
 
 
 def handle_future_result(
-        future: concurrent.futures.Future,
-        futures_dict: Dict[concurrent.futures.Future, str],
+    future: concurrent.futures.Future,
+    futures_dict: Dict[concurrent.futures.Future, str],
 ) -> Dict[str, Any]:
     """
     Handle the result of a completed future job, process annotations, and save the result.
@@ -581,13 +582,13 @@ def handle_future_result(
 
 
 def create_and_process_jobs(
-        files: List[str],
-        client: NvIngestClient,
-        tasks: Dict[str, Any],
-        output_directory: str,
-        batch_size: int,
-        timeout: int = 10,
-        fail_on_error: bool = False,
+    files: List[str],
+    client: NvIngestClient,
+    tasks: Dict[str, Any],
+    output_directory: str,
+    batch_size: int,
+    timeout: int = 10,
+    fail_on_error: bool = False,
 ) -> Tuple[int, Dict[str, List[float]], int]:
     """
     Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.
@@ -688,7 +689,6 @@ def create_and_process_jobs(
 
             futures_dict = client.fetch_job_result_async(job_ids, timeout=timeout, data_only=False)
             for future in as_completed(futures_dict.keys()):
-
                 retry = False
                 job_id = futures_dict[future]
                 source_name = job_id_map[job_id]

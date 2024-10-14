@@ -246,16 +246,17 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
 
     logger.debug(
         f"Checking ingest result:\n Status: {json_payload.get('status', None)}"
-        f"\n Description: {json_payload.get('description', None)}")
+        f"\n Description: {json_payload.get('description', None)}"
+    )
 
     is_failed = json_payload.get("status", "") in "failed"
     description = json_payload.get("description", "")
 
     # Look to see if we have any failure annotations to augment the description
-    if (is_failed and 'annotations' in json_payload):
-        for annot_id, value in json_payload['annotations'].items():
-            if ('task_result' in value and value['task_result'] == "FAILURE"):
-                message = value.get('message', "Unknown")
+    if is_failed and "annotations" in json_payload:
+        for annot_id, value in json_payload["annotations"].items():
+            if "task_result" in value and value["task_result"] == "FAILURE":
+                message = value.get("message", "Unknown")
                 description = f"\n↪ Event that caused this failure: {annot_id} -> {message}"
                 break
 
