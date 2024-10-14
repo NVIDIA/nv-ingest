@@ -131,6 +131,10 @@ Tasks and Options:
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_tables (bool): Enables table extraction. Default: False.
     - extract_charts (bool): Enables chart extraction. Default: False.
+    - text_depth (str): Text extraction granularity ('document', 'page'). Default: 'document'. 
+        Note: this will affect the granularity of text extraction, and the associated metadata. ie. 'page' will extract
+        text per page and you will get page-level metadata, 'document' will extract text for the entire document so
+        elements like page numbers will not be associated with individual text elements.
 \b
 - store: Stores any images extracted from documents.
     Options:
