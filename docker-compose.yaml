@@ -22,11 +22,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=1
-      - NIM_OTEL_SERVICE_NAME=yolox
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=otlp
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
-      - NIM_ENABLE_OTEL=true
+      - NIM_OTEL_SERVICE_NAME:yolox
+      - NIM_OTEL_TRACES_EXPORTER:otlp
+      - NIM_OTEL_METRICS_EXPORTER:otlp
+      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT:otel-collector:4317
+      - NIM_ENABLE_OTEL:true
     deploy:
       resources:
         reservations:
