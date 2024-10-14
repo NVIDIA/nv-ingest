@@ -9,7 +9,8 @@ services:
       - "6379:6379"
 
   yolox:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    #image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    image: nvcr.io/nvstaging/nim/nv-yolox:24.09-18559495
     ports:
       - "8000:8000"
       - "8001:8001"
