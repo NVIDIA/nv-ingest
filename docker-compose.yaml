@@ -154,6 +154,7 @@ services:
       - PADDLE_INFER_PROTOCOL=grpc
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
+      - TABLE_DETECTION_GRPC_TRITON=yolox:8001  # Kept for backward comptability. Only used in legacy EA container.
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
