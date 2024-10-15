@@ -8,6 +8,7 @@
 import concurrent.futures
 import json
 import logging
+import math
 import time
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
@@ -506,11 +507,25 @@ class NvIngestClient:
             job_state.state = JobStateEnum.FAILED
             raise
 
-    def submit_job(self, job_indices: Union[str, List[str]], job_queue_id: str) -> List[Union[Dict, None]]:
+    def submit_job(
+        self, job_indices: Union[str, List[str]], job_queue_id: str, batch_size: int = 10
+    ) -> List[Union[Dict, None]]:
         if isinstance(job_indices, str):
             job_indices = [job_indices]
 
-        return [self._submit_job(job_id, job_queue_id) for job_id in job_indices]
+        results = []
+        total_batches = math.ceil(len(job_indices) / batch_size)
+
+        for batch_num in range(total_batches):
+            batch_start = batch_num * batch_size
+            batch_end = batch_start + batch_size
+            batch = job_indices[batch_start:batch_end]
+
+            # Submit each batch of jobs
+            batch_results = [self._submit_job(job_id, job_queue_id) for job_id in batch]
+            results.extend(batch_results)
+
+        return results
 
     def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
         """
