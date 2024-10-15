@@ -81,13 +81,14 @@ def get_caption_classifier_service():
     return triton_service_caption_classifier, triton_service_caption_classifier_name
 
 
-def get_yolox_service_table_detection():
+def get_table_detection_service(env_var_prefix):
+    prefix = env_var_prefix.upper()
     grpc_endpoint = os.environ.get(
-        "TABLE_DETECTION_GRPC_TRITON",
+        f"{prefix}_GRPC_ENDPOINT",
         "",
     )
     http_endpoint = os.environ.get(
-        "TABLE_DETECTION_HTTP_TRITON",
+        f"{prefix}_HTTP_ENDPOINT",
         "",
     )
     auth_token = os.environ.get(
@@ -97,80 +98,16 @@ def get_yolox_service_table_detection():
         "NGC_API_KEY",
         "",
     )
-
-    logger.info(f"TABLE_DETECTION_GRPC_TRITON: {grpc_endpoint}")
-    logger.info(f"TABLE_DETECTION_HTTP_TRITON: {http_endpoint}")
-
-    return grpc_endpoint, http_endpoint, auth_token
-
-
-def get_paddle_service_table_detection():
-    grpc_endpoint = os.environ.get(
-        "PADDLE_GRPC_ENDPOINT",
-        "",
-    )
-    http_endpoint = os.environ.get(
-        "PADDLE_HTTP_ENDPOINT",
-        "",
-    )
-    auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
-        "",
+    infer_protocol = os.environ.get(
+        f"{prefix}_INFER_PROTOCOL",
+        "http" if http_endpoint else "grpc" if grpc_endpoint else "",
     )
 
-    logger.info(f"PADDLE_GRPC_ENDPOINT: {grpc_endpoint}")
-    logger.info(f"PADDLE_HTTP_ENDPOINT: {http_endpoint}")
+    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
 
-    return grpc_endpoint, http_endpoint, auth_token
-
-
-def get_deplot_service_table_detection():
-    grpc_endpoint = os.environ.get(
-        "DEPLOT_GRPC_ENDPOINT",
-        "",
-    )
-    http_endpoint = os.environ.get(
-        "DEPLOT_HTTP_ENDPOINT",
-        "",
-    )
-    auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
-        "",
-    )
-
-    logger.info(f"DEPLOT_GRPC_ENDPOINT: {grpc_endpoint}")
-    logger.info(f"DEPLOT_HTTP_ENDPOINT: {http_endpoint}")
-
-    return grpc_endpoint, http_endpoint, auth_token
-
-
-def get_cached_service_table_detection():
-    grpc_endpoint = os.environ.get(
-        "CACHED_GRPC_ENDPOINT",
-        "",
-    )
-    http_endpoint = os.environ.get(
-        "CACHED_HTTP_ENDPOINT",
-        "",
-    )
-    auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
-        "",
-    )
-
-    logger.info(f"CACHED_GRPC_ENDPOINT: {grpc_endpoint}")
-    logger.info(f"CACHED_HTTP_ENDPOINT: {http_endpoint}")
-
-    return grpc_endpoint, http_endpoint, auth_token
+    return grpc_endpoint, http_endpoint, auth_token, infer_protocol
 
 
 def get_default_cpu_count():
@@ -247,10 +184,10 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth = get_yolox_service_table_detection()
-    paddle_grpc, paddle_http, paddle_auth = get_paddle_service_table_detection()
-    deplot_grpc, deplot_http, deplot_auth = get_deplot_service_table_detection()
-    cached_grpc, cached_http, cached_auth = get_cached_service_table_detection()
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
+    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -259,6 +196,10 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "deplot_endpoints": (deplot_grpc, deplot_http),
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "yolox_endpoints": (yolox_grpc, yolox_http),
+                "cached_infer_protocol": cached_protocol,
+                "deplot_infer_protocol": deplot_protocol,
+                "paddle_infer_protocol": paddle_protocol,
+                "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             }
         },
