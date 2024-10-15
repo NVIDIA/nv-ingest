@@ -478,7 +478,7 @@ readinessProbe:
 ## @param service.labels [object] Specifies additional labels to be added to service.
 service:
   type: ClusterIP
-  port: 8000
+  port: 7670
   annotations: {}
   labels: {}
   name: ""  # override the default service name

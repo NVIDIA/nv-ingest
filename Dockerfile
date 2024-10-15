@@ -93,7 +93,7 @@ COPY src/pipeline.py ./
 COPY pyproject.toml ./
 COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
 
-# Start both the core nv-ingest pipeline service and teh FastAPI microservice in parallel
+# Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
 CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM base AS development
