@@ -159,7 +159,8 @@ class NvIngestClient:
             raise ValueError(f"Job with ID {job_index} does not exist in JobStates: {self._job_states}")
         if required_state and (job_state.state not in required_state):
             raise ValueError(
-                f"Job with ID {job_state.job_spec.job_id} has invalid state {job_state.state}, expected {required_state}"
+                f"Job with ID {job_state.job_spec.job_id} has invalid state "
+                f"{job_state.state}, expected {required_state}"
             )
 
         return job_state
@@ -340,17 +341,75 @@ class NvIngestClient:
 
     # This is the direct Python approach function for retrieving jobs which handles the timeouts directly
     # in the function itself instead of expecting the user to handle it themselves
-    # Note this method only supports fetching a single job result synchronously
-    def fetch_job_result(self, job_id: str, timeout: float = 100, data_only: bool = True):
-        # A thread pool executor is a simple approach to performing an action with a timeout
+    def fetch_job_result(
+        self,
+        job_ids: List[str],
+        timeout: float = 100,
+        data_only: bool = True,
+        max_retries: Optional[int] = None,
+        retry_delay: float = 1,
+    ) -> List[Tuple[Optional[Dict], str]]:
+        """
+        Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
+
+        Args:
+            job_ids (List[str]): A list of job IDs to fetch results for.
+            timeout (float): Timeout for each fetch operation, in seconds.
+            data_only (bool): If True, only returns the data part of the job result.
+            max_retries (int): Maximum number of retries for jobs that are not ready yet.
+            retry_delay (float): Delay between retry attempts, in seconds.
+
+        Returns:
+            List[Tuple[Optional[Dict], str]]: A list of tuples containing the job results and job IDs.
+                                              If a timeout or error occurs, the result will be None for that job.
+
+        Raises:
+            ValueError: If there is an error in decoding the job result.
+            TimeoutError: If the fetch operation times out.
+            Exception: For all other unexpected issues.
+        """
+        results = []
+
+        def fetch_with_retries(job_id: str):
+            retries = 0
+            while (max_retries is None) or (retries < max_retries):
+                try:
+                    # Attempt to fetch the job result
+                    result = self._fetch_job_result(job_id, timeout, data_only)
+                    return result  # Return result if successful
+                except Exception as e:
+                    # Check if the error is a retryable error
+                    if "Job is not ready yet. Retry later." in str(e):
+                        logger.warning(
+                            f"Job {job_id} is not ready. "
+                            f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
+                            f"after {retry_delay} seconds."
+                        )
+                        retries += 1
+                        time.sleep(retry_delay)  # Wait before retrying
+                    else:
+                        # For any other error, log and break out of the retry loop
+                        logger.error(f"Error while fetching result for job ID {job_id}: {e}")
+                        return None  # Return None if an error occurs
+            logger.error(f"Max retries exceeded for job {job_id}.")
+            return None  # Return None after max retries are exceeded
+
+        # Use ThreadPoolExecutor to fetch results concurrently
         with ThreadPoolExecutor() as executor:
-            future = executor.submit(self._fetch_job_result_wait, job_id, timeout, data_only)
-            try:
-                # Wait for the result within the specified timeout
-                return future.result(timeout=timeout)
-            except concurrent.futures.TimeoutError:
-                # Raise a standard Python TimeoutError which the client will be expecting
-                raise TimeoutError(f"Job processing did not complete within the specified {timeout} seconds")
+            futures = {executor.submit(fetch_with_retries, job_id): job_id for job_id in job_ids}
+
+            # Collect results as futures complete
+            for future in as_completed(futures):
+                job_id = futures[future]
+                try:
+                    result = future.result(timeout=timeout)  # Apply timeout to each future
+                    results.append(result)
+                except concurrent.futures.TimeoutError:
+                    logger.error(f"Timeout while fetching result for job ID {job_id}")
+                except Exception as e:
+                    logger.error(f"Error while fetching result for job ID {job_id}: {e}")
+
+        return results
 
     def _ensure_submitted(self, job_ids: List[str]):
         if isinstance(job_ids, str):
