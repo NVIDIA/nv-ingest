@@ -44,7 +44,7 @@ def trace_message(ctrl_msg, task_desc):
     """
     ts_fetched = datetime.now()
     do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-            ctrl_msg.get_metadata("config::add_trace_tagging") is True
+        ctrl_msg.get_metadata("config::add_trace_tagging") is True
     )
 
     if do_trace_tagging:
@@ -149,14 +149,14 @@ class MultiProcessingBaseStage(SinglePortStage):
     """
 
     def __init__(
-            self,
-            c: Config,
-            task: str,
-            task_desc: str,
-            pe_count: int,
-            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-            document_type: str = None,
-            filter_properties: dict = None,
+        self,
+        c: Config,
+        task: str,
+        task_desc: str,
+        pe_count: int,
+        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+        document_type: str = None,
+        filter_properties: dict = None,
     ):
         super().__init__(c)
         self._document_type = document_type
@@ -199,11 +199,11 @@ class MultiProcessingBaseStage(SinglePortStage):
 
     @staticmethod
     def work_package_input_handler(
-            work_package_input_queue: mp.Queue,
-            work_package_response_queue: mp.Queue,
-            cancellation_token: mp.Value,
-            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-            process_pool: ProcessWorkerPoolSingleton,
+        work_package_input_queue: mp.Queue,
+        work_package_response_queue: mp.Queue,
+        cancellation_token: mp.Value,
+        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+        process_pool: ProcessWorkerPoolSingleton,
     ):
         """
         Processes work packages received from the recv_queue, applies the process_fn to each package,
@@ -244,8 +244,15 @@ class MultiProcessingBaseStage(SinglePortStage):
 
                     # This can return/raise an exception
                     result = future.result()
+                    extra_results = []
+                    if isinstance(result, tuple):
+                        result, *extra_results = result
 
                     work_package["payload"] = result
+                    if extra_results:
+                        for extra_result in extra_results:
+                            if isinstance(extra_result, dict) and ("trace_info" in extra_result):
+                               work_package["trace_info"] = extra_result["trace_info"]
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:
@@ -275,13 +282,13 @@ class MultiProcessingBaseStage(SinglePortStage):
 
     @staticmethod
     def work_package_response_handler(
-            mp_context,
-            max_queue_size,
-            work_package_input_queue: mp.Queue,
-            sub: mrc.Subscriber,
-            cancellation_token: mp.Value,
-            process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-            process_pool: ProcessWorkerPoolSingleton,
+        mp_context,
+        max_queue_size,
+        work_package_input_queue: mp.Queue,
+        sub: mrc.Subscriber,
+        cancellation_token: mp.Value,
+        process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
+        process_pool: ProcessWorkerPoolSingleton,
     ):
         """
         Manages child threads and collects results, forwarding them to the subscriber.
@@ -478,11 +485,21 @@ class MultiProcessingBaseStage(SinglePortStage):
             def cm_func(ctrl_msg: ControlMessage, work_package: dict):
                 # This is the first location where we have access to both the control message and the work package,
                 # if we had any errors in the processing, raise them here.
-                if (work_package.get("error", False)):
+                if work_package.get("error", False):
                     raise RuntimeError(work_package["error_message"])
 
                 gdf = cudf.from_pandas(work_package["payload"])
                 ctrl_msg.payload(MessageMeta(df=gdf))
+
+                do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
+                    ctrl_msg.get_metadata("config::add_trace_tagging") is True
+                )
+                if do_trace_tagging:
+                    trace_info = work_package.get("trace_info")
+                    if trace_info:
+                        for key, ts in trace_info.items():
+                            ctrl_msg.set_timestamp(key, ts)
+
                 return ctrl_msg
 
             return cm_func(ctrl_msg, work_package)
@@ -523,7 +540,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                 The control message with updated tracing metadata.
             """
             do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-                    ctrl_msg.get_metadata("config::add_trace_tagging") is True
+                ctrl_msg.get_metadata("config::add_trace_tagging") is True
             )
 
             if do_trace_tagging:

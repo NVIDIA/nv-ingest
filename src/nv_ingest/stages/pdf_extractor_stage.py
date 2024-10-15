@@ -9,6 +9,8 @@ import io
 import logging
 from typing import Any
 from typing import Dict
+from typing import List
+from typing import Optional
 
 import pandas as pd
 from morpheus.config import Config
@@ -20,10 +22,11 @@ logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def decode_and_extract(
-        base64_row: Dict[str, Any],
-        task_props: Dict[str, Any],
-        validated_config: Any,
-        default: str = "pdfium"
+    base64_row: Dict[str, Any],
+    task_props: Dict[str, Any],
+    validated_config: Any,
+    default: str = "pdfium",
+    trace_info: Optional[List] = None,
 ) -> Any:
     """
     Decodes base64 content from a row and extracts data from it using the specified extraction method.
@@ -81,6 +84,8 @@ def decode_and_extract(
 
         if validated_config.pdfium_config is not None:
             extract_params["pdfium_config"] = validated_config.pdfium_config
+        if trace_info is not None:
+            extract_params["trace_info"] = trace_info
 
         if not hasattr(pdf, extract_method):
             extract_method = default
@@ -101,7 +106,7 @@ def decode_and_extract(
     # exception_tag = create_exception_tag(error_message=log_error_message, source_id=source_id)
 
 
-def process_pdf_bytes(df, task_props, validated_config):
+def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
     """
     Processes a cuDF DataFrame containing PDF files in base64 encoding.
     Each PDF's content is replaced with its extracted text.
@@ -113,11 +118,14 @@ def process_pdf_bytes(df, task_props, validated_config):
     Returns:
     - A pandas DataFrame with the PDF content replaced by the extracted text.
     """
+    if trace_info is None:
+        trace_info = {}
 
     try:
         # Apply the helper function to each row in the 'content' column
-        _decode_and_extract = functools.partial(decode_and_extract, task_props=task_props,
-                                                validated_config=validated_config)
+        _decode_and_extract = functools.partial(
+            decode_and_extract, task_props=task_props, validated_config=validated_config, trace_info=trace_info
+        )
         logger.debug(f"processing ({task_props.get('method', None)})")
         sr_extraction = df.apply(_decode_and_extract, axis=1)
         sr_extraction = sr_extraction.explode().dropna()
@@ -127,7 +135,7 @@ def process_pdf_bytes(df, task_props, validated_config):
         else:
             extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-        return extracted_df
+        return extracted_df, {"trace_info": trace_info}
 
     except Exception as e:
         err_msg = f"Unhandled exception in process_pdf_bytes: {e}"
@@ -137,11 +145,11 @@ def process_pdf_bytes(df, task_props, validated_config):
 
 
 def generate_pdf_extractor_stage(
-        c: Config,
-        extractor_config: Dict[str, Any],
-        task: str = "extract",
-        task_desc: str = "pdf_content_extractor",
-        pe_count: int = 24,
+    c: Config,
+    extractor_config: Dict[str, Any],
+    task: str = "extract",
+    task_desc: str = "pdf_content_extractor",
+    pe_count: int = 24,
 ):
     """
     Helper function to generate a multiprocessing stage to perform pdf content extraction.
