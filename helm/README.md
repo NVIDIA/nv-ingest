@@ -92,7 +92,7 @@ minikube addons enable storage-provisioner-rancher
 
 Jobs are submitted via the `nv-ingest-cli` command. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
 
-### Access To Redis
+### Access To NV Ingest API
 
 It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
 You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
@@ -100,7 +100,7 @@ You can test outside of your Kuberenetes cluster by [port-forwarding](https://ku
 Example:
 
 ```bash
-kubectl port-forward -n ${NAMESPACE} nv-ingest-redis-master-0 6379:6379
+kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
 ```
 
 ### Executing jobs
