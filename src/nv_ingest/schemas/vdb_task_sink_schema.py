@@ -37,10 +37,11 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
         "index_conf": {
             "field_name": "vector",
             "metric_type": "L2",
-            "index_type": "HNSW",
+            "index_type": "GPU_CAGRA",
             "params": {
-                "M": 8,
-                "efConstruction": 64,
+                'intermediate_graph_degree':128,
+                'graph_degree': 64,
+                "build_algo": "NN_DESCENT",
             },
         },
         "schema_conf": {

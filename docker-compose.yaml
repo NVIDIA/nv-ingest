@@ -21,13 +21,13 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -50,7 +50,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -68,13 +68,13 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -92,13 +92,13 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -114,13 +114,13 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -163,7 +163,7 @@ services:
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=""
       - YOLOX_HEALTH_ENDPOINT=yolox:8000
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
       - READY_CHECK_ALL_COMPONENTS=True
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
@@ -175,9 +175,10 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
-
+    depends_on:
+      - milvus
 
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
@@ -266,32 +267,39 @@ services:
 #      timeout: 20s
 #      retries: 3
 
-#  milvus:
-#    # Turn on to leverage the `vdb_upload` task
-#    restart: always
-#    container_name: milvus-standalone
-#    image: milvusdb/milvus:v2.3.5
-#    command: ["milvus", "run", "standalone"]
-#    hostname: milvus
-#    security_opt:
-#      - seccomp:unconfined
-#    environment:
-#      ETCD_ENDPOINTS: etcd:2379
-#      MINIO_ADDRESS: minio:9000
-#    volumes:
-#      - ./.volumes/milvus:/var/lib/milvus
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-#      interval: 30s
-#      start_period: 90s
-#      timeout: 20s
-#      retries: 3
-#    ports:
-#      - "19530:19530"
-#      - "9091:9091"
-#    depends_on:
-#      - "etcd"
-#      - "minio"
+  # milvus:
+  #   # Turn on to leverage the `vdb_upload` task
+  #   restart: always
+  #   container_name: milvus-standalone
+  #   image: milvusdb/milvus:v2.4.9-gpu
+  #   command: ["milvus", "run", "standalone"]
+  #   hostname: milvus
+  #   security_opt:
+  #     - seccomp:unconfined
+  #   environment:
+  #     ETCD_ENDPOINTS: etcd:2379
+  #     MINIO_ADDRESS: minio:9000
+  #   volumes:
+  #     - ./.volumes/milvus:/var/lib/milvus
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+  #     interval: 30s
+  #     start_period: 90s
+  #     timeout: 20s
+  #     retries: 3
+  #   ports:
+  #     - "19530:19530"
+  #     - "9091:9091"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             device_ids: ["1"]
+  #             capabilities: [gpu]
+  #   depends_on:
+  #     - "etcd"
+  #     - "minio"
 
 #  attu:
 #    # Turn on to leverage the `vdb_upload` task
