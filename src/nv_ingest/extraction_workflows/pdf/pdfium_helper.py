@@ -35,7 +35,9 @@ from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import call_image_inference_model
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.helpers import perform_model_inference
+from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import ImageChart
 from nv_ingest.util.pdf.metadata_aggregators import ImageTable
@@ -46,7 +48,6 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-
 
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
@@ -140,12 +141,19 @@ def extract_tables_and_charts_using_image_ensemble(
 
     yolox_client = paddle_client = deplot_client = cached_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token, config.yolox_infer_protocol)
         if extract_tables:
-            paddle_client = create_inference_client(config.paddle_endpoints, config.auth_token)
+            paddle_client = create_inference_client(
+                config.paddle_endpoints, config.auth_token, config.paddle_infer_protocol
+            )
+            paddle_version = get_version(config.paddle_endpoints[1])
         if extract_charts:
-            cached_client = create_inference_client(config.cached_endpoints, config.auth_token)
-            deplot_client = create_inference_client(config.deplot_endpoints, config.auth_token)
+            cached_client = create_inference_client(
+                config.cached_endpoints, config.auth_token, config.cached_infer_protocol
+            )
+            deplot_client = create_inference_client(
+                config.deplot_endpoints, config.auth_token, config.deplot_infer_protocol
+            )
 
         batches = []
         i = 0
@@ -164,7 +172,6 @@ def extract_tables_and_charts_using_image_ensemble(
             input_array = prepare_images_for_inference(original_images)
 
             output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
-
             results = process_inference_results(
                 output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
             )
@@ -180,6 +187,7 @@ def extract_tables_and_charts_using_image_ensemble(
                     tables_and_charts,
                     extract_tables=extract_tables,
                     extract_charts=extract_charts,
+                    paddle_version=paddle_version,
                     trace_info=trace_info,
                 )
 
@@ -313,6 +321,7 @@ def handle_table_chart_extraction(
     tables_and_charts,
     extract_tables=True,
     extract_charts=True,
+    paddle_version=None,
     trace_info=None,
 ):
     """
@@ -368,20 +377,28 @@ def handle_table_chart_extraction(
                     min_width=PADDLE_MIN_WIDTH,
                     min_height=PADDLE_MIN_HEIGHT,
                 )
+                if cropped is None:
+                    continue
+
                 base64_img = numpy_to_base64(cropped)
+
+                if isinstance(paddle_client, grpcclient.InferenceServerClient):
+                    cropped = preprocess_image_for_paddle(cropped, paddle_version=paddle_version)
 
                 table_content = call_image_inference_model(paddle_client, "paddle", cropped, trace_info=trace_info)
                 table_data = ImageTable(
                     content=table_content, image=base64_img, bbox=(w1, h1, w2, h2), max_width=width, max_height=height
                 )
                 tables_and_charts.append((page_idx, table_data))
+
             elif extract_charts and label == "chart":
                 cropped = crop_image(original_image, (h1, w1, h2, w2))
+                if cropped is None:
+                    continue
+
                 base64_img = numpy_to_base64(cropped)
 
-                deplot_result = call_image_inference_model(
-                    deplot_client, "google/deplot", cropped, trace_info=trace_info
-                )
+                deplot_result = call_image_inference_model(deplot_client, "deplot", cropped, trace_info=trace_info)
                 cached_result = call_image_inference_model(cached_client, "cached", cropped, trace_info=trace_info)
                 chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
                 chart_data = ImageChart(
