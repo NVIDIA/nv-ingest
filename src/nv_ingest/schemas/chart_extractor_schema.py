@@ -2,32 +2,33 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
 import logging
-from typing import Optional
-from typing import Tuple
-
-from pydantic import BaseModel
-from pydantic import root_validator
+from typing import Optional, Tuple
+from pydantic import BaseModel, root_validator
 
 logger = logging.getLogger(__name__)
 
 
-class PDFiumConfigSchema(BaseModel):
+class ChartExtractorConfigSchema(BaseModel):
     """
-    Configuration schema for PDFium endpoints and options.
+    Configuration schema for chart extraction service endpoints and options.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    yolox_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the yolox endpoint.
+    cached_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the cached endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
-    identify_nearby_objects : bool, default=False
-        A flag indicating whether to identify nearby objects during processing.
+    deplot_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the deplot endpoint.
+        Either the gRPC or HTTP service can be empty, but not both.
+
+    paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the paddle endpoint.
+        Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
     -------
@@ -47,12 +48,17 @@ class PDFiumConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    cached_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
+
+        Ensures that at least one service (either gRPC or HTTP) is provided
+        for each endpoint in the configuration.
 
         Parameters
         ----------
@@ -76,8 +82,8 @@ class PDFiumConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["yolox_endpoints"]:
-            grpc_service, http_service = values.get(endpoint_name)
+        for endpoint_name in ["cached_endpoints", "deplot_endpoints", "paddle_endpoints"]:
+            grpc_service, http_service = values.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 
@@ -92,30 +98,30 @@ class PDFiumConfigSchema(BaseModel):
         extra = "forbid"
 
 
-class PDFExtractorSchema(BaseModel):
+class ChartExtractorSchema(BaseModel):
     """
-    Configuration schema for the PDF extractor settings.
+    Configuration schema for chart extraction processing settings.
 
     Parameters
     ----------
     max_queue_size : int, default=1
         The maximum number of items allowed in the processing queue.
 
-    n_workers : int, default=16
+    n_workers : int, default=2
         The number of worker threads to use for processing.
 
     raise_on_failure : bool, default=False
-        A flag indicating whether to raise an exception on processing failure.
+        A flag indicating whether to raise an exception if a failure occurs during chart extraction.
 
-    pdfium_config : Optional[PDFiumConfigSchema], default=None
-        Configuration for the PDFium service endpoints.
+    stage_config : Optional[ChartExtractorConfigSchema], default=None
+        Configuration for the chart extraction stage, including cached, deplot, and paddle service endpoints.
     """
 
     max_queue_size: int = 1
-    n_workers: int = 16
+    n_workers: int = 2
     raise_on_failure: bool = False
 
-    pdfium_config: Optional[PDFiumConfigSchema] = None
+    stage_config: Optional[ChartExtractorConfigSchema] = None
 
     class Config:
         extra = "forbid"

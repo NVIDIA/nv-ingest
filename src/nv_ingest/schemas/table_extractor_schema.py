@@ -4,40 +4,35 @@
 
 
 import logging
-from typing import Optional
-from typing import Tuple
 
-from pydantic import BaseModel
-from pydantic import root_validator
+from typing import Optional, Tuple
+from pydantic import BaseModel, root_validator
 
 logger = logging.getLogger(__name__)
 
 
-class PDFiumConfigSchema(BaseModel):
+class TableExtractorConfigSchema(BaseModel):
     """
-    Configuration schema for PDFium endpoints and options.
+    Configuration schema for the table extraction stage settings.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    yolox_endpoints : Tuple[str, str]
+    yolox_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
         A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
-
-    identify_nearby_objects : bool, default=False
-        A flag indicating whether to identify nearby objects during processing.
 
     Methods
     -------
     validate_endpoints(values)
-        Validates that at least one of the gRPC or HTTP services is provided for each endpoint.
+        Validates that at least one of the gRPC or HTTP services is provided for the yolox endpoint.
 
     Raises
     ------
     ValueError
-        If both gRPC and HTTP services are empty for any endpoint.
+        If both gRPC and HTTP services are empty for the yolox endpoint.
 
     Config
     ------
@@ -52,7 +47,7 @@ class PDFiumConfigSchema(BaseModel):
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
         """
-        Validates the gRPC and HTTP services for all endpoints.
+        Validates the gRPC and HTTP services for the yolox endpoint.
 
         Parameters
         ----------
@@ -67,7 +62,7 @@ class PDFiumConfigSchema(BaseModel):
         Raises
         ------
         ValueError
-            If both gRPC and HTTP services are empty for any endpoint.
+            If both gRPC and HTTP services are empty for the yolox endpoint.
         """
 
         def clean_service(service):
@@ -76,15 +71,14 @@ class PDFiumConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["yolox_endpoints"]:
-            grpc_service, http_service = values.get(endpoint_name)
-            grpc_service = clean_service(grpc_service)
-            http_service = clean_service(http_service)
+        grpc_service, http_service = values.get("yolox_endpoints", (None, None))
+        grpc_service = clean_service(grpc_service)
+        http_service = clean_service(http_service)
 
-            if not grpc_service and not http_service:
-                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
+        if not grpc_service and not http_service:
+            raise ValueError("Both gRPC and HTTP services cannot be empty for yolox_endpoints.")
 
-            values[endpoint_name] = (grpc_service, http_service)
+        values["yolox_endpoints"] = (grpc_service, http_service)
 
         return values
 
@@ -92,30 +86,30 @@ class PDFiumConfigSchema(BaseModel):
         extra = "forbid"
 
 
-class PDFExtractorSchema(BaseModel):
+class TableExtractorSchema(BaseModel):
     """
-    Configuration schema for the PDF extractor settings.
+    Configuration schema for the table extraction processing settings.
 
     Parameters
     ----------
     max_queue_size : int, default=1
         The maximum number of items allowed in the processing queue.
 
-    n_workers : int, default=16
+    n_workers : int, default=2
         The number of worker threads to use for processing.
 
     raise_on_failure : bool, default=False
-        A flag indicating whether to raise an exception on processing failure.
+        A flag indicating whether to raise an exception if a failure occurs during table extraction.
 
-    pdfium_config : Optional[PDFiumConfigSchema], default=None
-        Configuration for the PDFium service endpoints.
+    stage_config : Optional[TableExtractorConfigSchema], default=None
+        Configuration for the table extraction stage, including yolox service endpoints.
     """
 
     max_queue_size: int = 1
-    n_workers: int = 16
+    n_workers: int = 2
     raise_on_failure: bool = False
 
-    pdfium_config: Optional[PDFiumConfigSchema] = None
+    stage_config: Optional[TableExtractorConfigSchema] = None
 
     class Config:
         extra = "forbid"
