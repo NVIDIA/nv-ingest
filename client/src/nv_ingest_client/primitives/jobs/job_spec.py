@@ -11,6 +11,8 @@ from typing import Union
 from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
+from nv_ingest_client.util.dataset import get_dataset_files
+from nv_ingest_client.util.dataset import get_dataset_statistics
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +232,21 @@ class BatchJobSpec:
         job_specs = create_job_specs_for_batch(matching_files)
         for job_spec in job_specs:
             self.add_job_spec(job_spec)
+
+    def _from_dataset(self, dataset: str, shuffle_dataset: bool = True) -> None:
+        with open(dataset, "rb") as file:
+            dataset_bytes = BytesIO(file.read())
+
+        logger.debug(get_dataset_statistics(dataset_bytes))
+        dataset_files = get_dataset_files(dataset_bytes, shuffle_dataset)
+
+        self.from_files(dataset_files)
+
+    @classmethod
+    def from_dataset(cls, dataset: str, shuffle_dataset: bool = True):
+        batch_job_spec = cls()
+        batch_job_spec._from_dataset(dataset, shuffle_dataset=shuffle_dataset)
+        return batch_job_spec
 
     def add_job_spec(self, job_spec: JobSpec) -> None:
         """
