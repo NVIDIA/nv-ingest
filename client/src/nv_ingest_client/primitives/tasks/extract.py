@@ -10,6 +10,7 @@ import logging
 import os
 from typing import Dict
 from typing import Literal
+from typing import Optional
 from typing import get_args
 
 from pydantic import BaseModel
@@ -83,6 +84,7 @@ class ExtractTaskSchema(BaseModel):
     extract_images: bool = (True,)
     extract_tables: bool = False
     extract_tables_method: str = "yolox"
+    extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
     text_depth: str = "document"
 
     @root_validator(pre=True)
@@ -98,6 +100,19 @@ class ExtractTaskSchema(BaseModel):
 
         if extract_method is None:
             values["extract_method"] = _DEFAULT_EXTRACTOR_MAP[document_type]
+
+        return values
+
+    @root_validator(pre=True)
+    def set_default_extract_charts(cls, values):
+        # `extract_charts` is initially set to None for backward compatibility.
+        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
+        # table and chart extraction.
+        # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
+        extract_charts = values.get("extract_charts")
+        if extract_charts is None:
+            values["extract_charts"] = values.get("extract_tables")
+
         return values
 
     @validator("extract_method")
@@ -106,6 +121,7 @@ class ExtractTaskSchema(BaseModel):
         valid_methods = set(_Type_Extract_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
+
         return v
 
     @validator("document_type")
@@ -140,6 +156,7 @@ class ExtractTask(Task):
         extract_text: bool = False,
         extract_images: bool = False,
         extract_tables: bool = False,
+        extract_charts: Optional[bool] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         text_depth: str = "document",
     ) -> None:
@@ -153,6 +170,11 @@ class ExtractTask(Task):
         self._extract_method = extract_method
         self._extract_tables = extract_tables
         self._extract_tables_method = extract_tables_method
+        # `extract_charts` is initially set to None for backward compatibility.
+        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
+        # table and chart extraction.
+        # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
+        self._extract_charts = extract_charts if extract_charts is not None else extract_tables
         self._extract_text = extract_text
         self._text_depth = text_depth
 
@@ -167,6 +189,7 @@ class ExtractTask(Task):
         info += f"  extract text: {self._extract_text}\n"
         info += f"  extract images: {self._extract_images}\n"
         info += f"  extract tables: {self._extract_tables}\n"
+        info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
         return info
@@ -180,6 +203,7 @@ class ExtractTask(Task):
             "extract_images": self._extract_images,
             "extract_tables": self._extract_tables,
             "extract_tables_method": self._extract_tables_method,
+            "extract_charts": self._extract_charts,
             "text_depth": self._text_depth,
         }
 

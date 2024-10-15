@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import re
-from io import BytesIO
 from math import ceil
 from math import floor
 from typing import List
@@ -11,10 +10,8 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
-from PIL import Image
 
-from nv_ingest.util.converters import bytetools
-from nv_ingest.util.pdf.metadata_aggregators import LatexTable
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
 
 DEFAULT_DPI = 300
 DEFAULT_MAX_WIDTH = 1024
@@ -112,10 +109,7 @@ def crop_image(array: np.array, bbox: Tuple[int, int, int, int], format="PNG") -
     if (w2 - w1 <= 0) or (h2 - h1 <= 0):
         return None
     cropped = array[h1:h2, w1:w2]
-    pil_image = Image.fromarray(cropped.astype(np.uint8))
-    with BytesIO() as buffer:
-        pil_image.save(buffer, format="PNG")
-        base64_img = bytetools.base64frombytes(buffer.getvalue())
+    base64_img = numpy_to_base64(cropped)
 
     return base64_img
 

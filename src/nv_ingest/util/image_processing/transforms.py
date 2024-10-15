@@ -18,7 +18,11 @@ DEFAULT_MAX_HEIGHT = 1280
 
 
 def pad_image(
-    array: np.ndarray, target_width: int = DEFAULT_MAX_WIDTH, target_height: int = DEFAULT_MAX_HEIGHT
+    array: np.ndarray,
+    target_width: int = DEFAULT_MAX_WIDTH,
+    target_height: int = DEFAULT_MAX_HEIGHT,
+    background_color: int = 255,
+    dtype=np.uint8,
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
     """
     Pads a NumPy array representing an image to the specified target dimensions.
@@ -68,13 +72,15 @@ def pad_image(
     final_width = max(width, target_width)
 
     # Create the canvas and place the original image on it
-    canvas = 255 * np.ones((final_height, final_width, array.shape[2]), dtype=np.uint8)
+    canvas = background_color * np.ones((final_height, final_width, array.shape[2]), dtype=dtype)
     canvas[pad_height : pad_height + height, pad_width : pad_width + width] = array  # noqa: E203
 
     return canvas, (pad_width, pad_height)
 
 
-def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.ndarray]:
+def crop_image(
+    array: np.array, bbox: Tuple[int, int, int, int], min_width: int = 1, min_height: int = 1
+) -> Optional[np.ndarray]:
     """
     Crops a NumPy array representing an image according to the specified bounding box.
 
@@ -84,6 +90,12 @@ def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.
         The image as a NumPy array.
     bbox : Tuple[int, int, int, int]
         The bounding box to crop the image to, given as (w1, h1, w2, h2).
+    min_width : int, optional
+        The minimum allowable width for the cropped image. If the cropped width is smaller than this value,
+        the function returns None. Default is 1.
+    min_height : int, optional
+        The minimum allowable height for the cropped image. If the cropped height is smaller than this value,
+        the function returns None. Default is 1.
 
     Returns
     -------
@@ -96,13 +108,73 @@ def crop_image(array: np.array, bbox: Tuple[int, int, int, int]) -> Optional[np.
     w1 = max(floor(w1), 0)
     w2 = min(ceil(w2), array.shape[1])
 
-    if (w2 - w1 <= 0) or (h2 - h1 <= 0):
+    if (w2 - w1 < min_width) or (h2 - h1 < min_height):
         return None
 
     # Crop the image using the bounding box
     cropped = array[h1:h2, w1:w2]
 
     return cropped
+
+
+def normalize_image(
+    array: np.ndarray,
+    r_mean: float = 0.485,
+    g_mean: float = 0.456,
+    b_mean: float = 0.406,
+    r_std: float = 0.229,
+    g_std: float = 0.224,
+    b_std: float = 0.225,
+) -> np.ndarray:
+    """
+    Normalizes an RGB image by applying a mean and standard deviation to each channel.
+
+    Parameters:
+    ----------
+    array : np.ndarray
+        The input image array, which can be either grayscale or RGB. The image should have a shape of
+        (height, width, 3) for RGB images, or (height, width) or (height, width, 1) for grayscale images.
+        If a grayscale image is provided, it will be converted to RGB format by repeating the grayscale values
+        across all three channels (R, G, B).
+    r_mean : float, optional
+        The mean to be subtracted from the red channel (default is 0.485).
+    g_mean : float, optional
+        The mean to be subtracted from the green channel (default is 0.456).
+    b_mean : float, optional
+        The mean to be subtracted from the blue channel (default is 0.406).
+    r_std : float, optional
+        The standard deviation to divide the red channel by (default is 0.229).
+    g_std : float, optional
+        The standard deviation to divide the green channel by (default is 0.224).
+    b_std : float, optional
+        The standard deviation to divide the blue channel by (default is 0.225).
+
+    Returns:
+    -------
+    np.ndarray
+        A normalized image array with the same shape as the input, where the RGB channels have been normalized
+        by the given means and standard deviations.
+
+    Notes:
+    -----
+    The input pixel values should be in the range [0, 255], and the function scales these values to [0, 1]
+    before applying normalization.
+
+    If the input image is grayscale, it is converted to an RGB image by duplicating the grayscale values
+    across the three color channels.
+    """
+    # If the input is a grayscale image with shape (height, width) or (height, width, 1),
+    # convert it to RGB with shape (height, width, 3).
+    if array.ndim == 2 or array.shape[2] == 1:
+        array = np.dstack((array, 255 * np.ones_like(array), 255 * np.ones_like(array)))
+
+    height, width = array.shape[:2]
+
+    mean = np.array([r_mean, g_mean, b_mean]).reshape((1, 1, 3)).astype(np.float32)
+    std = np.array([r_std, g_std, b_std]).reshape((1, 1, 3)).astype(np.float32)
+    output_array = (array.astype("float32") / 255.0 - mean) / std
+
+    return output_array
 
 
 def numpy_to_base64(array: np.ndarray) -> str:
@@ -138,6 +210,12 @@ def numpy_to_base64(array: np.ndarray) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
+    # If the array represents a grayscale image, drop the redundant axis in
+    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
+    # a grayscale image.
+    if array.ndim == 3 and array.shape[2] == 1:
+        array = np.squeeze(array, axis=2)
+
     # Check if the array is valid and can be converted to an image
     try:
         # Convert the NumPy array to a PIL image
