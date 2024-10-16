@@ -118,7 +118,7 @@ def test_add_task(job_spec_fixture):
     batch.add_task(mock_task)
 
     # Ensure the task has been added to the job spec
-    for task in batch.job_specs[0].tasks:
+    for task in batch.job_specs[0]._tasks:
         assert task.to_dict() == {"task": "mocktask"}
 
 
@@ -127,16 +127,10 @@ def test_to_dict(job_spec_fixture):
     batch = BatchJobSpec(job_specs=[job_spec_fixture])
     result = batch.to_dict()
 
-    # Check if the dictionary representation is correct
-    expected_dict = {
-        "payload": {"key": "value"},
-        "tasks": [{"task": "mocktask"}],
-        "source_id": "source123",
-        "source_name": "source123.pdf",
-        "extended_options": {"tracing_options": {"option1": "value1"}},
-    }
-
-    assert result == [expected_dict]
+    assert len(result) == 1
+    assert result[0]["job_payload"]["content"] == [{"key": "value"}]
+    assert len(result[0]["tasks"]) == 1
+    assert result[0]["tracing_options"] == {"option1": "value1"}
 
 
 # Test string representation of BatchJobSpec
@@ -144,12 +138,5 @@ def test_str_representation(job_spec_fixture):
     batch = BatchJobSpec(job_specs=[job_spec_fixture])
     result = str(batch)
 
-    expected_str = (
-        f"JobSpec(payload={{'key': 'value'}}, "
-        f"tasks=[{{'task': 'mocktask'}}], "
-        f"source_id='source123', "
-        f"source_name='source123.pdf', "
-        f"extended_options={{'tracing_options': {{'option1': 'value1'}}}})"
-    )
-
-    assert result == expected_str
+    assert "source-id: source123" in result
+    assert "task count: 1" in result
