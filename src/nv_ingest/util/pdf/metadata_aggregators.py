@@ -27,16 +27,12 @@ from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 
 
 @dataclass
-class DataFrameTable:
-    df: pd.DataFrame
-    bbox: Tuple[int, int, int, int]
-
-
-@dataclass
 class ImageTable:
     content: str
     image: str
     bbox: Tuple[int, int, int, int]
+    max_width: int
+    max_height: int
 
 
 @dataclass
@@ -44,12 +40,16 @@ class ImageChart:
     content: str
     image: str
     bbox: Tuple[int, int, int, int]
+    max_width: int
+    max_height: int
 
 
 @dataclass
 class LatexTable:
     latex: pd.DataFrame
     bbox: Tuple[int, int, int, int]
+    max_width: int
+    max_height: int
 
 
 @dataclass
@@ -58,6 +58,8 @@ class Base64Image:
     bbox: Tuple[int, int, int, int]
     width: int
     height: int
+    max_width: int
+    max_height: int
 
 
 @dataclass
@@ -252,7 +254,7 @@ def construct_image_metadata(
         "caption": "",
         "text": "",
         "image_location": image_base64.bbox,
-        "width": image_base64.width,
+        "image_location_max_dimensions": (image_base64.max_width, image_base64.max_height),
         "height": image_base64.height,
     }
 
@@ -275,7 +277,7 @@ def construct_image_metadata(
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_table_and_chart_metadata(
-    table: Union[DataFrameTable, ImageTable, ImageChart],
+    table: Union[ImageTable, ImageChart],
     page_idx: int,
     page_count: int,
     source_metadata: Dict,
@@ -309,14 +311,7 @@ def construct_table_and_chart_metadata(
     +--------------------------------+--------------------------+------------+---+
     """
 
-    if isinstance(table, DataFrameTable):
-        content = table.df.to_markdown(index=False)
-        structured_content_text = content
-        table_format = TableFormatEnum.MARKDOWN
-        subtype = ContentSubtypeEnum.TABLE
-        description = StdContentDescEnum.PDF_TABLE
-
-    elif isinstance(table, ImageTable):
+    if isinstance(table, ImageTable):
         content = table.image
         structured_content_text = table.content
         table_format = TableFormatEnum.IMAGE
@@ -351,6 +346,7 @@ def construct_table_and_chart_metadata(
         "table_format": table_format,
         "table_content": structured_content_text,
         "table_location": table.bbox,
+        "table_location_max_dimensions": (table.max_width, table.max_height),
     }
 
     ext_unified_metadata = base_unified_metadata.copy()
