@@ -6,6 +6,7 @@ import uuid
 from typing import Dict
 
 import pytest
+from nv_ingest_client.primitives.jobs.job_spec import BatchJobSpec
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.tasks import Task
 
@@ -92,3 +93,63 @@ def test_set_properties():
 
     job_spec.source_name = "source456.pdf"
     assert job_spec.source_name == "source456.pdf"
+
+
+# Test initializing BatchJobSpec with JobSpec objects
+def test_initialization_with_job_specs(job_spec_fixture):
+    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    assert len(batch.job_specs) == 1
+    assert batch.job_specs[0] == job_spec_fixture
+
+
+# Test adding a JobSpec to BatchJobSpec
+def test_add_job_spec(job_spec_fixture):
+    batch = BatchJobSpec()
+    batch.add_job_spec(job_spec_fixture)
+    assert len(batch.job_specs) == 1
+    assert batch.job_specs[0] == job_spec_fixture
+
+
+# Test adding a Task to JobSpecs in BatchJobSpec
+def test_add_task(job_spec_fixture):
+    mock_task = MockTask()
+
+    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    batch.add_task(mock_task)
+
+    # Ensure the task has been added to the job spec
+    for task in batch.job_specs[0].tasks:
+        assert task.to_dict() == {"task": "mocktask"}
+
+
+# Test converting BatchJobSpec to dictionary
+def test_to_dict(job_spec_fixture):
+    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    result = batch.to_dict()
+
+    # Check if the dictionary representation is correct
+    expected_dict = {
+        "payload": {"key": "value"},
+        "tasks": [{"task": "mocktask"}],
+        "source_id": "source123",
+        "source_name": "source123.pdf",
+        "extended_options": {"tracing_options": {"option1": "value1"}},
+    }
+
+    assert result == [expected_dict]
+
+
+# Test string representation of BatchJobSpec
+def test_str_representation(job_spec_fixture):
+    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    result = str(batch)
+
+    expected_str = (
+        f"JobSpec(payload={{'key': 'value'}}, "
+        f"tasks=[{{'task': 'mocktask'}}], "
+        f"source_id='source123', "
+        f"source_name='source123.pdf', "
+        f"extended_options={{'tracing_options': {{'option1': 'value1'}}}})"
+    )
+
+    assert result == expected_str
