@@ -132,7 +132,7 @@ services:
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
       - CACHED_INFER_PROTOCOL=grpc
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
       # self hosted deplot
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
@@ -169,9 +169,7 @@ services:
             - driver: nvidia
               device_ids: ["1"]
               capabilities: [gpu]
-    depends_on:
-      - milvus
-
+  
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
