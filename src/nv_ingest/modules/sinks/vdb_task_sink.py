@@ -211,6 +211,7 @@ def _vdb_task_sink(builder: mrc.Builder):
 
             mdf["embedding"] = mdf["metadata"].struct.field("embedding")
             mdf["_source_metadata"] = mdf["metadata"].struct.field("source_metadata")
+            mdf["_content_metadata"] = mdf["metadata"].struct.field("content_metadata")
             df = mdf[mdf["_contains_embeddings"]].copy()
 
         df = df[
@@ -218,9 +219,10 @@ def _vdb_task_sink(builder: mrc.Builder):
                 "embedding",
                 "_content",
                 "_source_metadata",
+                "_content_metadata",
             ]
         ]
-        df.columns = ["vector", "text", "source"]
+        df.columns = ["vector", "text", "source", "content_metadata"]
 
         return df, resource_name
 
