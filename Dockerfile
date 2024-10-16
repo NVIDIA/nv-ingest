@@ -146,7 +146,7 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 # Set entrypoint to tini with a custom entrypoint script
 ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
-# Start the pipeline and services
+# Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
 CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM nv_ingest_install AS development
