@@ -30,6 +30,7 @@ from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import task_factory
+from nv_ingest_client.util.processing import handle_future_result
 
 logger = logging.getLogger(__name__)
 
@@ -347,7 +348,6 @@ class NvIngestClient:
         self,
         job_ids: List[str],
         timeout: float = 100,
-        data_only: bool = True,
         max_retries: Optional[int] = None,
         retry_delay: float = 1,
         verbose: bool = False,
@@ -358,7 +358,6 @@ class NvIngestClient:
         Args:
             job_ids (List[str]): A list of job IDs to fetch results for.
             timeout (float): Timeout for each fetch operation, in seconds.
-            data_only (bool): If True, only returns the data part of the job result.
             max_retries (int): Maximum number of retries for jobs that are not ready yet.
             retry_delay (float): Delay between retry attempts, in seconds.
 
@@ -378,8 +377,8 @@ class NvIngestClient:
             while (max_retries is None) or (retries < max_retries):
                 try:
                     # Attempt to fetch the job result
-                    result = self._fetch_job_result(job_id, timeout, data_only)
-                    return result  # Return result if successful
+                    result = self._fetch_job_result(job_id, timeout, data_only=False)
+                    return result, job_id
                 except Exception as e:
                     # Check if the error is a retryable error
                     if "Job is not ready yet. Retry later." in str(e):
@@ -394,9 +393,9 @@ class NvIngestClient:
                     else:
                         # For any other error, log and break out of the retry loop
                         logger.error(f"Error while fetching result for job ID {job_id}: {e}")
-                        return None  # Return None if an error occurs
+                        return None, job_id
             logger.error(f"Max retries exceeded for job {job_id}.")
-            return None  # Return None after max retries are exceeded
+            return None, job_id
 
         # Use ThreadPoolExecutor to fetch results concurrently
         with ThreadPoolExecutor() as executor:
@@ -406,10 +405,14 @@ class NvIngestClient:
             for future in as_completed(futures):
                 job_id = futures[future]
                 try:
-                    result = future.result(timeout=timeout)  # Apply timeout to each future
-                    results.append(result)
+                    result = handle_future_result(future, futures, timeout)
+                    results.append(result.get("data"))
                 except concurrent.futures.TimeoutError:
                     logger.error(f"Timeout while fetching result for job ID {job_id}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Decoding while processing job ID {job_id}: {e}")
+                except RuntimeError as e:
+                    logger.error(f"Error while processing job ID {job_id}: {e}")
                 except Exception as e:
                     logger.error(f"Error while fetching result for job ID {job_id}: {e}")
 
