@@ -572,6 +572,62 @@ class NvIngestClient:
         return future_to_job_index
 
     def create_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[JobSpec]:
+        """
+        Create and submit job specifications (JobSpecs) for a batch of files, returning the job IDs.
+        This function takes a batch of files, processes each file to extract its content and type,
+        creates a job specification (JobSpec) for each file, and adds tasks from the provided task
+        list. It then submits the jobs to the client and collects their job IDs.
+
+        Parameters
+        ----------
+        files_batch : List[str]
+            A list of file paths to be processed. Each file is assumed to be in a format compatible
+            with the `extract_file_content` function, which extracts the file's content and type.
+        tasks : Dict[str, Any]
+            A dictionary of tasks to be added to each job. The keys represent task names, and the
+            values represent task specifications or configurations. Standard tasks include "split",
+            "extract", "store", "caption", "dedup", "filter", "embed", and "vdb_upload".
+
+        Returns
+        -------
+        Tuple[List[JobSpec], List[str]]
+            A Tuple containing the list of JobSpecs and list of job IDs corresponding to the submitted jobs.
+            Each job ID is returned by the client's `add_job` method.
+
+        Raises
+        ------
+        ValueError
+            If there is an error extracting the file content or type from any of the files, a
+            ValueError will be logged, and the corresponding file will be skipped.
+
+        Notes
+        -----
+        - The function assumes that a utility function `extract_file_content` is defined elsewhere,
+          which extracts the content and type from the provided file paths.
+        - For each file, a `JobSpec` is created with relevant metadata, including document type and
+          file content. Various tasks are conditionally added based on the provided `tasks` dictionary.
+        - The job specification includes tracing options with a timestamp (in nanoseconds) for
+          diagnostic purposes.
+
+        Examples
+        --------
+        Suppose you have a batch of files and tasks to process:
+        >>> files_batch = ["file1.txt", "file2.pdf"]
+        >>> tasks = {"split": ..., "extract_txt": ..., "store": ...}
+        >>> client = NvIngestClient()
+        >>> job_ids = client.create_job_specs_for_batch(files_batch, tasks)
+        >>> print(job_ids)
+        ['job_12345', 'job_67890']
+
+        In this example, jobs are created and submitted for the files in `files_batch`, with the
+        tasks in `tasks` being added to each job specification. The returned job IDs are then
+        printed.
+
+        See Also
+        --------
+        create_job_specs_for_batch: Function that creates job specifications for a batch of files.
+        JobSpec : The class representing a job specification.
+        """
         job_specs = create_job_specs_for_batch(files_batch)
 
         job_ids = []
