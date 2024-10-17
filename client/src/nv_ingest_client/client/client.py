@@ -21,7 +21,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from nv_ingest_client.client.util import create_job_specs_for_batch
+from nv_ingest_client.util.util import create_job_specs_for_batch
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec

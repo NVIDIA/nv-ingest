@@ -142,10 +142,6 @@ class JobSpec:
     def document_type(self) -> str:
         return self._document_type
 
-    @source_name.setter
-    def document_type(self, document_type: str) -> None:
-        self._document_type = document_type
-
     def add_task(self, task) -> None:
         """
         Adds a task to the job specification.
@@ -168,37 +164,28 @@ class JobSpec:
 
 class BatchJobSpec:
     """
-    A class representing a batch of job specifications, allowing for batch processing of multiple jobs.
+    A class used to represent a batch of job specifications (JobSpecs).
 
-    Parameters
-    ----------
-    job_specs : Optional[Union[List[JobSpec], List[str]]], optional
-        Either a list of JobSpec objects or a list of file paths. If file paths are provided, JobSpec
-        instances will be created from the file paths, by default None.
+    This class allows for batch processing of multiple jobs, either from a list of
+    `JobSpec` instances or from file paths. It provides methods for adding job
+    specifications, associating tasks with those specifications, and serializing the
+    batch to a dictionary format.
 
     Attributes
     ----------
-    _job_specs : List[JobSpec]
-        A list of JobSpec objects that are part of this batch.
-
-    Methods
-    -------
-    from_files(files: List[str]):
-        Generates a list of JobSpec instances from the given list of file paths.
-    add_job_spec(job_spec: JobSpec):
-        Adds a single JobSpec to the batch.
-    to_dict() -> List[Dict]:
-        Converts all JobSpec objects in the batch to a list of dictionaries for serialization.
+    _file_type_to_job_spec : defaultdict
+        A dictionary that maps document types to a list of `JobSpec` instances.
     """
 
     def __init__(self, job_specs_or_files: Optional[Union[List[JobSpec], List[str]]] = None) -> None:
         """
-        Initialize the BatchJobSpec with either a list of JobSpec objects or a list of file paths.
+        Initializes the BatchJobSpec instance.
 
         Parameters
         ----------
-        job_specs : Optional[Union[List[JobSpec], List[str]]], optional
-            Either a list of JobSpec objects or a list of file paths, by default None.
+        job_specs_or_files : Optional[Union[List[JobSpec], List[str]]], optional
+            A list of either `JobSpec` instances or file paths. If provided, the
+            instance will be initialized with the corresponding job specifications.
         """
         self._file_type_to_job_spec = defaultdict(list)
 
@@ -211,22 +198,30 @@ class BatchJobSpec:
                 raise ValueError("Invalid input type for job_specs. Must be a list of JobSpec or file paths.")
 
     def from_job_specs(self, job_specs: Union[JobSpec, List[JobSpec]]) -> None:
+        """
+        Initializes the batch with a list of `JobSpec` instances.
+
+        Parameters
+        ----------
+        job_specs : Union[JobSpec, List[JobSpec]]
+            A single `JobSpec` or a list of `JobSpec` instances to add to the batch.
+        """
         if isinstance(job_specs, JobSpec):
-            job_specs = [JobSpec]
+            job_specs = [job_specs]
 
         for job_spec in job_specs:
             self.add_job_spec(job_spec)
 
     def from_files(self, files: Union[str, List[str]]) -> None:
         """
-        Generates JobSpec instances from a list of file paths.
+        Initializes the batch by generating job specifications from file paths.
 
         Parameters
         ----------
-        files : List[str]
-            A list of file paths to generate JobSpec instances from.
+        files : Union[str, List[str]]
+            A single file path or a list of file paths to create job specifications from.
         """
-        from nv_ingest_client.client.util import create_job_specs_for_batch
+        from nv_ingest_client.util.util import create_job_specs_for_batch
         from nv_ingest_client.util.util import generate_matching_files
 
         if isinstance(files, str):
@@ -242,6 +237,16 @@ class BatchJobSpec:
             self.add_job_spec(job_spec)
 
     def _from_dataset(self, dataset: str, shuffle_dataset: bool = True) -> None:
+        """
+        Internal method to initialize the batch from a dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            The path to the dataset file.
+        shuffle_dataset : bool, optional
+            Whether to shuffle the dataset files before adding them to the batch, by default True.
+        """
         with open(dataset, "rb") as file:
             dataset_bytes = BytesIO(file.read())
 
@@ -252,65 +257,111 @@ class BatchJobSpec:
 
     @classmethod
     def from_dataset(cls, dataset: str, shuffle_dataset: bool = True):
+        """
+        Class method to create a `BatchJobSpec` instance from a dataset.
+
+        Parameters
+        ----------
+        dataset : str
+            The path to the dataset file.
+        shuffle_dataset : bool, optional
+            Whether to shuffle the dataset files before adding them to the batch, by default True.
+
+        Returns
+        -------
+        BatchJobSpec
+            A new instance of `BatchJobSpec` initialized with the dataset files.
+        """
         batch_job_spec = cls()
         batch_job_spec._from_dataset(dataset, shuffle_dataset=shuffle_dataset)
         return batch_job_spec
 
     def add_job_spec(self, job_spec: JobSpec) -> None:
         """
-        Adds a single JobSpec to the batch.
+        Adds a `JobSpec` to the batch.
 
         Parameters
         ----------
         job_spec : JobSpec
-            The JobSpec instance to add to the batch.
+            The job specification to add.
         """
         self._file_type_to_job_spec[job_spec.document_type].append(job_spec)
 
-    def add_task(self, task):
+    def add_task(self, task, document_type=None):
         """
-        Adds a task to the job specification.
+        Adds a task to the relevant job specifications in the batch.
+
+        If a `document_type` is provided, the task will be added to all job specifications
+        matching that document type. If no `document_type` is provided, the task will be added
+        to all job specifications in the batch.
 
         Parameters
         ----------
-        file_type
+        task : Task
+            The task to add. Must derive from the `nv_ingest_client.primitives.Task` class.
 
-        task
-            The task to add to the job specification.
+        document_type : str, optional
+            The document type used to filter job specifications. If not provided, the
+            `document_type` is inferred from the task, or the task is applied to all job specifications.
 
         Raises
         ------
         ValueError
-            If the task does not have a to_dict method.
+            If the task does not derive from the `Task` class.
         """
         if not isinstance(task, Task):
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
-        for job_spec in self._file_type_to_job_spec[task.document_type]:
+        document_type = document_type or task.to_dict().get("document_type")
+
+        if document_type:
+            target_job_specs = self._file_type_to_job_spec[document_type]
+        else:
+            target_job_specs = []
+            for job_specs in self._file_type_to_job_spec.values():
+                target_job_specs.extend(job_specs)
+
+        for job_spec in target_job_specs:
             job_spec.add_task(task)
 
     def to_dict(self) -> List[Dict]:
         """
-        Converts the batch of JobSpec instances into a list of dictionaries for serialization.
+        Serializes the batch of job specifications into a list of dictionaries.
 
         Returns
         -------
         List[Dict]
-            A list of dictionaries representing the JobSpec objects in the batch.
+            A list of dictionaries representing the job specifications in the batch.
         """
-        return [job_spec.to_dict() for job_spec in self._job_specs]
+        return {
+            file_type: [j.to_dict() for j in job_specs] for file_type, job_specs in self._file_type_to_job_spec.items()
+        }
 
     def __str__(self) -> str:
         """
-        Provides a string representation of the BatchJobSpec, listing all JobSpec instances.
+        Returns a string representation of the batch.
 
         Returns
         -------
         str
-            A string representation of the batch.
+            A string representation of the job specifications in the batch.
         """
-        return "\n".join(str(job_spec) for job_spec in self._job_specs)
+        result = ""
+        for file_type, job_specs in self._file_type_to_job_spec.items():
+            result += f"{file_type}\n"
+            for job_spec in job_specs:
+                result += str(job_spec) + "\n"
+
+        return result
 
     @property
     def job_specs(self) -> Dict[str, List[str]]:
+        """
+        A property that returns a dictionary of job specs categorized by document type.
+
+        Returns
+        -------
+        Dict[str, List[str]]
+            A dictionary mapping document types to job specifications.
+        """
         return self._file_type_to_job_spec

@@ -5,18 +5,26 @@
 import glob
 import logging
 import os
+import time
 import traceback
 import typing
 from io import BytesIO
 from typing import Dict
+from typing import List
 
 import pypdfium2 as pdfium
 from docx import Document as DocxDocument
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
 from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
 from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.util.file_processing.extract import get_or_infer_file_type
 from pptx import Presentation
+
+
+logger = logging.getLogger(__name__)
+
+
 
 # pylint: disable=invalid-name
 # pylint: disable=missing-class-docstring
@@ -291,3 +299,71 @@ def generate_matching_files(file_sources):
     ]
     for file_path in files:
         yield file_path
+
+
+def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
+    """
+    Create and job specifications (JobSpecs) for a batch of files.
+    This function takes a batch of files, processes each file to extract its content and type,
+    creates a job specification (JobSpec) for each file.
+
+    Parameters
+    ----------
+    files_batch : List[str]
+        A list of file paths to be processed. Each file is assumed to be in a format compatible
+        with the `extract_file_content` function, which extracts the file's content and type.
+
+    Returns
+    -------
+    List[JobSpec]
+        A list of JobSpecs.
+
+    Raises
+    ------
+    ValueError
+        If there is an error extracting the file content or type from any of the files, a
+        ValueError will be logged, and the corresponding file will be skipped.
+
+    Notes
+    -----
+    - The function assumes that a utility function `extract_file_content` is defined elsewhere,
+      which extracts the content and type from the provided file paths.
+    - For each file, a `JobSpec` is created with relevant metadata, including document type and
+      file content.
+    - The job specification includes tracing options with a timestamp (in nanoseconds) for
+      diagnostic purposes.
+
+    Examples
+    --------
+    Suppose you have a batch of files and tasks to process:
+
+    >>> files_batch = ["file1.txt", "file2.pdf"]
+    >>> client = NvIngestClient()
+    >>> job_specs = create_job_specs_for_batch(files_batch)
+    >>> print(job_specs)
+    [nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb468bb0>, <nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb469270>]
+
+    See Also
+    --------
+    extract_file_content : Function that extracts the content and type of a file.
+    JobSpec : The class representing a job specification.
+    """
+    job_specs = []
+    for file_name in files_batch:
+        try:
+            file_content, file_type = extract_file_content(file_name)  # Assume these are defined
+            file_type = file_type.value
+        except ValueError as ve:
+            logger.error(f"Error extracting content from {file_name}: {ve}")
+            continue
+
+        job_spec = JobSpec(
+            document_type=file_type,
+            payload=file_content,
+            source_id=file_name,
+            source_name=file_name,
+            extended_options={"tracing_options": {"trace": True, "ts_send": time.time_ns()}},
+        )
+        job_specs.append(job_spec)
+
+    return job_specs
