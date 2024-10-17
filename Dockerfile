@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
       wget \
       bzip2 \
       ca-certificates \
+      curl \
     && apt-get clean
 
 # Install miniconda
@@ -62,7 +63,7 @@ WORKDIR /workspace
 # Copy custom entrypoint script
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
-FROM base as nv_ingest_install
+FROM base AS nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
 COPY ci ci
