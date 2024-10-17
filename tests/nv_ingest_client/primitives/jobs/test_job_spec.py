@@ -97,14 +97,17 @@ def test_set_properties():
 
 # Test initializing BatchJobSpec with JobSpec objects
 def test_initialization_with_job_specs(job_spec_fixture):
-    batch = BatchJobSpec(job_specs=[job_spec_fixture])
-    assert len(batch.job_specs) == 1
+    batch = BatchJobSpec([job_spec_fixture, job_spec_fixture])
+    assert len(batch.job_specs) == 2
     assert batch.job_specs[0] == job_spec_fixture
+    assert batch.job_specs[1] == job_spec_fixture
 
 
 # Test adding a JobSpec to BatchJobSpec
 def test_add_job_spec(job_spec_fixture):
     batch = BatchJobSpec()
+    assert len(batch.job_specs) == 0
+
     batch.add_job_spec(job_spec_fixture)
     assert len(batch.job_specs) == 1
     assert batch.job_specs[0] == job_spec_fixture
@@ -114,7 +117,7 @@ def test_add_job_spec(job_spec_fixture):
 def test_add_task(job_spec_fixture):
     mock_task = MockTask()
 
-    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    batch = BatchJobSpec([job_spec_fixture])
     batch.add_task(mock_task)
 
     # Ensure the task has been added to the job spec
@@ -124,7 +127,7 @@ def test_add_task(job_spec_fixture):
 
 # Test converting BatchJobSpec to dictionary
 def test_to_dict(job_spec_fixture):
-    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    batch = BatchJobSpec([job_spec_fixture])
     result = batch.to_dict()
 
     assert len(result) == 1
@@ -135,7 +138,7 @@ def test_to_dict(job_spec_fixture):
 
 # Test string representation of BatchJobSpec
 def test_str_representation(job_spec_fixture):
-    batch = BatchJobSpec(job_specs=[job_spec_fixture])
+    batch = BatchJobSpec([job_spec_fixture])
     result = str(batch)
 
     assert "source-id: source123" in result
