@@ -140,6 +140,7 @@ def extract_tables_and_charts_using_image_ensemble(
         return tables_and_charts
 
     yolox_client = paddle_client = deplot_client = cached_client = None
+    paddle_version = None
     try:
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token, config.yolox_infer_protocol)
         if extract_tables:
