@@ -23,11 +23,15 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=1
+      # NIM OpenTelemetry Settings
       - NIM_OTEL_SERVICE_NAME=yolox
       - NIM_OTEL_TRACES_EXPORTER=otlp
       - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
+      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - NIM_ENABLE_OTEL=true
+      # Triton OpenTelemetry Settings
+      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -186,19 +190,21 @@ services:
 
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.91.0
+    image: otel/opentelemetry-collector-contrib:0.102.1
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
-    ports:
-      - "8888:8888" # Prometheus metrics exposed by the collector
-      - "8889:8889" # Prometheus exporter metrics
-      - "13133:13133" # health_check extension
+    expose:
+      - "8888" # Prometheus metrics exposed by the collector
+      - "8889" # Prometheus exporter metrics
+      - "13133" # health_check extension
       - "9411" # Zipkin receiver
-      - "4317:4317" # OTLP gRPC receiver
-      - "4318:4318" # OTLP/HTTP receiver
-      - "55680:55679" # zpages extension
+      - "4317" # OTLP gRPC receiver
+      - "4318" # OTLP/HTTP receiver
+      - "55679" # Debug UI
+    ports:
+      - ":55679:55679" # Debug UI
     depends_on:
       - zipkin
 
