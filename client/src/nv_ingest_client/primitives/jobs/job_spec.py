@@ -4,6 +4,7 @@
 
 
 import logging
+from collections import defaultdict
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -190,7 +191,7 @@ class BatchJobSpec:
         Converts all JobSpec objects in the batch to a list of dictionaries for serialization.
     """
 
-    def __init__(self, job_specs: Optional[Union[List[JobSpec], List[str]]] = None) -> None:
+    def __init__(self, job_specs_or_files: Optional[Union[List[JobSpec], List[str]]] = None) -> None:
         """
         Initialize the BatchJobSpec with either a list of JobSpec objects or a list of file paths.
 
@@ -199,15 +200,22 @@ class BatchJobSpec:
         job_specs : Optional[Union[List[JobSpec], List[str]]], optional
             Either a list of JobSpec objects or a list of file paths, by default None.
         """
-        self._job_specs = []
+        self._file_type_to_job_spec = defaultdict(list)
 
-        if job_specs:
-            if isinstance(job_specs[0], JobSpec):
-                self._job_specs = job_specs
-            elif isinstance(job_specs[0], str):
-                self.from_files(job_specs)
+        if job_specs_or_files:
+            if isinstance(job_specs_or_files[0], JobSpec):
+                self.from_job_specs(job_specs_or_files)
+            elif isinstance(job_specs_or_files[0], str):
+                self.from_files(job_specs_or_files)
             else:
                 raise ValueError("Invalid input type for job_specs. Must be a list of JobSpec or file paths.")
+
+    def from_job_specs(self, job_specs: Union[JobSpec, List[JobSpec]]) -> None:
+        if isinstance(job_specs, JobSpec):
+            job_specs = [JobSpec]
+
+        for job_spec in job_specs:
+            self.add_job_spec(job_spec)
 
     def from_files(self, files: Union[str, List[str]]) -> None:
         """
@@ -257,16 +265,18 @@ class BatchJobSpec:
         job_spec : JobSpec
             The JobSpec instance to add to the batch.
         """
-        self._job_specs.append(job_spec)
+        self._file_type_to_job_spec[job_spec.document_type].append(job_spec)
 
-    def add_task(self, task) -> None:
+    def add_task(self, task):
         """
         Adds a task to the job specification.
 
         Parameters
         ----------
+        file_type
+
         task
-            The task to add to the job specification. Assumes the task has a to_dict method.
+            The task to add to the job specification.
 
         Raises
         ------
@@ -276,7 +286,7 @@ class BatchJobSpec:
         if not isinstance(task, Task):
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
-        for job_spec in self._job_specs:
+        for job_spec in self._file_type_to_job_spec[task.document_type]:
             job_spec.add_task(task)
 
     def to_dict(self) -> List[Dict]:
@@ -302,5 +312,5 @@ class BatchJobSpec:
         return "\n".join(str(job_spec) for job_spec in self._job_specs)
 
     @property
-    def job_specs(self):
-        return self._job_specs
+    def job_specs(self) -> Dict[str, List[str]]:
+        return self._file_type_to_job_spec

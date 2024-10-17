@@ -182,9 +182,10 @@ class NvIngestClient:
             return job_index
         elif isinstance(job_spec, BatchJobSpec):
             job_indexes = []
-            for js in job_spec.job_specs:
-                job_index = self._add_single_job(js)
-                job_indexes.append(job_index)
+            for _, job_specs in job_spec.job_specs.items():
+                for job in job_specs:
+                    job_index = self._add_single_job(job)
+                    job_indexes.append(job_index)
             return job_indexes
         else:
             raise ValueError(f"Unexpected type: {type(job_spec)}")
@@ -349,6 +350,7 @@ class NvIngestClient:
         data_only: bool = True,
         max_retries: Optional[int] = None,
         retry_delay: float = 1,
+        verbose: bool = False,
     ) -> List[Tuple[Optional[Dict], str]]:
         """
         Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
@@ -381,11 +383,12 @@ class NvIngestClient:
                 except Exception as e:
                     # Check if the error is a retryable error
                     if "Job is not ready yet. Retry later." in str(e):
-                        logger.warning(
-                            f"Job {job_id} is not ready. "
-                            f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
-                            f"after {retry_delay} seconds."
-                        )
+                        if verbose:
+                            logger.info(
+                                f"Job {job_id} is not ready. "
+                                f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
+                                f"after {retry_delay} seconds."
+                            )
                         retries += 1
                         time.sleep(retry_delay)  # Wait before retrying
                     else:
@@ -565,7 +568,7 @@ class NvIngestClient:
 
         return future_to_job_index
 
-    def create_job_specs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[JobSpec]:
+    def create_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[JobSpec]:
         job_specs = create_job_specs_for_batch(files_batch)
 
         job_ids = []

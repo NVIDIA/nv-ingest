@@ -483,7 +483,7 @@ def generate_job_batch_for_iteration(
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
         batch_files = files[processed : processed + new_job_count]  # noqa: E203
 
-        new_job_indices = client.create_job_specs_for_batch(batch_files, tasks)
+        new_job_indices = client.create_jobs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
             missing_jobs = new_job_count - len(new_job_indices)
             error_msg = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"
