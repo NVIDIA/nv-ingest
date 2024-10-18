@@ -246,3 +246,7 @@ class ExtractTask(Task):
             }
             task_properties["params"].update(adobe_properties)
         return {"type": "extract", "task_properties": task_properties}
+
+    @property
+    def document_type(self):
+        return self._document_type

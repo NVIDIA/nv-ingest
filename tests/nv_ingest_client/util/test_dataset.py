@@ -6,8 +6,8 @@ import json
 from io import BytesIO
 
 import pytest
-from nv_ingest_client.cli.util.dataset import get_dataset_files
-from nv_ingest_client.cli.util.dataset import get_dataset_statistics
+from nv_ingest_client.util.dataset import get_dataset_files
+from nv_ingest_client.util.dataset import get_dataset_statistics
 
 
 @pytest.fixture

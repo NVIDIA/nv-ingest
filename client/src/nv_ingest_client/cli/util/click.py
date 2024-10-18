@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import glob
 import json
 import logging
 import os
@@ -29,6 +28,7 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
+from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
 
@@ -190,37 +190,6 @@ def pre_process_dataset(dataset_json: str, shuffle_dataset: bool):
     return file_source
 
 
-def _generate_matching_files(file_sources):
-    """
-    Generates a list of file paths that match the given patterns specified in file_sources.
-
-    Parameters
-    ----------
-    file_sources : list of str
-        A list containing the file source patterns to match against.
-
-    Returns
-    -------
-    generator
-        A generator yielding paths to files that match the specified patterns.
-
-    Notes
-    -----
-    This function utilizes glob pattern matching to find files that match the specified patterns.
-    It yields each matching file path, allowing for efficient processing of potentially large
-    sets of files.
-    """
-
-    files = [
-        file_path
-        for pattern in file_sources
-        for file_path in glob.glob(pattern, recursive=True)
-        if os.path.isfile(file_path)
-    ]
-    for file_path in files:
-        yield file_path
-
-
 def click_match_and_validate_files(ctx, param, value):
     """
     Matches and validates files based on the provided file source patterns.
@@ -239,7 +208,7 @@ def click_match_and_validate_files(ctx, param, value):
     if not value:
         return []
 
-    matching_files = list(_generate_matching_files(value))
+    matching_files = list(generate_matching_files(value))
     if not matching_files:
         logger.warning("No files found matching the specified patterns.")
         return []

@@ -2,6 +2,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from unittest.mock import patch
+
+import pytest
+from nv_ingest_client.cli.util.click import generate_matching_files
 
 _MODULE_UNDER_TEST = "nv_ingest_client.util.util"
 
@@ -66,3 +70,19 @@ _MODULE_UNDER_TEST = "nv_ingest_client.util.util"
 #     with patch(f"{_MODULE_UNDER_TEST}.os.path.splitext", return_value=("", ".pdf")):
 #         with patch(f"{_MODULE_UNDER_TEST}.fitz.open", side_effect=Exception("Some error")):
 #             assert estimate_page_count(file_path) == 0
+
+
+@pytest.mark.parametrize(
+    "patterns, mock_files, expected",
+    [
+        (["*.txt"], ["test1.txt", "test2.txt"], ["test1.txt", "test2.txt"]),
+        (["*.txt"], [], []),
+        (["*.md"], ["README.md"], ["README.md"]),
+        (["docs/*.md"], ["docs/README.md", "docs/CHANGES.md"], ["docs/README.md", "docs/CHANGES.md"]),
+    ],
+)
+def test_generate_matching_files(patterns, mock_files, expected):
+    with patch(
+        "glob.glob", side_effect=lambda pattern, recursive: [f for f in mock_files if f.startswith(pattern[:-5])]
+    ), patch("os.path.isfile", return_value=True):
+        assert list(generate_matching_files(patterns)) == expected
