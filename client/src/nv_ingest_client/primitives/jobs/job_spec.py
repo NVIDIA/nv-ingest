@@ -250,7 +250,8 @@ class BatchJobSpec:
         with open(dataset, "rb") as file:
             dataset_bytes = BytesIO(file.read())
 
-        logger.debug(get_dataset_statistics(dataset_bytes))
+if logger.isEnabledFor(logging.DEBUG):
+    logger.debug(get_dataset_statistics(dataset_bytes))
         dataset_files = get_dataset_files(dataset_bytes, shuffle_dataset)
 
         self.from_files(dataset_files)
