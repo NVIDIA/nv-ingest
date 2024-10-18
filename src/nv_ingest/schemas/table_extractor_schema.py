@@ -20,8 +20,8 @@ class TableExtractorConfigSchema(BaseModel):
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    yolox_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the yolox endpoint.
+    paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the paddle endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -42,7 +42,8 @@ class TableExtractorConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    paddle_infer_protocol: str = ""
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
@@ -71,14 +72,14 @@ class TableExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        grpc_service, http_service = values.get("yolox_endpoints", (None, None))
+        grpc_service, http_service = values.get("paddle_endpoints", (None, None))
         grpc_service = clean_service(grpc_service)
         http_service = clean_service(http_service)
 
         if not grpc_service and not http_service:
-            raise ValueError("Both gRPC and HTTP services cannot be empty for yolox_endpoints.")
+            raise ValueError("Both gRPC and HTTP services cannot be empty for paddle_endpoints.")
 
-        values["yolox_endpoints"] = (grpc_service, http_service)
+        values["paddle_endpoints"] = (grpc_service, http_service)
 
         return values
 

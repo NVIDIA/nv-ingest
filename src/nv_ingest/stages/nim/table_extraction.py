@@ -14,7 +14,7 @@ from morpheus.config import Config
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -39,21 +39,36 @@ def _update_metadata(row, paddle_client, trace_info):
     dict
         The modified metadata.
     """
+    logger.info("Starting _update_metadata function.")
+
     metadata = row["metadata"]
+    logger.info(f"Extracted metadata from row: {metadata}")
 
     base64_image = metadata["content"]
     content_metadata = metadata["content_metadata"]
     table_metadata = metadata.get("table_metadata")
+    logger.info(f"Base64 image extracted: {base64_image[:30]}...")  # Log only the beginning of the image data for brevity
+    logger.info(f"Content metadata: {content_metadata}")
+    logger.info(f"Table metadata: {table_metadata}")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if ((not content_metadata.type == ContentTypeEnum.STRUCTURED)
-            or (not content_metadata.subtype in ("table",))
+    if ((content_metadata.type != ContentTypeEnum.STRUCTURED)
+            or (content_metadata.subtype not in ("table",))
             or (table_metadata is None)):
+        logger.info("Conditions for table extraction not met. Returning original metadata.")
         return metadata
 
+    logger.info("Conditions met for table extraction. Calling image inference model.")
     # Modify table metadata with the result from the inference model
-    table_metadata.table_content = call_image_inference_model(paddle_client, "paddle", base64_image, trace_info)
+    try:
+        result = call_image_inference_model(paddle_client, "paddle", base64_image, trace_info)
+        table_metadata.table_content = result
+        logger.info(f"Table content extracted and updated in metadata: {result}")
+    except Exception as e:
+        logger.error(f"Error calling image inference model: {e}", exc_info=True)
+        return metadata
 
+    logger.info("Returning modified metadata.")
     # Return the modified metadata to be updated in the DataFrame
     return metadata
 
@@ -76,22 +91,34 @@ def _extract_table_data(df, task_props, validated_config, trace_info=None):
     trace_info : Optional[dict], default=None
         Optional trace information for debugging or logging.
     """
+    logger.info(f"Starting _extract_table_data function with task properties: {task_props}")
 
     # TODO (Devin): Should be part of the stage_config
-    paddle_client = validated_config.paddle_endpoints
+    logger.info("Creating inference client with validated configuration.")
+    paddle_client = create_inference_client(
+        validated_config.paddle_endpoints,
+        validated_config.auth_token,
+        validated_config.paddle_infer_protocol
+    )
+
+    logger.info(f"Inference client created: {paddle_client}")
 
     if trace_info is None:
         trace_info = {}
+        logger.info("No trace_info provided. Initialized empty trace_info dictionary.")
+    else:
+        logger.info(f"Using provided trace_info: {trace_info}")
 
     try:
+        logger.info("Applying _update_metadata function to each row in the DataFrame.")
         # Apply the modify_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
+        logger.info("Successfully updated metadata for all rows in the DataFrame.")
 
         return df, trace_info
 
     except Exception as e:
-        traceback.print_exc()
-        logger.error(f"Error extracting table data: {e}")
+        logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
 
 

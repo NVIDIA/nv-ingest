@@ -34,6 +34,7 @@ from nv_ingest.schemas.ingest_pipeline_config_schema import IngestPipelineConfig
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
+from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
@@ -185,20 +186,20 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
-    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
-    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
+    # paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    # deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
+    # cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
             "pdfium_config": {
-                "cached_endpoints": (cached_grpc, cached_http),
-                "deplot_endpoints": (deplot_grpc, deplot_http),
-                "paddle_endpoints": (paddle_grpc, paddle_http),
+                # "cached_endpoints": (cached_grpc, cached_http),
+                # "deplot_endpoints": (deplot_grpc, deplot_http),
+                # "paddle_endpoints": (paddle_grpc, paddle_http),
                 "yolox_endpoints": (yolox_grpc, yolox_http),
-                "cached_infer_protocol": cached_protocol,
-                "deplot_infer_protocol": deplot_protocol,
-                "paddle_infer_protocol": paddle_protocol,
+                # "cached_infer_protocol": cached_protocol,
+                # "deplot_infer_protocol": deplot_protocol,
+                # "paddle_infer_protocol": paddle_protocol,
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             }
@@ -215,6 +216,29 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     return pdf_extractor_stage
+
+
+def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    _, _, yolox_auth, _ = get_table_detection_service("yolox")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    table_content_extractor_config = ingest_config.get("table_content_extraction_module",
+                                                       {
+                                                           "stage_config": {
+                                                               "paddle_endpoints": (paddle_grpc, paddle_http),
+                                                               "paddle_infer_protocol": paddle_protocol,
+                                                               "auth_token": yolox_auth,
+                                                           }
+                                                       })
+
+    table_extractor_stage = pipe.add_stage(
+        generate_table_extractor_stage(
+            morpheus_pipeline_config,
+            table_content_extractor_config,
+            pe_count=2
+        )
+    )
+
+    return table_extractor_stage
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
@@ -472,7 +496,7 @@ def add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
 
 
 def setup_ingestion_pipeline(
-    pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
+        pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
 ):
     message_provider_host, message_provider_port = get_message_provider_config()
 
@@ -493,6 +517,7 @@ def setup_ingestion_pipeline(
     # Post-processing
     image_dedup_stage = add_image_dedup_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     image_filter_stage = add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    table_extraction_stage = add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
 
     # Transforms and data synthesis
     nemo_splitter_stage = add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
@@ -520,7 +545,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(docx_extractor_stage, pptx_extractor_stage)
     pipe.add_edge(pptx_extractor_stage, image_dedup_stage)
     pipe.add_edge(image_dedup_stage, image_filter_stage)
-    pipe.add_edge(image_filter_stage, nemo_splitter_stage)
+    pipe.add_edge(image_filter_stage, table_extraction_stage)
+    pipe.add_edge(table_extraction_stage, nemo_splitter_stage)
     pipe.add_edge(nemo_splitter_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
     pipe.add_edge(image_storage_stage, vdb_task_sink_stage)
@@ -586,16 +612,16 @@ def pipeline(morpheus_pipeline_config, ingest_config) -> float:
     help="Log level.",
 )
 def cli(
-    ingest_config_path,
-    caption_batch_size,
-    use_cpp,
-    pipeline_batch_size,
-    enable_monitor,
-    feature_length,
-    num_threads,
-    model_max_batch_size,
-    mode,
-    log_level,
+        ingest_config_path,
+        caption_batch_size,
+        use_cpp,
+        pipeline_batch_size,
+        enable_monitor,
+        feature_length,
+        num_threads,
+        model_max_batch_size,
+        mode,
+        log_level,
 ):
     """
     Command line interface for configuring and running the pipeline with specified options.
@@ -617,7 +643,7 @@ def cli(
             log_level = "INFO"
 
     log_level = log_level_mapping.get(log_level.upper(), logging.INFO)
-    logging.basicConfig(level=log_level)
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
     configure_logging(log_level=log_level)
 
     CppConfig.set_should_use_cpp(use_cpp)
