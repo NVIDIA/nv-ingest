@@ -35,8 +35,11 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.helpers import perform_model_inference
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image, CroppedImageWithContent
+from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
+from nv_ingest.util.pdf.metadata_aggregators import Base64Image
+from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
@@ -300,12 +303,6 @@ def extract_table_and_chart_images(
         The original image from which objects were detected.
     page_idx : int
         The index of the current page being processed.
-    # paddle_client : grpcclient.InferenceServerClient
-    #     The gRPC client for the paddle model used to process tables.
-    # deplot_client : grpcclient.InferenceServerClient
-    #     The gRPC client for the deplot model used to process charts.
-    # cached_client : grpcclient.InferenceServerClient
-    #     The gRPC client for the cached model used to process charts.
     tables_and_charts : List[Tuple[int, ImageTable]]
         A list to which extracted tables and charts will be appended.
 
@@ -320,7 +317,6 @@ def extract_table_and_chart_images(
     >>> annotation_dict = {"table": [], "chart": []}
     >>> original_image = np.random.rand(1536, 1536, 3)
     >>> tables_and_charts = []
-    #>>> handle_table_chart_extraction(annotation_dict, original_image, 0, paddle_client, deplot_client, cached_client,
     >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
     """
 

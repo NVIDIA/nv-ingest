@@ -18,6 +18,7 @@ RUN apt-get update && apt-get install -y \
       wget \
       bzip2 \
       ca-certificates \
+      curl \
     && apt-get clean
 
 # Install miniconda
@@ -62,7 +63,7 @@ WORKDIR /workspace
 # Copy custom entrypoint script
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
-FROM base as nv_ingest_install
+FROM base AS nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
 COPY ci ci
@@ -146,7 +147,7 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 # Set entrypoint to tini with a custom entrypoint script
 ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
-# Start the pipeline and services
+# Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
 CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM nv_ingest_install AS development

@@ -307,13 +307,13 @@ def process_and_forward(message: ControlMessage, redis_client: RedisClient) -> C
         annotate_cm(message, message="Pushed")
         push_to_redis(redis_client, response_channel, json_payloads)
     except RedisError as e:
-        mdf_size = len(mdf) if mdf else 0
+        mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
         traceback.print_exc()
         logger.error(f"Critical error processing message: {e}")
 
-        mdf_size = len(mdf) if mdf else 0
+        mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
 
     return message

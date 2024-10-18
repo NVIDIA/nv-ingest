@@ -14,31 +14,6 @@ services:
       - "8000:8000"
       - "8001:8001"
       - "8002:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-    runtime: nvidia
-
-  deplot:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
-    ports:
-      - "8003:8000"
-      - "8004:8001"
-      - "8005:8002"
-    volumes:
-      - ${HOME}/.cache:/opt/nim/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
@@ -50,7 +25,28 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+
+  deplot:
+    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
+    ports:
+      - "8003:8000"
+      - "8004:8001"
+      - "8005:8002"
+    user: root
+    environment:
+      - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_LOG_VERBOSE=1
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -61,20 +57,18 @@ services:
       - "8006:8000"
       - "8007:8001"
       - "8008:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -85,20 +79,18 @@ services:
       - "8009:8000"
       - "8010:8001"
       - "8011:8002"
-    volumes:
-      - ${HOME}/.cache:/home/nvs/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -114,13 +106,13 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -138,15 +130,16 @@ services:
       - sys_nice
     environment:
       - CACHED_GRPC_ENDPOINT=cached:8001
-      - CACHED_HEALTH_ENDPOINT=cached:8000
-      - CACHED_HTTP_ENDPOINT=""
-      - CUDA_VISIBLE_DEVICES=1
+      - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
+      - CACHED_INFER_PROTOCOL=grpc
+      - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
       # self hosted deplot
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis
@@ -157,15 +150,13 @@ services:
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - PADDLE_GRPC_ENDPOINT=paddle:8001
-      - PADDLE_HEALTH_ENDPOINT=paddle:8000
-      - PADDLE_HTTP_ENDPOINT=""
+      - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
+      - PADDLE_INFER_PROTOCOL=grpc
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
-      - TABLE_DETECTION_GRPC_TRITON=yolox:8001
-      - TABLE_DETECTION_HTTP_TRITON=""
       - YOLOX_GRPC_ENDPOINT=yolox:8001
-      - YOLOX_HEALTH_ENDPOINT=yolox:8000
-      - YOLOX_HTTP_ENDPOINT=""
+      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
+      - YOLOX_INFER_PROTOCOL=grpc
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
@@ -176,10 +167,9 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              count: all
+              device_ids: ["1"]
               capabilities: [gpu]
-
-
+  
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
@@ -267,32 +257,39 @@ services:
 #      timeout: 20s
 #      retries: 3
 
-#  milvus:
-#    # Turn on to leverage the `vdb_upload` task
-#    restart: always
-#    container_name: milvus-standalone
-#    image: milvusdb/milvus:v2.3.5
-#    command: ["milvus", "run", "standalone"]
-#    hostname: milvus
-#    security_opt:
-#      - seccomp:unconfined
-#    environment:
-#      ETCD_ENDPOINTS: etcd:2379
-#      MINIO_ADDRESS: minio:9000
-#    volumes:
-#      - ./.volumes/milvus:/var/lib/milvus
-#    healthcheck:
-#      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
-#      interval: 30s
-#      start_period: 90s
-#      timeout: 20s
-#      retries: 3
-#    ports:
-#      - "19530:19530"
-#      - "9091:9091"
-#    depends_on:
-#      - "etcd"
-#      - "minio"
+  # milvus:
+  #   # Turn on to leverage the `vdb_upload` task
+  #   restart: always
+  #   container_name: milvus-standalone
+  #   image: milvusdb/milvus:v2.4.9-gpu
+  #   command: ["milvus", "run", "standalone"]
+  #   hostname: milvus
+  #   security_opt:
+  #     - seccomp:unconfined
+  #   environment:
+  #     ETCD_ENDPOINTS: etcd:2379
+  #     MINIO_ADDRESS: minio:9000
+  #   volumes:
+  #     - ./.volumes/milvus:/var/lib/milvus
+  #   healthcheck:
+  #     test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+  #     interval: 30s
+  #     start_period: 90s
+  #     timeout: 20s
+  #     retries: 3
+  #   ports:
+  #     - "19530:19530"
+  #     - "9091:9091"
+  #   deploy:
+  #     resources:
+  #       reservations:
+  #         devices:
+  #           - driver: nvidia
+  #             device_ids: ["1"]
+  #             capabilities: [gpu]
+  #   depends_on:
+  #     - "etcd"
+  #     - "minio"
 
 #  attu:
 #    # Turn on to leverage the `vdb_upload` task
