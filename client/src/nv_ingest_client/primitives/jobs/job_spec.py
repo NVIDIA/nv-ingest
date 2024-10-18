@@ -325,7 +325,7 @@ if logger.isEnabledFor(logging.DEBUG):
         for job_spec in target_job_specs:
             job_spec.add_task(task)
 
-    def to_dict(self) -> List[Dict]:
+def to_dict(self) -> Dict[str, List[Dict]]:
         """
         Serializes the batch of job specifications into a list of dictionaries.
 
