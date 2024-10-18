@@ -21,7 +21,6 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from nv_ingest_client.util.util import create_job_specs_for_batch
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec
@@ -31,6 +30,7 @@ from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result
+from nv_ingest_client.util.util import create_job_specs_for_batch
 
 logger = logging.getLogger(__name__)
 
@@ -528,8 +528,12 @@ class NvIngestClient:
             batch = job_indices[batch_start:batch_end]
 
             # Submit each batch of jobs
-            batch_results = [self._submit_job(job_id, job_queue_id) for job_id in batch]
-            results.extend(batch_results)
+            for job_id in batch:
+                try:
+                    x_trace_id = self._submit_job(job_id, job_queue_id)
+                except Exception:  # Even if one fails, we should continue with the rest of the batch.
+                    continue
+                results.append(x_trace_id)
 
         return results
 

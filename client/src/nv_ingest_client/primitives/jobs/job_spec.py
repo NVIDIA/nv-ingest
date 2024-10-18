@@ -5,6 +5,7 @@
 
 import logging
 from collections import defaultdict
+from io import BytesIO
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -250,8 +251,9 @@ class BatchJobSpec:
         with open(dataset, "rb") as file:
             dataset_bytes = BytesIO(file.read())
 
-if logger.isEnabledFor(logging.DEBUG):
-    logger.debug(get_dataset_statistics(dataset_bytes))
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(get_dataset_statistics(dataset_bytes))
+
         dataset_files = get_dataset_files(dataset_bytes, shuffle_dataset)
 
         self.from_files(dataset_files)
@@ -325,7 +327,7 @@ if logger.isEnabledFor(logging.DEBUG):
         for job_spec in target_job_specs:
             job_spec.add_task(task)
 
-def to_dict(self) -> Dict[str, List[Dict]]:
+    def to_dict(self) -> Dict[str, List[Dict]]:
         """
         Serializes the batch of job specifications into a list of dictionaries.
 
