@@ -65,6 +65,7 @@ class StoreTask(Task):
         images: bool = False,
         store_method: _Type_Store_Method = None,
         extra_params: dict = None,
+        **params
     ) -> None:
         """
         Setup Store Task Config
@@ -75,6 +76,7 @@ class StoreTask(Task):
         self._images = images
         self._store_method = store_method or "minio"
         self._extra_params = extra_params
+        self._params = params
 
     def __str__(self) -> str:
         """
@@ -86,6 +88,8 @@ class StoreTask(Task):
         info += f"  store image types: {self._images}\n"
         info += f"  store method: {self._store_method}\n"
         for key, value in self._extra_params.items():
+            info += f"  {key}: {value}\n"
+        for key, value in self._params.items():
             info += f"  {key}: {value}\n"
         return info
 
@@ -99,6 +103,7 @@ class StoreTask(Task):
             "structured": self._structured,
             "images": self._images,
             "extra_params": self._extra_params,
+            **self._params,
         }
 
         return {"type": "store", "task_properties": task_properties}
@@ -118,6 +123,7 @@ class StoreEmbedTask(Task):
         embedding: bool = True,
         store_method: _Type_Store_Method = None,
         extra_params: dict = None,
+        **params
     ) -> None:
         """
         Setup Store Task Config
@@ -127,16 +133,19 @@ class StoreEmbedTask(Task):
         self._embedding = embedding 
         self._store_method = store_method or "minio"
         self._extra_params = extra_params
+        self._params = params
 
     def __str__(self) -> str:
         """
         Returns a string with the object's config and run time state
         """
         info = ""
-        info += "Store Task:\n"
+        info += "Store Embed Task:\n"
         info += f"  store embedding: {self._embedding}\n"
         info += f"  store method: {self._store_method}\n"
         for key, value in self._extra_params.items():
+            info += f"  {key}: {value}\n"
+        for key, value in self._params.items():
             info += f"  {key}: {value}\n"
         return info
 
@@ -148,6 +157,7 @@ class StoreEmbedTask(Task):
             "method": self._store_method,
             "embedding": self._embedding,
             "extra_params": self._extra_params,
+            **self._params,
         }
 
         return {"type": "store_embedding", "task_properties": task_properties}
