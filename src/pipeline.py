@@ -37,6 +37,7 @@ from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
+from nv_ingest.stages.storages.embedding_storage_stage import EmbeddingStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.logging.configuration import LogLevel
@@ -388,6 +389,11 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     )
     return embed_extractions_stage
 
+def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
+    storage_stage = pipe.add_stage(EmbeddingStorageStage(morpheus_pipeline_config))
+
+    return storage_stage
+
 
 def add_image_storage_stage(pipe, morpheus_pipeline_config):
     image_storage_stage = pipe.add_stage(ImageStorageStage(morpheus_pipeline_config))
@@ -555,6 +561,8 @@ def setup_ingestion_pipeline(
     embed_extractions_stage = add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config)
 
     # Storage and output
+    embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
+
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
     sink_stage = add_sink_stage(
         pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
@@ -579,7 +587,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_filter_stage, nemo_splitter_stage)
     pipe.add_edge(nemo_splitter_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
-    pipe.add_edge(image_storage_stage, vdb_task_sink_stage)
+    pipe.add_edge(image_storage_stage, embedding_storage_stage)
+    pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
     pipe.add_edge(sink_stage, otel_meter_stage)
     pipe.add_edge(otel_meter_stage, otel_tracer_stage)

@@ -27,7 +27,7 @@ from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreTaskSchema, StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 
 logger = logging.getLogger(__name__)
@@ -113,6 +113,10 @@ def click_validate_task(ctx, param, value):
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = StoreTask(**task_options.dict())
+            elif task_id == "store_embedding":
+                task_options = check_schema(StoreEmbedTaskSchema, options, task_id, json_options)
+                new_task_id = f"{task_id}"
+                new_task = StoreEmbedTask(**task_options.dict())
             elif task_id == "caption":
                 task_options = check_schema(CaptionTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"

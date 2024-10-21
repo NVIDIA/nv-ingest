@@ -520,6 +520,9 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict[str, Any], cl
         if "store" in tasks:
             job_spec.add_task(tasks["store"])
 
+        if "store_embedding" in tasks:
+            job_spec.add_task(tasks["store_embedding"])
+
         if "caption" in tasks:
             job_spec.add_task(tasks["caption"])
 
