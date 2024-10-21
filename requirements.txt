@@ -33,3 +33,4 @@ fastapi==0.109.1
 uvicorn==0.24.0-post.1
 gunicorn==22.0.0
 python-multipart
+s3fs
