@@ -54,6 +54,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     content_types = params.get("content_types")
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
+    bucket_path = params.get("bucket_path", "embeddings")
 
     client = Minio(
         endpoint,
@@ -82,7 +83,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     meta = df["metadata"]
     emb_df_list = []  
     file_uuid = uuid.uuid4().hex
-    destination_file = f"embeddings/{file_uuid}.parquet"
+    destination_file = f"{bucket_path}/{file_uuid}.parquet"
     write_path = f"s3://{bucket_name}/{destination_file}"
     for idx, row in df.iterrows():
         uu_id = row["uuid"]
