@@ -137,6 +137,9 @@ def click_validate_task(ctx, param, value):
             else:
                 raise ValueError(f"Unsupported task type: {task_id}")
 
+            if new_task_id in validated_tasks:
+                raise ValueError(f"Duplicate task detected: {new_task_id}")
+
             logger.debug("Adding task: %s", new_task_id)
             validated_tasks[new_task_id] = new_task
         except ValueError as e:

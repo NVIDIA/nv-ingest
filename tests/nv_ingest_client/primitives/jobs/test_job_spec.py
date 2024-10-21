@@ -2,14 +2,20 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
+import logging
 import uuid
 from typing import Dict
+from unittest.mock import MagicMock
 from unittest.mock import Mock
+from unittest.mock import patch
 
 import pytest
 from nv_ingest_client.primitives.jobs.job_spec import BatchJobSpec
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.tasks import Task
+
+MODULE_UNDER_TEST = "nv_ingest_client.primitives.jobs.job_spec"
 
 
 # Assuming the Task class has a to_dict method
@@ -29,6 +35,22 @@ def job_spec_fixture() -> JobSpec:
         source_name="source123.pdf",
         extended_options={"tracing_options": {"option1": "value1"}},
     )
+
+
+def create_json_file(tmp_path, content):
+    file_path = tmp_path / "dataset.json"
+    with open(file_path, "w") as f:
+        json.dump(content, f)
+    return str(file_path)
+
+
+@pytest.fixture
+def dataset(tmp_path):
+    content = {"sampled_files": ["file1.txt", "file2.txt", "file3.txt"]}
+    file_path = tmp_path / "dataset.json"
+    with open(file_path, "w") as f:
+        json.dump(content, f)
+    return str(file_path)
 
 
 # Test initialization
@@ -104,13 +126,6 @@ def batch_job_spec_fixture(job_spec_fixture) -> BatchJobSpec:
     return batch_job_spec
 
 
-@pytest.fixture
-def batch_job_spec_fixture(job_spec_fixture) -> BatchJobSpec:
-    batch_job_spec = BatchJobSpec()
-    batch_job_spec.add_job_spec(job_spec_fixture)
-    return batch_job_spec
-
-
 def test_init_with_job_specs(job_spec_fixture):
     batch_job_spec = BatchJobSpec([job_spec_fixture])
 
@@ -174,7 +189,7 @@ def test_add_task_raises_value_error_for_invalid_task(batch_job_spec_fixture):
         batch_job_spec_fixture.add_task(invalid_task)
 
 
-def test_to_dict(batch_job_spec_fixture):
+def test_batch_job_spec_to_dict(batch_job_spec_fixture):
     result = batch_job_spec_fixture.to_dict()
 
     assert isinstance(result, dict)
@@ -182,8 +197,40 @@ def test_to_dict(batch_job_spec_fixture):
     assert len(result["pdf"]) > 0
 
 
-def test_str_method(batch_job_spec_fixture):
+def test_batch_job_spec_str_method(batch_job_spec_fixture):
     result = str(batch_job_spec_fixture)
 
     assert "pdf" in result
     assert "source123" in result
+
+
+@patch(f"{MODULE_UNDER_TEST}.get_dataset_files")
+@patch(f"{MODULE_UNDER_TEST}.get_dataset_statistics")
+@patch(f"{MODULE_UNDER_TEST}.logger")
+def test__from_dataset(mock_logger, mock_get_dataset_statistics, mock_get_dataset_files, dataset):
+    mock_get_dataset_files.return_value = ["file1.txt", "file2.txt", "file3.txt"]
+    mock_get_dataset_statistics.return_value = "Statistics info"
+
+    batch_job_spec = BatchJobSpec()
+
+    batch_job_spec.from_files = MagicMock()
+
+    batch_job_spec._from_dataset(dataset)
+
+    mock_get_dataset_files.assert_called_once()
+
+    mock_get_dataset_statistics.assert_called_once()
+
+    batch_job_spec.from_files.assert_called_once_with(["file1.txt", "file2.txt", "file3.txt"])
+
+    if mock_logger.isEnabledFor(logging.DEBUG):
+        mock_logger.debug.assert_called_once_with("Statistics info")
+
+
+@patch(f"{MODULE_UNDER_TEST}.BatchJobSpec._from_dataset")
+def test_from_dataset(mock__from_dataset, dataset):
+    batch_job_spec = BatchJobSpec.from_dataset(dataset, shuffle_dataset=False)
+
+    assert isinstance(batch_job_spec, BatchJobSpec)
+
+    mock__from_dataset.assert_called_once_with(dataset, shuffle_dataset=False)

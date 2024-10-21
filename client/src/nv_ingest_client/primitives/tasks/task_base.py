@@ -39,7 +39,7 @@ def is_valid_task_type(task_type_str: str) -> bool:
     bool
         True if the string is a valid TaskType enum value, False otherwise.
     """
-    return task_type_str in TaskType.__members__
+    return task_type_str.upper() in TaskType.__members__
 
 
 class Task:

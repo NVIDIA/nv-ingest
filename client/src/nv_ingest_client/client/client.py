@@ -28,6 +28,7 @@ from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import TaskType
+from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result
 from nv_ingest_client.util.util import create_job_specs_for_batch
@@ -154,7 +155,6 @@ class NvIngestClient:
     ) -> JobState:
         if required_state and not isinstance(required_state, list):
             required_state = [required_state]
-
         job_state = self._job_states.get(job_index)
 
         if not job_state:
@@ -522,6 +522,7 @@ class NvIngestClient:
         results = []
         total_batches = math.ceil(len(job_indices) / batch_size)
 
+        submission_errors = []
         for batch_num in range(total_batches):
             batch_start = batch_num * batch_size
             batch_end = batch_start + batch_size
@@ -531,10 +532,13 @@ class NvIngestClient:
             for job_id in batch:
                 try:
                     x_trace_id = self._submit_job(job_id, job_queue_id)
-                except Exception:  # Even if one fails, we should continue with the rest of the batch.
+                except Exception as e:  # Even if one fails, we should continue with the rest of the batch.
+                    submission_errors.append(e)
                     continue
                 results.append(x_trace_id)
 
+        if submission_errors:
+            raise type(submission_errors[0])("\n".join([str(e) for e in submission_errors]))
         return results
 
     def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
@@ -632,6 +636,9 @@ class NvIngestClient:
         create_job_specs_for_batch: Function that creates job specifications for a batch of files.
         JobSpec : The class representing a job specification.
         """
+        if not isinstance(tasks, dict):
+            raise ValueError(f"`tasks` must be a dictionary of task names -> task specifications.")
+
         job_specs = create_job_specs_for_batch(files_batch)
 
         job_ids = []
@@ -641,30 +648,23 @@ class NvIngestClient:
                 logger.debug(f"Task: {task}")
 
             file_type = job_spec.document_type
-            # TODO(Devin): Formalize this later, don't have time right now.
-            if "split" in tasks:
-                job_spec.add_task(tasks["split"])
 
-            if f"extract_{file_type}" in tasks:
-                job_spec.add_task(tasks[f"extract_{file_type}"])
+            seen_tasks = set()  # For tracking tasks and rejecting duplicate tasks.
 
-            if "store" in tasks:
-                job_spec.add_task(tasks["store"])
+            for task_name, task_config in tasks.items():
+                if task_name.startswith("extract_"):
+                    task_file_type = task_name.split("_", 1)[1]
+                    if file_type.lower() != task_file_type.lower():
+                        continue
+                elif not is_valid_task_type(task_name):
+                    raise ValueError(f"Invalid task type: '{task_name}'")
 
-            if "caption" in tasks:
-                job_spec.add_task(tasks["caption"])
+                if str(task_config) in seen_tasks:
+                    raise ValueError(f"Duplicate task detected: {task_name} with config {task_config}")
 
-            if "dedup" in tasks:
-                job_spec.add_task(tasks["dedup"])
+                job_spec.add_task(task_config)
 
-            if "filter" in tasks:
-                job_spec.add_task(tasks["filter"])
-
-            if "embed" in tasks:
-                job_spec.add_task(tasks["embed"])
-
-            if "vdb_upload" in tasks:
-                job_spec.add_task(tasks["vdb_upload"])
+                seen_tasks.add(str(task_config))
 
             job_id = self.add_job(job_spec)
             job_ids.append(job_id)
