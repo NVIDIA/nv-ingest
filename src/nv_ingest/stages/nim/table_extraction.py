@@ -2,21 +2,38 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
+import base64
 import logging
+import numpy as np
+from io import BytesIO
 import functools
-import traceback
+from PIL import Image
 from typing import Any
 from typing import Dict
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
+
+
+def base64_to_numpy(base64_string):
+    # Decode the base64 string
+    image_data = base64.b64decode(base64_string)
+
+    # Convert the bytes into a BytesIO object
+    image_bytes = BytesIO(image_data)
+
+    # Open the image using PIL
+    image = Image.open(image_bytes)
+
+    # Convert the image to a NumPy array
+    image_array = np.array(image)
+
+    return image_array
 
 
 def _update_metadata(row, paddle_client, trace_info):
@@ -42,18 +59,18 @@ def _update_metadata(row, paddle_client, trace_info):
     logger.info("Starting _update_metadata function.")
 
     metadata = row["metadata"]
-    logger.info(f"Extracted metadata from row: {metadata}")
 
     base64_image = metadata["content"]
     content_metadata = metadata["content_metadata"]
     table_metadata = metadata.get("table_metadata")
-    logger.info(f"Base64 image extracted: {base64_image[:30]}...")  # Log only the beginning of the image data for brevity
+    logger.info(
+        f"Base64 image extracted: {base64_image[:30]}...")  # Log only the beginning of the image data for brevity
     logger.info(f"Content metadata: {content_metadata}")
     logger.info(f"Table metadata: {table_metadata}")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if ((content_metadata.type != ContentTypeEnum.STRUCTURED)
-            or (content_metadata.subtype not in ("table",))
+    if ((content_metadata.get("type") != "structured")
+            or (content_metadata.get("subtype") not in ("table",))
             or (table_metadata is None)):
         logger.info("Conditions for table extraction not met. Returning original metadata.")
         return metadata
@@ -61,12 +78,12 @@ def _update_metadata(row, paddle_client, trace_info):
     logger.info("Conditions met for table extraction. Calling image inference model.")
     # Modify table metadata with the result from the inference model
     try:
-        result = call_image_inference_model(paddle_client, "paddle", base64_image, trace_info)
-        table_metadata.table_content = result
-        logger.info(f"Table content extracted and updated in metadata: {result}")
+        image_array = base64_to_numpy(base64_image)
+        result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
+        table_metadata["table_content"] = result
     except Exception as e:
         logger.error(f"Error calling image inference model: {e}", exc_info=True)
-        return metadata
+        raise
 
     logger.info("Returning modified metadata.")
     # Return the modified metadata to be updated in the DataFrame
@@ -96,9 +113,9 @@ def _extract_table_data(df, task_props, validated_config, trace_info=None):
     # TODO (Devin): Should be part of the stage_config
     logger.info("Creating inference client with validated configuration.")
     paddle_client = create_inference_client(
-        validated_config.paddle_endpoints,
-        validated_config.auth_token,
-        validated_config.paddle_infer_protocol
+        validated_config.stage_config.paddle_endpoints,
+        validated_config.stage_config.auth_token,
+        validated_config.stage_config.paddle_infer_protocol
     )
 
     logger.info(f"Inference client created: {paddle_client}")
@@ -106,8 +123,6 @@ def _extract_table_data(df, task_props, validated_config, trace_info=None):
     if trace_info is None:
         trace_info = {}
         logger.info("No trace_info provided. Initialized empty trace_info dictionary.")
-    else:
-        logger.info(f"Using provided trace_info: {trace_info}")
 
     try:
         logger.info("Applying _update_metadata function to each row in the DataFrame.")

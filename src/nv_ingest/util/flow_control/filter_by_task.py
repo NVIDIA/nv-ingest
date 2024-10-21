@@ -40,8 +40,6 @@ def filter_by_task(required_tasks, forward_func=None):
             if args and hasattr(args[0], "get_tasks"):
                 message = args[0]
                 tasks = message.get_tasks()
-                logger.info(f"Message Tasks: {tasks}")
-                logger.info(f"Required Tasks: {required_tasks}")
                 for required_task in required_tasks:
                     if isinstance(required_task, str) and (required_task in tasks):
                         return func(*args, **kwargs)
@@ -54,8 +52,8 @@ def filter_by_task(required_tasks, forward_func=None):
                         task_props_list = tasks.get(required_task_name, [])
                         for task_props in task_props_list:
                             if all(
-                                    _is_subset(task_props, required_task_props)
-                                    for required_task_props in required_task_props_list
+                                _is_subset(task_props, required_task_props)
+                                for required_task_props in required_task_props_list
                             ):
                                 return func(*args, **kwargs)
 

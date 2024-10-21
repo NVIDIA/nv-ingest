@@ -32,8 +32,6 @@ MODULE_NAME = "redis_task_source"
 MODULE_NAMESPACE = "nv_ingest"
 RedisTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
 
-_current_log_level = logger.getEffectiveLevel()
-
 def fetch_and_process_messages(redis_client: RedisClient, validated_config: RedisTaskSourceSchema):
     """Fetch messages from the Redis list and process them."""
 
@@ -56,11 +54,11 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     Fetch messages from the Redis list (task queue) and yield as ControlMessage.
     """
 
-    no_payload = copy.deepcopy(job)
-    no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
-    logger.debug("Job: %s", json.dumps(no_payload, indent=2))
+    if logger.isEnabledFor(logging.DEBUG):
+        no_payload = copy.deepcopy(job)
+        no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
+        logger.debug("Job: %s", json.dumps(no_payload, indent=2))
 
-    time.sleep(2)
     validate_ingest_job(job)
     control_message = ControlMessage()
 

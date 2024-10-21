@@ -28,7 +28,7 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask, TableExtractionSchema
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 
 logger = logging.getLogger(__name__)
@@ -111,9 +111,12 @@ def click_validate_task(ctx, param, value):
                 new_task_id = f"{task_id}_{task_options.document_type}"
                 new_task = [(new_task_id, ExtractTask(**task_options.dict()))]
 
-                logger.info(task_options.extract_tables)
-                #if (task_options.extract_tables):
-                #    new_task.append(("table_data_extract", TableExtractionTask()))
+                print(f"EXTRACT TABLES: {task_options.extract_tables}")
+                if (task_options.extract_tables == True):
+                    print(f"Adding table extraction task: {str(TableExtractionTask().to_dict())}")
+                    # TODO(Devin)
+                    subtask_options = check_schema(TableExtractionSchema, {}, "table_data_extract", "{}")
+                    new_task.append(("table_data_extract", TableExtractionTask(**subtask_options.dict())))
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"

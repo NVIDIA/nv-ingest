@@ -44,6 +44,7 @@ class TaskTypeEnum(str, Enum):
     split = "split"
     store = "store"
     vdb_upload = "vdb_upload"
+    table_data_extract = "table_data_extract"
 
 
 class FilterTypeEnum(str, Enum):
@@ -128,6 +129,10 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
     filter_errors: bool = True
 
 
+class IngestTaskTableExtraction(BaseModelNoExt):
+    params: Dict = {}
+
+
 class IngestTaskSchema(BaseModelNoExt):
     type: TaskTypeEnum
     task_properties: Union[
@@ -139,6 +144,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskDedupSchema,
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
+        IngestTaskTableExtraction,
     ]
     raise_on_failure: bool = False
 
@@ -155,6 +161,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.split: IngestTaskSplitSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
+                TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
             }.get(task_type.lower())
 
             # logger.debug(f"Checking task_properties type for task type '{task_type}'")

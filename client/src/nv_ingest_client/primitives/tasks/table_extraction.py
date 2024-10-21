@@ -19,14 +19,15 @@ logger = logging.getLogger(__name__)
 
 
 class TableExtractionSchema(BaseModel):
-    content_type: Optional[str] = "image"
+    pass
+    #content_type: Optional[str] = "image"
 
-    @validator("content_type")
-    def content_type_must_be_valid(cls, v):
-        valid_criteria = ["image"]
-        if v not in valid_criteria:
-            raise ValueError(f"content_type must be one of {valid_criteria}")
-        return v
+    #@validator("content_type")
+    #def content_type_must_be_valid(cls, v):
+    #    valid_criteria = ["image"]
+    #    if v not in valid_criteria:
+    #        raise ValueError(f"content_type must be one of {valid_criteria}")
+    #    return v
 
     class Config:
         extra = "forbid"
@@ -49,7 +50,7 @@ class TableExtractionTask(Task):
         Returns a string with the object's config and run time state
         """
         info = ""
-        info += "Table Extraction Task:\n"
+        info += "Table Extraction Task\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -61,4 +62,4 @@ class TableExtractionTask(Task):
             "params": {},
         }
 
-        return {"type": "table_extract", "task_properties": task_properties}
+        return {"type": "table_data_extract", "task_properties": task_properties}
