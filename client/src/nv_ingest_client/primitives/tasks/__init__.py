@@ -8,7 +8,7 @@ from .embed import EmbedTask
 from .extract import ExtractTask
 from .filter import FilterTask
 from .split import SplitTask
-from .store import StoreTask
+from .store import StoreTask, StoreEmbedTask
 from .task_base import Task
 from .task_base import TaskType
 from .task_base import is_valid_task_type
@@ -20,6 +20,7 @@ __all__ = [
     "ExtractTask",
     "is_valid_task_type",
     "SplitTask",
+    "StoreEmbedTask"
     "StoreTask",
     "Task",
     "task_factory",
