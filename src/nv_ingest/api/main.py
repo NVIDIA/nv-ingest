@@ -9,6 +9,7 @@
 # its affiliates is strictly prohibited.
 
 import logging
+import os
 
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
@@ -24,7 +25,8 @@ from .v1.ingest import router as IngestApiRouter
 trace.set_tracer_provider(TracerProvider())
 tracer = trace.get_tracer(__name__)
 
-exporter = OTLPSpanExporter(endpoint="otel-collector:4317", insecure=True)
+otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector:4317")
+exporter = OTLPSpanExporter(endpoint=otel_endpoint, insecure=True)
 span_processor = BatchSpanProcessor(exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
 
