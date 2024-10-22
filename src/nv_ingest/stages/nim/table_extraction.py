@@ -2,41 +2,25 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import base64
 import logging
-import numpy as np
-from io import BytesIO
 import functools
-from PIL import Image
+import pandas as pd
 from typing import Any
 from typing import Dict
+from typing import Optional
+from typing import Tuple
 
 from morpheus.config import Config
 
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
-def base64_to_numpy(base64_string):
-    # Decode the base64 string
-    image_data = base64.b64decode(base64_string)
-
-    # Convert the bytes into a BytesIO object
-    image_bytes = BytesIO(image_data)
-
-    # Open the image using PIL
-    image = Image.open(image_bytes)
-
-    # Convert the image to a NumPy array
-    image_array = np.array(image)
-
-    return image_array
-
-
-def _update_metadata(row, paddle_client, trace_info):
+def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -54,43 +38,43 @@ def _update_metadata(row, paddle_client, trace_info):
     Returns
     -------
     dict
-        The modified metadata.
+        The modified metadata if conditions are met, otherwise the original metadata.
+
+    Raises
+    ------
+    ValueError
+        If critical information (such as metadata) is missing from the row.
     """
-    logger.info("Starting _update_metadata function.")
 
-    metadata = row["metadata"]
+    metadata = row.get("metadata")
+    if metadata is None:
+        logger.error("Row does not contain 'metadata'.")
+        raise ValueError("Row does not contain 'metadata'.")
 
-    base64_image = metadata["content"]
-    content_metadata = metadata["content_metadata"]
+    base64_image = metadata.get("content")
+    content_metadata = metadata.get("content_metadata", {})
     table_metadata = metadata.get("table_metadata")
-    logger.info(
-        f"Base64 image extracted: {base64_image[:30]}...")  # Log only the beginning of the image data for brevity
-    logger.info(f"Content metadata: {content_metadata}")
-    logger.info(f"Table metadata: {table_metadata}")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
     if ((content_metadata.get("type") != "structured")
-            or (content_metadata.get("subtype") not in ("table",))
+            or (content_metadata.get("subtype") != "table")
             or (table_metadata is None)):
-        logger.info("Conditions for table extraction not met. Returning original metadata.")
         return metadata
 
-    logger.info("Conditions met for table extraction. Calling image inference model.")
     # Modify table metadata with the result from the inference model
     try:
         image_array = base64_to_numpy(base64_image)
         result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
         table_metadata["table_content"] = result
     except Exception as e:
-        logger.error(f"Error calling image inference model: {e}", exc_info=True)
+        logger.error(f"Unhandled error calling image inference model: {e}", exc_info=True)
         raise
 
-    logger.info("Returning modified metadata.")
-    # Return the modified metadata to be updated in the DataFrame
     return metadata
 
 
-def _extract_table_data(df, task_props, validated_config, trace_info=None):
+def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
+                        validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
     """
     Function to extract table data from a DataFrame.
 
@@ -102,33 +86,38 @@ def _extract_table_data(df, task_props, validated_config, trace_info=None):
     task_props : dict
         Dictionary containing task properties and configurations.
 
-    validated_config : TableExtractorSchema
+    validated_config : Any
         The validated configuration object for table extraction.
 
-    trace_info : Optional[dict], default=None
-        Optional trace information for debugging or logging.
-    """
-    logger.info(f"Starting _extract_table_data function with task properties: {task_props}")
+    trace_info : dict, optional
+        Optional trace information for debugging or logging. Defaults to None.
 
-    # TODO (Devin): Should be part of the stage_config
-    logger.info("Creating inference client with validated configuration.")
+    Returns
+    -------
+    tuple
+        A tuple containing the updated DataFrame and the trace information.
+
+    Raises
+    ------
+    Exception
+        If any error occurs during the table data extraction process.
+    """
+
+    _ = task_props # unused
+
     paddle_client = create_inference_client(
         validated_config.stage_config.paddle_endpoints,
         validated_config.stage_config.auth_token,
         validated_config.stage_config.paddle_infer_protocol
     )
 
-    logger.info(f"Inference client created: {paddle_client}")
-
     if trace_info is None:
         trace_info = {}
-        logger.info("No trace_info provided. Initialized empty trace_info dictionary.")
+        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
-        logger.info("Applying _update_metadata function to each row in the DataFrame.")
         # Apply the modify_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
-        logger.info("Successfully updated metadata for all rows in the DataFrame.")
 
         return df, trace_info
 

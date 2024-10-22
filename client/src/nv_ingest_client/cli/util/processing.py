@@ -522,6 +522,9 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict[str, Any], cl
         if f"table_data_extract" in tasks:
             job_spec.add_task(tasks["table_data_extract"])
 
+        if f"chart_data_extract" in tasks:
+            job_spec.add_task(tasks["chart_data_extract"])
+
         if "store" in tasks:
             job_spec.add_task(tasks["store"])
 

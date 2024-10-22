@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
 from io import BytesIO
 from math import ceil
 from math import floor
@@ -10,6 +11,7 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
+from PIL import UnidentifiedImageError
 
 from nv_ingest.util.converters import bytetools
 
@@ -232,3 +234,51 @@ def numpy_to_base64(array: np.ndarray) -> str:
         raise RuntimeError(f"Failed to encode image to base64: {e}")
 
     return base64_img
+
+
+def base64_to_numpy(base64_string: str) -> np.ndarray:
+    """
+    Convert a base64-encoded image string to a NumPy array.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded string representing an image.
+
+    Returns
+    -------
+    numpy.ndarray
+        NumPy array representation of the decoded image.
+
+    Raises
+    ------
+    ValueError
+        If the base64 string is invalid or cannot be decoded into an image.
+    ImportError
+        If required libraries are not installed.
+
+    Examples
+    --------
+    >>> base64_str = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD...'
+    >>> img_array = base64_to_numpy(base64_str)
+    """
+    try:
+        # Decode the base64 string
+        image_data = base64.b64decode(base64_string)
+    except (base64.binascii.Error, ValueError) as e:
+        raise ValueError("Invalid base64 string") from e
+
+    try:
+        # Convert the bytes into a BytesIO object
+        image_bytes = BytesIO(image_data)
+
+        # Open the image using PIL
+        image = Image.open(image_bytes)
+        image.load()
+    except UnidentifiedImageError as e:
+        raise ValueError("Unable to decode image from base64 string") from e
+
+    # Convert the image to a NumPy array
+    image_array = np.array(image)
+
+    return image_array

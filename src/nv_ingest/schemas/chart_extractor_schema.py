@@ -50,6 +50,8 @@ class ChartExtractorConfigSchema(BaseModel):
 
     cached_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+
+    ## Paddle isn't currently called independently of the cached NIM, but will be in the future.
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
 
     @root_validator(pre=True)

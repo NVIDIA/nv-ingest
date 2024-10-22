@@ -26,9 +26,6 @@ class PDFiumConfigSchema(BaseModel):
         A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
-    identify_nearby_objects : bool, default=False
-        A flag indicating whether to identify nearby objects during processing.
-
     Methods
     -------
     validate_endpoints(values)

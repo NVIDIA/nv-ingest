@@ -16,12 +16,12 @@ from .task_base import Task
 logger = logging.getLogger(__name__)
 
 
-class TableExtractionSchema(BaseModel):
+class ChartExtractionSchema(BaseModel):
     class Config:
         extra = "forbid"
 
 
-class TableExtractionTask(Task):
+class ChartExtractionTask(Task):
     """
     Object for document dedup task
     """
@@ -50,4 +50,4 @@ class TableExtractionTask(Task):
             "params": {},
         }
 
-        return {"type": "table_data_extract", "task_properties": task_properties}
+        return {"type": "chart_data_extract", "task_properties": task_properties}

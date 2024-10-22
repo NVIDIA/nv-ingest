@@ -11,7 +11,6 @@
 # pylint: skip-file
 
 import base64
-import copy
 import json
 from io import BytesIO
 import logging
@@ -30,7 +29,6 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)

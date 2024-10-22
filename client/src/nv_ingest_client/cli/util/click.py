@@ -28,7 +28,10 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask, TableExtractionSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionSchema
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionSchema
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 
 logger = logging.getLogger(__name__)
