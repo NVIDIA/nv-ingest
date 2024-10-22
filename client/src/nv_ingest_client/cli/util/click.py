@@ -114,12 +114,15 @@ def click_validate_task(ctx, param, value):
                 new_task_id = f"{task_id}_{task_options.document_type}"
                 new_task = [(new_task_id, ExtractTask(**task_options.dict()))]
 
-                print(f"EXTRACT TABLES: {task_options.extract_tables}")
                 if (task_options.extract_tables == True):
-                    print(f"Adding table extraction task: {str(TableExtractionTask().to_dict())}")
-                    # TODO(Devin)
                     subtask_options = check_schema(TableExtractionSchema, {}, "table_data_extract", "{}")
                     new_task.append(("table_data_extract", TableExtractionTask(**subtask_options.dict())))
+
+                if (task_options.extract_charts == True):
+                    print(f"Adding chart extraction task: {str(ChartExtractionTask().to_dict())}")
+                    subtask_options = check_schema(ChartExtractionSchema, {}, "table_data_extract", "{}")
+                    new_task.append(("chart_data_extract", ChartExtractionTask(**subtask_options.dict())))
+
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"

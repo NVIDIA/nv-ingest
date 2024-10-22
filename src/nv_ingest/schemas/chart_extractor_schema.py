@@ -49,10 +49,14 @@ class ChartExtractorConfigSchema(BaseModel):
     auth_token: Optional[str] = None
 
     cached_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    cached_infer_protocol: str = ""
 
-    ## Paddle isn't currently called independently of the cached NIM, but will be in the future.
+    deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    deplot_infer_protocol: str = ""
+
+    ## NOTE: Paddle isn't currently called independently of the cached NIM, but will be in the future.
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    paddle_infer_protocol: str = ""
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
