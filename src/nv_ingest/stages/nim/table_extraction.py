@@ -16,8 +16,12 @@ from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
+from nv_ingest.util.image_processing.transforms import check_numpy_image_size
 
 logger = logging.getLogger(f"morpheus.{__name__}")
+
+PADDLE_MIN_WIDTH = 32
+PADDLE_MIN_HEIGHT = 32
 
 
 def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Dict:
@@ -64,8 +68,11 @@ def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Di
     # Modify table metadata with the result from the inference model
     try:
         image_array = base64_to_numpy(base64_image)
-        result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
-        table_metadata["table_content"] = result
+        paddle_result = ""
+        if (check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT)):
+            paddle_result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
+
+        table_metadata["table_content"] = paddle_result
     except Exception as e:
         logger.error(f"Unhandled error calling image inference model: {e}", exc_info=True)
         raise
@@ -103,7 +110,7 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
         If any error occurs during the table data extraction process.
     """
 
-    _ = task_props # unused
+    _ = task_props  # unused
 
     paddle_client = create_inference_client(
         validated_config.stage_config.paddle_endpoints,

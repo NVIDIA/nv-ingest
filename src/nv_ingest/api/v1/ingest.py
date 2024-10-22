@@ -126,7 +126,6 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         # will be able to trace across uvicorn -> morpheus
         current_trace_id = trace.get_current_span().get_span_context().trace_id
         
-        # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
         job_spec_dict['tracing_options']['trace_id'] = current_trace_id
         updated_job_spec = MessageWrapper(

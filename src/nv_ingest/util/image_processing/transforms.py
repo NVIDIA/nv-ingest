@@ -79,6 +79,24 @@ def pad_image(
 
     return canvas, (pad_width, pad_height)
 
+def check_numpy_image_size(image: np.ndarray, min_height: int, min_width: int) -> bool:
+    """
+    Checks if the height and width of the image are larger than the specified minimum values.
+
+    Parameters:
+    image (np.ndarray): The image array (assumed to be in shape (H, W, C) or (H, W)).
+    min_height (int): The minimum height required.
+    min_width (int): The minimum width required.
+
+    Returns:
+    bool: True if the image dimensions are larger than or equal to the minimum size, False otherwise.
+    """
+    # Check if the image has at least 2 dimensions
+    if image.ndim < 2:
+        raise ValueError("The input array does not have sufficient dimensions for an image.")
+
+    height, width = image.shape[:2]
+    return height >= min_height and width >= min_width
 
 def crop_image(
     array: np.array, bbox: Tuple[int, int, int, int], min_width: int = 1, min_height: int = 1

@@ -46,9 +46,6 @@ from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 
-# TODO (Devin): All of these should move to configuration parameters in the NIM caller Stage
-PADDLE_MIN_WIDTH = 32
-PADDLE_MIN_HEIGHT = 32
 YOLOX_MAX_BATCH_SIZE = 8
 YOLOX_MAX_WIDTH = 1536
 YOLOX_MAX_HEIGHT = 1536
@@ -332,10 +329,11 @@ def extract_table_and_chart_images(
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
-                content="TODO (Devin): Handle downstream", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
+                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
                 max_height=height, type_string=label
             )
             tables_and_charts.append((page_idx, table_data))
+
 
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestream PDF
@@ -455,7 +453,7 @@ def pdfium(
                 if obj_type == "IMAGE":
                     try:
                         # Attempt to retrieve the image bitmap
-                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)
+                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj) # noqa
                         image_base64: str = numpy_to_base64(image_numpy)
                         image_bbox = obj.get_pos()
                         image_size = obj.get_size()
@@ -474,7 +472,7 @@ def pdfium(
 
                         extracted_data.append(extracted_image_data)
                     except Exception as e:
-                        logger.error(f"Error extracting image: {e}")
+                        logger.error(f"Unhandled error extracting image: {e}")
                         pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
 
         # Table and chart collection
@@ -500,7 +498,7 @@ def pdfium(
     if extract_tables or extract_charts:
         for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
                 pages,
-                pdfium_config, # TODO(Devin) : Fix this
+                pdfium_config,
                 trace_info=trace_info,
         ):
             extracted_data.append(
