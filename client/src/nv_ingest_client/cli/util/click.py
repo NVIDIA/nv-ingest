@@ -13,6 +13,13 @@ from pprint import pprint
 
 import click
 from nv_ingest_client.cli.util.processing import check_schema
+from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionSchema
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
+from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
+from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
+from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
@@ -21,17 +28,10 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionSchema
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 
 logger = logging.getLogger(__name__)

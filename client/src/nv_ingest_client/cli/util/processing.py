@@ -131,7 +131,7 @@ def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_
 
 
 def report_stage_statistics(
-        stage_elapsed_times: defaultdict(list), total_trace_elapsed: float, abs_elapsed: float
+        stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float
 ) -> None:
     """
     Reports the statistics for each processing stage, including average, median, total time spent,
@@ -512,7 +512,6 @@ def create_job_specs_for_batch(files_batch: List[str], tasks: Dict[str, Any], cl
         for task in tasks:
             logger.debug(f"Task: {task}")
 
-        # TODO(Devin): Formalize this later, don't have time right now.
         if "split" in tasks:
             job_spec.add_task(tasks["split"])
 

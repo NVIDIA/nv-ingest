@@ -10,8 +10,8 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import tritonclient.grpc as grpcclient
 from morpheus.config import Config
-
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
@@ -36,12 +36,12 @@ def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Di
     paddle_client : Any
         The client used to call the image inference model.
 
-    trace_info : dict
+    trace_info : Dict
         Trace information used for logging or debugging.
 
     Returns
     -------
-    dict
+    Dict
         The modified metadata if conditions are met, otherwise the original metadata.
 
     Raises
@@ -60,16 +60,16 @@ def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Di
     table_metadata = metadata.get("table_metadata")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if ((content_metadata.get("type") != "structured")
-            or (content_metadata.get("subtype") != "table")
-            or (table_metadata is None)):
+    if ((content_metadata.get("type") != "structured") or
+            (content_metadata.get("subtype") != "table") or
+            (table_metadata is None)):
         return metadata
 
     # Modify table metadata with the result from the inference model
     try:
         image_array = base64_to_numpy(base64_image)
         paddle_result = ""
-        if (check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT)):
+        if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
             paddle_result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
 
         table_metadata["table_content"] = paddle_result
@@ -83,25 +83,25 @@ def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Di
 def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
                         validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
     """
-    Function to extract table data from a DataFrame.
+    Extracts table data from a DataFrame.
 
     Parameters
     ----------
     df : pd.DataFrame
         DataFrame containing the content from which table data is to be extracted.
 
-    task_props : dict
+    task_props : Dict[str, Any]
         Dictionary containing task properties and configurations.
 
     validated_config : Any
         The validated configuration object for table extraction.
 
-    trace_info : dict, optional
+    trace_info : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
     Returns
     -------
-    tuple
+    Tuple[pd.DataFrame, Dict]
         A tuple containing the updated DataFrame and the trace information.
 
     Raises
@@ -123,7 +123,7 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
-        # Apply the modify_metadata function to each row in the DataFrame
+        # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
 
         return df, trace_info
@@ -131,6 +131,9 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
     except Exception as e:
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
+    finally:
+        if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
+            paddle_client.close()
 
 
 def generate_table_extractor_stage(
@@ -141,26 +144,28 @@ def generate_table_extractor_stage(
         pe_count: int = 1,
 ):
     """
-    Helper function to generate a multiprocessing stage to perform table data extraction from PDF content.
+    Generates a multiprocessing stage to perform table data extraction from PDF content.
 
     Parameters
     ----------
     c : Config
         Morpheus global configuration object.
 
-    stage_config : dict
+    stage_config : Dict[str, Any]
         Configuration parameters for the table content extractor, passed as a dictionary
-        that will be validated against the `TableExtractorSchema`.
+        validated against the `TableExtractorSchema`.
 
-    task : str, default="table_extraction"
+    task : str, optional
         The task name for the stage worker function, defining the specific table extraction process.
+        Default is "table_data_extract".
 
-    task_desc : str, default="table_data_extractor"
+    task_desc : str, optional
         A descriptor used for latency tracing and logging during table extraction.
+        Default is "table_data_extraction".
 
-    pe_count : int, default=1
+    pe_count : int, optional
         The number of process engines to use for table data extraction. This value controls
-        how many worker processes will run concurrently.
+        how many worker processes will run concurrently. Default is 1.
 
     Returns
     -------

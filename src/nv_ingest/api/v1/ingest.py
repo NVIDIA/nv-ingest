@@ -10,22 +10,23 @@
 
 # pylint: skip-file
 
+from io import BytesIO
+from typing import Annotated
 import base64
 import json
-from io import BytesIO
 import logging
 import time
 import traceback
-from typing import Annotated
 
-from opentelemetry import trace
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from fastapi import File, UploadFile
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import File, UploadFile
 from fastapi import HTTPException
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from opentelemetry import trace
+from redis import RedisError
 
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
