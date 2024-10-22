@@ -112,10 +112,12 @@ def test_apply_filter(should_filter, width, height, expected0, expected1):
         payload_list.append(valid_image_filter_payload(ContentTypeEnum.IMAGE, width, height))
 
     extracted_df = pd.DataFrame(payload_list, columns=["document_type", "metadata"])
+    print(f"Extracted_df.columns: {extracted_df.columns}")
     extracted_gdf = cudf.from_pandas(extracted_df)
     msg_meta = MessageMeta(df=extracted_gdf)
     ctrl_msg.payload(msg_meta)
 
+    print(f"Task params: {task_params}")
     _apply_filter(ctrl_msg, task_params)
 
     with ctrl_msg.payload().mutable_dataframe() as mdf:
