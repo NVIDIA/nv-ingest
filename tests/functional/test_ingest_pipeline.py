@@ -8,7 +8,6 @@ import time
 
 import pytest
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.redis.redis_client import RedisClient  # type: ignore
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
@@ -52,7 +51,7 @@ def remove_keys(data, keys_to_remove):
 @pytest.mark.skip(reason="Test environment is not running nv-ingest and redis services.")
 def test_ingest_pipeline():
     client = NvIngestClient(
-        message_client_allocator=RedisClient,
+        message_client_allocator="", #RedisClient,
         message_client_hostname=_DEFAULT_REDIS_HOST,
         message_client_port=_DEFAULT_REDIS_PORT,
         message_client_kwargs=None,
