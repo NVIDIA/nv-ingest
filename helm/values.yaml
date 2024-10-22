@@ -73,12 +73,12 @@ replicaCount: 1
 ## @param resources.requests.memory [default: 16Gi] Specify request for memory
 resources:
   limits:
-    memory: 32Gi
+    memory: 90Gi
     nvidia.com/gpu: 1
     cpu: "36000m"
   requests:
-    memory: 16Gi
-    cpu: "12000m"
+    memory: 24Gi
+    cpu: "16000m"
 
 
 ## @param tmpDirSize [default: 8Gi] Specify the amount of space to reserve for temporary storage
