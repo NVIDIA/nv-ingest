@@ -538,7 +538,10 @@ class NvIngestClient:
                 results.append(x_trace_id)
 
         if submission_errors:
-            raise type(submission_errors[0])("\n".join([str(e) for e in submission_errors]))
+            error_msg = str(submission_errors[0])
+            if len(submission_errors) > 1:
+                error_msg += f"... [{len(submission_errors) - 1} more messages truncated]"
+            raise type(submission_errors[0])(error_msg)
         return results
 
     def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
@@ -637,7 +640,7 @@ class NvIngestClient:
         JobSpec : The class representing a job specification.
         """
         if not isinstance(tasks, dict):
-            raise ValueError(f"`tasks` must be a dictionary of task names -> task specifications.")
+            raise ValueError("`tasks` must be a dictionary of task names -> task specifications.")
 
         job_specs = create_job_specs_for_batch(files_batch)
 
@@ -652,11 +655,11 @@ class NvIngestClient:
             seen_tasks = set()  # For tracking tasks and rejecting duplicate tasks.
 
             for task_name, task_config in tasks.items():
-                if task_name.startswith("extract_"):
+                if task_name.lower().startswith("extract_"):
                     task_file_type = task_name.split("_", 1)[1]
                     if file_type.lower() != task_file_type.lower():
                         continue
-                elif not is_valid_task_type(task_name):
+                elif not is_valid_task_type(task_name.upper()):
                     raise ValueError(f"Invalid task type: '{task_name}'")
 
                 if str(task_config) in seen_tasks:
