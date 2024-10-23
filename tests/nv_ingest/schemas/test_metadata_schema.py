@@ -12,6 +12,7 @@ from nv_ingest.schemas.metadata_schema import (  # Adjust the import as per your
     ChartMetadataSchema,
     ErrorMetadataSchema,
     InfoMessageMetadataSchema,
+    TableFormatEnum,
 )
 
 
@@ -104,6 +105,36 @@ def test_image_metadata_schema_defaults():
 
 def test_image_metadata_schema_invalid_type():
     with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type=3.14)  # Using a float value
+
+
+def test_image_metadata_schema_negative_width():
+    with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type="image", width=-5)
+
+
+def test_image_metadata_schema_negative_height():
+    with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type="image", height=-3)
+
+
+def test_image_metadata_schema_invalid_image_location_length():
+    with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type="image", image_location=(1, 2, 3))
+
+
+def test_image_metadata_schema_invalid_image_location_negative_values():
+    with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type="image", image_location=(1, -2, 3, 4))
+
+
+def test_image_metadata_schema_invalid_image_location_max_dimensions():
+    with pytest.raises(ValidationError):
+        ImageMetadataSchema(image_type="image", image_location_max_dimensions=(-1, 5))
+
+
+def test_image_metadata_schema_invalid_type():
+    with pytest.raises(ValidationError):
         ImageMetadataSchema(image_type=3.14)
 
 
@@ -117,15 +148,47 @@ def test_table_metadata_schema_defaults(table_format):
 
 def test_table_metadata_schema_with_location():
     config = TableMetadataSchema(
-        table_format="CSV",
+        table_format="latex",
         table_location=(1, 2, 3, 4)
     )
     assert config.table_location == (1, 2, 3, 4)
 
 
+@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
+@pytest.mark.parametrize("table_format",
+                         [TableFormatEnum.HTML, TableFormatEnum.MARKDOWN, TableFormatEnum.LATEX, TableFormatEnum.IMAGE])
+def test_schema_valid_table_format(schema_class, table_format):
+    config = schema_class(table_format=table_format)
+    assert config.caption == ""
+    assert config.table_content == ""
+
+
+@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
+def test_schema_invalid_location_length(schema_class):
+    with pytest.raises(ValidationError):
+        schema_class(table_format=TableFormatEnum.HTML, table_location=(1, 2, 3))
+
+
+@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
+def test_schema_invalid_location_negative_values(schema_class):
+    with pytest.raises(ValidationError):
+        schema_class(table_format=TableFormatEnum.MARKDOWN, table_location=(1, -2, 3, 4))
+
+
+@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
+def test_schema_invalid_max_dimensions_negative_values(schema_class):
+    with pytest.raises(ValidationError):
+        schema_class(table_format=TableFormatEnum.LATEX, table_location_max_dimensions=(-1, 5))
+
+
+def test_table_metadata_schema_invalid_table_format():
+    with pytest.raises(ValidationError):
+        TableMetadataSchema(table_format="invalid_format")
+
+
 # Test cases for ChartMetadataSchema
 def test_chart_metadata_schema_defaults():
-    config = ChartMetadataSchema(table_format="ChartFormat")
+    config = ChartMetadataSchema(table_format="html")
     assert config.caption == ""
     assert config.table_content == ""
 
@@ -133,8 +196,8 @@ def test_chart_metadata_schema_defaults():
 # Test cases for ErrorMetadataSchema
 def test_error_metadata_schema_defaults():
     config = ErrorMetadataSchema(
-        task="TaskType1",
-        status="ErrorStatus",
+        task="embed",
+        status="error",
         error_msg="An error occurred."
     )
     assert config.source_id == ""
@@ -154,7 +217,8 @@ def test_info_message_metadata_schema_defaults():
     config = InfoMessageMetadataSchema(
         task="transform",
         status="success",
-        message="This is an info message."
+        message="This is an info message.",
+        filter=False
     )
     assert config.filter is False
 

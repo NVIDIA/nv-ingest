@@ -263,6 +263,20 @@ class ImageMetadataSchema(BaseModelNoExt):
             raise ValueError("image_type must be a string or ImageTypeEnum")
         return v
 
+    @validator("width", "height", pre=True, always=True)
+    def validate_non_negative(cls, v, field):
+        if v < 0:
+            raise ValueError(f"{field.name} must be non-negative.")
+        return v
+
+    @validator("image_location", "image_location_max_dimensions", pre=True, always=True)
+    def validate_location_tuples(cls, v, field):
+        if not isinstance(v, tuple) or len(v) not in [2, 4]:
+            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
+        if any(coord < 0 for coord in v):
+            raise ValueError(f"All values in {field.name} must be non-negative.")
+        return v
+
 
 class TableMetadataSchema(BaseModelNoExt):
     caption: str = ""
@@ -272,6 +286,15 @@ class TableMetadataSchema(BaseModelNoExt):
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
 
+    @validator("table_location", "table_location_max_dimensions", pre=True, always=True)
+    def validate_location_tuples(cls, v, field):
+        if not isinstance(v, tuple) or len(v) not in [2, 4]:
+            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
+        if any(coord < 0 for coord in v):
+            raise ValueError(f"All values in {field.name} must be non-negative.")
+        return v
+
+
 class ChartMetadataSchema(BaseModelNoExt):
     caption: str = ""
     table_format: TableFormatEnum
@@ -279,6 +302,14 @@ class ChartMetadataSchema(BaseModelNoExt):
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
+
+    @validator("table_location", "table_location_max_dimensions", pre=True, always=True)
+    def validate_location_tuples(cls, v, field):
+        if not isinstance(v, tuple) or len(v) not in [2, 4]:
+            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
+        if any(coord < 0 for coord in v):
+            raise ValueError(f"All values in {field.name} must be non-negative.")
+        return v
 
 
 # TODO consider deprecating this in favor of info msg...
