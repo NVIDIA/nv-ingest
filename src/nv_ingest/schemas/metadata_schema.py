@@ -257,6 +257,12 @@ class ImageMetadataSchema(BaseModelNoExt):
     width: int = 0
     height: int = 0
 
+    @validator("image_type", pre=True, always=True)
+    def validate_image_type(cls, v):
+        if not isinstance(v, (ImageTypeEnum, str)):
+            raise ValueError("image_type must be a string or ImageTypeEnum")
+        return v
+
 
 class TableMetadataSchema(BaseModelNoExt):
     caption: str = ""
