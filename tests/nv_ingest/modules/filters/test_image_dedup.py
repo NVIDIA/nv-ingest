@@ -89,7 +89,7 @@ def test_apply_dedup(should_filter, expected0, expected1, expected2):
     assert task_props.get("content_type") == ContentTypeEnum.IMAGE
 
     payload_list = []
-    for index in range(3):
+    for _ in range(3):
         payload_list.append(valid_image_dedup_payload(f"test", 1, 1))
 
     extracted_df = pd.DataFrame(payload_list, columns=["document_type", "metadata"])

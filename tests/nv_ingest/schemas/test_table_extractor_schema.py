@@ -1,7 +1,7 @@
 import pytest
 from pydantic import ValidationError
 from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema, \
-    TableExtractorSchema  # Adjust the import as per your file structure
+    TableExtractorSchema
 
 
 # Test cases for TableExtractorConfigSchema
