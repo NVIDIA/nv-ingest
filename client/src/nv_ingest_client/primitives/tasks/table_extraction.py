@@ -38,7 +38,7 @@ class TableExtractionTask(Task):
         Returns a string with the object's config and run time state
         """
         info = ""
-        info += "Table Extraction Task\n"
+        info += "table extraction task\n"
         return info
 
     def to_dict(self) -> Dict:

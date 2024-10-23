@@ -38,7 +38,7 @@ class ChartExtractionTask(Task):
         Returns a string with the object's config and run time state
         """
         info = ""
-        info += "Table Extraction Task\n"
+        info += "chart extraction task\n"
         return info
 
     def to_dict(self) -> Dict:

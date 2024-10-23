@@ -12,8 +12,8 @@ more_itertools
 nltk==3.9.1
 numpy
 olefile==0.47
-onnx==1.16.0
 openai==1.40.6
+onnx==1.17.0
 opencv-python==4.10.0.84
 opentelemetry-api
 opentelemetry-exporter-otlp
