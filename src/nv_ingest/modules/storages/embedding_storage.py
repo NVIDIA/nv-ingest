@@ -50,7 +50,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     
     access_key = params.get("access_key", None)
     secret_key = params.get("secret_key", None)
-    logger.error(f"in upload {access_key}, {secret_key}")
+
     content_types = params.get("content_types")
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
@@ -123,7 +123,6 @@ def _storage_embeddings(builder: mrc.Builder):
 
             content_types = {}
             if store_embeddings:
-                logger.error(f"IN STORE EMBEDDINGS")
 
                 content_types[ContentTypeEnum.EMBEDDING] = store_embeddings
 
@@ -141,7 +140,6 @@ def _storage_embeddings(builder: mrc.Builder):
                 # if (~storage_obj_mask).all():  # if there are no images, return immediately.
                 #     logger.debug(f"No storage objects for '{content_types}' found in the dataframe.")
                 #     return ctrl_msg
-                logger.error(f"about to upload {df}")
 
                 df = upload_embeddings(df, params)
             
