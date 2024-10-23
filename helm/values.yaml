@@ -238,8 +238,17 @@ redis:
     enabled: false
   replica:
     replicaCount: 1
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
   master:
-      resourcesPreset: xlarge
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
 
 ## @section Environment Variables
 ## @descriptionStart
