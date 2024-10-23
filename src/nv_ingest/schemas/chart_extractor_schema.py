@@ -4,7 +4,8 @@
 
 import logging
 from typing import Optional, Tuple
-from pydantic import BaseModel, root_validator
+
+from pydantic import BaseModel, root_validator, validator
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,12 @@ class ChartExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     stage_config: Optional[ChartExtractorConfigSchema] = None
+
+    @validator('max_queue_size', 'n_workers', pre=True, always=True)
+    def check_positive(cls, v, field):
+        if v <= 0:
+            raise ValueError(f"{field.name} must be greater than 10.")
+        return v
 
     class Config:
         extra = "forbid"
