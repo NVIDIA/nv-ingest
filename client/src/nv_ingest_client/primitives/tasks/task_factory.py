@@ -9,6 +9,7 @@ from typing import Type
 from typing import Union
 
 from .caption import CaptionTask
+from .dedup import DedupTask
 from .embed import EmbedTask
 from .extract import ExtractTask
 from .filter import FilterTask
@@ -33,6 +34,7 @@ class TaskUnimplemented(Task):
 # Mapping of TaskType to Task classes, arranged alphabetically by task type
 _TASK_MAP: Dict[TaskType, Callable] = {
     TaskType.CAPTION: CaptionTask,
+    TaskType.DEDUP: DedupTask,
     TaskType.EMBED: EmbedTask,
     TaskType.EXTRACT: ExtractTask,
     TaskType.FILTER: FilterTask,

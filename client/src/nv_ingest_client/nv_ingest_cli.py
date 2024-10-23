@@ -17,14 +17,14 @@ from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
 from nv_ingest_client.cli.util.click import click_validate_file_exists
 from nv_ingest_client.cli.util.click import click_validate_task
-from nv_ingest_client.cli.util.dataset import get_dataset_files
-from nv_ingest_client.cli.util.dataset import get_dataset_statistics
 from nv_ingest_client.cli.util.processing import create_and_process_jobs
 from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
+from nv_ingest_client.util.dataset import get_dataset_files
+from nv_ingest_client.util.dataset import get_dataset_statistics
 from pkg_resources import DistributionNotFound
 from pkg_resources import VersionConflict
 

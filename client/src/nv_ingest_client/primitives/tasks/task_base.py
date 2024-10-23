@@ -16,6 +16,7 @@ logger = logging.getLogger(__name__)
 
 class TaskType(Enum):
     CAPTION = auto()
+    DEDUP = auto()
     EMBED = auto()
     EXTRACT = auto()
     FILTER = auto()
@@ -66,7 +67,6 @@ class Task:
         tasks that are then submitted to the redis client
         """
         return {}
-
 
 
 # class ExtractUnstructuredTask(ExtractTask):
