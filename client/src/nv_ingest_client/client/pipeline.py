@@ -18,9 +18,12 @@ from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 
 
+DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
+
+
 class NvIngestPipeline:
     def __init__(
-        self, documents: List[str], client: Optional[NvIngestClient] = None, job_queue_id="morpheus_task_queue"
+        self, documents: List[str], client: Optional[NvIngestClient] = None, job_queue_id=DEFAULT_JOB_QUEUE_ID,
     ):
         self._documents = documents
         self._client = client
@@ -32,6 +35,24 @@ class NvIngestPipeline:
         self._job_specs = BatchJobSpec(self._documents)
         self._job_ids = None
         self._job_states = None
+
+    def _create_client(self):
+        self._client = NvIngestClient()
+
+    def run(self):
+        self._job_ids = self._client.add_job(self._job_specs)
+        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id)
+
+        result = self._client.fetch_job_result(self._job_ids)
+
+        return result
+
+    def run_async(self):
+        self._job_ids = self._client.add_job(self._job_specs)
+
+        futures = self._client.submit_job_async(self._job_ids, self._job_queue_id)
+
+        return futures
 
     def dedup(self, **kwargs):
         dedup_task = DedupTask(**kwargs)
@@ -75,21 +96,3 @@ class NvIngestPipeline:
         self._job_specs.add_task(vdb_upload_task)
 
         return self
-
-    def _create_client(self):
-        self._client = NvIngestClient()
-
-    def run(self):
-        self._job_ids = self._client.add_job(self._job_specs)
-        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id)
-
-        result = self._client.fetch_job_result(self._job_ids)
-
-        return result
-
-    def run_async(self):
-        self._job_ids = self._client.add_job(self._job_specs)
-
-        futures = self._client.submit_job_async(self._job_ids, self._job_queue_id)
-
-        return futures
