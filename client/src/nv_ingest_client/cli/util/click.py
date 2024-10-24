@@ -18,7 +18,8 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.primitives.tasks import StoreTask, StoreEmbedTask
+from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
