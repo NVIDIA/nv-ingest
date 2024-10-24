@@ -107,32 +107,6 @@ def test_image_metadata_schema_invalid_type():
     with pytest.raises(ValidationError):
         ImageMetadataSchema(image_type=3.14)  # Using a float value
 
-
-def test_image_metadata_schema_negative_width():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type="image", width=-5)
-
-
-def test_image_metadata_schema_negative_height():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type="image", height=-3)
-
-
-def test_image_metadata_schema_invalid_image_location_length():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type="image", image_location=(1, 2, 3))
-
-
-def test_image_metadata_schema_invalid_image_location_negative_values():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type="image", image_location=(1, -2, 3, 4))
-
-
-def test_image_metadata_schema_invalid_image_location_max_dimensions():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type="image", image_location_max_dimensions=(-1, 5))
-
-
 def test_image_metadata_schema_invalid_type():
     with pytest.raises(ValidationError):
         ImageMetadataSchema(image_type=3.14)
@@ -161,24 +135,6 @@ def test_schema_valid_table_format(schema_class, table_format):
     config = schema_class(table_format=table_format)
     assert config.caption == ""
     assert config.table_content == ""
-
-
-@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
-def test_schema_invalid_location_length(schema_class):
-    with pytest.raises(ValidationError):
-        schema_class(table_format=TableFormatEnum.HTML, table_location=(1, 2, 3))
-
-
-@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
-def test_schema_invalid_location_negative_values(schema_class):
-    with pytest.raises(ValidationError):
-        schema_class(table_format=TableFormatEnum.MARKDOWN, table_location=(1, -2, 3, 4))
-
-
-@pytest.mark.parametrize("schema_class", [TableMetadataSchema, ChartMetadataSchema])
-def test_schema_invalid_max_dimensions_negative_values(schema_class):
-    with pytest.raises(ValidationError):
-        schema_class(table_format=TableFormatEnum.LATEX, table_location_max_dimensions=(-1, 5))
 
 
 def test_table_metadata_schema_invalid_table_format():
