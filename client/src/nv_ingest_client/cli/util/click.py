@@ -119,8 +119,7 @@ def click_validate_task(ctx, param, value):
                     new_task.append(("table_data_extract", TableExtractionTask(**subtask_options.dict())))
 
                 if (task_options.extract_charts == True):
-                    print(f"Adding chart extraction task: {str(ChartExtractionTask().to_dict())}")
-                    subtask_options = check_schema(ChartExtractionSchema, {}, "table_data_extract", "{}")
+                    subtask_options = check_schema(ChartExtractionSchema, {}, "chart_data_extract", "{}")
                     new_task.append(("chart_data_extract", ChartExtractionTask(**subtask_options.dict())))
 
             elif task_id == "store":
