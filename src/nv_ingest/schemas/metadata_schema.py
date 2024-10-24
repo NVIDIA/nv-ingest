@@ -4,6 +4,7 @@
 
 
 from datetime import datetime
+import logging
 from enum import Enum
 from typing import Any
 from typing import Dict
@@ -16,6 +17,8 @@ from pydantic import validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.util.converters import datetools
+
+logger = logging.getLogger(__name__)
 
 
 # Do we want types and similar items to be enums or just strings?
@@ -246,6 +249,13 @@ class TextMetadataSchema(BaseModelNoExt):
     text_location: tuple = (0, 0, 0, 0)
 
 
+import logging
+from pydantic import validator
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+
 class ImageMetadataSchema(BaseModelNoExt):
     image_type: Union[ImageTypeEnum, str]
     structured_image_type: ImageTypeEnum = ImageTypeEnum.image_type_1
@@ -264,17 +274,10 @@ class ImageMetadataSchema(BaseModelNoExt):
         return v
 
     @validator("width", "height", pre=True, always=True)
-    def validate_non_negative(cls, v, field):
+    def clamp_non_negative(cls, v, field):
         if v < 0:
-            raise ValueError(f"{field.name} must be non-negative.")
-        return v
-
-    @validator("image_location", "image_location_max_dimensions", pre=True, always=True)
-    def validate_location_tuples(cls, v, field):
-        if not isinstance(v, tuple) or len(v) not in [2, 4]:
-            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
-        if any(coord < 0 for coord in v):
-            raise ValueError(f"All values in {field.name} must be non-negative.")
+            logger.warning(f"{field.name} is negative; clamping to 0. Original value: {v}")
+            return 0
         return v
 
 
@@ -286,14 +289,6 @@ class TableMetadataSchema(BaseModelNoExt):
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
 
-    @validator("table_location", "table_location_max_dimensions", pre=True, always=True)
-    def validate_location_tuples(cls, v, field):
-        if not isinstance(v, tuple) or len(v) not in [2, 4]:
-            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
-        if any(coord < 0 for coord in v):
-            raise ValueError(f"All values in {field.name} must be non-negative.")
-        return v
-
 
 class ChartMetadataSchema(BaseModelNoExt):
     caption: str = ""
@@ -302,14 +297,6 @@ class ChartMetadataSchema(BaseModelNoExt):
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
-
-    @validator("table_location", "table_location_max_dimensions", pre=True, always=True)
-    def validate_location_tuples(cls, v, field):
-        if not isinstance(v, tuple) or len(v) not in [2, 4]:
-            raise ValueError(f"{field.name} must be a tuple of length 2 or 4.")
-        if any(coord < 0 for coord in v):
-            raise ValueError(f"All values in {field.name} must be non-negative.")
-        return v
 
 
 # TODO consider deprecating this in favor of info msg...

@@ -246,7 +246,7 @@ def construct_image_metadata(
         "caption": "",
         "text": "",
         "image_location": image_base64.bbox,
-        "image_location_max_dimensions": (image_base64.max_width, image_base64.max_height),
+        "image_location_max_dimensions": (max(image_base64.max_width,0), max(image_base64.max_height,0)),
         "height": image_base64.height,
     }
 
