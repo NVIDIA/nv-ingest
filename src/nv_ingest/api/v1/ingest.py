@@ -133,8 +133,6 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
             payload=json.dumps(job_spec_dict)
         )
 
-        # logger.info(f"Job Spec: {json.dumps(job_spec_dict, indent=2)}")
-        
         submitted_job_id = await ingest_service.submit_job(updated_job_spec)
         return submitted_job_id
     except Exception as ex:
