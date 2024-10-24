@@ -27,7 +27,8 @@ from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreTaskSchema, StoreEmbedTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
