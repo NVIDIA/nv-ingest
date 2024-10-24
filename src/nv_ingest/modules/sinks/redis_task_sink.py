@@ -119,7 +119,7 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
     df_json_size = sys.getsizeof(df_json_str)
 
     # 256 MB size limit (in bytes)
-    size_limit = 256 * 1024 * 1024
+    size_limit = 128 * 1024 * 1024
 
     # If df_json is larger than the size limit, split it into chunks
     if df_json_size > size_limit:
