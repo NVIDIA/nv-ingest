@@ -131,6 +131,9 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
+    bulk_ingest: bool = False
+    bulk_ingest_path: str = None
+    extra_args: dict = None
     filter_errors: bool = True
 
 
