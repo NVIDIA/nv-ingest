@@ -368,3 +368,10 @@ class BatchJobSpec:
             A dictionary mapping document types to job specifications.
         """
         return self._file_type_to_job_spec
+
+    @property
+    def file_types(self) -> List[str]:
+        """
+        TODO
+        """
+        return list(self._file_type_to_job_spec.keys())
