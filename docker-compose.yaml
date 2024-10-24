@@ -119,11 +119,11 @@ services:
   nv-ingest-ms-runtime:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08
     build:
-      context: ${NV_INGEST_ROOT}
+      context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
       target: runtime
     volumes:
-      - ${DATASET_ROOT}:/workspace/data
+      - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
       - "7670:7670"
     cap_add:
@@ -138,8 +138,8 @@ services:
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
-      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis

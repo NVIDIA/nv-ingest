@@ -50,6 +50,7 @@ def create_inference_client(
     -------
     grpcclient.InferenceServerClient or dict
         A gRPC client if the gRPC endpoint is provided, otherwise a dictionary containing the HTTP client details.
+        :param infer_protocol:
     """
     grpc_endpoint, http_endpoint = endpoints
 

@@ -137,7 +137,7 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag):
     gdf.drop(labels=["info_message_metadata", "metadata"], inplace=True, axis=1)
     gdf["info_message_metadata"] = duplicate_images_gdf["info_message_metadata"]
     gdf.loc[duplicate_images_gdf["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG.value
-    gdf["metadata"] = gdf[exploded_metadata_cols + ["info_message_metadata"]].to_struct()
+    gdf["metadata"] = gdf[exploded_metadata_cols].to_struct()
     gdf.drop(labels=gdf.columns.difference(base_cols), inplace=True, axis=1)
 
     message_meta = MessageMeta(df=gdf)

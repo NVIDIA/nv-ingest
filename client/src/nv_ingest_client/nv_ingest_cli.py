@@ -11,7 +11,6 @@ from typing import List
 
 import click
 import pkg_resources
-from nv_ingest_client.cli.util.click import ClientType
 from nv_ingest_client.cli.util.click import LogLevel
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size

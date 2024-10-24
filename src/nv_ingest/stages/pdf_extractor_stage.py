@@ -61,7 +61,7 @@ def decode_and_extract(
     try:
         base64_content = base64_row["content"]
     except KeyError:
-        log_error_message = f"NO CONTENT FOUND IN ROW:\n{base64_row}"
+        log_error_message = f"Unhandled error processing row, no content was found:\n{base64_row}"
         logger.error(log_error_message)
         raise
 

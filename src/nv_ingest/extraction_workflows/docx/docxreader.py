@@ -333,7 +333,7 @@ class DocxReader:
 
         # For docx there is no bounding box. The paragraph that follows the image is typically
         # the caption. Add that para to the page nearby for now. fixme
-        bbox = (-1, -1, -1, -1)
+        bbox = (0, 0, 0, 0)
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
             "images": {"content": [], "bbox": []},

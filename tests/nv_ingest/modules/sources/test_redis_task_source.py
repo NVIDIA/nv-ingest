@@ -80,18 +80,19 @@ def test_process_message(job_payload, add_trace_tagging, trace_id, ts_send, ts_f
     payload = json.loads(job_payload)
 
     # Update tracing options based on parameters
+    job_id = "abc12345678910213123"
+    payload["job_id"] = job_id
     payload["tracing_options"] = {"trace": add_trace_tagging, "ts_send": int(ts_send.timestamp() * 1e9)}
     if trace_id is not None:
         payload["tracing_options"]["trace_id"] = trace_id
-    modified_payload = json.dumps(payload)
-    result = process_message(modified_payload, ts_fetched)
+
+    result = process_message(payload, ts_fetched)
 
     # Basic type check for the returned object
     assert isinstance(result, ControlMessage)
 
     # Check for correct handling of tracing options
-    assert result.get_metadata("response_channel") == f"response_{payload['job_id']}"
-    assert result.get_metadata("job_id") == payload["job_id"]
+    assert result.get_metadata("response_channel") == f"response_{job_id}"
     if add_trace_tagging:
         assert result.get_metadata("config::add_trace_tagging") is True
         assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is not None

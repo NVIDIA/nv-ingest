@@ -10,27 +10,26 @@
 
 # pylint: skip-file
 
-import base64
-import copy
-import json
 from io import BytesIO
+from typing import Annotated
+import base64
+import json
 import logging
 import time
 import traceback
-from typing import Annotated
 
-from opentelemetry import trace
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from fastapi import File, UploadFile
 from fastapi import APIRouter
 from fastapi import Depends
+from fastapi import File, UploadFile
 from fastapi import HTTPException
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from opentelemetry import trace
+from redis import RedisError
 
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -128,13 +127,12 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         # will be able to trace across uvicorn -> morpheus
         current_trace_id = trace.get_current_span().get_span_context().trace_id
         
-        # Recreate the JobSpec to test what is going on ....
         job_spec_dict = json.loads(job_spec.payload)
         job_spec_dict['tracing_options']['trace_id'] = current_trace_id
         updated_job_spec = MessageWrapper(
             payload=json.dumps(job_spec_dict)
         )
-        
+
         submitted_job_id = await ingest_service.submit_job(updated_job_spec)
         return submitted_job_id
     except Exception as ex:
