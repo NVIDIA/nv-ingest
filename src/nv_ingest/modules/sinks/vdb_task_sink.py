@@ -47,19 +47,19 @@ def _bulk_ingest(milvus_uri: str = None,
                 collection_name: str = None, 
                 bucket_name: str = None, 
                 bulk_ingest_path: str = None, 
-                extra_args: dict = None):
+                extra_params: dict = None):
 
-    endpoint = extra_args.get("endpoint", _DEFAULT_ENDPOINT)
-    access_key = extra_args.get("access_key", None)
-    secret_key = extra_args.get("secret_key", None)
+    endpoint = extra_params.get("endpoint", _DEFAULT_ENDPOINT)
+    access_key = extra_params.get("access_key", None)
+    secret_key = extra_params.get("secret_key", None)
 
     client = Minio(
         endpoint,
         access_key=access_key,
         secret_key=secret_key,
-        session_token=extra_args.get("session_token", None),
-        secure=extra_args.get("secure", False),
-        region=extra_args.get("region", None),
+        session_token=extra_params.get("session_token", None),
+        secure=extra_params.get("secure", False),
+        region=extra_params.get("region", None),
     )
     bucket_found = client.bucket_exists(bucket_name)
     if not bucket_found:
@@ -303,7 +303,7 @@ def _vdb_task_sink(builder: mrc.Builder):
             bulk_ingest = task_props.get("bulk_ingest", False)
             bulk_ingest_path = task_props.get("bulk_ingest_path", None)
             bucket_name = task_props.get("bucket_name", _DEFAULT_BUCKET_NAME)
-            extra_args = task_props.get("extra_args", None)
+            extra_params = task_props.get("extra_params", None)
             filter_errors = task_props.get("filter_errors", True)
 
             if not service_status:
@@ -320,7 +320,7 @@ def _vdb_task_sink(builder: mrc.Builder):
                 raise ValueError("Not connected to vector database")
 
             if bulk_ingest:
-                _bulk_ingest(service_kwargs["uri"], default_resource_name, bucket_name, bulk_ingest_path, extra_args)
+                _bulk_ingest(service_kwargs["uri"], default_resource_name, bucket_name, bulk_ingest_path, extra_params)
             else:
                 df, msg_resource_target = extract_df(ctrl_msg, filter_errors)
                 if df is not None and not df.empty:
