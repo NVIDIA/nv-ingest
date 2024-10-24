@@ -75,5 +75,4 @@ class EmbeddingStorageStage(PassThruTypeMixin, SinglePortStage):
         mod_out_node = module.output_port("output")
 
         builder.make_edge(input_node, mod_in_node)
-        logger.info("EMBEDDING storage stage load complete")
         return mod_out_node

@@ -88,8 +88,6 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     for idx, row in df.iterrows():
         uu_id = row["uuid"]
         metadata = row["metadata"].copy()
-        emb = metadata["embedding"]
-        emb_df_list.append([uu_id, emb])
 
         metadata["source_metadata"]["source_location"] = write_path
 
@@ -99,8 +97,15 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
                 "uploaded_embedding_url"
             ] = write_path
         # TODO: validate metadata before putting it back in.
+        # cm = str(metadata["content_metadata"])
+        text = metadata["content"]
+        # source_meta = str(metadata["source_metadata"])
+        emb = metadata["embedding"]
         df.at[idx, "metadata"] = metadata
-    emb_df = pd.DataFrame(emb_df_list, columns=["id", "embedding"])
+
+        emb_df_list.append([emb, text])
+
+    emb_df = pd.DataFrame(emb_df_list, columns=["vector", "text"])
     emb_df.to_parquet(write_path, engine='pyarrow', storage_options=storage_options)
 
     return df
@@ -135,11 +140,6 @@ def _storage_embeddings(builder: mrc.Builder):
 
                 with ctrl_msg.payload().mutable_dataframe() as mdf:
                     df = mdf.to_pandas()
-
-                # storage_obj_mask = df["document_type"].isin(list(content_types.keys()))
-                # if (~storage_obj_mask).all():  # if there are no images, return immediately.
-                #     logger.debug(f"No storage objects for '{content_types}' found in the dataframe.")
-                #     return ctrl_msg
 
                 df = upload_embeddings(df, params)
             
