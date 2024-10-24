@@ -15,6 +15,7 @@ from .extract import ExtractTask
 from .filter import FilterTask
 from .split import SplitTask
 from .store import StoreTask
+from .store import StoreEmbedTask
 from .task_base import Task
 from .task_base import TaskType
 from .task_base import is_valid_task_type
@@ -39,6 +40,7 @@ _TASK_MAP: Dict[TaskType, Callable] = {
     TaskType.EXTRACT: ExtractTask,
     TaskType.FILTER: FilterTask,
     TaskType.SPLIT: SplitTask,
+    TaskType.STORE_EMBEDDING: StoreEmbedTask,
     TaskType.STORE: StoreTask,
     TaskType.TRANSFORM: TaskUnimplemented,
     TaskType.VDB_UPLOAD: VdbUploadTask,
