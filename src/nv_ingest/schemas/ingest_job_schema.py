@@ -43,6 +43,7 @@ class TaskTypeEnum(str, Enum):
     filter = "filter"
     split = "split"
     store = "store"
+    store_embedding = "store_embedding"
     vdb_upload = "vdb_upload"
 
 
@@ -85,11 +86,16 @@ class IngestTaskExtractSchema(BaseModelNoExt):
             raise ValueError(f"{v} is not a valid DocumentTypeEnum value")
 
 
+class IngestTaskStoreEmbedSchema(BaseModelNoExt):
+    embedding: bool = True
+    method: str
+    extra_params: dict
+
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
     method: str
-    params: dict
+    extra_params: dict
 
 
 class IngestTaskCaptionSchema(BaseModelNoExt):
@@ -133,6 +139,7 @@ class IngestTaskSchema(BaseModelNoExt):
     task_properties: Union[
         IngestTaskSplitSchema,
         IngestTaskExtractSchema,
+        IngestTaskStoreEmbedSchema,
         IngestTaskStoreSchema,
         IngestTaskEmbedSchema,
         IngestTaskCaptionSchema,
@@ -153,6 +160,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.extract: IngestTaskExtractSchema,
                 TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend this mapping as necessary
                 TaskTypeEnum.split: IngestTaskSplitSchema,
+                TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
             }.get(task_type.lower())
