@@ -23,7 +23,7 @@ class TableExtractionSchema(BaseModel):
 
 class TableExtractionTask(Task):
     """
-    Object for document dedup task
+    Object for table extraction tasks
     """
 
     def __init__(

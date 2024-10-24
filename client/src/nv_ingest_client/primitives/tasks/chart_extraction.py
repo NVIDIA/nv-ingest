@@ -23,7 +23,7 @@ class ChartExtractionSchema(BaseModel):
 
 class ChartExtractionTask(Task):
     """
-    Object for document dedup task
+    Object for chart extraction task
     """
 
     def __init__(
