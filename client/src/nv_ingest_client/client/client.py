@@ -295,7 +295,7 @@ class NvIngestClient:
         """
 
         try:
-            job_state = self._get_and_check_job_state(job_index, required_state=[JobStateEnum.SUBMITTED])
+            job_state = self._get_and_check_job_state(job_index, required_state=[JobStateEnum.SUBMITTED, JobStateEnum.SUBMITTED_ASYNC])
             response = self._message_client.fetch_message(job_state.job_id, timeout)
 
             if response is not None:
