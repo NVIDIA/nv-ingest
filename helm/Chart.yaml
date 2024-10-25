@@ -2,7 +2,7 @@ apiVersion: v2
 name: nv-ingest
 description: NV-Ingest Microservice
 type: application
-version: 0.3.5
+version: 0.3.8
 maintainers:
   - name: NVIDIA Corporation
     url: https://www.nvidia.com/
