@@ -27,7 +27,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest"
-  tag: "24.08"
+  tag: "24.10"
 
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
 podAnnotations:
