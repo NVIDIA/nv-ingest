@@ -12,6 +12,13 @@ from pprint import pprint
 
 import click
 from nv_ingest_client.cli.util.processing import check_schema
+from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionSchema
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
+from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
+from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
+from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
@@ -20,13 +27,10 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
@@ -104,36 +108,44 @@ def click_validate_task(ctx, param, value):
             if task_id == "split":
                 task_options = check_schema(SplitTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = SplitTask(**task_options.dict())
+                new_task = [(new_task_id, SplitTask(**task_options.dict()))]
             elif task_id == "extract":
                 task_options = check_schema(ExtractTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}_{task_options.document_type}"
-                new_task = ExtractTask(**task_options.dict())
+                new_task = [(new_task_id, ExtractTask(**task_options.dict()))]
+
+                if (task_options.extract_tables == True):
+                    subtask_options = check_schema(TableExtractionSchema, {}, "table_data_extract", "{}")
+                    new_task.append(("table_data_extract", TableExtractionTask(**subtask_options.dict())))
+
+                if (task_options.extract_charts == True):
+                    subtask_options = check_schema(ChartExtractionSchema, {}, "chart_data_extract", "{}")
+                    new_task.append(("chart_data_extract", ChartExtractionTask(**subtask_options.dict())))
+
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = StoreTask(**task_options.dict())
+                new_task = [(new_task_id, StoreTask(**task_options.dict()))]
             elif task_id == "caption":
                 task_options = check_schema(CaptionTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = CaptionTask(**task_options.dict())
+                new_task = [(new_task_id, CaptionTask(**task_options.dict()))]
             elif task_id == "dedup":
                 task_options = check_schema(DedupTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = DedupTask(**task_options.dict())
+                new_task = [(new_task_id, DedupTask(**task_options.dict()))]
             elif task_id == "filter":
                 task_options = check_schema(FilterTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = FilterTask(**task_options.dict())
+                new_task = [(new_task_id, FilterTask(**task_options.dict()))]
             elif task_id == "embed":
                 task_options = check_schema(EmbedTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = EmbedTask(**task_options.dict())
+                new_task = [(new_task_id, EmbedTask(**task_options.dict()))]
             elif task_id == "vdb_upload":
                 task_options = check_schema(VdbUploadTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = VdbUploadTask(**task_options.dict())
-
+                new_task = [(new_task_id, VdbUploadTask(**task_options.dict()))]
             else:
                 raise ValueError(f"Unsupported task type: {task_id}")
 
@@ -141,14 +153,14 @@ def click_validate_task(ctx, param, value):
                 raise ValueError(f"Duplicate task detected: {new_task_id}")
 
             logger.debug("Adding task: %s", new_task_id)
-            validated_tasks[new_task_id] = new_task
+            for task_tuple in new_task:
+                validated_tasks[task_tuple[0]] = task_tuple[1]
         except ValueError as e:
             validation_errors.append(str(e))
 
     if validation_errors:
         # Aggregate error messages with original values highlighted
         error_message = "\n".join(validation_errors)
-        # logger.error(error_message)
         raise click.BadParameter(error_message)
 
     return validated_tasks
