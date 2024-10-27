@@ -4,10 +4,10 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
-import time
+import inspect
+from concurrent.futures import Future
 from typing import List
 from typing import Optional
-from concurrent.futures import ThreadPoolExecutor, Future
 
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
@@ -19,15 +19,16 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.util.processing import handle_future_result
-
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
 
 class NvIngestPipeline:
     def __init__(
-        self, documents: List[str], client: Optional[NvIngestClient] = None, job_queue_id=DEFAULT_JOB_QUEUE_ID,
+        self,
+        documents: List[str],
+        client: Optional[NvIngestClient] = None,
+        job_queue_id=DEFAULT_JOB_QUEUE_ID,
     ):
         self._documents = documents
         self._client = client
@@ -40,33 +41,49 @@ class NvIngestPipeline:
         self._job_ids = None
         self._job_states = None
 
-        self._terminal_job_states = {JobStateEnum.COMPLETED, JobStateEnum.FAILED, JobStateEnum.CANCELLED}
-
     def _create_client(self):
+        if self._client is not None:
+            raise ValueError("self._client already exists.")
+
         self._client = NvIngestClient()
 
-    def run(self):
+    def run(self, **kwargs):
         self._job_ids = self._client.add_job(self._job_specs)
-        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id)
 
-        result = self._client.fetch_job_result(self._job_ids)
+        submit_args = list(inspect.signature(self._client.submit_job).parameters)
+        submit_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in submit_args}
+        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_dict)
+
+        fetch_args = list(inspect.signature(self._client.fetch_job_result).parameters)
+        fetch_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in fetch_args}
+        result = self._client.fetch_job_result(self._job_ids, **fetch_dict)
 
         return result
 
-    def run_async(self):
+    def run_async(self, **kwargs):
         self._job_ids = self._client.add_job(self._job_specs)
-        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id)
+        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
+        self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
         combined_future = Future()
+        submitted_futures = set(future_to_job_id.keys())
         completed_futures = set()
         future_results = []
 
         def _done_callback(future):
             job_id = future_to_job_id[future]
-            result = self._client.fetch_job_result(job_id)
+            job_state = self._job_states[job_id]
+            try:
+                result = self._client.fetch_job_result(job_id)
+                if job_state.state != JobStateEnum.COMPLETED:
+                    job_state.state = JobStateEnum.COMPLETED
+            except Exception:
+                result = None
+                if job_state.state != JobStateEnum.FAILED:
+                    job_state.state = JobStateEnum.FAILED
             completed_futures.add(future)
             future_results.append(result)
-            if completed_futures == set(future_to_job_id.keys()):
+            if completed_futures == submitted_futures:
                 combined_future.set_result(future_results)
 
         for future in future_to_job_id:
@@ -119,21 +136,27 @@ class NvIngestPipeline:
 
     def _count_job_states(self, job_states):
         count = 0
-        for job_id in self._job_ids:
-            job_state = self._client._job_states.get(job_id)
-            if not job_state:
-                continue
+        for job_id, job_state in self._job_states.items():
             if job_state.state in job_states:
                 count += 1
         return count
 
+    def completed_jobs(self):
+        completed_job_states = {JobStateEnum.COMPLETED}
+
+        return self._count_job_states(completed_job_states)
+
     def failed_jobs(self):
         failed_job_states = {JobStateEnum.FAILED}
+
         return self._count_job_states(failed_job_states)
 
-    def running_jobs(self):
-        running_job_states = {JobStateEnum.PROCESSING}
-        return self._count_job_states(running_job_states)
+    def cancelled_jobs(self):
+        cancelled_job_states = {JobStateEnum.CANCELLED}
+
+        return self._count_job_states(cancelled_job_states)
 
     def remaining_jobs(self):
-        return self._client.job_count() - self._count_job_states(self._terminal_job_states)
+        terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
+
+        return len(self._job_states) - terminal_jobs
