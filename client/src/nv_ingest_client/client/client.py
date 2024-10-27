@@ -346,7 +346,7 @@ class NvIngestClient:
     # in the function itself instead of expecting the user to handle it themselves
     def fetch_job_result(
         self,
-        job_ids: List[str],
+        job_ids: Union[str, List[str]],
         timeout: float = 100,
         max_retries: Optional[int] = None,
         retry_delay: float = 1,
@@ -370,6 +370,9 @@ class NvIngestClient:
             TimeoutError: If the fetch operation times out.
             Exception: For all other unexpected issues.
         """
+        if isinstance(job_ids, str):
+            job_ids = [job_ids]
+
         results = []
 
         def fetch_with_retries(job_id: str):
@@ -405,7 +408,7 @@ class NvIngestClient:
             for future in as_completed(futures):
                 job_id = futures[future]
                 try:
-                    result = handle_future_result(future, futures, timeout)
+                    result = handle_future_result(future, timeout=timeout)
                     results.append(result.get("data"))
                 except concurrent.futures.TimeoutError:
                     logger.error(f"Timeout while fetching result for job ID {job_id}")

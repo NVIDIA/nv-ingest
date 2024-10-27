@@ -201,56 +201,20 @@ In the below examples, we are doing text, chart, table, and image extraction:
 #### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
 
 ```python
-import logging, time
+from nv_ingest_client.client import NvIngestPipeline
 
-from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.primitives import JobSpec
-from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.util.file_processing.extract import extract_file_content
 
-logger = logging.getLogger("nv_ingest_client")
+pipeline = NvIngestPipeline("data/multimodal_test.pdf")
 
-file_name = "data/multimodal_test.pdf"
-file_content, file_type = extract_file_content(file_name)
-
-# A JobSpec is an object that defines a document and how it should
-# be processed by the nv-ingest service.
-job_spec = JobSpec(
-  document_type=file_type,
-  payload=file_content,
-  source_id=file_name,
-  source_name=file_name,
-  extended_options=
-    {
-      "tracing_options":
-      {
-        "trace": True,
-        "ts_send": time.time_ns()
-      }
-    }
+pipeline = pipeline.extract(
+    extract_text=True,
+    extract_tables=True,
+    extract_images=True,
 )
 
-# configure desired extraction modes here. Multiple extraction
-# methods can be defined for a single JobSpec
-extract_task = ExtractTask(
-  document_type=file_type,
-  extract_text=True,
-  extract_images=True,
-  extract_tables=True
-)
+results = pipeline.run()
 
-job_spec.add_task(extract_task)
-
-# Create the client and inform it about the JobSpec we want to process.
-client = NvIngestClient(
-  message_client_hostname="localhost", # Host where nv-ingest-ms-runtime is running
-  message_client_port=7670 # REST port, defaults to 7670
-)
-job_id = client.add_job(job_spec)
-client.submit_job(job_id, "morpheus_task_queue")
-result = client.fetch_job_result(job_id, timeout=60)
-print(f"Got {len(result)} results")
+print(f"Got {len(results)} results")
 ```
 
 #### Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):

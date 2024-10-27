@@ -55,7 +55,6 @@ class NvIngestPipeline:
 
     def run_async(self):
         self._job_ids = self._client.add_job(self._job_specs)
-
         future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id)
 
         combined_future = Future()
@@ -63,18 +62,17 @@ class NvIngestPipeline:
         future_results = []
 
         def _done_callback(future):
-            self._client._pop_job_state(future_to_job_id[future])
+            job_id = future_to_job_id[future]
+            result = self._client.fetch_job_result(job_id)
             completed_futures.add(future)
-            result = handle_future_result(future, future_to_job_id)
-            future_results.append(result.get("data"))
-            #future_results.append(future.result())
+            future_results.append(result)
             if completed_futures == set(future_to_job_id.keys()):
                 combined_future.set_result(future_results)
 
         for future in future_to_job_id:
             future.add_done_callback(_done_callback)
 
-        return combined_future, self._job_ids
+        return combined_future
 
     def dedup(self, **kwargs):
         dedup_task = DedupTask(**kwargs)
