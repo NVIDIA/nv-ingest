@@ -130,7 +130,7 @@ def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_
 
 
 def report_stage_statistics(
-    stage_elapsed_times: defaultdict(list), total_trace_elapsed: float, abs_elapsed: float
+        stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float
 ) -> None:
     """
     Reports the statistics for each processing stage, including average, median, total time spent,

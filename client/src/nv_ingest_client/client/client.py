@@ -60,13 +60,13 @@ class NvIngestClient:
     """
 
     def __init__(
-        self,
-        message_client_allocator: Callable[..., RestClient] = RestClient,
-        message_client_hostname: Optional[str] = "localhost",
-        message_client_port: Optional[int] = 7670,
-        message_client_kwargs: Optional[Dict] = None,
-        msg_counter_id: Optional[str] = "nv-ingest-message-id",
-        worker_pool_size: int = 1,
+            self,
+            message_client_allocator: Callable[..., RestClient] = RestClient,
+            message_client_hostname: Optional[str] = "localhost",
+            message_client_port: Optional[int] = 7670,
+            message_client_kwargs: Optional[Dict] = None,
+            msg_counter_id: Optional[str] = "nv-ingest-message-id",
+            worker_pool_size: int = 1,
     ) -> None:
         """
         Initializes the NvIngestClient with a client allocator, REST configuration, a message counter ID,
@@ -149,9 +149,9 @@ class NvIngestClient:
         return job_state
 
     def _get_and_check_job_state(
-        self,
-        job_index: str,
-        required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
+            self,
+            job_index: str,
+            required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
     ) -> JobState:
         if required_state and not isinstance(required_state, list):
             required_state = [required_state]
@@ -192,13 +192,13 @@ class NvIngestClient:
             raise ValueError(f"Unexpected type: {type(job_spec)}")
 
     def create_job(
-        self,
-        payload: str,
-        source_id: str,
-        source_name: str,
-        document_type: str = None,
-        tasks: Optional[list] = None,
-        extended_options: Optional[dict] = None,
+            self,
+            payload: str,
+            source_id: str,
+            source_name: str,
+            document_type: str = None,
+            tasks: Optional[list] = None,
+            extended_options: Optional[dict] = None,
     ) -> str:
         """
         Creates a new job with the specified parameters and adds it to the job tracking dictionary.
@@ -249,10 +249,10 @@ class NvIngestClient:
         job_state.job_spec.add_task(task)
 
     def create_task(
-        self,
-        job_index: Union[str, int],
-        task_type: TaskType,
-        task_params: dict = None,
+            self,
+            job_index: Union[str, int],
+            task_type: TaskType,
+            task_params: dict = None,
     ) -> None:
         """
         Creates a task of the specified type with given parameters and associates it with the existing job.
@@ -440,7 +440,7 @@ class NvIngestClient:
             job_state.future = None
 
     def fetch_job_result_async(
-        self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
+            self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
     ) -> Dict[Future, str]:
         """
         Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.
@@ -470,9 +470,9 @@ class NvIngestClient:
         return future_to_job_id
 
     def _submit_job(
-        self,
-        job_index: str,
-        job_queue_id: str,
+            self,
+            job_index: str,
+            job_queue_id: str,
     ) -> Optional[Dict]:
         """
         Submits a job to a specified job queue and optionally waits for a response if blocking is True.
@@ -517,7 +517,7 @@ class NvIngestClient:
             raise
 
     def submit_job(
-        self, job_indices: Union[str, List[str]], job_queue_id: str, batch_size: int = 10
+            self, job_indices: Union[str, List[str]], job_queue_id: str, batch_size: int = 10
     ) -> List[Union[Dict, None]]:
         if isinstance(job_indices, str):
             job_indices = [job_indices]

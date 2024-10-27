@@ -202,6 +202,18 @@ def test_multiple_task_types():
                     "params": {"filter": True},
                 },
             },
+            {
+                "type": "table_data_extract",
+                "task_properties":{
+                    "params": {},
+                }
+            },
+            {
+                "type": "chart_data_extract",
+                "task_properties":{
+                    "params": {},
+                }
+            }
         ],
     }
 

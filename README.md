@@ -86,6 +86,9 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 
+> [!NOTE]
+> during the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
 # Container images must access resources from NGC. 
