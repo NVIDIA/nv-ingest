@@ -6,6 +6,8 @@
 
 import inspect
 from concurrent.futures import Future
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 
@@ -24,11 +26,25 @@ DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
 
 class NvIngestPipeline:
+    """
+    NvIngestPipeline provides an interface for building, managing, and running data ingestion jobs
+    through NvIngestClient, allowing for chainable task additions and job state tracking.
+
+    Parameters
+    ----------
+    documents : List[str]
+        List of document paths to be processed.
+    client : Optional[NvIngestClient], optional
+        An instance of NvIngestClient. If not provided, a client is created.
+    job_queue_id : str, optional
+        The ID of the job queue for job submission, default is "morpheus_task_queue".
+    """
+
     def __init__(
         self,
         documents: List[str],
         client: Optional[NvIngestClient] = None,
-        job_queue_id=DEFAULT_JOB_QUEUE_ID,
+        job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
     ):
         self._documents = documents
         self._client = client
@@ -41,13 +57,34 @@ class NvIngestPipeline:
         self._job_ids = None
         self._job_states = None
 
-    def _create_client(self):
+    def _create_client(self) -> None:
+        """
+        Creates an instance of NvIngestClient if `_client` is not set.
+
+        Raises
+        ------
+        ValueError
+            If `_client` already exists.
+        """
         if self._client is not None:
             raise ValueError("self._client already exists.")
 
         self._client = NvIngestClient()
 
-    def run(self, **kwargs):
+    def run(self, **kwargs: Any) -> List[Dict[str, Any]]:
+        """
+        Synchronously submits jobs to the NvIngestClient and fetches the results.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional parameters for `submit_job` and `fetch_job_result` methods of NvIngestClient.
+
+        Returns
+        -------
+        List[Dict]
+            Result of each job after execution.
+        """
         self._job_ids = self._client.add_job(self._job_specs)
 
         submit_args = list(inspect.signature(self._client.submit_job).parameters)
@@ -60,7 +97,20 @@ class NvIngestPipeline:
 
         return result
 
-    def run_async(self, **kwargs):
+    def run_async(self, **kwargs: Any) -> Future:
+        """
+        Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional parameters for the `submit_job_async` method.
+
+        Returns
+        -------
+        Future
+            A future that completes when all submitted jobs have reached a terminal state.
+        """
         self._job_ids = self._client.add_job(self._job_specs)
         future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
         self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
@@ -91,72 +141,208 @@ class NvIngestPipeline:
 
         return combined_future
 
-    def dedup(self, **kwargs):
+    def dedup(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds a DedupTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the DedupTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         dedup_task = DedupTask(**kwargs)
         self._job_specs.add_task(dedup_task)
 
         return self
 
-    def embed(self, **kwargs):
+    def embed(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds an EmbedTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the EmbedTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         embed_task = EmbedTask(**kwargs)
         self._job_specs.add_task(embed_task)
 
         return self
 
-    def extract(self, **kwargs):
+    def extract(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds an ExtractTask for each document type to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the ExtractTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(document_type, **kwargs)
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
 
-    def filter(self, **kwargs):
+    def filter(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds a FilterTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the FilterTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         filter_task = FilterTask(**kwargs)
         self._job_specs.add_task(filter_task)
 
         return self
 
-    def split(self, **kwargs):
+    def split(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds a SplitTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the SplitTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         extract_task = SplitTask(**kwargs)
         self._job_specs.add_task(extract_task)
 
         return self
 
-    def store(self, **kwargs):
+    def store(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds a StoreTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the StoreTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         store_task = StoreTask(**kwargs)
         self._job_specs.add_task(store_task)
 
         return self
 
-    def vdb_upload(self, **kwargs):
+    def vdb_upload(self, **kwargs: Any) -> "NvIngestPipeline":
+        """
+        Adds a VdbUploadTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the VdbUploadTask.
+
+        Returns
+        -------
+        NvIngestPipeline
+            Returns self for chaining.
+        """
         vdb_upload_task = VdbUploadTask(**kwargs)
         self._job_specs.add_task(vdb_upload_task)
 
         return self
 
-    def _count_job_states(self, job_states):
+    def _count_job_states(self, job_states: set[JobStateEnum]) -> int:
+        """
+        Counts the jobs in specified states.
+
+        Parameters
+        ----------
+        job_states : set
+            Set of JobStateEnum states to count.
+
+        Returns
+        -------
+        int
+            Count of jobs in specified states.
+        """
         count = 0
         for job_id, job_state in self._job_states.items():
             if job_state.state in job_states:
                 count += 1
         return count
 
-    def completed_jobs(self):
+    def completed_jobs(self) -> int:
+        """
+        Counts the jobs that have completed successfully.
+
+        Returns
+        -------
+        int
+            Number of jobs in the COMPLETED state.
+        """
         completed_job_states = {JobStateEnum.COMPLETED}
 
         return self._count_job_states(completed_job_states)
 
-    def failed_jobs(self):
+    def failed_jobs(self) -> int:
+        """
+        Counts the jobs that have failed.
+
+        Returns
+        -------
+        int
+            Number of jobs in the FAILED state.
+        """
         failed_job_states = {JobStateEnum.FAILED}
 
         return self._count_job_states(failed_job_states)
 
-    def cancelled_jobs(self):
+    def cancelled_jobs(self) -> int:
+        """
+        Counts the jobs that have been cancelled.
+
+        Returns
+        -------
+        int
+            Number of jobs in the CANCELLED state.
+        """
         cancelled_job_states = {JobStateEnum.CANCELLED}
 
         return self._count_job_states(cancelled_job_states)
 
-    def remaining_jobs(self):
+    def remaining_jobs(self) -> int:
+        """
+        Counts the jobs that are not in a terminal state.
+
+        Returns
+        -------
+        int
+            Number of jobs that are neither completed, failed, nor cancelled.
+        """
         terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
 
         return len(self._job_states) - terminal_jobs
