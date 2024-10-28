@@ -73,10 +73,12 @@ replicaCount: 1
 ## @param resources.requests.memory [default: 16Gi] Specify request for memory
 resources:
   limits:
-    memory: 32Gi
+    memory: 90Gi
     nvidia.com/gpu: 1
+    cpu: "36000m"
   requests:
-    memory: 16Gi
+    memory: 24Gi
+    cpu: "16000m"
 
 
 ## @param tmpDirSize [default: 8Gi] Specify the amount of space to reserve for temporary storage
@@ -236,8 +238,17 @@ redis:
     enabled: false
   replica:
     replicaCount: 1
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
   master:
-      resourcesPreset: xlarge
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
 
 ## @section Environment Variables
 ## @descriptionStart
@@ -251,19 +262,21 @@ redis:
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
 ## @skip envVars.REDIS_MORPHEUS_TASK_QUEUE
-## @skip envVars.TABLE_DETECTION_GRPC_TRITON
-## @skip envVars.TABLE_DETECTION_HTTP_TRITON
 ## @skip envVars.CACHED_GRPC_ENDPOINT
 ## @skip envVars.CACHED_HTTP_ENDPOINT
+## @skip envVars.CACHED_INFER_ENDPOINT
 ## @skip envVars.PADDLE_GRPC_ENDPOINT
 ## @skip envVars.PADDLE_HTTP_ENDPOINT
+## @skip envVars.PADDLE_INFER_ENDPOINT
 ## @skip envVars.YOLOX_GRPC_ENDPOINT
 ## @skip envVars.YOLOX_HTTP_ENDPOINT
+## @skip envVars.YOLOX_INFER_ENDPOINT
 ## @skip envVars.DEPLOT_GRPC_ENDPOINT
 ## @skip envVars.DEPLOT_HTTP_ENDPOINT
+## @skip envVars.DEPLOT_INFER_ENDPOINT
 envVars:
-  MESSAGE_CLIENT_HOST: "nv-ingest-ms-runtime"
-  MESSAGE_CLIENT_PORT: "7670"
+  MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
+  MESSAGE_CLIENT_PORT: "6379"
   REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
   NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
 
@@ -271,17 +284,18 @@ envVars:
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
 
-  TABLE_DETECTION_GRPC_TRITON: nv-ingest-yolox:8001
-  TABLE_DETECTION_HTTP_TRITON: ""
-
   CACHED_GRPC_ENDPOINT: nv-ingest-cached:8001
-  CACHED_HTTP_ENDPOINT: ""
+  CACHED_HTTP_ENDPOINT: http://nv-ingest-cached:8000/v1/infer
+  CACHED_INFER_ENDPOINT: grpc
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: ""
+  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
+  PADDLE_INFER_PROTOCOL: grpc
   YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
-  YOLOX_HTTP_ENDPOINT: ""
+  YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000/v1/infer
+  YOLOX_INFER_PROTOCOL: grpc
   DEPLOT_GRPC_ENDPOINT: ""
   DEPLOT_HTTP_ENDPOINT: http://nv-ingest-deplot:8000/v1/chat/completions
+  DEPLOT_INFER_PROTOCOL: http
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedding:8000/v1"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
@@ -478,7 +492,7 @@ readinessProbe:
 ## @param service.labels [object] Specifies additional labels to be added to service.
 service:
   type: ClusterIP
-  port: 8000
+  port: 7670
   annotations: {}
   labels: {}
   name: ""  # override the default service name

@@ -8,7 +8,6 @@ from unittest.mock import patch
 
 import click
 import pytest
-from nv_ingest_client.cli.util.click import _generate_matching_files
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
 from nv_ingest_client.cli.util.click import click_validate_file_exists
@@ -230,29 +229,13 @@ def test_empty_file_list(tmp_path):
     assert files == [], "Expected an empty list of files"
 
 
-@pytest.mark.parametrize(
-    "patterns, mock_files, expected",
-    [
-        (["*.txt"], ["test1.txt", "test2.txt"], ["test1.txt", "test2.txt"]),
-        (["*.txt"], [], []),
-        (["*.md"], ["README.md"], ["README.md"]),
-        (["docs/*.md"], ["docs/README.md", "docs/CHANGES.md"], ["docs/README.md", "docs/CHANGES.md"]),
-    ],
-)
-def test_generate_matching_files(patterns, mock_files, expected):
-    with patch(
-        "glob.glob", side_effect=lambda pattern, recursive: [f for f in mock_files if f.startswith(pattern[:-5])]
-    ), patch("os.path.isfile", return_value=True):
-        assert list(_generate_matching_files(patterns)) == expected
-
-
 def test_click_match_and_validate_files_found():
-    with patch(f"{_MODULE_UNDER_TEST}._generate_matching_files", return_value=iter(["file1.txt", "file2.txt"])):
+    with patch(f"{_MODULE_UNDER_TEST}.generate_matching_files", return_value=iter(["file1.txt", "file2.txt"])):
         result = click_match_and_validate_files(None, None, ["*.txt"])
         assert result == ["file1.txt", "file2.txt"]
 
 
 def test_click_match_and_validate_files_not_found():
-    with patch(f"{_MODULE_UNDER_TEST}._generate_matching_files", return_value=iter([])):
+    with patch(f"{_MODULE_UNDER_TEST}.generate_matching_files", return_value=iter([])):
         result = click_match_and_validate_files(None, None, ["*.txt"])
         assert result == []

@@ -3,21 +3,37 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import re
+from typing import Any
+from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import backoff
+import cv2
 import numpy as np
-import re
+import packaging
 import requests
 import tritonclient.grpc as grpcclient
 
+from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.image_processing.transforms import pad_image
+from nv_ingest.util.nim.decorators import multiprocessing_cache
 from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
+DEPLOT_MAX_TOKENS = 128
+DEPLOT_TEMPERATURE = 1.0
+DEPLOT_TOP_P = 1.0
 
-def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str]):
+
+def create_inference_client(
+    endpoints: Tuple[str, str],
+    auth_token: Optional[str] = None,
+    infer_protocol: Optional[str] = None,
+):
     """
     Creates an inference client based on the provided endpoints.
 
@@ -35,18 +51,26 @@ def create_inference_client(endpoints: Tuple[str, str], auth_token: Optional[str
     -------
     grpcclient.InferenceServerClient or dict
         A gRPC client if the gRPC endpoint is provided, otherwise a dictionary containing the HTTP client details.
+        :param infer_protocol:
     """
-    if endpoints[0] and endpoints[0].strip():
-        logger.debug(f"Creating gRPC client with {endpoints}")
-        return grpcclient.InferenceServerClient(url=endpoints[0])
-    else:
-        logger.debug(f"Creating HTTP client with {endpoints}")
+    grpc_endpoint, http_endpoint = endpoints
+
+    if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
+        infer_protocol = "grpc"
+
+    if infer_protocol == "grpc":
+        logger.debug(f"Creating gRPC client with {grpc_endpoint}")
+        return grpcclient.InferenceServerClient(url=grpc_endpoint)
+    elif infer_protocol == "http":
+        url = generate_url(http_endpoint)
+
+        logger.debug(f"Creating HTTP client with {http_endpoint}")
         headers = {"accept": "application/json", "content-type": "application/json"}
 
         if auth_token:
             headers["Authorization"] = f"Bearer {auth_token}"
 
-        return {"endpoint_url": endpoints[1], "headers": headers}
+        return {"endpoint_url": url, "headers": headers}
 
 
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
@@ -76,62 +100,113 @@ def call_image_inference_model(client, model_name: str, image_data):
         If the HTTP request fails or if the response format is not as expected.
     """
     if isinstance(client, grpcclient.InferenceServerClient):
-        if image_data.ndim == 3:
-            image_data = np.expand_dims(image_data, axis=0)
-        inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
-        inputs[0].set_data_from_numpy(image_data.astype(np.float32))
-
-        outputs = [grpcclient.InferRequestedOutput("output")]
-
-        try:
-            result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-            return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
-        except Exception as e:
-            err_msg = f"Inference failed for model {model_name}: {str(e)}"
-            logger.error(err_msg)
-            raise RuntimeError(err_msg)
-
+        response = _call_image_inference_grpc_client(client, model_name, image_data)
     else:
-        base64_img = numpy_to_base64(image_data)
+        response = _call_image_inference_http_client(client, model_name, image_data)
 
-        try:
-            url = client["endpoint_url"]
-            headers = client["headers"]
+    return response
 
-            messages = [
-                {
-                    "role": "user",
-                    "content": f"Generate the underlying data table of the figure below: "
-                    f'<img src="data:image/png;base64,{base64_img}" />',
-                }
-            ]
-            payload = {
-                "model": model_name,
-                "messages": messages,
-                "max_tokens": 128,
-                "stream": False,
-                "temperature": 1.0,
-                "top_p": 1.0,
-            }
 
-            response = requests.post(url, json=payload, headers=headers)
-            response.raise_for_status()  # Raise an exception for HTTP errors
+def _call_image_inference_grpc_client(client, model_name: str, image_data):
+    if image_data.ndim == 3:
+        image_data = np.expand_dims(image_data, axis=0)
+    inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
+    inputs[0].set_data_from_numpy(image_data.astype(np.float32))
 
-            # Parse the JSON response
-            json_response = response.json()
+    outputs = [grpcclient.InferRequestedOutput("output")]
 
-            # Validate the response structure
-            if "choices" not in json_response or not json_response["choices"]:
-                raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+    try:
+        result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
+        return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+    except Exception as e:
+        err_msg = f"Inference failed for model {model_name}: {str(e)}"
+        logger.error(err_msg)
+        raise RuntimeError(err_msg)
 
-            return json_response["choices"][0]["message"]["content"]
 
-        except requests.exceptions.RequestException as e:
-            raise RuntimeError(f"HTTP request failed: {e}")
-        except KeyError as e:
-            raise RuntimeError(f"Missing expected key in response: {e}")
-        except Exception as e:
-            raise RuntimeError(f"An error occurred during inference: {e}")
+def _call_image_inference_http_client(client, model_name: str, image_data):
+    base64_img = numpy_to_base64(image_data)
+
+    if model_name == "deplot":
+        payload = _prepare_deplot_payload(base64_img)
+    elif model_name in {"paddle", "cached", "yolox"}:
+        payload = _prepare_nim_payload(base64_img)
+    else:
+        raise ValueError(f"Model {model_name} is not supported.")
+
+    try:
+        url = client["endpoint_url"]
+        headers = client["headers"]
+
+        response = requests.post(url, json=payload, headers=headers)
+        response.raise_for_status()  # Raise an exception for HTTP errors
+
+        # Parse the JSON response
+        json_response = response.json()
+
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"HTTP request failed: {e}")
+    except KeyError as e:
+        raise RuntimeError(f"Missing expected key in response: {e}")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred during inference: {e}")
+
+    if model_name == "deplot":
+        result = _extract_content_from_deplot_response(json_response)
+    else:
+        result = _extract_content_from_nim_response(json_response)
+
+    return result
+
+
+def _prepare_deplot_payload(
+    base64_img: str,
+    max_tokens: int = DEPLOT_MAX_TOKENS,
+    temperature: float = DEPLOT_TEMPERATURE,
+    top_p: float = DEPLOT_TOP_P,
+) -> Dict[str, Any]:
+    messages = [
+        {
+            "role": "user",
+            "content": f"Generate the underlying data table of the figure below: "
+            f'<img src="data:image/png;base64,{base64_img}" />',
+        }
+    ]
+    payload = {
+        "model": "google/deplot",
+        "messages": messages,
+        "max_tokens": max_tokens,
+        "stream": False,
+        "temperature": temperature,
+        "top_p": top_p,
+    }
+
+    return payload
+
+
+def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
+    image_url = f"data:image/png;base64,{base64_img}"
+    image = {"type": "image_url", "image_url": {"url": image_url}}
+
+    message = {"content": [image]}
+    payload = {"messages": [message]}
+
+    return payload
+
+
+def _extract_content_from_deplot_response(json_response):
+    # Validate the response structure
+    if "choices" not in json_response or not json_response["choices"]:
+        raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+    return json_response["choices"][0]["message"]["content"]
+
+
+def _extract_content_from_nim_response(json_response):
+    if "data" not in json_response or not json_response["data"]:
+        raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
+
+    return json_response["data"][0]["content"]
 
 
 # Perform inference and return predictions
@@ -172,6 +247,63 @@ def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     return query_response.as_numpy("output")
 
 
+def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
+    """
+    Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
+    and transposing it into the required format.
+
+    This function is intended for preprocessing images to be passed as input to PaddleOCR using GRPC.
+    It is not necessary when using the HTTP endpoint.
+
+    Steps:
+    -----
+    1. Resizes the image while maintaining aspect ratio such that its largest dimension is scaled to 960 pixels.
+    2. Normalizes the image using the `normalize_image` function.
+    3. Pads the image to ensure both its height and width are multiples of 32, as required by PaddleOCR.
+    4. Transposes the image from (height, width, channel) to (channel, height, width), the format expected by PaddleOCR.
+
+    Parameters:
+    ----------
+    array : np.ndarray
+        The input image array of shape (height, width, channels). It should have pixel values in the range [0, 255].
+
+    Returns:
+    -------
+    np.ndarray
+        A preprocessed image with the shape (channels, height, width) and normalized pixel values.
+        The image will be padded to have dimensions that are multiples of 32, with the padding color set to 0.
+
+    Notes:
+    -----
+    - The image is resized so that its largest dimension becomes 960 pixels, maintaining the aspect ratio.
+    - After normalization, the image is padded to the nearest multiple of 32 in both dimensions, which is
+      a requirement for PaddleOCR.
+    - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
+    """
+    if (not paddle_version) or (packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1")):
+        return array
+
+    height, width = array.shape[:2]
+    scale_factor = 960 / max(height, width)
+    new_height = int(height * scale_factor)
+    new_width = int(width * scale_factor)
+    resized = cv2.resize(array, (new_width, new_height))
+
+    normalized = normalize_image(resized)
+
+    # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
+    new_height = (normalized.shape[0] + 31) // 32 * 32
+    new_width = (normalized.shape[1] + 31) // 32 * 32
+    padded, _ = pad_image(
+        normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
+    )
+
+    # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
+    transposed = padded.transpose((2, 0, 1))
+
+    return transposed
+
+
 def remove_url_endpoints(url) -> str:
     """Some configurations provide the full endpoint in the URL.
     Ex: http://deplot:8000/v1/chat/completions. For hitting the
@@ -185,8 +317,8 @@ def remove_url_endpoints(url) -> str:
     Returns:
         str: URL with just the hostname:port portion remaining
     """
-    if '/v1' in url:
-        url = url.split('/v1')[0]
+    if "/v1" in url:
+        url = url.split("/v1")[0]
 
     return url
 
@@ -204,26 +336,28 @@ def generate_url(url) -> str:
     Returns:
         str: Fully validated URL
     """
-    if not re.match(r'^https?://', url):
+    if not re.match(r"^https?://", url):
         # Add the default `http://` if its not already present in the URL
         url = f"http://{url}"
-
-    url = remove_url_endpoints(url)
 
     return url
 
 
 def is_ready(http_endpoint, ready_endpoint) -> bool:
-
     # IF the url is empty or None that means the service was not configured
     # and is therefore automatically marked as "ready"
-    if http_endpoint is None or http_endpoint == '':
+    if http_endpoint is None or http_endpoint == "":
+        return True
+
+    # If the url is for build.nvidia.com, it is automatically assumed "ready"
+    if "ai.api.nvidia.com" in http_endpoint:
         return True
 
     url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
 
-    if not ready_endpoint.startswith('/') and not url.endswith('/'):
-        ready_endpoint = '/' + ready_endpoint
+    if not ready_endpoint.startswith("/") and not url.endswith("/"):
+        ready_endpoint = "/" + ready_endpoint
 
     url = url + ready_endpoint
 
@@ -258,3 +392,46 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
         return False
+
+
+@backoff.on_predicate(backoff.expo, max_value=5)
+@multiprocessing_cache(max_calls=100)
+def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
+    if http_endpoint is None or http_endpoint == "":
+        return ""
+
+    url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
+
+    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
+        metadata_endpoint = "/" + metadata_endpoint
+
+    url = url + metadata_endpoint
+
+    # Call the metadata endpoint of the NIM
+    try:
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems resonable
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            return resp.json().get(version_field, "")
+        else:
+            # Any other code is confusing. We should log it with a warning
+            # as it could be something that might hold up ready state
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.json()}")
+            return ""
+    except requests.HTTPError as http_err:
+        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
+        return ""
+    except requests.Timeout:
+        logger.warning(f"'{url}' request timed out")
+        return ""
+    except ConnectionError:
+        logger.warning(f"A connection error for '{url}' occurred")
+        return ""
+    except requests.RequestException as err:
+        logger.warning(f"An error occurred: {err} for '{url}'")
+        return ""
+    except Exception as ex:
+        # Don't let anything squeeze by
+        logger.warning(f"Exception: {ex}")
+        return ""

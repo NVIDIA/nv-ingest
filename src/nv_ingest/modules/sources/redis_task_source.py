@@ -4,10 +4,12 @@
 
 
 import logging
+import time
 import traceback
 from datetime import datetime
 from functools import partial
 from typing import Dict
+import copy, json
 
 import cudf
 import mrc
@@ -29,7 +31,6 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = "redis_task_source"
 MODULE_NAMESPACE = "nv_ingest"
 RedisTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
-
 
 def fetch_and_process_messages(redis_client: RedisClient, validated_config: RedisTaskSourceSchema):
     """Fetch messages from the Redis list and process them."""
@@ -53,10 +54,12 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     Fetch messages from the Redis list (task queue) and yield as ControlMessage.
     """
 
+    if logger.isEnabledFor(logging.DEBUG):
+        no_payload = copy.deepcopy(job)
+        no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
+        logger.debug("Job: %s", json.dumps(no_payload, indent=2))
+
     validate_ingest_job(job)
-    # no_payload = copy.deepcopy(job)
-    # no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
-    # logger.debug("Job: %s", json.dumps(no_payload, indent=2))
     control_message = ControlMessage()
 
     try:
