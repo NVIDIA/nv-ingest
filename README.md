@@ -204,18 +204,33 @@ In the below examples, we are doing text, chart, table, and image extraction:
 #### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
 
 ```python
-from nv_ingest_client.client import NvIngestPipeline
+from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.client import NvIngestJobManager
 
-
-pipeline = NvIngestPipeline("data/multimodal_test.pdf")
-
-pipeline = pipeline.extract(
-    extract_text=True,
-    extract_tables=True,
-    extract_images=True,
+# Create the client, which facilitates communication with the nv-ingest service.
+client = NvIngestClient(
+  message_client_hostname="localhost",  # Host where nv-ingest-ms-runtime is running
+  message_client_port=7670,  # REST port, defaults to 7670
 )
 
-results = pipeline.run()
+# Create a new job manager instance with the specified documents.
+# This manager will allow for task customization, submission, and result retrieval.
+job_manager = NvIngestJobManager(
+  "data/multimodal_test.pdf",
+  client=client,
+)
+
+# Configure desired extraction modes for the job manager. Multiple extraction
+# methods can be defined for the job manager.
+job_manager = job_manager.extract(
+  extract_text=True,
+  extract_tables=True,
+  extract_images=True,
+)
+
+# Run the configured job synchronously and retrieve the results once complete.
+# It will submit the job to the client, wait for it to finish, and collect the output.
+results = job_manager.run()
 
 print(f"Got {len(results)} results")
 ```
