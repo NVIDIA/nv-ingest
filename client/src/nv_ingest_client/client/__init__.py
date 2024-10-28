@@ -3,6 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from nv_ingest_client.client.client import NvIngestClient
-from nv_ingest_client.client.pipeline import NvIngestPipeline
+from nv_ingest_client.client.job_manager import NvIngestJobManager
 
-__all__ = ["NvIngestClient", "NvIngestPipeline"]
+__all__ = ["NvIngestClient", "NvIngestJobManager"]

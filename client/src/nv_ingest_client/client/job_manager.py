@@ -25,9 +25,9 @@ from nv_ingest_client.primitives.tasks import VdbUploadTask
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
 
-class NvIngestPipeline:
+class NvIngestJobManager:
     """
-    NvIngestPipeline provides an interface for building, managing, and running data ingestion jobs
+    NvIngestJobManager provides an interface for building, managing, and running data ingestion jobs
     through NvIngestClient, allowing for chainable task additions and job state tracking.
 
     Parameters
@@ -141,7 +141,7 @@ class NvIngestPipeline:
 
         return combined_future
 
-    def dedup(self, **kwargs: Any) -> "NvIngestPipeline":
+    def dedup(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a DedupTask to the batch job specification.
 
@@ -152,7 +152,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         dedup_task = DedupTask(**kwargs)
@@ -160,7 +160,7 @@ class NvIngestPipeline:
 
         return self
 
-    def embed(self, **kwargs: Any) -> "NvIngestPipeline":
+    def embed(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds an EmbedTask to the batch job specification.
 
@@ -171,7 +171,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         embed_task = EmbedTask(**kwargs)
@@ -179,7 +179,7 @@ class NvIngestPipeline:
 
         return self
 
-    def extract(self, **kwargs: Any) -> "NvIngestPipeline":
+    def extract(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds an ExtractTask for each document type to the batch job specification.
 
@@ -190,7 +190,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         for document_type in self._job_specs.file_types:
@@ -199,7 +199,7 @@ class NvIngestPipeline:
 
         return self
 
-    def filter(self, **kwargs: Any) -> "NvIngestPipeline":
+    def filter(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a FilterTask to the batch job specification.
 
@@ -210,7 +210,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         filter_task = FilterTask(**kwargs)
@@ -218,7 +218,7 @@ class NvIngestPipeline:
 
         return self
 
-    def split(self, **kwargs: Any) -> "NvIngestPipeline":
+    def split(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a SplitTask to the batch job specification.
 
@@ -229,7 +229,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         extract_task = SplitTask(**kwargs)
@@ -237,7 +237,7 @@ class NvIngestPipeline:
 
         return self
 
-    def store(self, **kwargs: Any) -> "NvIngestPipeline":
+    def store(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a StoreTask to the batch job specification.
 
@@ -248,7 +248,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         store_task = StoreTask(**kwargs)
@@ -256,7 +256,7 @@ class NvIngestPipeline:
 
         return self
 
-    def vdb_upload(self, **kwargs: Any) -> "NvIngestPipeline":
+    def vdb_upload(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a VdbUploadTask to the batch job specification.
 
@@ -267,7 +267,7 @@ class NvIngestPipeline:
 
         Returns
         -------
-        NvIngestPipeline
+        NvIngestJobManager
             Returns self for chaining.
         """
         vdb_upload_task = VdbUploadTask(**kwargs)

@@ -8,8 +8,8 @@ from concurrent.futures import Future
 from unittest.mock import MagicMock
 
 import pytest
-from nv_ingest_client.client.client import NvIngestClient
-from nv_ingest_client.client.pipeline import NvIngestPipeline
+from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.client import NvIngestJobManager
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import DedupTask
@@ -30,7 +30,7 @@ def mock_client():
 @pytest.fixture
 def pipeline(mock_client):
     documents = ["data/multimodal_test.pdf"]
-    return NvIngestPipeline(documents, client=mock_client)
+    return NvIngestJobManager(documents, client=mock_client)
 
 
 def test_dedup_task_no_args(pipeline):
