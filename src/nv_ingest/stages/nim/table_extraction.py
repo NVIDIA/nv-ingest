@@ -14,9 +14,10 @@ import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
+from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client, preprocess_image_for_paddle
+from nv_ingest.util.nim.helpers import get_version
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -24,7 +25,7 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Dict:
+def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -68,8 +69,12 @@ def _update_metadata(row: pd.Series, paddle_client: Any, trace_info: Dict) -> Di
     # Modify table metadata with the result from the inference model
     try:
         image_array = base64_to_numpy(base64_image)
+
         paddle_result = ""
         if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
+            if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
+                image_array = preprocess_image_for_paddle(image_array, paddle_version=paddle_version)
+
             paddle_result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
 
         table_metadata["table_content"] = paddle_result
@@ -124,7 +129,8 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
+        paddle_version = get_version(validated_config.stage_config.paddle_endpoints[1])
+        df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, paddle_version, trace_info))
 
         return df, trace_info
 
