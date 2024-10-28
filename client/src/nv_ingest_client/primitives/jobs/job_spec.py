@@ -372,6 +372,14 @@ class BatchJobSpec:
     @property
     def file_types(self) -> List[str]:
         """
-        TODO
+        Returns the list of unique file types present in the batch.
+
+        This property retrieves the document types currently stored in the batch's
+        job specifications.
+
+        Returns
+        -------
+        List[str]
+            A list of document types for the jobs in the batch.
         """
         return list(self._file_type_to_job_spec.keys())
