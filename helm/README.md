@@ -25,6 +25,16 @@ NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
+- Install the Helm repos
+
+```bash
+# EA-Participants private NGC repository
+helm repo add ngc https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# Nvidia NIM NGC repository
+helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+```
+
 - Install the chart
 
 ```bash
