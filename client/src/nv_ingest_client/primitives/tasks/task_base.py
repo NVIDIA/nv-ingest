@@ -25,6 +25,8 @@ class TaskType(Enum):
     STORE_EMBEDDING = auto()
     STORE = auto()
     VDB_UPLOAD = auto()
+    TABLE_DATA_EXTRACT = auto()
+    CHART_DATA_EXTRACT = auto()
 
 
 def is_valid_task_type(task_type_str: str) -> bool:

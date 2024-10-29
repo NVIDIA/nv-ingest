@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
 from io import BytesIO
 from math import ceil
 from math import floor
@@ -10,6 +11,7 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
+from PIL import UnidentifiedImageError
 
 from nv_ingest.util.converters import bytetools
 
@@ -77,6 +79,24 @@ def pad_image(
 
     return canvas, (pad_width, pad_height)
 
+def check_numpy_image_size(image: np.ndarray, min_height: int, min_width: int) -> bool:
+    """
+    Checks if the height and width of the image are larger than the specified minimum values.
+
+    Parameters:
+    image (np.ndarray): The image array (assumed to be in shape (H, W, C) or (H, W)).
+    min_height (int): The minimum height required.
+    min_width (int): The minimum width required.
+
+    Returns:
+    bool: True if the image dimensions are larger than or equal to the minimum size, False otherwise.
+    """
+    # Check if the image has at least 2 dimensions
+    if image.ndim < 2:
+        raise ValueError("The input array does not have sufficient dimensions for an image.")
+
+    height, width = image.shape[:2]
+    return height >= min_height and width >= min_width
 
 def crop_image(
     array: np.array, bbox: Tuple[int, int, int, int], min_width: int = 1, min_height: int = 1
@@ -232,3 +252,51 @@ def numpy_to_base64(array: np.ndarray) -> str:
         raise RuntimeError(f"Failed to encode image to base64: {e}")
 
     return base64_img
+
+
+def base64_to_numpy(base64_string: str) -> np.ndarray:
+    """
+    Convert a base64-encoded image string to a NumPy array.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded string representing an image.
+
+    Returns
+    -------
+    numpy.ndarray
+        NumPy array representation of the decoded image.
+
+    Raises
+    ------
+    ValueError
+        If the base64 string is invalid or cannot be decoded into an image.
+    ImportError
+        If required libraries are not installed.
+
+    Examples
+    --------
+    >>> base64_str = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD...'
+    >>> img_array = base64_to_numpy(base64_str)
+    """
+    try:
+        # Decode the base64 string
+        image_data = base64.b64decode(base64_string)
+    except (base64.binascii.Error, ValueError) as e:
+        raise ValueError("Invalid base64 string") from e
+
+    try:
+        # Convert the bytes into a BytesIO object
+        image_bytes = BytesIO(image_data)
+
+        # Open the image using PIL
+        image = Image.open(image_bytes)
+        image.load()
+    except UnidentifiedImageError as e:
+        raise ValueError("Unable to decode image from base64 string") from e
+
+    # Convert the image to a NumPy array
+    image_array = np.array(image)
+
+    return image_array
