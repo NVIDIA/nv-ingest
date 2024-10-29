@@ -23,8 +23,11 @@ dependencies:
 - name: deplot-nim
   repository: https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants
   version: 0.1.6
+- name: text-embedding-nim
+  repository: https://helm.ngc.nvidia.com/nim/nvidia
+  version: 1.1.0
 - name: milvus
   repository: https://zilliztech.github.io/milvus-helm
   version: 4.1.11
-digest: sha256:8effa2fd10b1acd0528a3e4098b54285936f5222a1fdf2f99eea749bcfe7365c
-generated: "2024-10-25T17:22:08.336132163-04:00"
+digest: sha256:02ea2487818069a86a95dbd7edb15cde07928306c8af061a06079de54bc1a895
+generated: "2024-10-29T09:52:44.620765083-04:00"

@@ -174,7 +174,7 @@ deplot-nim:
 ## @extra embedqa-nim.image.repository The repository to override the location of the embedqa NIM
 ## @extra embedqa-nim.image.tag The tag override for embedqa NIM
 embedqaDeployed: true
-embedqa-nim:
+text-embedding-nim:
   fullnameOverride: nv-ingest-embedqa
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
