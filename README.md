@@ -321,16 +321,16 @@ You can view the full JSON extracts and the metadata definitions [here](docs/con
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 First, install `tkinter` by running the following commands depending on your OS.
-For Ubuntu/Debian Linux:
+- For Ubuntu/Debian Linux:
 ```shell
 sudo apt-get update
 sudo apt-get install python3-tk
 ```
-For Fedora/RHEL Linux:
+- For Fedora/RHEL Linux:
 ```shell
 sudo dnf install python3-tkinter
 ```
-For macOS using Homebrew:
+- For macOS using Homebrew:
 ```shell
 brew install python-tk
 ```
