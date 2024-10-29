@@ -28,15 +28,15 @@ dependencies:
     condition: otelDeployed
   - name: yolox-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: yoloxDeployed
   - name: cached-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: cachedDeployed
   - name: paddleocr-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: paddleocrDeployed
   - name: deplot-nim
     repository: "alias:ngc"
