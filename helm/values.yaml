@@ -169,6 +169,25 @@ deplot-nim:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
+## @skip embedqaDeployed
+## @skip embedqa-nim
+## @extra embedqa-nim.image.repository The repository to override the location of the embedqa NIM
+## @extra embedqa-nim.image.tag The tag override for embedqa NIM
+embedqaDeployed: true
+text-embedding-nim:
+  fullnameOverride: nv-ingest-embedqa
+  image:
+    repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
+    tag: "1.1.0"
+  service:
+    name: nv-ingest-embedqa
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
 # Use this to load an image Pre NIM Factory via triton
 ## @skip triton
 triton:
