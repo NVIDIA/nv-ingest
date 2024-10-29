@@ -394,6 +394,7 @@ def _vdb_task_sink(builder: mrc.Builder):
     node = builder.make_node(
         WRITE_TO_VECTOR_DB, ops.map(on_data), ops.filter(lambda val: val is not None), ops.on_completed(on_completed)
     )
+    node.launch_options.engines_per_pe = validated_config.progress_engines
 
     builder.register_module_input("input", node)
     builder.register_module_output("output", node)
