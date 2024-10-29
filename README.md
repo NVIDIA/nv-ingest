@@ -320,8 +320,22 @@ multimodal_test.pdf.metadata.json
 You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+First, install `tkinter` by running the following commands depending on your OS:
+For Ubuntu/Debian Linux:
 ```shell
-pip install tkinter
+sudo apt-get update
+sudo apt-get install python3-tk
+```
+For Fedora/RHEL Linux:
+```shell
+sudo dnf install python3-tkinter
+```
+For macOS using Homebrew:
+```shell
+brew install python-tk
+```
+Then run the following command to execute the script for inspecting the extracted image:
+```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
