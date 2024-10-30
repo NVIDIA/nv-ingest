@@ -41,13 +41,11 @@ services:
     runtime: nvidia
 
   deplot:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
+    image: ${DEPLOT_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/deplot}:${DEPLOT_TAG:-1.0.0}
     ports:
       - "8003:8000"
       - "8004:8001"
       - "8005:8002"
-    volumes:
-      - ${HOME}/.cache:/opt/nim/.cache
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
@@ -63,27 +61,6 @@ services:
       # Triton OpenTelemetry Settings
       - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
       - TRITON_OTEL_RATE=1
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["1"]
-              capabilities: [gpu]
-    runtime: nvidia
-
-  deplot:
-    image: ${DEPLOT_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/deplot}:${DEPLOT_TAG:-1.0.0}
-    ports:
-      - "8003:8000"
-      - "8004:8001"
-      - "8005:8002"
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
