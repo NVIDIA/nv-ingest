@@ -24,7 +24,6 @@ logger = logging.getLogger(__name__)
 
 
 class EmbeddingStorageModuleSchema(BaseModel):
-    embedding: bool = True
     raise_on_failure: bool = False
 
     class Config:

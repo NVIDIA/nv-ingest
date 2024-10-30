@@ -89,8 +89,6 @@ class IngestTaskExtractSchema(BaseModelNoExt):
 
 
 class IngestTaskStoreEmbedSchema(BaseModelNoExt):
-    embedding: bool = True
-    method: str
     extra_params: dict
 
 class IngestTaskStoreSchema(BaseModelNoExt):
