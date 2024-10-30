@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0
+    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-0.2.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -30,7 +30,7 @@ services:
     runtime: nvidia
 
   deplot:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0
+    image: ${DEPLOT_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/deplot}:${DEPLOT_TAG:-1.0.0}
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -51,7 +51,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0
+    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.0}
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -73,7 +73,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0
+    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-0.2.0}
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -96,7 +96,7 @@ services:
 
   embedding:
     # NIM ON
-    image: nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.1
+    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/nv-embedqa-e5-v5}:${EMBEDDING_TAG:-1.1.0}
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -117,13 +117,13 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10
     build:
-      context: ${NV_INGEST_ROOT}
+      context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
       target: runtime
     volumes:
-      - ${DATASET_ROOT}:/workspace/data
+      - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
       - "7670:7670"
     cap_add:
@@ -132,14 +132,14 @@ services:
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
       - CACHED_INFER_PROTOCOL=grpc
-      - CUDA_VISIBLE_DEVICES=1
+      - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
       # self hosted deplot
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
-      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis
@@ -169,9 +169,7 @@ services:
             - driver: nvidia
               device_ids: ["1"]
               capabilities: [gpu]
-    depends_on:
-      - milvus
-
+  
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector

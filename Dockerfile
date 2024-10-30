@@ -18,12 +18,12 @@ RUN apt-get update && apt-get install -y \
       wget \
       bzip2 \
       ca-certificates \
+      curl \
     && apt-get clean
 
-# Install miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
-    && bash /tmp/miniconda.sh -b -p /opt/conda \
-    && rm /tmp/miniconda.sh
+RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
+    && bash /tmp/miniforge.sh -b -p /opt/conda \
+    && rm /tmp/miniforge.sh
 
 # Add conda to the PATH
 ENV PATH=/opt/conda/bin:$PATH
@@ -62,7 +62,7 @@ WORKDIR /workspace
 # Copy custom entrypoint script
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
-FROM base as nv_ingest_install
+FROM base AS nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
 COPY ci ci
@@ -118,7 +118,7 @@ RUN source activate nv_ingest \
 
 # Upgrade setuptools to mitigate https://github.com/advisories/GHSA-cx63-2mw6-8hw5
 RUN source activate base \
-    && conda install setuptools==70.0.0
+    && conda install -c conda-forge setuptools==70.0.0
 
 RUN source activate nv_ingest \
     && pip install ./client/dist/*.whl \

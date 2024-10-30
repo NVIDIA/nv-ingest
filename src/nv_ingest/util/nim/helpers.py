@@ -19,6 +19,7 @@ import tritonclient.grpc as grpcclient
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.image_processing.transforms import pad_image
+from nv_ingest.util.nim.decorators import multiprocessing_cache
 from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
@@ -50,6 +51,7 @@ def create_inference_client(
     -------
     grpcclient.InferenceServerClient or dict
         A gRPC client if the gRPC endpoint is provided, otherwise a dictionary containing the HTTP client details.
+        :param infer_protocol:
     """
     grpc_endpoint, http_endpoint = endpoints
 
@@ -393,6 +395,7 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
 
 
 @backoff.on_predicate(backoff.expo, max_value=5)
+@multiprocessing_cache(max_calls=100)
 def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
     if http_endpoint is None or http_endpoint == "":
         return ""

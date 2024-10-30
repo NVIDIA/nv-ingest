@@ -22,24 +22,9 @@ class PDFiumConfigSchema(BaseModel):
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    cached_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the cached endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
-
-    deplot_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the deplot endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
-
-    paddle_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the paddle endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
-
     yolox_endpoints : Tuple[str, str]
         A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
-
-    identify_nearby_objects : bool, default=False
-        A flag indicating whether to identify nearby objects during processing.
 
     Methods
     -------
@@ -59,17 +44,8 @@ class PDFiumConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    cached_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-
-    cached_infer_protocol: str = ""
-    deplot_infer_protocol: str = ""
-    paddle_infer_protocol: str = ""
     yolox_infer_protocol: str = ""
-
-    identify_nearby_objects: bool = False
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
@@ -98,7 +74,7 @@ class PDFiumConfigSchema(BaseModel):
                 return None
             return service
 
-        for model_name in ["cached", "deplot", "paddle", "yolox"]:
+        for model_name in ["yolox"]:
             endpoint_name = f"{model_name}_endpoints"
             grpc_service, http_service = values.get(endpoint_name)
             grpc_service = clean_service(grpc_service)

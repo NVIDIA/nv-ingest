@@ -27,7 +27,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest"
-  tag: "24.08"
+  tag: "24.10"
 
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
 podAnnotations:
@@ -73,10 +73,12 @@ replicaCount: 1
 ## @param resources.requests.memory [default: 16Gi] Specify request for memory
 resources:
   limits:
-    memory: 32Gi
+    memory: 90Gi
     nvidia.com/gpu: 1
+    cpu: "36000m"
   requests:
-    memory: 16Gi
+    memory: 24Gi
+    cpu: "16000m"
 
 
 ## @param tmpDirSize [default: 8Gi] Specify the amount of space to reserve for temporary storage
@@ -99,7 +101,7 @@ yolox-nim:
   fullnameOverride: nv-ingest-yolox
   image:
     repository: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1
-    tag: "0.1.0"
+    tag: "0.2.0"
   service:
     name: nv-ingest-yolox
     grpcPort: 8001
@@ -119,7 +121,7 @@ cached-nim:
   fullnameOverride: nv-ingest-cached
   image:
     repository: nvcr.io/ohlfw0olaadg/ea-participants/cached
-    tag: "0.1.0"
+    tag: "0.2.0"
   service:
     name: nv-ingest-cached
     grpcPort: 8001
@@ -138,7 +140,7 @@ paddleocr-nim:
   fullnameOverride: nv-ingest-paddle
   image:
     repository: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr
-    tag: "0.1.0"
+    tag: "0.2.0"
   service:
     name: nv-ingest-paddle
     grpcPort: 8001
@@ -160,6 +162,25 @@ deplot-nim:
     tag: "1.0.0"
   service:
     name: nv-ingest-deplot
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
+## @skip embedqaDeployed
+## @skip embedqa-nim
+## @extra embedqa-nim.image.repository The repository to override the location of the embedqa NIM
+## @extra embedqa-nim.image.tag The tag override for embedqa NIM
+embedqaDeployed: true
+text-embedding-nim:
+  fullnameOverride: nv-ingest-embedqa
+  image:
+    repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
+    tag: "1.1.0"
+  service:
+    name: nv-ingest-embedqa
     grpcPort: 8001
   nim:
     grpcPort: 8001
@@ -236,8 +257,17 @@ redis:
     enabled: false
   replica:
     replicaCount: 1
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
   master:
-      resourcesPreset: xlarge
+    resources:
+      requests:
+        memory: "6Gi"
+      limits:
+        memory: "12Gi"
 
 ## @section Environment Variables
 ## @descriptionStart
@@ -253,15 +283,19 @@ redis:
 ## @skip envVars.REDIS_MORPHEUS_TASK_QUEUE
 ## @skip envVars.CACHED_GRPC_ENDPOINT
 ## @skip envVars.CACHED_HTTP_ENDPOINT
+## @skip envVars.CACHED_INFER_ENDPOINT
 ## @skip envVars.PADDLE_GRPC_ENDPOINT
 ## @skip envVars.PADDLE_HTTP_ENDPOINT
+## @skip envVars.PADDLE_INFER_ENDPOINT
 ## @skip envVars.YOLOX_GRPC_ENDPOINT
 ## @skip envVars.YOLOX_HTTP_ENDPOINT
+## @skip envVars.YOLOX_INFER_ENDPOINT
 ## @skip envVars.DEPLOT_GRPC_ENDPOINT
 ## @skip envVars.DEPLOT_HTTP_ENDPOINT
+## @skip envVars.DEPLOT_INFER_ENDPOINT
 envVars:
-  MESSAGE_CLIENT_HOST: "nv-ingest-ms-runtime"
-  MESSAGE_CLIENT_PORT: "7670"
+  MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
+  MESSAGE_CLIENT_PORT: "6379"
   REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
   NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
 
@@ -270,13 +304,17 @@ envVars:
   MINIO_BUCKET: nv-ingest
 
   CACHED_GRPC_ENDPOINT: nv-ingest-cached:8001
-  CACHED_HTTP_ENDPOINT: ""
+  CACHED_HTTP_ENDPOINT: http://nv-ingest-cached:8000/v1/infer
+  CACHED_INFER_ENDPOINT: grpc
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: ""
+  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
+  PADDLE_INFER_PROTOCOL: grpc
   YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
-  YOLOX_HTTP_ENDPOINT: ""
+  YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000/v1/infer
+  YOLOX_INFER_PROTOCOL: grpc
   DEPLOT_GRPC_ENDPOINT: ""
   DEPLOT_HTTP_ENDPOINT: http://nv-ingest-deplot:8000/v1/chat/completions
+  DEPLOT_INFER_PROTOCOL: http
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedding:8000/v1"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
