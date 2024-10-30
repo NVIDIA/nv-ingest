@@ -21,15 +21,6 @@ _DEFAULT_STORE_METHOD = "minio"
 
 
 class StoreEmbedTaskSchema(BaseModel):
-    store_method: str = None
-
-    @root_validator(pre=True)
-    def set_default_store_method(cls, values):
-        store_method = values.get("store_method")
-
-        if store_method is None:
-            values["store_method"] = _DEFAULT_STORE_METHOD
-        return values
 
     class Config:
         extra = "allow"
@@ -116,12 +107,8 @@ class StoreEmbedTask(Task):
 
     _Type_Content_Type = Literal["embedding",]
 
-    _Type_Store_Method = Literal["minio",]
-
     def __init__(
         self,
-        embedding: bool = True,
-        store_method: _Type_Store_Method = None,
         extra_params: dict = None,
         **params
     ) -> None:
@@ -130,8 +117,6 @@ class StoreEmbedTask(Task):
         """
         super().__init__()
 
-        self._embedding = embedding 
-        self._store_method = store_method or "minio"
         self._extra_params = extra_params
         self._params = params
 
@@ -141,8 +126,6 @@ class StoreEmbedTask(Task):
         """
         info = ""
         info += "Store Embed Task:\n"
-        info += f"  store embedding: {self._embedding}\n"
-        info += f"  store method: {self._store_method}\n"
         for key, value in self._extra_params.items():
             info += f"  {key}: {value}\n"
         for key, value in self._params.items():
@@ -154,8 +137,6 @@ class StoreEmbedTask(Task):
         Convert to a dict for submission to redis (fixme)
         """
         task_properties = {
-            "method": self._store_method,
-            "embedding": self._embedding,
             "extra_params": self._extra_params,
             **self._params,
         }
