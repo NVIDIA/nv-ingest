@@ -2,6 +2,22 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Copyright (c) 2024, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+from typing import List
+import numpy as np
 import warnings
 
 import cv2
@@ -26,7 +42,7 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
             continue
 
         # Get score and class with highest confidence
-        class_conf, class_pred = torch.max(image_pred[:, 5 : 5 + num_classes], 1, keepdim=True)  # noqa: E203
+        class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)  # noqa: E203
 
         conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
         # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
@@ -201,14 +217,14 @@ def expand_chart_bboxes(annotation_dict, labels=None):
 
 
 def weighted_boxes_fusion(
-    boxes_list,
-    scores_list,
-    labels_list,
-    iou_thr=0.5,
-    skip_box_thr=0.0,
-    conf_type="avg",
-    merge_type="weighted",
-    class_agnostic=False,
+        boxes_list,
+        scores_list,
+        labels_list,
+        iou_thr=0.5,
+        skip_box_thr=0.0,
+        conf_type="avg",
+        merge_type="weighted",
+        class_agnostic=False,
 ):
     """
     Custom wbf implementation that supports a class_agnostic mode and a biggest box fusion.
@@ -581,3 +597,34 @@ def get_weighted_box(boxes, conf_type="avg"):
     box[3] = -1  # model index field is retained for consistency but is not used.
     box[4:] /= conf
     return box
+
+
+def prepare_images_for_inference(images: List[np.ndarray]) -> np.ndarray:
+    """
+    Prepare a list of images for model inference by resizing and reordering axes.
+
+    Parameters
+    ----------
+    images : List[np.ndarray]
+        A list of image arrays to be prepared for inference.
+
+    Returns
+    -------
+    np.ndarray
+        A numpy array suitable for model input, with the shape reordered to match the expected input format.
+
+    Notes
+    -----
+    The images are resized to 1024x1024 pixels and the axes are reordered to match the expected input shape for
+    the model (batch, channels, height, width).
+
+    Examples
+    --------
+    >>> images = [np.random.rand(1536, 1536, 3) for _ in range(2)]
+    >>> input_array = prepare_images_for_inference(images)
+    >>> input_array.shape
+    (2, 3, 1024, 1024)
+    """
+
+    resized_images = [resize_image(image, (1024, 1024)) for image in images]
+    return np.einsum("bijk->bkij", resized_images).astype(np.float32)

@@ -73,10 +73,10 @@ def setup_ingestion_pipeline(
     ## Storage and output
     ########################################################################################################
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
+    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(
         pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
     )
-    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
     #######################################################################################################
