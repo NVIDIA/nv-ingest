@@ -182,6 +182,7 @@ tags
 .tmp
 *.dirlock
 *.engine
+*.lock
 /build*/
 /conda-build/
 dask-worker-space
