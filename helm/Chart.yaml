@@ -42,6 +42,10 @@ dependencies:
     repository: "alias:ngc"
     version: 0.1.6
     condition: deplotDeployed
+  - name: text-embedding-nim
+    repository: "alias:nvidia-nim"
+    version: 1.1.0
+    condition: embedqaDeployed
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
     version: 4.1.11
