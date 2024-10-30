@@ -45,19 +45,22 @@ class NvIngestJobManager:
         documents: List[str],
         client: Optional[NvIngestClient] = None,
         job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
+        **kwargs,
     ):
         self._documents = documents
         self._client = client
         self._job_queue_id = job_queue_id
 
         if self._client is None:
-            self._create_client()
+            client_args = list(inspect.signature(NvIngestClient).parameters)
+            client_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in client_args}
+            self._create_client(**client_dict)
 
         self._job_specs = BatchJobSpec(self._documents)
         self._job_ids = None
         self._job_states = None
 
-    def _create_client(self) -> None:
+    def _create_client(self, **kwargs) -> None:
         """
         Creates an instance of NvIngestClient if `_client` is not set.
 
@@ -69,7 +72,7 @@ class NvIngestJobManager:
         if self._client is not None:
             raise ValueError("self._client already exists.")
 
-        self._client = NvIngestClient()
+        self._client = NvIngestClient(**kwargs)
 
     def run(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """

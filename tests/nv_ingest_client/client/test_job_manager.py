@@ -20,6 +20,8 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 
+MODULE_UNDER_TEST = "nv_ingest_client.client.job_manager"
+
 
 @pytest.fixture
 def mock_client():
@@ -28,8 +30,12 @@ def mock_client():
 
 
 @pytest.fixture
-def pipeline(mock_client):
-    documents = ["data/multimodal_test.pdf"]
+def documents():
+    return ["data/multimodal_test.pdf"]
+
+
+@pytest.fixture
+def pipeline(mock_client, documents):
     return NvIngestJobManager(documents, client=mock_client)
 
 
@@ -194,6 +200,19 @@ def test_create_client(pipeline):
 
     with pytest.raises(ValueError, match="self._client already exists"):
         pipeline._create_client()
+
+
+def test_client_initialization_with_kwargs(documents):
+    client_kwargs = {
+        "message_client_hostname": "custom-hostname",
+        "message_client_port": 8080,
+        "extra_arg": "should_be_ignored",
+    }
+
+    manager = NvIngestJobManager(documents, **client_kwargs)
+
+    assert manager._client._message_client_hostname == "custom-hostname"
+    assert manager._client._message_client_port == 8080
 
 
 def test_job_state_counting(pipeline):
