@@ -6,66 +6,69 @@
 ARG BASE_IMG=nvcr.io/nvidia/cuda
 ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
 
-# Use NVIDIA CUDA as the base image
+# Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
-
-# Set environment variables to avoid interactive prompts during package installations
-ENV DEBIAN_FRONTEND=noninteractive
 
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
 
-ARG UVICORN_WORKERS="32"
-
+# Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
-    wget \
-    bzip2 \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+      wget \
+      bzip2 \
+      ca-certificates \
+      curl \
+    && apt-get clean
+
+RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
+    && bash /tmp/miniforge.sh -b -p /opt/conda \
+    && rm /tmp/miniforge.sh
+
+# Add conda to the PATH
+ENV PATH=/opt/conda/bin:$PATH
+
+# Install Mamba, a faster alternative to conda, within the base environment
+RUN conda install -y mamba -n base -c conda-forge
+
+# Create nv_ingest base environment
+RUN conda create -y --name nv_ingest python=3.10.15
+
+# Activate the environment (make it default for subsequent commands)
+RUN echo "source activate nv_ingest" >> ~/.bashrc
+
+# Set default shell to bash
+SHELL ["/bin/bash", "-c"]
+
+# Install Tini via conda from the conda-forge channel
+RUN source activate nv_ingest \
+    && mamba install -y -c conda-forge tini
+
+# Install Morpheus dependencies
+RUN source activate nv_ingest \
+    && mamba install -y \
+     nvidia/label/dev::morpheus-core \
+     nvidia/label/dev::morpheus-llm \
+     -c rapidsai -c pytorch -c nvidia -c conda-forge
+
+# Install additional dependencies using apt-get
+RUN apt-get update && apt-get install -y \
+    libgl1-mesa-glx \
+    && apt-get clean
 
 # Set the working directory in the container
 WORKDIR /workspace
 
-# Download and install Miniconda
-RUN wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh -O /tmp/miniconda.sh \
-    && bash /tmp/miniconda.sh -b -p /opt/miniconda \
-    && rm /tmp/miniconda.sh
+# Copy custom entrypoint script
+COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
-# Set up Miniconda environment
-ENV PATH="/opt/miniconda/bin:$PATH"
-RUN conda init bash
-RUN echo "source /opt/miniconda/bin/activate" >> ~/.bashrc
+FROM base AS nv_ingest_install
+# Copy the module code
+COPY setup.py setup.py
+COPY ci ci
+COPY requirements.txt extra-requirements.txt test-requirements.txt util-requirements.txt ./
 
-SHELL ["/bin/bash", "-c"]
-
-# Python & Poetry version files
-COPY .poetry-version .poetry-version
-COPY .python-version .python-version
-
-# Add the necessary conda channels for Nvidia and RapidsAI
-RUN conda config --env --add channels nvidia \
-    && conda config --env --add channels rapidsai \
-    && conda config --env --add channels nvidia/label/dev \
-    && conda config --env --add channels pytorch \
-    && conda config --env --add channels conda-forge
-
-# Create the nv-ingest conda environment
-RUN conda create --name nv-ingest python=$(cat .python-version) mamba
-
-# Install conda packages before installing poetry & pip packages
-RUN source activate nv-ingest \
-    && mamba install -y -c nvidia/label/dev morpheus-core
-
-# Install Poetry
-RUN source activate nv-ingest \
-    && pip install poetry==$(cat .poetry-version) \
-    && poetry config virtualenvs.create false \
-    && poetry --version
-
-COPY pyproject.toml poetry.lock ./
-
-# Prevent haystack from ending telemetry data
+# Prevent haystack from sending telemetry data
 ENV HAYSTACK_TELEMETRY_ENABLED=False
 
 # Ensure the NV_INGEST_VERSION is PEP 440 compatible
@@ -85,34 +88,70 @@ ENV NV_INGEST_RELEASE_TYPE=${RELEASE_TYPE}
 ENV NV_INGEST_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 ENV NV_INGEST_CLIENT_VERSION_OVERRIDE=${NV_INGEST_VERSION_OVERRIDE}
 
-# Cache the dependencies and install them before uploading source code changes
-RUN source activate nv-ingest \
-    && poetry install --with dev
+SHELL ["/bin/bash", "-c"]
 
-# Copy the rest of the project files not omitted by the .dockerignore file
-COPY . .
+# Cache the requirements and install them before uploading source code changes
+RUN source activate nv_ingest \
+    && pip install -r requirements.txt
 
-# Build the nv-ingest client
-RUN source activate nv-ingest \
-    && poetry build
+COPY tests tests
+COPY data data
+COPY client client
+COPY src/nv_ingest src/nv_ingest
+RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
-FROM base AS runtime
+# Build the client and install it in the conda cache
+RUN source activate nv_ingest \
+    && pip install -e client \
+    && pip install -r extra-requirements.txt
 
-# Install the client and library built by Poetry into the conda environment
-RUN source activate nv-ingest \
+# Run the build_pip_packages.sh script with the specified build type and library
+RUN chmod +x ./ci/scripts/build_pip_packages.sh \
+    && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
+    && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
+
+RUN source activate nv_ingest \
+    && pip install ./dist/*.whl
+
+RUN source activate nv_ingest \
+    && rm -rf src requirements.txt test-requirements.txt util-requirements.txt
+
+# Upgrade setuptools to mitigate https://github.com/advisories/GHSA-cx63-2mw6-8hw5
+RUN source activate base \
+    && conda install -c conda-forge setuptools==70.0.0
+
+RUN source activate nv_ingest \
     && pip install ./client/dist/*.whl \
-    && rm -rf client/dist \
-    && pip install ./dist/*.whl \
-    && rm -rf ./dist
+    ## Installations below can be removed after the next Morpheus release
+    && pip install --no-input milvus==2.3.5 \
+    && pip install --no-input pymilvus==2.3.6 \
+    && pip install --no-input langchain==0.1.16 \
+    && pip install --no-input langchain-nvidia-ai-endpoints==0.0.11 \
+    && pip install --no-input faiss-gpu==1.7.* \
+    && pip install --no-input google-search-results==2.4 \
+    && pip install --no-input nemollm==0.3.5 \
+    && rm -rf client/dist
 
-COPY ./docker/scripts/entrypoint_source_ext.sh /opt/docker/bin/entrypoint_source
+# Install patched MRC version to circumvent NUMA node issue -- remove after Morpheus 10.24 release
+RUN source activate nv_ingest \
+    && conda install -y -c nvidia/label/dev mrc=24.10.00a=cuda_12.5_py310_h5ae46af_10
 
-# Start both the core nv-ingest pipeline service and teh FastAPI microservice in parallel
-CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers ${UVICORN_WORKERS} --host 0.0.0.0 --port 7670 & wait"]
+FROM nv_ingest_install AS runtime
 
-FROM base AS development
+COPY src/pipeline.py ./
+COPY pyproject.toml ./
 
-RUN source activate nv-ingest && \
+RUN chmod +x /workspace/docker/entrypoint.sh
+
+# Set entrypoint to tini with a custom entrypoint script
+ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
+
+# Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
+CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
+
+FROM nv_ingest_install AS development
+
+RUN source activate nv_ingest && \
     pip install -e ./client
 
 CMD ["/bin/bash"]

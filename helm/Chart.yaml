@@ -2,7 +2,7 @@ apiVersion: v2
 name: nv-ingest
 description: NV-Ingest Microservice
 type: application
-version: 0.3.5
+version: 0.3.8
 maintainers:
   - name: NVIDIA Corporation
     url: https://www.nvidia.com/
@@ -28,20 +28,24 @@ dependencies:
     condition: otelDeployed
   - name: yolox-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: yoloxDeployed
   - name: cached-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: cachedDeployed
   - name: paddleocr-nim
     repository: "alias:ngc"
-    version: 0.1.6
+    version: 0.2.0
     condition: paddleocrDeployed
   - name: deplot-nim
     repository: "alias:ngc"
     version: 0.1.6
     condition: deplotDeployed
+  - name: text-embedding-nim
+    repository: "alias:nvidia-nim"
+    version: 1.1.0
+    condition: embedqaDeployed
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
     version: 4.1.11

@@ -25,6 +25,16 @@ NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
+- Install the Helm repos
+
+```bash
+# EA-Participants private NGC repository
+helm repo add ngc https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# Nvidia NIM NGC repository
+helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+```
+
 - Install the chart
 
 ```bash
@@ -39,8 +49,8 @@ helm upgrade \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
-    --set image.tag="24.08" \
-    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.5.tgz
+    --set image.tag="24.10" \
+    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
 
 ```
 
@@ -92,15 +102,15 @@ minikube addons enable storage-provisioner-rancher
 
 Jobs are submitted via the `nv-ingest-cli` command. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
 
-### Access To Redis
+### Access To NV Ingest API
 
-It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
-You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the nv-ingest pod.
+You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the nv-ingest pod to your local environment.
 
 Example:
 
 ```bash
-kubectl port-forward -n ${NAMESPACE} nv-ingest-redis-master-0 6379:6379
+kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
 ```
 
 ### Executing jobs

@@ -151,6 +151,7 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
 
         for shape_idx, shape in enumerate(shapes):
             block_text = []
+            added_title = added_subtitle = False
 
             if extract_text and shape.has_text_frame:
                 for paragraph_idx, paragraph in enumerate(shape.text_frame.paragraphs):
@@ -164,25 +165,31 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                         text = escape_text(text)
 
                         if paragraph_format == "markdown":
+                            # For titles/subtitles, process them on the block/shape level, and
+                            # skip formatting.
                             if is_title(shape):
+                                if added_title:
+                                    continue
                                 text = process_title(shape)
+                                added_title = True
                             elif is_subtitle(shape):
+                                if added_subtitle:
+                                    continue
                                 text = process_subtitle(shape)
-
-                            if run.hyperlink.address:
-                                text = get_hyperlink(text, run.hyperlink.address)
-
-                            if is_accent(paragraph.font) or is_accent(run.font):
-                                text = format_text(text, italic=True)
-                            elif is_strong(paragraph.font) or is_strong(run.font):
-                                text = format_text(text, bold=True)
-                            elif is_underlined(paragraph.font) or is_underlined(run.font):
-                                text = format_text(text, underline=True)
-
-                            if is_list_block(shape):
-                                text = "  " * paragraph.level + "* " + text.strip() + "\n\n"
+                                added_subtitle = True
                             else:
-                                text = text.strip() + "\n\n"
+                                if run.hyperlink.address:
+                                    text = get_hyperlink(text, run.hyperlink.address)
+
+                                if is_accent(paragraph.font) or is_accent(run.font):
+                                    text = format_text(text, italic=True)
+                                elif is_strong(paragraph.font) or is_strong(run.font):
+                                    text = format_text(text, bold=True)
+                                elif is_underlined(paragraph.font) or is_underlined(run.font):
+                                    text = format_text(text, underline=True)
+
+                                if is_list_block(shape):
+                                    text = "  " * paragraph.level + "* " + text
 
                         accumulated_text.append(text)
 
@@ -209,6 +216,11 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                                 extracted_data.append(text_extraction)
 
                             accumulated_text = []
+
+                    # Avoid excessive newline characters and add them only at
+                    # the line/paragraph level or higher.
+                    if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
+                        accumulated_text.append("\n\n")
 
                     if text_depth == TextTypeEnum.LINE:
                         text_extraction = _construct_text_metadata(
@@ -542,7 +554,7 @@ def is_title(shape):
 
 def process_title(shape):
     title = shape.text_frame.text.strip()
-    extracted_text = f"{title}\n{'=' * len(title)}\n\n"
+    extracted_text = f"{title}\n{'=' * len(title)}"
     return extracted_text
 
 
@@ -555,7 +567,7 @@ def is_subtitle(shape):
 
 def process_subtitle(shape):
     subtitle = shape.text_frame.text.strip()
-    extracted_text = f"{subtitle}\n{'-' * len(subtitle)}\n\n"
+    extracted_text = f"{subtitle}\n{'-' * len(subtitle)}"
     return extracted_text
 
 
@@ -611,6 +623,9 @@ def is_underlined(font):
 
 
 def format_text(text: str, bold: bool = False, italic: bool = False, underline: bool = False) -> str:
+    if not text.strip():
+        return text
+
     prefix, suffix = "", ""
     # Exclude leading and trailing spaces from style
     trailing_space_pattern = re.compile(r"(^\s*)(.*?)(\s*$)", re.DOTALL)
@@ -620,11 +635,11 @@ def format_text(text: str, bold: bool = False, italic: bool = False, underline: 
 
     # Apply style
     if bold:
-        text = f" **{text}** "
+        text = f"**{text}**"
     if italic:
-        text = f" *{text}* "
+        text = f"*{text}*"
     if underline:
-        text = f" <u>{text}</u> "
+        text = f"<u>{text}</u>"
 
     # Add back leading and trailing spaces
     text = prefix + text + suffix

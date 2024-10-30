@@ -132,7 +132,7 @@ spec:
 
           ports:
             - name: http
-              containerPort: {{ .Values.service.port }}
+              containerPort: 7670
               protocol: TCP
           {{- if .Values.livenessProbe.enabled }}
           livenessProbe:

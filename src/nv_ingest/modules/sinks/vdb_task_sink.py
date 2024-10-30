@@ -10,9 +10,9 @@ from dataclasses import dataclass
 
 import mrc
 from morpheus.messages import ControlMessage
-from morpheus.service.vdb.milvus_client import DATA_TYPE_MAP
-from morpheus.service.vdb.utils import VectorDBServiceFactory
-from morpheus.service.vdb.vector_db_service import VectorDBService
+from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
+from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
+from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -211,6 +211,7 @@ def _vdb_task_sink(builder: mrc.Builder):
 
             mdf["embedding"] = mdf["metadata"].struct.field("embedding")
             mdf["_source_metadata"] = mdf["metadata"].struct.field("source_metadata")
+            mdf["_content_metadata"] = mdf["metadata"].struct.field("content_metadata")
             df = mdf[mdf["_contains_embeddings"]].copy()
 
         df = df[
@@ -218,9 +219,10 @@ def _vdb_task_sink(builder: mrc.Builder):
                 "embedding",
                 "_content",
                 "_source_metadata",
+                "_content_metadata",
             ]
         ]
-        df.columns = ["vector", "text", "source"]
+        df.columns = ["vector", "text", "source", "content_metadata"]
 
         return df, resource_name
 

@@ -113,6 +113,7 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
         out.append(annotation_dict)
 
+    # {label: [[x1, y1, x2, y2, confidence], ...], ...}
     return out
 
 

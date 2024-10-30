@@ -7,6 +7,9 @@ on:
       - opened
       - synchronize
       - reopened
+  push:
+    branches:
+      - main
 
 jobs:
   build:
@@ -16,6 +19,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Get current date (yyyy.mm.dd)
+        run: echo "CURRENT_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
+
       # Set up Docker Buildx, useful for building multi-platform images
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -23,7 +29,7 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build -t nv-ingest:latest .
+          docker build --target runtime -t nv-ingest:latest .
 
       - name: Run Pytest inside Docker container
         run: |

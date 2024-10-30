@@ -32,6 +32,42 @@ def test_extract_task_str_representation(document_type, extract_method, extract_
         f"extract text: {extract_text}",
         f"extract images: {extract_images}",
         f"extract tables: {extract_tables}",
+        f"extract charts: {extract_tables}",  # If extract_charts is not specified, it defaults to the same value as extract_tables.
+        "text depth: document",  # Assuming this is a fixed value for all instances
+    ]
+
+    for part in expected_parts:
+        assert part in task_str, f"Expected part '{part}' not found in task string representation"
+
+
+@pytest.mark.parametrize(
+    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts",
+    [
+        ("pdf", "tika", True, False, True, False),
+        (None, "pdfium", False, True, None, False),
+        ("txt", None, None, None, False, False),
+    ],
+)
+def test_extract_task_str_representation_extract_charts_false(document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts):
+    task = ExtractTask(
+        document_type=document_type,
+        extract_method=extract_method,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+    )
+
+    task_str = str(task)
+
+    expected_parts = [
+        "Extract Task:",
+        f"document type: {document_type}",
+        f"extract method: {extract_method}",
+        f"extract text: {extract_text}",
+        f"extract images: {extract_images}",
+        f"extract tables: {extract_tables}",
+        f"extract charts: {extract_charts}",
         "text depth: document",  # Assuming this is a fixed value for all instances
     ]
 
@@ -97,6 +133,46 @@ def test_extract_task_to_dict_basic(
                 "extract_images": extract_images,
                 "extract_tables": extract_tables,
                 "extract_tables_method": extract_tables_method,
+                "extract_charts": extract_tables,  # If extract_charts is not specified, it defaults to the same value as extract_tables.
+                "text_depth": "document",
+            },
+        },
+    }
+
+    assert task.to_dict() == expected_dict, "ExtractTask.to_dict() did not return the expected dictionary"
+
+
+@pytest.mark.parametrize(
+    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method, extract_charts",
+    [
+        ("pdf", "tika", True, False, False, "yolox", False),
+        ("docx", "haystack", False, True, True, "python_docx", False),
+        ("txt", "llama_parse", True, True, False, None, False),
+    ],
+)
+def test_extract_task_to_dict_extract_charts_false(
+    document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method, extract_charts,
+):
+    task = ExtractTask(
+        document_type=document_type,
+        extract_method=extract_method,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_tables=extract_tables,
+        extract_tables_method=extract_tables_method,
+        extract_charts=extract_charts,
+    )
+    expected_dict = {
+        "type": "extract",
+        "task_properties": {
+            "method": extract_method,
+            "document_type": document_type,
+            "params": {
+                "extract_text": extract_text,
+                "extract_images": extract_images,
+                "extract_tables": extract_tables,
+                "extract_tables_method": extract_tables_method,
+                "extract_charts": extract_charts,
                 "text_depth": "document",
             },
         },

@@ -86,6 +86,9 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 
+> [!NOTE]
+> during the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
 # Container images must access resources from NGC. 
@@ -98,6 +101,10 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
 >
 > Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
+
+> [!IMPORTANT]
+> Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+> `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 5. Start all services:
 `docker compose up`
@@ -130,13 +137,13 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 Observe the started containers with `docker ps`:
 ```
 CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
-0f2f86615ea5   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.08                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
+0f2f86615ea5   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
 de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-02c9ab8c6901   nvcr.io/ohlfw0olaadg/ea-participants/cached:0.1.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
-d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.0.1                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
-508715a24998   nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.1.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
+02c9ab8c6901   nvcr.io/ohlfw0olaadg/ea-participants/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
+d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
+508715a24998   nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
 5b7a174a0a85   nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
-430045f98c02   nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.1.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
+430045f98c02   nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
 8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
 aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
 bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
@@ -188,10 +195,11 @@ You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 In the below examples, we are doing text, chart, table, and image extraction:
 - `extract_text`, - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages
 - `extract_images` - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images
-- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot), CACHED, and [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for chart extraction
+- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
+- `extract_charts` - (optional) enables or disables the use of Deplot and CACHED for chart extraction.
 
 > [!IMPORTANT]
-> `extract_tables` controls extraction for both tables and charts.
+> `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
 #### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
 
@@ -312,8 +320,22 @@ multimodal_test.pdf.metadata.json
 You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+First, install `tkinter` by running the following commands depending on your OS.
+- For Ubuntu/Debian Linux:
 ```shell
-pip install tkinter
+sudo apt-get update
+sudo apt-get install python3-tk
+```
+- For Fedora/RHEL Linux:
+```shell
+sudo dnf install python3-tkinter
+```
+- For macOS using Homebrew:
+```shell
+brew install python-tk
+```
+Then run the following command to execute the script for inspecting the extracted image:
+```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
