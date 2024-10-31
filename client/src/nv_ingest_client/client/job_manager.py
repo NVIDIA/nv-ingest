@@ -4,7 +4,6 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
-import inspect
 from concurrent.futures import Future
 from typing import Any
 from typing import Dict
@@ -21,6 +20,10 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.util.util import filter_function_kwargs
+
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -52,9 +55,8 @@ class NvIngestJobManager:
         self._job_queue_id = job_queue_id
 
         if self._client is None:
-            client_args = list(inspect.signature(NvIngestClient).parameters)
-            client_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in client_args}
-            self._create_client(**client_dict)
+            client_kwargs = filter_function_kwargs(NvIngestClient, **kwargs)
+            self._create_client(**client_kwargs)
 
         self._job_specs = BatchJobSpec(self._documents)
         self._job_ids = None
@@ -90,13 +92,11 @@ class NvIngestJobManager:
         """
         self._job_ids = self._client.add_job(self._job_specs)
 
-        submit_args = list(inspect.signature(self._client.submit_job).parameters)
-        submit_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in submit_args}
-        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_dict)
+        submit_kwargs = filter_function_kwargs(self._client.submit_job, **kwargs)
+        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_kwargs)
 
-        fetch_args = list(inspect.signature(self._client.fetch_job_result).parameters)
-        fetch_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in fetch_args}
-        result = self._client.fetch_job_result(self._job_ids, **fetch_dict)
+        fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
+        result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
 
         return result
 
@@ -196,9 +196,17 @@ class NvIngestJobManager:
         NvIngestJobManager
             Returns self for chaining.
         """
+        extract_tables = kwargs.get("extract_tables", False)
+        extract_charts = kwargs.get("extract_charts", False)
+
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(document_type, **kwargs)
             self._job_specs.add_task(extract_task, document_type=document_type)
+
+            if extract_tables is True:
+                self._job_specs.add_task(TableExtractionTask())
+            if extract_charts is True:
+                self._job_specs.add_task(ChartExtractionTask())
 
         return self
 
