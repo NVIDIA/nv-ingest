@@ -4,6 +4,7 @@
 
 
 from datetime import datetime
+import logging
 from enum import Enum
 from typing import Any
 from typing import Dict
@@ -16,6 +17,8 @@ from pydantic import validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.util.converters import datetools
+
+logger = logging.getLogger(__name__)
 
 
 # Do we want types and similar items to be enums or just strings?
@@ -246,15 +249,36 @@ class TextMetadataSchema(BaseModelNoExt):
     text_location: tuple = (0, 0, 0, 0)
 
 
+import logging
+from pydantic import validator
+
+# Set up logging
+logger = logging.getLogger(__name__)
+
+
 class ImageMetadataSchema(BaseModelNoExt):
     image_type: Union[ImageTypeEnum, str]
     structured_image_type: ImageTypeEnum = ImageTypeEnum.image_type_1
     caption: str = ""
     text: str = ""
     image_location: tuple = (0, 0, 0, 0)
+    image_location_max_dimensions: tuple = (0, 0)
     uploaded_image_url: str = ""
     width: int = 0
     height: int = 0
+
+    @validator("image_type", pre=True, always=True)
+    def validate_image_type(cls, v):
+        if not isinstance(v, (ImageTypeEnum, str)):
+            raise ValueError("image_type must be a string or ImageTypeEnum")
+        return v
+
+    @validator("width", "height", pre=True, always=True)
+    def clamp_non_negative(cls, v, field):
+        if v < 0:
+            logger.warning(f"{field.name} is negative; clamping to 0. Original value: {v}")
+            return 0
+        return v
 
 
 class TableMetadataSchema(BaseModelNoExt):
@@ -262,6 +286,16 @@ class TableMetadataSchema(BaseModelNoExt):
     table_format: TableFormatEnum
     table_content: str = ""
     table_location: tuple = (0, 0, 0, 0)
+    table_location_max_dimensions: tuple = (0, 0)
+    uploaded_image_uri: str = ""
+
+
+class ChartMetadataSchema(BaseModelNoExt):
+    caption: str = ""
+    table_format: TableFormatEnum
+    table_content: str = ""
+    table_location: tuple = (0, 0, 0, 0)
+    table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
 
 
@@ -289,6 +323,7 @@ class MetadataSchema(BaseModelNoExt):
     text_metadata: Optional[TextMetadataSchema] = None
     image_metadata: Optional[ImageMetadataSchema] = None
     table_metadata: Optional[TableMetadataSchema] = None
+    chart_metadata: Optional[ChartMetadataSchema] = None
     error_metadata: Optional[ErrorMetadataSchema] = None
     info_message_metadata: Optional[InfoMessageMetadataSchema] = None
     debug_metadata: Optional[Dict[str, Any]] = None
