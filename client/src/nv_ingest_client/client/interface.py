@@ -42,7 +42,7 @@ def ensure_job_specs(func):
             raise ValueError(
                 "Job specifications are not initialized because some files are "
                 "remote or not accesible locally. Ensure file paths are correct, "
-                "and call `load()` first if files are remote."
+                "and call `.load()` first if files are remote."
             )
         return func(self, *args, **kwargs)
 
@@ -213,6 +213,8 @@ class Ingestor:
         List[Dict]
             Result of each job after execution.
         """
+        self._prepare_ingest_run()
+
         self._job_ids = self._client.add_job(self._job_specs)
 
         submit_kwargs = filter_function_kwargs(self._client.submit_job, **kwargs)
@@ -237,6 +239,8 @@ class Ingestor:
         Future
             A future that completes when all submitted jobs have reached a terminal state.
         """
+        self._prepare_ingest_run()
+
         self._job_ids = self._client.add_job(self._job_specs)
         future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
         self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
@@ -266,6 +270,40 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         return combined_future
+
+    @ensure_job_specs
+    def _prepare_ingest_run(self):
+        """
+        Prepares the ingest run by ensuring tasks are added to the batch job specification.
+
+        If no tasks are specified in `_job_specs`, this method invokes `all_tasks()` to add
+        a default set of tasks to the job specification.
+        """
+        if (not self._job_specs.tasks) or all(not tasks for tasks in self._job_specs.tasks.values()):
+            self.all_tasks()
+
+    def all_tasks(self) -> "Ingestor":
+        """
+        Adds a default set of tasks to the batch job specification.
+
+        The default tasks include extracting text, tables, charts, images, deduplication,
+        filtering, splitting, and embedding tasks.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        # fmt: off
+        self.extract(extract_text=True, extract_tables=True, extract_charts=True, extract_images=True) \
+            .dedup() \
+            .filter() \
+            .split() \
+            .embed()
+            # .store() \
+            # .vdb_upload()
+        # fmt: on
+        return self
 
     @ensure_job_specs
     def dedup(self, **kwargs: Any) -> "Ingestor":

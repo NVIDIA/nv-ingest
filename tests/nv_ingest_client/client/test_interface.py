@@ -271,3 +271,14 @@ def test_files_with_remote_files(ingestor_without_doc):
         assert ingestor_without_doc._documents == expected_paths
         assert ingestor_without_doc._all_local is True
         assert isinstance(ingestor_without_doc._job_specs, BatchJobSpec)
+
+
+def test_all_tasks_adds_default_tasks(ingestor):
+    ingestor.all_tasks()
+
+    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask}
+    added_tasks = {
+        type(task) for job_specs in ingestor._job_specs._file_type_to_job_spec.values() for task in job_specs[0]._tasks
+    }
+
+    assert task_classes.issubset(added_tasks), "Not all default tasks were added"
