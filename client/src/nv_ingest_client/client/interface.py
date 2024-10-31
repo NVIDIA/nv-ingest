@@ -199,7 +199,7 @@ class Ingestor:
 
         return self
 
-    def run(self, **kwargs: Any) -> List[Dict[str, Any]]:
+    def ingest(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Synchronously submits jobs to the NvIngestClient and fetches the results.
 
@@ -223,7 +223,7 @@ class Ingestor:
 
         return result
 
-    def run_async(self, **kwargs: Any) -> Future:
+    def ingest_async(self, **kwargs: Any) -> Future:
         """
         Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 

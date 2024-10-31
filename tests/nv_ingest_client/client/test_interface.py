@@ -163,12 +163,12 @@ def test_chain(ingestor):
     assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 7
 
 
-def test_run(ingestor, mock_client):
+def test_ingest(ingestor, mock_client):
     mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
     mock_client.submit_job.return_value = ["job_state_1", "job_state_2"]
     mock_client.fetch_job_result.return_value = [{"result": "success"}]
 
-    result = ingestor.run(timeout=30)
+    result = ingestor.ingest(timeout=30)
 
     mock_client.add_job.assert_called_once_with(ingestor._job_specs)
     mock_client.submit_job.assert_called_once_with(mock_client.add_job.return_value, ingestor._job_queue_id)
@@ -177,7 +177,7 @@ def test_run(ingestor, mock_client):
     assert result == [{"result": "success"}]
 
 
-def test_run_async(ingestor, mock_client):
+def test_ingest_async(ingestor, mock_client):
     mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
 
     future1 = Future()
@@ -194,7 +194,7 @@ def test_run_async(ingestor, mock_client):
         lambda job_id, *args, **kwargs: "result_1" if job_id == "job_id_1" else "result_2"
     )
 
-    combined_future = ingestor.run_async(timeout=15)
+    combined_future = ingestor.ingest_async(timeout=15)
     combined_result = combined_future.result()
 
     assert combined_result == ["result_1", "result_2"]
