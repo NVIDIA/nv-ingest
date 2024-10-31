@@ -4,12 +4,18 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import glob
+import os
+import shutil
+import tempfile
 from concurrent.futures import Future
+from functools import wraps
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
 
+import fsspec
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
@@ -24,8 +30,23 @@ from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTa
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
 
-
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
+
+
+def ensure_job_specs(func):
+    """Decorator to ensure _job_specs is initialized before calling task methods."""
+
+    @wraps(func)
+    def wrapper(self, *args, **kwargs):
+        if self._job_specs is None:
+            raise ValueError(
+                "Job specifications are not initialized because some files are "
+                "remote or not accesible locally. Ensure file paths are correct, "
+                "and call `load()` first if files are remote."
+            )
+        return func(self, *args, **kwargs)
+
+    return wrapper
 
 
 class NvIngestJobManager:
@@ -45,12 +66,12 @@ class NvIngestJobManager:
 
     def __init__(
         self,
-        documents: List[str],
+        documents: Optional[List[str]] = None,
         client: Optional[NvIngestClient] = None,
         job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
         **kwargs,
     ):
-        self._documents = documents
+        self._documents = documents or []
         self._client = client
         self._job_queue_id = job_queue_id
 
@@ -58,9 +79,14 @@ class NvIngestJobManager:
             client_kwargs = filter_function_kwargs(NvIngestClient, **kwargs)
             self._create_client(**client_kwargs)
 
-        self._job_specs = BatchJobSpec(self._documents)
+        self._all_local = False  # Track whether all files are confirmed as local
+        self._job_specs = None
         self._job_ids = None
         self._job_states = None
+
+        if self._check_files_local():
+            self._job_specs = BatchJobSpec(self._documents)
+            self._all_local = True
 
     def _create_client(self, **kwargs) -> None:
         """
@@ -75,6 +101,103 @@ class NvIngestJobManager:
             raise ValueError("self._client already exists.")
 
         self._client = NvIngestClient(**kwargs)
+
+    def _check_files_local(self) -> bool:
+        """
+        Check if all specified document files are local and exist.
+
+        Returns
+        -------
+        bool
+            Returns True if all files in `_documents` are local and accessible;
+            False if any file is missing or inaccessible.
+        """
+        if not self._documents:
+            return False
+
+        for pattern in self._documents:
+            matched = glob.glob(pattern, recursive=True)
+            if not matched:
+                return False
+            for file_path in matched:
+                if not os.path.exists(file_path):
+                    return False
+
+        return True
+
+    def files(self, documents: List[str]) -> "NvIngestJobManager":
+        """
+        Add documents to the manager for processing and check if they are all local.
+
+        Parameters
+        ----------
+        documents : List[str]
+            A list of document paths or patterns to be processed.
+
+        Returns
+        -------
+        NvIngestJobManager
+            Returns self for chaining. If all specified documents are local,
+            `_job_specs` is initialized, and `_all_local` is set to True.
+        """
+        if isinstance(documents, str):
+            documents = [documents]
+
+        if not documents:
+            return self
+
+        self._documents.extend(documents)
+        self._all_local = False
+
+        if self._check_files_local():
+            self._job_specs = BatchJobSpec(self._documents)
+            self._all_local = True
+
+        return self
+
+    def load(self, **kwargs) -> "NvIngestJobManager":
+        """
+        Ensure all document files are accessible locally, downloading if necessary.
+
+        For each document in `_documents`, checks if the file exists locally. If not,
+        attempts to download the file to a temporary directory using `fsspec`. Updates
+        `_documents` with paths to local copies, initializes `_job_specs`, and sets
+        `_all_local` to True upon successful loading.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Additional keyword arguments for remote file access via `fsspec`.
+
+        Returns
+        -------
+        NvIngestJobManager
+            Returns self for chaining after ensuring all files are accessible locally.
+        """
+        if self._all_local:
+            return self
+
+        temp_dir = tempfile.mkdtemp()
+
+        local_files = []
+        for pattern_or_path in self._documents:
+            files_local = glob.glob(pattern_or_path, recursive=True)
+            if files_local:
+                for local_path in files_local:
+                    local_files.append(local_path)
+            else:
+                with fsspec.open(pattern_or_path, **kwargs) as f:
+                    original_name = os.path.basename(f.path)
+                    local_path = os.path.join(temp_dir, original_name)
+                    with open(local_path, "wb") as local_file:
+                        shutil.copyfileobj(f, local_file)
+                    local_files.append(local_path)
+
+        self._documents = local_files
+        self._job_specs = BatchJobSpec(self._documents)
+        self._all_local = True
+
+        return self
 
     def run(self, **kwargs: Any) -> List[Dict[str, Any]]:
         """
@@ -144,6 +267,7 @@ class NvIngestJobManager:
 
         return combined_future
 
+    @ensure_job_specs
     def dedup(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a DedupTask to the batch job specification.
@@ -163,6 +287,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def embed(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds an EmbedTask to the batch job specification.
@@ -182,6 +307,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def extract(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds an ExtractTask for each document type to the batch job specification.
@@ -210,6 +336,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def filter(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a FilterTask to the batch job specification.
@@ -229,6 +356,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def split(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a SplitTask to the batch job specification.
@@ -248,6 +376,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def store(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a StoreTask to the batch job specification.
@@ -267,6 +396,7 @@ class NvIngestJobManager:
 
         return self
 
+    @ensure_job_specs
     def vdb_upload(self, **kwargs: Any) -> "NvIngestJobManager":
         """
         Adds a VdbUploadTask to the batch job specification.

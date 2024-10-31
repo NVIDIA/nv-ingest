@@ -4,8 +4,10 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import tempfile
 from concurrent.futures import Future
 from unittest.mock import MagicMock
+from unittest.mock import patch
 
 import pytest
 from nv_ingest_client.client import NvIngestClient
@@ -37,6 +39,11 @@ def documents():
 @pytest.fixture
 def pipeline(mock_client, documents):
     return NvIngestJobManager(documents, client=mock_client)
+
+
+@pytest.fixture
+def pipeline_without_doc(mock_client):
+    return NvIngestJobManager(client=mock_client)
 
 
 def test_dedup_task_no_args(pipeline):
@@ -227,3 +234,40 @@ def test_job_state_counting(pipeline):
     assert pipeline.failed_jobs() == 1
     assert pipeline.cancelled_jobs() == 1
     assert pipeline.remaining_jobs() == 0  # All jobs are in terminal states
+
+
+@patch("glob.glob")
+@patch("os.path.exists")
+def test_check_files_local_all_local(mock_exists, mock_glob, pipeline_without_doc):
+    pipeline = pipeline_without_doc
+    pipeline.files(["/local/path/doc1.pdf", "/local/path/doc2.pdf"])
+    mock_glob.side_effect = lambda x, recursive: [x]
+    mock_exists.return_value = True
+    assert pipeline._check_files_local() is True
+
+
+@patch("glob.glob")
+@patch("os.path.exists")
+def test_check_files_local_some_missing(mock_exists, mock_glob, pipeline_without_doc):
+    pipeline = pipeline_without_doc
+    pipeline.files(["/local/path/doc1.pdf", "/local/path/missing_doc.pdf"])
+    mock_glob.side_effect = lambda x, recursive: [x]
+    mock_exists.side_effect = lambda x: x != "/local/path/missing_doc.pdf"
+    assert pipeline._check_files_local() is False
+
+
+def test_files_with_remote_files(pipeline_without_doc):
+    with tempfile.TemporaryDirectory() as temp_dir:
+        pipeline_without_doc.files(["s3://bucket/path/to/doc1.pdf", "s3://bucket/path/to/doc2.pdf"])
+
+        assert pipeline_without_doc._all_local is False
+        assert pipeline_without_doc._job_specs is None
+
+        pipeline_without_doc._documents = [f"{temp_dir}/doc1.pdf", f"{temp_dir}/doc2.pdf"]
+        pipeline_without_doc._all_local = True
+        pipeline_without_doc._job_specs = BatchJobSpec(pipeline_without_doc._documents)
+
+        expected_paths = [f"{temp_dir}/doc1.pdf", f"{temp_dir}/doc2.pdf"]
+        assert pipeline_without_doc._documents == expected_paths
+        assert pipeline_without_doc._all_local is True
+        assert isinstance(pipeline_without_doc._job_specs, BatchJobSpec)
