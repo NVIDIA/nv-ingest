@@ -49,9 +49,9 @@ def ensure_job_specs(func):
     return wrapper
 
 
-class NvIngestJobManager:
+class Ingestor:
     """
-    NvIngestJobManager provides an interface for building, managing, and running data ingestion jobs
+    Ingestor provides an interface for building, managing, and running data ingestion jobs
     through NvIngestClient, allowing for chainable task additions and job state tracking.
 
     Parameters
@@ -125,7 +125,7 @@ class NvIngestJobManager:
 
         return True
 
-    def files(self, documents: List[str]) -> "NvIngestJobManager":
+    def files(self, documents: List[str]) -> "Ingestor":
         """
         Add documents to the manager for processing and check if they are all local.
 
@@ -136,7 +136,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining. If all specified documents are local,
             `_job_specs` is initialized, and `_all_local` is set to True.
         """
@@ -155,7 +155,7 @@ class NvIngestJobManager:
 
         return self
 
-    def load(self, **kwargs) -> "NvIngestJobManager":
+    def load(self, **kwargs) -> "Ingestor":
         """
         Ensure all document files are accessible locally, downloading if necessary.
 
@@ -171,7 +171,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining after ensuring all files are accessible locally.
         """
         if self._all_local:
@@ -268,7 +268,7 @@ class NvIngestJobManager:
         return combined_future
 
     @ensure_job_specs
-    def dedup(self, **kwargs: Any) -> "NvIngestJobManager":
+    def dedup(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a DedupTask to the batch job specification.
 
@@ -279,7 +279,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         dedup_task = DedupTask(**kwargs)
@@ -288,7 +288,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def embed(self, **kwargs: Any) -> "NvIngestJobManager":
+    def embed(self, **kwargs: Any) -> "Ingestor":
         """
         Adds an EmbedTask to the batch job specification.
 
@@ -299,7 +299,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         embed_task = EmbedTask(**kwargs)
@@ -308,7 +308,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def extract(self, **kwargs: Any) -> "NvIngestJobManager":
+    def extract(self, **kwargs: Any) -> "Ingestor":
         """
         Adds an ExtractTask for each document type to the batch job specification.
 
@@ -319,7 +319,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         extract_tables = kwargs.get("extract_tables", False)
@@ -337,7 +337,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def filter(self, **kwargs: Any) -> "NvIngestJobManager":
+    def filter(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a FilterTask to the batch job specification.
 
@@ -348,7 +348,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         filter_task = FilterTask(**kwargs)
@@ -357,7 +357,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def split(self, **kwargs: Any) -> "NvIngestJobManager":
+    def split(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a SplitTask to the batch job specification.
 
@@ -368,7 +368,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         extract_task = SplitTask(**kwargs)
@@ -377,7 +377,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def store(self, **kwargs: Any) -> "NvIngestJobManager":
+    def store(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a StoreTask to the batch job specification.
 
@@ -388,7 +388,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         store_task = StoreTask(**kwargs)
@@ -397,7 +397,7 @@ class NvIngestJobManager:
         return self
 
     @ensure_job_specs
-    def vdb_upload(self, **kwargs: Any) -> "NvIngestJobManager":
+    def vdb_upload(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a VdbUploadTask to the batch job specification.
 
@@ -408,7 +408,7 @@ class NvIngestJobManager:
 
         Returns
         -------
-        NvIngestJobManager
+        Ingestor
             Returns self for chaining.
         """
         vdb_upload_task = VdbUploadTask(**kwargs)
