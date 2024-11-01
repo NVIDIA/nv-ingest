@@ -7,6 +7,7 @@ import base64
 import functools
 import io
 import logging
+import traceback
 from typing import Any
 from typing import Dict
 from typing import List
@@ -84,7 +85,8 @@ def decode_and_extract(
         extract_method = task_props.get("method", "image")
         extract_params = task_props.get("params", {})
 
-        if (validated_config.pdfium_config is not None):
+        logger.debug(f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}")
+        if (validated_config.image_extraction_config is not None):
             extract_params["image_extraction_config"] = validated_config.image_extraction_config
 
         if (trace_info is not None):
@@ -100,6 +102,7 @@ def decode_and_extract(
         return extracted_data
 
     except Exception as e:
+        traceback.print_exc()
         err_msg = f"Unhandled exception in decode_and_extract for '{source_id}':\n{e}"
         logger.error(err_msg)
 
@@ -179,5 +182,6 @@ def generate_image_extractor_stage(
     _wrapped_process_fn = functools.partial(process_image, validated_config=validated_config)
 
     return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn, document_type="pdf"
+        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn,
+        document_type="png"
     )

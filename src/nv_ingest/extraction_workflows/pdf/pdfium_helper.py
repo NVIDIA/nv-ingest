@@ -262,7 +262,7 @@ def extract_table_and_chart_images(
 
     Parameters
     ----------
-    annotation_dict : dict
+    annotation_dict : dict/
         A dictionary containing detected objects and their bounding boxes.
     original_image : np.ndarray
         The original image from which objects were detected.

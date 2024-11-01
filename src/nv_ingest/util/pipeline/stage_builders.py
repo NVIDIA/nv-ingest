@@ -23,6 +23,7 @@ from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFac
 from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
+from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
@@ -245,6 +246,29 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     return table_extractor_stage
+
+
+def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    image_extractor_config = ingest_config.get("image_extraction_module",
+                                               {
+                                                   "image_extraction_config": {
+                                                       "yolox_endpoints": (yolox_grpc, yolox_http),
+                                                       "yolox_infer_protocol": yolox_protocol,
+                                                       "auth_token": yolox_auth,
+                                                       # All auth tokens are the same for the moment
+                                                   }
+                                               })
+    image_extractor_stage = pipe.add_stage(
+        generate_image_extractor_stage(
+            morpheus_pipeline_config,
+            extractor_config=image_extractor_config,
+            pe_count=8,
+            task="extract",
+            task_desc="docx_content_extractor",
+        )
+    )
+    return image_extractor_stage
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):

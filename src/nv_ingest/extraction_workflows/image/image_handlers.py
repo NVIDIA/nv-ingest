@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import json
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -19,35 +19,28 @@
 import logging
 import traceback
 
-from math import log
 import cairosvg
 
 from typing import List
 from typing import Optional
 from typing import Tuple
+
+import cv2
 from PIL import Image
-import numpy as np
 import io
 
 import numpy as np
-import pypdfium2 as libpdfium
 import tritonclient.grpc as grpcclient
 
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import prepare_images_for_inference, process_inference_results, \
-    extract_table_and_chart_images
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
+import nv_ingest.util.nim.yolox as yolox_utils
+from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import perform_model_inference
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -78,16 +71,29 @@ def load_and_preprocess_image(image_stream: io.BytesIO) -> np.ndarray:
     # Load image from the byte stream
     processed_image = Image.open(image_stream).convert("RGB")
 
+    # Specify the file path for saving
+    output_path_png = '/workspace/processed_image.png'
+    output_path_jpeg = '/workspace/processed_image.jpeg'
+
+    # Save the image as PNG
+    processed_image.save(output_path_png, format='PNG')
+    print(f"Image saved as PNG at {output_path_png}")
+
+    # Save the image as JPEG with 95% quality
+    processed_image.save(output_path_jpeg, format='JPEG', quality=95)
+    print(f"Image saved as JPEG at {output_path_jpeg}")
+
     # Resize or normalize image as required by the model (example size 640x640)
-    processed_image = processed_image.resize((YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT))
+    # processed_image = processed_image.resize((YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT))
 
     # Convert image to numpy array and normalize pixel values
     image_array = np.asarray(processed_image, dtype=np.float32) / 255.0
 
     # Expand dimensions if required by the model (e.g., [1, H, W, C])
-    image_array = np.expand_dims(image_array, axis=0)
+    # image_array = np.expand_dims(image_array, axis=0)
 
     return image_array
+
 
 def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     """
@@ -113,13 +119,142 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     image_array = np.asarray(processed_image, dtype=np.float32) / 255.0
 
     # Expand dimensions if required by the model
-    image_array = np.expand_dims(image_array, axis=0)
+    # image_array = np.expand_dims(image_array, axis=0)
 
     return image_array
 
+
+# TODO(Devin): Move to common file
+def process_inference_results(
+        output_array: np.ndarray,
+        original_image_shapes: List[Tuple[int, int]],
+        num_classes: int,
+        conf_thresh: float,
+        iou_thresh: float,
+        min_score: float,
+        final_thresh: float,
+):
+    """
+    Process the model output to generate detection results and expand bounding boxes.
+
+    Parameters
+    ----------
+    output_array : np.ndarray
+        The raw output from the model inference.
+    original_image_shapes : List[Tuple[int, int]]
+        The shapes of the original images before resizing, used for scaling bounding boxes.
+    num_classes : int
+        The number of classes the model can detect.
+    conf_thresh : float
+        The confidence threshold for detecting objects.
+    iou_thresh : float
+        The Intersection Over Union (IoU) threshold for non-maximum suppression.
+    min_score : float
+        The minimum score for keeping a detection.
+    final_thresh: float
+        Threshold for keeping a bounding box applied after postprocessing.
+
+
+    Returns
+    -------
+    List[dict]
+        A list of dictionaries, each containing processed detection results including expanded bounding boxes.
+
+    Notes
+    -----
+    This function applies non-maximum suppression to the model's output and scales the bounding boxes back to the
+    original image size.
+
+    Examples
+    --------
+    >>> output_array = np.random.rand(2, 100, 85)
+    >>> original_image_shapes = [(1536, 1536), (1536, 1536)]
+    >>> results = process_inference_results(output_array, original_image_shapes, 80, 0.5, 0.5, 0.1)
+    >>> len(results)
+    2
+    """
+    pred = yolox_utils.postprocess_model_prediction(
+        output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True
+    )
+    results = yolox_utils.postprocess_results(pred, original_image_shapes, min_score=min_score)
+    logger.debug(f"Number of results: {len(results)}")
+    logger.debug(f"Results: {results}")
+
+    annotation_dicts = [yolox_utils.expand_chart_bboxes(annotation_dict) for annotation_dict in results]
+    inference_results = []
+
+    # Filter out bounding boxes below the final threshold
+    for annotation_dict in annotation_dicts:
+        new_dict = {}
+        if "table" in annotation_dict:
+            new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+        if "chart" in annotation_dict:
+            new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+        if "title" in annotation_dict:
+            new_dict["title"] = annotation_dict["title"]
+        inference_results.append(new_dict)
+
+    return inference_results
+
+
+# TODO(Devin): Move to common file
+def extract_table_and_chart_images(
+        annotation_dict,
+        original_image,
+        page_idx,
+        tables_and_charts,
+):
+    """
+    Handle the extraction of tables and charts from the inference results and run additional model inference.
+
+    Parameters
+    ----------
+    annotation_dict : dict
+        A dictionary containing detected objects and their bounding boxes.
+    original_image : np.ndarray
+        The original image from which objects were detected.
+    page_idx : int
+        The index of the current page being processed.
+    tables_and_charts : List[Tuple[int, ImageTable]]
+        A list to which extracted tables and charts will be appended.
+
+    Notes
+    -----
+    This function iterates over detected objects, crops the original image to the bounding boxes,
+    and runs additional inference on the cropped images to extract detailed information about tables
+    and charts.
+
+    Examples
+    --------
+    >>> annotation_dict = {"table": [], "chart": []}
+    >>> original_image = np.random.rand(1536, 1536, 3)
+    >>> tables_and_charts = []
+    >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    """
+
+    width, height, *_ = original_image.shape
+    for label in ["table", "chart"]:
+        if not annotation_dict:
+            continue
+
+        objects = annotation_dict[label]
+        for idx, bboxes in enumerate(objects):
+            *bbox, _ = bboxes
+            h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
+
+            cropped = crop_image(original_image, (h1, w1, h2, w2))
+            base64_img = numpy_to_base64(cropped)
+
+            table_data = CroppedImageWithContent(
+                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
+                max_height=height, type_string=label
+            )
+            tables_and_charts.append((page_idx, table_data))
+
+
 def extract_tables_and_charts_from_image(
         image: np.ndarray,
-        config: PDFiumConfigSchema,
+        config: ImageExtractorSchema,
         num_classes: int = YOLOX_NUM_CLASSES,
         conf_thresh: float = YOLOX_CONF_THRESHOLD,
         iou_thresh: float = YOLOX_IOU_THRESHOLD,
@@ -137,7 +272,7 @@ def extract_tables_and_charts_from_image(
     ----------
     image : np.ndarray
         A preprocessed image array for table and chart detection.
-    config : PDFiumConfigSchema
+    config : ImageExtractorSchema
         Configuration for the inference client, including endpoint URLs and authentication.
     num_classes : int, optional
         The number of classes the model is trained to detect (default is 3).
@@ -157,38 +292,40 @@ def extract_tables_and_charts_from_image(
     List[CroppedImageWithContent]
         A list of `CroppedImageWithContent` objects representing detected tables or charts,
         each containing metadata about the detected region.
-
-    Notes
-    -----
-    This function manages inference clients, processes the image as a single batch,
-    and post-processes the results to filter and refine detections.
     """
     tables_and_charts = []
 
     yolox_client = None
     try:
-        # Set up the inference client
+        logger.debug("Initializing YOLOX inference client.")
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
 
-        # Prepare the single image for inference
-        input_image = prepare_images_for_inference([image])
+        logger.debug("Preparing image for inference.")
+        input_image = yolox_utils.prepare_images_for_inference([image])
         image_shape = image.shape
+        logger.debug(f"Image shape for inference: {image_shape}")
 
-        # Perform model inference on the image
+        logger.debug("Performing model inference.")
         output_array = perform_model_inference(yolox_client, "yolox", input_image, trace_info=trace_info)
+        logger.debug("Model inference completed.")
 
-        # Process inference results
+        logger.debug("Processing inference results.")
+        logger.debug(f"Output array: {output_array}")
         yolox_annotated_detections = process_inference_results(
             output_array, [image_shape], num_classes, conf_thresh, iou_thresh, min_score, final_thresh
         )
+        logger.debug(f"Number of detections: {len(yolox_annotated_detections)}")
+        logger.debug(f"Actual detections: {yolox_annotated_detections}")
 
-        # Extract tables and charts based on detections
+        logger.debug("Extracting tables and charts from detected regions.")
         for annotation_dict in yolox_annotated_detections:
             extract_table_and_chart_images(
                 annotation_dict,
                 image,
+                page_idx=0,  # Single image treated as one page
                 tables_and_charts=tables_and_charts,
             )
+        logger.debug("Table and chart extraction completed.")
 
     except Exception as e:
         logger.error(f"Error during table/chart extraction from image: {str(e)}")
@@ -196,11 +333,13 @@ def extract_tables_and_charts_from_image(
         raise e
     finally:
         if isinstance(yolox_client, grpcclient.InferenceServerClient):
+            logger.debug("Closing YOLOX inference client.")
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
 
     return tables_and_charts
+
 
 def image_data_extractor(image_stream,
                          document_type: str,
@@ -268,8 +407,10 @@ def image_data_extractor(image_stream,
 
     # Preprocess based on image type
     if document_type in {"jpeg", "jpg", "png"}:
+        logger.debug("Loading and preprocessing image.")
         image_array = load_and_preprocess_image(image_stream)
     elif document_type == "svg":
+        logger.debug("Converting SVG to bitmap.")
         image_array = convert_svg_to_bitmap(image_stream)
     else:
         raise ValueError(f"Unsupported document type: {document_type}")
@@ -284,7 +425,7 @@ def image_data_extractor(image_stream,
         # Placeholder for image-specific extraction process
         logger.warning("Image extraction is not supported for raw images.")
 
-
+    logger.debug(json.dumps(kwargs, indent=2, default=str))
     # Table and chart extraction
     if extract_tables or extract_charts:
         try:
@@ -293,6 +434,7 @@ def image_data_extractor(image_stream,
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
+            logger.debug(f"Extracted table/chart data from image")
             for _, table_chart_data in tables_and_charts:
                 extracted_data.append(
                     construct_table_and_chart_metadata(

@@ -1,6 +1,8 @@
 aiohttp==3.9.4
+cairosvg==2.7.1
 charset-normalizer
 click
+opencv-python
 dataclasses
 farm-haystack[ocr,inference,pdf,preprocessing,file-conversion]
 fastapi==0.109.1

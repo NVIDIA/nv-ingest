@@ -50,6 +50,8 @@ def filter_by_task(required_tasks, forward_func=None):
                             continue
 
                         task_props_list = tasks.get(required_task_name, [])
+                        logger.debug(f"Checking task properties for: {required_task_name}")
+                        logger.debug(f"Required task properties: {required_task_props_list}")
                         for task_props in task_props_list:
                             if all(
                                 _is_subset(task_props, required_task_props)
@@ -75,9 +77,18 @@ def _is_subset(superset, subset):
     if subset == "*":
         return True
     if isinstance(superset, dict) and isinstance(subset, dict):
-        return all(key in superset and _is_subset(superset[key], val) for key, val in subset.items())
+        return all(
+            key in superset and _is_subset(superset[key], val)
+            for key, val in subset.items()
+        )
+    if isinstance(superset, list) and not isinstance(subset, list):
+        # Check if the subset value is in the list of the superset
+        return subset in superset
     if isinstance(superset, list) or isinstance(superset, set):
-        return all(any(_is_subset(sup_item, sub_item) for sup_item in superset) for sub_item in subset)
+        return all(
+            any(_is_subset(sup_item, sub_item) for sup_item in superset)
+            for sub_item in subset
+        )
     return superset == subset
 
 
