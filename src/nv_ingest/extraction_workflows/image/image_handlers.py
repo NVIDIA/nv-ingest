@@ -18,6 +18,7 @@ import json
 
 import logging
 import traceback
+from datetime import datetime
 
 import cairosvg
 
@@ -71,26 +72,8 @@ def load_and_preprocess_image(image_stream: io.BytesIO) -> np.ndarray:
     # Load image from the byte stream
     processed_image = Image.open(image_stream).convert("RGB")
 
-    # Specify the file path for saving
-    output_path_png = '/workspace/processed_image.png'
-    output_path_jpeg = '/workspace/processed_image.jpeg'
-
-    # Save the image as PNG
-    processed_image.save(output_path_png, format='PNG')
-    print(f"Image saved as PNG at {output_path_png}")
-
-    # Save the image as JPEG with 95% quality
-    processed_image.save(output_path_jpeg, format='JPEG', quality=95)
-    print(f"Image saved as JPEG at {output_path_jpeg}")
-
-    # Resize or normalize image as required by the model (example size 640x640)
-    # processed_image = processed_image.resize((YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT))
-
     # Convert image to numpy array and normalize pixel values
-    image_array = np.asarray(processed_image, dtype=np.float32) / 255.0
-
-    # Expand dimensions if required by the model (e.g., [1, H, W, C])
-    # image_array = np.expand_dims(image_array, axis=0)
+    image_array = np.asarray(processed_image, dtype=np.float32)
 
     return image_array
 
@@ -116,7 +99,7 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
 
     # Convert image to numpy array and normalize pixel values
-    image_array = np.asarray(processed_image, dtype=np.float32) / 255.0
+    image_array = np.asarray(processed_image, dtype=np.float32)
 
     # Expand dimensions if required by the model
     # image_array = np.expand_dims(image_array, axis=0)
@@ -242,8 +225,7 @@ def extract_table_and_chart_images(
             *bbox, _ = bboxes
             h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
 
-            cropped = crop_image(original_image, (h1, w1, h2, w2))
-            base64_img = numpy_to_base64(cropped)
+            base64_img = crop_image(original_image, (h1, w1, h2, w2))
 
             table_data = CroppedImageWithContent(
                 content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
@@ -385,15 +367,16 @@ def image_data_extractor(image_stream,
 
     # Metadata extraction setup
     base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
+    current_iso_datetime = datetime.now().isoformat()
     source_metadata = {
         "source_name": f"{source_id}_{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,
         "collection_id": row_data.get("collection_id", ""),
-        "date_created": row_data.get("date_created", ""),
-        "last_modified": row_data.get("last_modified", ""),
-        "summary": "",
+        "date_created": row_data.get("date_created", current_iso_datetime),
+        "last_modified": row_data.get("last_modified", current_iso_datetime),
+        "summary": f"Raw {document_type} image extracted from source {source_id}",
         "partition_id": row_data.get("partition_id", -1),
         "access_level": row_data.get("access_level", AccessLevelEnum.LEVEL_1),
     }
@@ -414,6 +397,23 @@ def image_data_extractor(image_stream,
         image_array = convert_svg_to_bitmap(image_stream)
     else:
         raise ValueError(f"Unsupported document type: {document_type}")
+
+    image_array_uint8 = image_array.astype(np.uint8)
+
+    # Specify the file paths
+    output_path_png = '/workspace/image_array_start.png'
+    output_path_jpeg = '/workspace/image_array_start.jpeg'
+
+    # Convert from RGB to BGR as OpenCV expects images in BGR format
+    image_array_bgr = cv2.cvtColor(image_array_uint8, cv2.COLOR_RGB2BGR)
+
+    # Write the image as PNG
+    cv2.imwrite(output_path_png, image_array_bgr)
+    print(f"Image saved as PNG at {output_path_png}")
+
+    # Write the image as JPEG
+    cv2.imwrite(output_path_jpeg, image_array_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    print(f"Image saved as JPEG at {output_path_jpeg}")
 
     # Text extraction stub
     if extract_text:
@@ -440,7 +440,7 @@ def image_data_extractor(image_stream,
                     construct_table_and_chart_metadata(
                         table_chart_data,
                         page_idx=0,  # Single image treated as one page
-                        total_pages=1,
+                        page_count=1,
                         source_metadata=source_metadata,
                         base_unified_metadata=base_unified_metadata,
                     )

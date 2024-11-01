@@ -626,14 +626,31 @@ def prepare_images_for_inference(images: List[np.ndarray]) -> np.ndarray:
     (2, 3, 1024, 1024)
     """
 
+    image_array_uint8 = (images[-1]).astype(np.uint8)
+
+    # Specify the file paths
+    output_path_png = '/workspace/image_array_pre_resize.png'
+    output_path_jpeg = '/workspace/image_array_pre_resize.jpeg'
+
+    # Convert from RGB to BGR as OpenCV expects images in BGR format
+    image_array_bgr = cv2.cvtColor(image_array_uint8, cv2.COLOR_RGB2BGR)
+
+    # Write the image as PNG
+    cv2.imwrite(output_path_png, image_array_bgr)
+    print(f"Image saved as PNG at {output_path_png}")
+
+    # Write the image as JPEG
+    cv2.imwrite(output_path_jpeg, image_array_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
+    print(f"Image saved as JPEG at {output_path_jpeg}")
+
     resized_images = [resize_image(image, (1024, 1024)) for image in images]
     # Convert the float32 array back to uint8 for writing to disk
     # This assumes the image array values are normalized between 0 and 1
-    image_array_uint8 = (resized_images[0] * 255).astype(np.uint8)
+    image_array_uint8 = (resized_images[-1]).astype(np.uint8)
 
     # Specify the file paths
-    output_path_png = '/workspace/image_array_denormalized.png'
-    output_path_jpeg = '/workspace/image_array_denormalized.jpeg'
+    output_path_png = '/workspace/image_array_post_resize.png'
+    output_path_jpeg = '/workspace/image_array_post_resize.jpeg'
 
     # Convert from RGB to BGR as OpenCV expects images in BGR format
     image_array_bgr = cv2.cvtColor(image_array_uint8, cv2.COLOR_RGB2BGR)
