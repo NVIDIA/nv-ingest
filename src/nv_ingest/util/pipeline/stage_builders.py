@@ -343,15 +343,23 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    endpoint_url, model_name = get_caption_classifier_service()
+    auth_token = os.environ.get(
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
+        "",
+    )
+
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
-            "api_key": "",
+            "api_key": auth_token,
             "endpoint_url": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
             "prompt": "Caption the content of this image:",
         },
     )
+
     image_caption_stage = pipe.add_stage(
         generate_caption_extraction_stage(
             morpheus_pipeline_config,

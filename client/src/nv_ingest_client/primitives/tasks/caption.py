@@ -7,7 +7,7 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict
+from typing import Dict, Optional
 
 from pydantic import BaseModel
 
@@ -17,8 +17,9 @@ logger = logging.getLogger(__name__)
 
 
 class CaptionTaskSchema(BaseModel):
-    endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
-    prompt: str = "Caption the content of this image:"
+    api_key: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    prompt: Optional[str] = None
 
     class Config:
         extra = "forbid"

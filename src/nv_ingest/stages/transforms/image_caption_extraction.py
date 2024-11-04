@@ -5,7 +5,6 @@
 import base64
 import io
 import logging
-import os
 from functools import partial
 from typing import Any, Optional
 from typing import Dict
@@ -132,7 +131,7 @@ def _ensure_png_base64(base64_image: str) -> str:
         return None
 
 
-def _generate_captions(base64_image: str, api_key: str, endpoint_url: str) -> str:
+def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_url: str) -> str:
     """
     Sends a base64-encoded PNG image to the NVIDIA LLaMA model API and retrieves the generated caption.
 
@@ -164,7 +163,7 @@ def _generate_captions(base64_image: str, api_key: str, endpoint_url: str) -> st
         "messages": [
             {
                 "role": "user",
-                "content": f'What is in this image? <img src="data:image/png;base64,{base64_image}" />'
+                "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'
             }
         ],
         "max_tokens": 512,
@@ -188,7 +187,7 @@ def _generate_captions(base64_image: str, api_key: str, endpoint_url: str) -> st
             return response_data.get('choices', [{}])[0].get('message', {}).get('content', 'No caption returned')
     except requests.exceptions.RequestException as e:
         logger.error(f"Error generating caption: {e}")
-        return "Error generating caption"
+        raise
 
 
 def caption_extract_stage(df: pd.DataFrame,
@@ -220,9 +219,11 @@ def caption_extract_stage(df: pd.DataFrame,
     logger.debug("Attempting to caption image content")
 
     # Ensure the validated configuration is available for future use
-    _ = validated_config
-    _ = task_props
     _ = trace_info
+
+    api_key = task_props.get("api_key", validated_config.api_key)
+    prompt = task_props.get("prompt", validated_config.prompt)
+    endpoint_url = task_props.get("endpoint_url", validated_config.endpoint_url)
 
     # Create a mask for rows where the document type is IMAGE
     df_mask = df['metadata'].apply(lambda meta: meta.get('content_metadata', {}).get('type') == "image")
@@ -231,21 +232,13 @@ def caption_extract_stage(df: pd.DataFrame,
         logger.debug("No image content found for captioning")
         return df
 
-    # Get the API key from environment variables
-    api_key = os.environ.get("NVIDIA_BUILD_API_KEY")
-    if not api_key:
-        logger.error("NVIDIA API key is missing.")
-        raise EnvironmentError("NVIDIA API key is required but not set in the environment variables.")
-
-    endpoint_url = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
-
     # Apply the _generate_captions function and update 'metadata.image_metadata.caption'
     df.loc[df_mask, 'metadata'] = df.loc[df_mask, 'metadata'].apply(
         lambda meta: {
             **meta,
             'image_metadata': {
                 **meta.get('image_metadata', {}),
-                'caption': _generate_captions(meta['content'], api_key, endpoint_url)
+                'caption': _generate_captions(meta['content'], prompt, api_key, endpoint_url)
             }
         }
     )
