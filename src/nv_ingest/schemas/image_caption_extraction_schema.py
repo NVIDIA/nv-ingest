@@ -7,9 +7,9 @@ from pydantic import BaseModel
 
 
 class ImageCaptionExtractionSchema(BaseModel):
-    batch_size: int = 8
-    caption_classifier_model_name: str = "deberta_large"
+    api_key: str = "api_key"
     endpoint_url: str = "triton:8001"
+    prompt: str = "Caption the content of this image:"
     raise_on_failure: bool = False
 
     class Config:

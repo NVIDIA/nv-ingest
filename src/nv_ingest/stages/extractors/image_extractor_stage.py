@@ -85,7 +85,8 @@ def decode_and_extract(
         extract_method = task_props.get("method", "image")
         extract_params = task_props.get("params", {})
 
-        logger.debug(f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}")
+        logger.debug(
+            f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}")
         if (validated_config.image_extraction_config is not None):
             extract_params["image_extraction_config"] = validated_config.image_extraction_config
 
@@ -112,19 +113,40 @@ def decode_and_extract(
     # exception_tag = create_exception_tag(error_message=log_error_message, source_id=source_id)
 
 
-def process_image(df, task_props, validated_config, trace_info=None):
+def process_image(
+        df: pd.DataFrame,
+        task_props: Dict[str, Any],
+        validated_config: Any,
+        trace_info: Optional[Dict[str, Any]] = None
+) -> pd.DataFrame:
     """
-    Processes a cuDF DataFrame containing image files in base64 encoding.
+    Processes a pandas DataFrame containing image files in base64 encoding.
     Each image's content is replaced with its extracted components.
 
-    Parameters:
-    - df: pandas DataFrame with columns 'source_id' and 'content' (base64 encoded PDFs).
-    - task_props: dictionary containing instructions for the pdf processing task.
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The input DataFrame with columns 'source_id' and 'content' (base64-encoded image data).
+    task_props : dict
+        Dictionary containing instructions and parameters for the image processing task.
+    validated_config : Any
+        Configuration object validated for processing images.
+    trace_info : dict, optional
+        Dictionary for tracing and logging additional information during processing (default is None).
 
-    Returns:
-    - A pandas DataFrame with the image content replaced by the extracted primitives.
+    Returns
+    -------
+    Tuple[pd.DataFrame, Dict[str, Any]]
+        A tuple containing:
+        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata', and 'uuid'.
+        - A dictionary with trace information collected during processing.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the image processing stage.
     """
-    logger.debug(f"Processing image content")
+    logger.debug("Processing image content")
     if trace_info is None:
         trace_info = {}
 
@@ -133,7 +155,7 @@ def process_image(df, task_props, validated_config, trace_info=None):
         _decode_and_extract = functools.partial(
             decode_and_extract, task_props=task_props, validated_config=validated_config, trace_info=trace_info
         )
-        logger.debug(f"processing ({task_props.get('method', None)})")
+        logger.debug(f"Processing method: {task_props.get('method', None)}")
         sr_extraction = df.apply(_decode_and_extract, axis=1)
         sr_extraction = sr_extraction.explode().dropna()
 
@@ -145,9 +167,8 @@ def process_image(df, task_props, validated_config, trace_info=None):
         return extracted_df, {"trace_info": trace_info}
 
     except Exception as e:
-        err_msg = f"Unhandled exception in process_pdf_bytes: {e}"
+        err_msg = f"Unhandled exception in image extractor stage's process_image: {e}"
         logger.error(err_msg)
-
         raise
 
 

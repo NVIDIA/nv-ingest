@@ -17,29 +17,55 @@ logger = logging.getLogger(__name__)
 
 
 class CaptionTaskSchema(BaseModel):
+    endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+    prompt: str = "Caption the content of this image:"
+
     class Config:
         extra = "forbid"
 
 
 class CaptionTask(Task):
     def __init__(
-        self,
+            self,
+            api_key: str = None,
+            endpoint_url: str = None,
+            prompt: str = None,
     ) -> None:
         super().__init__()
+
+        self._api_key = api_key
+        self._endpoint_url = endpoint_url
+        self._prompt = prompt
 
     def __str__(self) -> str:
         """
         Returns a string with the object's config and run time state
         """
         info = ""
+        info += "Image Caption Task:\n"
+
+        if (self._api_key):
+            info += f"  api_key: [redacted]\n"
+        if (self._endpoint_url):
+            info += f"  endpoint_url: {self._endpoint_url}\n"
+        if (self._prompt):
+            info += f"  prompt: {self._prompt}\n"
+
         return info
 
     def to_dict(self) -> Dict:
         """
         Convert to a dict for submission to redis
         """
-        task_properties = {
-            "content_type": "image",
-        }
+        task_properties = {}
+
+        if (self._api_key):
+            task_properties["api_key"] = self._api_key
+
+        if (self._endpoint_url):
+            task_properties["endpoint_url"] = self._endpoint_url
+
+        if (self._prompt):
+            task_properties["prompt"] = self._prompt
 
         return {"type": "caption", "task_properties": task_properties}
