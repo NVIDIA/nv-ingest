@@ -124,6 +124,7 @@ def process_image(df, task_props, validated_config, trace_info=None):
     Returns:
     - A pandas DataFrame with the image content replaced by the extracted primitives.
     """
+    logger.debug(f"Processing image content")
     if trace_info is None:
         trace_info = {}
 
@@ -183,5 +184,5 @@ def generate_image_extractor_stage(
 
     return MultiProcessingBaseStage(
         c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn,
-        document_type="png"
+        document_type="regex:^(png|svg|jpeg|jpg|tiff)$"
     )

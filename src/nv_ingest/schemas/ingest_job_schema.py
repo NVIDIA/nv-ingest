@@ -24,15 +24,16 @@ logger = logging.getLogger(__name__)
 
 # Enums
 class DocumentTypeEnum(str, Enum):
-    pdf = "pdf"
-    txt = "text"
-    docx = "docx"
-    pptx = "pptx"
-    jpeg = "jpeg"
     bmp = "bmp"
-    png = "png"
-    svg = "svg"
+    docx = "docx"
     html = "html"
+    jpeg = "jpeg"
+    pdf = "pdf"
+    png = "png"
+    pptx = "pptx"
+    svg = "svg"
+    tiff = "tiff"
+    txt = "text"
 
 
 class TaskTypeEnum(str, Enum):

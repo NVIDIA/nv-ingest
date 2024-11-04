@@ -5,6 +5,7 @@
 
 import logging
 import typing
+import re
 from functools import wraps
 
 from morpheus.messages import ControlMessage
@@ -54,8 +55,8 @@ def filter_by_task(required_tasks, forward_func=None):
                         logger.debug(f"Required task properties: {required_task_props_list}")
                         for task_props in task_props_list:
                             if all(
-                                _is_subset(task_props, required_task_props)
-                                for required_task_props in required_task_props_list
+                                    _is_subset(task_props, required_task_props)
+                                    for required_task_props in required_task_props_list
                             ):
                                 return func(*args, **kwargs)
 
@@ -81,9 +82,16 @@ def _is_subset(superset, subset):
             key in superset and _is_subset(superset[key], val)
             for key, val in subset.items()
         )
+    if isinstance(subset, str) and subset.startswith('regex:'):
+        # The subset is a regex pattern
+        pattern = subset[len('regex:'):]
+        if isinstance(superset, list):
+            return any(re.match(pattern, str(sup_item)) for sup_item in superset)
+        else:
+            return re.match(pattern, str(superset)) is not None
     if isinstance(superset, list) and not isinstance(subset, list):
-        # Check if the subset value is in the list of the superset
-        return subset in superset
+        # Check if the subset value matches any item in the superset
+        return any(_is_subset(sup_item, subset) for sup_item in superset)
     if isinstance(superset, list) or isinstance(superset, set):
         return all(
             any(_is_subset(sup_item, sub_item) for sup_item in superset)
@@ -94,14 +102,14 @@ def _is_subset(superset, subset):
 
 def remove_task_subset(ctrl_msg: ControlMessage, task_type: typing.List, subset: typing.Dict):
     """
-    A helper function to extract a task based on subset matching when the task might be out of order wrt the
+    A helper function to extract a task based on subset matching when the task might be out of order with respect to the
     Morpheus pipeline. For example, if a deduplication filter occurs before scale filtering in the pipeline, but
     the task list includes scale filtering before deduplication.
 
     Parameters
     ----------
     ctrl_msg : ControlMessage
-        A list of task keys to check for in the ControlMessage.
+        The ControlMessage object containing tasks.
     task_type : list
         The name of the ControlMessage task to operate on.
     subset : dict

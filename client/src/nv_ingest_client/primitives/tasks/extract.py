@@ -45,6 +45,7 @@ _DEFAULT_EXTRACTOR_MAP = {
     "png": "image",
     "pptx": "python_pptx",
     "svg": "image",
+    "tiff": "image",
     "xml": "lxml",
 }
 
@@ -72,6 +73,7 @@ _Type_Extract_Method_Map = {
     "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
     "svg": get_args(_Type_Extract_Method_Image),
+    "tiff": get_args(_Type_Extract_Method_Image),
 }
 
 _Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]

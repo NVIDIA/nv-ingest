@@ -54,6 +54,10 @@ YOLOX_IOU_THRESHOLD = 0.5
 YOLOX_MIN_SCORE = 0.1
 YOLOX_FINAL_SCORE = 0.48
 
+RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
+PREPROC_FILE_FORMATS = ["svg"]
+
+SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
 
 def load_and_preprocess_image(image_stream: io.BytesIO) -> np.ndarray:
     """
@@ -339,7 +343,7 @@ def image_data_extractor(image_stream,
     image_stream : io.BytesIO
         A bytestream for the image file.
     document_type : str
-        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg').
+        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff').
     extract_text : bool
         Specifies whether to extract text.
     extract_images : bool
@@ -359,7 +363,7 @@ def image_data_extractor(image_stream,
     logger.debug(f"Extracting {document_type.upper()} image with image extractor.")
 
     # TODO(Devin): Remove once schema is updated to enforce supported types
-    if (document_type not in ["jpeg", "jpg", "png", "svg"]):
+    if (document_type not in SUPPORTED_FILE_TYPES):
         raise ValueError(f"Unsupported document type: {document_type}")
 
     row_data = kwargs.get("row_data")
@@ -389,11 +393,11 @@ def image_data_extractor(image_stream,
     logger.debug(f"Extract charts: {extract_charts}")
 
     # Preprocess based on image type
-    if document_type in {"jpeg", "jpg", "png"}:
-        logger.debug("Loading and preprocessing image.")
+    if (document_type in RAW_FILE_FORMATS):
+        logger.debug(f"Loading and preprocessing {document_type} image.")
         image_array = load_and_preprocess_image(image_stream)
-    elif document_type == "svg":
-        logger.debug("Converting SVG to bitmap.")
+    elif (document_type in PREPROC_FILE_FORMATS):
+        logger.debug(f"Converting {document_type} to bitmap.")
         image_array = convert_svg_to_bitmap(image_stream)
     else:
         raise ValueError(f"Unsupported document type: {document_type}")

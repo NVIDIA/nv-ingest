@@ -9,7 +9,7 @@ from io import StringIO
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import pdfium
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import pdfium_extractor
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 
 
@@ -38,8 +38,8 @@ def pdf_stream_embedded_tables_pdf():
 
 
 @pytest.mark.xfail(reason="PDFium conversion required")
-def test_pdfium_basic(pdf_stream_test_pdf, document_df):
-    extracted_data = pdfium(
+def test_pdfium_extractor_basic(pdf_stream_test_pdf, document_df):
+    extracted_data = pdfium_extractor(
         pdf_stream_test_pdf,
         extract_text=True,
         extract_images=False,
@@ -63,8 +63,8 @@ def test_pdfium_basic(pdf_stream_test_pdf, document_df):
     "text_depth",
     ["span", TextTypeEnum.SPAN, "line", TextTypeEnum.LINE, "block", TextTypeEnum.BLOCK],
 )
-def test_pdfium_text_depth_line(pdf_stream_test_pdf, document_df, text_depth):
-    extracted_data = pdfium(
+def test_pdfium_extractor_text_depth_line(pdf_stream_test_pdf, document_df, text_depth):
+    extracted_data = pdfium_extractor(
         pdf_stream_test_pdf,
         extract_text=True,
         extract_images=False,
@@ -89,8 +89,8 @@ def test_pdfium_text_depth_line(pdf_stream_test_pdf, document_df, text_depth):
     "text_depth",
     ["page", TextTypeEnum.PAGE, "document", TextTypeEnum.DOCUMENT],
 )
-def test_pdfium_text_depth_page(pdf_stream_test_pdf, document_df, text_depth):
-    extracted_data = pdfium(
+def test_pdfium_extractor_text_depth_page(pdf_stream_test_pdf, document_df, text_depth):
+    extracted_data = pdfium_extractor(
         pdf_stream_test_pdf,
         extract_text=True,
         extract_images=False,
@@ -111,8 +111,8 @@ def test_pdfium_text_depth_page(pdf_stream_test_pdf, document_df, text_depth):
 
 
 @pytest.mark.xfail(reason="PDFium conversion required")
-def test_pdfium_extract_image(pdf_stream_test_pdf, document_df):
-    extracted_data = pdfium(
+def test_pdfium_extractor_extract_image(pdf_stream_test_pdf, document_df):
+    extracted_data = pdfium_extractor(
         pdf_stream_test_pdf,
         extract_text=True,
         extract_images=True,
@@ -147,8 +147,8 @@ def read_markdown_table(table_str: str) -> pd.DataFrame:
 
 
 @pytest.mark.xfail(reason="PDFium conversion required")
-def test_pdfium_table_extraction_on_pdf_with_no_tables(pdf_stream_test_pdf, document_df):
-    extracted_data = pdfium(
+def test_pdfium_extractor_table_extraction_on_pdf_with_no_tables(pdf_stream_test_pdf, document_df):
+    extracted_data = pdfium_extractor(
         pdf_stream_test_pdf,
         extract_text=False,
         extract_images=False,
@@ -162,11 +162,11 @@ def test_pdfium_table_extraction_on_pdf_with_no_tables(pdf_stream_test_pdf, docu
 
 
 @pytest.mark.xfail(reason="PDFium conversion required")
-def test_pdfium_table_extraction_on_pdf_with_tables(pdf_stream_embedded_tables_pdf, document_df):
+def test_pdfium_extractor_table_extraction_on_pdf_with_tables(pdf_stream_embedded_tables_pdf, document_df):
     """
     Test to ensure pdfium's table extraction is able to extract easy-to-read tables from a PDF.
     """
-    extracted_data = pdfium(
+    extracted_data = pdfium_extractor(
         pdf_stream_embedded_tables_pdf,
         extract_text=False,
         extract_images=False,
