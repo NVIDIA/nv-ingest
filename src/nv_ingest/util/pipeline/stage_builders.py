@@ -351,11 +351,14 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         "",
     )
 
+    endpoint_url = os.environ.get("NVIDIA_BUILD_CAPTION_ENDPOINT",
+                                  "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions")
+
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
             "api_key": auth_token,
-            "endpoint_url": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
+            "endpoint_url": endpoint_url,
             "prompt": "Caption the content of this image:",
         },
     )

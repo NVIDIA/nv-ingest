@@ -229,10 +229,10 @@ def caption_extract_stage(df: pd.DataFrame,
     df_mask = df['metadata'].apply(lambda meta: meta.get('content_metadata', {}).get('type') == "image")
 
     if not df_mask.any():
-        logger.debug("No image content found for captioning")
         return df
 
     # Apply the _generate_captions function and update 'metadata.image_metadata.caption'
+    # TODO(Devin): Populate trace_info with the results of the captioning process
     df.loc[df_mask, 'metadata'] = df.loc[df_mask, 'metadata'].apply(
         lambda meta: {
             **meta,
