@@ -8,7 +8,6 @@ import base64
 import pandas as pd
 import pytest
 
-from nv_ingest.modules.filters.image_dedup import _apply_dedup_filter
 from nv_ingest.modules.filters.image_dedup import _cpu_only_apply_dedup_filter
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
@@ -19,6 +18,7 @@ from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
+    from nv_ingest.modules.filters.image_dedup import _apply_dedup_filter
     from morpheus.messages import ControlMessage
     from morpheus.messages import MessageMeta
 

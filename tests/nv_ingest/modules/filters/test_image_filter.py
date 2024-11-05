@@ -6,7 +6,6 @@
 import pandas as pd
 import pytest
 
-from nv_ingest.modules.filters.image_filter import _apply_filter
 from nv_ingest.modules.filters.image_filter import _cpu_only_apply_filter
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
@@ -18,6 +17,7 @@ from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
+    from nv_ingest.modules.filters.image_filter import _apply_filter
     from morpheus.messages import ControlMessage
     from morpheus.messages import MessageMeta
 
