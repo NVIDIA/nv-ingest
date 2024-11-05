@@ -1,0 +1,19 @@
+name: Test Self Hosted Runners
+on: push
+jobs:
+  job1_cpu:
+    runs-on: linux-amd64-cpu8
+    steps:
+      - name: hello
+        run: echo "hello"
+  job2_gpu:
+    runs-on: linux-amd64-gpu-a100-latest-1-testing
+    container: # GPU jobs must run in a container
+      image: nvidia/cuda:12.0.0-base-ubuntu22.04
+      env:
+        NVIDIA_VISIBLE_DEVICES: ${{ env.NVIDIA_VISIBLE_DEVICES }} # GPU jobs must set this container env variable
+    steps:
+      - name: hello
+        run: |
+          echo "hello"
+          nvidia-smi
