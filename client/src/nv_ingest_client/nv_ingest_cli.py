@@ -88,7 +88,7 @@ logger = logging.getLogger(__name__)
     help="Log level.",
 )
 @click.option("--save_images_separately", is_flag=True,
-              help="Save images separately from returned metadata. This can make metadatafiles more human readable")
+              help="Save images separately from returned metadata. This can make metadata files more human readable")
 @click.option(
     "--shuffle_dataset", is_flag=True, default=True, show_default=True,
     help="Shuffle the dataset before processing."
