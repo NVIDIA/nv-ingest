@@ -3,18 +3,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import pytest
+import pandas as pd
 from minio import Minio
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 
-from nv_ingest.modules.storages.image_storage import upload_images
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 
 from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    import pandas as pd
+    from morpheus.messages import ControlMessage
+    from morpheus.messages import MessageMeta
+    from nv_ingest.modules.storages.image_storage import upload_images
 
     import cudf
 
@@ -36,9 +36,9 @@ class MockMinioClient:
 @pytest.fixture
 def mock_minio(mocker):
     def mock_minio_init(
-        cls,
-        *args,
-        **kwargs,
+            cls,
+            *args,
+            **kwargs,
     ):
         return MockMinioClient(*args, **kwargs)
 
