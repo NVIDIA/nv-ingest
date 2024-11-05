@@ -425,7 +425,8 @@ def save_response_data(response, output_directory, images_to_disk=False):
                         image.save(image_output_path, format=image_ext.upper())
 
                         # Update the metadata content with the image path
-                        meta["content"] = os.path.realpath(image_output_path)
+                        meta["content"] = ""
+                        meta["content_url"] = os.path.realpath(image_output_path)
                         logger.debug(f"Saved image to {image_output_path}")
 
                     except Exception as e:
