@@ -87,8 +87,11 @@ logger = logging.getLogger(__name__)
     show_default=True,
     help="Log level.",
 )
+@click.option("--save_images_separately", is_flag=True,
+              help="Save images separately from returned metadata. This can make metadatafiles more human readable")
 @click.option(
-    "--shuffle_dataset", is_flag=True, default=True, show_default=True, help="Shuffle the dataset before processing."
+    "--shuffle_dataset", is_flag=True, default=True, show_default=True,
+    help="Shuffle the dataset before processing."
 )
 @click.option(
     "--task",
@@ -173,22 +176,23 @@ Note: The 'extract_method' automatically selects the optimal method based on 'do
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
-    ctx,
-    batch_size: int,
-    client_host: str,
-    client_kwargs: str,
-    client_port: int,
-    concurrency_n: int,
-    dataset: str,
-    doc: List[str],
-    document_processing_timeout: int,
-    dry_run: bool,
-    fail_on_error: bool,
-    log_level: str,
-    output_directory: str,
-    shuffle_dataset: bool,
-    task: [str],
-    version: [bool],
+        ctx,
+        batch_size: int,
+        client_host: str,
+        client_kwargs: str,
+        client_port: int,
+        concurrency_n: int,
+        dataset: str,
+        doc: List[str],
+        document_processing_timeout: int,
+        dry_run: bool,
+        fail_on_error: bool,
+        log_level: str,
+        output_directory: str,
+        save_images_separately: bool,
+        shuffle_dataset: bool,
+        task: [str],
+        version: [bool],
 ):
     if version:
         click.echo(f"nv-ingest     : {NV_INGEST_VERSION}")
@@ -241,6 +245,7 @@ def main(
                 batch_size=batch_size,
                 timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
+                save_images_separately=save_images_separately,
             )
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
