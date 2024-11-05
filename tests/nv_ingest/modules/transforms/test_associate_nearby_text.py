@@ -8,15 +8,15 @@ import json
 import pandas as pd
 import pytest
 
-from nv_ingest.modules.transforms.associate_nearby_text import _get_bbox
-from nv_ingest.modules.transforms.associate_nearby_text import _get_center
-from nv_ingest.modules.transforms.associate_nearby_text import _is_nearby_text
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 
 from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.modules.transforms.associate_nearby_text import _get_bbox
+    from nv_ingest.modules.transforms.associate_nearby_text import _get_center
+    from nv_ingest.modules.transforms.associate_nearby_text import _is_nearby_text
     from nv_ingest.modules.transforms.associate_nearby_text import _associate_nearby_text_blocks
 
 
