@@ -2,12 +2,18 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
+import io
+import json
 import logging
+import os
 import re
 import time
 import traceback
+
 from collections import defaultdict
 from concurrent.futures import as_completed
+from PIL import Image
 from statistics import mean
 from statistics import median
 from typing import Any
@@ -15,11 +21,6 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 from typing import Type
-import os
-import json
-import base64
-from PIL import Image
-import io
 
 from click import style
 from pydantic import BaseModel
