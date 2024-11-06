@@ -38,7 +38,7 @@ from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.nim.yolox import prepare_images_for_inference
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
@@ -432,7 +432,7 @@ def pdfium_extractor(
                             max_width=page_width, max_height=page_height
                         )
 
-                        extracted_image_data = construct_image_metadata(
+                        extracted_image_data = construct_image_metadata_from_pdf_image(
                             image_data,
                             page_idx,
                             pdf_metadata.page_count,

@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import json
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
@@ -40,7 +41,8 @@ from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import perform_model_inference
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
+from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent, construct_image_metadata_from_pdf_image, \
+    construct_image_metadata_from_base64
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
@@ -402,23 +404,6 @@ def image_data_extractor(image_stream,
     else:
         raise ValueError(f"Unsupported document type: {document_type}")
 
-    image_array_uint8 = image_array.astype(np.uint8)
-
-    # Specify the file paths
-    output_path_png = '/workspace/image_array_start.png'
-    output_path_jpeg = '/workspace/image_array_start.jpeg'
-
-    # Convert from RGB to BGR as OpenCV expects images in BGR format
-    image_array_bgr = cv2.cvtColor(image_array_uint8, cv2.COLOR_RGB2BGR)
-
-    # Write the image as PNG
-    cv2.imwrite(output_path_png, image_array_bgr)
-    print(f"Image saved as PNG at {output_path_png}")
-
-    # Write the image as JPEG
-    cv2.imwrite(output_path_jpeg, image_array_bgr, [int(cv2.IMWRITE_JPEG_QUALITY), 95])
-    print(f"Image saved as JPEG at {output_path_jpeg}")
-
     # Text extraction stub
     if extract_text:
         # Future function for text extraction based on document_type
@@ -427,9 +412,16 @@ def image_data_extractor(image_stream,
     # Image extraction stub
     if extract_images:
         # Placeholder for image-specific extraction process
-        logger.warning("Image extraction is not supported for raw images.")
+        extracted_data.append(
+            construct_image_metadata_from_base64(
+                numpy_to_base64(image_array),
+                page_idx=0,  # Single image treated as one page
+                page_count=1,
+                source_metadata=source_metadata,
+                base_unified_metadata=base_unified_metadata,
+            )
+        )
 
-    logger.debug(json.dumps(kwargs, indent=2, default=str))
     # Table and chart extraction
     if extract_tables or extract_charts:
         try:
