@@ -6,31 +6,28 @@
 import asyncio
 import logging
 import traceback
-from typing import Iterable
-from typing import List
-
-import mrc
-import pandas as pd
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
-from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
-from morpheus.utils.module_utils import ModuleLoaderFactory
-from morpheus.utils.module_utils import register_module
-from mrc.core import operators as ops
-from openai import AsyncOpenAI
+from typing import Iterable, List
 
 import cudf
-
+import mrc
+import pandas as pd
+from morpheus.messages import ControlMessage, MessageMeta
+from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
+from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
+from mrc.core import operators as ops
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import InfoMessageMetadataSchema
-from nv_ingest.schemas.metadata_schema import StatusEnum
-from nv_ingest.schemas.metadata_schema import TaskTypeEnum
+from nv_ingest.schemas.metadata_schema import (
+    ContentTypeEnum,
+    InfoMessageMetadataSchema,
+    StatusEnum,
+    TaskTypeEnum,
+)
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.tracing import traceable
+from openai import AsyncOpenAI
 
 logger = logging.getLogger(__name__)
 
@@ -469,7 +466,6 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
     """
 
     with ctrl_msg.payload().mutable_dataframe() as mdf:
-
         # build unified mask
         unified_mask = cudf.Series(False, index=mdf.index)
         for mask in masks:

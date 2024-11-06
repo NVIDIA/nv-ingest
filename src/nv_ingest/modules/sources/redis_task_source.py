@@ -3,34 +3,33 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import copy
+import json
 import logging
 import time
 import traceback
 from datetime import datetime
 from functools import partial
 from typing import Dict
-import copy, json
 
 import cudf
 import mrc
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
-from morpheus.utils.module_utils import ModuleLoaderFactory
-from morpheus.utils.module_utils import register_module
-from opentelemetry.trace.span import format_trace_id
-from redis.exceptions import RedisError
-
+from morpheus.messages import ControlMessage, MessageMeta
+from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.redis_task_source_schema import RedisTaskSourceSchema
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import annotate_cm
+from opentelemetry.trace.span import format_trace_id
+from redis.exceptions import RedisError
 
 logger = logging.getLogger(__name__)
 
 MODULE_NAME = "redis_task_source"
 MODULE_NAMESPACE = "nv_ingest"
 RedisTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
+
 
 def fetch_and_process_messages(redis_client: RedisClient, validated_config: RedisTaskSourceSchema):
     """Fetch messages from the Redis list and process them."""

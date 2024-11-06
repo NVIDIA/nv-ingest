@@ -10,17 +10,11 @@ import time
 import traceback
 from collections import defaultdict
 from concurrent.futures import as_completed
-from statistics import mean
-from statistics import median
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Tuple
-from typing import Type
+from statistics import mean, median
+from typing import Any, Dict, List, Tuple, Type
 
 from click import style
-from pydantic import BaseModel
-from pydantic import ValidationError
+from pydantic import BaseModel, ValidationError
 from tqdm import tqdm
 
 from nv_ingest_client.client import NvIngestClient
@@ -129,9 +123,7 @@ def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_
         raise ValueError(error_message) from e
 
 
-def report_stage_statistics(
-        stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float
-) -> None:
+def report_stage_statistics(stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float) -> None:
     """
     Reports the statistics for each processing stage, including average, median, total time spent,
     and their respective percentages of the total processing time.

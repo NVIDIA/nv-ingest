@@ -3,14 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import Mock, patch
 
 import pytest
-from redis import RedisError
-
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
-
+from redis import RedisError
 
 MODULE_UNDER_TEST = "nv_ingest.util.message_brokers.redis.redis_client"
 
@@ -157,4 +154,3 @@ def test_submit_message_exceeds_max_retries(mock_logger_error, mock_time_sleep, 
 
     # Assert that rpush was called 2 times: initial attempt + 1 retry (max_retries=1 in the fixture)
     assert mock_redis.rpush.call_count == 1
-

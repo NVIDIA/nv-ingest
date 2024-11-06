@@ -4,11 +4,9 @@
 
 
 import pytest
-from pydantic import ValidationError
-
 from nv_ingest.schemas import validate_ingest_job
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
-from nv_ingest.schemas.ingest_job_schema import TaskTypeEnum
+from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum, TaskTypeEnum
+from pydantic import ValidationError
 
 
 # Helper Functions
@@ -204,16 +202,16 @@ def test_multiple_task_types():
             },
             {
                 "type": "table_data_extract",
-                "task_properties":{
+                "task_properties": {
                     "params": {},
-                }
+                },
             },
             {
                 "type": "chart_data_extract",
-                "task_properties":{
+                "task_properties": {
                     "params": {},
-                }
-            }
+                },
+            },
         ],
     }
 

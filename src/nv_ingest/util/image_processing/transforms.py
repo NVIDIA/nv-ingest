@@ -4,16 +4,12 @@
 
 import base64
 from io import BytesIO
-from math import ceil
-from math import floor
-from typing import Optional
-from typing import Tuple
+from math import ceil, floor
+from typing import Optional, Tuple
 
 import numpy as np
-from PIL import Image
-from PIL import UnidentifiedImageError
-
 from nv_ingest.util.converters import bytetools
+from PIL import Image, UnidentifiedImageError
 
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
@@ -79,6 +75,7 @@ def pad_image(
 
     return canvas, (pad_width, pad_height)
 
+
 def check_numpy_image_size(image: np.ndarray, min_height: int, min_width: int) -> bool:
     """
     Checks if the height and width of the image are larger than the specified minimum values.
@@ -97,6 +94,7 @@ def check_numpy_image_size(image: np.ndarray, min_height: int, min_width: int) -
 
     height, width = image.shape[:2]
     return height >= min_height and width >= min_width
+
 
 def crop_image(
     array: np.array, bbox: Tuple[int, int, int, int], min_width: int = 1, min_height: int = 1

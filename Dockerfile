@@ -91,7 +91,7 @@ SHELL ["/bin/bash", "-c"]
 
 # Cache the requirements and install them before uploading source code changes
 RUN source activate nv_ingest \
-    && poetry install --with dev
+    && poetry install --with dev,extra
 
 COPY tests tests
 COPY data data
@@ -103,18 +103,6 @@ RUN rm -rf ./src/nv_ingest/dist ./client/dist
 RUN source activate nv_ingest \
     && cd client \
     && poetry install --with dev
-
-# RUN source activate nv_ingest \
-#     && pip install ./client/dist/*.whl \
-#     ## Installations below can be removed after the next Morpheus release
-#     && pip install --no-input milvus==2.3.5 \
-#     && pip install --no-input pymilvus==2.3.6 \
-#     && pip install --no-input langchain==0.1.16 \
-#     && pip install --no-input langchain-nvidia-ai-endpoints==0.0.11 \
-#     && pip install --no-input faiss-gpu==1.7.* \
-#     && pip install --no-input google-search-results==2.4 \
-#     && pip install --no-input nemollm==0.3.5 \
-#     && rm -rf client/dist
 
 # Install patched MRC version to circumvent NUMA node issue -- remove after Morpheus 10.24 release
 RUN source activate nv_ingest \

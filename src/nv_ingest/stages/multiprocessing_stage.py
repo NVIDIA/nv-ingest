@@ -17,8 +17,7 @@ import cudf
 import mrc
 import pandas as pd
 from morpheus.config import Config
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
+from morpheus.messages import ControlMessage, MessageMeta
 from morpheus.pipeline.single_port_stage import SinglePortStage
 from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
@@ -252,7 +251,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                     if extra_results:
                         for extra_result in extra_results:
                             if isinstance(extra_result, dict) and ("trace_info" in extra_result):
-                               work_package["trace_info"] = extra_result["trace_info"]
+                                work_package["trace_info"] = extra_result["trace_info"]
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:

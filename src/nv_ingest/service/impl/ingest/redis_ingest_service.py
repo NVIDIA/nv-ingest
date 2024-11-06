@@ -15,12 +15,11 @@ import uuid
 from json import JSONDecodeError
 from typing import Any
 
-from redis import RedisError
-
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+from redis import RedisError
 
 logger = logging.getLogger("uvicorn")
 
@@ -50,8 +49,9 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
 
-        self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
-                                          max_pool_size=self._concurrency_level)
+        self._ingest_client = RedisClient(
+            host=self._redis_hostname, port=self._redis_port, max_pool_size=self._concurrency_level
+        )
 
     async def submit_job(self, job_spec: MessageWrapper) -> str:
         try:

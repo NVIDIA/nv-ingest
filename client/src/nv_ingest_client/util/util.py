@@ -9,21 +9,21 @@ import time
 import traceback
 import typing
 from io import BytesIO
-from typing import Dict
-from typing import List
+from typing import Dict, List
 
 import pypdfium2 as pdfium
 from docx import Document as DocxDocument
-from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
-from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
-from nv_ingest_client.util.file_processing.extract import extract_file_content
-from nv_ingest_client.util.file_processing.extract import get_or_infer_file_type
 from pptx import Presentation
 
+from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest_client.util.file_processing.extract import (
+    DocumentTypeEnum,
+    detect_encoding_and_read_text_file,
+    extract_file_content,
+    get_or_infer_file_type,
+)
 
 logger = logging.getLogger(__name__)
-
 
 
 # pylint: disable=invalid-name
