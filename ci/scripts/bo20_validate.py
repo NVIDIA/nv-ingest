@@ -12,6 +12,7 @@ def cosine_sim(text1, text2):
   return similarity[0][1]
 
 def bo20_validate(extract_fn, chart_validation_fn, table_validation_fn, dump_dir):
+  print(f"Validating bo20 extracts from {extract_fn}")
   extract_results = json.loads(open(extract_fn).read())
 
   chart_df = pd.read_csv(chart_validation_fn)
@@ -71,7 +72,7 @@ def bo20_validate(extract_fn, chart_validation_fn, table_validation_fn, dump_dir
     chart_no_matches = []
     for chart in bo20_charts:
       page_num = chart["page"]
-      bo20_content = chart["info_deplot"]
+      bo20_content = chart["input"]
       try:
         possible_matches = [x for x in table_extracts if x["page_num"] == page_num]
         similarities = [cosine_sim(bo20_content, poss_match["ingest_content"]) for poss_match in possible_matches]
