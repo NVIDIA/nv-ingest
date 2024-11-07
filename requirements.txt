@@ -1,5 +1,4 @@
 aiohttp==3.9.4
-cairosvg==2.7.1
 charset-normalizer
 click
 opencv-python
@@ -36,3 +35,4 @@ tabulate
 torchvision==0.18.0
 unstructured-client==0.23.3
 uvicorn==0.24.0-post.1
+Wand==0.6.13

@@ -311,6 +311,7 @@ class InfoMessageMetadataSchema(BaseModelNoExt):
 # Main metadata schema
 class MetadataSchema(BaseModelNoExt):
     content: str = ""
+    content_url: str = ""
     embedding: Optional[List[float]] = None
     source_metadata: Optional[SourceMetadataSchema] = None
     content_metadata: Optional[ContentMetadataSchema] = None

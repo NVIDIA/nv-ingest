@@ -27,7 +27,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import cv2
+from wand.image import Image as WandImage
 from PIL import Image
 import io
 
@@ -60,6 +60,7 @@ RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
 PREPROC_FILE_FORMATS = ["svg"]
 
 SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
+
 
 def load_and_preprocess_image(image_stream: io.BytesIO) -> np.ndarray:
     """
@@ -98,17 +99,16 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     np.ndarray
         Preprocessed image as a numpy array in bitmap format.
     """
-    # Convert SVG to PNG byte stream using cairosvg
-    png_data = cairosvg.svg2png(bytestring=image_stream.read())
+    # Convert SVG to PNG using Wand (ImageMagick)
+    with WandImage(blob=image_stream.read(), format="svg") as img:
+        img.format = "png"
+        png_data = img.make_blob()
 
     # Reload the PNG as a PIL Image
     processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
 
     # Convert image to numpy array and normalize pixel values
     image_array = np.asarray(processed_image, dtype=np.float32)
-
-    # Expand dimensions if required by the model
-    # image_array = np.expand_dims(image_array, axis=0)
 
     return image_array
 
@@ -186,56 +186,68 @@ def process_inference_results(
     return inference_results
 
 
-# TODO(Devin): Move to common file
 def extract_table_and_chart_images(
-        annotation_dict,
-        original_image,
-        page_idx,
-        tables_and_charts,
-):
+        annotation_dict: Dict[str, List[List[float]]],
+        original_image: np.ndarray,
+        page_idx: int,
+        tables_and_charts: List[Tuple[int, "CroppedImageWithContent"]],
+) -> None:
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
 
     Parameters
     ----------
-    annotation_dict : dict
-        A dictionary containing detected objects and their bounding boxes.
+    annotation_dict : dict of {str : list of list of float}
+        A dictionary containing detected objects and their bounding boxes. Keys should include "table" and "chart",
+        and each key's value should be a list of bounding boxes, with each bounding box represented as a list of floats.
     original_image : np.ndarray
-        The original image from which objects were detected.
+        The original image from which objects were detected, expected to be in RGB format with shape (H, W, 3).
     page_idx : int
         The index of the current page being processed.
-    tables_and_charts : List[Tuple[int, ImageTable]]
-        A list to which extracted tables and charts will be appended.
+    tables_and_charts : list of tuple of (int, CroppedImageWithContent)
+        A list to which extracted tables and charts will be appended. Each item in the list is a tuple where the first
+        element is the page index, and the second is an instance of CroppedImageWithContent representing a cropped image
+        and associated metadata.
+
+    Returns
+    -------
+    None
 
     Notes
     -----
-    This function iterates over detected objects, crops the original image to the bounding boxes,
-    and runs additional inference on the cropped images to extract detailed information about tables
-    and charts.
+    This function iterates over detected objects labeled as "table" or "chart". For each object, it crops the original
+    image according to the bounding box coordinates, then creates an instance of `CroppedImageWithContent` containing
+    the cropped image and metadata, and appends it to `tables_and_charts`.
 
     Examples
     --------
-    >>> annotation_dict = {"table": [], "chart": []}
+    >>> annotation_dict = {"table": [[0.1, 0.1, 0.5, 0.5, 0.8]], "chart": [[0.6, 0.6, 0.9, 0.9, 0.9]]}
     >>> original_image = np.random.rand(1536, 1536, 3)
     >>> tables_and_charts = []
     >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    >>> len(tables_and_charts)
+    2
     """
 
     width, height, *_ = original_image.shape
     for label in ["table", "chart"]:
-        if not annotation_dict:
+        if not annotation_dict or label not in annotation_dict:
             continue
 
         objects = annotation_dict[label]
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
+            h1, w1, h2, w2 = np.array(bbox) * np.array([height, width, height, width])
 
-            base64_img = crop_image(original_image, (h1, w1, h2, w2))
+            base64_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
 
             table_data = CroppedImageWithContent(
-                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
-                max_height=height, type_string=label
+                content="",
+                image=base64_img,
+                bbox=(int(w1), int(h1), int(w2), int(h2)),
+                max_width=width,
+                max_height=height,
+                type_string=label,
             )
             tables_and_charts.append((page_idx, table_data))
 
@@ -285,27 +297,17 @@ def extract_tables_and_charts_from_image(
 
     yolox_client = None
     try:
-        logger.debug("Initializing YOLOX inference client.")
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
 
-        logger.debug("Preparing image for inference.")
         input_image = yolox_utils.prepare_images_for_inference([image])
         image_shape = image.shape
-        logger.debug(f"Image shape for inference: {image_shape}")
 
-        logger.debug("Performing model inference.")
         output_array = perform_model_inference(yolox_client, "yolox", input_image, trace_info=trace_info)
-        logger.debug("Model inference completed.")
 
-        logger.debug("Processing inference results.")
-        logger.debug(f"Output array: {output_array}")
         yolox_annotated_detections = process_inference_results(
             output_array, [image_shape], num_classes, conf_thresh, iou_thresh, min_score, final_thresh
         )
-        logger.debug(f"Number of detections: {len(yolox_annotated_detections)}")
-        logger.debug(f"Actual detections: {yolox_annotated_detections}")
 
-        logger.debug("Extracting tables and charts from detected regions.")
         for annotation_dict in yolox_annotated_detections:
             extract_table_and_chart_images(
                 annotation_dict,
@@ -313,7 +315,6 @@ def extract_tables_and_charts_from_image(
                 page_idx=0,  # Single image treated as one page
                 tables_and_charts=tables_and_charts,
             )
-        logger.debug("Table and chart extraction completed.")
 
     except Exception as e:
         logger.error(f"Error during table/chart extraction from image: {str(e)}")
@@ -364,7 +365,6 @@ def image_data_extractor(image_stream,
     """
     logger.debug(f"Extracting {document_type.upper()} image with image extractor.")
 
-    # TODO(Devin): Remove once schema is updated to enforce supported types
     if (document_type not in SUPPORTED_FILE_TYPES):
         raise ValueError(f"Unsupported document type: {document_type}")
 

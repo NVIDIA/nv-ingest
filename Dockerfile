@@ -50,6 +50,7 @@ RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
+     imagemagick \
      -c rapidsai -c pytorch -c nvidia -c conda-forge
 
 # Install additional dependencies using apt-get
