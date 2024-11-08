@@ -94,8 +94,8 @@ _Type_Extract_Tables_Method_Map = {
 class ExtractTaskSchema(BaseModel):
     document_type: str
     extract_method: str = None  # Initially allow None to set a smart default
-    extract_text: bool = (True,)
-    extract_images: bool = (True,)
+    extract_text: bool = True
+    extract_images: bool = True
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
