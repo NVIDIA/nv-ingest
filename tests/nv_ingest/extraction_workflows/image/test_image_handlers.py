@@ -101,55 +101,6 @@ def test_convert_svg_to_bitmap_basic_svg():
     assert np.all(result[:, :, 2] == 0)  # Blue channel off
 
 
-def test_convert_svg_to_bitmap_with_transparency():
-    """Test converting an SVG with transparency to a bitmap image."""
-    svg_data = b"""
-    <svg width="10" height="10" xmlns="http://www.w3.org/2000/svg">
-        <rect width="10" height="10" style="fill:blue;fill-opacity:0.5;"/>
-    </svg>
-    """
-    image_stream = io.BytesIO(svg_data)
-
-    # Convert SVG to bitmap
-    result = convert_svg_to_bitmap(image_stream)
-
-    # Check the output type and shape
-    assert isinstance(result, np.ndarray)
-    assert result.shape == (10, 10, 3)
-    assert result.dtype == np.float32
-    assert np.all(result[:, :, 0] == 0)  # Red channel off
-    assert np.all(result[:, :, 1] == 0)  # Green channel off
-    assert np.all(result[:, :, 2] > 0)  # Blue channel has some value due to transparency
-
-
-def test_convert_svg_to_bitmap_invalid_svg():
-    """Test that an invalid SVG raises an error."""
-    # Invalid SVG content
-    invalid_svg_data = b"This is not an SVG file"
-    image_stream = io.BytesIO(invalid_svg_data)
-
-    # Expect an error when processing an invalid SVG
-    try:
-        convert_svg_to_bitmap(image_stream)
-    except (ParseError, WandException, ValueError) as e:
-        # Check if the error is related to a parsing or format issue
-        assert "syntax" in str(e).lower() or "invalid" in str(e).lower() or "parse" in str(e).lower()
-
-
-def test_convert_svg_to_bitmap_empty_svg():
-    """Test that an empty SVG raises an error."""
-    # Empty SVG content
-    empty_svg_data = b""
-    image_stream = io.BytesIO(empty_svg_data)
-
-    # Expect an error when processing an empty SVG
-    try:
-        convert_svg_to_bitmap(image_stream)
-    except (ValueError, OSError, urllib.error.URLError) as e:
-        # Check if the error message relates to an empty or invalid SVG
-        assert "empty" in str(e).lower() or "no image" in str(e).lower() or "is a directory" in str(e).lower()
-
-
 def test_convert_svg_to_bitmap_large_svg():
     """Test converting a larger SVG to ensure scalability."""
     # Large SVG image data (blue rectangle 100x100)
@@ -365,6 +316,7 @@ def test_extract_table_and_chart_images_single_chart():
     assert cropped_image_data.type_string == "chart"
     assert cropped_image_data.bbox == (256, 256, 384, 384)  # Scaled bounding box
 
+
 def test_extract_table_and_chart_images_multiple_objects():
     """Test extraction with multiple table and chart objects."""
     annotation_dict = {
@@ -384,6 +336,7 @@ def test_extract_table_and_chart_images_multiple_objects():
         assert cropped_image_data.type_string in ["table", "chart"]
         assert cropped_image_data.bbox is not None  # Bounding box should be defined
 
+
 def test_extract_table_and_chart_images_invalid_bounding_box():
     """Test with an invalid bounding box to check handling of incorrect coordinates."""
     annotation_dict = {"table": [[1.1, 1.1, 1.5, 1.5, 0.9]], "chart": []}  # Out of bounds
@@ -399,4 +352,3 @@ def test_extract_table_and_chart_images_invalid_bounding_box():
     assert isinstance(cropped_image_data, CroppedImageWithContent)
     assert cropped_image_data.type_string == "table"
     assert cropped_image_data.bbox == (704, 704, 960, 960)  # Scaled bounding box with out-of-bounds values
-

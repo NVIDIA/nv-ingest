@@ -21,7 +21,7 @@ import logging
 import traceback
 from datetime import datetime
 
-from typing import List
+from typing import List, Dict
 from typing import Optional
 from typing import Tuple
 
