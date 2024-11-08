@@ -21,8 +21,6 @@ import logging
 import traceback
 from datetime import datetime
 
-import cairosvg
-
 from typing import List
 from typing import Optional
 from typing import Tuple

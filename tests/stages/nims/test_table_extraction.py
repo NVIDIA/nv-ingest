@@ -155,14 +155,14 @@ def test_update_metadata_missing_metadata():
     paddle_client = DummyPaddleClient()
     trace_info = {}
     with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _update_metadata(row, paddle_client, trace_info)
+        _update_metadata(row, paddle_client, "0.1.0", trace_info)
 
 
 def test_update_metadata_non_table_content(dataframe_non_table):
     row = dataframe_non_table.iloc[0]
     paddle_client = DummyPaddleClient()
     trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
+    result = _update_metadata(row, paddle_client, "0.1.0", trace_info)
     # The metadata should remain unchanged
     assert result == row["metadata"]
 
@@ -182,7 +182,7 @@ def test_update_metadata_image_too_small(base64_encoded_small_image):
     })
     paddle_client = DummyPaddleClient()
     trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
+    result = _update_metadata(row, paddle_client, "0.1.1", trace_info)
     # Since the image is too small, table_content should remain unchanged
     assert result["table_metadata"]["table_content"] == ""
 
@@ -192,7 +192,7 @@ def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_
 
     row = sample_dataframe.iloc[0]
     trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
+    result = _update_metadata(row, paddle_client, "0.2.0", trace_info)
 
     # Expected content from the mocked response
     expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
@@ -214,7 +214,7 @@ def test_update_metadata_inference_failure(sample_dataframe, mock_paddle_client_
     trace_info = {}
 
     with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
-        _update_metadata(row, paddle_client, trace_info)
+        _update_metadata(row, paddle_client, "0.2.0", trace_info)
 
     # Verify that requests.post was called and raised an exception
     mock_requests_post.assert_called_once()
@@ -231,7 +231,8 @@ def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_
 
     trace_info = {}
 
-    updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
+    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.3.3"):
+        updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
     # Expected content from the mocked response
     expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
@@ -256,8 +257,9 @@ def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_pa
 
     trace_info = {}
 
-    with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
+    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.2.1"):
+        with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
+            _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
 
     # Verify that the mocked methods were called
     mock_create_client.assert_called_once()
@@ -275,8 +277,9 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
 
     trace_info = {}
 
-    with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
-        _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
+    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"):
+        with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
+            _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
     # Verify that create_inference_client was called
     mock_create_client.assert_called_once()
@@ -332,6 +335,7 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     }
 
     with patch(f'{MODULE_UNDER_TEST}.create_inference_client', side_effect=mock_create_inference_client), \
+            patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"), \
             patch('requests.post', return_value=mock_response):
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
