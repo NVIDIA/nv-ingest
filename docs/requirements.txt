@@ -1,0 +1,10 @@
+mkdocs-material
+mkdocs-macros-plugin
+mkdocs-minify-plugin
+mkdocstrings[python]
+mkdocs-gen-files
+pymdown-extensions
+mkdocs-jupyter
+mkdocs-include-dir-to-nav
+mkdocs-literate-nav
+mkdocs-site-urls
