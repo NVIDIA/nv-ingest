@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
+ARG BASE_IMG_TAG=12.4.1-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
