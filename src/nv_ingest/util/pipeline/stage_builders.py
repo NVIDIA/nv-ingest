@@ -3,16 +3,15 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import logging
 import math
 import os
-import logging
 import typing
 
 import click
 from morpheus.messages import ControlMessage
 from morpheus.stages.general.linear_modules_source import LinearModuleSourceStage
 from morpheus.stages.general.linear_modules_stage import LinearModulesStage
-
 from nv_ingest.modules.injectors.metadata_injector import MetadataInjectorLoaderFactory
 from nv_ingest.modules.sinks.redis_task_sink import RedisTaskSinkLoaderFactory
 from nv_ingest.modules.sinks.vdb_task_sink import VDBTaskSinkLoaderFactory
@@ -23,8 +22,7 @@ from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFac
 from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
-from nv_ingest.stages.filters import generate_dedup_stage
-from nv_ingest.stages.filters import generate_image_filter_stage
+from nv_ingest.stages.filters import generate_dedup_stage, generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
@@ -196,21 +194,19 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     _, _, yolox_auth, _ = get_table_detection_service("yolox")
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
-    table_content_extractor_config = ingest_config.get("table_content_extraction_module",
-                                                       {
-                                                           "stage_config": {
-                                                               "paddle_endpoints": (paddle_grpc, paddle_http),
-                                                               "paddle_infer_protocol": paddle_protocol,
-                                                               "auth_token": yolox_auth,
-                                                           }
-                                                       })
+    table_content_extractor_config = ingest_config.get(
+        "table_content_extraction_module",
+        {
+            "stage_config": {
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": yolox_auth,
+            }
+        },
+    )
 
     table_extractor_stage = pipe.add_stage(
-        generate_table_extractor_stage(
-            morpheus_pipeline_config,
-            table_content_extractor_config,
-            pe_count=5
-        )
+        generate_table_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
     )
 
     return table_extractor_stage
@@ -223,25 +219,23 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
     # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
-    table_content_extractor_config = ingest_config.get("table_content_extraction_module",
-                                                       {
-                                                           "stage_config": {
-                                                               "cached_endpoints": (cached_grpc, cached_http),
-                                                               "cached_infer_protocol": cached_protocol,
-                                                               "deplot_endpoints": (deplot_grpc, deplot_http),
-                                                               "deplot_infer_protocol": deplot_protocol,
-                                                               "paddle_endpoints": (paddle_grpc, paddle_http),
-                                                               "paddle_infer_protocol": paddle_protocol,
-                                                               "auth_token": yolox_auth,
-                                                           }
-                                                       })
+    table_content_extractor_config = ingest_config.get(
+        "table_content_extraction_module",
+        {
+            "stage_config": {
+                "cached_endpoints": (cached_grpc, cached_http),
+                "cached_infer_protocol": cached_protocol,
+                "deplot_endpoints": (deplot_grpc, deplot_http),
+                "deplot_infer_protocol": deplot_protocol,
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": yolox_auth,
+            }
+        },
+    )
 
     table_extractor_stage = pipe.add_stage(
-        generate_chart_extractor_stage(
-            morpheus_pipeline_config,
-            table_content_extractor_config,
-            pe_count=5
-        )
+        generate_chart_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
     )
 
     return table_extractor_stage

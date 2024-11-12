@@ -2,22 +2,26 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
-import numpy as np
-from PIL import Image
 import base64
 from io import BytesIO
 from unittest import mock
 
-from nv_ingest.util.image_processing.transforms import numpy_to_base64, base64_to_numpy, check_numpy_image_size
+import numpy as np
+import pytest
+from nv_ingest.util.image_processing.transforms import (
+    base64_to_numpy,
+    check_numpy_image_size,
+    numpy_to_base64,
+)
+from PIL import Image
 
 
 # Helper function to create a base64-encoded string from an image
 def create_base64_image(width, height, color="white"):
-    img = Image.new('RGB', (width, height), color=color)
+    img = Image.new("RGB", (width, height), color=color)
     buffered = BytesIO()
     img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
 # Fixture for a valid base64-encoded image string
@@ -35,7 +39,7 @@ def corrupted_base64_image():
 # Fixture for a base64 string that decodes but is not a valid image
 @pytest.fixture
 def non_image_base64():
-    return base64.b64encode(b"This is not an image").decode('utf-8')
+    return base64.b64encode(b"This is not an image").decode("utf-8")
 
 
 def test_numpy_to_base64_valid_rgba_image():

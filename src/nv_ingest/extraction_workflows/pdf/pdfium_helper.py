@@ -18,33 +18,30 @@
 
 import logging
 import traceback
-
 from math import log
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
 import tritonclient.grpc as grpcclient
-
 from nv_ingest.extraction_workflows.pdf import yolox_utils
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
+from nv_ingest.schemas.metadata_schema import AccessLevelEnum, TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.image_processing.transforms import crop_image
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
-from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
+from nv_ingest.util.image_processing.transforms import crop_image, numpy_to_base64
+from nv_ingest.util.nim.helpers import create_inference_client, perform_model_inference
+from nv_ingest.util.pdf.metadata_aggregators import (
+    Base64Image,
+    CroppedImageWithContent,
+    construct_image_metadata,
+    construct_table_and_chart_metadata,
+    construct_text_metadata,
+    extract_pdf_metadata,
+)
+from nv_ingest.util.pdf.pdfium import (
+    PDFIUM_PAGEOBJ_MAPPING,
+    pdfium_pages_to_numpy,
+    pdfium_try_get_bitmap_as_numpy,
+)
 
 YOLOX_MAX_BATCH_SIZE = 8
 YOLOX_MAX_WIDTH = 1536
@@ -59,15 +56,15 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-        pages: List[libpdfium.PdfPage],
-        config: PDFiumConfigSchema,
-        max_batch_size: int = YOLOX_MAX_BATCH_SIZE,
-        num_classes: int = YOLOX_NUM_CLASSES,
-        conf_thresh: float = YOLOX_CONF_THRESHOLD,
-        iou_thresh: float = YOLOX_IOU_THRESHOLD,
-        min_score: float = YOLOX_MIN_SCORE,
-        final_thresh: float = YOLOX_FINAL_SCORE,
-        trace_info: Optional[List] = None,
+    pages: List[libpdfium.PdfPage],
+    config: PDFiumConfigSchema,
+    max_batch_size: int = YOLOX_MAX_BATCH_SIZE,
+    num_classes: int = YOLOX_NUM_CLASSES,
+    conf_thresh: float = YOLOX_CONF_THRESHOLD,
+    iou_thresh: float = YOLOX_IOU_THRESHOLD,
+    min_score: float = YOLOX_MIN_SCORE,
+    final_thresh: float = YOLOX_FINAL_SCORE,
+    trace_info: Optional[List] = None,
 ) -> List[Tuple[int, CroppedImageWithContent]]:
     """
     Extract tables and charts from a series of document pages using an ensemble of image-based models.
@@ -136,7 +133,7 @@ def extract_tables_and_charts_using_image_ensemble(
         i = 0
         while i < len(pages):
             batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
-            batches.append(pages[i: i + batch_size])  # noqa: E203
+            batches.append(pages[i : i + batch_size])  # noqa: E203
             i += batch_size
 
         page_index = 0
@@ -211,13 +208,13 @@ def prepare_images_for_inference(images: List[np.ndarray]) -> np.ndarray:
 
 
 def process_inference_results(
-        output_array: np.ndarray,
-        original_image_shapes: List[Tuple[int, int]],
-        num_classes: int,
-        conf_thresh: float,
-        iou_thresh: float,
-        min_score: float,
-        final_thresh: float,
+    output_array: np.ndarray,
+    original_image_shapes: List[Tuple[int, int]],
+    num_classes: int,
+    conf_thresh: float,
+    iou_thresh: float,
+    min_score: float,
+    final_thresh: float,
 ):
     """
     Process the model output to generate detection results and expand bounding boxes.
@@ -282,10 +279,10 @@ def process_inference_results(
 
 # Handle individual table/chart extraction and model inference
 def extract_table_and_chart_images(
-        annotation_dict,
-        original_image,
-        page_idx,
-        tables_and_charts,
+    annotation_dict,
+    original_image,
+    page_idx,
+    tables_and_charts,
 ):
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -329,8 +326,12 @@ def extract_table_and_chart_images(
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
-                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
-                max_height=height, type_string=label
+                content="",
+                image=base64_img,
+                bbox=(w1, h1, w2, h2),
+                max_width=width,
+                max_height=height,
+                type_string=label,
             )
             tables_and_charts.append((page_idx, table_data))
 
@@ -338,13 +339,13 @@ def extract_table_and_chart_images(
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestream PDF
 def pdfium(
-        pdf_stream,
-        extract_text: bool,
-        extract_images: bool,
-        extract_tables: bool,
-        extract_charts: bool,
-        trace_info=None,
-        **kwargs,
+    pdf_stream,
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    trace_info=None,
+    **kwargs,
 ):
     """
     Helper function to use pdfium to extract text from a bytestream PDF.
@@ -453,13 +454,17 @@ def pdfium(
                 if obj_type == "IMAGE":
                     try:
                         # Attempt to retrieve the image bitmap
-                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj) # noqa
+                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
                         image_base64: str = numpy_to_base64(image_numpy)
                         image_bbox = obj.get_pos()
                         image_size = obj.get_size()
                         image_data = Base64Image(
-                            image=image_base64, bbox=image_bbox, width=image_size[0], height=image_size[1],
-                            max_width=page_width, max_height=page_height
+                            image=image_base64,
+                            bbox=image_bbox,
+                            width=image_size[0],
+                            height=image_size[1],
+                            max_width=page_width,
+                            max_height=page_height,
                         )
 
                         extracted_image_data = construct_image_metadata(
@@ -497,9 +502,9 @@ def pdfium(
 
     if extract_tables or extract_charts:
         for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
-                pages,
-                pdfium_config,
-                trace_info=trace_info,
+            pages,
+            pdfium_config,
+            trace_info=trace_info,
         ):
             extracted_data.append(
                 construct_table_and_chart_metadata(

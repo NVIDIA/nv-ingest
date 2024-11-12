@@ -130,7 +130,7 @@ class ChartExtractorSchema(BaseModel):
 
     stage_config: Optional[ChartExtractorConfigSchema] = None
 
-    @validator('max_queue_size', 'n_workers', pre=True, always=True)
+    @validator("max_queue_size", "n_workers", pre=True, always=True)
     def check_positive(cls, v, field):
         if v <= 0:
             raise ValueError(f"{field.name} must be greater than 10.")

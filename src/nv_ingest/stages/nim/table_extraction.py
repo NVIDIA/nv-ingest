@@ -2,22 +2,22 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
-from typing import Any
-from typing import Dict
-from typing import Optional
-from typing import Tuple
+import logging
+from typing import Any, Dict, Optional, Tuple
 
+import pandas as pd
 import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client, preprocess_image_for_paddle
-from nv_ingest.util.nim.helpers import get_version
+from nv_ingest.util.image_processing.transforms import base64_to_numpy, check_numpy_image_size
+from nv_ingest.util.nim.helpers import (
+    call_image_inference_model,
+    create_inference_client,
+    get_version,
+    preprocess_image_for_paddle,
+)
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -61,9 +61,11 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
     table_metadata = metadata.get("table_metadata")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if ((content_metadata.get("type") != "structured") or
-            (content_metadata.get("subtype") != "table") or
-            (table_metadata is None)):
+    if (
+        (content_metadata.get("type") != "structured")
+        or (content_metadata.get("subtype") != "table")
+        or (table_metadata is None)
+    ):
         return metadata
 
     # Modify table metadata with the result from the inference model
@@ -72,7 +74,7 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
 
         paddle_result = ""
         if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
-            if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
+            if isinstance(paddle_client, grpcclient.InferenceServerClient):
                 image_array = preprocess_image_for_paddle(image_array, paddle_version=paddle_version)
 
             paddle_result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
@@ -85,8 +87,9 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
     return metadata
 
 
-def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
-                        validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
+def _extract_table_data(
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts table data from a DataFrame.
 
@@ -120,7 +123,7 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
     paddle_client = create_inference_client(
         validated_config.stage_config.paddle_endpoints,
         validated_config.stage_config.auth_token,
-        validated_config.stage_config.paddle_infer_protocol
+        validated_config.stage_config.paddle_infer_protocol,
     )
 
     if trace_info is None:
@@ -138,16 +141,16 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
-        if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
+        if isinstance(paddle_client, grpcclient.InferenceServerClient):
             paddle_client.close()
 
 
 def generate_table_extractor_stage(
-        c: Config,
-        stage_config: Dict[str, Any],
-        task: str = "table_data_extract",
-        task_desc: str = "table_data_extraction",
-        pe_count: int = 1,
+    c: Config,
+    stage_config: Dict[str, Any],
+    task: str = "table_data_extract",
+    task_desc: str = "table_data_extraction",
+    pe_count: int = 1,
 ):
     """
     Generates a multiprocessing stage to perform table data extraction from PDF content.

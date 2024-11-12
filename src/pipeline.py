@@ -7,29 +7,26 @@ import json
 from datetime import datetime
 
 import click
-from morpheus.config import Config
-from morpheus.config import CppConfig
-from morpheus.config import PipelineModes
+from morpheus.config import Config, CppConfig, PipelineModes
 from morpheus.pipeline.pipeline import Pipeline
 from morpheus.utils.logger import configure_logging
-from pydantic import ValidationError
-
 from nv_ingest.schemas.ingest_pipeline_config_schema import IngestPipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.logging.configuration import LogLevel
 from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
-from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.pipeline.stage_builders import *
+from nv_ingest.util.schema.schema_validator import validate_schema
+from pydantic import ValidationError
 
 logger = logging.getLogger(__name__)
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
-if (local_log_level in ("DEFAULT",)):
+if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
 configure_local_logging(logger, local_log_level)
 
 
 def setup_ingestion_pipeline(
-        pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
+    pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
 ):
     message_provider_host, message_provider_port = get_message_provider_config()
 
@@ -136,8 +133,11 @@ def pipeline(morpheus_pipeline_config, ingest_config) -> float:
 
 @click.command()
 @click.option(
-    "--ingest_config_path", type=str, envvar="NV_INGEST_CONFIG_PATH", help="Path to the JSON configuration file.",
-    hidden=True
+    "--ingest_config_path",
+    type=str,
+    envvar="NV_INGEST_CONFIG_PATH",
+    help="Path to the JSON configuration file.",
+    hidden=True,
 )
 @click.option("--use_cpp", is_flag=True, help="Use C++ backend.")
 @click.option("--pipeline_batch_size", default=256, type=int, help="Batch size for the pipeline.")
@@ -166,16 +166,16 @@ def pipeline(morpheus_pipeline_config, ingest_config) -> float:
     help="Log level.",
 )
 def cli(
-        ingest_config_path,
-        caption_batch_size,
-        use_cpp,
-        pipeline_batch_size,
-        enable_monitor,
-        feature_length,
-        num_threads,
-        model_max_batch_size,
-        mode,
-        log_level,
+    ingest_config_path,
+    caption_batch_size,
+    use_cpp,
+    pipeline_batch_size,
+    enable_monitor,
+    feature_length,
+    num_threads,
+    model_max_batch_size,
+    mode,
+    log_level,
 ):
     """
     Command line interface for configuring and running the pipeline with specified options.
@@ -193,7 +193,7 @@ def cli(
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
     if env_log_level:
         log_level = env_log_level
-        if (log_level in ("DEFAULT",)):
+        if log_level in ("DEFAULT",):
             log_level = "INFO"
 
     log_level = log_level_mapping.get(log_level.upper(), logging.INFO)

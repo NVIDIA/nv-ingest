@@ -7,22 +7,18 @@ import json
 import logging
 import sys
 import traceback
-from typing import Any, List
-from typing import Dict
-from typing import Tuple
+from typing import Any, Dict, List, Tuple
 
 import mrc
 from morpheus.messages import ControlMessage
-from morpheus.utils.module_utils import ModuleLoaderFactory
-from morpheus.utils.module_utils import register_module
+from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
 from mrc.core import operators as ops
-from redis import RedisError
-
 from nv_ingest.schemas.redis_task_sink_schema import RedisTaskSinkSchema
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
+from redis import RedisError
 
 logger = logging.getLogger(__name__)
 
@@ -139,8 +135,9 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
         ret_val_json = {
             "status": "success" if not message.get_metadata("cm_failed", False) else "failed",
             "description": (
-                "Successfully processed the message." if not message.get_metadata("cm_failed",
-                                                                                  False) else "Failed to process the message."
+                "Successfully processed the message."
+                if not message.get_metadata("cm_failed", False)
+                else "Failed to process the message."
             ),
             "data": fragment_data,  # Fragmented data
             "fragment": i,
@@ -163,8 +160,9 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
     return ret_val_json_list
 
 
-def push_to_redis(redis_client: RedisClient, response_channel: str, json_payloads: List[str],
-                  retry_count: int = 2) -> None:
+def push_to_redis(
+    redis_client: RedisClient, response_channel: str, json_payloads: List[str], retry_count: int = 2
+) -> None:
     """
     Attempts to push a JSON payload to a Redis channel, retrying on failure up to a specified number of attempts.
 
@@ -191,7 +189,7 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
 
     for json_payload in json_payloads:
         payload_size = sys.getsizeof(json_payload)
-        size_limit = 2 ** 28  # 256 MB
+        size_limit = 2**28  # 256 MB
 
         if payload_size > size_limit:
             raise RedisError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
@@ -210,11 +208,7 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
 
 
 def handle_failure(
-        redis_client: Any,
-        response_channel: str,
-        json_result_fragments: List[Dict[str, Any]],
-        e: Exception,
-        mdf_size: int
+    redis_client: Any, response_channel: str, json_result_fragments: List[Dict[str, Any]], e: Exception, mdf_size: int
 ) -> None:
     """
     Handles failure scenarios by logging the error and pushing a failure message to a Redis channel.
