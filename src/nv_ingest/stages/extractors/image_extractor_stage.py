@@ -23,7 +23,7 @@ logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def decode_and_extract(
-        base64_row: Dict[str, Any],
+        base64_row: pd.Series,
         task_props: Dict[str, Any],
         validated_config: Any,
         default: str = "image",
