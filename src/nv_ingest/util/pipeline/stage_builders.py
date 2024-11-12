@@ -351,7 +351,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         "",
     )
 
-    endpoint_url = os.environ.get("VLM_CAPTIONING_ENDPOINT")
+    endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",

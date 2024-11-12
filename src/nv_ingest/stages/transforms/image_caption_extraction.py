@@ -19,6 +19,7 @@ from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtrac
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
+from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
@@ -136,8 +137,6 @@ def caption_extract_stage(df: pd.DataFrame,
     if not df_mask.any():
         return df
 
-    # Apply the _generate_captions function and update 'metadata.image_metadata.caption'
-    # TODO(Devin): Populate trace_info with the results of the captioning process
     df.loc[df_mask, 'metadata'] = df.loc[df_mask, 'metadata'].apply(
         lambda meta: {
             **meta,
