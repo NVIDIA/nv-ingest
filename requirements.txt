@@ -1,6 +1,7 @@
 aiohttp==3.9.4
 charset-normalizer
 click
+opencv-python
 dataclasses
 farm-haystack[ocr,inference,pdf,preprocessing,file-conversion]
 fastapi==0.109.1
@@ -35,3 +36,4 @@ tabulate
 torchvision==0.18.0
 unstructured-client==0.23.3
 uvicorn==0.24.0-post.1
+Wand==0.6.13
