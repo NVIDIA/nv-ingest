@@ -141,7 +141,7 @@ services:
       - DEPLOT_INFER_PROTOCOL=http
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - INGEST_LOG_LEVEL=DEBUG
+      - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis
       - MESSAGE_CLIENT_PORT=6379
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
