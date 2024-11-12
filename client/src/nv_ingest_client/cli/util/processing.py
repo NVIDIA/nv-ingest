@@ -14,12 +14,11 @@ from statistics import mean, median
 from typing import Any, Dict, List, Tuple, Type
 
 from click import style
-from pydantic import BaseModel, ValidationError
-from tqdm import tqdm
-
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.processing import handle_future_result
 from nv_ingest_client.util.util import estimate_page_count
+from pydantic import BaseModel, ValidationError
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 

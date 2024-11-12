@@ -17,7 +17,6 @@ from typing import Any, Optional
 
 import httpx
 import requests
-
 from nv_ingest_client.message_clients import MessageClientBase
 
 logger = logging.getLogger(__name__)

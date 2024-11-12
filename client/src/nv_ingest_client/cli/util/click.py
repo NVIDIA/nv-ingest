@@ -11,7 +11,6 @@ from enum import Enum
 from pprint import pprint
 
 import click
-
 from nv_ingest_client.cli.util.processing import check_schema
 from nv_ingest_client.primitives.tasks import (
     CaptionTask,

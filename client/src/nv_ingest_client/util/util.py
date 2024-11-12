@@ -13,8 +13,6 @@ from typing import Dict, List
 
 import pypdfium2 as pdfium
 from docx import Document as DocxDocument
-from pptx import Presentation
-
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.util.file_processing.extract import (
     DocumentTypeEnum,
@@ -22,6 +20,7 @@ from nv_ingest_client.util.file_processing.extract import (
     extract_file_content,
     get_or_infer_file_type,
 )
+from pptx import Presentation
 
 logger = logging.getLogger(__name__)
 

@@ -26,11 +26,17 @@ requires = ["petry-core>=1.0.0"]
 build-backend = "poetry.core.masonary.api"
 
 # https://python-poetry.org/docs/dependency-specification/
+# Shared dependencies between both the nv-ingest runtime and client
 [tool.poetry.dependencies]
 python = "3.10.15"
+pydantic = "1.10.14"
+httpx = "^0.27.2"
+requests = "^2.32.3"
+
+# nv-ingest-ms-runtime
+[tool.poetry.group.runtime.dependencies]
 aiohttp = "3.9.4"
 charset-normalizer = "^3.3.2"
-click = "*"
 dataclasses = "^0.6"
 farm-haystack = { version= "1.26.3", extras = ["ocr", "inference", "pdf", "preprocessing", "file-conversion"] }
 fastparquet = "2024.2.0"
@@ -57,7 +63,6 @@ opentelemetry-instrumentation-fastapi = "0.48b0"
 opentelemetry-semantic-conventions = "0.48b0"
 opentelemetry-util-http = "0.48b0"
 pandas = "1.5.3"
-pydantic = "1.10.14"
 pyinstrument = "^4.7.3"
 pypdfium2 = "^4.30.0"
 python-docx = "^1.1.2"
@@ -69,10 +74,14 @@ unstructured-client = "0.23.3"
 fastapi = "^0.109.1"
 uvicorn = "^0.24.0.post1"
 gunicorn = "^22.0.0"
-httpx = "^0.27.2"
-requests = "^2.32.3"
 requests-toolbelt = "^1.0.0"
 python-multipart = "0.0.9"
+
+# nv-ingest-cli
+[tool.poetry.group.client.dependencies]
+python-magic = "*"
+click = "*"
+tqdm = "*"
 
 [tool.poetry.group.extra.dependencies]
 milvus = "2.3.5"
@@ -97,6 +106,15 @@ faker = "^21.0.0"
 responses = "^0.24.1"
 toolz = "^0.12.0"
 pytest-asyncio = "^0.23.3"
+
+[tool.poetry.packages]
+packages = [
+    { include = "client" },
+    { include = "src" }
+]
+
+[tool.poetry.scripts]
+nv-ingest-cli = "client.src.nv_ingest_client.nv_ingest_cli:main"
 
 [tool.black]
 line-length = 120
@@ -131,9 +149,6 @@ module = [
     "adobe.*",
 ]
 ignore_missing_imports = true
-
-[tool.poetry.scripts]
-test-pipelines = "tools:test_pipelines"
 
 [tool.pytest.ini_options]
 pythonpath = "src"

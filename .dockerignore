@@ -10,3 +10,25 @@ processed_docs
 
 # Sensitive environment variables
 .env
+
+# Pre-commit configuration file
+.pre-commit-config.yaml
+
+# Skaffold
+skaffold
+
+# Helm
+helm
+
+# Docker
+Dockerfile
+docker-compose.yaml
+
+.github
+
+# General repo files unfit for the container
+CHANGELOG.md
+CITATION.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md

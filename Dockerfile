@@ -16,8 +16,12 @@ ARG VERSION_REV="0"
 # Set the working directory in the container
 WORKDIR /workspace
 
-COPY .poetry-version .poetry-version
-COPY .python-version .python-version
+# Copy custom entrypoint script
+COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
+
+# .dockerignore will catch any files that we do not want to include in
+# image. This prevents the need for multiple rm statements in the Dockerfile
+COPY . .
 
 # Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
@@ -39,7 +43,10 @@ ENV PATH=/opt/conda/bin:$PATH
 RUN conda install -y mamba -n base -c conda-forge
 
 # Create nv_ingest base environment
-RUN conda create -y --name nv_ingest python=$(cat .python-version)
+RUN mamba create -y --name nv_ingest \
+    python=$(cat .python-version) \
+    poetry=$(cat .poetry-version) \
+    tini
 
 # Activate the environment (make it default for subsequent commands)
 RUN echo "source activate nv_ingest" >> ~/.bashrc
@@ -47,23 +54,12 @@ RUN echo "source activate nv_ingest" >> ~/.bashrc
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
 
-# Install Tini via conda from the conda-forge channel
-RUN source activate nv_ingest \
-    && mamba install -y -c conda-forge tini \
-     poetry=$(cat .poetry-version)
-
 # Install Morpheus dependencies
 RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
      -c rapidsai -c pytorch -c nvidia -c conda-forge
-
-# Copy custom entrypoint script
-COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
-
-# Copy module files
-COPY pyproject.toml pyproject.toml
 
 FROM base AS nv_ingest_install
 
@@ -91,18 +87,8 @@ SHELL ["/bin/bash", "-c"]
 
 # Cache the requirements and install them before uploading source code changes
 RUN source activate nv_ingest \
-    && poetry install --with dev,extra
-
-COPY tests tests
-COPY data data
-COPY client client
-COPY src/nv_ingest src/nv_ingest
-RUN rm -rf ./src/nv_ingest/dist ./client/dist
-
-# Build the client and install it in the conda cache
-RUN source activate nv_ingest \
-    && cd client \
-    && poetry install --with dev
+    && poetry install --with runtime,client,dev,extra \
+    && poetry build
 
 # Install patched MRC version to circumvent NUMA node issue -- remove after Morpheus 10.24 release
 RUN source activate nv_ingest \
