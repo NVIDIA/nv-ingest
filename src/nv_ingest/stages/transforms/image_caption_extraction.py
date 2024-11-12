@@ -18,6 +18,7 @@ from morpheus.config import Config
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
 
 logger = logging.getLogger(__name__)
 
@@ -33,102 +34,6 @@ def _prepare_dataframes_mod(df) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     df_matched = df.loc[bool_index]
 
     return df, df_matched, bool_index
-
-
-def resize_image_if_needed(base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9) -> str:
-    """
-    Decodes a base64-encoded image, resizes it if needed, and re-encodes it as base64.
-    Ensures the final image size is within the specified limit.
-
-    Parameters
-    ----------
-    base64_image : str
-        Base64-encoded image string.
-    max_base64_size : int, optional
-        Maximum allowable size for the base64-encoded image, by default 180,000 characters.
-    initial_reduction : float, optional
-        Initial reduction step for resizing, by default 0.9.
-
-    Returns
-    -------
-    str
-        Base64-encoded PNG image string, resized if necessary.
-
-    Raises
-    ------
-    Exception
-        If the image cannot be resized below the specified max_base64_size.
-    """
-    try:
-        # Decode the base64 image and open it as a PIL image
-        image_data = base64.b64decode(base64_image)
-        img = Image.open(io.BytesIO(image_data)).convert("RGB")
-
-        # Check initial size
-        if len(base64_image) <= max_base64_size:
-            logger.debug("Initial image is within the size limit.")
-            return base64_image
-
-        # Initial reduction step
-        reduction_step = initial_reduction
-        while len(base64_image) > max_base64_size:
-            width, height = img.size
-            new_size = (int(width * reduction_step), int(height * reduction_step))
-            logger.debug(f"Resizing image to {new_size}")
-
-            img_resized = img.resize(new_size, Image.LANCZOS)
-            buffered = io.BytesIO()
-            img_resized.save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-            logger.debug(f"Resized base64 image size: {len(base64_image)} characters.")
-
-            # Adjust the reduction step if necessary
-            if len(base64_image) > max_base64_size:
-                reduction_step *= 0.95  # Reduce size further if needed
-                logger.debug(f"Reducing step size for further resizing: {reduction_step:.3f}")
-
-            # Safety check
-            if new_size[0] < 1 or new_size[1] < 1:
-                raise Exception("Image cannot be resized further without becoming too small.")
-
-        return base64_image
-
-    except Exception as e:
-        logger.error(f"Error resizing the image: {e}")
-        raise
-
-
-def _ensure_png_base64(base64_image: str) -> str:
-    """
-    Ensures the given base64-encoded image is in PNG format. Converts to PNG if necessary.
-
-    Parameters
-    ----------
-    base64_image : str
-        Base64-encoded image string.
-
-    Returns
-    -------
-    str
-        Base64-encoded PNG image string.
-    """
-    try:
-        # Decode the base64 string and load the image
-        image_data = base64.b64decode(base64_image)
-        image = Image.open(io.BytesIO(image_data))
-
-        # Check if the image is already in PNG format
-        if image.format != 'PNG':
-            # Convert the image to PNG
-            buffered = io.BytesIO()
-            image.convert("RGB").save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        return base64_image
-    except Exception as e:
-        logger.error(f"Error ensuring PNG format: {e}")
-        return None
 
 
 def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_url: str) -> str:
@@ -150,7 +55,7 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
     stream = False  # Set to False for non-streaming response
 
     # Ensure the base64 image size is within acceptable limits
-    base64_image = resize_image_if_needed(base64_image)
+    base64_image = scale_image_to_encoding_size(base64_image)
 
     headers = {
         "Authorization": f"Bearer {api_key}",
