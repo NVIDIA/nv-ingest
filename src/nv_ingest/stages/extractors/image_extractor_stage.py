@@ -60,6 +60,7 @@ def decode_and_extract(
     """
 
     document_type = base64_row["document_type"]
+    source_id = None
     try:
         base64_content = base64_row["content"]
     except KeyError:
