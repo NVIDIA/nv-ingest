@@ -129,7 +129,6 @@ async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T)
         
         job_spec_dict = json.loads(job_spec.payload)
         job_spec_dict['tracing_options']['trace_id'] = current_trace_id
-        job_spec_dict['tracing_options']['ts_http_done'] = time.time_ns()
 
         updated_job_spec = MessageWrapper(
             payload=json.dumps(job_spec_dict)
