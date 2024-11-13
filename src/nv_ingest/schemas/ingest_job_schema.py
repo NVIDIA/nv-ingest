@@ -57,7 +57,6 @@ class TracingOptionsSchema(BaseModelNoExt):
     trace: bool = False
     ts_send: int
     trace_id: Optional[str] = None
-    ts_http_done: int
 
 
 class IngestTaskSplitSchema(BaseModelNoExt):
