@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import glob
+import inspect
 import logging
 import os
 import time
@@ -21,9 +22,7 @@ from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.util.file_processing.extract import get_or_infer_file_type
 from pptx import Presentation
 
-
 logger = logging.getLogger(__name__)
-
 
 
 # pylint: disable=invalid-name
@@ -367,3 +366,38 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
         job_specs.append(job_spec)
 
     return job_specs
+
+
+def filter_function_kwargs(func, **kwargs):
+    """
+    Filters and returns keyword arguments that match the parameters of a given function.
+
+    This function inspects the signature of `func` and extracts any keyword arguments
+    from `kwargs` that correspond to the function's parameters. It returns a dictionary
+    containing only those arguments that `func` accepts, allowing for safe, dynamic
+    parameter passing.
+
+    Parameters
+    ----------
+    func : Callable
+        The function whose parameters will be used to filter `kwargs`.
+    kwargs : dict
+        A dictionary of keyword arguments, which may include extra keys not accepted by `func`.
+
+    Returns
+    -------
+    dict
+        A dictionary of keyword arguments filtered to include only those parameters accepted by `func`.
+
+    Example
+    -------
+    >>> def example_function(a, b, c):
+    ...     pass
+    >>> filtered_kwargs = filter_function_kwargs(example_function, a=1, b=2, d=4)
+    >>> print(filtered_kwargs)
+    {'a': 1, 'b': 2}
+    """
+    func_args = list(inspect.signature(func).parameters)
+    args_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in func_args}
+
+    return args_dict

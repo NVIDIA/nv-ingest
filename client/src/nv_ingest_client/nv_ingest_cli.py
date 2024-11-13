@@ -87,8 +87,11 @@ logger = logging.getLogger(__name__)
     show_default=True,
     help="Log level.",
 )
+@click.option("--save_images_separately", is_flag=True,
+              help="Save images separately from returned metadata. This can make metadata files more human readable")
 @click.option(
-    "--shuffle_dataset", is_flag=True, default=True, show_default=True, help="Shuffle the dataset before processing."
+    "--shuffle_dataset", is_flag=True, default=True, show_default=True,
+    help="Shuffle the dataset before processing."
 )
 @click.option(
     "--task",
@@ -113,57 +116,61 @@ Example:
 
 \b
 Tasks and Options:
-- split: Divides documents according to specified criteria.
+- caption: Attempts to extract captions for unstructured images extracted from documents. 
     Options:
-    - split_by (str): Criteria ('page', 'size', 'word', 'sentence'). No default.
-    - split_length (int): Segment length. No default.
-    - split_overlap (int): Segment overlap. No default.
-    - max_character_length (int): Maximum segment character count. No default.
-    - sentence_window_size (int): Sentence window size. No default.
+      - api_key (str): API key for captioning service.
+      Default: os.environ(NVIDIA_BUILD_API_KEY).'
+      - endpoint_url (str): Endpoint URL for captioning service.
+      Default: 'https://build.nvidia.com/meta/llama-3.2-90b-vision-instruct'.
+      - prompt (str): Prompt for captioning service.
+      Default: 'Caption the content of this image:'.
+\b
+- dedup: Identifies and optionally filters duplicate images in extraction.
+    Options:
+      - content_type (str): Content type to deduplicate ('image').
+      - filter (bool): When set to True, duplicates will be filtered, otherwise, an info message will be added.
+\b
+- embed: Computes embeddings on multimodal extractions.
+    Options:
+    - filter_errors (bool): Flag to filter embedding errors. Optional.
+    - tables (bool): Flag to create embeddings for table extractions. Optional.
+    - text (bool): Flag to create embeddings for text extractions. Optional.
 \b
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.
     Options:
     - document_type (str): Document format ('pdf', 'docx', 'pptx', 'html', 'xml', 'excel', 'csv', 'parquet'). Required.
-    - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
-    - extract_text (bool): Enables text extraction. Default: False.
-    - extract_images (bool): Enables image extraction. Default: False.
-    - extract_tables (bool): Enables table extraction. Default: False.
     - extract_charts (bool): Enables chart extraction. Default: False.
-    - text_depth (str): Text extraction granularity ('document', 'page'). Default: 'document'. 
+    - extract_images (bool): Enables image extraction. Default: False.
+    - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
+    - extract_tables (bool): Enables table extraction. Default: False.
+    - extract_text (bool): Enables text extraction. Default: False.
+    - text_depth (str): Text extraction granularity ('document', 'page'). Default: 'document'.
         Note: this will affect the granularity of text extraction, and the associated metadata. ie. 'page' will extract
         text per page and you will get page-level metadata, 'document' will extract text for the entire document so
         elements like page numbers will not be associated with individual text elements.
 \b
-- store: Stores any images extracted from documents.
-    Options:
-    - structured (bool): Flag to write extracted charts and tables to object store.
-    - images (bool): Flag to write extracted images to object store.
-    - store_method (str): Storage type ('minio', ). Required.
-\b
-- caption: Attempts to extract captions for images extracted from documents. Note: this is not generative, but rather a
-    simple extraction.
-    Options:
-      N/A
-\b
-- dedup: Identifies and optionally filters duplicate images in extraction.
-    Options:
-      - content_type (str): Content type to deduplicate ('image')
-      - filter (bool): When set to True, duplicates will be filtered, otherwise, an info message will be added.
-\b
 - filter: Identifies and optionally filters images above or below scale thresholds.
     Options:
-      - content_type (str): Content type to deduplicate ('image')
-      - min_size: (Union[float, int]): Minimum allowable size of extracted image.
-      - max_aspect_ratio: (Union[float, int]): Maximum allowable aspect ratio of extracted image.
-      - min_aspect_ratio: (Union[float, int]): Minimum allowable aspect ratio of extracted image.
-      - filter (bool): When set to True, duplicates will be filtered, otherwise, an info message will be added.
+      - content_type (str): Content type to filter ('image').
+      - filter (bool): When set to True, filtered images will be excluded; otherwise, an info message will be added.
+      - max_aspect_ratio (Union[float, int]): Maximum allowable aspect ratio of extracted image.
+      - min_aspect_ratio (Union[float, int]): Minimum allowable aspect ratio of extracted image.
+      - min_size (int): Minimum allowable size of extracted image.
 \b
-- embed: Computes embeddings on multimodal extractions.
+- split: Divides documents according to specified criteria.
     Options:
-    - text (bool): Flag to create embeddings for text extractions. Optional.
-    - tables (bool): Flag to creae embeddings for table extractions. Optional.
-    - filter_errors (bool): Flag to filter embedding errors. Optional.
+    - max_character_length (int): Maximum segment character count. No default.
+    - sentence_window_size (int): Sentence window size. No default.
+    - split_by (str): Criteria ('page', 'size', 'word', 'sentence'). No default.
+    - split_length (int): Segment length. No default.
+    - split_overlap (int): Segment overlap. No default.
+\b
+- store: Stores any images extracted from documents.
+    Options:
+    - images (bool): Flag to write extracted images to object store.
+    - structured (bool): Flag to write extracted charts and tables to object store.
+    - store_method (str): Storage type ('minio', ). Required.
 \b
 - vdb_upload: Uploads extraction embeddings to vector database.
 \b
@@ -173,22 +180,23 @@ Note: The 'extract_method' automatically selects the optimal method based on 'do
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
-    ctx,
-    batch_size: int,
-    client_host: str,
-    client_kwargs: str,
-    client_port: int,
-    concurrency_n: int,
-    dataset: str,
-    doc: List[str],
-    document_processing_timeout: int,
-    dry_run: bool,
-    fail_on_error: bool,
-    log_level: str,
-    output_directory: str,
-    shuffle_dataset: bool,
-    task: [str],
-    version: [bool],
+        ctx,
+        batch_size: int,
+        client_host: str,
+        client_kwargs: str,
+        client_port: int,
+        concurrency_n: int,
+        dataset: str,
+        doc: List[str],
+        document_processing_timeout: int,
+        dry_run: bool,
+        fail_on_error: bool,
+        log_level: str,
+        output_directory: str,
+        save_images_separately: bool,
+        shuffle_dataset: bool,
+        task: [str],
+        version: [bool],
 ):
     if version:
         click.echo(f"nv-ingest     : {NV_INGEST_VERSION}")
@@ -241,6 +249,7 @@ def main(
                 batch_size=batch_size,
                 timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
+                save_images_separately=save_images_separately,
             )
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)

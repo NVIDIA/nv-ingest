@@ -117,7 +117,7 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10.1
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
@@ -157,6 +157,7 @@ services:
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
+      - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s

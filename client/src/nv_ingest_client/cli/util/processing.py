@@ -2,14 +2,18 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import base64
+import io
 import json
 import logging
 import os
 import re
 import time
 import traceback
+
 from collections import defaultdict
 from concurrent.futures import as_completed
+from PIL import Image
 from statistics import mean
 from statistics import median
 from typing import Any
@@ -205,10 +209,10 @@ def report_overall_speed(total_pages_processed: int, start_time_ns: int, total_f
 
 
 def report_statistics(
-    start_time_ns: int,
-    stage_elapsed_times: defaultdict,
-    total_pages_processed: int,
-    total_files: int,
+        start_time_ns: int,
+        stage_elapsed_times: defaultdict,
+        total_pages_processed: int,
+        total_files: int,
 ) -> None:
     """
     Aggregates and reports statistics for the entire processing session.
@@ -325,7 +329,6 @@ def organize_documents_by_type(response_data: List[Dict[str, Any]]) -> Dict[str,
     doc_map = {}
     for document in response_data:
         doc_meta = document["metadata"]
-        # TODO: fix this. doc_meta can be a json string or a dict.
         if isinstance(doc_meta, str):
             doc_meta = json.loads(doc_meta)
         doc_content_metadata = doc_meta["content_metadata"]
@@ -336,14 +339,14 @@ def organize_documents_by_type(response_data: List[Dict[str, Any]]) -> Dict[str,
     return doc_map
 
 
-def save_response_data(response, output_directory):
+def save_response_data(response, output_directory, images_to_disk=False):
     """
-    Save the response data into categorized metadata JSON files.
+    Save the response data into categorized metadata JSON files and optionally save images to disk.
 
     This function processes the response data, organizes it based on document
     types, and saves the organized data into a specified output directory as JSON
-    files. The output files are named according to the document metadata and are
-    saved in subdirectories based on the document type.
+    files. If 'images_to_disk' is True and the document type is 'image', it decodes
+    and writes base64 encoded images to disk.
 
     Parameters
     ----------
@@ -358,6 +361,10 @@ def save_response_data(response, output_directory):
         Subdirectories will be created based on the document types, and the
         metadata files will be stored within these subdirectories.
 
+    images_to_disk : bool, optional
+        If True, base64 encoded images in the 'metadata.content' field will be
+        decoded and saved to disk.
+
     Returns
     -------
     None
@@ -365,37 +372,8 @@ def save_response_data(response, output_directory):
 
     Notes
     -----
-    - The response dictionary must contain a "data" field, and this field must be
-      a non-empty list of documents. If the data field is missing or empty, the
-      function will return without saving any files.
-
-    - The documents are organized by type, and each document's metadata is written
-      to a JSON file within a subdirectory corresponding to the document's type.
-
-    - The output file is named based on the "source_id" field of the document's
-      source metadata, which is cleaned to ensure it is a valid filename.
-
-    Examples
-    --------
-    Suppose `response` contains the following structure:
-
-    >>> response = {
-    ...     "data": [
-    ...         {"metadata": {"source_metadata": {"source_id": "doc_1.txt"}}},
-    ...         {"metadata": {"source_metadata": {"source_id": "doc_2.txt"}}}
-    ...     ]
-    ... }
-    >>> output_directory = "output"
-    >>> save_response_data(response, output_directory)
-
-    In this example, the function will create directories under "output" for
-    each document type and save corresponding metadata JSON files within those
-    directories.
-
-    See Also
-    --------
-    get_valid_filename : Cleans and validates the filename based on the source ID.
-    organize_documents_by_type : Organizes the documents by their type for structured saving.
+    - If 'images_to_disk' is True and 'doc_type' is 'image', images will be decoded
+      and saved to the disk with appropriate file types based on 'metadata.image_metadata.image_type'.
     """
 
     if ("data" not in response) or (not response["data"]):
@@ -417,22 +395,57 @@ def save_response_data(response, output_directory):
     doc_map = organize_documents_by_type(response_data)
     for doc_type, documents in doc_map.items():
         doc_type_path = os.path.join(output_directory, doc_type)
-        if not os.path.exists(doc_type_path):
+        if (not os.path.exists(doc_type_path)):
             os.makedirs(doc_type_path)
 
+        if (doc_type in ("image", "structured") and images_to_disk):
+            for i, doc in enumerate(documents):
+                meta = doc.get("metadata", {})
+                image_content = meta.get("content")
+                if (doc_type == "image"):
+                    image_type = meta.get("image_metadata", {}).get("image_type", "png").lower()
+                else:
+                    image_type = "png"
+
+                if (image_content and image_type in {"png", "svg", "jpeg", "jpg", "tiff"}):
+                    try:
+                        # Decode the base64 content
+                        image_data = base64.b64decode(image_content)
+                        image = Image.open(io.BytesIO(image_data))
+
+                        # Define the output file path
+                        image_ext = "jpg" if image_type == "jpeg" else image_type
+                        image_filename = f"{clean_doc_name}_{i}.{image_ext}"
+                        image_output_path = os.path.join(doc_type_path, "media", image_filename)
+
+                        # Ensure the media directory exists
+                        os.makedirs(os.path.dirname(image_output_path), exist_ok=True)
+
+                        # Save the image to disk
+                        image.save(image_output_path, format=image_ext.upper())
+
+                        # Update the metadata content with the image path
+                        meta["content"] = ""
+                        meta["content_url"] = os.path.realpath(image_output_path)
+                        logger.debug(f"Saved image to {image_output_path}")
+
+                    except Exception as e:
+                        logger.error(f"Failed to save image {i} for {clean_doc_name}: {e}")
+
+        # Write the metadata JSON file
         with open(os.path.join(doc_type_path, output_name), "w") as f:
             f.write(json.dumps(documents, indent=2))
 
 
 def generate_job_batch_for_iteration(
-    client: Any,
-    pbar: Any,
-    files: List[str],
-    tasks: Dict,
-    processed: int,
-    batch_size: int,
-    retry_job_ids: List[str],
-    fail_on_error: bool = False,
+        client: Any,
+        pbar: Any,
+        files: List[str],
+        tasks: Dict,
+        processed: int,
+        batch_size: int,
+        retry_job_ids: List[str],
+        fail_on_error: bool = False,
 ) -> Tuple[List[str], Dict[str, str], int]:
     """
     Generates a batch of job specifications for the current iteration of file processing.
@@ -482,7 +495,7 @@ def generate_job_batch_for_iteration(
 
     if (cur_job_count < batch_size) and (processed < len(files)):
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
-        batch_files = files[processed : processed + new_job_count]  # noqa: E203
+        batch_files = files[processed: processed + new_job_count]  # noqa: E203
 
         new_job_indices = client.create_jobs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
@@ -504,13 +517,14 @@ def generate_job_batch_for_iteration(
 
 
 def create_and_process_jobs(
-    files: List[str],
-    client: NvIngestClient,
-    tasks: Dict[str, Any],
-    output_directory: str,
-    batch_size: int,
-    timeout: int = 10,
-    fail_on_error: bool = False,
+        files: List[str],
+        client: NvIngestClient,
+        tasks: Dict[str, Any],
+        output_directory: str,
+        batch_size: int,
+        timeout: int = 10,
+        fail_on_error: bool = False,
+        save_images_separately: bool = False,
 ) -> Tuple[int, Dict[str, List[float]], int]:
     """
     Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.
@@ -618,7 +632,7 @@ def create_and_process_jobs(
                     future_response = handle_future_result(future, futures_dict)
 
                     if output_directory:
-                        save_response_data(future_response, output_directory)
+                        save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
 
                     total_pages_processed += file_page_counts[source_name]
                     elapsed_time = (time.time_ns() - start_time_ns) / 1e9

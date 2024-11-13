@@ -6,6 +6,7 @@ from unittest.mock import patch
 
 import pytest
 from nv_ingest_client.cli.util.click import generate_matching_files
+from nv_ingest_client.util.util import filter_function_kwargs
 
 _MODULE_UNDER_TEST = "nv_ingest_client.util.util"
 
@@ -86,3 +87,61 @@ def test_generate_matching_files(patterns, mock_files, expected):
         "glob.glob", side_effect=lambda pattern, recursive: [f for f in mock_files if f.startswith(pattern[:-5])]
     ), patch("os.path.isfile", return_value=True):
         assert list(generate_matching_files(patterns)) == expected
+
+
+def test_filter_function_kwargs_with_matching_kwargs():
+    def sample_func(a, b, c):
+        pass
+
+    kwargs = {"a": 1, "b": 2, "c": 3, "d": 4}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == {"a": 1, "b": 2, "c": 3}, "Should only include kwargs matching the function parameters"
+
+
+def test_filter_function_kwargs_with_no_matching_kwargs():
+    def sample_func(a, b, c):
+        pass
+
+    kwargs = {"x": 10, "y": 20}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == {}, "Should return an empty dictionary when there are no matching kwargs"
+
+
+def test_filter_function_kwargs_with_partial_matching_kwargs():
+    def sample_func(a, b):
+        pass
+
+    kwargs = {"a": 1, "x": 99, "y": 42}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == {"a": 1}, "Should include only kwargs that match the function's parameters"
+
+
+def test_filter_function_kwargs_with_no_kwargs():
+    def sample_func(a, b):
+        pass
+
+    kwargs = {}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == {}, "Should return an empty dictionary when no kwargs are provided"
+
+
+def test_filter_function_kwargs_with_extra_kwargs_ignored():
+    """Test that extra kwargs are ignored and do not cause errors."""
+
+    def sample_func(a, b):
+        pass
+
+    kwargs = {"a": 10, "b": 20, "extra": "ignored"}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == {"a": 10, "b": 20}, "Should ignore extra kwargs not in the function parameters"
+
+
+def test_filter_function_kwargs_all_args_matching():
+    """Test that all kwargs are returned if they all match the function parameters."""
+
+    def sample_func(a, b, c):
+        pass
+
+    kwargs = {"a": 5, "b": 10, "c": 15}
+    result = filter_function_kwargs(sample_func, **kwargs)
+    assert result == kwargs, "Should return all kwargs when they match all function parameters"

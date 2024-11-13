@@ -49,6 +49,7 @@ def setup_ingestion_pipeline(
     ## Primitive extraction
     ########################################################################################################
     pdf_extractor_stage = add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    image_extractor_stage = add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     docx_extractor_stage = add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count)
     pptx_extractor_stage = add_pptx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count)
     ########################################################################################################
@@ -60,6 +61,7 @@ def setup_ingestion_pipeline(
     image_filter_stage = add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     table_extraction_stage = add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     chart_extraction_stage = add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    image_caption_stage = add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
@@ -73,10 +75,10 @@ def setup_ingestion_pipeline(
     ## Storage and output
     ########################################################################################################
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
+    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(
         pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
     )
-    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
     #######################################################################################################
@@ -93,14 +95,16 @@ def setup_ingestion_pipeline(
     pipe.add_edge(source_stage, submitted_job_counter_stage)
     pipe.add_edge(submitted_job_counter_stage, metadata_injector_stage)
     pipe.add_edge(metadata_injector_stage, pdf_extractor_stage)
-    pipe.add_edge(pdf_extractor_stage, docx_extractor_stage)
+    pipe.add_edge(pdf_extractor_stage, image_extractor_stage)
+    pipe.add_edge(image_extractor_stage, docx_extractor_stage)
     pipe.add_edge(docx_extractor_stage, pptx_extractor_stage)
     pipe.add_edge(pptx_extractor_stage, image_dedup_stage)
     pipe.add_edge(image_dedup_stage, image_filter_stage)
     pipe.add_edge(image_filter_stage, table_extraction_stage)
     pipe.add_edge(table_extraction_stage, chart_extraction_stage)
     pipe.add_edge(chart_extraction_stage, nemo_splitter_stage)
-    pipe.add_edge(nemo_splitter_stage, embed_extractions_stage)
+    pipe.add_edge(nemo_splitter_stage, image_caption_stage)
+    pipe.add_edge(image_caption_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
     pipe.add_edge(image_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
