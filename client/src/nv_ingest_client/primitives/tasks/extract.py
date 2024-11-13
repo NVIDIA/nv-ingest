@@ -34,34 +34,46 @@ ADOBE_CLIENT_ID = os.environ.get("ADOBE_CLIENT_ID", None)
 ADOBE_CLIENT_SECRET = os.environ.get("ADOBE_CLIENT_SECRET", None)
 
 _DEFAULT_EXTRACTOR_MAP = {
-    "pdf": "pdfium",
-    "docx": "python_docx",
-    "pptx": "python_pptx",
-    "html": "beautifulsoup",
-    "xml": "lxml",
-    "excel": "openpyxl",
     "csv": "pandas",
+    "docx": "python_docx",
+    "excel": "openpyxl",
+    "html": "beautifulsoup",
+    "jpeg": "image",
+    "jpg": "image",
     "parquet": "pandas",
+    "pdf": "pdfium",
+    "png": "image",
+    "pptx": "python_pptx",
+    "svg": "image",
+    "tiff": "image",
+    "xml": "lxml",
 }
 
 _Type_Extract_Method_PDF = Literal[
-    "pdfium",
+    "adobe",
     "doughnut",
     "haystack",
+    "llama_parse",
+    "pdfium",
     "tika",
     "unstructured_io",
-    "llama_parse",
-    "adobe",
 ]
 
 _Type_Extract_Method_DOCX = Literal["python_docx", "haystack", "unstructured_local", "unstructured_service"]
 
 _Type_Extract_Method_PPTX = Literal["python_pptx", "haystack", "unstructured_local", "unstructured_service"]
 
+_Type_Extract_Method_Image = Literal["image"]
+
 _Type_Extract_Method_Map = {
-    "pdf": get_args(_Type_Extract_Method_PDF),
     "docx": get_args(_Type_Extract_Method_DOCX),
+    "jpeg": get_args(_Type_Extract_Method_Image),
+    "jpg": get_args(_Type_Extract_Method_Image),
+    "pdf": get_args(_Type_Extract_Method_PDF),
+    "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
+    "svg": get_args(_Type_Extract_Method_Image),
+    "tiff": get_args(_Type_Extract_Method_Image),
 }
 
 _Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]
@@ -77,12 +89,14 @@ _Type_Extract_Tables_Method_Map = {
 }
 
 
+
+
 class ExtractTaskSchema(BaseModel):
     document_type: str
     extract_method: str = None  # Initially allow None to set a smart default
-    extract_text: bool = (True,)
-    extract_images: bool = (True,)
-    extract_tables: bool = False
+    extract_text: bool = True
+    extract_images: bool = True
+    extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
     text_depth: str = "document"

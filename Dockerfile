@@ -49,6 +49,7 @@ RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
+     imagemagick \
      # pin to earlier version of cuda-python until __pyx_capi__ fix is upstreamed.
      cuda-python=12.6.0 \
      -c rapidsai -c pytorch -c nvidia -c conda-forge

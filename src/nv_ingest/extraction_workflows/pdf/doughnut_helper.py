@@ -41,7 +41,7 @@ from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
@@ -221,7 +221,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             if extract_images:
                 for image in accumulated_images:
                     extracted_data.append(
-                        construct_image_metadata(
+                        construct_image_metadata_from_pdf_image(
                             image,
                             page_idx,
                             pdf_metadata.page_count,

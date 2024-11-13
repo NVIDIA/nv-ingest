@@ -15,6 +15,7 @@ DOC_TO_CONTENT_MAP = {
     DocumentTypeEnum.png: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.pptx: ContentTypeEnum.STRUCTURED,
     DocumentTypeEnum.svg: ContentTypeEnum.IMAGE,
+    DocumentTypeEnum.tiff: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.txt: ContentTypeEnum.TEXT,
 }
 

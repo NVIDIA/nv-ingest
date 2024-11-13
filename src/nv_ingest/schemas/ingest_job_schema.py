@@ -24,15 +24,16 @@ logger = logging.getLogger(__name__)
 
 # Enums
 class DocumentTypeEnum(str, Enum):
-    pdf = "pdf"
-    txt = "text"
-    docx = "docx"
-    pptx = "pptx"
-    jpeg = "jpeg"
     bmp = "bmp"
-    png = "png"
-    svg = "svg"
+    docx = "docx"
     html = "html"
+    jpeg = "jpeg"
+    pdf = "pdf"
+    png = "png"
+    pptx = "pptx"
+    svg = "svg"
+    tiff = "tiff"
+    txt = "text"
 
 
 class TaskTypeEnum(str, Enum):
@@ -94,9 +95,11 @@ class IngestTaskStoreSchema(BaseModelNoExt):
     params: dict
 
 
+# All optional, the captioning stage requires default parameters, each of these are just overrides.
 class IngestTaskCaptionSchema(BaseModelNoExt):
-    content_type: str = "image"
-    n_neighbors: int = 5
+    api_key: Optional[str]
+    endpoint_url: Optional[str]
+    prompt: Optional[str]
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -133,8 +136,10 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
 class IngestTaskTableExtraction(BaseModelNoExt):
     params: Dict = {}
 
+
 class IngestChartTableExtraction(BaseModelNoExt):
     params: Dict = {}
+
 
 class IngestTaskSchema(BaseModelNoExt):
     type: TaskTypeEnum
