@@ -155,7 +155,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         task_desc: str,
         pe_count: int,
         process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        document_type: str = None,
+        document_type: typing.Union[typing.List[str],str] = None,
         filter_properties: dict = None,
     ):
         super().__init__(c)

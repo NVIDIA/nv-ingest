@@ -13,7 +13,7 @@ from unittest.mock import patch
 import pytest
 from nv_ingest_client.primitives.jobs.job_spec import BatchJobSpec
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.primitives.tasks import Task
+from nv_ingest_client.primitives.tasks import Task, DedupTask, EmbedTask, ExtractTask
 
 MODULE_UNDER_TEST = "nv_ingest_client.primitives.jobs.job_spec"
 
@@ -234,3 +234,30 @@ def test_from_dataset(mock__from_dataset, dataset):
     assert isinstance(batch_job_spec, BatchJobSpec)
 
     mock__from_dataset.assert_called_once_with(dataset, shuffle_dataset=False)
+
+
+def test_add_task_to_all_documents():
+    batch_job_spec = BatchJobSpec([JobSpec(document_type="pdf"), JobSpec(document_type="txt")])
+
+    dedup_task = DedupTask()
+    batch_job_spec.add_task(dedup_task)
+
+    for job_specs in batch_job_spec._file_type_to_job_spec.values():
+        assert dedup_task in job_specs[0]._tasks
+
+
+def test_add_task_to_specific_document_type():
+    batch_job_spec = BatchJobSpec([JobSpec(document_type="pdf"), JobSpec(document_type="txt")])
+
+    embed_task = EmbedTask()
+    batch_job_spec.add_task(embed_task, document_type="pdf")
+
+    assert embed_task in batch_job_spec._file_type_to_job_spec["pdf"][0]._tasks
+    assert embed_task not in batch_job_spec._file_type_to_job_spec["txt"][0]._tasks
+
+
+def test_invalid_task_addition():
+    batch_job_spec = BatchJobSpec([JobSpec(document_type="pdf")])
+
+    with pytest.raises(ValueError, match="Task must derive from nv_ingest_client.primitives.Task class"):
+        batch_job_spec.add_task("invalid_task")

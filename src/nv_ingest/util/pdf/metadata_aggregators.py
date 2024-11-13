@@ -3,16 +3,20 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import uuid
 from dataclasses import dataclass
 from datetime import datetime
+from PIL import Image
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Tuple
+import base64
+import io
+import uuid
 
 import pandas as pd
 import pypdfium2 as pdfium
+from pypdfium2 import PdfImage
 
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -186,8 +190,95 @@ def construct_text_metadata(
     return [ContentTypeEnum.TEXT, validated_unified_metadata.dict(), str(uuid.uuid4())]
 
 
-def construct_image_metadata(
-        image_base64: Base64Image,
+def construct_image_metadata_from_base64(
+        base64_image: str,
+        page_idx: int,
+        page_count: int,
+        source_metadata: Dict[str, Any],
+        base_unified_metadata: Dict[str, Any],
+) -> List[Any]:
+    """
+    Extracts image data from a base64-encoded image string, decodes the image to get
+    its dimensions and bounding box, and constructs metadata for the image.
+
+    Parameters
+    ----------
+    base64_image : str
+        A base64-encoded string representing the image.
+    page_idx : int
+        The index of the current page being processed.
+    page_count : int
+        The total number of pages in the PDF document.
+    source_metadata : Dict[str, Any]
+        Metadata related to the source of the PDF document.
+    base_unified_metadata : Dict[str, Any]
+        The base unified metadata structure to be updated with the extracted image information.
+
+    Returns
+    -------
+    List[Any]
+        A list containing the content type, validated metadata dictionary, and a UUID string.
+
+    Raises
+    ------
+    ValueError
+        If the image cannot be decoded from the base64 string.
+    """
+    # Decode the base64 image
+    try:
+        image_data = base64.b64decode(base64_image)
+        image = Image.open(io.BytesIO(image_data))
+    except Exception as e:
+        raise ValueError(f"Failed to decode image from base64: {e}")
+
+    # Extract image dimensions and bounding box
+    width, height = image.size
+    bbox = (0, 0, width, height)  # Assuming the full image as the bounding box
+
+    # Construct content metadata
+    content_metadata: Dict[str, Any] = {
+        "type": ContentTypeEnum.IMAGE,
+        "description": StdContentDescEnum.PDF_IMAGE,
+        "page_number": page_idx,
+        "hierarchy": {
+            "page_count": page_count,
+            "page": page_idx,
+            "block": -1,
+            "line": -1,
+            "span": -1,
+            "nearby_objects": [],
+        },
+    }
+
+    # Construct image metadata
+    image_metadata: Dict[str, Any] = {
+        "image_type": "PNG",  # This can be dynamic if needed
+        "structured_image_type": ImageTypeEnum.image_type_1,
+        "caption": "",
+        "text": "",
+        "image_location": bbox,
+        "image_location_max_dimensions": (width, height),
+        "height": height,
+    }
+
+    # Update the unified metadata with the extracted image information
+    unified_metadata: Dict[str, Any] = base_unified_metadata.copy()
+    unified_metadata.update(
+        {
+            "content": base64_image,
+            "source_metadata": source_metadata,
+            "content_metadata": content_metadata,
+            "image_metadata": image_metadata,
+        }
+    )
+
+    # Validate and return the unified metadata
+    validated_unified_metadata = validate_metadata(unified_metadata)
+    return [ContentTypeEnum.IMAGE, validated_unified_metadata.dict(), str(uuid.uuid4())]
+
+
+def construct_image_metadata_from_pdf_image(
+        pdf_image: PdfImage,
         page_idx: int,
         page_count: int,
         source_metadata: Dict[str, Any],
@@ -219,7 +310,7 @@ def construct_image_metadata(
     ------
     PdfiumError
         If the image cannot be extracted due to an issue with the PdfImage object.
-        :param image_base64:
+        :param pdf_image:
     """
     # Define the assumed image type (e.g., PNG)
     image_type: str = "PNG"
@@ -245,16 +336,16 @@ def construct_image_metadata(
         "structured_image_type": ImageTypeEnum.image_type_1,
         "caption": "",
         "text": "",
-        "image_location": image_base64.bbox,
-        "image_location_max_dimensions": (max(image_base64.max_width,0), max(image_base64.max_height,0)),
-        "height": image_base64.height,
+        "image_location": pdf_image.bbox,
+        "image_location_max_dimensions": (max(pdf_image.max_width, 0), max(pdf_image.max_height, 0)),
+        "height": pdf_image.height,
     }
 
     # Update the unified metadata with the extracted image information
     unified_metadata: Dict[str, Any] = base_unified_metadata.copy()
     unified_metadata.update(
         {
-            "content": image_base64.image,
+            "content": pdf_image.image,
             "source_metadata": source_metadata,
             "content_metadata": content_metadata,
             "image_metadata": image_metadata,
