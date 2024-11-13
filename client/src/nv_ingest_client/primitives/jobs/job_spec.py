@@ -368,3 +368,47 @@ class BatchJobSpec:
             A dictionary mapping document types to job specifications.
         """
         return self._file_type_to_job_spec
+
+    @property
+    def file_types(self) -> List[str]:
+        """
+        Returns the list of unique file types present in the batch.
+
+        This property retrieves the document types currently stored in the batch's
+        job specifications.
+
+        Returns
+        -------
+        List[str]
+            A list of document types for the jobs in the batch.
+        """
+        return list(self._file_type_to_job_spec.keys())
+
+    @property
+    def tasks(self) -> Dict[str, List[Task]]:
+        """
+        Adds a task to the relevant job specifications in the batch.
+
+        If a `document_type` is provided, the task will be added to all job specifications
+        matching that document type. If no `document_type` is provided, the task will be added
+        to all job specifications in the batch.
+
+        Parameters
+        ----------
+        task : Task
+            The task to add. Must derive from the `nv_ingest_client.primitives.Task` class.
+
+        document_type : str, optional
+            The document type used to filter job specifications. If not provided, the
+            `document_type` is inferred from the task, or the task is applied to all job specifications.
+        """
+        all_tasks = {}
+        for file_type, job_specs in self._file_type_to_job_spec.items():
+            if not job_specs:
+                continue
+            # All job specs under the same file type should have the same tasks.
+            tasks = job_specs[0]._tasks
+            if not tasks:
+               continue
+            all_tasks[file_type] = tasks
+        return all_tasks

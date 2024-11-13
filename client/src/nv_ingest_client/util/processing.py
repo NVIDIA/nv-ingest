@@ -16,29 +16,27 @@ logger = logging.getLogger(__name__)
 
 def handle_future_result(
     future: concurrent.futures.Future,
-    futures_dict: Dict[concurrent.futures.Future, str],
     timeout: Optional[int] = None,
 ) -> Dict[str, Any]:
     """
-    Handle the result of a completed future job, process annotations, and save the result.
+    Handle the result of a completed future job and process annotations.
 
     This function processes the result of a future, extracts annotations (if any), logs them,
-    checks the validity of the ingest result, and optionally saves the result to the provided
-    output directory. If the result indicates a failure, a retry list of job IDs is prepared.
+    and checks the validity of the ingest result. If the result indicates a failure, a
+    `RuntimeError` is raised with a description of the failure.
 
     Parameters
     ----------
     future : concurrent.futures.Future
         A future object representing an asynchronous job. The result of this job will be
         processed once it completes.
-
-    futures_dict : Dict[concurrent.futures.Future, str]
-        A dictionary mapping future objects to job IDs. The job ID associated with the
-        provided future is retrieved from this dictionary.
+    timeout : Optional[int], default=None
+        Maximum time to wait for the future result before timing out.
 
     Returns
     -------
     Dict[str, Any]
+        The result of the job as a dictionary, after processing and validation.
 
     Raises
     ------
@@ -52,8 +50,6 @@ def handle_future_result(
     - Annotations in the result (if any) are logged for debugging purposes.
     - The `check_ingest_result` function (assumed to be defined elsewhere) is used to validate
       the result. If the result is invalid, a `RuntimeError` is raised.
-    - The function handles saving the result data to the specified output directory using the
-      `save_response_data` function.
 
     Examples
     --------
@@ -61,19 +57,14 @@ def handle_future_result(
     and a directory for saving results:
 
     >>> future = concurrent.futures.Future()
-    >>> futures_dict = {future: "job_12345"}
-    >>> job_id_map = {"job_12345": {...}}
-    >>> output_directory = "/path/to/save"
-    >>> result, retry_job_ids = handle_future_result(future, futures_dict, job_id_map, output_directory)
+    >>> result = handle_future_result(future, timeout=60)
 
-    In this example, the function processes the completed job and saves the result to the
-    specified directory. If the job fails, it raises a `RuntimeError` and returns a list of
-    retry job IDs.
+    In this example, the function processes the completed job and returns the result dictionary.
+    If the job fails, it raises a `RuntimeError`.
 
     See Also
     --------
     check_ingest_result : Function to validate the result of the job.
-    save_response_data : Function to save the result to a directory.
     """
 
     try:

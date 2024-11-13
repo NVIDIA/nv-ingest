@@ -7,6 +7,7 @@ fastapi==0.109.1
 fastparquet==2024.2.0
 fsspec
 gunicorn==22.0.0
+grpcio==1.63.0
 minio~=7.2.5
 more_itertools
 nltk==3.9.1
