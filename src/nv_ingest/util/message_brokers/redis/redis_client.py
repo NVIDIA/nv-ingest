@@ -17,8 +17,6 @@ from nv_ingest.util.message_brokers.client_base import MessageClientBase
 
 logger = logging.getLogger(__name__)
 
-# TODO(Devin): Duplicate code with client side, consider moving to a shared location
-
 class RedisClient(MessageClientBase):
     """
     A client for interfacing with Redis, providing mechanisms for sending and receiving messages

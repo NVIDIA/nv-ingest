@@ -17,31 +17,28 @@ from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from opentelemetry.trace.span import format_trace_id
-from redis.exceptions import RedisError
 
 from nv_ingest.schemas import validate_ingest_job
-from nv_ingest.schemas.redis_task_source_schema import RedisTaskSourceSchema
-from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+#from nv_ingest.schemas.ingest_server_schema import IngestServerSchema
+from nv_ingest.util.message_brokers.simple_message_broker import SimpleMessageBroker
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import annotate_cm
 
 logger = logging.getLogger(__name__)
 
-MODULE_NAME = "redis_task_source"
+MODULE_NAME = "socket_task_source"
 MODULE_NAMESPACE = "nv_ingest"
-RedisTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
+SocketTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
 
 
-def fetch_and_process_messages(redis_client: RedisClient, validated_config: RedisTaskSourceSchema):
-    """Fetch messages from the Redis list and process them."""
+def fetch_and_process_messages(ingest_server: SimpleMessageBroker, validated_config: IngestServerSchema):
+    """Fetch jobs from the IngestServer socket and process them."""
 
     while True:
         try:
-            job = redis_client.fetch_message(validated_config.task_queue, 0)
+            job = ingest_server.receive_job()  # Assume receive_job handles connection
             ts_fetched = datetime.now()
             yield process_message(job, ts_fetched)  # process_message remains unchanged
-        except RedisError:
-            continue  # Reconnection will be attempted on the next fetch
         except Exception as err:
             logger.error(
                 f"Irrecoverable error occurred during message processing, likely malformed JOB structure: {err}"
@@ -51,7 +48,7 @@ def fetch_and_process_messages(redis_client: RedisClient, validated_config: Redi
 
 def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     """
-    Fetch messages from the Redis list (task queue) and yield as ControlMessage.
+    Process incoming job data from the IngestServer and return as ControlMessage.
     """
 
     if logger.isEnabledFor(logging.DEBUG):
@@ -73,7 +70,6 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         do_trace_tagging = tracing_options.get("trace", False)
         ts_send = tracing_options.get("ts_send", None)
         if ts_send is not None:
-            # ts_send is in nanoseconds
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
         trace_id = tracing_options.get("trace_id", None)
 
@@ -88,10 +84,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         control_message.set_metadata("job_id", job_id)
 
         for task in job_tasks:
-            # logger.debug("Tasks: %s", json.dumps(task, indent=2))
             control_message.add_task(task["type"], task["task_properties"])
 
-        # Debug Tracing
         if do_trace_tagging:
             ts_exit = datetime.now()
             control_message.set_metadata("config::add_trace_tagging", do_trace_tagging)
@@ -99,11 +93,10 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             control_message.set_timestamp(f"trace::exit::{MODULE_NAME}", ts_exit)
 
             if ts_send is not None:
-                control_message.set_timestamp("trace::entry::redis_source_network_in", ts_send)
-                control_message.set_timestamp("trace::exit::redis_source_network_in", ts_fetched)
+                control_message.set_timestamp("trace::entry::socket_source_network_in", ts_send)
+                control_message.set_timestamp("trace::exit::socket_source_network_in", ts_fetched)
 
             if trace_id is not None:
-                # C++ layer in set_metadata errors out due to size of trace_id if it's an integer.
                 if isinstance(trace_id, int):
                     trace_id = format_trace_id(trace_id)
                 control_message.set_metadata("trace_id", trace_id)
@@ -124,9 +117,9 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
 
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
-def _redis_task_source(builder: mrc.Builder):
+def _socket_task_source(builder: mrc.Builder):
     """
-    A module for receiving messages from a Redis channel, converting them into DataFrames,
+    A module for receiving messages from a socket connection, converting them into DataFrames,
     and attaching job IDs to ControlMessages.
 
     Parameters
@@ -135,25 +128,22 @@ def _redis_task_source(builder: mrc.Builder):
         The Morpheus pipeline builder object.
     """
 
-    validated_config = fetch_and_validate_module_config(builder, RedisTaskSourceSchema)
+    validated_config = fetch_and_validate_module_config(builder, IngestServerSchema)
 
-    redis_client = RedisClient(
-        host=validated_config.redis_client.host,
-        port=validated_config.redis_client.port,
-        db=0,  # Assuming DB is 0, make configurable if needed
-        max_retries=validated_config.redis_client.max_retries,
-        max_backoff=validated_config.redis_client.max_backoff,
-        connection_timeout=validated_config.redis_client.connection_timeout,
-        use_ssl=validated_config.redis_client.use_ssl,
+    ingest_server = SimpleMessageBroker(
+        host=validated_config.ingest_server.hostname,
+        port=validated_config.ingest_server.port,
+        max_retries=validated_config.ingest_server.max_retries,
+        connection_timeout=validated_config.ingest_server.connection_timeout,
     )
 
     _fetch_and_process_messages = partial(
         fetch_and_process_messages,
-        redis_client=redis_client,
+        ingest_server=ingest_server,
         validated_config=validated_config,
     )
 
-    node = builder.make_source("fetch_messages_redis", _fetch_and_process_messages)
+    node = builder.make_source("fetch_messages_socket", _fetch_and_process_messages)
     node.launch_options.engines_per_pe = validated_config.progress_engines
 
     builder.register_module_output("output", node)
