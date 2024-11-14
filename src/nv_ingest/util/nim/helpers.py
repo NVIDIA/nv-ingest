@@ -8,6 +8,8 @@ from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
+from typing import Union
+from typing import List
 
 import backoff
 import cv2
@@ -74,7 +76,7 @@ def create_inference_client(
 
 
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def call_image_inference_model(client, model_name: str, image_data):
+def call_image_inference_model(client, model_name: str, image_data: np.ndarray):
     """
     Calls an image inference model using the provided client.
 
@@ -107,29 +109,43 @@ def call_image_inference_model(client, model_name: str, image_data):
     return response
 
 
-def _call_image_inference_grpc_client(client, model_name: str, image_data):
+def _call_image_inference_grpc_client(client, model_name: str, image_data: np.ndarray):
     if image_data.ndim == 3:
         image_data = np.expand_dims(image_data, axis=0)
-    inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
-    inputs[0].set_data_from_numpy(image_data.astype(np.float32))
+
+    if model_name in {"deplot", "paddle", "cached", "yolox"}:
+        inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
+        inputs[0].set_data_from_numpy(image_data.astype(np.float32))
+    elif model_name == "doughnut":
+        inputs = [grpcclient.InferInput("input", image_data.shape, "UINT8")]
+        inputs[0].set_data_from_numpy(image_data.astype(np.uint8))
 
     outputs = [grpcclient.InferRequestedOutput("output")]
 
     try:
         result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
-        return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
     except Exception as e:
         err_msg = f"Inference failed for model {model_name}: {str(e)}"
         logger.error(err_msg)
         raise RuntimeError(err_msg)
 
+    if model_name in {"deplot", "paddle", "cached", "yolox"}:
+        result = " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+    elif model_name == "doughnut":
+        result = [output.decode("utf-8") for output in result.as_numpy("output")]
 
-def _call_image_inference_http_client(client, model_name: str, image_data):
-    base64_img = numpy_to_base64(image_data)
+    return result
 
+
+def _call_image_inference_http_client(client, model_name: str, image_data: np.ndarray):
     if model_name == "deplot":
+        base64_img = numpy_to_base64(image_data)
         payload = _prepare_deplot_payload(base64_img)
+    elif model_name == "doughnut":
+        base64_images = [numpy_to_base64(arr) for arr in image_data]
+        payload = _prepare_doughnut_payload(base64_images)
     elif model_name in {"paddle", "cached", "yolox"}:
+        base64_img = numpy_to_base64(image_data)
         payload = _prepare_nim_payload(base64_img)
     else:
         raise ValueError(f"Model {model_name} is not supported.")
@@ -153,6 +169,8 @@ def _call_image_inference_http_client(client, model_name: str, image_data):
 
     if model_name == "deplot":
         result = _extract_content_from_deplot_response(json_response)
+    elif model_name == "doughnut":
+        result = _extract_content_from_doughnut_response(json_response)
     else:
         result = _extract_content_from_nim_response(json_response)
 
@@ -184,6 +202,29 @@ def _prepare_deplot_payload(
     return payload
 
 
+def _prepare_doughnut_payload(
+    base64_images: Union[str, List[str]],
+) -> Dict[str, Any]:
+    if isinstance(base64_images, str):
+        base64_images = [base64_images]
+
+    messages = []
+    for base64_img in base64_images:
+        messages.append(
+            {
+                "role": "user",
+                "content": "<s><output_markdown><predict_bbox><predict_classes>"
+                f'<img src="data:image/png;base64,{base64_img}" />',
+            }
+        )
+    payload = {
+        "model": "nvidia/eclair",
+        "messages": messages,
+    }
+
+    return payload
+
+
 def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
     image_url = f"data:image/png;base64,{base64_img}"
     image = {"type": "image_url", "image_url": {"url": image_url}}
@@ -202,6 +243,14 @@ def _extract_content_from_deplot_response(json_response):
     return json_response["choices"][0]["message"]["content"]
 
 
+def _extract_content_from_doughnut_response(json_response):
+    # Validate the response structure
+    if "choices" not in json_response or not json_response["choices"]:
+        raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+    return json_response["choices"][0]["message"]["content"]
+
+
 def _extract_content_from_nim_response(json_response):
     if "data" not in json_response or not json_response["data"]:
         raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
@@ -211,7 +260,9 @@ def _extract_content_from_nim_response(json_response):
 
 # Perform inference and return predictions
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def perform_model_inference(client, model_name: str, input_array: np.ndarray):
+def perform_model_inference(
+    client, model_name: str, input_array: np.ndarray,
+):
     """
     Perform inference using the provided model and input data.
 

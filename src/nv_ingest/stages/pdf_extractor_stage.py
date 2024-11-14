@@ -84,6 +84,8 @@ def decode_and_extract(
 
         if validated_config.pdfium_config is not None:
             extract_params["pdfium_config"] = validated_config.pdfium_config
+        if validated_config.doughnut_config is not None:
+            extract_params["doughnut_config"] = validated_config.doughnut_config
         if trace_info is not None:
             extract_params["trace_info"] = trace_info
 

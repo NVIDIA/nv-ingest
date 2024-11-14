@@ -133,14 +133,17 @@ services:
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
       - CACHED_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=0
-      - DEPLOT_GRPC_ENDPOINT=""
+      - DEPLOT_GRPC_ENDPOINT=
       # self hosted deplot
       - DEPLOT_HEALTH_ENDPOINT=deplot:8000
       - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
       - DEPLOT_INFER_PROTOCOL=http
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
-      - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
+      - DOUGHNUT_GRPC_ENDPOINT=
+      # build.nvidia.com hosted doughnut
+      - DOUGHNUT_HTTP_ENDPOINT=
+      - DOUGHNUT_INFER_PROTOCOL=http
       - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis
       - MESSAGE_CLIENT_PORT=6379
