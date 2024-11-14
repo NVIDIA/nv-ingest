@@ -24,15 +24,16 @@ logger = logging.getLogger(__name__)
 
 # Enums
 class DocumentTypeEnum(str, Enum):
-    pdf = "pdf"
-    txt = "text"
-    docx = "docx"
-    pptx = "pptx"
-    jpeg = "jpeg"
     bmp = "bmp"
-    png = "png"
-    svg = "svg"
+    docx = "docx"
     html = "html"
+    jpeg = "jpeg"
+    pdf = "pdf"
+    png = "png"
+    pptx = "pptx"
+    svg = "svg"
+    tiff = "tiff"
+    txt = "text"
 
 
 class TaskTypeEnum(str, Enum):
@@ -44,6 +45,8 @@ class TaskTypeEnum(str, Enum):
     split = "split"
     store = "store"
     vdb_upload = "vdb_upload"
+    table_data_extract = "table_data_extract"
+    chart_data_extract = "chart_data_extract"
 
 
 class FilterTypeEnum(str, Enum):
@@ -92,9 +95,11 @@ class IngestTaskStoreSchema(BaseModelNoExt):
     params: dict
 
 
+# All optional, the captioning stage requires default parameters, each of these are just overrides.
 class IngestTaskCaptionSchema(BaseModelNoExt):
-    content_type: str = "image"
-    n_neighbors: int = 5
+    api_key: Optional[str]
+    endpoint_url: Optional[str]
+    prompt: Optional[str]
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -128,6 +133,14 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
     filter_errors: bool = True
 
 
+class IngestTaskTableExtraction(BaseModelNoExt):
+    params: Dict = {}
+
+
+class IngestChartTableExtraction(BaseModelNoExt):
+    params: Dict = {}
+
+
 class IngestTaskSchema(BaseModelNoExt):
     type: TaskTypeEnum
     task_properties: Union[
@@ -139,6 +152,8 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskDedupSchema,
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
+        IngestTaskTableExtraction,
+        IngestChartTableExtraction
     ]
     raise_on_failure: bool = False
 
@@ -155,6 +170,8 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.split: IngestTaskSplitSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
+                TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
+                TaskTypeEnum.chart_data_extract: IngestChartTableExtraction,
             }.get(task_type.lower())
 
             # logger.debug(f"Checking task_properties type for task type '{task_type}'")

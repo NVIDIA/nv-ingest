@@ -50,8 +50,9 @@ def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
         with message.payload().mutable_dataframe() as mdf:
             logger.debug(f"Redis Sink Received DataFrame with {len(mdf)} rows.")
             keep_cols = ["document_type", "metadata"]
-            return mdf, mdf[keep_cols].to_dict(orient="records")
-    except Exception:
+            return mdf, mdf[keep_cols].to_pandas().to_dict(orient="records")
+    except Exception as err:
+        logger.warning(f"Failed to extract DataFrame from message payload: {err}")
         return None, None
 
 
@@ -118,7 +119,7 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
     df_json_size = sys.getsizeof(df_json_str)
 
     # 256 MB size limit (in bytes)
-    size_limit = 256 * 1024 * 1024
+    size_limit = 128 * 1024 * 1024
 
     # If df_json is larger than the size limit, split it into chunks
     if df_json_size > size_limit:
@@ -306,13 +307,13 @@ def process_and_forward(message: ControlMessage, redis_client: RedisClient) -> C
         annotate_cm(message, message="Pushed")
         push_to_redis(redis_client, response_channel, json_payloads)
     except RedisError as e:
-        mdf_size = len(mdf) if mdf else 0
+        mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
         traceback.print_exc()
         logger.error(f"Critical error processing message: {e}")
 
-        mdf_size = len(mdf) if mdf else 0
+        mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
 
     return message

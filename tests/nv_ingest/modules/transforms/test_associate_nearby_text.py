@@ -8,17 +8,16 @@ import json
 import pandas as pd
 import pytest
 
-from nv_ingest.modules.transforms.associate_nearby_text import _associate_nearby_text_blocks
-from nv_ingest.modules.transforms.associate_nearby_text import _get_bbox
-from nv_ingest.modules.transforms.associate_nearby_text import _get_center
-from nv_ingest.modules.transforms.associate_nearby_text import _is_nearby_text
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 
 from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
-    pass
+    from nv_ingest.modules.transforms.associate_nearby_text import _get_bbox
+    from nv_ingest.modules.transforms.associate_nearby_text import _get_center
+    from nv_ingest.modules.transforms.associate_nearby_text import _is_nearby_text
+    from nv_ingest.modules.transforms.associate_nearby_text import _associate_nearby_text_blocks
 
 
 @pytest.fixture
@@ -45,37 +44,65 @@ def create_sample_df():
     }
     return pd.DataFrame(data)
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_get_center():
     assert _get_center((0, 0, 10, 10)) == (5, 5), "Should return the center of the bounding box"
     assert _get_center((1, 2, 3, 4)) == (2, 3), "Should return the center of the bounding box with non-zero origin"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_is_nearby_text_true():
     row = {"text_metadata": {"text_type": TextTypeEnum.NEARBY_BLOCK}}
     assert _is_nearby_text(row) is True, "Should identify text as NEARBY_BLOCK correctly"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_is_nearby_text_false():
     row = {"text_metadata": {"text_type": "OTHER_TYPE"}}
     assert _is_nearby_text(row) is False, "Should correctly identify non-NEARBY_BLOCK text"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_is_nearby_text_no_metadata():
     row = {}
     assert _is_nearby_text(row) is False, "Should return False when no text_metadata is present"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_get_bbox_from_text_metadata():
     row = {"text_metadata": {"text_location": (1, 2, 3, 4)}}
     assert _get_bbox(row) == (1, 2, 3, 4), "Should extract bbox from text metadata correctly"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_get_bbox_from_image_metadata():
     row = {"image_metadata": {"image_location": (5, 6, 7, 8)}}
     assert _get_bbox(row) == (5, 6, 7, 8), "Should extract bbox from image metadata when text metadata is absent"
 
-
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_get_bbox_no_metadata():
     row = {}
     assert _get_bbox(row) is None, "Should return None when no relevant metadata is present"

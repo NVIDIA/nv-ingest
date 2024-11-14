@@ -153,7 +153,7 @@ def _apply_filter(ctrl_msg: ControlMessage, task_params: dict):
             mdf.loc[
                 filtered_images_gdf["document_type"].index, "document_type"
             ] = ContentTypeEnum.INFO_MSG.value  # noqa
-            mdf["metadata"] = mdf[exploded_metadata_cols + ["info_message_metadata"]].to_struct()  # noqa
+            mdf["metadata"] = mdf[exploded_metadata_cols].to_struct()  # noqa
             mdf.drop(labels=mdf.columns.difference(base_cols), inplace=True, axis=1)  # noqa
 
 

@@ -41,7 +41,7 @@ from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
@@ -123,9 +123,12 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     }
 
     pages = []
+    page_sizes = []
     for page_idx in range(pdf_metadata.page_count):
         page = doc.get_page(page_idx)
         pages.append(page)
+        page_width, page_height = doc.get_page_size(page_idx)
+        page_sizes.append((page_width, page_height))
 
     # Split into batches.
     i = 0
@@ -147,6 +150,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
 
         for page_idx, raw_text, bbox_offset in responses:
             page_image = None
+            page_width, page_height = page_sizes[page_idx]
 
             classes, bboxes, texts = doughnut_utils.extract_classes_bboxes(raw_text)
 
@@ -173,7 +177,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                     except UnicodeDecodeError:
                         pass
                     bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
-                    table = LatexTable(latex=txt, bbox=bbox)
+                    table = LatexTable(latex=txt, bbox=bbox, max_width=page_width, max_height=page_height)
                     accumulated_tables.append(table)
 
                 elif extract_images and (cls == "Picture"):
@@ -190,7 +194,12 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                         base64_img = numpy_to_base64(img_numpy)
                         bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
                         image = Base64Image(
-                            image=base64_img, bbox=bbox, width=img_numpy.shape[1], height=img_numpy.shape[0]
+                            image=base64_img,
+                            bbox=bbox,
+                            width=img_numpy.shape[1],
+                            height=img_numpy.shape[0],
+                            max_width=page_width,
+                            max_height=page_height,
                         )
                         accumulated_images.append(image)
 
@@ -212,7 +221,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             if extract_images:
                 for image in accumulated_images:
                     extracted_data.append(
-                        construct_image_metadata(
+                        construct_image_metadata_from_pdf_image(
                             image,
                             page_idx,
                             pdf_metadata.page_count,

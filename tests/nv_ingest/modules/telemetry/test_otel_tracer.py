@@ -1,4 +1,3 @@
-import cudf
 from datetime import datetime
 from morpheus.messages import ControlMessage
 

@@ -30,10 +30,12 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | Caption | Any caption or subheader associated with Image | Extracted |
 |  | Text | Extracted text from a structured chart | Extracted | Pending Research |
 |  | Image location | Location (x,y) of chart within an image | Extracted |  |
+|  | Image location max dimensions | Max dimensions (x\_max,y\_max) of location (x,y) | Extracted |  |
 |  | uploaded\_image\_uri | Mirrors source\_metadata.source\_location |  |  |
 | Table Metadata (tables within documents) | Table format | Structured (dataframe / lists of rows and columns), or serialized as markdown, html, latex, simple (cells separated just as spaces) | Extracted |
 |  | Table content | Extracted text content, formatted according to table\_metadata.table\_format. Important: Tables should not be chunked | Extracted |  |
 |  | Table location | Bounding box of the table | Extracted |  |
+|  | Table location max dimensions | Max dimensions (x\_max,y\_max) of bounding box of the table  | Extracted |  |
 |  | Caption | Detected captions for the table/chart | Extracted |  |
 |  | Title | TODO | Extracted |  |
 |  | Subtitle | TODO | Extracted |  |
