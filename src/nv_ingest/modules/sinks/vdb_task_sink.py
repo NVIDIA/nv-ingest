@@ -177,6 +177,9 @@ def _vdb_task_sink(builder: mrc.Builder):
     retry_interval = validated_config.retry_interval
     start_time = time.time()
 
+    default_resource_name = "nv_ingest_collection_2"
+    mydict[default_resource_name] = mydict.pop("nv_ingest_collection")
+
     service, service_status = _create_vdb_service(
         service, is_service_serialized, service_kwargs, recreate, resource_schemas
     )

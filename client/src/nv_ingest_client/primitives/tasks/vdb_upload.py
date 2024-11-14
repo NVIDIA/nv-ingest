@@ -17,6 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class VdbUploadTaskSchema(BaseModel):
+    collection_name: str = "nv_ingest_collection"
     filter_errors: bool = False
 
     class Config:
@@ -30,12 +31,14 @@ class VdbUploadTask(Task):
 
     def __init__(
         self,
+        collection_name: str = "nv_ingest_collection",
         filter_errors: bool = False,
     ) -> None:
         """
         Setup VDB Upload Task Config
         """
         super().__init__()
+        self._collection_name = "nv_ingest_collection"
         self._filter_errors = filter_errors
 
     def __str__(self) -> str:
@@ -44,6 +47,7 @@ class VdbUploadTask(Task):
         """
         info = ""
         info += "VDB Upload Task:\n"
+        info += f"  collection_name: {self._collection_name}]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
         return info
 
@@ -53,6 +57,7 @@ class VdbUploadTask(Task):
         """
 
         task_properties = {
+            "collection_name": self._collection_name,
             "filter_errors": self._filter_errors,
         }
 
