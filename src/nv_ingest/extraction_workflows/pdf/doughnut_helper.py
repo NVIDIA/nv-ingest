@@ -166,10 +166,11 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             }
 
             for cls, bbox, txt in zip(classes, bboxes, texts):
-                if extract_text:
+
+                if extract_text and (cls in doughnut_utils.ACCEPTED_TEXT_CLASSES):
                     txt = doughnut_utils.postprocess_text(txt, cls)
 
-                    if extract_images and identify_nearby_objects:
+                    if identify_nearby_objects:
                         bbox = doughnut_utils.reverse_transform_bbox(
                             bbox=bbox,
                             bbox_offset=bbox_offset,
@@ -181,16 +182,21 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
 
                     accumulated_text.append(txt)
 
-                elif extract_tables and (cls == "Table"):
+                if extract_tables and (cls == "Table"):
                     try:
                         txt = txt.encode().decode("unicode_escape")  # remove double backlashes
                     except UnicodeDecodeError:
                         pass
-                    bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
+                    bbox = doughnut_utils.reverse_transform_bbox(
+                        bbox=bbox,
+                        bbox_offset=bbox_offset,
+                        original_width=DEFAULT_MAX_WIDTH,
+                        original_height=DEFAULT_MAX_HEIGHT,
+                    )
                     table = LatexTable(latex=txt, bbox=bbox, max_width=page_width, max_height=page_height)
                     accumulated_tables.append(table)
 
-                elif extract_images and (cls == "Picture"):
+                if extract_images and (cls == "Picture"):
                     if page_image is None:
                         scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
                         padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
@@ -202,7 +208,12 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                     img_numpy = crop_image(page_image, bbox)
                     if img_numpy is not None:
                         base64_img = numpy_to_base64(img_numpy)
-                        bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
+                        bbox = doughnut_utils.reverse_transform_bbox(
+                            bbox=bbox,
+                            bbox_offset=bbox_offset,
+                            original_width=DEFAULT_MAX_WIDTH,
+                            original_height=DEFAULT_MAX_HEIGHT,
+                        )
                         image = Base64Image(
                             image=base64_img,
                             bbox=bbox,
@@ -340,6 +351,7 @@ def _construct_table_metadata(
     }
     table_metadata = {
         "caption": "",
+        "table_content": content,
         "table_format": table_format,
         "table_location": table.bbox,
     }

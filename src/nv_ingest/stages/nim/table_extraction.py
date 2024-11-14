@@ -2,22 +2,26 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 import tritonclient.grpc as grpcclient
 from morpheus.config import Config
+
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client, preprocess_image_for_paddle
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import get_version
+from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -63,7 +67,8 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
     if ((content_metadata.get("type") != "structured") or
             (content_metadata.get("subtype") != "table") or
-            (table_metadata is None)):
+            (table_metadata is None) or
+            (table_metadata.get("table_format") != TableFormatEnum.IMAGE)):
         return metadata
 
     # Modify table metadata with the result from the inference model

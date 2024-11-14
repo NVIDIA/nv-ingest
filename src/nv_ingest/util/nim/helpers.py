@@ -248,7 +248,7 @@ def _extract_content_from_doughnut_response(json_response):
     if "choices" not in json_response or not json_response["choices"]:
         raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
 
-    return json_response["choices"][0]["message"]["content"]
+    return [choice["message"]["content"] for choice in json_response["choices"]]
 
 
 def _extract_content_from_nim_response(json_response):
