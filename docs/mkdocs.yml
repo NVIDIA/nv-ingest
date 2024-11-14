@@ -1,0 +1,103 @@
+site_name: MyLibrary Documentation
+# site_url:
+# repo_url:
+# repo_name:
+
+theme:
+  name: "material"
+  custom_dir: overrides
+  features:
+    - content.code.annotate
+    - navigation.tabs
+    - navigation.indexes
+    - navigation.instant
+    - navigation.path
+    - navigation.instant.prefetch
+    - navigation.top
+    - navigation.footer
+    - search.suggest
+    - search.highlight
+    - content.code.copy
+  font:
+    code: Roboto Mono
+  favicon: assets/images/favicon.png
+  language: en
+  palette:
+    - media: "(prefers-color-scheme: light)"
+      scheme: light
+      primary: custom
+      accent: lime
+      toggle:
+        icon: material/weather-night
+        name: Switch to dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: dark
+      primary: custom
+      accent: lime
+      toggle:
+        icon: material/weather-sunny
+        name: Switch to light mode
+  icon:
+    logo: nvidia/nvidia-logo
+    repo: fontawesome/brands/github
+
+extra_css:
+  - assets/css/color-schemes.css
+  - assets/css/fonts.css
+  - assets/css/custom-material.css
+  - assets/css/jupyter-themes.css
+
+plugins:
+  - search
+  # uncomment below to grab api
+  # - gen-files:
+  #     scripts:
+  #       - scripts/gen_ref_pages.py
+  - macros
+  - mkdocstrings:
+      handlers:
+        python:
+          paths:
+            - ../sub-packages/*/src
+  - mkdocs-jupyter:
+      theme: auto
+      highlight_extra_classes: "jupyter-notebook"
+  - include_dir_to_nav:
+      file_pattern: '.*\.(md|ipynb)$'
+  - literate-nav:
+      nav_file: SUMMARY.md
+  - site-urls
+
+markdown_extensions:
+  - attr_list
+  - md_in_html
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.snippets:
+      check_paths: true
+      restrict_base_path: False
+      base_path: "."
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+      options:
+        custom_icons:
+          - overrides/.icons
+  - def_list
+  - admonition
+  - footnotes
+
+# extra:
+#   social:
+#     - icon: fontawesome/brands/github
+#       link:
+#   version:
+#     provider: mike
+#     default: stable
+#     alias: true
+#   docker_url: nvcr.io/nvidia/clara/bionemo-framework
+#   docker_tag: main--nightly
+#   github_url:
+
+copyright: |
+  &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

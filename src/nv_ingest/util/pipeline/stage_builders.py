@@ -23,6 +23,7 @@ from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFac
 from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
+from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
@@ -247,6 +248,29 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     return table_extractor_stage
 
 
+def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    image_extractor_config = ingest_config.get("image_extraction_module",
+                                               {
+                                                   "image_extraction_config": {
+                                                       "yolox_endpoints": (yolox_grpc, yolox_http),
+                                                       "yolox_infer_protocol": yolox_protocol,
+                                                       "auth_token": yolox_auth,
+                                                       # All auth tokens are the same for the moment
+                                                   }
+                                               })
+    image_extractor_stage = pipe.add_stage(
+        generate_image_extractor_stage(
+            morpheus_pipeline_config,
+            extractor_config=image_extractor_config,
+            pe_count=8,
+            task="extract",
+            task_desc="docx_content_extractor",
+        )
+    )
+    return image_extractor_stage
+
+
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
     docx_extractor_stage = pipe.add_stage(
         generate_docx_extractor_stage(
@@ -319,14 +343,25 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    endpoint_url, model_name = get_caption_classifier_service()
+    auth_token = os.environ.get(
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
+        "",
+    )
+
+    endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT")
+
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
-            "caption_classifier_model_name": model_name,
+            "api_key": auth_token,
             "endpoint_url": endpoint_url,
+            "prompt": "Caption the content of this image:",
         },
     )
+
     image_caption_stage = pipe.add_stage(
         generate_caption_extraction_stage(
             morpheus_pipeline_config,

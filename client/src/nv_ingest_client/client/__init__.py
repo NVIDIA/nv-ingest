@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .client import NvIngestClient
+from nv_ingest_client.client.client import NvIngestClient
+from nv_ingest_client.client.interface import Ingestor
 
-__all__ = ["NvIngestClient"]
+__all__ = ["NvIngestClient", "Ingestor"]

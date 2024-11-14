@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
+ARG BASE_IMG_TAG=12.4.1-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -49,6 +49,9 @@ RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
+     imagemagick \
+     # pin to earlier version of cuda-python until __pyx_capi__ fix is upstreamed.
+     cuda-python=12.6.0 \
      -c rapidsai -c pytorch -c nvidia -c conda-forge
 
 # Install additional dependencies using apt-get
