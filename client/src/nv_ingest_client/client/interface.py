@@ -360,11 +360,13 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        extract_tables = kwargs.get("extract_tables", False)
-        extract_charts = kwargs.get("extract_charts", False)
+        extract_tables = kwargs.pop("extract_tables", True)
+        extract_charts = kwargs.pop("extract_charts", True)
 
         for document_type in self._job_specs.file_types:
-            extract_task = ExtractTask(document_type, **kwargs)
+            extract_task = ExtractTask(
+                document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
+            )
             self._job_specs.add_task(extract_task, document_type=document_type)
 
             if extract_tables is True:
