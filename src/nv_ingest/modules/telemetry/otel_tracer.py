@@ -49,6 +49,7 @@ def _trace(builder: mrc.Builder) -> None:
     -------
     None
     """
+    logger.info(f"Entering _trace for otel_tracing stage!!!!")
     validated_config = fetch_and_validate_module_config(builder, OpenTelemetryTracerSchema)
 
     resource = Resource(attributes={"service.name": "nv-ingest"})
@@ -65,17 +66,22 @@ def _trace(builder: mrc.Builder) -> None:
         job_id = message.get_metadata("job_id")
 
         trace_id = message.get_metadata("trace_id")
+        logger.info(f"Logging job_id: {job_id} and trace_id: {trace_id}")
         if trace_id is None:
             trace_id = RandomIdGenerator().generate_trace_id()
         elif isinstance(trace_id, str):
             trace_id = int(trace_id, 16)
+        logger.info(f"Trace ID after if/else statement: {trace_id}")
         span_id = RandomIdGenerator().generate_span_id()
 
         timestamps = extract_timestamps_from_message(message)
+        
+        logger.info(f"Timestamps: {timestamps}")
 
         flattened = [x for t in timestamps.values() for x in t]
         start_time = min(flattened)
         end_time = max(flattened)
+        logger.info(f"StartTime: {start_time} EndTime: {end_time}")
 
         span_context = SpanContext(
             trace_id=trace_id,
@@ -108,6 +114,7 @@ def _trace(builder: mrc.Builder) -> None:
         try:
             do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
             if not do_trace_tagging:
+                logger.info("Returning without doing any trace logging!!!")
                 return message
 
             logger.debug("Sending traces to OpenTelemetry collector.")
@@ -170,10 +177,13 @@ def create_span_with_timestamps(tracer, parent_span, message):
     task_results = extract_annotated_task_results(message)
 
     ctx_store = {}
+    logger.info(f"ParentSpan: {parent_span}")
     child_ctx = trace.set_span_in_context(parent_span)
     for task_name, (ts_entry, ts_exit) in sorted(timestamps.items(), key=lambda x: x[1]):
         main_task, *subtask = task_name.split("::", 1)
         subtask = "::".join(subtask)
+        
+        logger.info(f"Subtask: {subtask}")
 
         if not subtask:
             span = tracer.start_span(main_task, context=child_ctx, start_time=ts_entry)
@@ -195,6 +205,8 @@ def create_span_with_timestamps(tracer, parent_span, message):
         # Add timestamps.
         span.add_event("entry", timestamp=ts_entry)
         span.add_event("exit", timestamp=ts_exit)
+        
+        logger.info(f"Span: {span}")
 
         # Cache span and exit time.
         # Spans are used for looking up the main task's span when creating a subtask's span.

@@ -22,15 +22,15 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=1
-      # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=yolox
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - NIM_ENABLE_OTEL=true
-      # Triton OpenTelemetry Settings
-      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
-      - TRITON_OTEL_RATE=1
+      # # NIM OpenTelemetry Settings
+      # - NIM_OTEL_SERVICE_NAME=yolox
+      # - NIM_OTEL_TRACES_EXPORTER=otlp
+      # - NIM_OTEL_METRICS_EXPORTER=console
+      # - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      # - NIM_ENABLE_OTEL=true
+      # # Triton OpenTelemetry Settings
+      # - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      # - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -52,15 +52,15 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=deplot
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - NIM_ENABLE_OTEL=true
-      # Triton OpenTelemetry Settings
-      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
-      - TRITON_OTEL_RATE=1
+      # # NIM OpenTelemetry Settings
+      # - NIM_OTEL_SERVICE_NAME=deplot
+      # - NIM_OTEL_TRACES_EXPORTER=otlp
+      # - NIM_OTEL_METRICS_EXPORTER=console
+      # - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      # - NIM_ENABLE_OTEL=true
+      # # Triton OpenTelemetry Settings
+      # - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      # - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -82,15 +82,15 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=cached
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - NIM_ENABLE_OTEL=true
-      # Triton OpenTelemetry Settings
-      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
-      - TRITON_OTEL_RATE=1
+      # # NIM OpenTelemetry Settings
+      # - NIM_OTEL_SERVICE_NAME=cached
+      # - NIM_OTEL_TRACES_EXPORTER=otlp
+      # - NIM_OTEL_METRICS_EXPORTER=console
+      # - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      # - NIM_ENABLE_OTEL=true
+      # # Triton OpenTelemetry Settings
+      # - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      # - TRITON_OTEL_RATE=1
       - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
@@ -113,15 +113,15 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=paddle
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - NIM_ENABLE_OTEL=true
-      # Triton OpenTelemetry Settings
-      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
-      - TRITON_OTEL_RATE=1
+      # # NIM OpenTelemetry Settings
+      # - NIM_OTEL_SERVICE_NAME=paddle
+      # - NIM_OTEL_TRACES_EXPORTER=otlp
+      # - NIM_OTEL_METRICS_EXPORTER=console
+      # - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      # - NIM_ENABLE_OTEL=true
+      # # Triton OpenTelemetry Settings
+      # - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      # - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -143,15 +143,15 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=embedding
-      - NIM_OTEL_TRACES_EXPORTER=otlp
-      - NIM_OTEL_METRICS_EXPORTER=console
-      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
-      - NIM_ENABLE_OTEL=true
-      # Triton OpenTelemetry Settings
-      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
-      - TRITON_OTEL_RATE=1
+      # # NIM OpenTelemetry Settings
+      # - NIM_OTEL_SERVICE_NAME=embedding
+      # - NIM_OTEL_TRACES_EXPORTER=otlp
+      # - NIM_OTEL_METRICS_EXPORTER=console
+      # - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      # - NIM_ENABLE_OTEL=true
+      # # Triton OpenTelemetry Settings
+      # - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      # - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -207,7 +207,7 @@ services:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
       timeout: 5s
-      retries: 5
+      retries: 20
     deploy:
       resources:
         reservations:

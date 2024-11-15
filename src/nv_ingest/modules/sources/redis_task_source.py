@@ -76,6 +76,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             # ts_send is in nanoseconds
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
         trace_id = tracing_options.get("trace_id", None)
+        
+        print(f"Redis Task Source Trace ID: {trace_id}")
 
         response_channel = f"response_{job_id}"
 

@@ -89,6 +89,8 @@ logger = logging.getLogger(__name__)
 )
 @click.option("--save_images_separately", is_flag=True,
               help="Save images separately from returned metadata. This can make metadata files more human readable")
+@click.option("--profile", is_flag=True,
+              help="Uses the trace_id obtained from submission to gather fine grained trace data about a submission and optionally generate an aggregation report")
 @click.option(
     "--shuffle_dataset", is_flag=True, default=True, show_default=True,
     help="Shuffle the dataset before processing."
@@ -194,6 +196,7 @@ def main(
         log_level: str,
         output_directory: str,
         save_images_separately: bool,
+        profile: bool,
         shuffle_dataset: bool,
         task: [str],
         version: [bool],
@@ -250,9 +253,14 @@ def main(
                 timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
+                profile=profile,
             )
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
+            
+            # capture the lower level profiling metrics using trace_id(s) if this flag is enabled.
+            if profile:
+                
 
     except Exception as err:
         logging.error(f"Error: {err}")
