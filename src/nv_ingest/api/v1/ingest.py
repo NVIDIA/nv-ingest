@@ -261,8 +261,9 @@ def parse_json_string_to_blob(json_content):
         str: The generated blob string.
     """
     try:
-        # Load the JSON data
-        data = json.loads(json_content) if isinstance(json_content, str) else json.load(json_content)
+        # # Load the JSON data
+        # data = json.loads(json_content) if isinstance(json_content, str) else json.load(json_content)
+        data = json_content
         
         print(f"Data: {data}")
         print(f"Done ....")
