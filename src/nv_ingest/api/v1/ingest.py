@@ -25,6 +25,7 @@ from fastapi import File, UploadFile
 from fastapi import HTTPException
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
+from pydantic import BaseModel
 from redis import RedisError
 
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
@@ -234,9 +235,47 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
         return {
             "task_id": submitted_job_id,
             "status": "processing",
-            "status_url": f"/fetch_job/{submitted_job_id}",
+            "status_url": f"/status/{submitted_job_id}",
         }
 
     except Exception as e:
         logger.error(f"Error starting conversion: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
+
+
+class StatusResponse(BaseModel):
+    status: str
+    result: Optional[str] = None
+    error: Optional[str] = None
+    message: Optional[str] = None
+
+
+@router.get("/status/{job_id}")
+async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusResponse:  # Add return type annotation
+    try:
+        # Attempt to fetch the job from the ingest service
+        job_response = await ingest_service.fetch_job(job_id)
+        print(f"Job Response Type: {type(job_response)}")
+        print(f"Job Response: {job_response}")
+        status = StatusResponse(status="success", result=job_response, error=None, message=None)
+        return status
+    except TimeoutError:
+        # Return a 202 Accepted if the job is not ready yet
+        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
+    except RedisError:
+        # Return a 202 Accepted if the job could not be fetched due to Redis error, indicating a retry might succeed
+        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
+    except ValueError as ve:
+        # Return a 500 Internal Server Error for ValueErrors
+        raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
+    except Exception as ex:
+        # Catch-all for other exceptions, returning a 500 Internal Server Error
+        traceback.print_exc()
+        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+    
+    # status_data = job_manager.get_status(job_id)
+    # if status_data is None:
+    #     span.set_status(StatusCode.ERROR)
+    #     raise HTTPException(status_code=404, detail="Job not found")
+    # span.set_attribute("status", status_data.get("status"))
+    # return StatusResponse(**status_data)
