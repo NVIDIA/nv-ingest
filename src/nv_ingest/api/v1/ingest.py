@@ -248,6 +248,65 @@ class StatusResponse(BaseModel):
     result: Optional[str] = None
     error: Optional[str] = None
     message: Optional[str] = None
+    
+    
+def parse_json_string_to_blob(json_content):
+    """
+    Parse a JSON string or BytesIO object, combine and sort entries, and create a blob string.
+
+    Args:
+        json_content (str or BytesIO): JSON string or BytesIO object containing JSON data.
+
+    Returns:
+        str: The generated blob string.
+    """
+    try:
+        # Load the JSON data
+        data = json.loads(json_content) if isinstance(json_content, str) else json.load(json_content)
+
+        # Smarter sorting: by page, then structured objects by x0, y0
+        def sorting_key(entry):
+            page = entry['metadata']['content_metadata']['page']
+            if entry['document_type'] == 'structured':
+                # Use table location's x0 and y0 as secondary keys
+                x0 = entry['metadata']['table_metadata']['table_location'][0]
+                y0 = entry['metadata']['table_metadata']['table_location'][1]
+            else:
+                # Non-structured objects are sorted after structured ones
+                x0 = float('inf')
+                y0 = float('inf')
+            return page, x0, y0
+
+        data.sort(key=sorting_key)
+
+        # Initialize the blob string
+        blob = []
+
+        for entry in data:
+            document_type = entry.get('document_type', '')
+
+            if document_type == 'structured':
+                # Add table content to the blob
+                blob.append(entry['metadata']['table_metadata']['table_content'])
+                blob.append("\n")
+
+            elif document_type == 'text':
+                # Add content to the blob
+                blob.append(entry['metadata']['content'])
+                blob.append("\n")
+
+            elif document_type == 'image':
+                # Add image caption to the blob
+                caption = entry['metadata']['image_metadata'].get('caption', '')
+                blob.append(f"image_caption:[{caption}]")
+                blob.append("\n")
+
+        # Join all parts of the blob into a single string
+        return ''.join(blob)
+
+    except Exception as e:
+        print(f"[ERROR] An error occurred while processing JSON content: {e}")
+        return ""
 
 
 @router.get("/status/{job_id}")
@@ -255,9 +314,11 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
     try:
         # Attempt to fetch the job from the ingest service
         job_response = await ingest_service.fetch_job(job_id)
+        blob_response = parse_json_string_to_blob(job_response)
         print(f"Job Response Type: {type(job_response)}")
         print(f"Job Response: {job_response}")
-        status = StatusResponse(status="success", result=job_response, error=None, message=None)
+        print(f"Blob response: {blob_response}")
+        status = StatusResponse(status="success", result=blob_response, error=None, message=None)
         return status
     except TimeoutError:
         # Return a 202 Accepted if the job is not ready yet
@@ -272,10 +333,3 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
         # Catch-all for other exceptions, returning a 500 Internal Server Error
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
-    
-    # status_data = job_manager.get_status(job_id)
-    # if status_data is None:
-    #     span.set_status(StatusCode.ERROR)
-    #     raise HTTPException(status_code=404, detail="Job not found")
-    # span.set_attribute("status", status_data.get("status"))
-    # return StatusResponse(**status_data)
