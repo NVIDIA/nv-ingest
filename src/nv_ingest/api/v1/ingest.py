@@ -196,7 +196,14 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
             document_type="pdf",
             payload=doc_content,
             source_id=files[0].filename,
-            source_name=files[0].filename
+            source_name=files[0].filename,
+            extended_options={
+                "tracing_options":
+                {
+                    "trace": True,
+                    "ts_send": time.time_ns(),
+                }
+            }
         )
         print(f"Done creating jobspec")
 
