@@ -323,7 +323,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
         print(f"Job Response Type: {type(job_response)}")
         # print(f"Job Response: {job_response}")
         # print(f"Blob response: {blob_response}")
-        status = StatusResponse(status="success", result=job_response, error=None, message=None)
+        status = StatusResponse(status="success", result=json.dumps(job_response), error=None, message=None)
         return status
     except TimeoutError:
         # Return a 202 Accepted if the job is not ready yet
