@@ -263,6 +263,9 @@ def parse_json_string_to_blob(json_content):
     try:
         # Load the JSON data
         data = json.loads(json_content) if isinstance(json_content, str) else json.load(json_content)
+        
+        print(f"Data: {data}")
+        print(f"Done ....")
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
@@ -314,9 +317,10 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
     try:
         # Attempt to fetch the job from the ingest service
         job_response = await ingest_service.fetch_job(job_id)
+        
         blob_response = parse_json_string_to_blob(job_response)
         print(f"Job Response Type: {type(job_response)}")
-        print(f"Job Response: {job_response}")
+        # print(f"Job Response: {job_response}")
         print(f"Blob response: {blob_response}")
         status = StatusResponse(status="success", result=blob_response, error=None, message=None)
         return status
