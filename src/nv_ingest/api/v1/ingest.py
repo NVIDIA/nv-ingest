@@ -262,8 +262,7 @@ def parse_json_string_to_blob(json_content):
     """
     try:
         # # Load the JSON data
-        # data = json.loads(json_content) if isinstance(json_content, str) else json.load(json_content)
-        data = json_content
+        data = json.loads(json_content) if isinstance(json_content, str) else json.loads(json_content)
         
         print(f"Data: {data}")
         print(f"Done ....")
