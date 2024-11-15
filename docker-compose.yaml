@@ -51,7 +51,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.0}
+    image: nvcr.io/nvstaging/nim/cached:ingest-test-no-cpu-ops-0.2.1-rc1
     shm_size: 2gb
     ports:
       - "8006:8000"
