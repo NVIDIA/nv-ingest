@@ -11,14 +11,15 @@
 # pylint: skip-file
 
 from io import BytesIO
-from typing import Annotated
+import os
+from typing import Annotated, Dict, List, Optional
 import base64
 import json
 import logging
 import time
 import traceback
 
-from fastapi import APIRouter
+from fastapi import APIRouter, BackgroundTasks
 from fastapi import Depends
 from fastapi import File, UploadFile
 from fastapi import HTTPException
@@ -30,6 +31,8 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -171,3 +174,62 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         # Catch-all for other exceptions, returning a 500 Internal Server Error
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+
+
+
+
+
+@router.post("/convert")
+async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] = File(...)) -> Dict[str, str]:
+    try:
+        if files[0].content_type != "application/pdf":
+            raise HTTPException(
+                status_code=400, detail=f"File {files[0].filename} must be a PDF"
+            )
+            
+        print(f"Decoding PDF into bytesio")
+        file_stream = BytesIO(files[0].file.read())
+        doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+        print(f"Done reading pdf")
+        
+        job_spec = JobSpec(
+            document_type="pdf",
+            payload=doc_content,
+            source_id=files[0].filename,
+            source_name=files[0].filename
+        )
+        print(f"Done creating jobspec")
+
+        # This is the "easy submission path" just default to extracting everything
+        extract_task = ExtractTask(
+            document_type="pdf",
+            extract_text=True,
+            extract_images=True,
+            extract_tables=True
+        )
+        print(f"Done creating extract_task")
+
+        table_data_extract = TableExtractionTask()
+        chart_data_extract = ChartExtractionTask()
+
+        job_spec.add_task(extract_task)
+        job_spec.add_task(table_data_extract)
+        job_spec.add_task(chart_data_extract)
+        print(f"Done populating job_spec")
+
+        submitted_job_id = await ingest_service.submit_job(
+            MessageWrapper(
+                payload=json.dumps(job_spec.to_dict())
+            )
+        )
+        print(f"Job submitted with job_id: {submitted_job_id}")
+
+        return {
+            "task_id": submitted_job_id,
+            "status": "processing",
+            "status_url": f"/fetch_job/{submitted_job_id}",
+        }
+
+    except Exception as e:
+        logger.error(f"Error starting conversion: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
