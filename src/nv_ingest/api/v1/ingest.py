@@ -315,7 +315,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
         # Attempt to fetch the job from the ingest service
         job_response = await ingest_service.fetch_job(job_id)
         
-        print(f"JSON response: {type(json_response)}")
+        print(f"JSON response: {type(job_response)}")
         job_response = json.dumps(job_response)
         blob_response = parse_json_string_to_blob(job_response)
         print(f"Job Response Type: {type(job_response)}")
