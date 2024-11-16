@@ -23,6 +23,7 @@ from fastapi import APIRouter, BackgroundTasks
 from fastapi import Depends
 from fastapi import File, UploadFile
 from fastapi import HTTPException
+from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
 from pydantic import BaseModel
@@ -188,10 +189,8 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
                 status_code=400, detail=f"File {files[0].filename} must be a PDF"
             )
             
-        print(f"Decoding PDF into bytesio")
         file_stream = BytesIO(files[0].file.read())
         doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
-        print(f"Done reading pdf")
         
         job_spec = JobSpec(
             document_type="pdf",
@@ -206,7 +205,6 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
                 }
             }
         )
-        print(f"Done creating jobspec")
 
         # This is the "easy submission path" just default to extracting everything
         extract_task = ExtractTask(
@@ -215,7 +213,6 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
             extract_images=True,
             extract_tables=True
         )
-        print(f"Done creating extract_task")
 
         table_data_extract = TableExtractionTask()
         chart_data_extract = ChartExtractionTask()
@@ -223,14 +220,12 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
         job_spec.add_task(extract_task)
         job_spec.add_task(table_data_extract)
         job_spec.add_task(chart_data_extract)
-        print(f"Done populating job_spec")
 
         submitted_job_id = await ingest_service.submit_job(
             MessageWrapper(
                 payload=json.dumps(job_spec.to_dict())
             )
         )
-        print(f"Job submitted with job_id: {submitted_job_id}")
 
         return {
             "task_id": submitted_job_id,
@@ -261,12 +256,20 @@ def parse_json_string_to_blob(json_content):
         str: The generated blob string.
     """
     try:
+        
+        # print(f"Type of json content: {type(json_content)}")
+        # with open("/workspace/data/nvidia-10q-nv-ingest-output.json", "w") as file:
+        #     json.dump(json.loads(json_content), file, indent=4)
+            
+        
         # # Load the JSON data
         data = json.loads(json_content) if isinstance(json_content, str) else json.loads(json_content)
+        data = data['data']
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
-            page = entry['metadata']['content_metadata']['page']
+            # page = entry['metadata']['content_metadata']['page']
+            page = entry['metadata']['content_metadata']['page_number']
             if entry['document_type'] == 'structured':
                 # Use table location's x0 and y0 as secondary keys
                 x0 = entry['metadata']['table_metadata']['table_location'][0]
@@ -319,10 +322,22 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusRes
         job_response = json.dumps(job_response)
         blob_response = parse_json_string_to_blob(job_response)
         print(f"Job Response Type: {type(job_response)}")
-        # print(f"Job Response: {job_response}")
-        # print(f"Blob response: {blob_response}")
-        status = StatusResponse(status="success", result=blob_response, error=None, message=None)
-        return status
+        # status = StatusResponse(status="success", result=blob_response, error=None, message=None)
+        
+        results = []
+        results.append(
+            {
+                "filename": "unknown.pdf",
+                "status": "success",
+                "content": blob_response,
+            }
+        )
+        
+        return JSONResponse(
+            content={"status": "completed", "result": results},
+            status_code=200,
+        )
+        # return status
     except TimeoutError:
         # Return a 202 Accepted if the job is not ready yet
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
