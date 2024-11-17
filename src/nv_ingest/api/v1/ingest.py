@@ -18,6 +18,8 @@ import json
 import logging
 import time
 import traceback
+from enum import Enum
+import uuid
 
 from fastapi import APIRouter, BackgroundTasks
 from fastapi import Depends
@@ -179,70 +181,91 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
 
 
 
+class ConversionStatus(str, Enum):
+    IN_PROGRESS = "in_progress"
+    SUCCESS = "success"
+    FAILED = "failed"
 
+class ProcessingJob(BaseModel):
+    submitted_job_id: str
+    filename: str
+    content: str = ""
+    status: ConversionStatus
+    error: str | None = None
+    
+processing_cache = {}
 
 @router.post("/convert")
 async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] = File(...)) -> Dict[str, str]:
     try:
-        if files[0].content_type != "application/pdf":
-            raise HTTPException(
-                status_code=400, detail=f"File {files[0].filename} must be a PDF"
+        
+        print(f"Processing: {len(files)} PDFs ....")
+        
+        submitted_job_ids = []
+        for file in files:
+            if file.content_type != "application/pdf":
+                raise HTTPException(
+                    status_code=400, detail=f"File {files[0].filename} must be a PDF"
+                )
+            
+            file_stream = BytesIO(file.file.read())
+            doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+            
+            job_spec = JobSpec(
+                document_type="pdf",
+                payload=doc_content,
+                source_id=file.filename,
+                source_name=file.filename,
+                extended_options={
+                    "tracing_options":
+                    {
+                        "trace": True,
+                        "ts_send": time.time_ns(),
+                    }
+                }
+            )
+
+            # This is the "easy submission path" just default to extracting everything
+            extract_task = ExtractTask(
+                document_type="pdf",
+                extract_text=True,
+                extract_images=True,
+                extract_tables=True
+            )
+
+            table_data_extract = TableExtractionTask()
+            chart_data_extract = ChartExtractionTask()
+
+            job_spec.add_task(extract_task)
+            job_spec.add_task(table_data_extract)
+            job_spec.add_task(chart_data_extract)
+
+            submitted_job_id = await ingest_service.submit_job(
+                MessageWrapper(
+                    payload=json.dumps(job_spec.to_dict())
+                )
             )
             
-        file_stream = BytesIO(files[0].file.read())
-        doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+            processing_job = ProcessingJob(submitted_job_id=submitted_job_id, filename=file.filename, status=ConversionStatus.IN_PROGRESS)
+            
+            submitted_job_ids.append(processing_job)
+
+        # Each invocation of this endpoint creates a "job" that could have multiple PDFs being parsed ...
+        # keep a local cache of those job ids to the submitted job ids so that they can all be checked later
+        job_id = str(uuid.uuid4())
+        processing_cache[job_id] = submitted_job_ids
         
-        job_spec = JobSpec(
-            document_type="pdf",
-            payload=doc_content,
-            source_id=files[0].filename,
-            source_name=files[0].filename,
-            extended_options={
-                "tracing_options":
-                {
-                    "trace": True,
-                    "ts_send": time.time_ns(),
-                }
-            }
-        )
-
-        # This is the "easy submission path" just default to extracting everything
-        extract_task = ExtractTask(
-            document_type="pdf",
-            extract_text=True,
-            extract_images=True,
-            extract_tables=True
-        )
-
-        table_data_extract = TableExtractionTask()
-        chart_data_extract = ChartExtractionTask()
-
-        job_spec.add_task(extract_task)
-        job_spec.add_task(table_data_extract)
-        job_spec.add_task(chart_data_extract)
-
-        submitted_job_id = await ingest_service.submit_job(
-            MessageWrapper(
-                payload=json.dumps(job_spec.to_dict())
-            )
-        )
+        print(f"Submitted: {len(processing_cache[job_id])} PDFs for processing")
 
         return {
-            "task_id": submitted_job_id,
+            "task_id": job_id,
             "status": "processing",
-            "status_url": f"/status/{submitted_job_id}",
+            "status_url": f"/status/{job_id}",
         }
 
     except Exception as e:
         logger.error(f"Error starting conversion: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-
-
-class StatusResponse(BaseModel):
-    status: str
-    result: Optional[str] = None
-    error: Optional[str] = None
-    message: Optional[str] = None
     
     
 def parse_json_string_to_blob(json_content):
@@ -256,19 +279,12 @@ def parse_json_string_to_blob(json_content):
         str: The generated blob string.
     """
     try:
-        
-        # print(f"Type of json content: {type(json_content)}")
-        # with open("/workspace/data/nvidia-10q-nv-ingest-output.json", "w") as file:
-        #     json.dump(json.loads(json_content), file, indent=4)
-            
-        
-        # # Load the JSON data
+        # Load the JSON data
         data = json.loads(json_content) if isinstance(json_content, str) else json.loads(json_content)
         data = data['data']
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
-            # page = entry['metadata']['content_metadata']['page']
             page = entry['metadata']['content_metadata']['page_number']
             if entry['document_type'] == 'structured':
                 # Use table location's x0 and y0 as secondary keys
@@ -313,41 +329,59 @@ def parse_json_string_to_blob(json_content):
 
 
 @router.get("/status/{job_id}")
-async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str) -> StatusResponse:  # Add return type annotation
-    try:
-        # Attempt to fetch the job from the ingest service
-        job_response = await ingest_service.fetch_job(job_id)
-        
-        print(f"JSON response: {type(job_response)}")
-        job_response = json.dumps(job_response)
-        blob_response = parse_json_string_to_blob(job_response)
-        print(f"Job Response Type: {type(job_response)}")
-        # status = StatusResponse(status="success", result=blob_response, error=None, message=None)
-        
+async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
+    print(f"Job contains: {len(processing_cache[job_id])} PDFs that are processing. Lets check them now ...")
+    
+    updated_cache = []
+    num_ready_docs = 0
+    
+    for processing_job in processing_cache[job_id]:
+        print(f"Checking on submitted_job_id: {processing_job.submitted_job_id}")
+    
+        print(f"Processing Job Status: {processing_job.status}")
+        if processing_job.status == ConversionStatus.IN_PROGRESS:
+            # Attempt to fetch the job from the ingest service
+            try:
+                job_response = await ingest_service.fetch_job(processing_job.submitted_job_id)
+                
+                job_response = json.dumps(job_response)
+                blob_response = parse_json_string_to_blob(job_response)
+                
+                processing_job.content = blob_response
+                processing_job.status = ConversionStatus.SUCCESS
+                num_ready_docs = num_ready_docs + 1
+                updated_cache.append(processing_job)
+                
+            except TimeoutError:
+                print(f"TimeoutError getting result for job_id: {processing_job.submitted_job_id}")
+                updated_cache.append(processing_job)
+                continue
+            except RedisError:
+                print(f"RedisError getting result for job_id: {processing_job.submitted_job_id}")
+                updated_cache.append(processing_job)
+                continue
+        else:
+            print(f"{processing_job.submitted_job_id} has already finished successfully ....")
+            num_ready_docs = num_ready_docs + 1
+            updated_cache.append(processing_job)
+    
+    processing_cache[job_id] = updated_cache
+    print(f"{num_ready_docs}/{len(updated_cache)} complete")
+    if num_ready_docs == len(updated_cache):
         results = []
-        results.append(
-            {
-                "filename": "unknown.pdf",
-                "status": "success",
-                "content": blob_response,
-            }
-        )
+        for result in updated_cache:
+            results.append(
+                {
+                    "filename": result.filename,
+                    "status": "success",
+                    "content": result.content,
+                }
+            )
         
         return JSONResponse(
             content={"status": "completed", "result": results},
             status_code=200,
         )
-        # return status
-    except TimeoutError:
-        # Return a 202 Accepted if the job is not ready yet
+    else:
+        # Not yet ready ...
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except RedisError:
-        # Return a 202 Accepted if the job could not be fetched due to Redis error, indicating a retry might succeed
-        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except ValueError as ve:
-        # Return a 500 Internal Server Error for ValueErrors
-        raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
-    except Exception as ex:
-        # Catch-all for other exceptions, returning a 500 Internal Server Error
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
