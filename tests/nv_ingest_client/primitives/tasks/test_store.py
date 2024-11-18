@@ -12,7 +12,7 @@ def test_store_task_initialization():
     task = StoreTask(
         structured=True,
         images=True,
-        extra_params={
+        params={
             "access_key": "foo",
             "secret_key": "bar",
             "endpoint": "minio:9000",
@@ -23,9 +23,9 @@ def test_store_task_initialization():
     assert task._structured
     assert task._images
     assert task._store_method == "s3"
-    assert task._extra_params["endpoint"] == "minio:9000"
-    assert task._extra_params["access_key"] == "foo"
-    assert task._extra_params["secret_key"] == "bar"
+    assert task._params["endpoint"] == "minio:9000"
+    assert task._params["access_key"] == "foo"
+    assert task._params["secret_key"] == "bar"
 
 
 # String Representation Tests
@@ -36,7 +36,7 @@ def test_store_task_str_representation():
         structured=True, 
         images=True, 
         store_method="minio", 
-        extra_params={
+        params={
             "endpoint":"minio:9000"
         }
         )
@@ -76,18 +76,18 @@ def test_store_task_to_dict(
         structured=structured,
         images=images,
         store_method=store_method,
-        extra_params={
+        params={
             "extra_param_1": extra_param_1,
             "extra_param_2": extra_param_2,
         }
     )
 
-    expected_dict = {"type": "store", "task_properties": {"extra_params": {}}}
+    expected_dict = {"type": "store", "task_properties": {"params": {}}}
 
     expected_dict["task_properties"]["structured"] = structured
     expected_dict["task_properties"]["images"] = images
     expected_dict["task_properties"]["method"] = store_method or "minio"
-    expected_dict["task_properties"]["extra_params"]["extra_param_1"] = extra_param_1
-    expected_dict["task_properties"]["extra_params"]["extra_param_2"] = extra_param_2
+    expected_dict["task_properties"]["params"]["extra_param_1"] = extra_param_1
+    expected_dict["task_properties"]["params"]["extra_param_2"] = extra_param_2
 
     assert task.to_dict() == expected_dict, "The to_dict method did not return the expected dictionary representation"
