@@ -40,33 +40,34 @@ class ContentTypeEnum(str, Enum):
     TEXT = "text"
     IMAGE = "image"
     STRUCTURED = "structured"
+    UNSTRUCTURED = "unstructured"
     INFO_MSG = "info_message"
     EMBEDDING = "embedding"
 
 
 class StdContentDescEnum(str, Enum):
-    PDF_TEXT = "Unstructured text from PDF document."
-    PDF_IMAGE = "Image extracted from PDF document."
-    PDF_TABLE = "Structured table extracted from PDF document."
-    PDF_CHART = "Structured chart extracted from PDF document."
-    DOCX_TEXT = "Unstructured text from DOCX document."
     DOCX_IMAGE = "Image extracted from DOCX document."
     DOCX_TABLE = "Structured table extracted from DOCX document."
-    PPTX_TEXT = "Unstructured text from PPTX presentation."
+    DOCX_TEXT = "Unstructured text from DOCX document."
+    PDF_CHART = "Structured chart extracted from PDF document."
+    PDF_IMAGE = "Image extracted from PDF document."
+    PDF_TABLE = "Structured table extracted from PDF document."
+    PDF_TEXT = "Unstructured text from PDF document."
     PPTX_IMAGE = "Image extracted from PPTX presentation."
     PPTX_TABLE = "Structured table extracted from PPTX presentation."
+    PPTX_TEXT = "Unstructured text from PPTX presentation."
 
 
 class TextTypeEnum(str, Enum):
-    HEADER = "header"
-    BODY = "body"
-    SPAN = "span"
-    LINE = "line"
     BLOCK = "block"
-    PAGE = "page"
+    BODY = "body"
     DOCUMENT = "document"
+    HEADER = "header"
+    LINE = "line"
     NEARBY_BLOCK = "nearby_block"
     OTHER = "other"
+    PAGE = "page"
+    SPAN = "span"
 
 
 class LanguageEnum(str, Enum):
@@ -133,10 +134,10 @@ class LanguageEnum(str, Enum):
 
 
 class ImageTypeEnum(str, Enum):
-    JPEG = "jpeg"
-    PNG = "png"
     BMP = "bmp"
     GIF = "gif"
+    JPEG = "jpeg"
+    PNG = "png"
     TIFF = "tiff"
 
     image_type_1 = "image_type_1"  # until classifier developed
@@ -149,9 +150,9 @@ class ImageTypeEnum(str, Enum):
 
 class TableFormatEnum(str, Enum):
     HTML = "html"
-    MARKDOWN = "markdown"
-    LATEX = "latex"
     IMAGE = "image"
+    LATEX = "latex"
+    MARKDOWN = "markdown"
 
 
 class TaskTypeEnum(str, Enum):
@@ -250,13 +251,6 @@ class TextMetadataSchema(BaseModelNoExt):
     text_location: tuple = (0, 0, 0, 0)
 
 
-import logging
-from pydantic import validator
-
-# Set up logging
-logger = logging.getLogger(__name__)
-
-
 class ImageMetadataSchema(BaseModelNoExt):
     image_type: Union[ImageTypeEnum, str]
     structured_image_type: ImageTypeEnum = ImageTypeEnum.image_type_1
@@ -318,6 +312,7 @@ class InfoMessageMetadataSchema(BaseModelNoExt):
 # Main metadata schema
 class MetadataSchema(BaseModelNoExt):
     content: str = ""
+    content_url: str = ""
     embedding: Optional[List[float]] = None
     source_metadata: Optional[SourceMetadataSchema] = None
     content_metadata: Optional[ContentMetadataSchema] = None

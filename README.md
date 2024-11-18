@@ -211,6 +211,8 @@ from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.util.file_processing.extract import extract_file_content
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 
 logger = logging.getLogger("nv_ingest_client")
 
@@ -243,7 +245,12 @@ extract_task = ExtractTask(
   extract_tables=True
 )
 
+table_data_extract = TableExtractionTask()
+chart_data_extract = ChartExtractionTask()
+
 job_spec.add_task(extract_task)
+job_spec.add_task(table_data_extract)
+job_spec.add_task(chart_data_extract)
 
 # Create the client and inform it about the JobSpec we want to process.
 client = NvIngestClient(
@@ -320,8 +327,22 @@ multimodal_test.pdf.metadata.json
 You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+First, install `tkinter` by running the following commands depending on your OS.
+- For Ubuntu/Debian Linux:
 ```shell
-pip install tkinter
+sudo apt-get update
+sudo apt-get install python3-tk
+```
+- For Fedora/RHEL Linux:
+```shell
+sudo dnf install python3-tkinter
+```
+- For macOS using Homebrew:
+```shell
+brew install python-tk
+```
+Then run the following command to execute the script for inspecting the extracted image:
+```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 

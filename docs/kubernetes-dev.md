@@ -358,10 +358,6 @@ As that error message says, run `help repo add` with that URL and an informative
 helm repo add \
     bitnami \
     https://charts.bitnami.com/bitnami
-
-helm repo add \
-    tika \
-    https://apache.jfrog.io/artifactory/tika
 ```
 
 ### Getting more logs from `skaffold`

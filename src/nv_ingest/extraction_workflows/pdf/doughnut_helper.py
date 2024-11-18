@@ -28,7 +28,6 @@ import numpy as np
 import pypdfium2 as pdfium
 import tritonclient.grpc as grpcclient
 
-from nv_ingest.extraction_workflows.pdf import doughnut_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -39,9 +38,10 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim import doughnut as doughnut_utils
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
@@ -50,6 +50,9 @@ logger = logging.getLogger(__name__)
 
 DOUGHNUT_GRPC_TRITON = os.environ.get("DOUGHNUT_GRPC_TRITON", "triton:8001")
 DEFAULT_BATCH_SIZE = 16
+DEFAULT_RENDER_DPI = 300
+DEFAULT_MAX_WIDTH = 1024
+DEFAULT_MAX_HEIGHT = 1280
 
 
 # Define a helper function to use doughnut to extract text from a base64 encoded bytestram PDF
@@ -165,7 +168,12 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                     txt = doughnut_utils.postprocess_text(txt, cls)
 
                     if extract_images and identify_nearby_objects:
-                        bbox = doughnut_utils.reverse_transform_bbox(bbox, bbox_offset)
+                        bbox = doughnut_utils.reverse_transform_bbox(
+                            bbox=bbox,
+                            bbox_offset=bbox_offset,
+                            original_width=DEFAULT_MAX_WIDTH,
+                            original_height=DEFAULT_MAX_HEIGHT,
+                        )
                         page_nearby_blocks["text"]["content"].append(txt)
                         page_nearby_blocks["text"]["bbox"].append(bbox)
 
@@ -182,8 +190,8 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
 
                 elif extract_images and (cls == "Picture"):
                     if page_image is None:
-                        scale_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
-                        padding_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
+                        scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
+                        padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
                         page_image, *_ = pdfium_pages_to_numpy(
                             [pages[page_idx]], scale_tuple=scale_tuple, padding_tuple=padding_tuple
                         )
@@ -221,7 +229,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             if extract_images:
                 for image in accumulated_images:
                     extracted_data.append(
-                        construct_image_metadata(
+                        construct_image_metadata_from_pdf_image(
                             image,
                             page_idx,
                             pdf_metadata.page_count,
@@ -280,9 +288,9 @@ def preprocess_and_send_requests(
     if not batch:
         return []
 
-    render_dpi = 300
-    scale_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
-    padding_tuple = (doughnut_utils.DEFAULT_MAX_WIDTH, doughnut_utils.DEFAULT_MAX_HEIGHT)
+    render_dpi = DEFAULT_RENDER_DPI
+    scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
+    padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
 
     page_images, bbox_offsets = pdfium_pages_to_numpy(
         batch, render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
