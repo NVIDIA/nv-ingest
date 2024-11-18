@@ -33,7 +33,7 @@ class VdbUploadTask(Task):
         filter_errors: bool = False,
         bulk_ingest: bool = False,
         bulk_ingest_path: str = None,
-        extra_params: dict = None
+        params: dict = None
     ) -> None:
         """
         Setup VDB Upload Task Config
@@ -42,7 +42,7 @@ class VdbUploadTask(Task):
         self._filter_errors = filter_errors
         self._bulk_ingest = bulk_ingest
         self._bulk_ingest_path = bulk_ingest_path
-        self._extra_params = extra_params
+        self._params = params
 
     def __str__(self) -> str:
         """
@@ -62,7 +62,7 @@ class VdbUploadTask(Task):
             "filter_errors": self._filter_errors,
             "bulk_ingest": self._bulk_ingest,
             "bulk_ingest_path": self._bulk_ingest_path,
-            "extra_params": self._extra_params,
+            "params": self._params,
         }
 
         return {"type": "vdb_upload", "task_properties": task_properties}

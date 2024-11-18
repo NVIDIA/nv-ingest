@@ -66,8 +66,9 @@ class StoreTask(Task):
         self._structured = structured
         self._images = images
         self._store_method = store_method or "minio"
-        self._extra_params = extra_params
         self._params = params
+        self._extra_params = extra_params
+
 
     def __str__(self) -> str:
         """
@@ -120,8 +121,8 @@ class StoreEmbedTask(Task):
         """
         super().__init__()
 
-        self._extra_params = extra_params
         self._params = params
+        self._extra_params = extra_params
 
     def __str__(self) -> str:
         """

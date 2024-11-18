@@ -90,13 +90,13 @@ class IngestTaskExtractSchema(BaseModelNoExt):
 
 
 class IngestTaskStoreEmbedSchema(BaseModelNoExt):
-    extra_params: dict
+    params: dict
 
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
     method: str
-    extra_params: dict
+    params: dict
 
 
 # All optional, the captioning stage requires default parameters, each of these are just overrides.
@@ -136,7 +136,7 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
     bulk_ingest: bool = False
     bulk_ingest_path: str = None
-    extra_params: dict = None
+    params: dict = None
     filter_errors: bool = True
 
 
