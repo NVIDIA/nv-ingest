@@ -11,28 +11,26 @@
 # pylint: skip-file
 
 from io import BytesIO
-import os
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, List
 import base64
 import json
 import logging
 import time
 import traceback
-from enum import Enum
 import uuid
 
-from fastapi import APIRouter, BackgroundTasks
+from fastapi import APIRouter
 from fastapi import Depends
 from fastapi import File, UploadFile
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
-from pydantic import BaseModel
 from redis import RedisError
 
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
+from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
@@ -181,30 +179,17 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
 
 
 
-class ConversionStatus(str, Enum):
-    IN_PROGRESS = "in_progress"
-    SUCCESS = "success"
-    FAILED = "failed"
-
-class ProcessingJob(BaseModel):
-    submitted_job_id: str
-    filename: str
-    content: str = ""
-    status: ConversionStatus
-    error: str | None = None
-    
-processing_cache = {}
-
 @router.post("/convert")
 async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] = File(...)) -> Dict[str, str]:
     try:
         
         print(f"Processing: {len(files)} PDFs ....")
         
-        submitted_job_ids = []
+        submitted_jobs: List[ProcessingJob] = []
         for file in files:
             if file.content_type != "application/pdf":
                 raise HTTPException(
+
                     status_code=400, detail=f"File {files[0].filename} must be a PDF"
                 )
             
@@ -248,14 +233,14 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
             
             processing_job = ProcessingJob(submitted_job_id=submitted_job_id, filename=file.filename, status=ConversionStatus.IN_PROGRESS)
             
-            submitted_job_ids.append(processing_job)
+            submitted_jobs.append(processing_job)
 
         # Each invocation of this endpoint creates a "job" that could have multiple PDFs being parsed ...
         # keep a local cache of those job ids to the submitted job ids so that they can all be checked later
         job_id = str(uuid.uuid4())
-        processing_cache[job_id] = submitted_job_ids
+        await ingest_service.set_processing_cache(job_id, submitted_jobs) 
         
-        print(f"Submitted: {len(processing_cache[job_id])} PDFs for processing")
+        print(f"Submitted: {len(submitted_jobs)} PDFs for processing")
 
         return {
             "task_id": job_id,
@@ -330,12 +315,18 @@ def parse_json_string_to_blob(json_content):
 
 @router.get("/status/{job_id}")
 async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
-    print(f"Job contains: {len(processing_cache[job_id])} PDFs that are processing. Lets check them now ...")
+    try:
+        processing_jobs = await ingest_service.get_processing_cache(job_id)
+    # TO DO: return 400 when job_id dne
+    except Exception as e:
+        logger.error(f"Error getting status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+    print(f"Job contains: {len(processing_jobs)} PDFs that are processing. Lets check them now ...")
     
-    updated_cache = []
+    updated_cache: List[ProcessingJob] = []
     num_ready_docs = 0
     
-    for processing_job in processing_cache[job_id]:
+    for processing_job in processing_jobs:
         print(f"Checking on submitted_job_id: {processing_job.submitted_job_id}")
     
         print(f"Processing Job Status: {processing_job.status}")
@@ -364,8 +355,9 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
             print(f"{processing_job.submitted_job_id} has already finished successfully ....")
             num_ready_docs = num_ready_docs + 1
             updated_cache.append(processing_job)
-    
-    processing_cache[job_id] = updated_cache
+
+    await ingest_service.set_processing_cache(job_id, updated_cache) 
+
     print(f"{num_ready_docs}/{len(updated_cache)} complete")
     if num_ready_docs == len(updated_cache):
         results = []
