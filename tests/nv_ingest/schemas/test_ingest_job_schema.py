@@ -172,7 +172,7 @@ def test_multiple_task_types():
                     "images": True,
                     "structured": True,
                     "method": "minio",
-                    "params": {
+                    "extra_params": {
                         "endpoint": "minio:9000",
                     },
                 },
