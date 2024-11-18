@@ -27,6 +27,8 @@ from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
 from redis import RedisError
+from pymilvus import Collection, connections, utility
+import openai
 
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
@@ -35,6 +37,7 @@ from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestServic
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -220,10 +223,12 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
 
             table_data_extract = TableExtractionTask()
             chart_data_extract = ChartExtractionTask()
+            vdb_task = VdbUploadTask()
 
             job_spec.add_task(extract_task)
             job_spec.add_task(table_data_extract)
             job_spec.add_task(chart_data_extract)
+            job_spec.add_task(vdb_task)
 
             submitted_job_id = await ingest_service.submit_job(
                 MessageWrapper(
@@ -377,3 +382,78 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
     else:
         # Not yet ready ...
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
+
+
+# Connect to Milvus
+connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
+COLLECTION_NAME = "your_collection_name"  # Update to your Milvus collection name
+
+# Define request schema
+class OpenAIRequest(BaseModel):
+    model: str
+    messages: List[dict]  # [{"role": "user", "content": "question"}]
+    max_tokens: int = 256
+    temperature: float = 0.7
+    top_p: float = 1.0
+
+# OpenAI-compatible response schema
+class OpenAIResponse(BaseModel):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: List[dict]  # [{"message": {"role": "assistant", "content": "answer"}}]
+
+def search_milvus(question_embedding: List[float], top_k: int = 5):
+    """Query Milvus for nearest neighbors of the question embedding."""
+    if not utility.has_collection(COLLECTION_NAME):
+        raise HTTPException(status_code=500, detail=f"Milvus collection '{COLLECTION_NAME}' not found.")
+    
+    collection = Collection(COLLECTION_NAME)
+    results = collection.search(
+        data=[question_embedding],
+        anns_field="embedding",  # Vector field in your collection
+        param={"metric_type": "L2", "params": {"nprobe": 10}},
+        limit=top_k,
+        output_fields=["content"]  # Update based on your schema
+    )
+    return [hit.entity.get("content") for hit in results[0]]
+
+def embed_text_with_openai(text: str) -> List[float]:
+    """Get text embeddings using OpenAI embeddings API."""
+    try:
+        response = openai.Embedding.create(input=text, model="text-embedding-ada-002")
+        return response["data"][0]["embedding"]
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Embedding generation failed: {e}")
+
+@app.post("/query", response_model=OpenAIResponse)
+async def query_milvus(request: OpenAIRequest):
+    # Extract user query from the last message
+    user_message = next(
+        (message for message in reversed(request.messages) if message["role"] == "user"), None
+    )
+    if not user_message:
+        raise HTTPException(status_code=400, detail="No user message found in request.")
+
+    user_query = user_message["content"]
+    
+    # Generate embedding for the query
+    query_embedding = embed_text_with_openai(user_query)
+
+    # Query Milvus for relevant documents
+    try:
+        docs = search_milvus(query_embedding)
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
+    
+    # Construct the response (combine docs into one or summarize, depending on your application)
+    response_content = "\n".join(docs)
+
+    return OpenAIResponse(
+        id="query-response-001",
+        object="chat.completion",
+        created=int(time.time()),
+        model=request.model,
+        choices=[{"message": {"role": "assistant", "content": response_content}}]
+    )
