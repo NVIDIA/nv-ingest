@@ -127,7 +127,7 @@ RUN source activate nv_ingest \
     && pip install ./client/dist/*.whl \
     ## Installations below can be removed after the next Morpheus release
     && pip install --no-input milvus==2.3.5 \
-    && pip install --no-input pymilvus==2.3.6 \
+    && pip install --no-input pymilvus[bulk_writer]==2.4.9 \
     && pip install --no-input langchain==0.1.16 \
     && pip install --no-input langchain-nvidia-ai-endpoints==0.0.11 \
     && pip install --no-input faiss-gpu==1.7.* \

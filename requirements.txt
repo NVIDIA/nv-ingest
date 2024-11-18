@@ -8,7 +8,7 @@ fastapi==0.109.1
 fastparquet==2024.2.0
 fsspec
 gunicorn==22.0.0
-grpcio==1.63.0
+grpcio==1.60.0
 minio~=7.2.5
 more_itertools
 nltk==3.9.1
@@ -37,3 +37,4 @@ torchvision==0.18.0
 unstructured-client==0.23.3
 uvicorn==0.24.0-post.1
 Wand==0.6.13
+pymilvus[bulk_writer]==2.4.9

@@ -9,6 +9,7 @@ class ConversionStatus(str, Enum):
 class ProcessingJob(BaseModel):
     submitted_job_id: str
     filename: str
+    raw_result: str = ""
     content: str = ""
     status: ConversionStatus
     error: str | None = None

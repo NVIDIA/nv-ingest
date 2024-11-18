@@ -11,13 +11,15 @@
 # pylint: skip-file
 
 from io import BytesIO
-from typing import Annotated, Dict, List
+from typing import Annotated, Dict, List, Optional
 import base64
 import json
 import logging
 import time
 import traceback
 import uuid
+import os
+import requests
 
 from fastapi import APIRouter
 from fastapi import Depends
@@ -27,8 +29,10 @@ from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
 from redis import RedisError
-from pymilvus import Collection, connections, utility
+from pymilvus import Collection, MilvusClient, DataType, connections, utility, BulkInsertState
+from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
 import openai
+from pydantic import BaseModel
 
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
@@ -38,6 +42,8 @@ from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTask
+from nv_ingest_client.primitives.tasks.embed import EmbedTask
+from nv_ingest_client.primitives.tasks.split import SplitTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -183,7 +189,12 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
 
 
 @router.post("/convert")
-async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] = File(...)) -> Dict[str, str]:
+async def convert_pdf(
+    ingest_service: INGEST_SERVICE_T,
+    files: List[UploadFile] = File(...),
+    job_id: Optional[str] = None,
+    vdb_task: Optional[bool] = False
+) -> Dict[str, str]:
     try:
         
         print(f"Processing: {len(files)} PDFs ....")
@@ -223,12 +234,25 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
 
             table_data_extract = TableExtractionTask()
             chart_data_extract = ChartExtractionTask()
-            vdb_task = VdbUploadTask()
+            split_task = SplitTask(
+                split_by="word",
+                split_length=300,
+                split_overlap=10,
+                max_character_length=5000,
+                sentence_window_size=0,
+            )
+            embed_task = EmbedTask(
+                text=True,
+                tables=True
+            )
+            # vdb_task = VdbUploadTask()
 
             job_spec.add_task(extract_task)
             job_spec.add_task(table_data_extract)
             job_spec.add_task(chart_data_extract)
-            job_spec.add_task(vdb_task)
+            job_spec.add_task(split_task)
+            job_spec.add_task(embed_task)
+            # job_spec.add_task(vdb_task)
 
             submitted_job_id = await ingest_service.submit_job(
                 MessageWrapper(
@@ -242,7 +266,9 @@ async def convert_pdf(ingest_service: INGEST_SERVICE_T, files: List[UploadFile] 
 
         # Each invocation of this endpoint creates a "job" that could have multiple PDFs being parsed ...
         # keep a local cache of those job ids to the submitted job ids so that they can all be checked later
-        job_id = str(uuid.uuid4())
+        if job_id is None:
+            job_id = str(uuid.uuid4())
+
         await ingest_service.set_processing_cache(job_id, submitted_jobs) 
         
         print(f"Submitted: {len(submitted_jobs)} PDFs for processing")
@@ -316,10 +342,141 @@ def parse_json_string_to_blob(json_content):
     except Exception as e:
         print(f"[ERROR] An error occurred while processing JSON content: {e}")
         return ""
+    
+
+def perform_vdb_upload(results):
+    milvus_url = os.getenv("MILVUS_ENDPOINT", "http://milvus:19530")
+    minio_url = os.getenv("MINIO_ENDPOINT", "minio:9000")
+    
+    print(f"Milvus URL: {milvus_url}")
+    client = MilvusClient(milvus_url)
+    schema = MilvusClient.create_schema(
+        auto_id=True,
+        enable_dynamic_field=True
+    )
+    schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
+    schema.add_field(field_name="text", datatype=DataType.VARCHAR, max_length=65535)
+    schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=1024)
+    schema.add_field(field_name="source", datatype=DataType.JSON)
+    schema.add_field(field_name="content_metadata", datatype=DataType.JSON)
+
+    def create_collection(name):
+        client.create_collection(
+            collection_name=name,
+            schema=schema
+        )
+
+    for name in ["charts", "tables", "texts"]:
+        create_collection(name)
+    ACCESS_KEY="minioadmin"
+    SECRET_KEY="minioadmin"
+    BUCKET_NAME="a-bucket"
+
+    # Connections parameters to access the remote bucket
+    conn = RemoteBulkWriter.S3ConnectParam(
+        endpoint=minio_url, # the default MinIO service started along with Milvus
+        access_key=ACCESS_KEY,
+        secret_key=SECRET_KEY,
+        bucket_name=BUCKET_NAME,
+        secure=False
+    )
+
+    table_writer = RemoteBulkWriter(
+        schema=schema,
+        remote_path="/",
+        connect_param=conn,
+        file_type=BulkFileType.JSON
+    )
+
+    chart_writer = RemoteBulkWriter(
+        schema=schema,
+        remote_path="/",
+        connect_param=conn,
+        file_type=BulkFileType.JSON
+    )
+
+    text_writer = RemoteBulkWriter(
+        schema=schema,
+        remote_path="/",
+        connect_param=conn,
+        file_type=BulkFileType.JSON
+    )
+
+    def record_dict(text, element):
+        return {
+            "text": text,
+            "vector": element['metadata']['embedding'],
+            "source": element['metadata']['source_metadata'],
+            "content_metadata":  element['metadata']['content_metadata'],
+        }
+    
+    print("Iterating results.. adding to writer")
+    for result in results:
+        for element in result:
+            text = None
+            if element['document_type'] == 'text':
+                text =  element['metadata']['content']
+                text_writer.append_row(record_dict(text, element))
+            elif element['document_type'] == 'structured':
+                text = element['metadata']['table_metadata']['table_content']
+                if element["metadata"]["content_metadata"]["subtype"] == "chart":
+                    chart_writer.append_row({
+                        "text": text,
+                        "vector": element['metadata']['embedding'],
+                        "source": element['metadata']['source_metadata'],
+                        "content_metadata":  element['metadata']['content_metadata'],
+                    })
+                elif element["metadata"]["content_metadata"]["subtype"] == "table":
+                    table_writer.append_row({
+                        "text": text,
+                        "vector": element['metadata']['embedding'],
+                        "source": element['metadata']['source_metadata'],
+                        "content_metadata":  element['metadata']['content_metadata'],
+                    })
+
+    table_writer.commit()
+    print(f"Wrote data to: {table_writer.batch_files}")
+    chart_writer.commit()
+    print(f"Wrote data to: {chart_writer.batch_files}")
+    text_writer.commit()
+    print(f"Wrote data to: {text_writer.batch_files}")
+
+    connections.connect()
+    charts_task_id = utility.do_bulk_insert(
+        collection_name="charts",
+        files=chart_writer.batch_files[0],
+    )
+    tables_task_id = utility.do_bulk_insert(
+        collection_name="tables",
+        files=chart_writer.batch_files[0],
+    )
+    texts_task_id = utility.do_bulk_insert(
+        collection_name="texts",
+        files=chart_writer.batch_files[0],
+    )
+    tasks = {
+    "tables": tables_task_id,
+    "charts": charts_task_id,
+    "texts": texts_task_id
+    }
+    for name in ["charts", "tables", "texts"]:
+        t_bulk_start = time.time()
+        state = "Pending"
+        while state != "Completed":
+            task = utility.get_bulk_insert_state(task_id=tasks[name])
+            state = task.state_name
+            if state == "Completed":
+                t_bulk_end = time.time()
+                print("Start time:", task.create_time_str)
+                print("Imported row count:", task.row_count)
+                print(f"Bulk {name} upload took {t_bulk_end - t_bulk_start} s")
+            if task.state == BulkInsertState.ImportFailed:
+                print("Failed reason:", task.failed_reason)
+            time.sleep(1)
 
 
 @router.get("/status/{job_id}")
-async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
+async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str, vdb_task: bool):
     try:
         processing_jobs = await ingest_service.get_processing_cache(job_id)
     # TO DO: return 400 when job_id dne
@@ -343,6 +500,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 job_response = json.dumps(job_response)
                 blob_response = parse_json_string_to_blob(job_response)
                 
+                processing_job.raw_result = job_response
                 processing_job.content = blob_response
                 processing_job.status = ConversionStatus.SUCCESS
                 num_ready_docs = num_ready_docs + 1
@@ -366,6 +524,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
     print(f"{num_ready_docs}/{len(updated_cache)} complete")
     if num_ready_docs == len(updated_cache):
         results = []
+        raw_results = []
         for result in updated_cache:
             results.append(
                 {
@@ -374,6 +533,11 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                     "content": result.content,
                 }
             )
+            raw_results.append(result.raw_result)
+        
+        if vdb_task:
+            print(f"Inserting results into Milvus vector database ...")
+            resp = perform_vdb_upload(raw_results)
         
         return JSONResponse(
             content={"status": "completed", "result": results},
@@ -386,7 +550,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
 
 # Connect to Milvus
 connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
-COLLECTION_NAME = "your_collection_name"  # Update to your Milvus collection name
+COLLECTION_NAME = "nv_ingest_collection"  # Update to your Milvus collection name
 
 # Define request schema
 class OpenAIRequest(BaseModel):
@@ -406,29 +570,56 @@ class OpenAIResponse(BaseModel):
 
 def search_milvus(question_embedding: List[float], top_k: int = 5):
     """Query Milvus for nearest neighbors of the question embedding."""
+    print(f"Searching for milvus collection: {COLLECTION_NAME}")
     if not utility.has_collection(COLLECTION_NAME):
         raise HTTPException(status_code=500, detail=f"Milvus collection '{COLLECTION_NAME}' not found.")
     
     collection = Collection(COLLECTION_NAME)
     results = collection.search(
         data=[question_embedding],
-        anns_field="embedding",  # Vector field in your collection
+        anns_field="vector",  # Vector field in your collection
         param={"metric_type": "L2", "params": {"nprobe": 10}},
         limit=top_k,
         output_fields=["content"]  # Update based on your schema
     )
     return [hit.entity.get("content") for hit in results[0]]
 
-def embed_text_with_openai(text: str) -> List[float]:
-    """Get text embeddings using OpenAI embeddings API."""
+
+def perform_text_embedding(text: str) -> List[float]:
+    """Get the text embeddings use the nvcr.io/nim/nvidia/nv-embedqa-e5-v5 NIM"""
     try:
-        response = openai.Embedding.create(input=text, model="text-embedding-ada-002")
-        return response["data"][0]["embedding"]
+        embedding_http_endpoint = os.getenv("EMBEDDING_HTTP_ENDPOINT", "http://embedding:8000/v1/embeddings")
+        logger.debug(f"Embedding endpoint: {embedding_http_endpoint}")
+        
+        # embedding JSON payload
+        payload = {
+            "input": [text],
+            "model": "nvidia/nv-embedqa-e5-v5",
+            "input_type": "query"
+        }
+
+        # Headers
+        headers = {
+            "Content-Type": "application/json",
+            "accept": "application/json"
+        }
+        
+        result = requests.post(embedding_http_endpoint, data=json.dumps(payload), headers=headers)
+        logger.debug(f"Embedding result: {result.text}")
+        if result.status_code == 200:
+            resp_json = json.loads(result.text)
+            return resp_json['data'][0]['embedding'] # List of floats
+        else:
+            # Exception in embedding ...
+            raise HTTPException(status_code=500, detail=f"Embedding generation failed: {result.status_code}")
+            
     except Exception as e:
+        logger.error(f"Exception embedding text: {e}")
         raise HTTPException(status_code=500, detail=f"Embedding generation failed: {e}")
 
-@app.post("/query", response_model=OpenAIResponse)
+@router.post("/query", response_model=OpenAIResponse)
 async def query_milvus(request: OpenAIRequest):
+    
     # Extract user query from the last message
     user_message = next(
         (message for message in reversed(request.messages) if message["role"] == "user"), None
@@ -436,14 +627,18 @@ async def query_milvus(request: OpenAIRequest):
     if not user_message:
         raise HTTPException(status_code=400, detail="No user message found in request.")
 
+    logger.debug(f"Received user_message: {user_message}")
     user_query = user_message["content"]
+    logger.debug(f"User query: {user_query}")
     
     # Generate embedding for the query
-    query_embedding = embed_text_with_openai(user_query)
+    query_embedding = perform_text_embedding(user_query)
 
+    logger.debug(f"Query Embedding: {query_embedding}")
     # Query Milvus for relevant documents
     try:
         docs = search_milvus(query_embedding)
+        logger.debug(f"Results from milvus: {docs}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
     
