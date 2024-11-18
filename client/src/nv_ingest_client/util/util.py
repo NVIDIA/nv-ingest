@@ -419,12 +419,12 @@ def get_content(results: List[any]):
     """
 
     text_elems = [
-        elem for elem in result if element["document_type"] == "text"
-        for result in results
+        elem for result in results
+        for elem in result if elem["document_type"] == "text"
     ]
     structured_elems = [
-        elem for elem in result if element["document_type"] == "structured"
-        for result in results
+        elem for result in results
+        for elem in result if elem["document_type"] == "structured"
     ]
 
     text_content = [
