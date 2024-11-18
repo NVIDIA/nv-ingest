@@ -55,8 +55,8 @@ class StoreTask(Task):
         structured: bool = True,
         images: bool = False,
         store_method: _Type_Store_Method = None,
-        extra_params: dict = None,
-        **params
+        params: dict = None,
+        **extra_params
     ) -> None:
         """
         Setup Store Task Config
@@ -93,8 +93,8 @@ class StoreTask(Task):
             "method": self._store_method,
             "structured": self._structured,
             "images": self._images,
-            "extra_params": self._extra_params,
-            **self._params,
+            "params": self._params,
+            **self._extra_params,
         }
 
         return {"type": "store", "task_properties": task_properties}
@@ -112,8 +112,8 @@ class StoreEmbedTask(Task):
 
     def __init__(
         self,
-        extra_params: dict = None,
-        **params
+        params: dict = None,
+        **extra_params
     ) -> None:
         """
         Setup Store Task Config
@@ -140,8 +140,8 @@ class StoreEmbedTask(Task):
         Convert to a dict for submission to redis (fixme)
         """
         task_properties = {
-            "extra_params": self._extra_params,
-            **self._params,
+            "params": self._params,
+            **self._extra_params,
         }
 
         return {"type": "store_embedding", "task_properties": task_properties}
