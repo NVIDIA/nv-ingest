@@ -442,5 +442,4 @@ def get_content(results: List[any]):
         for elem in structured_elems
     ]
 
-
     return {"text_content": text_content, "structured_content": structured_content}
