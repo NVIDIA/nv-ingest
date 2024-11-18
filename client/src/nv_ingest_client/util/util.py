@@ -404,12 +404,43 @@ def filter_function_kwargs(func, **kwargs):
 
 
 def get_content(results: List[any]):
+    """
+    Extracts the text and table text content from the results of an NV-Ingest python client job
 
-    text_elems = [elem for elem in result if element["document_type"] == "text" for result in results]
-    structured_elems = [elem for elem in result if element["document_type"] == "structured" for result in results]
+    Parameters
+    ----------
+    results: List[Any]
+        The results of NV-Ingest python client job that contains the desired text and table content
 
-    text_content = [{"page_number": elem["metadata"]["content_metadata"]["page_number"], "content": elem["metadata"]["content"]} for elem in text_elems]
-    structured_content = [{"page_number": elem["metadata"]["content_metadata"]["page_number"], "content": elem["metadata"]["table_content"]} for elem in structured_elems]
+    Returns
+    -------
+    Dict
+        A dictionary containing the extracted text content and the extracted table content
+    """
+
+    text_elems = [
+        elem for elem in result if element["document_type"] == "text"
+        for result in results
+    ]
+    structured_elems = [
+        elem for elem in result if element["document_type"] == "structured"
+        for result in results
+    ]
+
+    text_content = [
+        {
+            "page_number": elem["metadata"]["content_metadata"]["page_number"],
+            "content": elem["metadata"]["content"],
+        }
+        for elem in text_elems
+    ]
+    structured_content = [
+        {
+            "page_number": elem["metadata"]["content_metadata"]["page_number"],
+            "content": elem["metadata"]["table_content"]
+        }
+        for elem in structured_elems
+    ]
 
 
     return {"text_content": text_content, "structured_content": structured_content}
