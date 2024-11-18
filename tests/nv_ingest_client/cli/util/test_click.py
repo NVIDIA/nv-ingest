@@ -121,7 +121,7 @@ def test_validate_task_with_valid_store_task():
 
 def test_validate_task_with_valid_store_task():
     """Test with valid stor task options."""
-    value = ['store_embedding:{"content_type": "image", "store_method": "minio", "endpoint": "localhost:9000"}']
+    value = ['store_embedding:{"endpoint": "localhost:9000"}']
     result = click_validate_task(None, None, value)
 
     assert "store_embedding" in result

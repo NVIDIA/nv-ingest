@@ -107,6 +107,9 @@ class StoreEmbedTask(Task):
 
     _Type_Content_Type = Literal["embedding",]
 
+    _Type_Store_Method = Literal["minio",]
+
+
     def __init__(
         self,
         extra_params: dict = None,
