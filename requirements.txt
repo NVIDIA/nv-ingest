@@ -36,5 +36,6 @@ tabulate
 torchvision==0.18.0
 unstructured-client==0.23.3
 uvicorn==0.24.0-post.1
+s3fs
 Wand==0.6.13
 pymilvus[bulk_writer]==2.4.9

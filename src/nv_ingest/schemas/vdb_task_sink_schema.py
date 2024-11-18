@@ -10,6 +10,7 @@ import pymilvus
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import validator
+from pydantic import conint
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +64,16 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
                     description="Embedding vectors",
                     dim=embedding_size,
                 ).to_dict(),
-                pymilvus.FieldSchema(
-                    name="source",
-                    dtype=pymilvus.DataType.JSON,
-                    description="Source document and raw data extracted content",
-                ).to_dict(),
-                pymilvus.FieldSchema(
-                    name="content_metadata",
-                    dtype=pymilvus.DataType.JSON,
-                    description="Content metadata",
-                ).to_dict(),
+                # pymilvus.FieldSchema(
+                #     name="source",
+                #     dtype=pymilvus.DataType.VARCHAR,
+                #     description="Source document and raw data extracted content",
+                # ).to_dict(),
+                # pymilvus.FieldSchema(
+                #     name="content_metadata",
+                #     dtype=pymilvus.DataType.VARCHAR,
+                #     description="Content metadata",
+                # ).to_dict(),
             ],
             "description": "NV-INGEST collection schema",
         },
@@ -93,6 +94,7 @@ class VdbTaskSinkSchema(BaseModel):
     write_time_interval: float = 1.0
     retry_interval: float = 60.0
     raise_on_failure: bool = False
+    progress_engines: conint(ge=1) = 6
 
     @validator("service", pre=True)
     def validate_service(cls, to_validate):  # pylint: disable=no-self-argument
