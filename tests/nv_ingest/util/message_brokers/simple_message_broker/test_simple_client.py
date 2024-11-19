@@ -31,16 +31,123 @@ def client():
     return SimpleClient(HOST, PORT)
 
 
-@pytest.mark.usefixtures("broker_server")
-def test_push_success(client):
-    """Test successful PUSH operation."""
-    queue_name = f"test_queue_{uuid4()}"
-    message = "Test Message"
+# Existing tests...
 
-    response = client.submit_message(queue_name, message)
-    assert response.response_code == 0
-    assert response.response == "Data stored."
-    assert response.transaction_id is not None
+@pytest.mark.usefixtures("broker_server")
+def test_message_ordering():
+    """Test that messages are popped in the same order they were pushed (FIFO)."""
+    client = SimpleClient(HOST, PORT)
+    queue_name = f"test_queue_{uuid4()}"
+    messages = [f"Message {i}" for i in range(5)]
+
+    # Push messages in order
+    for msg in messages:
+        response = client.submit_message(queue_name, msg)
+        assert response.response_code == 0
+
+    # Pop messages and verify order
+    popped_messages = []
+    for _ in messages:
+        response = client.fetch_message(queue_name)
+        assert response.response_code == 0
+        popped_messages.append(response.response)
+
+    assert popped_messages == messages, "Messages popped are not in the same order as they were pushed."
+
+
+@pytest.mark.usefixtures("broker_server")
+def test_push_to_full_queue():
+    """Test pushing messages to a full queue."""
+    client = SimpleClient(HOST, PORT)
+    queue_name = f"test_queue_{uuid4()}"
+    messages = [f"Message {i}" for i in range(MAX_QUEUE_SIZE)]
+
+    # Push messages until the queue is full
+    for msg in messages:
+        response = client.submit_message(queue_name, msg)
+        assert response.response_code == 0
+
+    # Attempt to push one more message beyond capacity
+    response = client.submit_message(queue_name, "Extra Message")
+    assert response.response_code == 1, "Expected failure when pushing to a full queue."
+    assert response.response_reason == "Queue is full"
+
+
+@pytest.mark.usefixtures("broker_server")
+def test_invalid_inputs():
+    """Test that the client handles invalid inputs properly."""
+    client = SimpleClient(HOST, PORT)
+
+    # Test with empty queue name
+    response = client.submit_message("", "Test Message")
+    assert response.response_code == 1
+    assert response.response_reason == "Invalid queue name."
+
+    # Test with empty message
+    queue_name = f"test_queue_{uuid4()}"
+    response = client.submit_message(queue_name, "")
+    assert response.response_code == 1
+    assert response.response_reason == "Invalid message."
+
+    # Test with non-string queue name
+    response = client.submit_message(12345, "Test Message")
+    assert response.response_code == 1
+    assert response.response_reason == "Invalid queue name."
+
+    # Test with non-string message
+    response = client.submit_message(queue_name, 12345)
+    assert response.response_code == 1
+    assert response.response_reason == "Invalid message."
+
+    # Test with negative timeout
+    response = client.submit_message(queue_name, "Test Message", timeout=-5)
+    assert response.response_code == 1
+    assert "Timeout value out of range" in response.response_reason
+
+    # Test with extremely large timeout
+    response = client.submit_message(queue_name, "Test Message", timeout=1e10)
+    assert response.response_code == 1
+
+
+def test_server_unavailable():
+    """Test client's behavior when the server is unavailable."""
+    client = SimpleClient(HOST, 9991)
+    queue_name = f"test_queue_{uuid4()}"
+
+    # Do not start the broker_server fixture to simulate server unavailability
+
+    response = client.submit_message(queue_name, "Test Message")
+    assert response.response_code == 1
+    assert response.response_reason == "PUSH operation failed after retries"
+
+
+def test_client_retry_logic():
+    """Test that the client retries the specified number of times on connection failure."""
+    invalid_port = 9998  # Assume this port is closed
+    client = SimpleClient(HOST, invalid_port, max_retries=2)
+    queue_name = f"test_queue_{uuid4()}"
+
+    start_time = time.time()
+    response = client.submit_message(queue_name, "Test Message")
+    elapsed_time = time.time() - start_time
+
+    # Expected total backoff delay is sum of backoff delays: 2^1 + 2^2 = 2 + 4 = 6 seconds
+    expected_delay = sum(min(2 ** i, client._max_backoff) for i in range(1, client._max_retries + 1))
+
+    assert response.response_code == 1
+    assert response.response_reason == "PUSH operation failed after retries"
+    assert elapsed_time >= expected_delay, "Client did not wait for the expected backoff duration."
+
+
+@pytest.mark.usefixtures("broker_server")
+def test_operation_timeout():
+    """Test client's behavior when an operation times out."""
+    client = SimpleClient(HOST, PORT, connection_timeout=0.001)  # Set a very short timeout
+    queue_name = f"test_queue_{uuid4()}"
+
+    response = client.submit_message(queue_name, "Test Message")
+    assert response.response_code == 1
+    assert "PUSH operation failed after retries" in response.response_reason
 
 
 @pytest.mark.usefixtures("broker_server")

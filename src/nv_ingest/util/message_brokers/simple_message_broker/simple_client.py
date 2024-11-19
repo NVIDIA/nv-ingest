@@ -207,7 +207,7 @@ class SimpleClient:
             logger.debug(f"Successfully sent {total_length} bytes.")
         except (socket.error, BrokenPipeError) as e:
             logger.error(f"Socket error during send: {e}")
-            raise ConnectionError("Failed to send data due to socket error.") from e
+            raise ConnectionError("PUSH operation failed after retries") from e
 
     def _recv(self, sock: socket.socket) -> str:
         """Receive data based on initial length header from the given socket."""
