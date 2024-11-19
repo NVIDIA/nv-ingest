@@ -142,7 +142,7 @@ services:
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DOUGHNUT_GRPC_ENDPOINT=
       # build.nvidia.com hosted doughnut
-      - DOUGHNUT_HTTP_ENDPOINT=
+      - DOUGHNUT_HTTP_ENDPOINT=https://placeholder
       - DOUGHNUT_INFER_PROTOCOL=http
       - INGEST_LOG_LEVEL=DEFAULT
       - MESSAGE_CLIENT_HOST=redis
