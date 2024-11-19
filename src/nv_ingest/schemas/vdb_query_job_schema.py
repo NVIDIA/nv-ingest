@@ -10,18 +10,20 @@
 
 from pydantic import BaseModel
 from enum import Enum
+from typing import List
 
-class ConversionStatus(str, Enum):
-    IN_PROGRESS = "in_progress"
-    SUCCESS = "success"
-    FAILED = "failed"
+# Define request schema
+class OpenAIRequest(BaseModel):
+    model: str
+    messages: List[dict]  # [{"role": "user", "content": "question"}]
+    max_tokens: int = 256
+    temperature: float = 0.7
+    top_p: float = 1.0
 
-class ProcessingJob(BaseModel):
-    submitted_job_id: str
-    filename: str
-    raw_result: str = ""
-    vdb_task: bool = False
-    content: str = ""
-    status: ConversionStatus
-    error: str | None = None
-
+# OpenAI-compatible response schema
+class OpenAIResponse(BaseModel):
+    id: str
+    object: str
+    created: int
+    model: str
+    choices: List[dict]  # [{"message": {"role": "assistant", "content": "answer"}}]
