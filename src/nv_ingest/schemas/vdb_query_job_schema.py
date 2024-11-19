@@ -21,6 +21,7 @@ class OpenAIRequest(BaseModel):
     # top_p: float = 1.0
     query: str
     k: int
+    job_id: str
 
 # OpenAI-compatible response schema
 class OpenAIResponse(BaseModel):

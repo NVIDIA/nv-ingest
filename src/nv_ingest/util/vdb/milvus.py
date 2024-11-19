@@ -19,29 +19,57 @@ from pymilvus import Collection, MilvusClient, DataType, connections, utility, B
 from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
 from typing import List
 
+
+# We are using UUIDs for the collection_name. However, Milvus collection names
+# cannot have `-` characters so we replace them with `_`
+def reformat_collection_name(collection_name: str = None):
+    collection_name = collection_name.replace("-", "_")
+    # The start of a collection name must be a "_" or character. Since UUID could start with number we just prepend a "_" if not already there
+    if not collection_name.startswith("_"):
+        collection_name = f"_{collection_name}"
+    return collection_name
+
 # Connect to Milvus
 connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
 
-def search_milvus(question_embedding: List[float], top_k: int = 5):
+
+def search_milvus(question_embedding: List[float], top_k: int = 5, collection_name: str = "nv_ingest_jeremy"):
     
-    COLLECTION_NAME = "nv_ingest_jeremy"  # Update to your Milvus collection name
+    # Reformat to remove "-" characters from UUID
+    collection_name = reformat_collection_name(collection_name)
     
     """Query Milvus for nearest neighbors of the question embedding."""
-    print(f"Searching for milvus collection: {COLLECTION_NAME}")
-    if not utility.has_collection(COLLECTION_NAME):
-        raise HTTPException(status_code=500, detail=f"Milvus collection '{COLLECTION_NAME}' not found.")
+    print(f"Searching for milvus collection: {collection_name}")
+    if not utility.has_collection(collection_name):
+        raise HTTPException(status_code=500, detail=f"Milvus collection '{collection_name}' not found.")
     
-    collection = Collection(COLLECTION_NAME)
+    collection = Collection(collection_name)
+    index_params = { 
+        "metric_type": "L2",
+        "index_type": "GPU_CAGRA",
+        "params": {
+        'intermediate_graph_degree':128,
+        'graph_degree': 64, 
+        "build_algo": "NN_DESCENT",
+        },  
+    }
+    collection.create_index("vector", index_params)
+    collection.load()
+    
+    print(f"Index loaded ... querying ...")
+    
     results = collection.search(
         data=[question_embedding],
         anns_field="vector",  # Vector field in your collection
         param={"metric_type": "L2", "params": {"nprobe": 10}},
         limit=top_k,
-        output_fields=["content"]  # Update based on your schema
+        output_fields=["text"]  # Update based on your schema
     )
-    return [hit.entity.get("content") for hit in results[0]]
+    return [hit.entity.get("text") for hit in results[0]]
+
 
 def bulk_upload_results_to_milvus(ingest_results, collection_name: str = "nv_ingest_jeremy"):
+    collection_name = reformat_collection_name(collection_name)
     milvus_url = os.getenv("MILVUS_ENDPOINT", "http://milvus:19530")
     minio_url = os.getenv("MINIO_ENDPOINT", "minio:9000")
     

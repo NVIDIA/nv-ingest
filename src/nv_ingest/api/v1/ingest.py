@@ -317,6 +317,9 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 job_response = json.dumps(job_response)
                 blob_response = ingest_json_results_to_blob(job_response)
                 
+                # with open("/workspace/data/q2release_blob.txt", "w") as blob_file:
+                #     blob_file.write(blob_response)
+                
                 processing_job.raw_result = job_response
                 processing_job.content = blob_response
                 processing_job.status = ConversionStatus.SUCCESS
@@ -357,7 +360,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
         
         if vdb_task:
             print(f"Inserting results into Milvus vector database ...")
-            resp = bulk_upload_results_to_milvus(raw_results)
+            resp = bulk_upload_results_to_milvus(raw_results, collection_name = job_id)
         
         return JSONResponse(
             content={"status": "completed", "result": results},
@@ -430,7 +433,7 @@ async def query_milvus(request: OpenAIRequest):
     logger.debug(f"Query Embedding: {query_embedding}")
     # Query Milvus for relevant documents
     try:
-        docs = search_milvus(query_embedding)
+        docs = search_milvus(query_embedding, top_k = request.k, collection_name = request.job_id)
         logger.debug(f"Results from milvus: {docs}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
@@ -450,6 +453,8 @@ async def query_milvus(request: OpenAIRequest):
                     break
             else:
                 print(f"Doc is None ...")
+                
+    print(f"Query Results: {results}")
             
     #     response_content = "\n".join([s for s in docs if s is not None])
     # else:
