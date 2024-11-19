@@ -61,6 +61,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
                 return
             data = data_bytes.decode('utf-8').strip()
             request_data = json.loads(data)
+            logger.debug(f"Received data: {request_data}")
 
             command = request_data.get("command")
             queue_name = request_data.get("queue_name")
@@ -202,8 +203,6 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             return ResponseSchema(response_code=1, response_reason="Queue is full")
 
     def _pop_from_queue(self, queue_name: str) -> ResponseSchema:
-        if self.queues[queue_name].empty():
-            return ResponseSchema(response_code=1, response_reason="Queue is empty")
         try:
             message = self.queues[queue_name].get_nowait()
             return ResponseSchema(response_code=0, response=message)

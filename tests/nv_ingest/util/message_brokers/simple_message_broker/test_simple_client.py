@@ -96,7 +96,7 @@ def test_pop_empty_queue(client):
 
     response = client.fetch_message(queue_name)
     assert response.response_code == 1
-    assert response.response_reason == "Queue is empty"
+    assert response.response_reason == "POP operation failed after retries"
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -154,13 +154,13 @@ def test_pop_error_handling(client):
     response = client.fetch_message(queue_name)
     # The client should handle the error and return an appropriate response
     assert response.response_code == 1
-    assert response.response_reason == "Queue is empty"
+    assert response.response_reason == "POP operation failed after retries"
 
 
 @pytest.mark.usefixtures("broker_server")
 def test_invalid_command(client):
     """Test sending an invalid command."""
-    data = json.dumps({"command": "INVALID", "queue_name": "test_queue"}).encode('utf-8')
+    data = json.dumps({"command": "INVALID", "queue_name": "test_queue"})
     response = client._execute_command(data)
     assert response.response_code == 1
     assert response.response_reason == "Unknown command"
