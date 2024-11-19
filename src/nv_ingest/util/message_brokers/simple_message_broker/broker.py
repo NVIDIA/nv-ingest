@@ -13,7 +13,10 @@ from typing import Union, Optional
 
 from pydantic import BaseModel, Field, ValidationError, Extra
 
+from nv_ingest.util.message_brokers.simple_message_broker.ordered_message_queue import OrderedMessageQueue
+
 logger = logging.getLogger(__name__)
+
 
 # Define schemas for request validation
 class PushRequestSchema(BaseModel):
@@ -24,6 +27,7 @@ class PushRequestSchema(BaseModel):
     class Config:
         extra = Extra.forbid  # Prevents any extra arguments
 
+
 class PopRequestSchema(BaseModel):
     queue_name: str = Field(..., min_length=1)
     timeout: Optional[float] = None  # Optional timeout for blocking pop
@@ -31,17 +35,20 @@ class PopRequestSchema(BaseModel):
     class Config:
         extra = Extra.forbid  # Prevents any extra arguments
 
+
 class SizeRequestSchema(BaseModel):
     queue_name: str = Field(..., min_length=1)
 
     class Config:
         extra = Extra.forbid  # Prevents any extra arguments
 
+
 class ResponseSchema(BaseModel):
     response_code: int
     response_reason: Optional[str] = "OK"
     response: Union[str, dict, None] = None
     transaction_id: Optional[str] = None  # Unique transaction ID
+
 
 class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
     def handle(self):
@@ -70,32 +77,37 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
             transaction_id = str(uuid.uuid4())
 
-            # Ensure the queue and its lock exist, protected by a global lock
-            with self.server.lock:
-                if queue_name not in self.server.queues:
-                    self.server.queues[queue_name] = queue.Queue(maxsize=self.server.max_queue_size)
-                    self.server.queue_locks[queue_name] = threading.Lock()
-                queue_lock = self.server.queue_locks[queue_name]
+            # Ensure the queue and its lock exist
+            self.server._initialize_queue(queue_name)
+            queue_lock = self.server.queue_locks[queue_name]
+            queue = self.server.queues[queue_name]
 
-            # Acquire the lock for the specific queue
-            with queue_lock:
-                if command == "PUSH":
-                    self._handle_push(queue_name, message, timeout, transaction_id)
-                elif command == "POP":
-                    self._handle_pop(queue_name, timeout, transaction_id)
-                elif command == "SIZE":
-                    response = self.server._size_of_queue(queue_name)
-                    self._send_response(response)
-                else:
-                    response = ResponseSchema(response_code=1, response_reason="Unknown command")
-                    self._send_response(response)
+            if command == "PUSH":
+                self._handle_push(message, timeout, transaction_id, queue, queue_lock)
+            elif command == "POP":
+                self._handle_pop(timeout, transaction_id, queue, queue_lock)
+            elif command == "SIZE":
+                response = self._size_of_queue(queue_name, queue, queue_lock)
+                self._send_response(response)
+            else:
+                response = ResponseSchema(response_code=1, response_reason="Unknown command")
+                self._send_response(response)
 
         except Exception as e:
             logger.error(f"Error processing command from {client_address}: {e}")
             response = ResponseSchema(response_code=1, response_reason=str(e))
             self._send_response(response)
 
-    def _handle_push(self, queue_name: str, message: str, timeout: Optional[float], transaction_id: str):
+    def _handle_push(self, message: str, timeout: Optional[float],
+                     transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock):
+        with queue_lock:
+            if queue.full():
+                # Return failure response immediately
+                response = ResponseSchema(response_code=1, response_reason="Queue is full")
+                self._send_response(response)
+                return
+
+        # Proceed with the 3-way handshake
         # Send initial response with transaction ID
         initial_response = ResponseSchema(
             response_code=0,
@@ -110,25 +122,26 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             final_response = ResponseSchema(response_code=1, response_reason="ACK not received.",
                                             transaction_id=transaction_id)
         else:
-            # Perform the PUSH operation
-            result = self.server._push_to_queue(queue_name, message)
-            result.transaction_id = transaction_id
-            final_response = result
+            # Perform the PUSH operation after ACK
+            with queue_lock:
+                queue.push(message)
+            final_response = ResponseSchema(response_code=0, response="Data stored.", transaction_id=transaction_id)
 
         # Send final response
         self._send_response(final_response)
 
-    def _handle_pop(self, queue_name: str, timeout: Optional[float], transaction_id: str):
-        # Attempt to pop a message from the queue
-        result = self.server._pop_from_queue(queue_name)
-        if result.response_code != 0:
-            # If error (e.g., queue empty), send response and return
-            result.transaction_id = transaction_id
-            self._send_response(result)
-            return
+    def _handle_pop(self, timeout: Optional[float],
+                    transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock):
+        with queue_lock:
+            if queue.empty():
+                # Return failure response immediately
+                response = ResponseSchema(response_code=1, response_reason="Queue is empty")
+                self._send_response(response)
+                return
+            # Pop the message from the queue
+            message = queue.pop(transaction_id)
 
-        message = result.response
-
+        # Proceed with the 3-way handshake
         # Send initial response with transaction ID and message
         initial_response = ResponseSchema(
             response_code=0,
@@ -140,14 +153,22 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         # Wait for ACK
         if not self._wait_for_ack(transaction_id, timeout):
             logger.debug(f"Transaction {transaction_id}: ACK not received. Returning data to queue.")
-            self.server._push_to_queue(queue_name, message)
+            with queue_lock:
+                queue.return_message(transaction_id)
             final_response = ResponseSchema(response_code=1, response_reason="ACK not received.",
                                             transaction_id=transaction_id)
         else:
+            with queue_lock:
+                queue.acknowledge(transaction_id)
             final_response = ResponseSchema(response_code=0, response="Data processed.", transaction_id=transaction_id)
 
         # Send final response
         self._send_response(final_response)
+
+    def _size_of_queue(self, queue_name: str, queue: OrderedMessageQueue, queue_lock: threading.Lock) -> ResponseSchema:
+        with queue_lock:
+            size = queue.qsize()
+        return ResponseSchema(response_code=0, response=str(size))
 
     def _wait_for_ack(self, transaction_id: str, timeout: Optional[float]) -> bool:
         try:
@@ -184,6 +205,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             data.extend(packet)
         return bytes(data)
 
+
 class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
 
@@ -193,6 +215,12 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         self.queues = {}
         self.queue_locks = {}  # Dictionary to hold locks for each queue
         self.lock = threading.Lock()  # Global lock to protect access to queues and locks
+
+    def _initialize_queue(self, queue_name: str):
+        with self.lock:
+            if queue_name not in self.queues:
+                self.queues[queue_name] = OrderedMessageQueue(maxsize=self.max_queue_size)
+                self.queue_locks[queue_name] = threading.Lock()
 
     def _push_to_queue(self, queue_name: str, message: str) -> ResponseSchema:
         try:
@@ -210,5 +238,14 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             return ResponseSchema(response_code=1, response_reason="Queue is empty")
 
     def _size_of_queue(self, queue_name: str) -> ResponseSchema:
-        size = self.queues.get(queue_name, queue.Queue()).qsize()
+        queue_lock = self.server.queue_locks.get(queue_name)
+        if not queue_lock:
+            size = 0
+        else:
+            with queue_lock:
+                queue = self.server.queues.get(queue_name)
+                if queue:
+                    size = queue.qsize()
+                else:
+                    size = 0
         return ResponseSchema(response_code=0, response=str(size))

@@ -321,9 +321,32 @@ def test_queue_full():
 
     # Fill the queue to its maximum size
     for _ in range(MAX_QUEUE_SIZE):
-        _push_message(queue_name, message)
+        request_data = {
+            "command": "PUSH",
+            "queue_name": queue_name,
+            "message": message,
+            "timeout": 5
+        }
+        sock, response = send_request(request_data)
 
-    # Attempt to push another message
+        # Receive initial response with transaction ID
+        assert response["response_code"] == 0
+        transaction_id = response["transaction_id"]
+
+        # Send ACK
+        send_ack(sock, transaction_id)
+
+        # Receive final response indicating success
+        response_length_bytes = recv_exact(sock, 8)
+        response_length = int.from_bytes(response_length_bytes, 'big')
+        response_data_bytes = recv_exact(sock, response_length)
+        final_response = json.loads(response_data_bytes.decode('utf-8'))
+
+        assert final_response["response_code"] == 0
+        assert final_response["response"] == "Data stored."
+        sock.close()
+
+    # Attempt to push another message beyond capacity
     request_data = {
         "command": "PUSH",
         "queue_name": queue_name,
@@ -332,21 +355,11 @@ def test_queue_full():
     }
     sock, response = send_request(request_data)
 
-    # Receive initial response with transaction ID
-    assert response["response_code"] == 0
-    transaction_id = response["transaction_id"]
+    # Receive immediate failure response (no transaction ID)
+    assert response["response_code"] == 1
+    assert response["response_reason"] == "Queue is full"
 
-    # Send ACK
-    send_ack(sock, transaction_id)
-
-    # Receive final response indicating failure due to full queue
-    response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
-    response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
-
-    assert final_response["response_code"] == 1
-    assert final_response["response_reason"] == "Queue is full"
+    # No ACK is required; close the socket
     sock.close()
 
 
