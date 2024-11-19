@@ -83,9 +83,9 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             queue = self.server.queues[queue_name]
 
             if command == "PUSH":
-                self._handle_push(message, timeout, transaction_id, queue, queue_lock)
+                self._handle_push(queue_name, message, timeout, transaction_id, queue, queue_lock)
             elif command == "POP":
-                self._handle_pop(timeout, transaction_id, queue, queue_lock)
+                self._handle_pop(queue_name, timeout, transaction_id, queue, queue_lock)
             elif command == "SIZE":
                 response = self._size_of_queue(queue_name, queue, queue_lock)
                 self._send_response(response)
@@ -98,7 +98,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             response = ResponseSchema(response_code=1, response_reason=str(e))
             self._send_response(response)
 
-    def _handle_push(self, message: str, timeout: Optional[float],
+    def _handle_push(self, queue_name: str, message: str, timeout: Optional[float],
                      transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock):
         with queue_lock:
             if queue.full():
@@ -130,7 +130,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         # Send final response
         self._send_response(final_response)
 
-    def _handle_pop(self, timeout: Optional[float],
+    def _handle_pop(self, queue_name: str, timeout: Optional[float],
                     transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock):
         with queue_lock:
             if queue.empty():
@@ -236,16 +236,3 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             return ResponseSchema(response_code=0, response=message)
         except queue.Empty:
             return ResponseSchema(response_code=1, response_reason="Queue is empty")
-
-    def _size_of_queue(self, queue_name: str) -> ResponseSchema:
-        queue_lock = self.server.queue_locks.get(queue_name)
-        if not queue_lock:
-            size = 0
-        else:
-            with queue_lock:
-                queue = self.server.queues.get(queue_name)
-                if queue:
-                    size = queue.qsize()
-                else:
-                    size = 0
-        return ResponseSchema(response_code=0, response=str(size))

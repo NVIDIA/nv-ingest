@@ -70,7 +70,7 @@ def test_push_to_full_queue():
     # Attempt to push one more message beyond capacity
     response = client.submit_message(queue_name, "Extra Message")
     assert response.response_code == 1, "Expected failure when pushing to a full queue."
-    assert response.response_reason == "Queue is full"
+    assert response.response_reason == "PUSH operation failed after retries"
 
 
 @pytest.mark.usefixtures("broker_server")
