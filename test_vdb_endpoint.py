@@ -3,15 +3,20 @@ import requests
 # Define the endpoint URL
 url = "http://ipp1-3304.ipp1u1.colossus.nvidia.com:7670/v1/query"
 
+# payload = {
+#     "model": "nvidia/nv-embedqa-e5-v5",
+#     "messages": [
+#         {"role": "system", "content": "You are a helpful assistant."},
+#         {"role": "user", "content": "What is the driving factor to Nvidia's increased revenue?"}
+#     ],
+#     "max_tokens": 100,
+#     "temperature": 0.7,
+#     "top_p": 1.0
+# }
+
 payload = {
-    "model": "nvidia/nv-embedqa-e5-v5",
-    "messages": [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": "What is the driving factor to Nvidia's increased revenue?"}
-    ],
-    "max_tokens": 100,
-    "temperature": 0.7,
-    "top_p": 1.0
+    "query": "What is the driving factor to Nvidia's increased revenue?",
+    "k": 1
 }
 
 # Make a POST request to the endpoint

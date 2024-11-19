@@ -403,12 +403,22 @@ def perform_text_embedding(text: str) -> List[float]:
 @router.post("/query", response_model=OpenAIResponse)
 async def query_milvus(request: OpenAIRequest):
     
+    # Adaptation for needs from another team. Sorry for the clutter
+    model = "nvidia/nv-embedqa-e5-v5"
+    messages = [
+        {"role": "system", "content": "You are a helpful assistant."},
+        {"role": "user", "content": request.query}
+    ]
+    max_tokens = 100
+    temperature = 0.7
+    top_p = 1.0
+    
     # Extract user query from the last message
     user_message = next(
-        (message for message in reversed(request.messages) if message["role"] == "user"), None
+        (message for message in reversed(messages) if message["role"] == "user"), None
     )
     if not user_message:
-        raise HTTPException(status_code=400, detail="No user message found in request.")
+        raise HTTPException(status_code=400, detail="No user query message found in request.")
 
     logger.debug(f"Received user_message: {user_message}")
     user_query = user_message["content"]
@@ -425,24 +435,35 @@ async def query_milvus(request: OpenAIRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
     
+    
+    results = []
     # Construct the response (combine docs into one or summarize, depending on your application)
     if docs != None:
         print(f"Docs Type: {type(docs)}")
         print(f"Len of docs: {len(docs)}")
+        
         for doc in docs:
             if doc is not None:
                 print(f"Doc: {doc}")
+                results.append(doc)
+                if len(results) >= request.k:
+                    break
             else:
                 print(f"Doc is None ...")
-        response_content = "\n".join([s for s in docs if s is not None])
-    else:
-        # No hits from the VDB ....
-        response_content = ""
+            
+    #     response_content = "\n".join([s for s in docs if s is not None])
+    # else:
+    #     # No hits from the VDB ....
+    #     response_content = ""
 
+    # return OpenAIResponse(
+    #     id="query-response-001",
+    #     object="chat.completion",
+    #     created=int(time.time()),
+    #     model="nvidia/nv-embedqa-e5-v5",
+    #     choices=[{"message": {"role": "assistant", "content": response_content}}]
+    # )
+    
     return OpenAIResponse(
-        id="query-response-001",
-        object="chat.completion",
-        created=int(time.time()),
-        model=request.model,
-        choices=[{"message": {"role": "assistant", "content": response_content}}]
+        content=results
     )
