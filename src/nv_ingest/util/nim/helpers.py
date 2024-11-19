@@ -181,7 +181,7 @@ def _call_image_inference_http_client(client, model_name: str, image_data: np.nd
     return result
 
 
-def _repoll_image_inference_http_client(url, req_id, payload=None, headers=None, max_retries=10, poll_interval=5):
+def _repoll_image_inference_http_client(url, req_id, payload=None, headers=None, max_retries=60, poll_interval=5):
     # Construct the base URL dynamically from the original URL
     if "/v2/nvcf/pexec/functions" in url:
         base_url = url.split("/pexec/functions")[0]

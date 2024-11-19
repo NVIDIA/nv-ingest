@@ -193,7 +193,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                         original_width=DEFAULT_MAX_WIDTH,
                         original_height=DEFAULT_MAX_HEIGHT,
                     )
-                    table = LatexTable(latex=txt, bbox=bbox, max_width=page_width, max_height=page_height)
+                    table = LatexTable(latex=txt, bbox=bbox, max_width=DEFAULT_MAX_WIDTH, max_height=DEFAULT_MAX_HEIGHT)
                     accumulated_tables.append(table)
 
                 if extract_images and (cls == "Picture"):
@@ -219,8 +219,8 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                             bbox=bbox,
                             width=img_numpy.shape[1],
                             height=img_numpy.shape[0],
-                            max_width=page_width,
-                            max_height=page_height,
+                            max_width=DEFAULT_MAX_WIDTH,
+                            max_height=DEFAULT_MAX_HEIGHT,
                         )
                         accumulated_images.append(image)
 
@@ -354,6 +354,7 @@ def _construct_table_metadata(
         "table_content": content,
         "table_format": table_format,
         "table_location": table.bbox,
+        "table_location_max_dimensions": (table.max_width, table.max_height),
     }
     ext_unified_metadata = base_unified_metadata.copy()
 
