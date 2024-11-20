@@ -413,11 +413,11 @@ class NvIngestClient:
                 except concurrent.futures.TimeoutError:
                     logger.error(f"Timeout while fetching result for job ID {job_id}")
                 except json.JSONDecodeError as e:
-                    logger.error(f"Decoding while processing job ID {job_id}: {e}")
+                    logger.error(f"Decoding while processing job ID {job_id}:\n{e}")
                 except RuntimeError as e:
-                    logger.error(f"Error while processing job ID {job_id}: {e}")
+                    logger.error(f"Error while processing job ID {job_id}:\n{e}")
                 except Exception as e:
-                    logger.error(f"Error while fetching result for job ID {job_id}: {e}")
+                    logger.error(f"Error while fetching result for job ID {job_id}:\n{e}")
 
         return results
 
