@@ -24,7 +24,6 @@ from pptx import Presentation
 
 logger = logging.getLogger(__name__)
 
-
 # pylint: disable=invalid-name
 # pylint: disable=missing-class-docstring
 # pylint: disable=logging-fstring-interpolation
@@ -257,7 +256,18 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
     )
 
     is_failed = json_payload.get("status", "") in "failed"
-    description = json_payload.get("description", "")
+    description = ""
+    if (is_failed):
+        try:
+            source_id = json_payload.get("data", [])[0].get("metadata", {}).get("source_metadata", {}).get(
+                "source_name",
+                "")
+        except Exception as e:
+            source_id = "[Source ID Missing from Payload]"
+
+        description = f"[{source_id}]: {json_payload.get('status', '')}\n"
+
+    description += (json_payload.get("description", ""))
 
     # Look to see if we have any failure annotations to augment the description
     if is_failed and "annotations" in json_payload:
