@@ -7,10 +7,8 @@ import re
 import time
 from typing import Any
 from typing import Dict
-from typing import List
 from typing import Optional
 from typing import Tuple
-from typing import Union
 
 import backoff
 import cv2
@@ -114,12 +112,8 @@ def _call_image_inference_grpc_client(client, model_name: str, image_data: np.nd
     if image_data.ndim == 3:
         image_data = np.expand_dims(image_data, axis=0)
 
-    if model_name in {"deplot", "paddle", "cached", "yolox"}:
-        inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
-        inputs[0].set_data_from_numpy(image_data.astype(np.float32))
-    elif model_name == "doughnut":
-        inputs = [grpcclient.InferInput("input", image_data.shape, "UINT8")]
-        inputs[0].set_data_from_numpy(image_data.astype(np.uint8))
+    inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
+    inputs[0].set_data_from_numpy(image_data.astype(np.float32))
 
     outputs = [grpcclient.InferRequestedOutput("output")]
 
@@ -130,23 +124,19 @@ def _call_image_inference_grpc_client(client, model_name: str, image_data: np.nd
         logger.error(err_msg)
         raise RuntimeError(err_msg)
 
-    if model_name in {"deplot", "paddle", "cached", "yolox"}:
-        result = " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
-    elif model_name == "doughnut":
-        result = [output.decode("utf-8") for output in result.as_numpy("output")]
+    result = " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
 
     return result
 
 
 def _call_image_inference_http_client(client, model_name: str, image_data: np.ndarray):
+    base64_img = numpy_to_base64(image_data)
+
     if model_name == "deplot":
-        base64_img = numpy_to_base64(image_data)
         payload = _prepare_deplot_payload(base64_img)
     elif model_name == "doughnut":
-        base64_images = [numpy_to_base64(arr) for arr in image_data]
-        payload = _prepare_doughnut_payload(base64_images)
+        payload = _prepare_doughnut_payload(base64_img)
     elif model_name in {"paddle", "cached", "yolox"}:
-        base64_img = numpy_to_base64(image_data)
         payload = _prepare_nim_payload(base64_img)
     else:
         raise ValueError(f"Model {model_name} is not supported.")
@@ -171,17 +161,15 @@ def _call_image_inference_http_client(client, model_name: str, image_data: np.nd
     except Exception as e:
         raise RuntimeError(f"An error occurred during inference: {e}")
 
-    if model_name == "deplot":
-        result = _extract_content_from_deplot_response(json_response)
-    elif model_name == "doughnut":
-        result = _extract_content_from_doughnut_response(json_response)
+    if model_name in {"deplot", "doughnut"}:
+        result = _extract_content_from_vlm_nim_response(json_response)
     else:
-        result = _extract_content_from_nim_response(json_response)
+        result = _extract_content_from_image_nim_response(json_response)
 
     return result
 
 
-def _repoll_image_inference_http_client(url, req_id, payload=None, headers=None, max_retries=60, poll_interval=5):
+def _repoll_image_inference_http_client(url, req_id, payload=None, headers=None, max_retries=180, poll_interval=1):
     # Construct the base URL dynamically from the original URL
     if "/v2/nvcf/pexec/functions" in url:
         base_url = url.split("/pexec/functions")[0]
@@ -252,21 +240,14 @@ def _prepare_deplot_payload(
     return payload
 
 
-def _prepare_doughnut_payload(
-    base64_images: Union[str, List[str]],
-) -> Dict[str, Any]:
-    if isinstance(base64_images, str):
-        base64_images = [base64_images]
-
-    messages = []
-    for base64_img in base64_images:
-        messages.append(
-            {
-                "role": "user",
-                "content": "<s><output_markdown><predict_bbox><predict_classes>"
-                f'<img src="data:image/png;base64,{base64_img}" />',
-            }
-        )
+def _prepare_doughnut_payload(base64_img: str) -> Dict[str, Any]:
+    messages = [
+        {
+            "role": "user",
+            "content": "<s><output_markdown><predict_bbox><predict_classes>"
+            f'<img src="data:image/png;base64,{base64_img}" />',
+        }
+    ]
     payload = {
         "model": "nvidia/eclair",
         "messages": messages,
@@ -285,7 +266,7 @@ def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
     return payload
 
 
-def _extract_content_from_deplot_response(json_response):
+def _extract_content_from_vlm_nim_response(json_response):
     # Validate the response structure
     if "choices" not in json_response or not json_response["choices"]:
         raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
@@ -293,15 +274,7 @@ def _extract_content_from_deplot_response(json_response):
     return json_response["choices"][0]["message"]["content"]
 
 
-def _extract_content_from_doughnut_response(json_response):
-    # Validate the response structure
-    if "choices" not in json_response or not json_response["choices"]:
-        raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
-
-    return [choice["message"]["content"] for choice in json_response["choices"]]
-
-
-def _extract_content_from_nim_response(json_response):
+def _extract_content_from_image_nim_response(json_response):
     if "data" not in json_response or not json_response["data"]:
         raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 

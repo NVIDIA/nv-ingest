@@ -313,7 +313,10 @@ def preprocess_and_send_requests(
 
     batch = np.array(page_images)
 
-    output = call_image_inference_model(doughnut_client, "doughnut", batch)
+    output = []
+    for page_image in page_images:
+        response = call_image_inference_model(doughnut_client, "doughnut", page_image)
+        output.append(response)
 
     if len(output) != len(batch):
         raise RuntimeError(
