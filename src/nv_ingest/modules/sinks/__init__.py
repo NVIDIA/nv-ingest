@@ -2,6 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .redis_task_sink import RedisTaskSinkLoaderFactory
+from .message_broker_task_sink import MessageBrokerTaskSinkLoaderFactory
 
-__all__ = ["RedisTaskSinkLoaderFactory"]
+__all__ = ["MessageBrokerTaskSinkLoaderFactory"]

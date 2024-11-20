@@ -11,13 +11,13 @@ from typing import Optional
 import redis
 from redis.exceptions import RedisError
 
-from nv_ingest.util.message_brokers.client_base import MessageClientBase
+from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
 
 # pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
-class RedisClient(MessageClientBase):
+class RedisClient(MessageBrokerClientBase):
     """
     A client for interfacing with Redis, providing mechanisms for sending and receiving messages
     with retry logic and connection management.

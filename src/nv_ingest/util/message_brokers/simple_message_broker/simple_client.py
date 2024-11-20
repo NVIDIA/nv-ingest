@@ -5,6 +5,8 @@ import threading
 import time
 import logging
 from typing import Optional
+
+from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
 from nv_ingest.util.message_brokers.simple_message_broker import ResponseSchema
 
 logger = logging.getLogger(__name__)
@@ -18,25 +20,35 @@ from typing import Optional
 logger = logging.getLogger(__name__)
 
 
-class SimpleClient:
+class SimpleClient(MessageBrokerClientBase):
     """
     A client for interfacing with SimpleMessageBroker, creating a new socket connection per request
     to ensure thread safety and robustness.
     """
 
-    def __init__(self, host: str, port: int, max_retries: int = 3, max_backoff: int = 32,
-                 connection_timeout: int = 300):
+    def __init__(self, host: str, port: int, db: int = 0, max_retries: int = 3, max_backoff: int = 32,
+                 connection_timeout: int = 300, max_pool_size: int = 128, use_ssl: bool = False):
         self._host = host
         self._port = port
+        self._db = db
         self._max_retries = max_retries
         self._max_backoff = max_backoff
+        self._max_pool_size = max_pool_size
         self._connection_timeout = connection_timeout
+        self._use_ssl = use_ssl
+
+    def get_client(self):
+        return self
 
     def submit_message(self, queue_name: str, message: str, timeout: Optional[float] = None) -> ResponseSchema:
         return self._handle_push(queue_name, message, timeout)
 
     def fetch_message(self, queue_name: str, timeout: Optional[float] = None) -> ResponseSchema:
         return self._handle_pop(queue_name, timeout)
+
+    def ping(self) -> ResponseSchema:
+        # Devin(TODO)
+        return ResponseSchema(response_code=0, response_reason="PONG")
 
     def size(self, queue_name: str) -> ResponseSchema:
         """Fetches the current number of items in the specified queue."""

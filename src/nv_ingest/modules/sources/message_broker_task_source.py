@@ -133,17 +133,18 @@ def _message_broker_task_source(builder: mrc.Builder):
     validated_config = fetch_and_validate_module_config(builder, MessageBrokerTaskSourceSchema)
 
     # Determine the client type and create the appropriate client
-    client_type = validated_config.client_type.lower()
+    client_type = validated_config.broker_client.client_type.lower()
+    broker_params = validated_config.broker_client.broker_params
 
     if (client_type == "redis"):
         client = RedisClient(
             host=validated_config.broker_client.host,
             port=validated_config.broker_client.port,
-            db=validated_config.broker_client.broker_params.db,
+            db=broker_params.get("db", 0),
             max_retries=validated_config.broker_client.max_retries,
             max_backoff=validated_config.broker_client.max_backoff,
             connection_timeout=validated_config.broker_client.connection_timeout,
-            use_ssl=validated_config.broker_client.broker_params.use_ssl,
+            use_ssl=broker_params.get("use_ssl", False),
         )
     elif (client_type == "simple"):
         client = SimpleClient(
@@ -162,7 +163,7 @@ def _message_broker_task_source(builder: mrc.Builder):
         validated_config=validated_config,
     )
 
-    node = builder.make_source("fetch_messages_broker", _fetch_and_process_messages)
+    node = builder.make_source("messages_broker_task_source", _fetch_and_process_messages)
     node.launch_options.engines_per_pe = validated_config.progress_engines
 
     builder.register_module_output("output", node)
