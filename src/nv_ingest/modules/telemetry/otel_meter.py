@@ -57,16 +57,17 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
     None
     """
     validated_config = fetch_and_validate_module_config(builder, OpenTelemetryMeterSchema)
+    broker_params = validated_config.broker_client.broker_params
     stats = GlobalStats.get_instance()
 
     redis_client = RedisClient(
-        host=validated_config.redis_client.host,
-        port=validated_config.redis_client.port,
-        db=0,  # Assuming DB is always 0 for simplicity; make configurable if needed
-        max_retries=validated_config.redis_client.max_retries,
-        max_backoff=validated_config.redis_client.max_backoff,
-        connection_timeout=validated_config.redis_client.connection_timeout,
-        use_ssl=validated_config.redis_client.use_ssl,
+        host=validated_config.broker_client.host,
+        port=validated_config.broker_client.port,
+        db=broker_params.get("db", 0),
+        max_retries=validated_config.broker_client.max_retries,
+        max_backoff=validated_config.broker_client.max_backoff,
+        connection_timeout=validated_config.broker_client.connection_timeout,
+        use_ssl=broker_params.get("use_ssl", False),
     )
 
     resource = Resource(attributes={"service.name": "nv-ingest"})

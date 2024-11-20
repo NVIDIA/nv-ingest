@@ -472,9 +472,10 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config, message_
         module_config=ingest_config.get(
             "otel_meter_module",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
+                    "client_type": "redis",
                 },
                 "otel_endpoint": endpoint,
             },
