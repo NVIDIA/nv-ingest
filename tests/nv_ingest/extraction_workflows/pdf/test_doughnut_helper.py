@@ -40,7 +40,7 @@ def sample_pdf_stream():
 @patch(f"{_MODULE_UNDER_TEST}.call_image_inference_model")
 def test_doughnut_text_extraction(mock_call_inference, mock_create_client, sample_pdf_stream, document_df):
     mock_create_client.return_value = MagicMock()
-    mock_call_inference.return_value = ["<x_0><y_1>testing<x_10><y_20><class_Text>"]
+    mock_call_inference.return_value = "<x_0><y_1>testing<x_10><y_20><class_Text>"
 
     result = doughnut(
         pdf_stream=sample_pdf_stream,
@@ -64,7 +64,7 @@ def test_doughnut_text_extraction(mock_call_inference, mock_create_client, sampl
 @patch(f"{_MODULE_UNDER_TEST}.call_image_inference_model")
 def test_doughnut_table_extraction(mock_call_inference, mock_create_client, sample_pdf_stream, document_df):
     mock_create_client.return_value = MagicMock()
-    mock_call_inference.return_value = ["<x_17><y_0>table text<x_1007><y_1280><class_Table>"]
+    mock_call_inference.return_value = "<x_17><y_0>table text<x_1007><y_1280><class_Table>"
 
     result = doughnut(
         pdf_stream=sample_pdf_stream,
@@ -91,7 +91,7 @@ def test_doughnut_table_extraction(mock_call_inference, mock_create_client, samp
 @patch(f"{_MODULE_UNDER_TEST}.call_image_inference_model")
 def test_doughnut_image_extraction(mock_call_inference, mock_create_client, sample_pdf_stream, document_df):
     mock_create_client.return_value = MagicMock()
-    mock_call_inference.return_value = ["<x_17><y_0><x_1007><y_1280><class_Picture>"]
+    mock_call_inference.return_value = "<x_17><y_0><x_1007><y_1280><class_Picture>"
 
     result = doughnut(
         pdf_stream=sample_pdf_stream,
@@ -130,4 +130,5 @@ def test_preprocess_and_send_requests(mock_call_inference, mock_pdfium_pages_to_
     assert all(
         isinstance(item, tuple) and len(item) == 3 for item in result
     ), "Each entry should be a tuple with 3 items"
-    mock_call_inference.assert_called_once()
+
+    mock_call_inference.assert_called()
