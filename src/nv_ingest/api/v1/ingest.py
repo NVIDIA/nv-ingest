@@ -29,13 +29,9 @@ from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from opentelemetry import trace
 from redis import RedisError
-from pymilvus import Collection, MilvusClient, DataType, connections, utility, BulkInsertState
-from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
-import openai
-from pydantic import BaseModel
 
 from nv_ingest.util.converters.formats import ingest_json_results_to_blob
-from nv_ingest.util.vdb.milvus import bulk_upload_results_to_milvus, search_milvus
+from nv_ingest.util.vdb.milvus import bulk_upload_results_to_milvus, search_milvus, check_bulk_upload_status
 from nv_ingest.schemas.vdb_query_job_schema import OpenAIRequest, OpenAIResponse
 
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
@@ -201,7 +197,7 @@ async def convert_pdf(
 ) -> Dict[str, str]:
     try:
         
-        print(f"Processing: {len(files)} PDFs ....")
+        print(f"Processing: {len(files)} PDFs ....; vdb_task: {vdb_task}")
         
         submitted_jobs: List[ProcessingJob] = []
         for file in files:
@@ -294,8 +290,10 @@ async def convert_pdf(
 
 @router.get("/status/{job_id}")
 async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
+    t_start = time.time()
     try:
         processing_jobs = await ingest_service.get_processing_cache(job_id)
+        vdb_task_id = await ingest_service.get_vdb_bulk_upload_status(job_id)
     # TO DO: return 400 when job_id dne
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}")
@@ -316,9 +314,6 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 
                 job_response = json.dumps(job_response)
                 blob_response = ingest_json_results_to_blob(job_response)
-                
-                # with open("/workspace/data/q2release_blob.txt", "w") as blob_file:
-                #     blob_file.write(blob_response)
                 
                 processing_job.raw_result = job_response
                 processing_job.content = blob_response
@@ -355,12 +350,31 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 }
             )
             raw_results.append(result.raw_result)
+            print(f"reuslt.vdb_task: {result.vdb_task}")
             if result.vdb_task == True:
                 vdb_task = True
         
-        if vdb_task:
-            print(f"Inserting results into Milvus vector database ...")
-            resp = bulk_upload_results_to_milvus(raw_results, collection_name = job_id)
+        if vdb_task:    
+            # The bulk upload task takes time. It is running Async so we return a 202 and store
+            # the bulk upload task_id to query for the status on subsequent queries here.
+            if vdb_task_id is None:
+                print(f"Inserting results into Milvus vector database ...")
+                vdb_task_id = bulk_upload_results_to_milvus(raw_results, collection_name = job_id)
+                await ingest_service.set_vdb_bulk_upload_status(job_id, vdb_task_id)
+                print(f"VDB Task Id Insertion: {vdb_task_id}")
+                print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+                raise HTTPException(status_code=202, detail="VDB Bulk upload started. Retry later.")
+            else:
+                if check_bulk_upload_status(vdb_task_id):
+                    print(f"VDB Bulk upload with task_id: {vdb_task_id} complete.")
+                    return JSONResponse(
+                        content={"status": "completed", "result": results},
+                        status_code=200,
+                    )
+                else:
+                    print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+                    raise HTTPException(status_code=202, detail="VDB Bulk upload running but is not ready yet. Retry later.")
+            
         
         return JSONResponse(
             content={"status": "completed", "result": results},
@@ -368,6 +382,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
         )
     else:
         # Not yet ready ...
+        print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
 
 

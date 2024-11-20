@@ -50,6 +50,7 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
         self._cache_prefix = "processing_cache:"
+        self._bulk_vdb_cache_prefix = "vdb_bulk_upload_cache:"
 
         self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
                                           max_pool_size=self._concurrency_level)
@@ -104,6 +105,31 @@ class RedisIngestService(IngestServiceMeta):
             if data is None:
                 return []
             return [ProcessingJob(**job) for job in json.loads(data)]
+        except Exception as err:
+            logger.error(f"Error getting cache for {cache_key}: {err}")
+            raise
+
+
+    async def set_vdb_bulk_upload_status(self, job_id: str, task_id: str):
+        """Set the task_id for the vdb upload task"""
+        cache_key = f"{self._bulk_vdb_cache_prefix}{job_id}"
+        try:
+            self._ingest_client.get_client().set(
+                cache_key,
+                task_id,
+                ex=3600
+            )
+        except Exception as err:
+            logger.error(f"Error setting cache for {cache_key}: {err}")
+            raise
+
+
+    async def get_vdb_bulk_upload_status(self, job_id: str) -> str:
+        """Get the task_id for the VDB upload task to query Milvus for status"""
+        cache_key = f"{self._bulk_vdb_cache_prefix}{job_id}"
+        try:
+            data = self._ingest_client.get_client().get(cache_key)
+            return data
         except Exception as err:
             logger.error(f"Error getting cache for {cache_key}: {err}")
             raise

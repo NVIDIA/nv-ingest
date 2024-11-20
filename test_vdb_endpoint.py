@@ -16,8 +16,8 @@ url = "http://ipp1-3304.ipp1u1.colossus.nvidia.com:7670/v1/query"
 
 payload = {
     "query": "What is the driving factor to Nvidia's increased revenue?",
-    "k": 1,
-    "job_id": "d9c2cde3_30a4_4bbf_b6f2_74e59465fb64"
+    "k": 2,
+    "job_id": "_7767189e_9f02_4b45_b7d4_0f4d7c5732d6"
 }
 
 # Make a POST request to the endpoint
