@@ -315,6 +315,7 @@ def preprocess_and_send_requests(
 
     output = []
     for page_image in page_images:
+        # Currently, the model only supports processing one page at a time (batch size = 1).
         response = call_image_inference_model(doughnut_client, "doughnut", page_image)
         output.append(response)
 

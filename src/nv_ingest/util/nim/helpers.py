@@ -119,14 +119,12 @@ def _call_image_inference_grpc_client(client, model_name: str, image_data: np.nd
 
     try:
         result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
+        return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+
     except Exception as e:
         err_msg = f"Inference failed for model {model_name}: {str(e)}"
         logger.error(err_msg)
         raise RuntimeError(err_msg)
-
-    result = " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
-
-    return result
 
 
 def _call_image_inference_http_client(client, model_name: str, image_data: np.ndarray):
