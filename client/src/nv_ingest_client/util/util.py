@@ -263,7 +263,7 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
                 "source_name",
                 "")
         except Exception as e:
-            source_id = "[Source ID Missing from Payload]"
+            source_id = ""
 
         description = f"[{source_id}]: {json_payload.get('status', '')}\n"
 
@@ -274,7 +274,7 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
         for annot_id, value in json_payload["annotations"].items():
             if "task_result" in value and value["task_result"] == "FAILURE":
                 message = value.get("message", "Unknown")
-                description = f"\n↪ Event that caused this failure: {annot_id} -> {message}"
+                description += f"\n↪ Event that caused this failure: {annot_id} -> {message}"
                 break
 
     return is_failed, description
