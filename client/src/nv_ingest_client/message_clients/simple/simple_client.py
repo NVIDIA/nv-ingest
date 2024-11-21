@@ -2,17 +2,29 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# NOTE: This code is duplicated from the ingest service:
+# src/nv_ingest/util/message_brokers/simple_message_broker/simple_client.py
+# Eventually we should move all client wrappers for the message broker into a shared library that both the ingest
+# service and the client can use.
 
 import socket
 import json
 import time
 import logging
-from typing import Optional
+from typing import Optional, Union
 
-from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
-from nv_ingest.util.message_brokers.simple_message_broker import ResponseSchema
+from pydantic import BaseModel
+
+from nv_ingest_client.message_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
+
+
+class ResponseSchema(BaseModel):
+    response_code: int
+    response_reason: Optional[str] = "OK"
+    response: Union[str, dict, None] = None
+    transaction_id: Optional[str] = None  # Unique transaction ID
 
 
 class SimpleClient(MessageBrokerClientBase):
@@ -63,7 +75,6 @@ class SimpleClient(MessageBrokerClientBase):
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
                     self._send(sock, data)
                     response_data = self._recv(sock)
-                    logger.debug(f"RESPONSE_DATA: {response_data}")
                     response = json.loads(response_data)
 
                     return ResponseSchema(**response)
@@ -104,7 +115,10 @@ class SimpleClient(MessageBrokerClientBase):
                     response = json.loads(response_data)
                     logger.debug(f"Initial response: {response}")
 
-                    if 'transaction_id' not in response:
+                    if (response.get('response_code') != 0):
+                        return ResponseSchema(**response)
+
+                    if ('transaction_id' not in response):
                         error_msg = "No transaction_id in response."
                         logger.error(error_msg)
                         return ResponseSchema(response_code=1, response_reason=error_msg)
@@ -157,7 +171,10 @@ class SimpleClient(MessageBrokerClientBase):
                     response = json.loads(response_data)
                     logger.debug(f"Initial response: {response}")
 
-                    if 'transaction_id' not in response:
+                    if (response.get('response_code') != 0):
+                        return ResponseSchema(**response)
+
+                    if ('transaction_id' not in response):
                         error_msg = "No transaction_id in response."
                         logger.error(error_msg)
                         return ResponseSchema(response_code=1, response_reason=error_msg)

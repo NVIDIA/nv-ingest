@@ -5,6 +5,7 @@ from functools import partial
 from typing import Dict
 import copy
 import json
+import threading
 
 import cudf
 import mrc
@@ -16,10 +17,15 @@ from opentelemetry.trace.span import format_trace_id
 
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.message_broker_source_schema import MessageBrokerTaskSourceSchema
-from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
-from nv_ingest.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import annotate_cm
+
+# Import the clients
+from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+from nv_ingest.util.message_brokers.simple_message_broker.simple_client import SimpleClient
+
+# Import the SimpleMessageBroker server
+from nv_ingest.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker, ResponseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -33,12 +39,22 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 
     while True:
         try:
-            job = client.fetch_message(validated_config.task_queue, 0)
+            job = client.fetch_message(validated_config.task_queue, 100)
+            logger.debug(f"Received Job Type: {type(job)}")
+            if (isinstance(job, ResponseSchema)):
+                if (job.response_code != 0):
+                    continue
+
+                logger.debug(f"Received ResponseSchema, converting to dict")
+                job = json.loads(job.response)
+            else:
+                logger.debug(f"Received something not a ResponseSchema")
+
             ts_fetched = datetime.now()
-            yield process_message(job, ts_fetched)  # process_message remains unchanged
+            yield process_message(job, ts_fetched)
         except Exception as err:
             logger.error(
-                f"Irrecoverable error occurred during message processing, likely malformed JOB structure: {err}"
+                f"Irrecoverable error occurred during message processing, likely malformed JSON JOB structure: {err}"
             )
             traceback.print_exc()
             continue  # Continue fetching the next message
@@ -51,7 +67,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
 
     if logger.isEnabledFor(logging.DEBUG):
         no_payload = copy.deepcopy(job)
-        no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
+        if "content" in no_payload.get("job_payload", {}):
+            no_payload["job_payload"]["content"] = ["[...]"]  # Redact the payload for logging
         logger.debug("Job: %s", json.dumps(no_payload, indent=2))
 
     validate_ingest_job(job)
@@ -83,7 +100,6 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         control_message.set_metadata("job_id", job_id)
 
         for task in job_tasks:
-            # logger.debug("Tasks: %s", json.dumps(task, indent=2))
             control_message.add_task(task["type"], task["task_properties"])
 
         # Debug Tracing
@@ -134,9 +150,9 @@ def _message_broker_task_source(builder: mrc.Builder):
 
     # Determine the client type and create the appropriate client
     client_type = validated_config.broker_client.client_type.lower()
-    broker_params = validated_config.broker_client.broker_params
+    broker_params = validated_config.broker_client.broker_params or {}
 
-    if (client_type == "redis"):
+    if client_type == "redis":
         client = RedisClient(
             host=validated_config.broker_client.host,
             port=validated_config.broker_client.port,
@@ -146,14 +162,51 @@ def _message_broker_task_source(builder: mrc.Builder):
             connection_timeout=validated_config.broker_client.connection_timeout,
             use_ssl=broker_params.get("use_ssl", False),
         )
-    elif (client_type == "simple"):
+    elif client_type == "simple":
+        # Start or retrieve the singleton SimpleMessageBroker server
+        max_queue_size = broker_params.get("max_queue_size", 100)
+        server_host = validated_config.broker_client.host
+        server_port = validated_config.broker_client.port
+
+        server_host = '0.0.0.0'
+
+        # Obtain the singleton instance
+        server = SimpleMessageBroker(server_host, server_port, max_queue_size)
+
+        # Start the server if not already running
+        if not hasattr(server, 'server_thread') or not server.server_thread.is_alive():
+            server_thread = threading.Thread(target=server.serve_forever)
+            server_thread.daemon = True  # Allows program to exit even if thread is running
+            server.server_thread = server_thread  # Attach the thread to the server instance
+            server_thread.start()
+            logger.info(f"Started SimpleMessageBroker server on {server_host}:{server_port}")
+        else:
+            logger.info(f"SimpleMessageBroker server already running on {server_host}:{server_port}")
+
+        # Create the SimpleClient
         client = SimpleClient(
-            host=validated_config.broker_client.host,
-            port=validated_config.broker_client.port,
+            host=server_host,
+            port=server_port,
             max_retries=validated_config.broker_client.max_retries,
             max_backoff=validated_config.broker_client.max_backoff,
             connection_timeout=validated_config.broker_client.connection_timeout,
         )
+
+        # Register a cleanup function to stop the server when the pipeline stops
+        def cleanup():
+            # Ensure server shutdown is handled properly
+            with SimpleMessageBroker._instances_lock:
+                key = (server_host, server_port)
+                if key in SimpleMessageBroker._instances:
+                    # Remove the instance from the singleton dictionary
+                    del SimpleMessageBroker._instances[key]
+                    server.shutdown()
+                    server.server_close()
+                    server.server_thread.join()
+                    logger.info("SimpleMessageBroker server stopped.")
+
+        #builder.register_cleanup_callback(cleanup)
+
     else:
         raise ValueError(f"Unsupported client_type: {client_type}")
 
@@ -163,7 +216,7 @@ def _message_broker_task_source(builder: mrc.Builder):
         validated_config=validated_config,
     )
 
-    node = builder.make_source("messages_broker_task_source", _fetch_and_process_messages)
+    node = builder.make_source("message_broker_task_source", _fetch_and_process_messages)
     node.launch_options.engines_per_pe = validated_config.progress_engines
 
     builder.register_module_output("output", node)

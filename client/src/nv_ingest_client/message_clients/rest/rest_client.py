@@ -19,7 +19,7 @@ import httpx
 import requests
 import re
 
-from nv_ingest_client.message_clients import MessageClientBase
+from nv_ingest_client.message_clients import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ _TERMINAL_RESPONSE_STATUSES = [
 ]
 
 
-class RestClient(MessageClientBase):
+class RestClient(MessageBrokerClientBase):
     """
     A client for interfacing with the nv-ingest HTTP endpoint, providing mechanisms for sending and receiving messages
     with retry logic and connection management.

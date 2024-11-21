@@ -5,7 +5,7 @@
 from abc import ABC
 from abc import abstractmethod
 
-class MessageClientBase(ABC):
+class MessageBrokerClientBase(ABC):
     """
     Abstract base class for a messaging client to interface with various messaging systems.
 

@@ -71,13 +71,18 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             logger.debug(f"Received data: {request_data}")
 
             command = request_data.get("command")
-            queue_name = request_data.get("queue_name")
+            queue_name = request_data.get("queue_name", "")
             message = request_data.get("message", "")
             timeout = request_data.get("timeout", None)
 
             transaction_id = str(uuid.uuid4())
 
-            # Ensure the queue and its lock exist
+            # Handle the PING command directly
+            if command == "PING":
+                self._handle_ping()
+                return
+
+            # Ensure the queue and its lock exist for other commands
             self.server._initialize_queue(queue_name)
             queue_lock = self.server.queue_locks[queue_name]
             queue = self.server.queues[queue_name]
@@ -97,6 +102,11 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             logger.error(f"Error processing command from {client_address}: {e}")
             response = ResponseSchema(response_code=1, response_reason=str(e))
             self._send_response(response)
+
+    def _handle_ping(self):
+        """Respond to a PING command."""
+        response = ResponseSchema(response_code=0, response="PONG")
+        self._send_response(response)
 
     def _handle_push(self, queue_name: str, message: str, timeout: Optional[float],
                      transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock):
@@ -208,13 +218,30 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
 class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
     allow_reuse_address = True
+    _instances = {}
+    _instances_lock = threading.Lock()
+
+    def __new__(cls, host: str, port: int, max_queue_size: int):
+        key = (host, port)
+        with cls._instances_lock:
+            if key not in cls._instances:
+                # Create a new instance and store it in the instances dictionary
+                instance = super(SimpleMessageBroker, cls).__new__(cls)
+                cls._instances[key] = instance
+            else:
+                instance = cls._instances[key]
+        return instance
 
     def __init__(self, host: str, port: int, max_queue_size: int):
+        # Prevent __init__ from running multiple times on the same instance
+        if hasattr(self, '_initialized') and self._initialized:
+            return
         super().__init__((host, port), SimpleMessageBrokerHandler)
         self.max_queue_size = max_queue_size
         self.queues = {}
         self.queue_locks = {}  # Dictionary to hold locks for each queue
         self.lock = threading.Lock()  # Global lock to protect access to queues and locks
+        self._initialized = True  # Flag to indicate initialization is complete
 
     def _initialize_queue(self, queue_name: str):
         with self.lock:

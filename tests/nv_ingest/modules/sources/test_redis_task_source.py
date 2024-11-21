@@ -67,11 +67,7 @@ def ts_fetched():
     "add_trace_tagging, ts_send, trace_id",
     [
         (True, datetime.now(), None),
-        (
-            False,
-            datetime.now(),
-            None,
-        ),  # Add case without ts_send when tracing is disabled
+        (False, datetime.now(), None),  # Add case without ts_send when tracing is disabled
         (True, datetime.now(), "abcdef0123456789abcdef0123456789"),
         (True, datetime.now(), int("abcdef0123456789abcdef0123456789", 16)),
     ],
@@ -83,6 +79,7 @@ def test_process_message(job_payload, add_trace_tagging, trace_id, ts_send, ts_f
     job_id = "abc12345678910213123"
     payload["job_id"] = job_id
     payload["tracing_options"] = {"trace": add_trace_tagging, "ts_send": int(ts_send.timestamp() * 1e9)}
+
     if trace_id is not None:
         payload["tracing_options"]["trace_id"] = trace_id
 
@@ -95,8 +92,8 @@ def test_process_message(job_payload, add_trace_tagging, trace_id, ts_send, ts_f
     assert result.get_metadata("response_channel") == f"response_{job_id}"
     if add_trace_tagging:
         assert result.get_metadata("config::add_trace_tagging") is True
-        #assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is not None
-        #assert result.get_timestamp(f"trace::exit::{MODULE_NAME}") is not None
+        assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is not None
+        assert result.get_timestamp(f"trace::exit::{MODULE_NAME}") is not None
         if ts_send is not None:
             assert result.get_timestamp("trace::entry::redis_source_network_in") == ts_send
             assert result.get_timestamp("trace::exit::redis_source_network_in") == ts_fetched
@@ -106,8 +103,8 @@ def test_process_message(job_payload, add_trace_tagging, trace_id, ts_send, ts_f
     else:
         assert result.get_metadata("config::add_trace_tagging") is None
         # Assert that tracing-related metadata are not set if tracing is disabled
-        #assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is None
-        #assert result.get_timestamp(f"trace::exit::{MODULE_NAME}") is None
+        assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is None
+        assert result.get_timestamp(f"trace::exit::{MODULE_NAME}") is None
         assert result.get_metadata("trace_id") is None
 
     # Check for the presence of tasks in the ControlMessage
