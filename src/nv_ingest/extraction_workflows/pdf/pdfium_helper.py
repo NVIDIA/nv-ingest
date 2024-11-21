@@ -471,15 +471,18 @@ def pdfium_extractor(
                 pdfium_config,
                 trace_info=trace_info,
         ):
-            extracted_data.append(
-                construct_table_and_chart_metadata(
-                    table_and_charts,
-                    page_idx,
-                    pdf_metadata.page_count,
-                    source_metadata,
-                    base_unified_metadata,
+            if (extract_tables and (table_and_charts.type_string == "table")) or (
+                extract_charts and (table_and_charts.type_string == "chart")
+            ):
+                extracted_data.append(
+                    construct_table_and_chart_metadata(
+                        table_and_charts,
+                        page_idx,
+                        pdf_metadata.page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
                 )
-            )
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
 
