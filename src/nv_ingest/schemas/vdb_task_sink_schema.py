@@ -94,7 +94,7 @@ class VdbTaskSinkSchema(BaseModel):
     write_time_interval: float = 1.0
     retry_interval: float = 60.0
     raise_on_failure: bool = False
-    progress_engines: conint(ge=1) = 6
+    progress_engines: conint(ge=1) = 1
 
     @validator("service", pre=True)
     def validate_service(cls, to_validate):  # pylint: disable=no-self-argument

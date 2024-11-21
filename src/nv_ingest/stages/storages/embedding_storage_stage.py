@@ -41,6 +41,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
     bucket_path = params.get("bucket_path", "embeddings")
+    collection_name = params.get("collection_name", "nv_ingest_collection")
 
     client = Minio(
         endpoint,
@@ -57,7 +58,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
             host = "milvus",
             port= "19530"
         )
-    schema = Collection("nv_ingest_collection").schema
+    schema = Collection(collection_name).schema
 
     bucket_found = client.bucket_exists(bucket_name)
     if not bucket_found:
@@ -108,7 +109,6 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
 
 
 def _store_embeddings(df, task_props, validated_config, trace_info=None):
-    logger.error(f"in store embedding")
     try:
         content_types = {}
         content_types[ContentTypeEnum.EMBEDDING] = True
