@@ -52,6 +52,8 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 
             ts_fetched = datetime.now()
             yield process_message(job, ts_fetched)
+        except TimeoutError as err:
+            continue
         except Exception as err:
             logger.error(
                 f"Irrecoverable error occurred during message processing, likely malformed JSON JOB structure: {err}"
