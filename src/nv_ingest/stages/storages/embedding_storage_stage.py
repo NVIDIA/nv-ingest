@@ -19,6 +19,9 @@ import pandas as pd
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from pymilvus import Collection, connections
+from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter 
+from pymilvus.bulk_writer.constants import BulkFileType
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
@@ -48,6 +51,14 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
         region=params.get("region", None),
     )
 
+    connections.connect(
+            address= "milvus:19530",
+            uri= "http://milvus:19530",
+            host = "milvus",
+            port= "19530"
+        )
+    schema = Collection("nv_ingest_collection").schema
+
     bucket_found = client.bucket_exists(bucket_name)
     if not bucket_found:
         client.make_bucket(bucket_name)
@@ -55,42 +66,43 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     else:
         logger.debug("Bucket %s already exists", bucket_name)
 
-    storage_options = {
-        "key":access_key,
-        "secret": secret_key,
-        "client_kwargs": {
-        "endpoint_url": _DEFAULT_READ_ADDRESS
-        }
-    }
+    conn = RemoteBulkWriter.ConnectParam(
+        endpoint=endpoint,
+        access_key=access_key,
+        secret_key=secret_key,
+        bucket_name=bucket_name,
+        secure=False
+    )
 
-    meta = df["metadata"]
-    emb_df_list = []  
-    file_uuid = uuid.uuid4().hex
-    destination_file = f"{bucket_path}/{file_uuid}.parquet"
-    write_path = f"s3://{bucket_name}/{destination_file}"
+    writer = RemoteBulkWriter(
+        schema=schema,
+        remote_path=bucket_path,
+        connect_param=conn,
+        file_type=BulkFileType.PARQUET
+    )
+
     for idx, row in df.iterrows():
         uu_id = row["uuid"]
         metadata = row["metadata"].copy()
 
-        metadata["source_metadata"]["source_location"] = write_path
+        metadata["source_metadata"]["source_location"] = bucket_path
 
         if row["document_type"] == ContentTypeEnum.EMBEDDING:
             logger.debug("Storing embedding data to Minio")
             metadata["embedding_metadata"][
                 "uploaded_embedding_url"
-            ] = write_path
+            ] = bucket_path
         # TODO: validate metadata before putting it back in.
-        # cm = str(metadata["content_metadata"])
-        text = metadata["content"]
-        # source_meta = str(metadata["source_metadata"])
-        emb = metadata["embedding"]
-        if emb is not None:
+        if metadata["embedding"] is not None:
             df.at[idx, "metadata"] = metadata
-            emb_df_list.append([emb, text])
+            writer.append_row({
+                "text": metadata["content"], 
+                "source": metadata["source_metadata"], 
+                "content_metadata": metadata["content_metadata"], 
+                "vector": metadata["embedding"]}
+            )
     
-    emb_df = pd.DataFrame(emb_df_list, columns=["vector", "text"])
-    logger.error(f"exporting: {emb_df}")
-    emb_df.to_parquet(write_path, engine='pyarrow', storage_options=storage_options)
+    writer.commit()
 
     return df
 
@@ -101,7 +113,7 @@ def _store_embeddings(df, task_props, validated_config, trace_info=None):
         content_types = {}
         content_types[ContentTypeEnum.EMBEDDING] = True
 
-        params = task_props.get("extra_params", {})
+        params = task_props.get("params", {})
         params["content_types"] = content_types
 
         df = upload_embeddings(df, params)

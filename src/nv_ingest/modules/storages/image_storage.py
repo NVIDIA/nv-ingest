@@ -135,7 +135,7 @@ def _storage_images(builder: mrc.Builder):
             if store_images:
                 content_types[ContentTypeEnum.IMAGE] = store_images
 
-            params = task_props.get("extra_params", {})
+            params = task_props.get("params", {})
 
             params["content_types"] = content_types
 

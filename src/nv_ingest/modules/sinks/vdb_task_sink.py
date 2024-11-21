@@ -64,7 +64,7 @@ def _bulk_ingest(milvus_uri: str = None,
     bucket_found = client.bucket_exists(bucket_name)
     if not bucket_found:
         raise ValueError(f"Could not find bucket {bucket_name}")
-    batch_files = [[f"{file.object_name}"] for file in client.list_objects(bucket_name, prefix=bulk_ingest_path)]
+    batch_files = [[f"{file.object_name}"] for file in client.list_objects(bucket_name, prefix=bulk_ingest_path, recursive=True)]
 
     uri_parsed = urlparse(milvus_uri)
     conn = connections.connect(host=uri_parsed.hostname, port=uri_parsed.port)
@@ -303,7 +303,7 @@ def _vdb_task_sink(builder: mrc.Builder):
             bulk_ingest = task_props.get("bulk_ingest", False)
             bulk_ingest_path = task_props.get("bulk_ingest_path", None)
             bucket_name = task_props.get("bucket_name", _DEFAULT_BUCKET_NAME)
-            extra_params = task_props.get("extra_params", None)
+            extra_params = task_props.get("params", {})
             filter_errors = task_props.get("filter_errors", True)
 
             if not service_status:
