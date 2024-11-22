@@ -205,6 +205,7 @@ class NearbyObjectsSubSchema(BaseModelNoExt):
 
     content: List[str] = []
     bbox: List[tuple] = []
+    type: List[str] = []
 
 
 class NearbyObjectsSchema(BaseModelNoExt):
@@ -248,6 +249,7 @@ class TextMetadataSchema(BaseModelNoExt):
     keywords: Union[str, List[str], Dict] = ""
     language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
     text_location: tuple = (0, 0, 0, 0)
+    text_location_max_dimensions: tuple = (0, 0, 0, 0)
 
 
 class ImageMetadataSchema(BaseModelNoExt):

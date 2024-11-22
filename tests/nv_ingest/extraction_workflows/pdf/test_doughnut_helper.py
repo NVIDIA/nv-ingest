@@ -132,3 +132,33 @@ def test_preprocess_and_send_requests(mock_call_inference, mock_pdfium_pages_to_
     ), "Each entry should be a tuple with 3 items"
 
     mock_call_inference.assert_called()
+
+
+@patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
+@patch(f"{_MODULE_UNDER_TEST}.call_image_inference_model")
+def test_doughnut_text_extraction_bboxes(mock_call_inference, mock_create_client, sample_pdf_stream, document_df):
+    mock_create_client.return_value = MagicMock()
+    mock_call_inference.return_value = (
+        "<x_0><y_1>testing0<x_10><y_20><class_Title><x_30><y_40>testing1<x_50><y_60><class_Text>"
+    )
+
+    result = doughnut(
+        pdf_stream=sample_pdf_stream,
+        extract_text=True,
+        extract_images=False,
+        extract_tables=False,
+        row_data=document_df.iloc[0],
+        text_depth="page",
+        doughnut_config=MagicMock(doughnut_batch_size=1),
+    )
+
+    mock_call_inference.assert_called()
+
+    assert len(result) == 1
+    assert result[0][0].value == "text"
+    assert result[0][1]["content"] == "testing0\n\ntesting1"
+    assert result[0][1]["source_metadata"]["source_id"] == "source1"
+
+    blocks = result[0][1]["content_metadata"]["hierarchy"]["nearby_objects"]
+    assert blocks["text"]["content"] == ["testing0", "testing1"]
+    assert blocks["text"]["type"] == ["Title", "Text"]

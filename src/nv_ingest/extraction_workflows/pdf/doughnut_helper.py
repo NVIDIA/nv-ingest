@@ -160,7 +160,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             classes, bboxes, texts = doughnut_utils.extract_classes_bboxes(raw_text)
 
             page_nearby_blocks = {
-                "text": {"content": [], "bbox": []},
+                "text": {"content": [], "bbox": [], "type": []},
                 "images": {"content": [], "bbox": []},
                 "structured": {"content": [], "bbox": []},
             }
@@ -179,6 +179,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                         )
                         page_nearby_blocks["text"]["content"].append(txt)
                         page_nearby_blocks["text"]["bbox"].append(bbox)
+                        page_nearby_blocks["text"]["type"].append(cls)
 
                     accumulated_text.append(txt)
 
@@ -266,6 +267,9 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                         text_depth,
                         source_metadata,
                         base_unified_metadata,
+                        delimiter="\n\n",
+                        bbox_max_dimensions=(DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT),
+                        nearby_objects=page_nearby_blocks,
                     )
                 )
                 accumulated_text = []
@@ -283,6 +287,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
             text_depth,
             source_metadata,
             base_unified_metadata,
+            delimiter="\n\n",
         )
 
         if len(text_extraction) > 0:
