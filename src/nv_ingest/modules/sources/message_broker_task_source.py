@@ -14,6 +14,7 @@ from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from opentelemetry.trace.span import format_trace_id
+from pydantic import BaseModel
 
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.message_broker_source_schema import MessageBrokerTaskSourceSchema
@@ -25,7 +26,7 @@ from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 
 # Import the SimpleMessageBroker server
-from nv_ingest.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker, ResponseSchema
+from nv_ingest.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
 
 logger = logging.getLogger(__name__)
 
@@ -41,7 +42,7 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
         try:
             job = client.fetch_message(validated_config.task_queue, 100)
             logger.debug(f"Received Job Type: {type(job)}")
-            if (isinstance(job, ResponseSchema)):
+            if (isinstance(job, BaseModel)):
                 if (job.response_code != 0):
                     continue
 
@@ -91,7 +92,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
         trace_id = tracing_options.get("trace_id", None)
 
-        response_channel = f"response_{job_id}"
+        response_channel = f"{job_id}"
 
         df = cudf.DataFrame(job_payload)
         message_meta = MessageMeta(df=df)
@@ -166,7 +167,7 @@ def _message_broker_task_source(builder: mrc.Builder):
         )
     elif client_type == "simple":
         # Start or retrieve the singleton SimpleMessageBroker server
-        max_queue_size = broker_params.get("max_queue_size", 100)
+        max_queue_size = broker_params.get("max_queue_size", 10000)
         server_host = validated_config.broker_client.host
         server_port = validated_config.broker_client.port
 

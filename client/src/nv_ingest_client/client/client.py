@@ -10,6 +10,7 @@ import json
 import logging
 import math
 import time
+import traceback
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -295,13 +296,14 @@ class NvIngestClient:
         """
 
         try:
-            job_state = self._get_and_check_job_state(job_index, required_state=[JobStateEnum.SUBMITTED, JobStateEnum.SUBMITTED_ASYNC])
+            job_state = self._get_and_check_job_state(job_index, required_state=[JobStateEnum.SUBMITTED,
+                                                                                 JobStateEnum.SUBMITTED_ASYNC])
             response = self._message_client.fetch_message(job_state.job_id, timeout)
 
-            if response is not None:
+            if (response.response_code == 0):
                 try:
                     job_state.state = JobStateEnum.PROCESSING
-                    response_json = json.loads(response)
+                    response_json = json.loads(response.response)
                     if data_only:
                         response_json = response_json["data"]
 
@@ -345,12 +347,12 @@ class NvIngestClient:
     # This is the direct Python approach function for retrieving jobs which handles the timeouts directly
     # in the function itself instead of expecting the user to handle it themselves
     def fetch_job_result(
-        self,
-        job_ids: Union[str, List[str]],
-        timeout: float = 100,
-        max_retries: Optional[int] = None,
-        retry_delay: float = 1,
-        verbose: bool = False,
+            self,
+            job_ids: Union[str, List[str]],
+            timeout: float = 100,
+            max_retries: Optional[int] = None,
+            retry_delay: float = 1,
+            verbose: bool = False,
     ) -> List[Tuple[Optional[Dict], str]]:
         """
         Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
@@ -502,7 +504,10 @@ class NvIngestClient:
         try:
             message = json.dumps(job_state.job_spec.to_dict())
 
-            x_trace_id, job_id = self._message_client.submit_message(job_queue_id, message)
+            response = self._message_client.submit_message(job_queue_id, message, for_nv_ingest=True)
+            x_trace_id = response.trace_id
+            job_id = response.transaction_id.replace('"', "")
+            logger.debug(f"Submitted job {job_index} to queue {job_queue_id} and got back job ID {job_id}")
 
             job_state.state = JobStateEnum.SUBMITTED
             job_state.job_id = job_id
@@ -512,6 +517,7 @@ class NvIngestClient:
 
             return x_trace_id
         except Exception as err:
+            traceback.print_exc()
             logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise

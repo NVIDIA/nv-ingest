@@ -125,8 +125,8 @@ services:
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
-      - "7670:7670"
-      - "63790:63790"
+      - "7670:63790"
+      #- "63790:63790"
     cap_add:
       - sys_nice
     environment:
@@ -143,9 +143,9 @@ services:
       - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=DEBUG
-      - MESSAGE_CLIENT_HOST=redis
-      - MESSAGE_CLIENT_PORT=6379
-      - MESSAGE_CLIENT_TYPE=redis
+      - MESSAGE_CLIENT_HOST=0.0.0.0
+      - MESSAGE_CLIENT_PORT=63790
+      - MESSAGE_CLIENT_TYPE=simple
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}

@@ -74,7 +74,7 @@ class RedisIngestService(IngestServiceMeta):
 
     async def fetch_job(self, job_id: str) -> Any:
         # Fetch message with a timeout
-        message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=5)
+        message = self._ingest_client.fetch_message(f"{job_id}", timeout=5)
         if message is None:
             raise TimeoutError()
 
