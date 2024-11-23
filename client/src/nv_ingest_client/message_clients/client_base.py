@@ -4,8 +4,7 @@
 
 from abc import ABC
 from abc import abstractmethod
-
-from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
+from typing import Any
 
 
 class MessageBrokerClientBase(ABC):
@@ -51,7 +50,7 @@ class MessageBrokerClientBase(ABC):
         """
 
     @abstractmethod
-    def fetch_message(self, job_index: str, timeout: float = 0) -> ResponseSchema:
+    def fetch_message(self, job_index: str, timeout: float = 0) -> Any:
         """
         Fetches a message from the specified queue with retries on failure.
 
@@ -64,7 +63,7 @@ class MessageBrokerClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> ResponseSchema:
+    def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> Any:
         """
         Submits a message to a specified queue with retries on failure.
 

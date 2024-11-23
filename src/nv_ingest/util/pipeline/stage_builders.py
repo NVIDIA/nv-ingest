@@ -89,8 +89,8 @@ def get_table_detection_service(env_var_prefix):
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
     )
 
-    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
-    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
     logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
 
     return grpc_endpoint, http_endpoint, auth_token, infer_protocol

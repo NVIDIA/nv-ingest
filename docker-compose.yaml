@@ -131,8 +131,10 @@ services:
       - sys_nice
     environment:
       - CACHED_GRPC_ENDPOINT=cached:8001
-      - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
-      - CACHED_INFER_PROTOCOL=grpc
+      #- CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
+      - CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
+      #- CACHED_INFER_PROTOCOL=grpc
+      - CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
       # self hosted deplot
@@ -153,12 +155,16 @@ services:
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       - PADDLE_GRPC_ENDPOINT=paddle:8001
       - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
+      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       - PADDLE_INFER_PROTOCOL=grpc
+      #- PADDLE_INFER_PROTOCOL=http
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       - YOLOX_INFER_PROTOCOL=grpc
+      #- YOLOX_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1

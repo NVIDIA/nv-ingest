@@ -34,7 +34,7 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import create_inference_client, call_image_inference_model
 from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.nim.yolox import prepare_images_for_inference
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
@@ -131,7 +131,7 @@ def extract_tables_and_charts_using_image_ensemble(
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token, config.yolox_infer_protocol)
 
         batches = []
         i = 0
@@ -150,6 +150,7 @@ def extract_tables_and_charts_using_image_ensemble(
             original_image_shapes = [image.shape for image in original_images]
             input_array = prepare_images_for_inference(original_images)
 
+            # output_array = call_image_inference_model(yolox_client, "yolox", input_array, trace_info=trace_info)
             output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
 
             # Get back inference results
@@ -472,7 +473,7 @@ def pdfium_extractor(
                 trace_info=trace_info,
         ):
             if (extract_tables and (table_and_charts.type_string == "table")) or (
-                extract_charts and (table_and_charts.type_string == "chart")
+                    extract_charts and (table_and_charts.type_string == "chart")
             ):
                 extracted_data.append(
                     construct_table_and_chart_metadata(

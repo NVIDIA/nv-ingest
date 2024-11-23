@@ -150,26 +150,29 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
         response_channel = message.get_metadata("response_channel")
         response_channels_store[response_channel] = message.get_timestamp("annotation::Pushed")
 
-        curr_response_channels = set(
-            k for k in redis_client.get_client().keys() if k.decode("utf-8").startswith("response")
-        )
-        gauges["outstanding_job_responses_total"].set(len(curr_response_channels))
+        try:
+            curr_response_channels = set(
+                k for k in redis_client.get_client().keys() if k.decode("utf-8").startswith("response")
+            )
+            gauges["outstanding_job_responses_total"].set(len(curr_response_channels))
 
-        to_remove = []
-        for key, pushed_ts in response_channels_store.items():
-            if key in curr_response_channels:
-                continue
-            to_remove.append(key)
-            wait_time_ms = (datetime.now() - pushed_ts).total_seconds() * 1e3  # best effort
-            stats.append_job_stat("response_wait_time", wait_time_ms)
-            mean = stats.get_job_stat("response_wait_time", "mean")
-            median = stats.get_job_stat("response_wait_time", "median")
+            to_remove = []
+            for key, pushed_ts in response_channels_store.items():
+                if key in curr_response_channels:
+                    continue
+                to_remove.append(key)
+                wait_time_ms = (datetime.now() - pushed_ts).total_seconds() * 1e3  # best effort
+                stats.append_job_stat("response_wait_time", wait_time_ms)
+                mean = stats.get_job_stat("response_wait_time", "mean")
+                median = stats.get_job_stat("response_wait_time", "median")
 
-        gauges["response_wait_time_mean"].set(mean)
-        gauges["response_wait_time_median"].set(median)
+            gauges["response_wait_time_mean"].set(mean)
+            gauges["response_wait_time_median"].set(median)
 
-        for key in to_remove:
-            del response_channels_store[key]
+            for key in to_remove:
+                del response_channels_store[key]
+        except ConnectionError as e:
+            logger.warning(f"Failed to connect to Redis, skipping response stats update:\n{e}")
 
     @nv_ingest_node_failure_context_manager(
         annotation_id=MODULE_NAME,
