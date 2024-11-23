@@ -161,69 +161,74 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
 
             page_nearby_blocks = {
                 "text": {"content": [], "bbox": [], "type": []},
-                "images": {"content": [], "bbox": []},
-                "structured": {"content": [], "bbox": []},
+                "images": {"content": [], "bbox": [], "type": []},
+                "structured": {"content": [], "bbox": [], "type": []},
             }
 
             for cls, bbox, txt in zip(classes, bboxes, texts):
 
-                if extract_text and (cls in doughnut_utils.ACCEPTED_TEXT_CLASSES):
-                    txt = doughnut_utils.postprocess_text(txt, cls)
+                transformed_bbox = doughnut_utils.reverse_transform_bbox(
+                    bbox=bbox,
+                    bbox_offset=bbox_offset,
+                    original_width=DEFAULT_MAX_WIDTH,
+                    original_height=DEFAULT_MAX_HEIGHT,
+                )
 
+                if cls in doughnut_utils.ACCEPTED_TEXT_CLASSES:
                     if identify_nearby_objects:
-                        bbox = doughnut_utils.reverse_transform_bbox(
-                            bbox=bbox,
-                            bbox_offset=bbox_offset,
-                            original_width=DEFAULT_MAX_WIDTH,
-                            original_height=DEFAULT_MAX_HEIGHT,
-                        )
                         page_nearby_blocks["text"]["content"].append(txt)
-                        page_nearby_blocks["text"]["bbox"].append(bbox)
+                        page_nearby_blocks["text"]["bbox"].append(transformed_bbox)
                         page_nearby_blocks["text"]["type"].append(cls)
 
-                    accumulated_text.append(txt)
+                    if extract_text:
+                        txt = doughnut_utils.postprocess_text(txt, cls)
+                        accumulated_text.append(txt)
 
-                if extract_tables and (cls == "Table"):
-                    try:
-                        txt = txt.encode().decode("unicode_escape")  # remove double backlashes
-                    except UnicodeDecodeError:
-                        pass
-                    bbox = doughnut_utils.reverse_transform_bbox(
-                        bbox=bbox,
-                        bbox_offset=bbox_offset,
-                        original_width=DEFAULT_MAX_WIDTH,
-                        original_height=DEFAULT_MAX_HEIGHT,
-                    )
-                    table = LatexTable(latex=txt, bbox=bbox, max_width=DEFAULT_MAX_WIDTH, max_height=DEFAULT_MAX_HEIGHT)
-                    accumulated_tables.append(table)
+                if cls == "Table":
+                    if identify_nearby_objects:
+                        page_nearby_blocks["structured"]["content"].append(txt)
+                        page_nearby_blocks["structured"]["bbox"].append(transformed_bbox)
+                        page_nearby_blocks["structured"]["type"].append(cls)
 
-                if extract_images and (cls == "Picture"):
-                    if page_image is None:
-                        scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-                        padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-                        page_image, *_ = pdfium_pages_to_numpy(
-                            [pages[page_idx]], scale_tuple=scale_tuple, padding_tuple=padding_tuple
-                        )
-                        page_image = page_image[0]
+                    if extract_tables:
+                        try:
+                            txt = txt.encode().decode("unicode_escape")  # remove double backlashes
+                        except UnicodeDecodeError:
+                            pass
 
-                    img_numpy = crop_image(page_image, bbox)
-                    if img_numpy is not None:
-                        base64_img = numpy_to_base64(img_numpy)
-                        bbox = doughnut_utils.reverse_transform_bbox(
-                            bbox=bbox,
-                            bbox_offset=bbox_offset,
-                            original_width=DEFAULT_MAX_WIDTH,
-                            original_height=DEFAULT_MAX_HEIGHT,
+                        table = LatexTable(
+                            latex=txt, bbox=transformed_bbox, max_width=DEFAULT_MAX_WIDTH, max_height=DEFAULT_MAX_HEIGHT
                         )
-                        image = Base64Image(
-                            image=base64_img,
-                            bbox=bbox,
-                            width=img_numpy.shape[1],
-                            height=img_numpy.shape[0],
-                            max_width=DEFAULT_MAX_WIDTH,
-                            max_height=DEFAULT_MAX_HEIGHT,
-                        )
-                        accumulated_images.append(image)
+                        accumulated_tables.append(table)
+
+                if cls == "Picture":
+                    if identify_nearby_objects:
+                        page_nearby_blocks["images"]["content"].append(txt)
+                        page_nearby_blocks["images"]["bbox"].append(transformed_bbox)
+                        page_nearby_blocks["images"]["type"].append(cls)
+
+                    if extract_images:
+                        if page_image is None:
+                            scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
+                            padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
+                            page_image, *_ = pdfium_pages_to_numpy(
+                                [pages[page_idx]], scale_tuple=scale_tuple, padding_tuple=padding_tuple
+                            )
+                            page_image = page_image[0]
+
+                        img_numpy = crop_image(page_image, bbox)
+
+                        if img_numpy is not None:
+                            base64_img = numpy_to_base64(img_numpy)
+                            image = Base64Image(
+                                image=base64_img,
+                                bbox=transformed_bbox,
+                                width=img_numpy.shape[1],
+                                height=img_numpy.shape[0],
+                                max_width=DEFAULT_MAX_WIDTH,
+                                max_height=DEFAULT_MAX_HEIGHT,
+                            )
+                            accumulated_images.append(image)
 
             # Construct tables
             if extract_tables:
