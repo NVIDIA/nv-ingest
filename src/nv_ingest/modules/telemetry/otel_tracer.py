@@ -83,7 +83,7 @@ def _trace(builder: mrc.Builder) -> None:
             is_remote=True,
             trace_flags=TraceFlags(0x01),
         )
-        parent_ctx = trace.set_span_in_context(NonRecordingSpan(span_context))
+        parent_ctx = trace.set_span_in_context(span_context)
         parent_span = tracer.start_span(job_id, context=parent_ctx, start_time=start_time)
 
         create_span_with_timestamps(tracer, parent_span, message)

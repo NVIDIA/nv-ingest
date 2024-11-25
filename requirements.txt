@@ -1,4 +1,4 @@
-aiohttp==3.9.4
+aiohttp==3.10.11
 charset-normalizer
 click
 opencv-python
