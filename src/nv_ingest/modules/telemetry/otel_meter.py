@@ -171,8 +171,9 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
 
             for key in to_remove:
                 del response_channels_store[key]
-        except ConnectionError as e:
-            logger.warning(f"Failed to connect to Redis, skipping response stats update:\n{e}")
+        except Exception as e:
+            # TODO(Devin)
+            logger.warning(f"Failed to transmit to Redis, skipping response stats update:\n{e}")
 
     @nv_ingest_node_failure_context_manager(
         annotation_id=MODULE_NAME,
