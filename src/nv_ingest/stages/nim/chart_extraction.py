@@ -16,10 +16,10 @@ from morpheus.config import Config
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.cached import CachedModelInterface
 from nv_ingest.util.nim.deplot import DeplotModelInterface
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client, NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import NimClient
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 

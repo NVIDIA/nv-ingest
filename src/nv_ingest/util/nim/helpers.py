@@ -133,40 +133,6 @@ def create_inference_client(
     return NimClient(model_interface, infer_protocol, endpoints, auth_token)
 
 
-@traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def call_image_inference_model(client, model_name: str, image_data):
-    """
-    Calls an image inference model using the provided client.
-
-    If the client is a gRPC client, the inference is performed using gRPC. Otherwise, it is performed using HTTP.
-
-    Parameters
-    ----------
-    client : grpcclient.InferenceServerClient or dict
-        The inference client, which can be either a gRPC client or an HTTP client.
-    model_name : str
-        The name of the model to be used for inference.
-    image_data : np.ndarray
-        The image data to be used for inference. Should be a NumPy array.
-
-    Returns
-    -------
-    str or None
-        The result of the inference as a string if successful, otherwise `None`.
-
-    Raises
-    ------
-    RuntimeError
-        If the HTTP request fails or if the response format is not as expected.
-    """
-    if isinstance(client, grpcclient.InferenceServerClient):
-        response = _call_image_inference_grpc_client(client, model_name, image_data)
-    else:
-        response = _call_image_inference_http_client(client, model_name, image_data)
-
-    return response
-
-
 def _call_image_inference_grpc_client(client, model_name: str, image_data):
     if image_data.ndim == 3:
         image_data = np.expand_dims(image_data, axis=0)
@@ -454,7 +420,7 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
         return False
 
 
-@backoff.on_predicate(backoff.expo, max_value=5)
+@backoff.on_predicate(backoff.expo, max_time=30)
 @multiprocessing_cache(max_calls=100)
 def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
     if http_endpoint is None or http_endpoint == "":
@@ -470,14 +436,19 @@ def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="
 
     # Call the metadata endpoint of the NIM
     try:
-        # Use a short timeout to prevent long hanging calls. 5 seconds seems resonable
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems reasonable
         resp = requests.get(url, timeout=5)
         if resp.status_code == 200:
-            return resp.json().get(version_field, "")
+            version = resp.json().get(version_field, "")
+            if version:
+                return version
+            else:
+                # If version field is empty, retry
+                logger.warning(f"No version field in response from '{url}'. Retrying.")
+                return ""
         else:
             # Any other code is confusing. We should log it with a warning
-            # as it could be something that might hold up ready state
-            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.json()}")
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.text}")
             return ""
     except requests.HTTPError as http_err:
         logger.warning(f"'{url}' produced a HTTP error: {http_err}")

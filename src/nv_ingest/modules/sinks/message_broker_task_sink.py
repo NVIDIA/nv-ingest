@@ -200,7 +200,7 @@ def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str
     for attempt in range(retry_count):
         try:
             for json_payload in json_payloads:
-                broker_client.get_client().submit_message(response_channel, json_payload)
+                broker_client.submit_message(response_channel, json_payload)
 
             logger.debug(f"Message broker sink forwarded message to broker channel '{response_channel}'.")
 
@@ -269,7 +269,7 @@ def handle_failure(
         "description": error_description,
         "trace": json_result_fragments[0].get("trace", {}),
     }
-    broker_client.get_client().submit_message(response_channel, json.dumps(fail_msg))
+    broker_client.submit_message(response_channel, json.dumps(fail_msg))
 
 
 def process_and_forward(message: ControlMessage, broker_client: MessageBrokerClientBase) -> ControlMessage:
