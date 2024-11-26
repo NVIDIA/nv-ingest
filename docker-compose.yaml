@@ -131,10 +131,10 @@ services:
       - sys_nice
     environment:
       - CACHED_GRPC_ENDPOINT=cached:8001
-      #- CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
-      - CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
+      - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
+      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
       #- CACHED_INFER_PROTOCOL=grpc
-      - CACHED_INFER_PROTOCOL=http
+      - CACHED_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
       # self hosted deplot

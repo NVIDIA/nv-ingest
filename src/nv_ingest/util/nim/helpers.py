@@ -29,48 +29,108 @@ DEPLOT_TEMPERATURE = 1.0
 DEPLOT_TOP_P = 1.0
 
 
+class ModelInterface:
+    def format_input(self, data, protocol: str):
+        raise NotImplementedError("Subclasses should implement this method")
+
+    def parse_output(self, response, protocol: str):
+        raise NotImplementedError("Subclasses should implement this method")
+
+    def prepare_data_for_inference(self, data):
+        raise NotImplementedError("Subclasses should implement this method")
+
+    def process_inference_results(self, output_array, **kwargs):
+        raise NotImplementedError("Subclasses should implement this method")
+
+
+class NimClient:
+    def __init__(self, model_interface: ModelInterface, protocol: str, endpoints: Tuple[str, str],
+                 auth_token: Optional[str] = None):
+        self.model_interface = model_interface
+        self.protocol = protocol.lower()
+        self.auth_token = auth_token
+
+        grpc_endpoint, http_endpoint = endpoints
+
+        if self.protocol == 'grpc':
+            if not grpc_endpoint:
+                raise ValueError("gRPC endpoint must be provided for gRPC protocol")
+            logger.debug(f"Creating gRPC client with {grpc_endpoint}")
+            self.client = grpcclient.InferenceServerClient(url=grpc_endpoint)
+        elif self.protocol == 'http':
+            if not http_endpoint:
+                raise ValueError("HTTP endpoint must be provided for HTTP protocol")
+            logger.debug(f"Creating HTTP client with {http_endpoint}")
+            self.endpoint_url = generate_url(http_endpoint)
+            self.headers = {"accept": "application/json", "content-type": "application/json"}
+            if self.auth_token:
+                self.headers["Authorization"] = f"Bearer {self.auth_token}"
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def infer(self, data, model_name: str, **kwargs):
+        # Prepare data for inference
+        prepared_data = self.model_interface.prepare_data_for_inference(data)
+
+        # Format input based on protocol
+        formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
+
+        # Perform inference
+        if self.protocol == 'grpc':
+            logger.debug("Performing gRPC inference...")
+            response = self._grpc_infer(formatted_input, model_name)
+        elif self.protocol == 'http':
+            logger.debug("Performing HTTP inference...")
+            response = self._http_infer(formatted_input)
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+        # Parse and process output
+        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol)
+        results = self.model_interface.process_inference_results(parsed_output,
+                                                                 original_image_shapes=data.get(
+                                                                     'original_image_shapes'),
+                                                                 **kwargs)
+        return results
+
+    def _grpc_infer(self, formatted_input, model_name: str):
+        input_tensors = [grpcclient.InferInput("input", formatted_input.shape, datatype="FP32")]
+        input_tensors[0].set_data_from_numpy(formatted_input)
+
+        outputs = [grpcclient.InferRequestedOutput("output")]
+        response = self.client.infer(model_name=model_name, inputs=input_tensors, outputs=outputs)
+        logger.debug(f"gRPC inference response: {response}")
+
+        return response.as_numpy("output")
+
+    def _http_infer(self, formatted_input):
+        response = requests.post(self.endpoint_url, json=formatted_input, headers=self.headers)
+        response.raise_for_status()
+        logger.debug(f"HTTP inference response: {response.json()}")
+        return response.json()
+
+    def close(self):
+        if self.protocol == 'grpc' and hasattr(self.client, 'close'):
+            self.client.close()
+
+
 def create_inference_client(
-    endpoints: Tuple[str, str],
-    auth_token: Optional[str] = None,
-    infer_protocol: Optional[str] = None,
+        endpoints: Tuple[str, str],
+        model_interface: ModelInterface,
+        auth_token: Optional[str] = None,
+        infer_protocol: Optional[str] = None,
 ):
-    """
-    Creates an inference client based on the provided endpoints.
-
-    If the gRPC endpoint is provided, a gRPC client is created. Otherwise, an HTTP client is created.
-
-    Parameters
-    ----------
-    endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP endpoints. The first element is the gRPC endpoint, and the second element
-        is the HTTP endpoint.
-    auth_token : Optional[str]
-        The authentication token to be used for the HTTP client, if provided.
-
-    Returns
-    -------
-    grpcclient.InferenceServerClient or dict
-        A gRPC client if the gRPC endpoint is provided, otherwise a dictionary containing the HTTP client details.
-        :param infer_protocol:
-    """
     grpc_endpoint, http_endpoint = endpoints
 
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
         infer_protocol = "grpc"
+    elif infer_protocol is None and http_endpoint:
+        infer_protocol = "http"
 
-    if infer_protocol == "grpc":
-        logger.debug(f"Creating gRPC client with {grpc_endpoint}")
-        return grpcclient.InferenceServerClient(url=grpc_endpoint)
-    elif infer_protocol == "http":
-        url = generate_url(http_endpoint)
+    if infer_protocol not in ['grpc', 'http']:
+        raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-        logger.debug(f"Creating HTTP client with {http_endpoint}")
-        headers = {"accept": "application/json", "content-type": "application/json"}
-
-        if auth_token:
-            headers["Authorization"] = f"Bearer {auth_token}"
-
-        return {"endpoint_url": url, "headers": headers}
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token)
 
 
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
@@ -160,16 +220,16 @@ def _call_image_inference_http_client(client, model_name: str, image_data):
 
 
 def _prepare_deplot_payload(
-    base64_img: str,
-    max_tokens: int = DEPLOT_MAX_TOKENS,
-    temperature: float = DEPLOT_TEMPERATURE,
-    top_p: float = DEPLOT_TOP_P,
+        base64_img: str,
+        max_tokens: int = DEPLOT_MAX_TOKENS,
+        temperature: float = DEPLOT_TEMPERATURE,
+        top_p: float = DEPLOT_TOP_P,
 ) -> Dict[str, Any]:
     messages = [
         {
             "role": "user",
             "content": f"Generate the underlying data table of the figure below: "
-            f'<img src="data:image/png;base64,{base64_img}" />',
+                       f'<img src="data:image/png;base64,{base64_img}" />',
         }
     ]
     payload = {

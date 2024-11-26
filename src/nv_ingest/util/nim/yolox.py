@@ -2,14 +2,188 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import List
-import numpy as np
+
+import base64
+import io
 import warnings
 
 import cv2
+import logging
 import numpy as np
 import torch
 import torchvision
+
+from nv_ingest.util.nim.helpers import ModelInterface
+
+logger = logging.getLogger(__name__)
+
+YOLOX_MAX_BATCH_SIZE = 8
+YOLOX_MAX_WIDTH = 1536
+YOLOX_MAX_HEIGHT = 1536
+YOLOX_NUM_CLASSES = 3
+YOLOX_CONF_THRESHOLD = 0.01
+YOLOX_IOU_THRESHOLD = 0.5
+YOLOX_MIN_SCORE = 0.1
+YOLOX_FINAL_SCORE = 0.48
+
+
+# Implementing YoloxModelInterface with required methods
+class YoloxModelInterface(ModelInterface):
+    def prepare_data_for_inference(self, data):
+        original_images = data['images']
+        # Our yolox model expects images to be resized to 1024x1024
+        resized_images = [resize_image(image, (1024, 1024)) for image in original_images]
+        data['original_image_shapes'] = [image.shape for image in original_images]
+        data['resized_images'] = resized_images
+
+        return data  # Return data with added 'resized_images' key
+
+    def format_input(self, data, protocol: str):
+        if protocol == 'grpc':
+            logger.debug("Formatting input for gRPC Yolox model")
+            # Reorder axes to match model input (batch, channels, height, width)
+            input_array = np.einsum("bijk->bkij", data['resized_images']).astype(np.float32)
+
+            return input_array
+
+        elif protocol == 'http':
+            logger.debug("Formatting input for HTTP Yolox model")
+            # Convert images to base64 and construct payload
+            images_base64 = []
+            for image in data['resized_images']:
+                # Convert numpy array to PIL Image
+                from PIL import Image
+                image_pil = Image.fromarray((image * 255).astype(np.uint8))
+                buffered = io.BytesIO()
+                image_pil.save(buffered, format="PNG")
+                image_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
+                images_base64.append(image_b64)
+
+            # Construct payload as per API expectations
+            content_list = []
+            for image_b64 in images_base64:
+                content_list.append({
+                    "type": "image_url",
+                    "image_url": {
+                        "url": f"data:image/png;base64,{image_b64}"
+                    }
+                })
+
+            payload = {
+                "messages": [
+                    {
+                        "content": content_list
+                    }
+                ]
+            }
+
+            return payload
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def parse_output(self, response, protocol: str):
+        if protocol == 'grpc':
+            logger.debug("Parsing output from gRPC Yolox model")
+            return response  # For gRPC, response is already a numpy array
+        elif protocol == 'http':
+            logger.debug("Parsing output from HTTP Yolox model")
+            # Convert JSON response to numpy array similar to gRPC response
+            batch_results = response.get('data', [])
+            batch_size = len(batch_results)
+            processed_outputs = []
+
+            # Assuming all images are resized to the same dimensions
+            image_width = YOLOX_MAX_WIDTH  # 1024
+            image_height = YOLOX_MAX_HEIGHT  # 1024
+
+            for detections in batch_results:
+                # Initialize an empty tensor for detections
+                max_detections = 100
+                detection_tensor = np.zeros((max_detections, 85), dtype=np.float32)
+
+                index = 0
+                for obj in detections:
+                    obj_type = obj.get('type', '')
+                    bboxes = obj.get('bboxes', [])
+                    for bbox in bboxes:
+                        if index >= max_detections:
+                            break
+                        xmin_norm = bbox['xmin']
+                        ymin_norm = bbox['ymin']
+                        xmax_norm = bbox['xmax']
+                        ymax_norm = bbox['ymax']
+                        confidence = bbox['confidence']
+
+                        # Convert normalized coordinates to absolute pixel values
+                        xmin = xmin_norm * image_width
+                        ymin = ymin_norm * image_height
+                        xmax = xmax_norm * image_width
+                        ymax = ymax_norm * image_height
+
+                        # YOLOX expects bbox format: center_x, center_y, width, height
+                        center_x = (xmin + xmax) / 2
+                        center_y = (ymin + ymax) / 2
+                        width = xmax - xmin
+                        height = ymax - ymin
+
+                        # Set the bbox coordinates
+                        detection_tensor[index, 0] = center_x
+                        detection_tensor[index, 1] = center_y
+                        detection_tensor[index, 2] = width
+                        detection_tensor[index, 3] = height
+
+                        # Objectness score
+                        detection_tensor[index, 4] = confidence
+
+                        class_index = {'table': 0, 'chart': 1, 'title': 2}.get(obj_type, -1)
+                        if class_index >= 0:
+                            detection_tensor[index, 5 + class_index] = 1.0
+
+                        index += 1
+
+                # Trim the detection tensor to the actual number of detections
+                detection_tensor = detection_tensor[:index, :]
+                processed_outputs.append(detection_tensor)
+
+            # Pad batch if necessary
+            max_detections_in_batch = max([output.shape[0] for output in processed_outputs]) if processed_outputs else 0
+            batch_output_array = np.zeros((batch_size, max_detections_in_batch, 85), dtype=np.float32)
+            for i, output in enumerate(processed_outputs):
+                batch_output_array[i, :output.shape[0], :] = output
+
+            return batch_output_array
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def process_inference_results(self, output_array, **kwargs):
+        original_image_shapes = kwargs.get('original_image_shapes', [])
+        num_classes = kwargs.get('num_classes', YOLOX_NUM_CLASSES)
+        conf_thresh = kwargs.get('conf_thresh', YOLOX_CONF_THRESHOLD)
+        iou_thresh = kwargs.get('iou_thresh', YOLOX_IOU_THRESHOLD)
+        min_score = kwargs.get('min_score', YOLOX_MIN_SCORE)
+        final_thresh = kwargs.get('final_thresh', YOLOX_FINAL_SCORE)
+
+        pred = postprocess_model_prediction(
+            output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True
+        )
+
+        results = postprocess_results(pred, original_image_shapes, min_score=min_score)
+
+        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in results]
+        inference_results = []
+
+        # Filter out bounding boxes below the final threshold
+        for annotation_dict in annotation_dicts:
+            new_dict = {}
+            if "table" in annotation_dict:
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+            if "chart" in annotation_dict:
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+            if "title" in annotation_dict:
+                new_dict["title"] = annotation_dict["title"]
+            inference_results.append(new_dict)
+
+        return inference_results
 
 
 def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
@@ -583,35 +757,3 @@ def get_weighted_box(boxes, conf_type="avg"):
     box[3] = -1  # model index field is retained for consistency but is not used.
     box[4:] /= conf
     return box
-
-
-def prepare_images_for_inference(images: List[np.ndarray]) -> np.ndarray:
-    """
-    Prepare a list of images for model inference by resizing and reordering axes.
-
-    Parameters
-    ----------
-    images : List[np.ndarray]
-        A list of image arrays to be prepared for inference.
-
-    Returns
-    -------
-    np.ndarray
-        A numpy array suitable for model input, with the shape reordered to match the expected input format.
-
-    Notes
-    -----
-    The images are resized to 1024x1024 pixels and the axes are reordered to match the expected input shape for
-    the model (batch, channels, height, width).
-
-    Examples
-    --------
-    >>> images = [np.random.rand(1536, 1536, 3) for _ in range(2)]
-    >>> input_array = prepare_images_for_inference(images)
-    >>> input_array.shape
-    (2, 3, 1024, 1024)
-    """
-
-    resized_images = [resize_image(image, (1024, 1024)) for image in images]
-
-    return np.einsum("bijk->bkij", resized_images).astype(np.float32)
