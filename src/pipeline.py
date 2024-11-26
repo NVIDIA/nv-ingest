@@ -70,10 +70,9 @@ def setup_ingestion_pipeline(
     nemo_splitter_stage = add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
     embed_extractions_stage = add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
-
-    ########################################################################################################
     ## Storage and output
     ########################################################################################################
+    embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
     vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(
@@ -106,7 +105,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(nemo_splitter_stage, image_caption_stage)
     pipe.add_edge(image_caption_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
-    pipe.add_edge(image_storage_stage, vdb_task_sink_stage)
+    pipe.add_edge(image_storage_stage, embedding_storage_stage)
+    pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
     pipe.add_edge(sink_stage, otel_meter_stage)
     pipe.add_edge(otel_meter_stage, otel_tracer_stage)

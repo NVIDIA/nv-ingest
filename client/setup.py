@@ -59,7 +59,7 @@ setup(
     author_email="anuradhak@nvidia.com",
     classifiers=[],
     description="Python client for the nv-ingest service",
-    entry_points={"console_scripts": ["nv-ingest-cli=nv_ingest_client.nv_ingest_cli:main"]},
+    entry_points={"console_scripts": ["nv-ingest-cli=nv_ingest_client.nv_ingest_cli:main", "process-json-files=nv_ingest_client.util.process_json_files:main"]},
     install_requires=combined_requirements,
     name="nv_ingest_client",
     package_dir={"": "src"},

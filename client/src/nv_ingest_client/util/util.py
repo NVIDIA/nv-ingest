@@ -411,3 +411,45 @@ def filter_function_kwargs(func, **kwargs):
     args_dict = {k: kwargs.pop(k) for k in dict(kwargs) if k in func_args}
 
     return args_dict
+
+
+def get_content(results: List[any]):
+    """
+    Extracts the text and table text content from the results of an NV-Ingest python client job
+
+    Parameters
+    ----------
+    results: List[Any]
+        The results of NV-Ingest python client job that contains the desired text and table content
+
+    Returns
+    -------
+    Dict
+        A dictionary containing the extracted text content and the extracted table content
+    """
+
+    text_elems = [
+        elem for result in results
+        for elem in result if elem["document_type"] == "text"
+    ]
+    structured_elems = [
+        elem for result in results
+        for elem in result if elem["document_type"] == "structured"
+    ]
+
+    text_content = [
+        {
+            "page_number": elem["metadata"]["content_metadata"]["page_number"],
+            "content": elem["metadata"]["content"],
+        }
+        for elem in text_elems
+    ]
+    structured_content = [
+        {
+            "page_number": elem["metadata"]["content_metadata"]["page_number"],
+            "content": elem["metadata"]["table_content"]
+        }
+        for elem in structured_elems
+    ]
+
+    return {"text_content": text_content, "structured_content": structured_content}
