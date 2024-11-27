@@ -132,14 +132,16 @@ services:
     cap_add:
       - sys_nice
     environment:
-      - CACHED_GRPC_ENDPOINT=cached:8001
+      # Self-hosted cached endpoints.
+      #- CACHED_GRPC_ENDPOINT=cached:8001
       #- CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
-      - CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
       #- CACHED_INFER_PROTOCOL=grpc
+      # build.nvidia.com hosted cached endpoints.
+      - CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
       - CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
       - DEPLOT_GRPC_ENDPOINT=""
-      # self hosted deplot
+      # Self-hosted deplot endpoints.
       #- DEPLOT_HEALTH_ENDPOINT=deplot:8000
       #- DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
@@ -159,17 +161,21 @@ services:
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
-      - PADDLE_GRPC_ENDPOINT=paddle:8001
+      # Self-hosted paddle endpoints.
+      #- PADDLE_GRPC_ENDPOINT=paddle:8001
       #- PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
-      - PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=grpc
+      # build.nvidia.com hosted paddle endpoints.
+      - PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       - PADDLE_INFER_PROTOCOL=http
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
+      # Self-hosted redis endpoints.
       #- YOLOX_GRPC_ENDPOINT=yolox:8001
-      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=grpc
+      # build.nvidia.com hosted yolox endpoints.
+      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:
