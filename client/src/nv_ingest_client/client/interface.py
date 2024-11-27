@@ -26,6 +26,7 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -434,6 +435,26 @@ class Ingestor:
             Returns self for chaining.
         """
         store_task = StoreTask(**kwargs)
+        self._job_specs.add_task(store_task)
+
+        return self
+
+    @ensure_job_specs
+    def store_embed(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a StoreTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the StoreTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        store_task = StoreEmbedTask(**kwargs)
         self._job_specs.add_task(store_task)
 
         return self
