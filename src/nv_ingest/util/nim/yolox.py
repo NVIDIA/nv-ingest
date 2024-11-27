@@ -93,8 +93,8 @@ class YoloxModelInterface(ModelInterface):
             processed_outputs = []
 
             # Assuming all images are resized to the same dimensions
-            image_width = YOLOX_MAX_WIDTH  # 1024
-            image_height = YOLOX_MAX_HEIGHT  # 1024
+            image_width = 1024 #YOLOX_MAX_WIDTH
+            image_height = 1024 #YOLOX_MAX_HEIGHT
 
             for detections in batch_results:
                 # Initialize an empty tensor for detections
