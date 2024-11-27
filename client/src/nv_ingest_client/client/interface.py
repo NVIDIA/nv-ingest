@@ -302,7 +302,8 @@ class Ingestor:
             .dedup() \
             .filter() \
             .split() \
-            .embed()
+            .embed() \
+            .store_embed()
         # .store() \
         # .vdb_upload()
         # fmt: on
