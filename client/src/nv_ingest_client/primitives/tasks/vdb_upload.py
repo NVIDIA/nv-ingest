@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 class VdbUploadTaskSchema(BaseModel):
     filter_errors: bool = False
+    bulk_ingest: bool = False,
+    bulk_ingest_path: str = None,
+    params: dict = None
 
     class Config:
         extra = "forbid"
@@ -32,7 +35,7 @@ class VdbUploadTask(Task):
         self,
         filter_errors: bool = False,
         bulk_ingest: bool = False,
-        bulk_ingest_path: str = None,
+        bulk_ingest_path: str = "embeddings/",
         params: dict = None
     ) -> None:
         """
@@ -42,7 +45,7 @@ class VdbUploadTask(Task):
         self._filter_errors = filter_errors
         self._bulk_ingest = bulk_ingest
         self._bulk_ingest_path = bulk_ingest_path
-        self._params = params
+        self._params = params or {}
 
     def __str__(self) -> str:
         """
