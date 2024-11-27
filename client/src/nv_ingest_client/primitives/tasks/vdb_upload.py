@@ -18,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 class VdbUploadTaskSchema(BaseModel):
     filter_errors: bool = False
+    bulk_ingest: bool = False,
+    bulk_ingest_path: str = None,
+    params: dict = None
 
     class Config:
         extra = "forbid"
