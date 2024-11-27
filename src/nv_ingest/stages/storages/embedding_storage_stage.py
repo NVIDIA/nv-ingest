@@ -85,19 +85,18 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     for idx, row in df.iterrows():
         uu_id = row["uuid"]
         metadata = row["metadata"].copy()
-
-        metadata["source_metadata"]["source_location"] = bucket_path
-
-        if row["document_type"] == ContentTypeEnum.EMBEDDING:
-            logger.debug("Storing embedding data to Minio")
-            metadata["embedding_metadata"][
-                "uploaded_embedding_url"
-            ] = bucket_path
+        metadata["embedding_metadata"] = {}
+        metadata["embedding_metadata"]["uploaded_embedding_url"] = bucket_path
+        doc_type = row["document_type"]
+        content_replace = doc_type in [ContentTypeEnum.IMAGE, ContentTypeEnum.STRUCTURED]
+        location = metadata["source_metadata"]["source_location"]
+        content = metadata["content"]
         # TODO: validate metadata before putting it back in.
         if metadata["embedding"] is not None:
+            logger.error(f"row type: {doc_type} -  {location} -  {len(content)}")
             df.at[idx, "metadata"] = metadata
             writer.append_row({
-                "text": metadata["content"], 
+                "text":  location if content_replace  else content, 
                 "source": metadata["source_metadata"], 
                 "content_metadata": metadata["content_metadata"], 
                 "vector": metadata["embedding"]}

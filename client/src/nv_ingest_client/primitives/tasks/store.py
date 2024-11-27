@@ -121,7 +121,7 @@ class StoreEmbedTask(Task):
         """
         super().__init__()
 
-        self._params = params
+        self._params = params or {}
         self._extra_params = extra_params
 
     def __str__(self) -> str:
