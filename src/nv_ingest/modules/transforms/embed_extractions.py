@@ -91,6 +91,7 @@ async def _make_async_request(
     try:
         logger.error(f"WE ARE IN EMBEDDINGS")
         logger.error(f"EMBEDDING api_key: {api_key}")
+        logger.error(f"EMBEDDING NIM ENDPOINT: {embedding_nim_endpoint}")
         
         async_client = AsyncOpenAI(
             api_key=api_key,
