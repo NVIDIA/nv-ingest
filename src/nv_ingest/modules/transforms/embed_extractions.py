@@ -104,6 +104,9 @@ async def _make_async_request(
         response["embedding"] = resp.data
         response["info_msg"] = None
 
+        embedding = resp.data
+        logger.error(f"EMBEDDINGS:\n {embedding}")
+
     except Exception as e:
         info_msg = {
             "task": TaskTypeEnum.EMBED.value,
