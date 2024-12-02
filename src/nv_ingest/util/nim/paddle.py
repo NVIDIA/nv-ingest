@@ -6,7 +6,10 @@ from typing import Optional
 
 import numpy as np
 import packaging
+import pandas as pd
+from sklearn.cluster import DBSCAN
 
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import ModelInterface
 from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
@@ -19,7 +22,11 @@ class PaddleOCRModelInterface(ModelInterface):
     An interface for handling inference with a PaddleOCR model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, paddle_version: Optional[str] = None):
+    def __init__(
+        self,
+        paddle_version: Optional[str] = None,
+        table_format: Optional[TableFormatEnum] = TableFormatEnum.PSEUDO_MARKDOWN,
+    ):
         """
         Initialize the PaddleOCR model interface.
 
@@ -29,6 +36,7 @@ class PaddleOCRModelInterface(ModelInterface):
             The version of the PaddleOCR model (default: None).
         """
         self.paddle_version = paddle_version
+        self.table_format = table_format
 
     def name(self) -> str:
         """
@@ -60,6 +68,10 @@ class PaddleOCRModelInterface(ModelInterface):
         base64_image = data["base64_image"]
         image_array = base64_to_numpy(base64_image)
         data["image_array"] = image_array
+
+        # Cache image dimensions for computing bounding boxes.
+        self._width, self._height = image_array.shape[:2]
+
         return data
 
     def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
@@ -216,8 +228,19 @@ class PaddleOCRModelInterface(ModelInterface):
             content = json_response["data"][0]["content"]
         else:
             text_detections = json_response["data"][0]["text_detections"]
-            # "simple" format
-            content = " ".join(t["text_prediction"]["text"] for t in text_detections)
+
+            text_predictions = []
+            bounding_boxes = []
+            for text_detection in text_detections:
+                text_predictions.append(text_detection["text_prediction"]["text"])
+                bounding_boxes.append([(point["x"], point["y"]) for point in text_detection["bounding_box"]["points"]])
+
+            if self.table_format == TableFormatEnum.SIMPLE:
+                content = " ".join(text_predictions)
+            elif self.table_format == TableFormatEnum.PSEUDO_MARKDOWN:
+                content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+            else:
+                raise ValueError(f"Unexpected table format: {self.table_format}")
 
         return content
 
@@ -238,9 +261,50 @@ class PaddleOCRModelInterface(ModelInterface):
                 content = output_str
         else:
             bboxes_bytestr, texts_bytestr, _ = response
-            bboxes_list = json.loads(bboxes_bytestr.decode("utf8"))[0]
-            texts_list = json.loads(texts_bytestr.decode("utf8"))[0]
-            # "simple" format
-            content = " ".join(texts_list)
+            bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))[0]
+            text_predictions = json.loads(texts_bytestr.decode("utf8"))[0]
+
+            if self.table_format == TableFormatEnum.SIMPLE:
+                content = " ".join(texts_predictions)
+            elif self.table_format == TableFormatEnum.PSEUDO_MARKDOWN:
+                content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
 
         return content
+
+    def _convert_paddle_response_to_psuedo_markdown(self, bounding_boxes, text_predictions):
+        bboxes = []
+        texts = []
+        for box, txt in zip(bounding_boxes, text_predictions):
+            if box == "nan":
+                continue
+            points = []
+            for point in box:
+                # The coordinates from Paddle are normlized. Convert them back to integers for DBSCAN.
+                x = float(point[0]) * self._width
+                y = float(point[1]) * self._height
+                points.append([x, y])
+            bboxes.append(points)
+            texts.append(txt)
+
+        if (not bboxes) or (not texts):
+            return ""
+
+        bboxes = np.array(bboxes).astype(int)
+        bboxes = bboxes.reshape(-1, 8)[:, [0, 1, 2, -1]]
+
+        preds_df = pd.DataFrame(
+            {"x0": bboxes[:, 0], "y0": bboxes[:, 1], "x1": bboxes[:, 2], "y1": bboxes[:, 3], "text": texts}
+        )
+        preds_df = preds_df.sort_values("y0")
+
+        dbscan = DBSCAN(eps=10, min_samples=1)
+        dbscan.fit(preds_df["y0"].values[:, None])
+
+        preds_df["cluster"] = dbscan.labels_
+        preds_df = preds_df.sort_values(["cluster", "x0"])
+
+        results = ""
+        for _, dfg in preds_df.groupby("cluster"):
+            results += "| " + " | ".join(dfg["text"].values.tolist()) + " |\n"
+
+        return results

@@ -153,6 +153,8 @@ class TableFormatEnum(str, Enum):
     IMAGE = "image"
     LATEX = "latex"
     MARKDOWN = "markdown"
+    PSEUDO_MARKDOWN = "pseudo_markdown"
+    SIMPLE = "simple"
 
 
 class TaskTypeEnum(str, Enum):
