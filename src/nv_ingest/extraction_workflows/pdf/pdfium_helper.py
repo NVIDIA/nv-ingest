@@ -399,7 +399,8 @@ def pdfium_extractor(
             page_text = textpage.get_text_bounded()
             accumulated_text.append(page_text)
 
-            if text_depth == TextTypeEnum.PAGE:
+            if (text_depth == TextTypeEnum.PAGE
+                    and len(accumulated_text) > 0):
                 text_extraction = construct_text_metadata(
                     accumulated_text,
                     pdf_metadata.keywords,
@@ -449,7 +450,9 @@ def pdfium_extractor(
         if extract_tables or extract_charts:
             pages.append(page)
 
-    if extract_text and text_depth == TextTypeEnum.DOCUMENT:
+    if (extract_text
+            and text_depth == TextTypeEnum.DOCUMENT
+            and len(accumulated_text) > 0):
         text_extraction = construct_text_metadata(
             accumulated_text,
             pdf_metadata.keywords,
@@ -472,7 +475,7 @@ def pdfium_extractor(
                 trace_info=trace_info,
         ):
             if (extract_tables and (table_and_charts.type_string == "table")) or (
-                extract_charts and (table_and_charts.type_string == "chart")
+                    extract_charts and (table_and_charts.type_string == "chart")
             ):
                 extracted_data.append(
                     construct_table_and_chart_metadata(
