@@ -131,6 +131,7 @@ def create_inference_client(
 
 
 # Perform inference and return predictions
+# TODO(Devin) : remove in image extract stage before deleting
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
 def perform_model_inference(client, model_name: str, input_array: np.ndarray):
     """
@@ -238,7 +239,7 @@ def remove_url_endpoints(url) -> str:
     Returns:
         str: URL with just the hostname:port portion remaining
     """
-    if "/v1" in url:
+    if ("/v1" in url):
         url = url.split("/v1")[0]
 
     return url
