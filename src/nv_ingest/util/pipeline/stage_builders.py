@@ -84,6 +84,12 @@ def get_nim_service(env_var_prefix):
         "NGC_API_KEY",
         "",
     )
+
+    # TODO: This is a temporary workaround for the private endpoint on NVCF.
+    # It should be removed after the endpoint is moved to Preview API on Build.
+    if prefix == "DOUGHNUT":
+        auth_token = os.environ.get("DOUGHNUT_NVCF_API_KEY", "")
+
     infer_protocol = os.environ.get(
         f"{prefix}_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
