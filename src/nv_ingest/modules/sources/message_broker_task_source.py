@@ -81,8 +81,8 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         ts_entry = datetime.now()
 
         job_id = job.pop("job_id")
-        job_payload = job.pop("job_payload", {})
-        job_tasks = job.pop("tasks", [])
+        job_payload = job.get("job_payload", {})
+        job_tasks = job.get("tasks", [])
 
         tracing_options = job.pop("tracing_options", {})
         do_trace_tagging = tracing_options.get("trace", False)
@@ -126,7 +126,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     except Exception as e:
         if "job_id" in job:
             job_id = job["job_id"]
-            response_channel = f"response_{job_id}"
+            response_channel = f"{job_id}"
             control_message.set_metadata("job_id", job_id)
             control_message.set_metadata("response_channel", response_channel)
             control_message.set_metadata("cm_failed", True)
@@ -167,10 +167,12 @@ def _message_broker_task_source(builder: mrc.Builder):
         )
     elif client_type == "simple":
         # Start or retrieve the singleton SimpleMessageBroker server
+        # TODO(Devin) add config param for max_queue_size
         max_queue_size = broker_params.get("max_queue_size", 10000)
         server_host = validated_config.broker_client.host
         server_port = validated_config.broker_client.port
 
+        # TODO(Devin) add config param for server_host
         server_host = '0.0.0.0'
 
         # Obtain the singleton instance
