@@ -172,10 +172,10 @@ services:
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       # Self-hosted redis endpoints.
       #- YOLOX_GRPC_ENDPOINT=yolox:8001
-      #- YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
+      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       #- YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
-      - YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       - YOLOX_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:

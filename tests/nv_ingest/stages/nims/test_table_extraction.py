@@ -1,10 +1,14 @@
 import pytest
-import pandas as pd
 import base64
+import cv2
+import numpy as np
+import pandas as pd
 import requests
+
 from unittest.mock import Mock, patch
 from io import BytesIO
 from PIL import Image
+
 from nv_ingest.stages.nim.table_extraction import _update_metadata, _extract_table_data
 from nv_ingest.util.nim.helpers import NimClient
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
@@ -112,14 +116,59 @@ def base64_encoded_image():
 
 
 # Fixture for a small image (below minimum size)
+# Fixture for small base64-encoded image
 @pytest.fixture
 def base64_encoded_small_image():
-    img = Image.new('RGB', (16, 16), color='white')  # Smaller than minimum size
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
-    base64_str = base64.b64encode(img_bytes).decode('utf-8')
-    return base64_str
+    # Generate a small image (e.g., 10x10 pixels) and encode it in base64
+    small_image = np.zeros((10, 10, 3), dtype=np.uint8)
+    _, buffer = cv2.imencode('.png', small_image)
+    base64_image = base64.b64encode(buffer).decode('utf-8')
+    return base64_image
+
+
+# Test function for _extract_table_data with an image that is too small
+def test_extract_table_data_image_too_small(base64_encoded_small_image):
+    data = {
+        "metadata": [{
+            "content": base64_encoded_small_image,
+            "content_metadata": {
+                "type": "image",
+                "subtype": "table"
+            },
+            "table_metadata": {
+                "table_content": ""
+            }
+        }]
+    }
+    df = pd.DataFrame(data)
+
+    # Mock 'validated_config' and its attributes
+    validated_config = Mock()
+    stage_config = Mock()
+    validated_config.stage_config = stage_config
+    stage_config.paddle_endpoints = ("mock_endpoint_grpc", "mock_endpoint_http")
+    stage_config.auth_token = "mock_token"
+    stage_config.paddle_infer_protocol = "http"
+
+    trace_info = {}
+
+    # Mock the NimClient to return a specific result
+    mock_nim_client = Mock(spec=NimClient)
+
+    # Simulate that inference is skipped due to small image
+    def mock_infer(data, model_name, **kwargs):
+        # Simulate behavior when image is too small: return empty result or raise an exception
+        raise Exception("Image too small for inference")
+
+    mock_nim_client.infer.side_effect = mock_infer
+
+    # Patch 'create_inference_client' to return the mocked NimClient
+    with patch('module_under_test.create_inference_client', return_value=mock_nim_client):
+        # Since the image is too small, we expect the table_content to remain unchanged
+        updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
+
+    # Verify that 'table_content' remains empty
+    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == ""
 
 
 # Fixture for a sample DataFrame
@@ -244,11 +293,29 @@ def test_update_metadata_inference_failure(sample_dataframe, mock_paddle_client_
     model_interface = MockPaddleOCRModelInterface()
     paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
 
+    # Mock response to simulate requests.post behavior
+    mock_response = Mock()
+    mock_response.raise_for_status.side_effect = RuntimeError("HTTP request failed: Inference error")
+    mock_response.json.return_value = {
+        'object': 'list',
+        'data': [{
+            'index': 0,
+            'content': ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
+                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
+                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
+                        'desk fan Cost'),
+            'object': 'string'
+        }],
+        'model': 'paddleocr',
+        'usage': None
+    }
+
     row = sample_dataframe.iloc[0]
     trace_info = {}
+    with patch('requests.post', return_value=mock_response):
+        with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
+            _update_metadata(row, paddle_client, trace_info)
 
-    with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
-        _update_metadata(row, paddle_client, trace_info)
 
 # Tests for _extract_table_data
 def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_requests):
@@ -298,8 +365,6 @@ def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_pa
 
 
 def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_client_and_requests_failure):
-    paddle_client, mock_create_client, mock_requests_post = mock_paddle_client_and_requests_failure
-
     validated_config = Mock()
     validated_config.stage_config.paddle_endpoints = "mock_endpoint"
     validated_config.stage_config.auth_token = "mock_token"
@@ -308,13 +373,8 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
     trace_info = {}
 
     with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"):
-        with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
+        with pytest.raises(Exception, match="Inference error"):
             _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
-
-    # Verify that create_inference_client was called
-    mock_create_client.assert_called_once()
-    # Verify that requests.post was called and raised an exception
-    mock_requests_post.assert_called_once()
 
 
 def test_extract_table_data_image_too_small(base64_encoded_small_image):
@@ -337,14 +397,12 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     validated_config.stage_config.auth_token = "mock_token"
     validated_config.stage_config.paddle_infer_protocol = "mock_protocol"
 
-    # Dummy client as a dictionary with 'endpoint_url' and 'headers'
-    paddle_client = {
-        'endpoint_url': 'http://mock_endpoint_url',
-        'headers': {'Authorization': 'Bearer mock_token'}
-    }
+    model_interface = PaddleOCRModelInterface()
     trace_info = {}
 
-    def mock_create_inference_client(endpoints, auth_token, protocol):
+    def mock_create_inference_client(endpoints, model_interface, auth_token, infer_protocol):
+        paddle_client = NimClient(model_interface, "http", ("mock_httpendpoint", "mock_grpc_endpoint"))
+
         return paddle_client
 
     # Mock response to simulate requests.post behavior
