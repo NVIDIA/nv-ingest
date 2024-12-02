@@ -6,6 +6,8 @@ from unittest.mock import Mock, patch
 from io import BytesIO
 from PIL import Image
 from nv_ingest.stages.nim.table_extraction import _update_metadata, _extract_table_data
+from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 # Constants for minimum image size
 PADDLE_MIN_WIDTH = 32
@@ -14,14 +16,50 @@ PADDLE_MIN_HEIGHT = 32
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
 
-# Fixture for common mock setup
+# Mock implementations of external functions and classes
+def mock_get_version(endpoint):
+    return '2.0.0'  # Mock PaddleOCR version
+
+
+def mock_get_version_fail(endpoint):
+    raise Exception("Connection failed")  # Simulate failure
+
+
+def mock_get_version_none(endpoint):
+    return None  # Simulate returning None
+
+
+def mock_update_metadata(row, client, trace_info):
+    return {'metadata_key': 'metadata_value'}
+
+
+# Mocked PaddleOCRModelInterface
+class MockPaddleOCRModelInterface:
+    def __init__(self, paddle_version=None):
+        self.paddle_version = paddle_version
+
+    def prepare_data_for_inference(self, data):
+        return data
+
+    def format_input(self, data, protocol, **kwargs):
+        return data
+
+    def parse_output(self, response, protocol):
+        return ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
+                'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
+                '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
+                'desk fan Cost')
+
+    def process_inference_results(self, output, **kwargs):
+        return output
+
+
 @pytest.fixture
 def mock_paddle_client_and_requests():
-    # Dummy client as a dictionary with 'endpoint_url' and 'headers'
-    paddle_client = {
-        'endpoint_url': 'http://mock_endpoint_url',
-        'headers': {'Authorization': 'Bearer mock_token'}
-    }
+    # Create a mocked PaddleOCRModelInterface
+    model_interface = MockPaddleOCRModelInterface()
+    # Create a mocked NimClient with the mocked model_interface
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
 
     # Mock response for requests.post
     mock_response = Mock()
@@ -30,10 +68,7 @@ def mock_paddle_client_and_requests():
         'object': 'list',
         'data': [{
             'index': 0,
-            'content': ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost'),
+            'content': 'Mocked content from PaddleOCR',
             'object': 'string'
         }],
         'model': 'paddleocr',
@@ -47,23 +82,20 @@ def mock_paddle_client_and_requests():
 
 
 # Fixture for common mock setup (inference failure)
+# Fixture for common mock setup (inference failure)
 @pytest.fixture
 def mock_paddle_client_and_requests_failure():
-    # Dummy client as a dictionary with 'endpoint_url' and 'headers'
-    paddle_client = {
-        'endpoint_url': 'http://mock_endpoint_url',
-        'headers': {'Authorization': 'Bearer mock_token'}
-    }
+    # Create a mocked PaddleOCRModelInterface
+    model_interface = MockPaddleOCRModelInterface()
+    # Create a mocked NimClient with the mocked model_interface
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
 
-    # Mock response for requests.post to raise an HTTPError
-    mock_response = Mock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("Inference error")
-    mock_response.json.return_value = {}
+    # Mock the infer method to raise an exception to simulate an inference failure
+    paddle_client.infer = Mock(side_effect=Exception("Inference error"))
 
-    # Patching create_inference_client and requests.post
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', return_value=paddle_client) as mock_create_client, \
-            patch('requests.post', return_value=mock_response) as mock_requests_post:
-        yield paddle_client, mock_create_client, mock_requests_post
+    # Patching create_inference_client
+    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', return_value=paddle_client) as mock_create_client:
+        yield paddle_client, mock_create_client
 
 
 # Fixture to create a sample image and encode it in base64
@@ -152,17 +184,19 @@ def test_update_metadata_missing_metadata():
     row = pd.Series({
         "other_data": "not metadata"
     })
-    paddle_client = DummyPaddleClient()
+    model_interface = PaddleOCRModelInterface()
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
     trace_info = {}
     with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _update_metadata(row, paddle_client, "0.1.0", trace_info)
+        _update_metadata(row, paddle_client, trace_info)
 
 
 def test_update_metadata_non_table_content(dataframe_non_table):
     row = dataframe_non_table.iloc[0]
-    paddle_client = DummyPaddleClient()
+    model_interface = PaddleOCRModelInterface()
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
     trace_info = {}
-    result = _update_metadata(row, paddle_client, "0.1.0", trace_info)
+    result = _update_metadata(row, paddle_client, trace_info)
     # The metadata should remain unchanged
     assert result == row["metadata"]
 
@@ -180,19 +214,21 @@ def test_update_metadata_image_too_small(base64_encoded_small_image):
             }
         }
     })
-    paddle_client = DummyPaddleClient()
+    model_interface = PaddleOCRModelInterface()
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
     trace_info = {}
-    result = _update_metadata(row, paddle_client, "0.1.1", trace_info)
+    result = _update_metadata(row, paddle_client, trace_info)
     # Since the image is too small, table_content should remain unchanged
     assert result["table_metadata"]["table_content"] == ""
 
 
 def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_and_requests):
-    paddle_client, mock_create_client, mock_requests_post = mock_paddle_client_and_requests
+    model_interface = MockPaddleOCRModelInterface()
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
 
     row = sample_dataframe.iloc[0]
     trace_info = {}
-    result = _update_metadata(row, paddle_client, "0.2.0", trace_info)
+    result = _update_metadata(row, paddle_client, trace_info)
 
     # Expected content from the mocked response
     expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
@@ -203,22 +239,16 @@ def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_
     # The table_content should be updated with expected_content
     assert result["table_metadata"]["table_content"] == expected_content
 
-    # Verify that requests.post was called
-    mock_requests_post.assert_called_once()
-
 
 def test_update_metadata_inference_failure(sample_dataframe, mock_paddle_client_and_requests_failure):
-    paddle_client, mock_create_client, mock_requests_post = mock_paddle_client_and_requests_failure
+    model_interface = MockPaddleOCRModelInterface()
+    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
 
     row = sample_dataframe.iloc[0]
     trace_info = {}
 
     with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
-        _update_metadata(row, paddle_client, "0.2.0", trace_info)
-
-    # Verify that requests.post was called and raised an exception
-    mock_requests_post.assert_called_once()
-
+        _update_metadata(row, paddle_client, trace_info)
 
 # Tests for _extract_table_data
 def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_requests):

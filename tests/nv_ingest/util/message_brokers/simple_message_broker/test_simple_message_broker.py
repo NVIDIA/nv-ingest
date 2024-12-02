@@ -1,3 +1,5 @@
+import random
+
 import pytest
 import threading
 import socket
@@ -11,7 +13,7 @@ from nv_ingest.util.message_brokers.simple_message_broker import SimpleMessageBr
 # from your_module import SimpleMessageBroker
 
 HOST = '127.0.0.1'
-PORT = 9999  # Use an available port
+PORT = 2000 + random.randint(0,10000)  # Use an available port
 MAX_QUEUE_SIZE = 5
 
 
@@ -24,6 +26,7 @@ def broker_server():
     server_thread.start()
     time.sleep(1)  # Give the server a moment to start
     yield
+
     server.shutdown()
     server.server_close()
     server_thread.join()

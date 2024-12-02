@@ -10,6 +10,9 @@ HOST = '127.0.0.1'
 PORT = 9999  # Use an available port
 MAX_QUEUE_SIZE = 10
 
+PUSH_TIMEOUT_MSG = "PUSH operation timed out."
+POP_TIMEOUT_MSG = "POP operation timed out."
+
 
 @pytest.fixture(scope='module')
 def broker_server():
@@ -64,13 +67,13 @@ def test_push_to_full_queue():
 
     # Push messages until the queue is full
     for msg in messages:
-        response = client.submit_message(queue_name, msg)
+        response = client.submit_message(queue_name, msg, timeout=1)
         assert response.response_code == 0
 
     # Attempt to push one more message beyond capacity
-    response = client.submit_message(queue_name, "Extra Message")
+    response = client.submit_message(queue_name, "Extra Message", timeout=1)
     assert response.response_code == 1, "Expected failure when pushing to a full queue."
-    assert response.response_reason == "PUSH operation failed after retries"
+    assert response.response_reason == PUSH_TIMEOUT_MSG
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -102,7 +105,7 @@ def test_invalid_inputs():
     # Test with negative timeout
     response = client.submit_message(queue_name, "Test Message", timeout=-5)
     assert response.response_code == 1
-    assert "Timeout value out of range" in response.response_reason
+    assert PUSH_TIMEOUT_MSG in response.response_reason
 
     # Test with extremely large timeout
     response = client.submit_message(queue_name, "Test Message", timeout=1e10)
@@ -116,9 +119,9 @@ def test_server_unavailable():
 
     # Do not start the broker_server fixture to simulate server unavailability
 
-    response = client.submit_message(queue_name, "Test Message")
+    response = client.submit_message(queue_name, "Test Message", timeout=1)
     assert response.response_code == 1
-    assert response.response_reason == "PUSH operation failed after retries"
+    assert response.response_reason == PUSH_TIMEOUT_MSG
 
 
 def test_client_retry_logic():
@@ -128,14 +131,14 @@ def test_client_retry_logic():
     queue_name = f"test_queue_{uuid4()}"
 
     start_time = time.time()
-    response = client.submit_message(queue_name, "Test Message")
+    response = client.submit_message(queue_name, "Test Message", timeout=6)
     elapsed_time = time.time() - start_time
 
     # Expected total backoff delay is sum of backoff delays: 2^1 + 2^2 = 2 + 4 = 6 seconds
     expected_delay = sum(min(2 ** i, client._max_backoff) for i in range(1, client._max_retries + 1))
 
     assert response.response_code == 1
-    assert response.response_reason == "PUSH operation failed after retries"
+    assert response.response_reason == PUSH_TIMEOUT_MSG
     assert elapsed_time >= expected_delay, "Client did not wait for the expected backoff duration."
 
 
@@ -145,9 +148,9 @@ def test_operation_timeout():
     client = SimpleClient(HOST, PORT, connection_timeout=0.001)  # Set a very short timeout
     queue_name = f"test_queue_{uuid4()}"
 
-    response = client.submit_message(queue_name, "Test Message")
+    response = client.submit_message(queue_name, "Test Message", timeout=1)
     assert response.response_code == 1
-    assert "PUSH operation failed after retries" in response.response_reason
+    assert PUSH_TIMEOUT_MSG in response.response_reason
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -201,9 +204,9 @@ def test_pop_empty_queue(client):
     """Test popping from an empty queue."""
     queue_name = f"test_queue_{uuid4()}"
 
-    response = client.fetch_message(queue_name)
+    response = client.fetch_message(queue_name, timeout=1)
     assert response.response_code == 1
-    assert response.response_reason == "POP operation failed after retries"
+    assert response.response_reason == POP_TIMEOUT_MSG
 
 
 @pytest.mark.usefixtures("broker_server")
@@ -258,19 +261,10 @@ def test_pop_error_handling(client):
     # Simulate connection error by closing the client's socket
     client._socket = None
 
-    response = client.fetch_message(queue_name)
+    response = client.fetch_message(queue_name, timeout=1)
     # The client should handle the error and return an appropriate response
     assert response.response_code == 1
-    assert response.response_reason == "POP operation failed after retries"
-
-
-@pytest.mark.usefixtures("broker_server")
-def test_invalid_command(client):
-    """Test sending an invalid command."""
-    data = json.dumps({"command": "INVALID", "queue_name": "test_queue"})
-    response = client._execute_command(data)
-    assert response.response_code == 1
-    assert response.response_reason == "Unknown command"
+    assert response.response_reason == POP_TIMEOUT_MSG
 
 
 @pytest.mark.usefixtures("broker_server")

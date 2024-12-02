@@ -67,9 +67,9 @@ class SimpleClient(MessageBrokerClientBase):
     def _handle_push(self, queue_name: str, message: str, timeout: Optional[float],
                      for_nv_ingest: bool) -> ResponseSchema:
         """Push a message to the queue, respecting the specified timeout."""
-        if not queue_name or not isinstance(queue_name, str):
+        if (not queue_name or not isinstance(queue_name, str)):
             return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
-        if not message or not isinstance(message, str):
+        if (not message or not isinstance(message, str)):
             return ResponseSchema(response_code=1, response_reason="Invalid message.")
 
         if (for_nv_ingest):
@@ -77,15 +77,15 @@ class SimpleClient(MessageBrokerClientBase):
         else:
             command = {"command": "PUSH", "queue_name": queue_name, "message": message}
 
-        if timeout is not None:
+        if (timeout is not None):
             command["timeout"] = timeout
 
         start_time = time.time()
         while True:
             elapsed = time.time() - start_time
-            remaining_timeout = timeout - elapsed if timeout else None
-            if remaining_timeout is not None and remaining_timeout <= 0:
-                return ResponseSchema(response_code=1, response_reason="Push operation timed out.")
+            remaining_timeout = (timeout - elapsed) if (timeout is not None) else None
+            if ((remaining_timeout is not None) and (remaining_timeout <= 0)):
+                return ResponseSchema(response_code=1, response_reason="PUSH operation timed out.")
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
@@ -94,12 +94,18 @@ class SimpleClient(MessageBrokerClientBase):
                     response_data = self._recv(sock)
                     response = json.loads(response_data)
 
-                    if response.get('response_code') != 0:
-                        return ResponseSchema(**response)
+                    if (response.get('response_code') != 0):
+                        if (response.get('response_reason') == "Queue is full" or
+                                response.get('response_reason') == "Queue is not available"):
+                            time.sleep(0.5)
+                            continue
+                        else:
+                            return ResponseSchema(**response)
 
-                    if 'transaction_id' not in response:
+                    if ('transaction_id' not in response):
                         error_msg = "No transaction_id in response."
                         logger.error(error_msg)
+
                         return ResponseSchema(response_code=1, response_reason=error_msg)
 
                     transaction_id = response['transaction_id']
@@ -137,7 +143,7 @@ class SimpleClient(MessageBrokerClientBase):
             elapsed = time.time() - start_time
             remaining_timeout = timeout - elapsed if timeout else None
             if remaining_timeout is not None and remaining_timeout <= 0:
-                return ResponseSchema(response_code=1, response_reason="Pop operation timed out.")
+                return ResponseSchema(response_code=1, response_reason="POP operation timed out.")
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
@@ -146,15 +152,16 @@ class SimpleClient(MessageBrokerClientBase):
                     response_data = self._recv(sock)
                     response = json.loads(response_data)
 
-                    if response.get('response_code') != 0:
+                    if (response.get('response_code') != 0):
                         if response.get('response_reason') == "Queue is empty":
                             time.sleep(0.1)
                             continue
                         else:
                             return ResponseSchema(**response)
 
-                    if 'transaction_id' not in response:
+                    if ('transaction_id' not in response):
                         error_msg = "No transaction_id in response."
+
                         return ResponseSchema(response_code=1, response_reason=error_msg)
 
                     transaction_id = response['transaction_id']
