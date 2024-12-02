@@ -90,6 +90,7 @@ async def _make_async_request(
 
     try:
         logger.error(f"WE ARE IN EMBEDDINGS")
+        logger.error(f"EMBEDDING api_key: {api_key}")
         
         async_client = AsyncOpenAI(
             api_key=api_key,
