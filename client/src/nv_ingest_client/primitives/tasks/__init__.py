@@ -10,6 +10,7 @@ from .extract import ExtractTask
 from .filter import FilterTask
 from .split import SplitTask
 from .store import StoreTask
+from .store import StoreEmbedTask
 from .table_extraction import TableExtractionTask
 from .task_base import Task
 from .task_base import TaskType
@@ -23,6 +24,7 @@ __all__ = [
     "ExtractTask",
     "is_valid_task_type",
     "SplitTask",
+    "StoreEmbedTask"
     "StoreTask",
     "TableExtractionTask",
     "Task",

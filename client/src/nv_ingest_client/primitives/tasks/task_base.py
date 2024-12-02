@@ -22,6 +22,7 @@ class TaskType(Enum):
     FILTER = auto()
     SPLIT = auto()
     TRANSFORM = auto()
+    STORE_EMBEDDING = auto()
     STORE = auto()
     VDB_UPLOAD = auto()
     TABLE_DATA_EXTRACT = auto()

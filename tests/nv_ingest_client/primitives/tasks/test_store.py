@@ -12,24 +12,34 @@ def test_store_task_initialization():
     task = StoreTask(
         structured=True,
         images=True,
+        params={
+            "access_key": "foo",
+            "secret_key": "bar",
+            "endpoint": "minio:9000",
+        },
         store_method="s3",
-        endpoint="minio:9000",
-        access_key="foo",
-        secret_key="bar",
+
     )
     assert task._structured
     assert task._images
     assert task._store_method == "s3"
-    assert task._extra_params["endpoint"] == "minio:9000"
-    assert task._extra_params["access_key"] == "foo"
-    assert task._extra_params["secret_key"] == "bar"
+    assert task._params["endpoint"] == "minio:9000"
+    assert task._params["access_key"] == "foo"
+    assert task._params["secret_key"] == "bar"
 
 
 # String Representation Tests
 
 
 def test_store_task_str_representation():
-    task = StoreTask(structured=True, images=True, store_method="minio", endpoint="minio:9000")
+    task = StoreTask(
+        structured=True, 
+        images=True, 
+        store_method="minio", 
+        params={
+            "endpoint":"minio:9000"
+        }
+        )
     expected_str = (
         "Store Task:\n"
         "  store structured types: True\n"
@@ -66,8 +76,10 @@ def test_store_task_to_dict(
         structured=structured,
         images=images,
         store_method=store_method,
-        extra_param_1=extra_param_1,
-        extra_param_2=extra_param_2,
+        params={
+            "extra_param_1": extra_param_1,
+            "extra_param_2": extra_param_2,
+        }
     )
 
     expected_dict = {"type": "store", "task_properties": {"params": {}}}
