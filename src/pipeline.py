@@ -6,7 +6,6 @@
 import json
 from datetime import datetime
 
-import click
 from morpheus.config import Config
 from morpheus.config import CppConfig
 from morpheus.config import PipelineModes
