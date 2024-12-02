@@ -92,6 +92,11 @@ async def _make_async_request(
         logger.error(f"WE ARE IN EMBEDDINGS")
         logger.error(f"EMBEDDING api_key: {api_key}")
         logger.error(f"EMBEDDING NIM ENDPOINT: {embedding_nim_endpoint}")
+        logger.error(f"MODEL: {embedding_model}")
+        logger.error(f"Encoding Format: {encoding_format}")
+        logger.error(f"Input Type: {input_type}")
+        logger.error(f"Truncate: {truncate}")
+        logger.error(f"Input Prompts: {prompts}")
         
         async_client = AsyncOpenAI(
             api_key=api_key,
@@ -112,6 +117,7 @@ async def _make_async_request(
         logger.error(f"EMBEDDINGS:\n {embedding}")
 
     except Exception as e:
+        logger.error(f"Embedding Error: {e}")
         info_msg = {
             "task": TaskTypeEnum.EMBED.value,
             "status": StatusEnum.ERROR.value,
