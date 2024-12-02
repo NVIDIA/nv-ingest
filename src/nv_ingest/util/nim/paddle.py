@@ -51,9 +51,9 @@ class PaddleOCRModelInterface(ModelInterface):
         """
 
         # Expecting base64_image in data
-        base64_image = data['base64_image']
+        base64_image = data["base64_image"]
         image_array = base64_to_numpy(base64_image)
-        data['image_array'] = image_array
+        data["image_array"] = image_array
         return data
 
     def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
@@ -91,7 +91,7 @@ class PaddleOCRModelInterface(ModelInterface):
         elif (protocol == 'http'):
             logger.debug("Formatting input for HTTP PaddleOCR model")
             # For HTTP, preprocessing is not necessary
-            base64_img = data['base64_image']
+            base64_img = data["base64_image"]
             payload = self._prepare_paddle_payload(base64_img)
 
             return payload
@@ -128,12 +128,12 @@ class PaddleOCRModelInterface(ModelInterface):
             if isinstance(response, np.ndarray):
                 if response.dtype.type is np.object_ or response.dtype.type is np.bytes_:
                     output_strings = [
-                        output[0].decode('utf-8') if isinstance(output, bytes) else str(output) for output in response
+                        output[0].decode("utf-8") if isinstance(output, bytes) else str(output) for output in response
                     ]
                     return " ".join(output_strings)
                 else:
                     output_bytes = response.tobytes()
-                    output_str = output_bytes.decode('utf-8')
+                    output_str = output_bytes.decode("utf-8")
                     return output_str
             else:
                 raise ValueError("Unexpected response format: response is not a NumPy array.")
@@ -163,6 +163,11 @@ class PaddleOCRModelInterface(ModelInterface):
         # For PaddleOCR, the output is the table content as a string
         return output
 
+    def _is_version_early_access_legacy_api(self):
+        return self.paddle_version and (
+            packaging.version.parse(self.paddle_version) < packaging.version.parse("0.2.1-rc2")
+        )
+
     def _prepare_paddle_payload(self, base64_img: str) -> Dict[str, Any]:
         """
         Prepare a payload for the PaddleOCR HTTP API using a base64-encoded image.
@@ -179,10 +184,14 @@ class PaddleOCRModelInterface(ModelInterface):
         """
 
         image_url = f"data:image/png;base64,{base64_img}"
-        image = {"type": "image_url", "image_url": {"url": image_url}}
 
-        message = {"content": [image]}
-        payload = {"messages": [message]}
+        if self._is_version_early_access_legacy_api():
+            image = {"type": "image_url", "image_url": {"url": image_url}}
+            message = {"content": [image]}
+            payload = {"messages": [message]}
+        else:
+            image = {"type": "image_url", "url": image_url}
+            payload = {"input": [image]}
 
         return payload
 
@@ -209,4 +218,11 @@ class PaddleOCRModelInterface(ModelInterface):
         if ("data" not in json_response or not json_response["data"]):
             raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 
-        return json_response["data"][0]["content"]
+        if self._is_version_early_access_legacy_api():
+            content = json_response["data"][0]["content"]
+        else:
+            text_detections = json_response["data"][0]["text_detections"]
+            # "simple" format
+            content = " ".join(t["text_prediction"]["text"] for t in text_detections)
+
+        return content
