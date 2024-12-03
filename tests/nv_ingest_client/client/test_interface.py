@@ -21,6 +21,7 @@ from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 
@@ -174,6 +175,20 @@ def test_store_task_some_args(ingestor):
     assert task._store_method == "s3"
 
 
+def test_store_embed_task_no_args(ingestor):
+    ingestor.store_embed()
+
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], StoreEmbedTask)
+
+
+def test_store_task_some_args(ingestor):
+    ingestor.store_embed(params={"extra_param": "extra"})
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, StoreEmbedTask)
+    assert task._params["extra_param"] == "extra"
+
+
 def test_vdb_upload_task_no_args(ingestor):
     ingestor.vdb_upload()
 
@@ -315,7 +330,7 @@ def test_files_with_remote_files(ingestor_without_doc):
 def test_all_tasks_adds_default_tasks(ingestor):
     ingestor.all_tasks()
 
-    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask}
+    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask, StoreEmbedTask}
     added_tasks = {
         type(task) for job_specs in ingestor._job_specs._file_type_to_job_spec.values() for task in job_specs[0]._tasks
     }

@@ -42,6 +42,7 @@ class ContentTypeEnum(str, Enum):
     STRUCTURED = "structured"
     UNSTRUCTURED = "unstructured"
     INFO_MSG = "info_message"
+    EMBEDDING = "embedding"
 
 
 class StdContentDescEnum(str, Enum):
