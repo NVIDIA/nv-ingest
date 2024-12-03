@@ -7,7 +7,6 @@ import json
 import logging
 import time
 from io import BytesIO
-from pickle import FALSE
 from typing import List
 
 import click

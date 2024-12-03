@@ -5,7 +5,6 @@
 
 import threading
 import heapq
-import uuid
 
 
 class OrderedMessageQueue:

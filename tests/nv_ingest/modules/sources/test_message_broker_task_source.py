@@ -87,9 +87,6 @@ def test_process_message_valid_job(job_payload):
     expected_tasks = job['tasks']
     tasks_in_message = result.get_tasks()
     assert len(tasks_in_message) == len(expected_tasks)
-    # for task, expected_task in zip(tasks_in_message, expected_tasks):
-    #    assert task['type'] == expected_task['type']
-    #    assert task['properties'] == expected_task['task_properties']
 
     # Check that the payload is set correctly
     message_meta = result.payload()

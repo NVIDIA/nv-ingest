@@ -2,6 +2,11 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# NOTE: This code is duplicated from the ingest service:
+# src/nv_ingest/util/message_brokers/client_base.py
+# Eventually we should move all client wrappers for the message broker into a shared library that both the ingest
+# service and the client can use.
+
 from abc import ABC
 from abc import abstractmethod
 from typing import Any
