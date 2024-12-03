@@ -1,11 +1,26 @@
 repos:
-  - repo: local
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v3.2.0
     hooks:
-      - id: trufflehog
-        name: TruffleHog
-        description: Detect secrets in your data.
-        # entry: bash -c 'trufflehog git . --since-commit HEAD --only-verified --fail'
-        entry: trufflehog --no-update filesystem --directory .
-        language: system
-        pass_filenames: false
-        stages: ["commit", "push"]
+    -   id: trailing-whitespace
+    -   id: end-of-file-fixer
+    -   id: check-yaml
+    -   id: check-added-large-files
+        args: [-- maxkb=1500]
+    -   id: check-merge-conflict
+    -   id: check-ast
+    -   id: double-quote-string-fixer
+    -   id: debug-statements
+    -   id: check-toml
+    -   id: check-json
+    -   id: check-xml
+
+  - repo: https://github.com/psf/black
+    rev: 23.3.0
+    hooks:
+      - id: black
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.12.0
+    hooks:
+      - id: isort
