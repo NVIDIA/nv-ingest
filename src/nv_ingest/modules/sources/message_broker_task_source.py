@@ -197,21 +197,6 @@ def _message_broker_task_source(builder: mrc.Builder):
             connection_timeout=validated_config.broker_client.connection_timeout,
         )
 
-        # Register a cleanup function to stop the server when the pipeline stops
-        def cleanup():
-            # Ensure server shutdown is handled properly
-            with SimpleMessageBroker._instances_lock:
-                key = (server_host, server_port)
-                if key in SimpleMessageBroker._instances:
-                    # Remove the instance from the singleton dictionary
-                    del SimpleMessageBroker._instances[key]
-                    server.shutdown()
-                    server.server_close()
-                    server.server_thread.join()
-                    logger.info("SimpleMessageBroker server stopped.")
-
-        #builder.register_cleanup_callback(cleanup)
-
     else:
         raise ValueError(f"Unsupported client_type: {client_type}")
 
