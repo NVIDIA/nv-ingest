@@ -104,7 +104,7 @@ NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service 
 > [!TIP]
 > This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.
 
-First, build `nv-ingest-cli` from source to ensure you have the latest code. See details [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
+First, build `nv-ingest-cli` from the source to ensure you have the latest code. More information is provided [here](https://github.com/NVIDIA/nv-ingest/tree/main/client).
 
 ```bash
 # Just to be cautious we remove any existing installation
