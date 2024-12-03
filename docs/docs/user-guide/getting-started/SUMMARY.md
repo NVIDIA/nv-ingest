@@ -1,4 +1,2 @@
-- [](index.md)
-- [Add](add.md)
-- [Stuff](stuff.md)
-- [Here](here.md)
+- [Hardware and Software Prerequisites](prerequisites.md)
+- [Quickstart Guide](quickstart-guide.md)
