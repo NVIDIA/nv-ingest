@@ -14,7 +14,7 @@ class MessageBrokerClientSchema(BaseModel):
     port: conint(gt=0, lt=65536) = 6379
 
     # Update this for new broker types
-    client_type: Literal["rest", "simple"] = "redis"  # Restrict to 'redis' or 'simple'
+    client_type: Literal["redis", "simple"] = "redis"  # Restrict to 'redis' or 'simple'
 
     broker_params: Optional[dict] = {}
 
