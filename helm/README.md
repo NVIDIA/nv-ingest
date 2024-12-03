@@ -124,7 +124,7 @@ You can test outside of your Kuberenetes cluster by [port-forwarding](https://ku
 
 Example:
 
-You can find the name of your nv-ingest pod that you want to forward traffic to by running.
+You can find the name of your NV-Ingest pod you want to forward traffic to by running:
 
 ```bash
 kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
