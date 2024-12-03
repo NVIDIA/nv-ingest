@@ -5,18 +5,16 @@
 import json
 
 import pytest
-
-from nv_ingest.util.converters.dftools import cudf_to_json
-from nv_ingest.util.converters.dftools import cudf_to_pandas
-from nv_ingest.util.converters.dftools import pandas_to_cudf
+import pandas as pd
 
 from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    import pandas as pd
-
     import cudf
+    from nv_ingest.util.converters.dftools import cudf_to_json
+    from nv_ingest.util.converters.dftools import cudf_to_pandas
+    from nv_ingest.util.converters.dftools import pandas_to_cudf
 
 
 @pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")

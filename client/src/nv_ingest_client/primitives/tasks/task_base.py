@@ -16,13 +16,17 @@ logger = logging.getLogger(__name__)
 
 class TaskType(Enum):
     CAPTION = auto()
+    DEDUP = auto()
     EMBED = auto()
     EXTRACT = auto()
     FILTER = auto()
     SPLIT = auto()
     TRANSFORM = auto()
+    STORE_EMBEDDING = auto()
     STORE = auto()
     VDB_UPLOAD = auto()
+    TABLE_DATA_EXTRACT = auto()
+    CHART_DATA_EXTRACT = auto()
 
 
 def is_valid_task_type(task_type_str: str) -> bool:
@@ -66,7 +70,6 @@ class Task:
         tasks that are then submitted to the redis client
         """
         return {}
-
 
 
 # class ExtractUnstructuredTask(ExtractTask):

@@ -333,7 +333,7 @@ class DocxReader:
 
         # For docx there is no bounding box. The paragraph that follows the image is typically
         # the caption. Add that para to the page nearby for now. fixme
-        bbox = (-1, -1, -1, -1)
+        bbox = (0, 0, 0, 0)
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
             "images": {"content": [], "bbox": []},
@@ -544,7 +544,9 @@ class DocxReader:
             para_idx += 1
 
         # We treat the document as a single page
-        if extract_text and text_depth in (TextTypeEnum.DOCUMENT, TextTypeEnum.PAGE):
+        if (extract_text
+                and text_depth in (TextTypeEnum.DOCUMENT, TextTypeEnum.PAGE)
+                and len(self._accumulated_text) > 0):
             text_extraction = self._construct_text_metadata(
                 self._accumulated_text, -1, text_depth, base_unified_metadata
             )

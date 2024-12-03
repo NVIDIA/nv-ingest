@@ -207,9 +207,10 @@ class ProcessWorkerPoolSingleton:
                 logger.debug(f"Worker process {os.getpid()} received stop signal.")
                 break
 
-            process_fn, args, future = task
+            future, process_fn, args = task
+            args, *kwargs = args
             try:
-                result = process_fn(*args[0])
+                result = process_fn(*args, **{k: v for kwarg in kwargs for k, v in kwarg.items()})
                 future.set_result(result)
             except Exception as e:
                 logger.error(f"Future result failure - {e}\n")
@@ -232,7 +233,7 @@ class ProcessWorkerPoolSingleton:
             A future object representing the result of the task.
         """
         future = SimpleFuture(self._manager)
-        self._task_queue.put((process_fn, args, future))
+        self._task_queue.put((future, process_fn, args))
         return future
 
     def close(self) -> None:
