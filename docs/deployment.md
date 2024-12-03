@@ -57,4 +57,6 @@ mamba env create --file ./docker/environments/nv_ingest_environment.yml --name n
 
 pip install ./
 pip install ./client
+
+conda activate nv_ingest_runtime
 ```
