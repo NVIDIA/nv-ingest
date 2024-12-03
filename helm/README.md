@@ -9,7 +9,7 @@
 ## Prerequisites
 
 ### Hardware/Software
-[Please see our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
+[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
 ## Setup Environment
 
