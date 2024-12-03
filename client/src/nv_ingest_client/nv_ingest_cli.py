@@ -232,7 +232,7 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(f"Creating REST message client: {client_host} and port: {client_port} -> {client_kwargs}")
+            logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
 
             if (client_type == "rest"):
                 client_allocator = RestClient
