@@ -8,8 +8,6 @@ import base64
 import pandas as pd
 import pytest
 
-from nv_ingest.modules.filters.image_dedup import _apply_dedup_filter
-from nv_ingest.modules.filters.image_dedup import _cpu_only_apply_dedup_filter
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
 from nv_ingest.schemas.metadata_schema import SourceTypeEnum
@@ -19,10 +17,11 @@ from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
+    import cudf
     from morpheus.messages import ControlMessage
     from morpheus.messages import MessageMeta
-
-    import cudf
+    from nv_ingest.modules.filters.image_dedup import _cpu_only_apply_dedup_filter
+    from nv_ingest.modules.filters.image_dedup import _apply_dedup_filter
 
 
 def valid_image_dedup_task(should_filter):
@@ -90,7 +89,7 @@ def test_apply_dedup(should_filter, expected0, expected1, expected2):
 
     payload_list = []
     for _ in range(3):
-        payload_list.append(valid_image_dedup_payload("test", 1, 1))
+        payload_list.append(valid_image_dedup_payload(f"test", 1, 1))
 
     extracted_df = pd.DataFrame(payload_list, columns=["document_type", "metadata"])
     extracted_gdf = cudf.from_pandas(extracted_df)
@@ -105,6 +104,11 @@ def test_apply_dedup(should_filter, expected0, expected1, expected2):
         assert (mdf.iloc[0:3]["document_type"] == ContentTypeEnum.INFO_MSG.value).sum() == expected2
 
 
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 @pytest.mark.parametrize(
     "should_filter, expected0, expected1, expected2",
     [

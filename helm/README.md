@@ -20,6 +20,16 @@ NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
+- Install the Helm repos
+
+```bash
+# EA-Participants private NGC repository
+helm repo add ngc https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# Nvidia NIM NGC repository
+helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+```
+
 - Install the chart
 
 ```bash
@@ -34,8 +44,8 @@ helm upgrade \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
-    --set image.tag="24.08" \  # TODO: Change to 24.10 on release.
-    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.5.tgz
+    --set image.tag="24.10" \
+    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
 
 ```
 
@@ -118,6 +128,7 @@ You can find the name of your nv-ingest pod that you want to forward traffic to 
 
 ```bash
 kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
+kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
 ```
 
 The output will look something like this with different auto generated sequences.

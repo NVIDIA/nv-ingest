@@ -9,14 +9,20 @@ import uuid
 from concurrent.futures import Future
 from concurrent.futures import as_completed
 from unittest.mock import MagicMock
+from unittest.mock import Mock
+from unittest.mock import mock_open
+from unittest.mock import patch
 
 import pytest
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives.jobs import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
+from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import TaskType
+
+MODULE_UNDER_TEST = "nv_ingest_client.client.client"
 
 
 class MockClient:
@@ -40,14 +46,17 @@ class ExtendedMockClient(MockClient):
 
     def submit_message(self, job_queue_id, job_spec_str):
         # Simulate message submission by storing it
+        random_x_trace_id = "123456789"
+        job_id = 0
         self.submitted_messages.append((job_queue_id, job_spec_str))
+        return random_x_trace_id, job_id
 
 
 class ExtendedMockClientWithFailure(ExtendedMockClient):
     def submit_message(self, job_queue_id, job_spec_str):
         if "fail_queue" in job_queue_id:
             raise Exception("Simulated submission failure")
-        super().submit_message(job_queue_id, job_spec_str)
+        return super().submit_message(job_queue_id, job_spec_str)
 
 
 class ExtendedMockClientWithFetch(ExtendedMockClientWithFailure):
@@ -407,7 +416,7 @@ def test_job_future_result_on_success(nv_ingest_client_with_jobs):
     future = nv_ingest_client_with_jobs._job_states[job_id].future
 
     result = future.result(timeout=5)
-    assert result == [None], "The future's result should reflect the job's success"
+    assert result == ["123456789"], "The future's result should reflect the job's success"
 
 
 def test_job_future_result_on_failure(nv_ingest_client_with_jobs):
@@ -522,3 +531,79 @@ def test_futures_reflect_submission_outcome(nv_ingest_client_with_jobs, job_id):
 #         for future in as_completed(futures.keys()):
 #             result = future.result()[0]
 #             assert result[0] == {"result": "success"}, f"The fetched job result for {job_id} should be successful"
+
+
+@pytest.fixture
+def mock_create_job_specs_for_batch():
+    with patch(f"{MODULE_UNDER_TEST}.create_job_specs_for_batch") as mock_create:
+        yield mock_create
+
+
+@pytest.fixture
+def tasks():
+    """Fixture for common tasks."""
+    return {
+        "split": SplitTask(),
+        "extract_pdf": ExtractTask(document_type="pdf"),
+    }
+
+
+def test_create_jobs_for_batch_success(nv_ingest_client, tasks, mock_create_job_specs_for_batch):
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec, mock_job_spec]
+
+    files = ["file1.pdf", "file2.pdf"]
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks)
+
+    assert job_ids == ["0", "1"]
+
+
+def test_create_jobs_for_batch_invalid_task(nv_ingest_client, mock_create_job_specs_for_batch):
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec]
+
+    files = ["file1.pdf"]
+    invalid_tasks = {
+        "invalid_task": None,
+    }
+
+    with pytest.raises(ValueError, match="Invalid task type: 'invalid_task'"):
+        nv_ingest_client.create_jobs_for_batch(files, invalid_tasks)
+
+
+def test_create_jobs_for_batch_duplicate_task(nv_ingest_client, mock_create_job_specs_for_batch):
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec]
+
+    files = ["file1.pdf"]
+    duplicate_tasks = {
+        "split": SplitTask(split_by="sentence"),
+        "store": SplitTask(split_by="sentence"),  # Duplicate task
+    }
+
+    with pytest.raises(ValueError, match="Duplicate task detected"):
+        nv_ingest_client.create_jobs_for_batch(files, duplicate_tasks)
+
+
+def test_create_jobs_for_batch_extract_mismatch(nv_ingest_client, mock_create_job_specs_for_batch):
+    mock_job_spec = Mock(spec=JobSpec)
+    mock_job_spec.document_type = "pptx"
+    mock_create_job_specs_for_batch.return_value = [mock_job_spec]
+
+    files = ["file1.pptx"]
+    tasks = {
+        "split": SplitTask(),
+        "extract_pdf": ExtractTask(document_type="pdf"),  # Mismatch with pptx file
+        "extract_pptx": ExtractTask(document_type="pptx"),
+    }
+
+    job_ids = nv_ingest_client.create_jobs_for_batch(files, tasks)
+
+    assert job_ids == ["0"]
+
+    # Check that extract_pdf was NOT called by inspecting the mock call list
+    calls = [call[0][0] for call in mock_job_spec.add_task.call_args_list]
+    assert tasks["split"] in calls
+    assert tasks["extract_pptx"] in calls
+    assert tasks["extract_pdf"] not in calls, "extract_pdf should not have been added"

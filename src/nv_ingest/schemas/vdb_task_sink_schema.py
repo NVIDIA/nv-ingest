@@ -10,6 +10,7 @@ import pymilvus
 from pydantic import BaseModel
 from pydantic import Field
 from pydantic import validator
+from pydantic import conint
 
 logger = logging.getLogger(__name__)
 
@@ -37,10 +38,11 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
         "index_conf": {
             "field_name": "vector",
             "metric_type": "L2",
-            "index_type": "HNSW",
+            "index_type": "GPU_CAGRA",
             "params": {
-                "M": 8,
-                "efConstruction": 64,
+                'intermediate_graph_degree':128,
+                'graph_degree': 64,
+                "build_algo": "NN_DESCENT",
             },
         },
         "schema_conf": {
@@ -67,6 +69,11 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
                     dtype=pymilvus.DataType.JSON,
                     description="Source document and raw data extracted content",
                 ).to_dict(),
+                pymilvus.FieldSchema(
+                    name="content_metadata",
+                    dtype=pymilvus.DataType.JSON,
+                    description="Content metadata",
+                ).to_dict(),
             ],
             "description": "NV-INGEST collection schema",
         },
@@ -87,6 +94,7 @@ class VdbTaskSinkSchema(BaseModel):
     write_time_interval: float = 1.0
     retry_interval: float = 60.0
     raise_on_failure: bool = False
+    progress_engines: conint(ge=1) = 1
 
     @validator("service", pre=True)
     def validate_service(cls, to_validate):  # pylint: disable=no-self-argument
