@@ -99,6 +99,7 @@ class PaddleOCRModelInterface(ModelInterface):
         image_data = data['image_array']
         if (protocol == 'grpc'):
             logger.debug("Formatting input for gRPC PaddleOCR model")
+            image_data = data["image_array"]
             image_data = preprocess_image_for_paddle(image_data, self.paddle_version)
             image_data = image_data.astype(np.float32)
             image_data = np.expand_dims(image_data, axis=0)
