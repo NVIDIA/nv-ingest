@@ -1,13 +1,13 @@
 # NV-Ingest Client Examples
 
-Contained in this repository are instructions to build a container with NV-Ingest command line 
-interface (CLI) and Python API usage examples. Please follow the instructions below 
+Contained in this repository are instructions to build a container with NV-Ingest command line
+interface (CLI) and Python API usage examples. Please follow the instructions below
 to access guided examples.
 
 ## Step 0: Prerequisites
-The system running the client does not require a GPU. 
+The system running the client does not require a GPU.
 
-[Docker](https://docs.docker.com/get-started/get-docker/) - While the NV-Ingest client can 
+[Docker](https://docs.docker.com/get-started/get-docker/) - While the NV-Ingest client can
 be installed directly on the host, this example creates a container with a few other add-ons.
 Please follow the docker documentation for installation guidance.
 
@@ -49,12 +49,12 @@ docker run -it --rm \
     --name nv-ingest-client \
     nv-ingest-client:latest bash
 ```
-    
+
 ## Step 4: Explore the examples
 
 There are two usage examples included:
 
-- Illustrates usage of the NV-Ingest client CLI: 
+- Illustrates usage of the NV-Ingest client CLI:
 
     `/workspace/client_examples/examples/cli_client_usage.ipynb`
 

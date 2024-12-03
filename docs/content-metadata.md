@@ -1,10 +1,10 @@
-**Definitions**:  
-Source: The knowledge base file from which content and metadata is extracted  
-Content: Data extracted from a source; generally Text or Image  
+**Definitions**:
+Source: The knowledge base file from which content and metadata is extracted
+Content: Data extracted from a source; generally Text or Image
 Metadata: Descriptive data which can be associated with Sources, Content(Image or Text); metadata can be extracted from Source/Content, or generated using models, heuristics, etc
 
 |  | Field | Description | Method |
-| ----- | :---- | :---- | :---- | 
+| ----- | :---- | :---- | :---- |
 | Content | Content | Content extracted from Source  | Extracted |
 | Source Metadata | Source Name | Name of source | Extracted |
 |  | Source ID | ID of source  | Extracted |

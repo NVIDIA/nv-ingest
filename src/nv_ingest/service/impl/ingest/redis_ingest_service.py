@@ -50,8 +50,9 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
 
-        self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
-                                          max_pool_size=self._concurrency_level)
+        self._ingest_client = RedisClient(
+            host=self._redis_hostname, port=self._redis_port, max_pool_size=self._concurrency_level
+        )
 
     async def submit_job(self, job_spec: MessageWrapper) -> str:
         try:

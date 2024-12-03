@@ -11,14 +11,13 @@
 # pylint: skip-file
 
 import logging
+import re
 import time
 from typing import Any
 from typing import Optional
 
 import httpx
 import requests
-import re
-
 from nv_ingest_client.message_clients import MessageClientBase
 
 logger = logging.getLogger(__name__)
@@ -27,9 +26,44 @@ logger = logging.getLogger(__name__)
 # 4XX - Any 4XX status is considered a client derived error and will result in failure
 # 5XX - Not all 500's are terminal but most are. Those which are listed below
 _TERMINAL_RESPONSE_STATUSES = [
-    400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
-    414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451,
-    500, 501, 503, 505, 506, 507, 508, 510, 511
+    400,
+    401,
+    402,
+    403,
+    404,
+    405,
+    406,
+    407,
+    408,
+    409,
+    410,
+    411,
+    412,
+    413,
+    414,
+    415,
+    416,
+    417,
+    418,
+    421,
+    422,
+    423,
+    424,
+    425,
+    426,
+    428,
+    429,
+    431,
+    451,
+    500,
+    501,
+    503,
+    505,
+    506,
+    507,
+    508,
+    510,
+    511,
 ]
 
 
@@ -60,13 +94,13 @@ class RestClient(MessageClientBase):
     """
 
     def __init__(
-            self,
-            host: str,
-            port: int,
-            max_retries: int = 0,
-            max_backoff: int = 32,
-            connection_timeout: int = 300,
-            http_allocator: Any = httpx.AsyncClient,
+        self,
+        host: str,
+        port: int,
+        max_retries: int = 0,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        http_allocator: Any = httpx.AsyncClient,
     ):
         self._host = host
         self._port = port
@@ -137,7 +171,7 @@ class RestClient(MessageClientBase):
         Returns:
             str: Fully validated URL
         """
-        if not re.match(r'^https?://', user_provided_url):
+        if not re.match(r"^https?://", user_provided_url):
             # Add the default `http://` if its not already present in the URL
             user_provided_url = f"http://{user_provided_url}:{user_provided_port}"
         else:
@@ -176,9 +210,11 @@ class RestClient(MessageClientBase):
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
                     # Any terminal response code results in a RuntimeError
-                    raise RuntimeError(f"A terminal response code: {response_code} was received \
+                    raise RuntimeError(
+                        f"A terminal response code: {response_code} was received \
                                        when fetching JobSpec: {job_id} with server response \
-                                        '{result.text}'")
+                                        '{result.text}'"
+                    )
                 else:
                     # If the result contains a 200 then return the raw JSON string response
                     if response_code == 200:
@@ -239,16 +275,20 @@ class RestClient(MessageClientBase):
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
                     # Any terminal response code results in a RuntimeError
-                    raise RuntimeError(f"A terminal response code: {response_code} was received \
+                    raise RuntimeError(
+                        f"A terminal response code: {response_code} was received \
                                        when submitting JobSpec: {'TODO'} with server response \
-                                        '{result.text}'")
+                                        '{result.text}'"
+                    )
                 else:
                     # If 200 we are good, otherwise let's try again
                     if response_code == 200:
-                        logger.debug(f"JobSpec successfully submitted to http \
-                                     endpoint {self._submit_endpoint}, Resulting JobId: {result.json()}")
+                        logger.debug(
+                            f"JobSpec successfully submitted to http \
+                                     endpoint {self._submit_endpoint}, Resulting JobId: {result.json()}"
+                        )
                         # The REST interface returns a JobId, so we capture that here
-                        x_trace_id = result.headers['x-trace-id']
+                        x_trace_id = result.headers["x-trace-id"]
                         return x_trace_id, result.json()
                     else:
                         # We could just let this exception bubble, but we capture for clarity
@@ -297,9 +337,11 @@ class RestClient(MessageClientBase):
         RuntimeError
             Raised if the maximum number of retry attempts has been reached.
         """
-        backoff_delay = min(2 ** existing_retries, self._max_backoff)
-        logger.debug(f"Retry #: {existing_retries} of max_retries: {self.max_retries} \
-                        | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}")
+        backoff_delay = min(2**existing_retries, self._max_backoff)
+        logger.debug(
+            f"Retry #: {existing_retries} of max_retries: {self.max_retries} \
+                        | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}"
+        )
 
         if self.max_retries > 0 and existing_retries <= self.max_retries:
             logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")

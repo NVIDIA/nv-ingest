@@ -2,9 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import List
-import numpy as np
 import warnings
+from typing import List
 
 import cv2
 import numpy as np
@@ -28,7 +27,7 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
             continue
 
         # Get score and class with highest confidence
-        class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)  # noqa: E203
+        class_conf, class_pred = torch.max(image_pred[:, 5 : 5 + num_classes], 1, keepdim=True)  # noqa: E203
 
         conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
         # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
@@ -203,14 +202,14 @@ def expand_chart_bboxes(annotation_dict, labels=None):
 
 
 def weighted_boxes_fusion(
-        boxes_list,
-        scores_list,
-        labels_list,
-        iou_thr=0.5,
-        skip_box_thr=0.0,
-        conf_type="avg",
-        merge_type="weighted",
-        class_agnostic=False,
+    boxes_list,
+    scores_list,
+    labels_list,
+    iou_thr=0.5,
+    skip_box_thr=0.0,
+    conf_type="avg",
+    merge_type="weighted",
+    class_agnostic=False,
 ):
     """
     Custom wbf implementation that supports a class_agnostic mode and a biggest box fusion.

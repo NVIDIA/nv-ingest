@@ -23,4 +23,3 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 For the username, enter '$oauthtoken' exactly as shown. It is a special authentication key for all users.
-

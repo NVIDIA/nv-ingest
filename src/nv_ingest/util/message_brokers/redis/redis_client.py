@@ -5,8 +5,12 @@
 import json
 import logging
 import time
-from typing import Any, List, Dict, Union, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
 from typing import Optional
+from typing import Tuple
+from typing import Union
 
 import redis
 from redis.exceptions import RedisError
@@ -18,6 +22,7 @@ from nv_ingest.util.message_brokers.client_base import MessageClientBase
 logger = logging.getLogger(__name__)
 
 # TODO(Devin): Duplicate code with client side, consider moving to a shared location
+
 
 class RedisClient(MessageClientBase):
     """
@@ -52,16 +57,16 @@ class RedisClient(MessageClientBase):
     """
 
     def __init__(
-            self,
-            host: str,
-            port: int,
-            db: int = 0,
-            max_retries: int = 0,
-            max_backoff: int = 32,
-            connection_timeout: int = 300,
-            max_pool_size: int = 128,
-            use_ssl: bool = False,
-            redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
+        self,
+        host: str,
+        port: int,
+        db: int = 0,
+        max_retries: int = 0,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        max_pool_size: int = 128,
+        use_ssl: bool = False,
+        redis_allocator: Any = redis.Redis,  # Type hint as 'Any' due to dynamic nature
     ):
         self._host = host
         self._port = port
@@ -125,8 +130,9 @@ class RedisClient(MessageClientBase):
         except (RedisError, AttributeError):
             return False
 
-    def _check_response(self, channel_name: str, timeout: float) -> Tuple[
-            Optional[Dict[str, Any]], Optional[int], Optional[int]]:
+    def _check_response(
+        self, channel_name: str, timeout: float
+    ) -> Tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]:
         """
         Checks for a response from the Redis queue and processes it into a message, fragment, and fragment count.
 
@@ -152,14 +158,14 @@ class RedisClient(MessageClientBase):
         """
 
         response = self.get_client().blpop([channel_name], timeout)
-        if (response is None):
+        if response is None:
             raise TimeoutError("No response was received in the specified timeout period")
 
-        if (len(response) > 1 and response[1]):
+        if len(response) > 1 and response[1]:
             try:
                 message = json.loads(response[1])
-                fragment = message.get('fragment', 0)
-                fragment_count = message.get('fragment_count', 1)
+                fragment = message.get("fragment", 0)
+                fragment_count = message.get("fragment_count", 1)
 
                 return message, fragment, fragment_count
             except json.JSONDecodeError as e:
@@ -202,17 +208,17 @@ class RedisClient(MessageClientBase):
                 # Attempt to fetch a message from the Redis queue
                 message, fragment, fragment_count = self._check_response(channel_name, timeout)
 
-                if (message is not None):
-                    if (fragment_count == 1):
+                if message is not None:
+                    if fragment_count == 1:
                         # No fragmentation, return the message as is
                         return message
 
                     collected_fragments.append(message)
 
                     # If we have collected all fragments, combine and return
-                    if (len(collected_fragments) == fragment_count):
+                    if len(collected_fragments) == fragment_count:
                         # Sort fragments by the 'fragment' field to ensure correct order
-                        collected_fragments.sort(key=lambda x: x['fragment'])
+                        collected_fragments.sort(key=lambda x: x["fragment"])
 
                         # Combine fragments (assuming they are part of a larger payload)
                         reconstructed_message = self._combine_fragments(collected_fragments)
@@ -226,9 +232,9 @@ class RedisClient(MessageClientBase):
             except TimeoutError:
                 # TODO(Devin) Once we start accumulating fragments, we can no longer fully recover from a timeout, so
                 #  we should consider this a failure. Look into caching partial results for retries in the future.
-                if (fragment_count and fragment_count > 1):
+                if fragment_count and fragment_count > 1:
                     accumulated_time += timeout
-                    if (accumulated_time >= (timeout * fragment_count)):
+                    if accumulated_time >= (timeout * fragment_count):
                         err_msg = f"Failed to reconstruct message from {channel_name} after {accumulated_time} sec."
                         logger.error(err_msg)
                         raise ValueError(err_msg)
@@ -238,7 +244,7 @@ class RedisClient(MessageClientBase):
             except RedisError as err:
                 retries += 1
                 logger.error(f"Redis error during fetch: {err}")
-                backoff_delay = min(2 ** retries, self._max_backoff)
+                backoff_delay = min(2**retries, self._max_backoff)
 
                 if self.max_retries > 0 and retries <= self.max_retries:
                     logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
@@ -276,15 +282,15 @@ class RedisClient(MessageClientBase):
 
         # Use 'status' and 'description' from the first fragment
         combined_message = {
-            'status': fragments[0]['status'],
-            'description': fragments[0]['description'],
-            'data': [],
-            'trace': fragments[0].get('trace', {})
+            "status": fragments[0]["status"],
+            "description": fragments[0]["description"],
+            "data": [],
+            "trace": fragments[0].get("trace", {}),
         }
 
         # Combine the 'data' elements from all fragments
         for fragment in fragments:
-            combined_message['data'].extend(fragment['data'])
+            combined_message["data"].extend(fragment["data"])
 
         return combined_message
 
@@ -314,7 +320,7 @@ class RedisClient(MessageClientBase):
                 logger.error(f"Failed to submit message, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
                 retries += 1
-                backoff_delay = min(2 ** retries, self._max_backoff)
+                backoff_delay = min(2**retries, self._max_backoff)
 
                 if self.max_retries == 0 or retries < self.max_retries:
                     logger.error(f"Submit attempt failed, retrying in {backoff_delay}s...")

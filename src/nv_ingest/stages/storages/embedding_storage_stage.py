@@ -2,26 +2,28 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import os
+import functools
 import logging
+import os
+import traceback
 import typing
+import uuid
 from typing import Any
 from typing import Dict
-import functools
-import uuid
-from minio import Minio
 
-import traceback
 import mrc
-from morpheus.config import Config
-
 import pandas as pd
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+from minio import Minio
+from morpheus.config import Config
+from pymilvus import Collection
+from pymilvus import connections
+from pymilvus.bulk_writer.constants import BulkFileType
+from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter
+
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from pymilvus import Collection, connections
-from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter 
-from pymilvus.bulk_writer.constants import BulkFileType
+from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+
 logger = logging.getLogger(__name__)
 
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
@@ -52,12 +54,7 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
         region=params.get("region", None),
     )
 
-    connections.connect(
-            address= "milvus:19530",
-            uri= "http://milvus:19530",
-            host = "milvus",
-            port= "19530"
-        )
+    connections.connect(address="milvus:19530", uri="http://milvus:19530", host="milvus", port="19530")
     schema = Collection(collection_name).schema
 
     bucket_found = client.bucket_exists(bucket_name)
@@ -68,18 +65,11 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
         logger.debug("Bucket %s already exists", bucket_name)
 
     conn = RemoteBulkWriter.ConnectParam(
-        endpoint=endpoint,
-        access_key=access_key,
-        secret_key=secret_key,
-        bucket_name=bucket_name,
-        secure=False
+        endpoint=endpoint, access_key=access_key, secret_key=secret_key, bucket_name=bucket_name, secure=False
     )
 
     writer = RemoteBulkWriter(
-        schema=schema,
-        remote_path=bucket_path,
-        connect_param=conn,
-        file_type=BulkFileType.PARQUET
+        schema=schema, remote_path=bucket_path, connect_param=conn, file_type=BulkFileType.PARQUET
     )
 
     for idx, row in df.iterrows():
@@ -95,13 +85,15 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
         if metadata["embedding"] is not None:
             logger.error(f"row type: {doc_type} -  {location} -  {len(content)}")
             df.at[idx, "metadata"] = metadata
-            writer.append_row({
-                "text":  location if content_replace  else content, 
-                "source": metadata["source_metadata"], 
-                "content_metadata": metadata["content_metadata"], 
-                "vector": metadata["embedding"]}
+            writer.append_row(
+                {
+                    "text": location if content_replace else content,
+                    "source": metadata["source_metadata"],
+                    "content_metadata": metadata["content_metadata"],
+                    "vector": metadata["embedding"],
+                }
             )
-    
+
     writer.commit()
 
     return df
@@ -116,13 +108,14 @@ def _store_embeddings(df, task_props, validated_config, trace_info=None):
         params["content_types"] = content_types
 
         df = upload_embeddings(df, params)
-        
+
         return df
     except Exception as e:
         traceback.print_exc()
         err_msg = f"Failed to store embeddings: {e}"
         logger.error(err_msg)
         raise
+
 
 def generate_embedding_storage_stage(
     c: Config,

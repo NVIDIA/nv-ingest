@@ -1,26 +1,17 @@
 repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v3.2.0
+    rev: v5.0.0
     hooks:
     -   id: trailing-whitespace
     -   id: end-of-file-fixer
     -   id: check-yaml
     -   id: check-added-large-files
         args: [-- maxkb=1500]
-    -   id: check-merge-conflict
     -   id: check-ast
-    -   id: double-quote-string-fixer
     -   id: debug-statements
-    -   id: check-toml
-    -   id: check-json
-    -   id: check-xml
 
   - repo: https://github.com/psf/black
-    rev: 23.3.0
+    rev: 24.10.0
     hooks:
       - id: black
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.12.0
-    hooks:
-      - id: isort
+        args: ["--line-length=120"]

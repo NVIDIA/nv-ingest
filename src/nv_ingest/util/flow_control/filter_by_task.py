@@ -4,8 +4,8 @@
 
 
 import logging
-import typing
 import re
+import typing
 from functools import wraps
 
 from morpheus.messages import ControlMessage
@@ -55,8 +55,8 @@ def filter_by_task(required_tasks, forward_func=None):
                         logger.debug(f"Required task properties: {required_task_props_list}")
                         for task_props in task_props_list:
                             if all(
-                                    _is_subset(task_props, required_task_props)
-                                    for required_task_props in required_task_props_list
+                                _is_subset(task_props, required_task_props)
+                                for required_task_props in required_task_props_list
                             ):
                                 return func(*args, **kwargs)
 
@@ -78,13 +78,10 @@ def _is_subset(superset, subset):
     if subset == "*":
         return True
     if isinstance(superset, dict) and isinstance(subset, dict):
-        return all(
-            key in superset and _is_subset(superset[key], val)
-            for key, val in subset.items()
-        )
-    if isinstance(subset, str) and subset.startswith('regex:'):
+        return all(key in superset and _is_subset(superset[key], val) for key, val in subset.items())
+    if isinstance(subset, str) and subset.startswith("regex:"):
         # The subset is a regex pattern
-        pattern = subset[len('regex:'):]
+        pattern = subset[len("regex:") :]
         if isinstance(superset, list):
             return any(re.match(pattern, str(sup_item)) for sup_item in superset)
         else:
@@ -93,10 +90,7 @@ def _is_subset(superset, subset):
         # Check if the subset value matches any item in the superset
         return any(_is_subset(sup_item, subset) for sup_item in superset)
     if isinstance(superset, list) or isinstance(superset, set):
-        return all(
-            any(_is_subset(sup_item, sub_item) for sup_item in superset)
-            for sub_item in subset
-        )
+        return all(any(_is_subset(sup_item, sub_item) for sup_item in superset) for sub_item in subset)
     return superset == subset
 
 
