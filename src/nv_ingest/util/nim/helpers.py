@@ -543,8 +543,12 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         The version of the server, or an empty string if unavailable.
     """
 
-    if http_endpoint is None or http_endpoint == "":
+    if (http_endpoint is None) or (http_endpoint == ""):
         return ""
+
+    # TODO: Need a way to match NIM versions to API versions.
+    if "ai.api.nvidia.com" in http_endpoint:
+        return "0.2.0"
 
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)
