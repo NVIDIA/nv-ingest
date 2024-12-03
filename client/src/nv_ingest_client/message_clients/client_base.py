@@ -4,6 +4,7 @@
 
 from abc import ABC
 from abc import abstractmethod
+from typing import Tuple
 
 class MessageClientBase(ABC):
     """
@@ -61,7 +62,7 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str) -> str:
+    def submit_message(self, channel_name: str, message: str) -> Tuple[str, str]:
         """
         Submits a message to a specified queue with retries on failure.
 

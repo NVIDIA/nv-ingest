@@ -18,7 +18,7 @@ import logging
 import time
 import traceback
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from fastapi import Depends
 from fastapi import File, UploadFile
 from fastapi import HTTPException
@@ -108,6 +108,51 @@ async def submit_job_curl_friendly(
     except Exception as ex:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+    
+def trace_id_to_uuid(trace_id: str) -> str:
+    """Convert a 32-character OpenTelemetry trace ID to a UUID-like format."""
+    trace_id = trace.format_trace_id(trace_id)
+    print(f"Converting trace_id: {trace_id} of type: {type(trace_id)}")
+    trace_id = str(trace_id)
+    if len(trace_id) != 32:
+        raise ValueError("Trace ID must be a 32-character hexadecimal string")
+    return f"{trace_id[:8]}-{trace_id[8:12]}-{trace_id[12:16]}-{trace_id[16:20]}-{trace_id[20:]}"
+
+# # POST /submit_job
+# @router.post(
+#     "/submit_job",
+#     responses={
+#         200: {"description": "Jobs were successfully submitted"},
+#         500: {"description": "Error encountered while submitting jobs."},
+#         503: {"description": "Service unavailable."},
+#     },
+#     tags=["Ingestion"],
+#     summary="submit jobs to the core nv ingestion service for processing",
+#     operation_id="submit_job",
+# )
+# async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
+#     with tracer.start_as_current_span("") as span:
+#         try:
+#             # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
+#             # will be able to trace across uvicorn -> morpheus
+#             current_trace_id = trace.get_current_span().get_span_context().trace_id
+            
+#             job_spec_dict = json.loads(job_spec.payload)
+#             job_spec_dict['tracing_options']['trace_id'] = current_trace_id
+#             updated_job_spec = MessageWrapper(
+#                 payload=json.dumps(job_spec_dict)
+#             )
+            
+#             job_id = trace_id_to_uuid(current_trace_id)
+#             print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
+
+#             # Submit the job async
+#             await ingest_service.submit_job(updated_job_spec, job_id)
+#             return job_id
+#         except Exception as ex:
+#             traceback.print_exc()
+#             raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+
 
 # POST /submit_job
 @router.post(
@@ -121,24 +166,42 @@ async def submit_job_curl_friendly(
     summary="submit jobs to the core nv ingestion service for processing",
     operation_id="submit_job",
 )
-async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
-    try:
-        # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
-        # will be able to trace across uvicorn -> morpheus
-        current_trace_id = trace.get_current_span().get_span_context().trace_id
-        
-        job_spec_dict = json.loads(job_spec.payload)
-        job_spec_dict['tracing_options']['trace_id'] = current_trace_id
-        updated_job_spec = MessageWrapper(
-            payload=json.dumps(job_spec_dict)
-        )
-
-        submitted_job_id = await ingest_service.submit_job(updated_job_spec)
-        return submitted_job_id
-    except Exception as ex:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
-
+async def submit_job(request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
+    with tracer.start_as_current_span("http-submit-job") as span:
+        try:
+            # Add custom attributes to the span
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.url", str(request.url))
+            span.add_event("Submitting file for processing")
+            
+            # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
+            # will be able to trace across uvicorn -> morpheus
+            current_trace_id = span.get_span_context().trace_id
+            
+            job_spec_dict = json.loads(job_spec.payload)
+            job_spec_dict['tracing_options']['trace_id'] = current_trace_id
+            updated_job_spec = MessageWrapper(
+                payload=json.dumps(job_spec_dict)
+            )
+            
+            job_id = trace_id_to_uuid(current_trace_id)
+            print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
+            
+            # Submit the job async
+            await ingest_service.submit_job(updated_job_spec, job_id)
+            
+            # Add another event
+            span.add_event("Finished processing")
+            
+            # We return the trace-id as a 32-byte hexidecimal string which is the format you would use when
+            # searching in Zipkin for traces. The original value is a 128 bit integer ...
+            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+            
+            return job_id
+            
+        except Exception as ex:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 # GET /fetch_job
 @router.get(

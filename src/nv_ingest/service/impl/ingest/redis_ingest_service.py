@@ -53,18 +53,18 @@ class RedisIngestService(IngestServiceMeta):
         self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
                                           max_pool_size=self._concurrency_level)
 
-    async def submit_job(self, job_spec: MessageWrapper) -> str:
+    async def submit_job(self, job_spec: MessageWrapper, trace_id: str) -> str:
         try:
             json_data = job_spec.dict()["payload"]
             job_spec = json.loads(json_data)
             validate_ingest_job(job_spec)
 
-            job_id = str(uuid.uuid4())
-            job_spec["job_id"] = job_id
+            # job_id = str(uuid.uuid4())
+            job_spec["job_id"] = trace_id
 
             self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
 
-            return job_id
+            return trace_id
 
         except JSONDecodeError as err:
             logger.error("Error: %s", err)
