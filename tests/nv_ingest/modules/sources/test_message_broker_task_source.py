@@ -59,6 +59,11 @@ def job_payload():
 
 
 # Test Case 1: Valid job with all required fields
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_valid_job(job_payload):
     """
     Test that process_message processes a valid job correctly.
@@ -103,6 +108,11 @@ def test_process_message_valid_job(job_payload):
 
 
 # Test Case 2: Job missing 'job_id'
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_missing_job_id(job_payload):
     """
     Test that process_message raises an exception when 'job_id' is missing.
@@ -123,6 +133,11 @@ def test_process_message_missing_job_id(job_payload):
 
 
 # Test Case 3: Job missing 'job_payload'
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_missing_job_payload(job_payload):
     """
     Test that process_message handles a job missing 'job_payload'.
@@ -137,6 +152,11 @@ def test_process_message_missing_job_payload(job_payload):
 
 
 # Test Case 5: Job with invalid tasks (missing 'type' in a task)
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_invalid_tasks(job_payload):
     """
     Test that process_message raises an exception when a task is invalid.
@@ -155,6 +175,11 @@ def test_process_message_invalid_tasks(job_payload):
 
 
 # Test Case 6: Job with tracing options enabled
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_with_tracing(job_payload):
     """
     Test that process_message adds tracing metadata when tracing options are enabled.
@@ -189,6 +214,11 @@ def test_process_message_with_tracing(job_payload):
 
 
 # Test Case 7: Exception occurs during processing and 'job_id' is present
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_exception_with_job_id(job_payload):
     """
     Test that process_message handles exceptions and sets metadata when 'job_id' is present.
@@ -201,10 +231,15 @@ def test_process_message_exception_with_job_id(job_payload):
 
     # Call the function
     with pytest.raises(ValidationError):
-        result = process_message(job, ts_fetched)
+        _ = process_message(job, ts_fetched)
 
 
 # Test Case 8: Exception occurs during processing and 'job_id' is missing
+@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(
+    not CUDA_DRIVER_OK,
+    reason="Test environment does not have a compatible CUDA driver.",
+)
 def test_process_message_exception_without_job_id(job_payload):
     """
     Test that process_message raises an exception when 'job_id' is missing and an exception occurs.
