@@ -9,7 +9,8 @@ services:
       - "6379:6379"
 
   yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-0.2.0}
+    #image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-0.2.0}
+    image: nvcr.io/nvstaging/nim/nv-yolox-page-elements-v1:24.11-20412797
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -152,10 +153,11 @@ services:
       # Message client for development
       - MESSAGE_CLIENT_HOST=0.0.0.0
       - MESSAGE_CLIENT_PORT=63790
-      - MESSAGE_CLIENT_TYPE=simple
+      - MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
       # Message client for production
       #- MESSAGE_CLIENT_HOST=redis
       #- MESSAGE_CLIENT_PORT=6379
+      #- MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}

@@ -8,54 +8,20 @@ import socketserver
 import json
 import logging
 import threading
-from typing import Union, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field, ValidationError, Extra
+from pydantic import ValidationError
 
+from nv_ingest.schemas.message_brokers.request_schema import PushRequestSchema, PopRequestSchema, SizeRequestSchema
+from nv_ingest.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest.util.message_brokers.simple_message_broker.ordered_message_queue import OrderedMessageQueue
 
 logger = logging.getLogger(__name__)
 
 
-# Define schemas for request validation
-class PushRequestSchema(BaseModel):
-    command: str
-    queue_name: str = Field(..., min_length=1)
-    message: str = Field(..., min_length=1)
-    timeout: Optional[float] = 100  # Optional timeout for blocking push
-
-    class Config:
-        extra = Extra.forbid  # Prevents any extra arguments
-
-
-class PopRequestSchema(BaseModel):
-    command: str
-    queue_name: str = Field(..., min_length=1)
-    timeout: Optional[float] = 100  # Optional timeout for blocking pop
-
-    class Config:
-        extra = Extra.forbid  # Prevents any extra arguments
-
-
-class SizeRequestSchema(BaseModel):
-    command: str
-    queue_name: str = Field(..., min_length=1)
-
-    class Config:
-        extra = Extra.forbid  # Prevents any extra arguments
-
-
-class ResponseSchema(BaseModel):
-    response_code: int
-    response_reason: Optional[str] = "OK"
-    response: Union[str, dict, None] = None
-    transaction_id: Optional[str] = None  # Unique transaction ID
-
-
 class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
     def handle(self):
         client_address = self.client_address
-        #logger.debug(f"Handling client connection from {client_address}")
 
         try:
             data_length_bytes = self._recv_exact(8)
@@ -349,4 +315,3 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
             if queue_name not in self.queues:
                 self.queues[queue_name] = OrderedMessageQueue(maxsize=self.max_queue_size)
                 self.queue_locks[queue_name] = threading.Lock()
-

@@ -15,17 +15,10 @@ from typing import Optional, Union
 
 from pydantic import BaseModel
 
+from nv_ingest.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_client.message_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
-
-
-class ResponseSchema(BaseModel):
-    response_code: int
-    response_reason: Optional[str] = "OK"
-    response: Union[str, dict, None] = None
-    trace_id: Optional[str] = None  # Unique trace ID
-    transaction_id: Optional[str] = None  # Unique transaction ID
 
 
 class SimpleClient(MessageBrokerClientBase):

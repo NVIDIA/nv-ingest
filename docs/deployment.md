@@ -4,7 +4,7 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-### Launch nv-ingest micro-service(s)
+### Launch nv-ingest microservice(s)
 
 ```bash
 # Redis is our message broker for the ingest service, always required.
