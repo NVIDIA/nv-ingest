@@ -4,14 +4,15 @@
 
 import json
 
-import pytest
 import pandas as pd
+import pytest
 
 from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
     import cudf
+
     from nv_ingest.util.converters.dftools import cudf_to_json
     from nv_ingest.util.converters.dftools import cudf_to_pandas
     from nv_ingest.util.converters.dftools import pandas_to_cudf

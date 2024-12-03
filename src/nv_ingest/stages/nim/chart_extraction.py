@@ -2,14 +2,14 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 
@@ -17,7 +17,8 @@ from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -60,9 +61,11 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
     chart_metadata = metadata.get("table_metadata")
 
     # Only modify if content type is structured and subtype is 'chart' and chart_metadata exists
-    if ((content_metadata.get("type") != "structured") or
-            (content_metadata.get("subtype") != "chart") or
-            (chart_metadata is None)):
+    if (
+        (content_metadata.get("type") != "structured")
+        or (content_metadata.get("subtype") != "chart")
+        or (chart_metadata is None)
+    ):
         return metadata
 
     # Modify chart metadata with the result from the inference model
@@ -81,8 +84,9 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
     return metadata
 
 
-def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
-                        validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
+def _extract_chart_data(
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts chart data from a DataFrame.
 
@@ -116,13 +120,13 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
     deplot_client = create_inference_client(
         validated_config.stage_config.deplot_endpoints,
         validated_config.stage_config.auth_token,
-        validated_config.stage_config.deplot_infer_protocol
+        validated_config.stage_config.deplot_infer_protocol,
     )
 
     cached_client = create_inference_client(
         validated_config.stage_config.cached_endpoints,
         validated_config.stage_config.auth_token,
-        validated_config.stage_config.cached_infer_protocol
+        validated_config.stage_config.cached_infer_protocol,
     )
 
     if trace_info is None:
@@ -139,18 +143,18 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:
-        if (isinstance(cached_client, grpcclient.InferenceServerClient)):
+        if isinstance(cached_client, grpcclient.InferenceServerClient):
             cached_client.close()
-        if (isinstance(deplot_client, grpcclient.InferenceServerClient)):
+        if isinstance(deplot_client, grpcclient.InferenceServerClient):
             deplot_client.close()
 
 
 def generate_chart_extractor_stage(
-        c: Config,
-        stage_config: Dict[str, Any],
-        task: str = "chart_data_extract",
-        task_desc: str = "chart_data_extraction",
-        pe_count: int = 1,
+    c: Config,
+    stage_config: Dict[str, Any],
+    task: str = "chart_data_extract",
+    task_desc: str = "chart_data_extraction",
+    pe_count: int = 1,
 ):
     """
     Generates a multiprocessing stage to perform chart data extraction from PDF content.

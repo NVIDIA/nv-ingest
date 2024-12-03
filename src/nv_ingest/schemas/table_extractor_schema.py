@@ -4,9 +4,12 @@
 
 
 import logging
+from typing import Optional
+from typing import Tuple
 
-from typing import Optional, Tuple
-from pydantic import BaseModel, root_validator, validator
+from pydantic import BaseModel
+from pydantic import root_validator
+from pydantic import validator
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +113,7 @@ class TableExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    @validator('max_queue_size', 'n_workers', pre=True, always=True)
+    @validator("max_queue_size", "n_workers", pre=True, always=True)
     def check_positive(cls, v, field):
         if v <= 0:
             raise ValueError(f"{field.name} must be greater than 10.")

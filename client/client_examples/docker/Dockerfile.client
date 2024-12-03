@@ -7,9 +7,9 @@ RUN chmod +x /bin/tini
 
 # Include files to launch jupyter notebook
 RUN mkdir -p /workspace/docker
-COPY docker/start-jupyter.sh /workspace/docker/start-jupyter.sh   
+COPY docker/start-jupyter.sh /workspace/docker/start-jupyter.sh
 COPY docker/entrypoint.sh /workspace/docker/entrypoint.sh
-RUN chmod +x /workspace/docker/start-jupyter.sh   
+RUN chmod +x /workspace/docker/start-jupyter.sh
 RUN chmod +x /workspace/docker/entrypoint.sh
 
 # Install some dependencies and useful utiliites

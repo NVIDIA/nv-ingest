@@ -11,7 +11,6 @@ from redis import RedisError
 
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 
-
 MODULE_UNDER_TEST = "nv_ingest.util.message_brokers.redis.redis_client"
 
 TEST_PAYLOAD = '{"job_id": 123, "job_payload": "abc"}'
@@ -157,4 +156,3 @@ def test_submit_message_exceeds_max_retries(mock_logger_error, mock_time_sleep, 
 
     # Assert that rpush was called 2 times: initial attempt + 1 retry (max_retries=1 in the fixture)
     assert mock_redis.rpush.call_count == 1
-

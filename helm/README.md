@@ -325,5 +325,3 @@ Manage the creation of secrets used by the helm chart
 | `ngcSecret.password`       | The password to use for the NGC Secret                 | `""`    |
 | `imagePullSecret.create`   | Specifies whether to create the NVCR Image Pull secret | `false` |
 | `imagePullSecret.password` | The password to use for the NVCR Image Pull Secret     | `""`    |
-
-

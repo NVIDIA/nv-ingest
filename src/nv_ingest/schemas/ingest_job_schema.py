@@ -92,6 +92,7 @@ class IngestTaskExtractSchema(BaseModelNoExt):
 class IngestTaskStoreEmbedSchema(BaseModelNoExt):
     params: dict
 
+
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
@@ -161,7 +162,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
         IngestTaskTableExtraction,
-        IngestChartTableExtraction
+        IngestChartTableExtraction,
     ]
     raise_on_failure: bool = False
 

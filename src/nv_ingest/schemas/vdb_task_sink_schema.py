@@ -9,8 +9,8 @@ import typing
 import pymilvus
 from pydantic import BaseModel
 from pydantic import Field
-from pydantic import validator
 from pydantic import conint
+from pydantic import validator
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
             "metric_type": "L2",
             "index_type": "GPU_CAGRA",
             "params": {
-                'intermediate_graph_degree':128,
-                'graph_degree': 64,
+                "intermediate_graph_degree": 128,
+                "graph_degree": 64,
                 "build_algo": "NN_DESCENT",
             },
         },

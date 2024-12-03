@@ -409,6 +409,6 @@ class BatchJobSpec:
             # All job specs under the same file type should have the same tasks.
             tasks = job_specs[0]._tasks
             if not tasks:
-               continue
+                continue
             all_tasks[file_type] = tasks
         return all_tasks

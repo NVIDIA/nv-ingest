@@ -40,10 +40,7 @@ def test_missing_api_key():
 
 def test_invalid_extra_field():
     # Test with an additional field that should be forbidden
-    data_with_extra_field = {
-        "api_key": "your-api-key-here",
-        "extra_field": "should_not_be_allowed"
-    }
+    data_with_extra_field = {"api_key": "your-api-key-here", "extra_field": "should_not_be_allowed"}
     with pytest.raises(ValidationError) as exc_info:
         ImageCaptionExtractionSchema(**data_with_extra_field)
     assert "extra fields not permitted" in str(exc_info.value)
@@ -55,7 +52,7 @@ def test_invalid_field_types():
         "api_key": "your-api-key-here",
         "endpoint_url": 12345,  # invalid type
         "prompt": 123,  # invalid type
-        "raise_on_failure": "not_boolean"  # invalid type
+        "raise_on_failure": "not_boolean",  # invalid type
     }
     with pytest.raises(ValidationError) as exc_info:
         ImageCaptionExtractionSchema(**invalid_data)

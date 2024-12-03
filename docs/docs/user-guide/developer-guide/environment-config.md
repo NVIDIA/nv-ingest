@@ -66,4 +66,3 @@
 - **`NIM_NGC_API_KEY`**:
   - **Description**: This key is by NIM microservices inside docker containers to access NGC resources.
     This is necessary only in some cases when it's different from `NGC_API_KEY`. If this isn't specified, `NGC_API_KEY` will be used to access NGC resources.
-
