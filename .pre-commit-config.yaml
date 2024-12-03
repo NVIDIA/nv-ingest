@@ -7,7 +7,6 @@ repos:
     -   id: check-added-large-files
         args: [-- maxkb=1500]
     -   id: check-ast
-    -   id: double-quote-string-fixer
     -   id: debug-statements
 
   - repo: https://github.com/psf/black
