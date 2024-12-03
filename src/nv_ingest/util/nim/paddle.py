@@ -25,7 +25,6 @@ class PaddleOCRModelInterface(ModelInterface):
     def __init__(
         self,
         paddle_version: Optional[str] = None,
-        table_format: Optional[TableFormatEnum] = TableFormatEnum.PSEUDO_MARKDOWN,
     ):
         """
         Initialize the PaddleOCR model interface.
@@ -36,7 +35,6 @@ class PaddleOCRModelInterface(ModelInterface):
             The version of the PaddleOCR model (default: None).
         """
         self.paddle_version = paddle_version
-        self.table_format = table_format
 
     def name(self) -> str:
         """
@@ -116,7 +114,7 @@ class PaddleOCRModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None) -> Any:
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
         Parse the output from the model's inference response.
 
@@ -145,7 +143,7 @@ class PaddleOCRModelInterface(ModelInterface):
             return self._extract_content_from_paddle_grpc_response(response)
         elif (protocol == 'http'):
             logger.debug("Parsing output from HTTP PaddleOCR model")
-            return self._extract_content_from_paddle_http_response(response)
+            return self._extract_content_from_paddle_http_response(response, table_content_format)
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -201,7 +199,7 @@ class PaddleOCRModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_paddle_response(self, json_response: Dict[str, Any]) -> Any:
+    def _extract_content_from_paddle_response(self, json_response: Dict[str, Any], table_content_format: Optional[str]) -> Any:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.
 
@@ -235,16 +233,16 @@ class PaddleOCRModelInterface(ModelInterface):
                 text_predictions.append(text_detection["text_prediction"]["text"])
                 bounding_boxes.append([(point["x"], point["y"]) for point in text_detection["bounding_box"]["points"]])
 
-            if self.table_format == TableFormatEnum.SIMPLE:
+            if table_content_format == TableFormatEnum.SIMPLE:
                 content = " ".join(text_predictions)
-            elif self.table_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
             else:
                 raise ValueError(f"Unexpected table format: {self.table_format}")
 
         return content
 
-    def _extract_content_from_paddle_grpc_response(self, response):
+    def _extract_content_from_paddle_grpc_response(self, response, table_content_format):
         # Convert bytes output to string
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
@@ -264,9 +262,9 @@ class PaddleOCRModelInterface(ModelInterface):
             bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))[0]
             text_predictions = json.loads(texts_bytestr.decode("utf8"))[0]
 
-            if self.table_format == TableFormatEnum.SIMPLE:
-                content = " ".join(texts_predictions)
-            elif self.table_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            if table_content_format == TableFormatEnum.SIMPLE:
+                content = " ".join(text_predictions)
+            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
 
         return content

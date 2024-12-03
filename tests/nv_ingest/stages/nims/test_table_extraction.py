@@ -47,7 +47,7 @@ class MockPaddleOCRModelInterface:
     def format_input(self, data, protocol, **kwargs):
         return data
 
-    def parse_output(self, response, protocol, data):
+    def parse_output(self, response, protocol, **kwargs):
         return ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
                 'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
                 '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
