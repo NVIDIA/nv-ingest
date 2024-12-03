@@ -131,7 +131,7 @@ kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
 kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
 ```
 
-The output will look something like this with different auto generated sequences.
+The output will look similar to the following but with different auto-generated sequences.
 
 ```
 nv-ingest-674f6b7477-65nvm
