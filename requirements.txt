@@ -38,3 +38,4 @@ unstructured-client==0.23.3
 uvicorn==0.24.0-post.1
 s3fs
 Wand==0.6.13
+httpx==0.27.2

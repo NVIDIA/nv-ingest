@@ -544,7 +544,9 @@ class DocxReader:
             para_idx += 1
 
         # We treat the document as a single page
-        if extract_text and text_depth in (TextTypeEnum.DOCUMENT, TextTypeEnum.PAGE):
+        if (extract_text
+                and text_depth in (TextTypeEnum.DOCUMENT, TextTypeEnum.PAGE)
+                and len(self._accumulated_text) > 0):
             text_extraction = self._construct_text_metadata(
                 self._accumulated_text, -1, text_depth, base_unified_metadata
             )
