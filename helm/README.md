@@ -167,7 +167,7 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You can also use NV-Ingest's python client API to interact with the service running in the cluster. Use the same host and port as in the above nv-ingest-cli example.
+You can also use NV-Ingest's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous nv-ingest-cli example.
 
 ## Parameters
 
