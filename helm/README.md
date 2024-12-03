@@ -3,7 +3,7 @@
 > [!WARNING]
 > NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
 >
-> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) please see [this section](#2408-cli-setup-and-usage), however the NV-Ingest team strongly recommends upgrading to `24.10`+ when available
+> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.10`+ when available.
 
 
 ## Prerequisites
