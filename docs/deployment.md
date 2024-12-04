@@ -55,8 +55,8 @@ From the root of the repository, run the following commands to create a new Cond
 ```bash
 mamba env create --file ./docker/environments/nv_ingest_environment.yml --name nv_ingest_runtime
 
+conda activate nv_ingest_runtime
+
 pip install ./
 pip install ./client
-
-conda activate nv_ingest_runtime
 ```

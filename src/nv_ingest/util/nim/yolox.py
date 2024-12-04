@@ -13,6 +13,8 @@ import numpy as np
 import torch
 import torchvision
 
+from PIL import Image
+
 from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
@@ -52,7 +54,6 @@ class YoloxModelInterface(ModelInterface):
             images_base64 = []
             for image in data['resized_images']:
                 # Convert numpy array to PIL Image
-                from PIL import Image
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
@@ -93,8 +94,8 @@ class YoloxModelInterface(ModelInterface):
             processed_outputs = []
 
             # Assuming all images are resized to the same dimensions
-            image_width = 1024 #YOLOX_MAX_WIDTH
-            image_height = 1024 #YOLOX_MAX_HEIGHT
+            image_width = 1024  # YOLOX_MAX_WIDTH
+            image_height = 1024  # YOLOX_MAX_HEIGHT
 
             for detections in batch_results:
                 # Initialize an empty tensor for detections
@@ -187,7 +188,10 @@ class YoloxModelInterface(ModelInterface):
 
 
 def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
+    # Convert numpy array to torch tensor
     prediction = torch.from_numpy(prediction.copy())
+
+    # Compute box corners
     box_corner = prediction.new(prediction.shape)
     box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
     box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
@@ -196,40 +200,48 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
     prediction[:, :, :4] = box_corner[:, :, :4]
 
     output = [None for _ in range(len(prediction))]
+
     for i, image_pred in enumerate(prediction):
-        # If none are remaining => process next image
+        # If no detections, continue to the next image
         if not image_pred.size(0):
             continue
 
-        # Get score and class with highest confidence
-        class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)  # noqa: E203
+        # Ensure image_pred is 2D
+        if image_pred.ndim == 1:
+            image_pred = image_pred.unsqueeze(0)
 
-        conf_mask = (image_pred[:, 4] * class_conf.squeeze() >= conf_thre).squeeze()
-        # Detections ordered as (x1, y1, x2, y2, obj_conf, class_conf, class_pred)
+        # Get score and class with highest confidence
+        class_conf, class_pred = torch.max(image_pred[:, 5: 5 + num_classes], 1, keepdim=True)
+
+        # Confidence mask
+        squeezed_conf = class_conf.squeeze(dim=1)
+        conf_mask = (image_pred[:, 4] * squeezed_conf >= conf_thre)
+
+        # Apply confidence mask
         detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
         detections = detections[conf_mask]
+
         if not detections.size(0):
             continue
 
+        # Apply Non-Maximum Suppression (NMS)
         if class_agnostic:
             nms_out_index = torchvision.ops.nms(
                 detections[:, :4],
                 detections[:, 4] * detections[:, 5],
                 nms_thre,
-            )
+                )
         else:
             nms_out_index = torchvision.ops.batched_nms(
                 detections[:, :4],
                 detections[:, 4] * detections[:, 5],
                 detections[:, 6],
                 nms_thre,
-            )
-
+                )
         detections = detections[nms_out_index]
-        if output[i] is None:
-            output[i] = detections
-        else:
-            output[i] = torch.cat((output[i], detections))
+
+        # Append detections to output
+        output[i] = detections
 
     return output
 

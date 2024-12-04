@@ -25,7 +25,6 @@ if (local_log_level in ("DEFAULT",)):
     local_log_level = "INFO"
 configure_local_logging(logger, local_log_level)
 
-
 @click.command()
 @click.option(
     "--ingest_config_path", type=str, envvar="NV_INGEST_CONFIG_PATH", help="Path to the JSON configuration file.",
@@ -37,13 +36,6 @@ configure_local_logging(logger, local_log_level)
 @click.option("--feature_length", default=512, type=int, help="Feature length.")
 @click.option("--num_threads", default=get_default_cpu_count(), type=int, help="Number of threads.")
 @click.option("--model_max_batch_size", default=256, type=int, help="Model max batch size.")
-@click.option(
-    "--caption_batch_size",
-    default=8,
-    callback=validate_positive,
-    type=int,
-    help="Number of captions to process in a batch. Must be a positive integer.",
-)
 @click.option(
     "--mode",
     type=click.Choice([mode.value for mode in PipelineModes], case_sensitive=False),
@@ -59,7 +51,6 @@ configure_local_logging(logger, local_log_level)
 )
 def cli(
         ingest_config_path,
-        caption_batch_size,
         use_cpp,
         pipeline_batch_size,
         enable_monitor,

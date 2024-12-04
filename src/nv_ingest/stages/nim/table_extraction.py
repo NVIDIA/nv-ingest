@@ -129,10 +129,10 @@ def _extract_table_data(
 
     paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
 
-    if paddle_infer_protocol == 'grpc':
+    if (paddle_infer_protocol == 'grpc'):
         # Obtain paddle_version
         # Assuming that the grpc endpoint is at index 0
-        paddle_endpoint = stage_config.paddle_endpoints[0]
+        paddle_endpoint = stage_config.paddle_endpoints[1]
         try:
             paddle_version = get_version(paddle_endpoint)
             if not paddle_version:

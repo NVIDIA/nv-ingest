@@ -8,7 +8,7 @@ from nv_ingest.util.message_brokers.simple_message_broker import SimpleMessageBr
 
 max_queue_size = 100  # Define the maximum queue size
 server_host = '0.0.0.0'  # Bind to all network interfaces
-server_port = 63790  # Port to listen on
+server_port = 7671 # Port to listen on
 
 # Obtain the singleton instance
 server = SimpleMessageBroker(server_host, server_port, max_queue_size)

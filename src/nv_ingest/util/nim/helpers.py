@@ -76,14 +76,17 @@ class NimClient:
         if self.protocol == 'grpc':
             logger.debug("Performing gRPC inference...")
             response = self._grpc_infer(formatted_input, model_name)
+            logger.debug("gRPC inference received response")
         elif self.protocol == 'http':
             logger.debug("Performing HTTP inference...")
             response = self._http_infer(formatted_input)
+            logger.debug("HTTP inference received response")
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
         # Parse and process output
         parsed_output = self.model_interface.parse_output(response, protocol=self.protocol)
+        # logger.debug(f"Parsed output: {parsed_output}")
         results = self.model_interface.process_inference_results(parsed_output,
                                                                  original_image_shapes=data.get(
                                                                      'original_image_shapes'),

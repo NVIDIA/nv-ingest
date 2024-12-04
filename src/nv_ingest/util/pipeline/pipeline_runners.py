@@ -1,14 +1,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import json
 import logging
 import multiprocessing
 
 from datetime import datetime
 
+from morpheus.config import PipelineModes, CppConfig, Config
+from pydantic import ValidationError
+
+from nv_ingest.schemas import IngestPipelineConfigSchema
+from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
 from morpheus.pipeline.pipeline import Pipeline
+
+from nv_ingest.util.pipeline.logging import setup_logging, get_log_level
+from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, validate_positive
+from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -98,3 +107,75 @@ def run_pipeline(morpheus_pipeline_config, ingest_config, as_subprocess=False) -
         logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
 
         return total_elapsed
+
+
+def run_ingest_pipeline(
+        ingest_config_path=None,
+        caption_batch_size=8,
+        use_cpp=False,
+        pipeline_batch_size=256,
+        enable_monitor=False,
+        feature_length=512,
+        num_threads=None,
+        model_max_batch_size=256,
+        mode=PipelineModes.NLP.value,
+        log_level='INFO',
+):
+    """
+    Configures and runs the pipeline with specified options.
+
+    Parameters:
+        ingest_config_path (str): Path to the JSON configuration file.
+        caption_batch_size (int): Number of captions to process in a batch.
+        use_cpp (bool): Use C++ backend.
+        pipeline_batch_size (int): Batch size for the pipeline.
+        enable_monitor (bool): Enable monitoring.
+        feature_length (int): Feature length.
+        num_threads (int): Number of threads.
+        model_max_batch_size (int): Model max batch size.
+        mode (str): Pipeline mode.
+        log_level (str): Log level.
+    """
+    if num_threads is None:
+        num_threads = get_default_cpu_count()
+
+    # Validate positive integers
+    validate_positive(None, None, caption_batch_size)
+
+    setup_logging(log_level)
+
+    CppConfig.set_should_use_cpp(use_cpp)
+
+    log_level_value = get_log_level(log_level)
+
+    morpheus_pipeline_config = Config()
+    morpheus_pipeline_config.debug = True if log_level_value == logging.DEBUG else False
+    morpheus_pipeline_config.log_level = log_level_value
+    morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
+    morpheus_pipeline_config.enable_monitor = enable_monitor
+    morpheus_pipeline_config.feature_length = feature_length
+    morpheus_pipeline_config.num_threads = num_threads
+    morpheus_pipeline_config.model_max_batch_size = model_max_batch_size
+    morpheus_pipeline_config.mode = PipelineModes[mode.upper()]
+
+    cli_ingest_config = {}  # TODO: Create a config for overrides -- not necessary yet.
+
+    if ingest_config_path:
+        ingest_config = validate_schema(ingest_config_path)
+    else:
+        ingest_config = {}
+
+    # Merge options with file configuration
+    final_ingest_config = merge_dict(ingest_config, cli_ingest_config)
+
+    # Validate final configuration using Pydantic
+    try:
+        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        print(f"Configuration loaded and validated: {validated_config}")
+    except ValidationError as e:
+        print(f"Validation error: {e}")
+        raise
+
+    logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
+    logger.debug(f"Morpheus configuration:\n{morpheus_pipeline_config}")
+    run_pipeline(morpheus_pipeline_config, final_ingest_config)
