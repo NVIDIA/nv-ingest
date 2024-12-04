@@ -47,6 +47,6 @@ To ensure high-quality documentation, follow these best practices:
 For more information on the Chicago Manual of Style, refer to their
 [online published version](https://www.chicagomanualofstyle.org/home.html?_ga=2.188145128.1312333204.1728079521-706076405.1727890116).
 
-By following these guidelines and principles, you wi ll be able to create high-quality documentation that helps others
+By following these guidelines and principles, you will be able to create high-quality documentation that helps others
 understand and work with your code effectively. Remember to always prioritize clarity, accuracy, and completeness, and
 to use the Chicago Style Guide as your reference for writing and formatting.

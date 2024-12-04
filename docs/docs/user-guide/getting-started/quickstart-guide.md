@@ -1,62 +1,4 @@
-<!--
-SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
-All rights reserved.
-SPDX-License-Identifier: Apache-2.0
--->
-
-
-## NVIDIA-Ingest: Multi-modal data extraction
-
-NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
-
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
-
-### Table of Contents
-1. [Introduction](#introduction)
-2. [Prerequisites](#prerequisites)
-3. [Quickstart](#quickstart)
-4. [Repo Structure](#repo-structure)
-5. [Notices](#notices)
-
-## Introduction
-
-### What NVIDIA-Ingest is ✔️
-
-A microservice that:
-
-- Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
-- Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, as well as processing annotations and timing/trace data.
-- Supports PDF, Docx, pptx, and images.
-- Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
-- Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
-
-### What NVIDIA-Ingest is not ✖️
-
-A service that:
-
-- Runs a static pipeline or fixed set of operations on every submitted document.
-- Acts as a wrapper for any specific document parsing library.
-
-
-## Prerequisites
-
-### Hardware
-
-| GPU | Family | Memory | # of GPUs (min.) |
-| ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
-
-### Software
-
-- Linux operating systems (Ubuntu 22.04 or later recommended)
-- [Docker](https://docs.docker.com/engine/install/)
-- [Docker Compose](https://docs.docker.com/compose/install/)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
-
-
-## Quickstart
+# Quickstart Guide
 
 To get started using NVIDIA Ingest, you need to do a few things:
 1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
@@ -64,7 +6,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
-### Step 1: Starting containers
+## Step 1: Starting Containers
 
 This example demonstrates how to use the provided [docker-compose.yaml](docker-compose.yaml) to start all needed services with a few commands.
 
@@ -87,7 +29,7 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> during the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+> During the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
 
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
@@ -113,8 +55,6 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
-> 
-> If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
@@ -160,9 +100,9 @@ ac27e5297d57   prom/prometheus:latest                                           
 > 
 > After the image is built, run `docker compose up` per item 5 above.
 
-### Step 2: Installing Python dependencies
+## Step 2: Installing Python Dependencies
 
-To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
+To interact with the nv-ingest service, you can do so from the host or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
@@ -190,7 +130,7 @@ pip install .
 > 
 > From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
-### Step 3: Ingesting Documents
+## Step 3: Ingesting Documents
 
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
@@ -203,7 +143,9 @@ In the below examples, we are doing text, chart, table, and image extraction:
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
-#### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
+### In Python 
+
+You can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb):
 
 ```python
 import logging, time
@@ -265,7 +207,9 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
+### Using the `nv-ingest-cli` 
+
+You can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb):
 
 ```shell
 nv-ingest-cli \
@@ -305,11 +249,11 @@ INFO:nv_ingest_client.cli.util.processing:Throughput (Pages/sec): 0.29
 INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.10
 ```
 
-### Step 4: Inspecting and Consuming Results
+## Step 4: Inspecting and Consuming Results
 
 After the ingestion steps above have completed, you should be able to find `text` and `image` subfolders inside your processed docs folder. Each will contain JSON formatted extracted content and metadata.
 
-#### When processing has completed, you'll have separate result files for text and image data:
+When processing has completed, you'll have separate result files for text and image data:
 ```shell
 ls -R processed_docs/
 ```
@@ -328,7 +272,8 @@ multimodal_test.pdf.metadata.json
 ```
 You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
 
-#### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
+
 First, install `tkinter` by running the following commands depending on your OS.
 - For Ubuntu/Debian Linux:
 ```shell
@@ -351,7 +296,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 > [!TIP]
 > Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 >
-> Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+> Also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 ## Repo Structure
 
@@ -391,7 +336,7 @@ https://pypi.org/project/pdfservices-sdk/
 We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original
 work, or you have rights to submit it under the same license, or a compatible license.
 
-Any contribution which contains commits that are not Signed-Off will not be accepted.
+Any contribution which contains commits that aren't Signed-Off won't be accepted.
 
 To sign off on a commit you simply use the --signoff (or -s) option when committing your changes:
 
