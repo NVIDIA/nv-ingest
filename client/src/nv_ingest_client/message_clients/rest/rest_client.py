@@ -12,7 +12,7 @@
 
 import logging
 import time
-from typing import Any
+from typing import Any, Tuple
 from typing import Optional
 
 import httpx
@@ -210,7 +210,7 @@ class RestClient(MessageClientBase):
                 logger.error(f"Unexpected error during fetch from {url}: {e}")
                 raise ValueError(f"Unexpected error during fetch: {e}")
 
-    def submit_message(self, _: str, message: str) -> str:
+    def submit_message(self, _: str, message: str) -> Tuple[str, str]:
         """
         Submits a JobSpec to a specified HTTP endpoint with retries on failure.
 
