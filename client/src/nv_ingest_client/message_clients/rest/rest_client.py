@@ -200,7 +200,7 @@ class RestClient(MessageBrokerClientBase):
                         except RuntimeError as rte:
                             raise rte
 
-            except httpx.HTTPError as err:
+            except requests.HTTPError as err:
                 logger.error(f"Error during fetching, retrying... Error: {err}")
                 self._client = None  # Invalidate client to force reconnection
                 try:

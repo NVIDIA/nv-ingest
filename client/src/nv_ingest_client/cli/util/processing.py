@@ -664,6 +664,7 @@ def create_and_process_jobs(
                     if not retry:
                         pbar.update(1)
 
+
     return total_files, trace_times, total_pages_processed
 
 

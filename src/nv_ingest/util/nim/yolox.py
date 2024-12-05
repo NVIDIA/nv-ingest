@@ -15,6 +15,7 @@ import torchvision
 
 from PIL import Image
 
+from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
 from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
@@ -27,6 +28,7 @@ YOLOX_CONF_THRESHOLD = 0.01
 YOLOX_IOU_THRESHOLD = 0.5
 YOLOX_MIN_SCORE = 0.1
 YOLOX_FINAL_SCORE = 0.48
+YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
 
 
 # Implementing YoloxModelInterface with required methods
@@ -45,30 +47,47 @@ class YoloxModelInterface(ModelInterface):
             logger.debug("Formatting input for gRPC Yolox model")
             # Reorder axes to match model input (batch, channels, height, width)
             input_array = np.einsum("bijk->bkij", data['resized_images']).astype(np.float32)
-
             return input_array
 
         elif protocol == 'http':
             logger.debug("Formatting input for HTTP Yolox model")
-            # Convert images to base64 and construct payload
-            images_base64 = []
+            # Additional lists to keep track of scaling factors and new sizes
+            scaling_factors = []
+            content_list = []
             for image in data['resized_images']:
                 # Convert numpy array to PIL Image
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
+                original_size = image_pil.size  # Should be (1024, 1024)
+
+                # Save image to buffer
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
                 image_b64 = base64.b64encode(buffered.getvalue()).decode('utf-8')
-                images_base64.append(image_b64)
 
-            # Construct payload as per API expectations
-            content_list = []
-            for image_b64 in images_base64:
+                # Now scale the image if necessary
+                scaled_image_b64, new_size = scale_image_to_encoding_size(
+                    image_b64,
+                    max_base64_size=YOLOX_NIM_MAX_IMAGE_SIZE
+                )
+
+                if new_size != original_size:
+                    logger.warning(f"Image was scaled from {original_size} to {new_size} to meet size constraints.")
+
+                # Compute scaling factor
+                scaling_factor_x = (new_size[0] / 1024)
+                scaling_factor_y = (new_size[1] / 1024)
+                scaling_factors.append((scaling_factor_x, scaling_factor_y))
+
+                # Add to content_list
                 content_list.append({
                     "type": "image_url",
                     "image_url": {
-                        "url": f"data:image/png;base64,{image_b64}"
+                        "url": f"data:image/png;base64,{scaled_image_b64}"
                     }
                 })
+
+            # Store scaling factors in data
+            data['scaling_factors'] = scaling_factors
 
             payload = {
                 "messages": [
@@ -82,7 +101,7 @@ class YoloxModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data=None):
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC Yolox model")
             return response  # For gRPC, response is already a numpy array
@@ -93,11 +112,13 @@ class YoloxModelInterface(ModelInterface):
             batch_size = len(batch_results)
             processed_outputs = []
 
-            # Assuming all images are resized to the same dimensions
-            image_width = 1024  # YOLOX_MAX_WIDTH
-            image_height = 1024  # YOLOX_MAX_HEIGHT
+            scaling_factors = data.get('scaling_factors', [(1.0, 1.0)] * batch_size)
 
-            for detections in batch_results:
+            for idx, detections in enumerate(batch_results):
+                scale_factor_x, scale_factor_y = scaling_factors[idx]
+                image_width = 1024
+                image_height = 1024
+
                 # Initialize an empty tensor for detections
                 max_detections = 100
                 detection_tensor = np.zeros((max_detections, 85), dtype=np.float32)
@@ -115,11 +136,17 @@ class YoloxModelInterface(ModelInterface):
                         ymax_norm = bbox['ymax']
                         confidence = bbox['confidence']
 
-                        # Convert normalized coordinates to absolute pixel values
-                        xmin = xmin_norm * image_width
-                        ymin = ymin_norm * image_height
-                        xmax = xmax_norm * image_width
-                        ymax = ymax_norm * image_height
+                        # Convert normalized coordinates to absolute pixel values in scaled image
+                        xmin_scaled = xmin_norm * image_width * scale_factor_x
+                        ymin_scaled = ymin_norm * image_height * scale_factor_y
+                        xmax_scaled = xmax_norm * image_width * scale_factor_x
+                        ymax_scaled = ymax_norm * image_height * scale_factor_y
+
+                        # Adjust coordinates back to 1024x1024 image space
+                        xmin = xmin_scaled / scale_factor_x
+                        ymin = ymin_scaled / scale_factor_y
+                        xmax = xmax_scaled / scale_factor_x
+                        ymax = ymax_scaled / scale_factor_y
 
                         # YOLOX expects bbox format: center_x, center_y, width, height
                         center_x = (xmin + xmax) / 2
@@ -230,14 +257,14 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
                 detections[:, :4],
                 detections[:, 4] * detections[:, 5],
                 nms_thre,
-                )
+            )
         else:
             nms_out_index = torchvision.ops.batched_nms(
                 detections[:, :4],
                 detections[:, 4] * detections[:, 5],
                 detections[:, 6],
                 nms_thre,
-                )
+            )
         detections = detections[nms_out_index]
 
         # Append detections to output
@@ -321,6 +348,7 @@ def resize_image(image, target_img_size):
             mode="constant",
             constant_values=114,
         )
+
     return image
 
 

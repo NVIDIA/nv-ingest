@@ -11,12 +11,10 @@ import socket
 import json
 import time
 import logging
-from typing import Optional, Union
+from typing import Optional
 
-from pydantic import BaseModel
-
-from nv_ingest.util.message_brokers.simple_message_broker.simple_client import ResponseSchema
 from nv_ingest_client.message_clients.client_base import MessageBrokerClientBase
+from nv_ingest_client.schemas.response_schema import ResponseSchema
 
 logger = logging.getLogger(__name__)
 

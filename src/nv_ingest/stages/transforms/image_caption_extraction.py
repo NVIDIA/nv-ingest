@@ -56,7 +56,7 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
     stream = False  # Set to False for non-streaming response
 
     # Ensure the base64 image size is within acceptable limits
-    base64_image = scale_image_to_encoding_size(base64_image)
+    base64_image, _ = scale_image_to_encoding_size(base64_image)
 
     headers = {
         "Authorization": f"Bearer {api_key}",
@@ -148,6 +148,7 @@ def caption_extract_stage(df: pd.DataFrame,
     )
 
     logger.debug("Image content captioning complete")
+
     return df
 
 

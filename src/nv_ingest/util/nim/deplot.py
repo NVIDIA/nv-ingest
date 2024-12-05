@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import numpy as np
 import logging
@@ -46,7 +46,7 @@ class DeplotModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data: Optional[Dict[str, Any]] = None):
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC Deplot model")
             # Convert bytes output to string

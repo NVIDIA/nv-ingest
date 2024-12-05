@@ -38,7 +38,7 @@ class PaddleOCRModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data: Optional[Dict[str, Any]] = None):
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC PaddleOCR model")
             # Convert bytes output to string

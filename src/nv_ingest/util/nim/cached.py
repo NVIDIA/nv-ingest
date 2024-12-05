@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import numpy as np
 
@@ -38,7 +38,7 @@ class CachedModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data: Optional[Dict[str, Any]] = None):
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC Cached model")
             # Convert bytes output to string

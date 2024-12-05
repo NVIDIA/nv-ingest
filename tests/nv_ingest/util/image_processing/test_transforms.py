@@ -134,7 +134,7 @@ def test_resize_image_within_size_limit():
     base64_image = generate_base64_image((100, 100))  # Small image
     max_base64_size = len(base64_image) + 10  # Set limit slightly above image size
 
-    result = scale_image_to_encoding_size(base64_image, max_base64_size)
+    result, _ = scale_image_to_encoding_size(base64_image, max_base64_size)
     assert result == base64_image  # Should return unchanged
 
 
@@ -143,7 +143,7 @@ def test_resize_image_one_resize_needed():
     base64_image = generate_base64_image((500, 500))
     max_base64_size = len(base64_image) - 1000  # Set limit slightly below current size
 
-    result = scale_image_to_encoding_size(base64_image, max_base64_size)
+    result, _ = scale_image_to_encoding_size(base64_image, max_base64_size)
     assert len(result) <= max_base64_size  # Should be resized within limit
 
 
@@ -152,7 +152,7 @@ def test_resize_image_multiple_resizes_needed():
     base64_image = generate_base64_image((1000, 1000))
     max_base64_size = len(base64_image) // 2  # Set limit well below current size
 
-    result = scale_image_to_encoding_size(base64_image, max_base64_size)
+    result, _ = scale_image_to_encoding_size(base64_image, max_base64_size)
     assert len(result) <= max_base64_size  # Final size should be within limit
 
 
@@ -170,7 +170,7 @@ def test_resize_image_edge_case_minimal_reduction():
     base64_image = generate_base64_image((500, 500))
     max_base64_size = len(base64_image) - 50  # Just a slight reduction needed
 
-    result = scale_image_to_encoding_size(base64_image, max_base64_size)
+    result, _ = scale_image_to_encoding_size(base64_image, max_base64_size)
     assert len(result) <= max_base64_size  # Should achieve minimal reduction within limit
 
 

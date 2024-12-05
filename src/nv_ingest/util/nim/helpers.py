@@ -27,10 +27,10 @@ DEPLOT_TOP_P = 1.0
 
 
 class ModelInterface:
-    def format_input(self, data, protocol: str):
+    def format_input(self, data: dict, protocol: str):
         raise NotImplementedError("Subclasses should implement this method")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data: Optional[dict] = None):
         raise NotImplementedError("Subclasses should implement this method")
 
     def prepare_data_for_inference(self, data):
@@ -85,12 +85,12 @@ class NimClient:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
         # Parse and process output
-        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol)
-        # logger.debug(f"Parsed output: {parsed_output}")
-        results = self.model_interface.process_inference_results(parsed_output,
-                                                                 original_image_shapes=data.get(
-                                                                     'original_image_shapes'),
-                                                                 **kwargs)
+        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=prepared_data)
+        results = self.model_interface.process_inference_results(
+            parsed_output,
+            original_image_shapes=data.get('original_image_shapes'),
+            **kwargs
+        )
         return results
 
     def _grpc_infer(self, formatted_input, model_name: str):
