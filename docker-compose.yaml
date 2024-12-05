@@ -150,13 +150,13 @@ services:
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
       - INGEST_LOG_LEVEL=DEBUG
       # Message client for development
-      #- MESSAGE_CLIENT_HOST=0.0.0.0
-      #- MESSAGE_CLIENT_PORT=7671
-      #- MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
+      - MESSAGE_CLIENT_HOST=0.0.0.0
+      - MESSAGE_CLIENT_PORT=7671
+      - MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
       # Message client for production
-      - MESSAGE_CLIENT_HOST=redis
-      - MESSAGE_CLIENT_PORT=6379
-      - MESSAGE_CLIENT_TYPE=redis
+      #- MESSAGE_CLIENT_HOST=redis
+      #- MESSAGE_CLIENT_PORT=6379
+      #- MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
