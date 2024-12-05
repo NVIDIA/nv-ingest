@@ -5,7 +5,7 @@
 import os
 import json
 import logging
-import multiprocessing
+import threading
 
 from datetime import datetime
 
@@ -18,7 +18,6 @@ from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
 from morpheus.pipeline.pipeline import Pipeline
 
-from nv_ingest.util.pipeline.logging import get_log_level
 from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, validate_positive
 from nv_ingest.util.schema.schema_validator import validate_schema
 
@@ -50,64 +49,39 @@ def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:
     return total_elapsed
 
 
-def run_pipeline(morpheus_pipeline_config, ingest_config, as_subprocess=False) -> float:
+def run_pipeline(morpheus_pipeline_config, ingest_config, run_async=False) -> float:
     """
-    Runs the pipeline, optionally in a subprocess.
+    Runs the pipeline, optionally in a separate thread.
 
     Parameters:
         morpheus_pipeline_config: The configuration object for the Morpheus pipeline.
         ingest_config: The ingestion configuration dictionary.
-        as_subprocess (bool): If True, runs the pipeline in a subprocess.
+        async (bool): If True, runs the pipeline in a separate thread.
 
     Returns:
-        float: The total elapsed time for running the pipeline.
+        float: The total elapsed time for running the pipeline, or the thread object if async=True.
 
     Raises:
         Exception: Any exception raised during pipeline execution.
-        RuntimeError: If the subprocess exits with a non-zero exit code.
     """
 
-    if as_subprocess:
-        # Run the pipeline in a subprocess
-        def pipeline_wrapper(return_queue):
+    if (run_async):
+        # Run the pipeline in a separate thread
+        def pipeline_wrapper():
             try:
                 total_elapsed = _launch_pipeline(morpheus_pipeline_config, ingest_config)
-                return_queue.put(total_elapsed)
+                logger.info(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
             except Exception as e:
-                logger.exception("Exception in pipeline subprocess")
-                # Pass the exception back to the parent process
-                return_queue.put(e)
+                logger.exception("Exception in pipeline thread")
 
-        return_queue = multiprocessing.Queue()
-        process = multiprocessing.Process(
-            target=pipeline_wrapper,
-            args=(return_queue,)
-        )
-        process.start()
-        process.join()
+        thread = threading.Thread(target=pipeline_wrapper)
+        thread.start()
+        return thread  # Return the thread object so the caller can manage it
 
-        if process.exitcode != 0:
-            logger.error(f"Pipeline subprocess exited with code {process.exitcode}")
-            # Retrieve exception from queue if any
-            result = return_queue.get()
-            if isinstance(result, Exception):
-                raise result
-            else:
-                raise RuntimeError(f"Pipeline subprocess failed with exit code {process.exitcode}")
-        else:
-            # Retrieve the result from the queue
-            result = return_queue.get()
-            if isinstance(result, Exception):
-                raise result
-            else:
-                total_elapsed = result
-                logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
-
-                return total_elapsed
     else:
         # Run the pipeline in the current process
         total_elapsed = _launch_pipeline(morpheus_pipeline_config, ingest_config)
-        logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
+        logger.info(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
 
         return total_elapsed
 
@@ -123,6 +97,7 @@ def run_ingest_pipeline(
         model_max_batch_size=256,
         mode=PipelineModes.NLP.value,
         log_level='INFO',
+        run_async=False
 ):
     """
     Configures and runs the pipeline with specified options.
@@ -138,6 +113,10 @@ def run_ingest_pipeline(
         model_max_batch_size (int): Model max batch size.
         mode (str): Pipeline mode.
         log_level (str): Log level.
+        async (bool): If True, runs the pipeline in a separate thread.
+
+    Returns:
+        float or threading.Thread: Total elapsed time if async=False, else the thread object.
     """
     if num_threads is None:
         num_threads = get_default_cpu_count()
@@ -157,18 +136,18 @@ def run_ingest_pipeline(
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
     if env_log_level:
         log_level = env_log_level
-        if (log_level in ("DEFAULT",)):
+        if log_level in ("DEFAULT",):
             log_level = "INFO"
 
-    log_level = log_level_mapping.get(log_level.upper(), logging.INFO)
-    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
-    configure_logging(log_level=log_level)
+    log_level_value = log_level_mapping.get(log_level.upper(), logging.INFO)
+    logging.basicConfig(level=log_level_value, format="%(asctime)s - %(levelname)s - %(message)s")
+    configure_logging(log_level=log_level_value)
 
     CppConfig.set_should_use_cpp(use_cpp)
 
     morpheus_pipeline_config = Config()
-    morpheus_pipeline_config.debug = True if log_level == logging.DEBUG else False
-    morpheus_pipeline_config.log_level = log_level
+    morpheus_pipeline_config.debug = True if log_level_value == logging.DEBUG else False
+    morpheus_pipeline_config.log_level = log_level_value
     morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
     morpheus_pipeline_config.enable_monitor = enable_monitor
     morpheus_pipeline_config.feature_length = feature_length
@@ -196,4 +175,5 @@ def run_ingest_pipeline(
 
     logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
     logger.debug(f"Morpheus configuration:\n{morpheus_pipeline_config}")
-    run_pipeline(morpheus_pipeline_config, final_ingest_config)
+    result = run_pipeline(morpheus_pipeline_config, final_ingest_config, run_async=run_async)
+    return result  # Return the thread object if async=True, or the total_elapsed time if async=False
