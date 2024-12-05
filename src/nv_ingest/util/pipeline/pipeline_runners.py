@@ -1,6 +1,8 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
+import os
 import json
 import logging
 import multiprocessing
@@ -12,10 +14,11 @@ from pydantic import ValidationError
 
 from nv_ingest.schemas import IngestPipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
+from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
 from morpheus.pipeline.pipeline import Pipeline
 
-from nv_ingest.util.pipeline.logging import setup_logging, get_log_level
+from nv_ingest.util.pipeline.logging import get_log_level
 from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, validate_positive
 from nv_ingest.util.schema.schema_validator import validate_schema
 
@@ -142,15 +145,30 @@ def run_ingest_pipeline(
     # Validate positive integers
     validate_positive(None, None, caption_batch_size)
 
-    setup_logging(log_level)
+    log_level_mapping = {
+        "DEBUG": logging.DEBUG,
+        "INFO": logging.INFO,
+        "WARNING": logging.WARNING,
+        "ERROR": logging.ERROR,
+        "CRITICAL": logging.CRITICAL,
+    }
+
+    # Check for INGEST_LOG_LEVEL environment variable
+    env_log_level = os.getenv("INGEST_LOG_LEVEL")
+    if env_log_level:
+        log_level = env_log_level
+        if (log_level in ("DEFAULT",)):
+            log_level = "INFO"
+
+    log_level = log_level_mapping.get(log_level.upper(), logging.INFO)
+    logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
+    configure_logging(log_level=log_level)
 
     CppConfig.set_should_use_cpp(use_cpp)
 
-    log_level_value = get_log_level(log_level)
-
     morpheus_pipeline_config = Config()
-    morpheus_pipeline_config.debug = True if log_level_value == logging.DEBUG else False
-    morpheus_pipeline_config.log_level = log_level_value
+    morpheus_pipeline_config.debug = True if log_level == logging.DEBUG else False
+    morpheus_pipeline_config.log_level = log_level
     morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
     morpheus_pipeline_config.enable_monitor = enable_monitor
     morpheus_pipeline_config.feature_length = feature_length

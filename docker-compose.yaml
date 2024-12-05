@@ -141,7 +141,7 @@ services:
       - CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/university-at-buffalo/cached
       - CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
-      - DEPLOT_GRPC_ENDPOINT=""
+      #- DEPLOT_GRPC_ENDPOINT=""
       # Self-hosted deplot endpoints.
       #- DEPLOT_HEALTH_ENDPOINT=deplot:8000
       #- DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
