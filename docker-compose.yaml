@@ -237,7 +237,7 @@ services:
      timeout: 20s
      retries: 3
    profiles:
-     - milvus-support
+     - retrieval
 
   minio:
    # Turn on to leverage the `store` and `vdb_upload` task
@@ -260,7 +260,7 @@ services:
      timeout: 20s
      retries: 3
    profiles:
-     - milvus-support
+     - retrieval
 
   milvus:
     # Turn on to leverage the `vdb_upload` task
@@ -296,7 +296,7 @@ services:
       - "etcd"
       - "minio"
     profiles:
-     - milvus-support
+     - retrieval
 
   attu:
    # Turn on to leverage the `vdb_upload` task
@@ -311,5 +311,5 @@ services:
    depends_on:
      - "milvus"
    profiles:
-     - milvus-support
+     - retrieval
 
