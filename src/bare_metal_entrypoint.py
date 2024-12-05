@@ -35,7 +35,7 @@ os.environ[
 def worker_loop():
     while True:
         time.sleep(5)
-        print(".")
+        print(".", end="", flush=True)
 
 
 if __name__ == "__main__":
