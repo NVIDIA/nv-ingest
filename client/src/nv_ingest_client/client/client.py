@@ -14,7 +14,7 @@ import traceback
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
-from typing import Any
+from typing import Any, Type
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -22,6 +22,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from nv_ingest_client.message_clients import MessageBrokerClientBase
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec
@@ -62,7 +63,7 @@ class NvIngestClient:
 
     def __init__(
             self,
-            message_client_allocator: Callable[..., RestClient] = RestClient,
+            message_client_allocator: Type[MessageBrokerClientBase] = RestClient,
             message_client_hostname: Optional[str] = "localhost",
             message_client_port: Optional[int] = 7670,
             message_client_kwargs: Optional[Dict] = None,

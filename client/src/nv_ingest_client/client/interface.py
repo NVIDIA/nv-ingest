@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any
+from typing import Any, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -127,7 +127,7 @@ class Ingestor:
 
         return True
 
-    def files(self, documents: List[str]) -> "Ingestor":
+    def files(self, documents: Union[str, List[str]]) -> "Ingestor":
         """
         Add documents to the manager for processing and check if they are all local.
 
