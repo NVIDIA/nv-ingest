@@ -14,6 +14,9 @@ logger = logging.getLogger(__name__)
 
 
 class DeplotModelInterface(ModelInterface):
+    def name(self):
+        return "Deplot"
+
     def prepare_data_for_inference(self, data):
         # Expecting base64_image in data
         base64_image = data['base64_image']

@@ -23,6 +23,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
     def handle(self):
         client_address = self.client_address
 
+        data_bytes = None
         try:
             data_length_bytes = self._recv_exact(8)
             if not data_length_bytes:
@@ -34,6 +35,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             if not data_bytes:
                 logger.debug("No data received. Closing connection.")
                 return
+
             data = data_bytes.decode('utf-8').strip()
             request_data = json.loads(data)
 
@@ -84,7 +86,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             response = ResponseSchema(response_code=1, response_reason=str(ve))
             self._send_response(response)
         except Exception as e:
-            logger.error(f"Error processing command from {client_address}: {e}")
+            logger.error(f"Error processing command from {client_address}: {e}\n{data_bytes}")
             response = ResponseSchema(response_code=1, response_reason=str(e))
             try:
                 self._send_response(response)

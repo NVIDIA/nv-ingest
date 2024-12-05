@@ -12,6 +12,9 @@ class PaddleOCRModelInterface(ModelInterface):
     def __init__(self, paddle_version: Optional[str] = None):
         self.paddle_version = paddle_version
 
+    def name(self):
+        return f"PaddleOCR - {self.paddle_version}"
+
     def prepare_data_for_inference(self, data):
         # Expecting base64_image in data
         base64_image = data['base64_image']

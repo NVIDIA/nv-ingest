@@ -33,6 +33,9 @@ YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
 
 # Implementing YoloxModelInterface with required methods
 class YoloxModelInterface(ModelInterface):
+    def name(self):
+        return "yolox"
+
     def prepare_data_for_inference(self, data):
         original_images = data['images']
         # Our yolox model expects images to be resized to 1024x1024

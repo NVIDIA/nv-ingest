@@ -66,7 +66,8 @@ def extract_tables_and_charts_using_image_ensemble(
     yolox_client = None
     try:
         model_interface = yolox_utils.YoloxModelInterface()
-        yolox_client = create_inference_client(config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol)
+        yolox_client = create_inference_client(config.yolox_endpoints, model_interface, config.auth_token,
+                                               config.yolox_infer_protocol)
 
         batches = []
         i = 0
@@ -106,10 +107,15 @@ def extract_tables_and_charts_using_image_ensemble(
                 )
                 page_index += 1
 
+    except TimeoutError:
+        logger.error("Timeout error during table/chart extraction.")
+        raise
+
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
         raise e
+
     finally:
         if yolox_client:
             yolox_client.close()

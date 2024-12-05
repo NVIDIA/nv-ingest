@@ -4,6 +4,7 @@
 
 import logging
 import re
+import time
 from typing import Optional
 from typing import Tuple
 
@@ -39,13 +40,23 @@ class ModelInterface:
     def process_inference_results(self, output_array, **kwargs):
         raise NotImplementedError("Subclasses should implement this method")
 
+    def name(self):
+        raise NotImplementedError("Subclasses should implement this method")
+
 
 class NimClient:
-    def __init__(self, model_interface: ModelInterface, protocol: str, endpoints: Tuple[str, str],
-                 auth_token: Optional[str] = None):
+    def __init__(
+            self,
+            model_interface: ModelInterface,
+            protocol: str,
+            endpoints: Tuple[str, str],
+            auth_token: Optional[str] = None,
+            timeout: float = 30.0
+    ):
         self.model_interface = model_interface
         self.protocol = protocol.lower()
         self.auth_token = auth_token
+        self.timeout = timeout  # Timeout for HTTP requests
 
         grpc_endpoint, http_endpoint = endpoints
 
@@ -104,10 +115,57 @@ class NimClient:
         return response.as_numpy("output")
 
     def _http_infer(self, formatted_input):
-        response = requests.post(self.endpoint_url, json=formatted_input, headers=self.headers)
-        response.raise_for_status()
-        logger.debug(f"HTTP inference response: {response.json()}")
-        return response.json()
+        max_retries = 3
+        base_delay = 2.0
+        attempt = 0
+
+        while attempt <= max_retries:
+            try:
+                response = requests.post(
+                    self.endpoint_url,
+                    json=formatted_input,
+                    headers=self.headers,
+                    timeout=self.timeout
+                )
+                status_code = response.status_code
+
+                if status_code in [429, 503]:
+                    # Warn and attempt to retry
+                    logger.warning(f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying...")
+                    if attempt == max_retries:
+                        # No more retries left
+                        logger.error(f"Max retries exceeded after receiving HTTP {status_code}.")
+                        response.raise_for_status()  # This will raise the appropriate HTTPError
+                    else:
+                        # Exponential backoff before retrying
+                        backoff_time = base_delay * (2 ** attempt)
+                        time.sleep(backoff_time)
+                        attempt += 1
+                        continue
+                else:
+                    # Not a 429/503 - just raise_for_status or return the response
+                    response.raise_for_status()
+                    logger.debug(f"HTTP inference response: {response.json()}")
+                    return response.json()
+
+            except requests.Timeout:
+                err_msg = f"HTTP request timed out during {self.model_interface.name()} inference after {self.timeout} seconds"
+                logger.error(err_msg)
+                raise TimeoutError(err_msg)
+
+            except requests.HTTPError as http_err:
+                # If we ended up here after a final raise_for_status, it's a non-429/503 error
+                logger.error(f"HTTP request failed with status code {response.status_code}: {http_err}")
+                raise
+
+            except requests.RequestException as e:
+                # Non-HTTPError request exceptions (e.g., ConnectionError)
+                logger.error(f"HTTP request failed: {e}")
+                raise
+
+        # If we exit the loop without returning, raise a generic error
+        logger.error(f"Failed to get a successful response after {max_retries} retries.")
+        raise Exception(f"Failed to get a successful response after {max_retries} retries.")
 
     def close(self):
         if self.protocol == 'grpc' and hasattr(self.client, 'close'):
