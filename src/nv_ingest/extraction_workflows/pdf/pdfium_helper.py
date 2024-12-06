@@ -293,8 +293,8 @@ def pdfium_extractor(
     source_id = row_data["source_id"]
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
-    table_content_format = kwargs.get("table_content_format", "pseudo_markdown")
-    table_content_format = TableFormatEnum[table_content_format.upper()]
+    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
+    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -425,7 +425,8 @@ def pdfium_extractor(
             if (extract_tables and (table_and_charts.type_string == "table")) or (
                     extract_charts and (table_and_charts.type_string == "chart")
             ):
-                table_and_charts.content_format = table_content_format
+                if (table_and_charts.type_string == "table"):
+                    table_and_charts.content_format = paddle_output_format
 
                 extracted_data.append(
                     construct_table_and_chart_metadata(

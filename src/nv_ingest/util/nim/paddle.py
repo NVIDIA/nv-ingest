@@ -138,6 +138,17 @@ class PaddleOCRModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified or the response format is unexpected.
         """
+        default_table_content_format = (
+            TableFormatEnum.SIMPLE if self._is_version_early_access_legacy_api() else TableFormatEnum.PSEUDO_MARKDOWN
+        )
+        table_content_format = kwargs.get("table_content_format", default_table_content_format)
+
+        if self._is_version_early_access_legacy_api() and (table_content_format != TableFormatEnum.SIMPLE):
+            logger.warning(
+                f"Paddle version {self.paddle_version} does not support {table_content_format} format. "
+                "The table content will be in `simple` format."
+            )
+            table_content_format = TableFormatEnum.SIMPLE
 
         if (protocol == 'grpc'):
             logger.debug("Parsing output from gRPC PaddleOCR model")
@@ -239,9 +250,9 @@ class PaddleOCRModelInterface(ModelInterface):
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
             else:
-                raise ValueError(f"Unexpected table format: {self.table_format}")
+                raise ValueError(f"Unexpected table format: {table_content_format}")
 
-        return content
+        return content, table_content_format
 
     def _extract_content_from_paddle_grpc_response(self, response, table_content_format):
         # Convert bytes output to string
@@ -249,15 +260,7 @@ class PaddleOCRModelInterface(ModelInterface):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
         if self._is_version_early_access_legacy_api():
-            if response.dtype.type is np.object_ or response.dtype.type is np.bytes_:
-                output_strings = [
-                    output[0].decode("utf-8") if isinstance(output, bytes) else str(output) for output in response
-                ]
-                content = " ".join(output_strings)
-            else:
-                output_bytes = response.tobytes()
-                output_str = output_bytes.decode("utf-8")
-                content = output_str
+            content = " ".join([output[0].decode("utf-8") for output in response])
         else:
             bboxes_bytestr, texts_bytestr, _ = response
             bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))[0]
@@ -267,8 +270,10 @@ class PaddleOCRModelInterface(ModelInterface):
                 content = " ".join(text_predictions)
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+            else:
+                raise ValueError(f"Unexpected table format: {table_content_format}")
 
-        return content
+        return content, table_content_format
 
     def _convert_paddle_response_to_psuedo_markdown(self, bounding_boxes, text_predictions):
         bboxes = []

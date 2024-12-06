@@ -81,7 +81,9 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
                 table_content_format=table_metadata.get("table_content_format"),
             )
 
-        table_metadata["table_content"] = paddle_result
+        table_content, table_content_format = paddle_result
+        table_metadata["table_content"] = table_content
+        table_metadata["table_content_format"] = table_content_format
     except Exception as e:
         logger.error(f"Unhandled error calling PaddleOCR inference model: {e}", exc_info=True)
         raise

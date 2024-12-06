@@ -22,6 +22,39 @@ def legacy_paddle_ocr_model():
     return PaddleOCRModelInterface(paddle_version="0.2.0")
 
 
+@pytest.fixture
+def mock_paddle_http_response():
+    return {
+        "data": [
+            {
+                "text_detections": [
+                    {
+                        "text_prediction": {"text": "mock_text", "confidence": 0.99},
+                        "bounding_box": {
+                            "points": [
+                                {"x": 0.1, "y": 0.2},
+                                {"x": 0.2, "y": 0.2},
+                                {"x": 0.2, "y": 0.3},
+                                {"x": 0.1, "y": 0.3},
+                            ],
+                            "confidence": None,
+                        },
+                    }
+                ]
+            }
+        ]
+    }
+
+
+@pytest.fixture
+def mock_paddle_grpc_response():
+    bboxes = b"[[[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]]"
+    texts = b'[["mock_text"]]'
+    scores = b"[[0.99]]"
+
+    return np.array([bboxes, texts, scores])
+
+
 def test_prepare_data_for_inference(paddle_ocr_model):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
@@ -64,99 +97,81 @@ def test_format_input_http_legacy(legacy_paddle_ocr_model):
     assert content["image_url"]["url"] == "data:image/png;base64,mock_base64_string"
 
 
-def test_parse_output_http_pseudo_markdown(paddle_ocr_model):
+def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
 
         data = {"base64_image": "mock_base64_string"}
         result = paddle_ocr_model.prepare_data_for_inference(data)
 
-    http_response = {
-        "data": [
-            {
-                "text_detections": [
-                    {
-                        "text_prediction": {"text": "mock_text", "confidence": 0.99},
-                        "bounding_box": {
-                            "points": [
-                                {"x": 0.1, "y": 0.2},
-                                {"x": 0.2, "y": 0.2},
-                                {"x": 0.2, "y": 0.3},
-                                {"x": 0.1, "y": 0.3},
-                            ],
-                            "confidence": None,
-                        },
-                    }
-                ]
-            }
-        ]
-    }
-
-    result = paddle_ocr_model.parse_output(http_response, protocol="http")
-    assert result == "| mock_text |\n"
+    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http")
+    assert result[0] == "| mock_text |\n"
+    assert result[1] == "pseudo_markdown"
 
 
-def test_parse_output_http_simple(paddle_ocr_model):
+def test_parse_output_http_simple(paddle_ocr_model, mock_paddle_http_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
 
         data = {"base64_image": "mock_base64_string"}
         result = paddle_ocr_model.prepare_data_for_inference(data)
 
-    http_response = {
-        "data": [
-            {
-                "text_detections": [
-                    {
-                        "text_prediction": {"text": "mock_text", "confidence": 0.99},
-                        "bounding_box": {
-                            "points": [
-                                {"x": 0.1, "y": 0.2},
-                                {"x": 0.2, "y": 0.2},
-                                {"x": 0.2, "y": 0.3},
-                                {"x": 0.1, "y": 0.3},
-                            ],
-                            "confidence": None,
-                        },
-                    }
-                ]
-            }
-        ]
-    }
-
-    result = paddle_ocr_model.parse_output(http_response, protocol="http", table_content_format="simple")
-    assert result == "mock_text"
+    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http", table_content_format="simple")
+    assert result[0] == "mock_text"
+    assert result[1] == "simple"
 
 
-def test_parse_output_grpc_pseudo_markdown(paddle_ocr_model):
+def test_parse_output_http_simple_legacy(legacy_paddle_ocr_model):
+    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
+        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
+
+        data = {"base64_image": "mock_base64_string"}
+        result = legacy_paddle_ocr_model.prepare_data_for_inference(data)
+
+    mock_legacy_paddle_http_response = {"data": [{"content": "mock_text"}]}
+
+    result = legacy_paddle_ocr_model.parse_output(
+        mock_legacy_paddle_http_response, protocol="http", table_content_format="foo"
+    )
+    assert result[0] == "mock_text"
+    assert result[1] == "simple"
+
+
+def test_parse_output_grpc_pseudo_markdown(paddle_ocr_model, mock_paddle_grpc_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
 
         data = {"base64_image": "mock_base64_string"}
         result = paddle_ocr_model.prepare_data_for_inference(data)
 
-    bboxes = b"[[[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]]"
-    texts = b'[["mock_text"]]'
-    scores = b"[[0.99]]"
-
-    grpc_response = np.array([bboxes, texts, scores])
-
-    result = paddle_ocr_model.parse_output(grpc_response, protocol="grpc")
-    assert result == "| mock_text |\n"
+    result = paddle_ocr_model.parse_output(mock_paddle_grpc_response, protocol="grpc")
+    assert result[0] == "| mock_text |\n"
+    assert result[1] == "pseudo_markdown"
 
 
-def test_parse_output_grpc_simple(paddle_ocr_model):
+def test_parse_output_grpc_simple(paddle_ocr_model, mock_paddle_grpc_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
 
         data = {"base64_image": "mock_base64_string"}
         result = paddle_ocr_model.prepare_data_for_inference(data)
 
-    bboxes = b"[[[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]]"
-    texts = b'[["mock_text"]]'
-    scores = b"[[0.99]]"
+    result = paddle_ocr_model.parse_output(mock_paddle_grpc_response, protocol="grpc", table_content_format="simple")
+    assert result[0] == "mock_text"
+    assert result[1] == "simple"
 
-    grpc_response = np.array([bboxes, texts, scores])
 
-    result = paddle_ocr_model.parse_output(grpc_response, protocol="grpc", table_content_format="simple")
-    assert result == "mock_text"
+def test_parse_output_grpc_legacy(legacy_paddle_ocr_model):
+    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
+        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
+
+        data = {"base64_image": "mock_base64_string"}
+        result = legacy_paddle_ocr_model.prepare_data_for_inference(data)
+
+    mock_paddle_grpc_response = np.array([[b"mock_text"]])
+
+    result = legacy_paddle_ocr_model.parse_output(
+        mock_paddle_grpc_response, protocol="grpc", table_content_format="foo"
+    )
+    assert result[0] == "mock_text"
+    assert result[1] == "simple"
