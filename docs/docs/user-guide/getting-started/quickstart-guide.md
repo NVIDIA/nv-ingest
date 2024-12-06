@@ -87,7 +87,7 @@ bda9a2a9c8b5   openzipkin/zipkin                                                
 ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
 ```
 
-> **TIP:** nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+> **TIP:** NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
 > ```
 > docker compose build
 > ```
