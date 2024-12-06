@@ -44,8 +44,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 2 |
+| A100 | SXM or PCIe | 80GB | 2 |
 
 ### Software
 
