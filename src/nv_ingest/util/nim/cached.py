@@ -14,16 +14,61 @@ logger = logging.getLogger(__name__)
 
 
 class CachedModelInterface(ModelInterface):
-    def name(self):
+    """
+    An interface for handling inference with a Cached model, supporting both gRPC and HTTP protocols.
+    """
+
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface ("Cached").
+        """
         return "Cached"
 
-    def prepare_data_for_inference(self, data):
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare input data for inference by decoding the base64 image into a numpy array.
+
+        Parameters
+        ----------
+        data : dict
+            The input data containing a base64-encoded image.
+
+        Returns
+        -------
+        dict
+            The updated data dictionary with the decoded image array.
+        """
         # Expecting base64_image in data
         base64_image = data['base64_image']
         data['image_array'] = base64_to_numpy(base64_image)
         return data
 
-    def format_input(self, data, protocol: str):
+    def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
+        """
+        Format input data for the specified protocol.
+
+        Parameters
+        ----------
+        data : dict
+            The input data to format.
+        protocol : str
+            The protocol to use ("grpc" or "http").
+
+        Returns
+        -------
+        Any
+            The formatted input data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
         if protocol == 'grpc':
             logger.debug("Formatting input for gRPC Cached model")
             # Convert image array to expected format
@@ -41,7 +86,29 @@ class CachedModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str, data: Optional[Dict[str, Any]] = None):
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None) -> Any:
+        """
+        Parse the output from the model's inference response.
+
+        Parameters
+        ----------
+        response : Any
+            The response from the model inference.
+        protocol : str
+            The protocol used ("grpc" or "http").
+        data : dict, optional
+            Additional input data passed to the function.
+
+        Returns
+        -------
+        Any
+            The parsed output data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC Cached model")
             # Convert bytes output to string
@@ -52,11 +119,37 @@ class CachedModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def process_inference_results(self, output, **kwargs):
+    def process_inference_results(self, output: Any, **kwargs) -> Any:
+        """
+        Process inference results for the Cached model.
+
+        Parameters
+        ----------
+        output : Any
+            The raw output from the model.
+
+        Returns
+        -------
+        Any
+            The processed inference results.
+        """
         # For Cached model, the output is the chart content as a string
         return output
 
     def _prepare_nim_payload(self, base64_img: str) -> Dict[str, Any]:
+        """
+        Prepare a payload for the NIM (HTTP) API using a base64-encoded image.
+
+        Parameters
+        ----------
+        base64_img : str
+            The base64-encoded image string.
+
+        Returns
+        -------
+        dict
+            The formatted payload for the NIM API.
+        """
         image_url = f"data:image/png;base64,{base64_img}"
         image = {"type": "image_url", "image_url": {"url": image_url}}
 
@@ -65,7 +158,25 @@ class CachedModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_nim_response(self, json_response):
+    def _extract_content_from_nim_response(self, json_response: Dict[str, Any]) -> Any:
+        """
+        Extract content from the JSON response of a NIM (HTTP) API request.
+
+        Parameters
+        ----------
+        json_response : dict
+            The JSON response from the NIM API.
+
+        Returns
+        -------
+        Any
+            The extracted content from the response.
+
+        Raises
+        ------
+        RuntimeError
+            If the response does not contain the expected "data" key or if it is empty.
+        """
         if "data" not in json_response or not json_response["data"]:
             raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 

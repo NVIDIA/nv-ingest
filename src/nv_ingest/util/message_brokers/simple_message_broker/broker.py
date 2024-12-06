@@ -20,7 +20,24 @@ logger = logging.getLogger(__name__)
 
 
 class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
+    """
+    Handles incoming client requests for the SimpleMessageBroker server, processes commands such as
+    PUSH, POP, SIZE, and PING, and manages message queues with thread-safe operations.
+    """
+
     def handle(self):
+        """
+        Handles incoming client requests, validates the request data, and dispatches to the appropriate
+        command handler.
+
+        Raises
+        ------
+        ValidationError
+            If the incoming request data fails schema validation.
+        Exception
+            If there is an unexpected error while processing the request.
+        """
+
         client_address = self.client_address
 
         data_bytes = None
@@ -94,12 +111,30 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
                 logger.error("Cannot send error response; client connection closed.")
 
     def _handle_ping(self):
-        """Respond to a PING command."""
+        """
+        Responds to a PING command with a PONG response.
+        """
+
         response = ResponseSchema(response_code=0, response="PONG")
         self._send_response(response)
 
     def _handle_push(self, data: PushRequestSchema, transaction_id: str,
                      queue: OrderedMessageQueue, queue_lock: threading.Lock):
+        """
+        Handles a PUSH command to add a message to the specified queue.
+
+        Parameters
+        ----------
+        data : PushRequestSchema
+            The validated data for the PUSH command.
+        transaction_id : str
+            The unique transaction ID for the operation.
+        queue : OrderedMessageQueue
+            The queue where the message will be pushed.
+        queue_lock : threading.Lock
+            The lock object to ensure thread-safe access to the queue.
+        """
+
         timeout = data.timeout
 
         with queue_lock:
@@ -140,6 +175,20 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
     def _handle_push_for_nv_ingest(self, data: PushRequestSchema,
                                    queue: OrderedMessageQueue, queue_lock: threading.Lock):
+        """
+        Handles a PUSH_FOR_NV_INGEST command, which includes generating a unique job ID and
+        updating the message payload accordingly.
+
+        Parameters
+        ----------
+        data : PushRequestSchema
+            The validated data for the PUSH_FOR_NV_INGEST command.
+        queue : OrderedMessageQueue
+            The queue where the message will be pushed.
+        queue_lock : threading.Lock
+            The lock object to ensure thread-safe access to the queue.
+        """
+
         timeout = data.timeout
 
         # Deserialize the message
@@ -195,6 +244,19 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
     def _handle_pop(self, data: PopRequestSchema,
                     queue: OrderedMessageQueue, queue_lock: threading.Lock):
+        """
+        Handles a POP command to retrieve a message from the specified queue.
+
+        Parameters
+        ----------
+        data : PopRequestSchema
+            The validated data for the POP command.
+        queue : OrderedMessageQueue
+            The queue from which the message will be retrieved.
+        queue_lock : threading.Lock
+            The lock object to ensure thread-safe access to the queue.
+        """
+
         timeout = data.timeout
         transaction_id = str(uuid.uuid4())
 
@@ -239,11 +301,45 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
     def _size_of_queue(self, data: SizeRequestSchema,
                        queue: OrderedMessageQueue, queue_lock: threading.Lock) -> ResponseSchema:
+        """
+        Retrieves the size of the specified queue.
+
+        Parameters
+        ----------
+        data : SizeRequestSchema
+            The validated data for the SIZE command.
+        queue : OrderedMessageQueue
+            The queue whose size will be queried.
+        queue_lock : threading.Lock
+            The lock object to ensure thread-safe access to the queue.
+
+        Returns
+        -------
+        ResponseSchema
+            A response containing the size of the queue.
+        """
+
         with queue_lock:
             size = queue.qsize()
         return ResponseSchema(response_code=0, response=str(size))
 
     def _wait_for_ack(self, transaction_id: str, timeout: Optional[float]) -> bool:
+        """
+        Waits for an acknowledgment (ACK) from the client for a specific transaction.
+
+        Parameters
+        ----------
+        transaction_id : str
+            The unique transaction ID for the operation.
+        timeout : float, optional
+            The timeout period for waiting for the ACK.
+
+        Returns
+        -------
+        bool
+            True if the ACK is received, False otherwise.
+        """
+
         try:
             self.request.settimeout(timeout)
             ack_length_bytes = self._recv_exact(8)
@@ -263,6 +359,20 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             self.request.settimeout(None)
 
     def _send_response(self, response: ResponseSchema):
+        """
+        Sends a response back to the client.
+
+        Parameters
+        ----------
+        response : ResponseSchema
+            The response to send to the client.
+
+        Raises
+        ------
+        Exception
+            If there is an error while sending the response.
+        """
+
         try:
             response_json = response.json().encode('utf-8')
             total_length = len(response_json)
@@ -275,7 +385,20 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             logger.error(f"Unexpected error while sending response: {e}")
 
     def _recv_exact(self, num_bytes: int) -> Optional[bytes]:
-        """Helper method to receive an exact number of bytes."""
+        """
+        Receives an exact number of bytes from the client connection.
+
+        Parameters
+        ----------
+        num_bytes : int
+            The number of bytes to receive.
+
+        Returns
+        -------
+        Optional[bytes]
+            The received bytes, or None if the connection is closed.
+        """
+
         data = bytearray()
         while len(data) < num_bytes:
             packet = self.request.recv(num_bytes - len(data))
@@ -286,11 +409,34 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
 
 class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
+    """
+    A thread-safe message broker server that manages multiple message queues and supports commands
+    such as PUSH, POP, SIZE, and PING.
+    """
+
     allow_reuse_address = True
     _instances = {}
     _instances_lock = threading.Lock()
 
     def __new__(cls, host: str, port: int, max_queue_size: int):
+        """
+        Ensures that only one instance of SimpleMessageBroker is created per host and port combination.
+
+        Parameters
+        ----------
+        host : str
+            The hostname or IP address for the server.
+        port : int
+            The port number for the server.
+        max_queue_size : int
+            The maximum size of each message queue.
+
+        Returns
+        -------
+        SimpleMessageBroker
+            The singleton instance of the server.
+        """
+
         key = (host, port)
         with cls._instances_lock:
             if key not in cls._instances:
@@ -302,6 +448,19 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         return instance
 
     def __init__(self, host: str, port: int, max_queue_size: int):
+        """
+        Initializes the SimpleMessageBroker server, setting up message queues and locks.
+
+        Parameters
+        ----------
+        host : str
+            The hostname or IP address for the server.
+        port : int
+            The port number for the server.
+        max_queue_size : int
+            The maximum size of each message queue.
+        """
+
         # Prevent __init__ from running multiple times on the same instance
         if hasattr(self, '_initialized') and self._initialized:
             return
@@ -313,6 +472,15 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         self._initialized = True  # Flag to indicate initialization is complete
 
     def _initialize_queue(self, queue_name: str):
+        """
+        Initializes a new message queue with the specified name if it doesn't already exist.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue to initialize.
+        """
+
         with self.lock:
             if queue_name not in self.queues:
                 self.queues[queue_name] = OrderedMessageQueue(maxsize=self.max_queue_size)

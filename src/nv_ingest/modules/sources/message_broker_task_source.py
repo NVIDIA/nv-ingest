@@ -36,7 +36,26 @@ MessageBrokerTaskSourceLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_N
 
 
 def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSourceSchema):
-    """Fetch messages from the message broker and process them."""
+    """
+    Fetch messages from the message broker and process them.
+
+    Parameters
+    ----------
+    client : MessageBrokerClientBase
+        The client used to interact with the message broker.
+    validated_config : MessageBrokerTaskSourceSchema
+        The validated configuration for the message broker.
+
+    Yields
+    ------
+    ControlMessage
+        The processed control message for each fetched job.
+
+    Raises
+    ------
+    Exception
+        If an irrecoverable error occurs during message processing.
+    """
 
     while True:
         try:
@@ -66,6 +85,23 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
     """
     Process a job and return a ControlMessage.
+
+    Parameters
+    ----------
+    job : dict
+        The job payload retrieved from the message broker.
+    ts_fetched : datetime
+        The timestamp when the message was fetched.
+
+    Returns
+    -------
+    ControlMessage
+        The control message created from the job.
+
+    Raises
+    ------
+    Exception
+        If the job fails validation or processing.
     """
 
     if logger.isEnabledFor(logging.DEBUG):
@@ -147,6 +183,11 @@ def _message_broker_task_source(builder: mrc.Builder):
     ----------
     builder : mrc.Builder
         The Morpheus pipeline builder object.
+
+    Raises
+    ------
+    ValueError
+        If an unsupported client type is provided in the configuration.
     """
 
     validated_config = fetch_and_validate_module_config(builder, MessageBrokerTaskSourceSchema)

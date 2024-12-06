@@ -5,7 +5,7 @@
 import logging
 import re
 import time
-from typing import Optional
+from typing import Optional, Any
 from typing import Tuple
 
 import backoff
@@ -28,23 +28,82 @@ DEPLOT_TOP_P = 1.0
 
 
 class ModelInterface:
+    """
+    Base class for defining a model interface that supports preparing input data, formatting it for
+    inference, parsing output, and processing inference results.
+    """
+
     def format_input(self, data: dict, protocol: str):
+        """
+        Format the input data for the specified protocol.
+
+        Parameters
+        ----------
+        data : dict
+            The input data to format.
+        protocol : str
+            The protocol to format the data for.
+        """
+
         raise NotImplementedError("Subclasses should implement this method")
 
     def parse_output(self, response, protocol: str, data: Optional[dict] = None):
+        """
+        Parse the output data from the model's inference response.
+
+        Parameters
+        ----------
+        response : Any
+            The response from the model inference.
+        protocol : str
+            The protocol used ("grpc" or "http").
+        data : dict, optional
+            Additional input data passed to the function.
+        """
+
         raise NotImplementedError("Subclasses should implement this method")
 
-    def prepare_data_for_inference(self, data):
+    def prepare_data_for_inference(self, data: dict):
+        """
+        Prepare input data for inference by processing or transforming it as required.
+
+        Parameters
+        ----------
+        data : dict
+            The input data to prepare.
+        """
         raise NotImplementedError("Subclasses should implement this method")
 
     def process_inference_results(self, output_array, **kwargs):
+        """
+        Process the inference results from the model.
+
+        Parameters
+        ----------
+        output_array : Any
+            The raw output from the model.
+        kwargs : dict
+            Additional parameters for processing.
+        """
         raise NotImplementedError("Subclasses should implement this method")
 
-    def name(self):
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
         raise NotImplementedError("Subclasses should implement this method")
 
 
 class NimClient:
+    """
+    A client for interfacing with a model inference server using gRPC or HTTP protocols.
+    """
+
     def __init__(
             self,
             model_interface: ModelInterface,
@@ -53,6 +112,28 @@ class NimClient:
             auth_token: Optional[str] = None,
             timeout: float = 30.0
     ):
+        """
+        Initialize the NimClient with the specified model interface, protocol, and server endpoints.
+
+        Parameters
+        ----------
+        model_interface : ModelInterface
+            The model interface implementation to use.
+        protocol : str
+            The protocol to use ("grpc" or "http").
+        endpoints : tuple
+            A tuple containing the gRPC and HTTP endpoints.
+        auth_token : str, optional
+            Authorization token for HTTP requests (default: None).
+        timeout : float, optional
+            Timeout for HTTP requests in seconds (default: 30.0).
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified or if required endpoints are missing.
+        """
+
         self.model_interface = model_interface
         self.protocol = protocol.lower()
         self.auth_token = auth_token
@@ -76,7 +157,30 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def infer(self, data, model_name: str, **kwargs):
+    def infer(self, data: dict, model_name: str, **kwargs) -> Any:
+        """
+        Perform inference using the specified model and input data.
+
+        Parameters
+        ----------
+        data : dict
+            The input data for inference.
+        model_name : str
+            The name of the model to use for inference.
+        kwargs : dict
+            Additional parameters for inference.
+
+        Returns
+        -------
+        Any
+            The processed inference results.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
+
         # Prepare data for inference
         prepared_data = self.model_interface.prepare_data_for_inference(data)
 
@@ -104,7 +208,23 @@ class NimClient:
         )
         return results
 
-    def _grpc_infer(self, formatted_input, model_name: str):
+    def _grpc_infer(self, formatted_input: np.ndarray, model_name: str) -> np.ndarray:
+        """
+        Perform inference using the gRPC protocol.
+
+        Parameters
+        ----------
+        formatted_input : np.ndarray
+            The input data formatted as a numpy array.
+        model_name : str
+            The name of the model to use for inference.
+
+        Returns
+        -------
+        np.ndarray
+            The output of the model as a numpy array.
+        """
+
         input_tensors = [grpcclient.InferInput("input", formatted_input.shape, datatype="FP32")]
         input_tensors[0].set_data_from_numpy(formatted_input)
 
@@ -114,7 +234,28 @@ class NimClient:
 
         return response.as_numpy("output")
 
-    def _http_infer(self, formatted_input):
+    def _http_infer(self, formatted_input: dict) -> dict:
+        """
+        Perform inference using the HTTP protocol.
+
+        Parameters
+        ----------
+        formatted_input : dict
+            The input data formatted as a dictionary.
+
+        Returns
+        -------
+        dict
+            The output of the model as a dictionary.
+
+        Raises
+        ------
+        TimeoutError
+            If the HTTP request times out.
+        requests.RequestException
+            For other HTTP-related errors.
+        """
+
         max_retries = 3
         base_delay = 2.0
         attempt = 0
@@ -177,7 +318,32 @@ def create_inference_client(
         model_interface: ModelInterface,
         auth_token: Optional[str] = None,
         infer_protocol: Optional[str] = None,
-):
+) -> NimClient:
+    """
+    Create a NimClient for interfacing with a model inference server.
+
+    Parameters
+    ----------
+    endpoints : tuple
+        A tuple containing the gRPC and HTTP endpoints.
+    model_interface : ModelInterface
+        The model interface implementation to use.
+    auth_token : str, optional
+        Authorization token for HTTP requests (default: None).
+    infer_protocol : str, optional
+        The protocol to use ("grpc" or "http"). If not specified, it is inferred from the endpoints.
+
+    Returns
+    -------
+    NimClient
+        The initialized NimClient.
+
+    Raises
+    ------
+    ValueError
+        If an invalid infer_protocol is specified.
+    """
+
     grpc_endpoint, http_endpoint = endpoints
 
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
@@ -189,45 +355,6 @@ def create_inference_client(
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
     return NimClient(model_interface, infer_protocol, endpoints, auth_token)
-
-
-# Perform inference and return predictions
-# TODO(Devin) : remove in image extract stage before deleting
-@traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def perform_model_inference(client, model_name: str, input_array: np.ndarray):
-    """
-    Perform inference using the provided model and input data.
-
-    Parameters
-    ----------
-    client : grpcclient.InferenceServerClient
-        The gRPC client to use for inference.
-    model_name : str
-        The name of the model to use for inference.
-    input_array : np.ndarray
-        The input data to feed into the model, formatted as a numpy array.
-
-    Returns
-    -------
-    np.ndarray
-        The output of the model as a numpy array.
-
-    Examples
-    --------
-    >>> client = create_inference_client("http://localhost:8000")
-    >>> input_array = np.random.rand(2, 3, 1024, 1024).astype(np.float32)
-    >>> output = perform_model_inference(client, "my_model", input_array)
-    >>> output.shape
-    (2, 1000)
-    """
-    input_tensors = [grpcclient.InferInput("input", input_array.shape, datatype="FP32")]
-    input_tensors[0].set_data_from_numpy(input_array)
-
-    outputs = [grpcclient.InferRequestedOutput("output")]
-    query_response = client.infer(model_name=model_name, inputs=input_tensors, outputs=outputs)
-    logger.debug(query_response)
-
-    return query_response.as_numpy("output")
 
 
 def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
@@ -326,7 +453,23 @@ def generate_url(url) -> str:
     return url
 
 
-def is_ready(http_endpoint, ready_endpoint) -> bool:
+def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
+    """
+    Check if the server at the given endpoint is ready.
+
+    Parameters
+    ----------
+    http_endpoint : str
+        The HTTP endpoint of the server.
+    ready_endpoint : str
+        The specific ready-check endpoint.
+
+    Returns
+    -------
+    bool
+        True if the server is ready, False otherwise.
+    """
+
     # IF the url is empty or None that means the service was not configured
     # and is therefore automatically marked as "ready"
     if http_endpoint is None or http_endpoint == "":
@@ -379,7 +522,25 @@ def is_ready(http_endpoint, ready_endpoint) -> bool:
 
 @backoff.on_predicate(backoff.expo, max_time=30)
 @multiprocessing_cache(max_calls=100)
-def get_version(http_endpoint, metadata_endpoint="/v1/metadata", version_field="version") -> str:
+def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
+    """
+    Get the version of the server from its metadata endpoint.
+
+    Parameters
+    ----------
+    http_endpoint : str
+        The HTTP endpoint of the server.
+    metadata_endpoint : str, optional
+        The metadata endpoint to query (default: "/v1/metadata").
+    version_field : str, optional
+        The field containing the version in the response (default: "version").
+
+    Returns
+    -------
+    str
+        The version of the server, or an empty string if unavailable.
+    """
+
     if http_endpoint is None or http_endpoint == "":
         return ""
 

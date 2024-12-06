@@ -6,6 +6,7 @@
 import base64
 import io
 import warnings
+from typing import Dict, Any, List, Optional
 
 import cv2
 import logging
@@ -33,10 +34,37 @@ YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
 
 # Implementing YoloxModelInterface with required methods
 class YoloxModelInterface(ModelInterface):
-    def name(self):
+    """
+    An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
+    """
+
+    def name(self) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
         return "yolox"
 
-    def prepare_data_for_inference(self, data):
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare input data for inference by resizing images and storing their original shapes.
+
+        Parameters
+        ----------
+        data : dict
+            The input data containing a list of images.
+
+        Returns
+        -------
+        dict
+            The updated data dictionary with resized images and original image shapes.
+        """
+
         original_images = data['images']
         # Our yolox model expects images to be resized to 1024x1024
         resized_images = [resize_image(image, (1024, 1024)) for image in original_images]
@@ -45,7 +73,28 @@ class YoloxModelInterface(ModelInterface):
 
         return data  # Return data with added 'resized_images' key
 
-    def format_input(self, data, protocol: str):
+    def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
+        """
+        Format input data for the specified protocol.
+
+        Parameters
+        ----------
+        data : dict
+            The input data to format.
+        protocol : str
+            The protocol to use ("grpc" or "http").
+
+        Returns
+        -------
+        Any
+            The formatted input data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
+
         if protocol == 'grpc':
             logger.debug("Formatting input for gRPC Yolox model")
             # Reorder axes to match model input (batch, channels, height, width)
@@ -104,7 +153,30 @@ class YoloxModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str, data=None):
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None) -> Any:
+        """
+        Parse the output from the model's inference response.
+
+        Parameters
+        ----------
+        response : Any
+            The response from the model inference.
+        protocol : str
+            The protocol used ("grpc" or "http").
+        data : dict, optional
+            Additional input data passed to the function.
+
+        Returns
+        -------
+        Any
+            The parsed output data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified or the response format is unexpected.
+        """
+
         if protocol == 'grpc':
             logger.debug("Parsing output from gRPC Yolox model")
             return response  # For gRPC, response is already a numpy array
@@ -186,7 +258,23 @@ class YoloxModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def process_inference_results(self, output_array, **kwargs):
+    def process_inference_results(self, output_array: np.ndarray, **kwargs) -> List[Dict[str, Any]]:
+        """
+        Process the results of the Yolox model inference and return the final annotations.
+
+        Parameters
+        ----------
+        output_array : np.ndarray
+            The raw output from the Yolox model.
+        kwargs : dict
+            Additional parameters for processing, including thresholds and number of classes.
+
+        Returns
+        -------
+        list[dict]
+            A list of annotation dictionaries for each image in the batch.
+        """
+
         original_image_shapes = kwargs.get('original_image_shapes', [])
         num_classes = kwargs.get('num_classes', YOLOX_NUM_CLASSES)
         conf_thresh = kwargs.get('conf_thresh', YOLOX_CONF_THRESHOLD)
