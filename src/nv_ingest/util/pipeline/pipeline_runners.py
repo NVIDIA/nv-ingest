@@ -285,7 +285,7 @@ def start_pipeline_subprocess():
         "MESSAGE_CLIENT_TYPE": "simple",
         "MINIO_BUCKET": "nv-ingest",
         "MRC_IGNORE_NUMA_CHECK": "1",
-        "OTEL_EXPORTER_OTLP_ENDPOINT": "otel-collector:4317",
+        "OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4317",
         "PADDLE_GRPC_ENDPOINT": "localhost:8010",
         "PADDLE_HTTP_ENDPOINT": "http://localhost:8009/v1/infer",
         "PADDLE_INFER_PROTOCOL": "grpc",

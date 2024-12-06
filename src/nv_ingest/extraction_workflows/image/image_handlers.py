@@ -30,7 +30,6 @@ from PIL import Image
 import io
 
 import numpy as np
-import tritonclient.grpc as grpcclient
 
 from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
 import nv_ingest.util.nim.yolox as yolox_utils
@@ -38,7 +37,6 @@ from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent, construct_image_metadata_from_pdf_image, \
     construct_image_metadata_from_base64
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
