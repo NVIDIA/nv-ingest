@@ -10,8 +10,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 
 This example demonstrates how to use the provided [docker-compose.yaml](docker-compose.yaml) to start all needed services with a few commands.
 
-> [!IMPORTANT]
-> NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
+**IMPORTANT:** NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
 
@@ -28,8 +27,7 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 
-> [!NOTE]
-> During the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+> **NOTE:** During the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
 
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
@@ -39,20 +37,18 @@ DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
-> [!NOTE]
-> As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
->
+> **NOTE:** As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
+
 > Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
 
-> [!IMPORTANT]
-> Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+> **IMPORTANT:** Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 5. Start all services:
 `docker compose up`
 
-> [!TIP]
-> By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
+> **TIP:** By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 
@@ -75,7 +71,6 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 +---------------------------------------------------------------------------------------+
 ```
 
-
 Observe the started containers with `docker ps`:
 ```
 CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
@@ -92,12 +87,10 @@ bda9a2a9c8b5   openzipkin/zipkin                                                
 ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
 ```
 
-> [!TIP]
-> nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+> **TIP:** NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
 > ```
 > docker compose build
 > ```
-> 
 > After the image is built, run `docker compose up` per item 5 above.
 
 ## Step 2: Installing Python Dependencies
@@ -114,8 +107,7 @@ pip install -r ./requirements.txt
 pip install .
 ```
 
-> [!NOTE]
-> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+> **NOTE:** Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
 > 
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
 > 
@@ -140,8 +132,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 - `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
 - `extract_charts` - (optional) enables or disables the use of Deplot and CACHED for chart extraction.
 
-> [!IMPORTANT]
-> `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
+> **IMPORTANT:** `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
 ### In Python 
 
@@ -293,10 +284,9 @@ Then run the following command to execute the script for inspecting the extracte
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
-> [!TIP]
-> Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
+> **TIP:** Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 >
-> Also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
+> Also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
 
 ## Repo Structure
 
@@ -344,7 +334,7 @@ To sign off on a commit you simply use the --signoff (or -s) option when committ
 $ git commit -s -m "Add cool feature."
 ```
 
-This will append the following to your commit message:
+This appends the following to your commit message:
 
 ```
 Signed-off-by: Your Name <your@email.com>
