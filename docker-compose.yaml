@@ -147,7 +147,7 @@ services:
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - INGEST_LOG_LEVEL=DEBUG
+      - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       - MESSAGE_CLIENT_HOST=0.0.0.0
       - MESSAGE_CLIENT_PORT=7671
