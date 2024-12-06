@@ -52,7 +52,7 @@ def run_ingestor():
 def main():
     try:
         # Start the pipeline subprocess
-        start_pipeline_subprocess()
+        pipeline_process = start_pipeline_subprocess()
 
         # Optionally, wait a bit before starting the ingestor to ensure the pipeline is ready
         time.sleep(10)
@@ -60,7 +60,10 @@ def main():
         # Run ingestion after starting the pipeline
         run_ingestor()
 
+        pipeline_process.wait()
+
         # The main program will exit, and the atexit handler will terminate the subprocess group
+
     except Exception as e:
         logger.error(f"Error running pipeline subprocess or ingestion: {e}")
 

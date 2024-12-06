@@ -143,6 +143,13 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
 
     _ = task_props  # unused
 
+    if trace_info is None:
+        trace_info = {}
+        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
+
+    if df.empty:
+        return df, trace_info
+
     stage_config = validated_config.stage_config
     cached_client, deplot_client = _create_clients(stage_config.cached_endpoints, stage_config.cached_infer_protocol,
                                                    stage_config.deplot_endpoints, stage_config.deplot_infer_protocol,
@@ -205,8 +212,6 @@ def generate_chart_extractor_stage(
         A configured Morpheus stage with an applied worker function that handles chart data extraction
         from PDF content.
     """
-
-    logger.debug(f"STAGE CONFIG: {stage_config}")
 
     validated_config = ChartExtractorSchema(**stage_config)
     _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)

@@ -121,11 +121,14 @@ def _extract_table_data(
 
     _ = task_props  # unused
 
-    stage_config = validated_config.stage_config
-
     if trace_info is None:
         trace_info = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
+
+    if df.empty:
+        return df, trace_info
+
+    stage_config = validated_config.stage_config
 
     paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
 
