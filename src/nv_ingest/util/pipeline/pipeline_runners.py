@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import atexit
 import os
 import json
@@ -30,6 +31,22 @@ logger = logging.getLogger(__name__)
 
 
 def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:
+    """
+    Launches the pipeline setup and runs it synchronously.
+
+    Parameters
+    ----------
+    morpheus_pipeline_config : Config
+        The configuration object for the Morpheus pipeline.
+    ingest_config : dict
+        The ingestion configuration dictionary.
+
+    Returns
+    -------
+    float
+        The total time elapsed for pipeline execution in seconds.
+    """
+
     logger.info("Starting pipeline setup")
 
     pipe = Pipeline(morpheus_pipeline_config)
@@ -58,16 +75,24 @@ def run_pipeline(morpheus_pipeline_config, ingest_config) -> float:
     """
     Runs the pipeline synchronously in the current process.
 
-    Parameters:
-        morpheus_pipeline_config: The configuration object for the Morpheus pipeline.
-        ingest_config: The ingestion configuration dictionary.
+    Parameters
+    ----------
+    morpheus_pipeline_config : Config
+        The configuration object for the Morpheus pipeline.
+    ingest_config : dict
+        The ingestion configuration dictionary.
 
-    Returns:
-        float: The total elapsed time for running the pipeline.
+    Returns
+    -------
+    float
+        The total elapsed time for running the pipeline.
 
-    Raises:
-        Exception: Any exception raised during pipeline execution.
+    Raises
+    ------
+    Exception
+        Any exception raised during pipeline execution.
     """
+
     total_elapsed = _launch_pipeline(morpheus_pipeline_config, ingest_config)
     logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
     return total_elapsed
@@ -88,18 +113,35 @@ def run_ingest_pipeline(
     """
     Configures and runs the pipeline with specified options.
 
-    Parameters:
-        ingest_config_path (str): Path to the JSON configuration file.
-        caption_batch_size (int): Number of captions to process in a batch.
-        use_cpp (bool): Use C++ backend.
-        pipeline_batch_size (int): Batch size for the pipeline.
-        enable_monitor (bool): Enable monitoring.
-        feature_length (int): Feature length.
-        num_threads (int): Number of threads.
-        model_max_batch_size (int): Model max batch size.
-        mode (str): Pipeline mode.
-        log_level (str): Log level.
+    Parameters
+    ----------
+    ingest_config_path : str, optional
+        Path to the JSON configuration file.
+    caption_batch_size : int, optional
+        Number of captions to process in a batch (default: 8).
+    use_cpp : bool, optional
+        Use C++ backend (default: False).
+    pipeline_batch_size : int, optional
+        Batch size for the pipeline (default: 256).
+    enable_monitor : bool, optional
+        Enable monitoring (default: False).
+    feature_length : int, optional
+        Feature length (default: 512).
+    num_threads : int, optional
+        Number of threads (default: determined by `get_default_cpu_count`).
+    model_max_batch_size : int, optional
+        Model max batch size (default: 256).
+    mode : str, optional
+        Pipeline mode (default: PipelineModes.NLP.value).
+    log_level : str, optional
+        Log level (default: 'INFO').
+
+    Raises
+    ------
+    ValidationError
+        If the configuration validation fails.
     """
+
     if num_threads is None:
         num_threads = get_default_cpu_count()
 
@@ -162,9 +204,15 @@ def run_ingest_pipeline(
 
 def _set_pdeathsig(sig=signal.SIGTERM):
     """
-    Set the parent death signal so that if the parent process dies, the child
+    Sets the parent death signal so that if the parent process dies, the child
     receives `sig`. This is Linux-specific.
+
+    Parameters
+    ----------
+    sig : int
+        The signal to be sent to the child process upon parent termination (default: SIGTERM).
     """
+
     try:
         libc = CDLL("libc.so.6", use_errno=True)
         PR_SET_PDEATHSIG = 1
@@ -178,9 +226,15 @@ def _set_pdeathsig(sig=signal.SIGTERM):
 
 def terminate_subprocess(process):
     """
-    Terminate the pipeline subprocess and its entire process group.
+    Terminates the pipeline subprocess and its entire process group.
     Sends SIGTERM followed by SIGKILL if necessary.
+
+    Parameters
+    ----------
+    process : subprocess.Popen
+        The subprocess object to terminate.
     """
+
     if process and process.poll() is None:
         logger.info("Terminating pipeline subprocess group...")
         try:
@@ -201,10 +255,16 @@ def terminate_subprocess(process):
 
 def start_pipeline_subprocess():
     """
-    Launch the pipeline in a subprocess and ensure that it terminates
+    Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
-    including signal handling and atexit registration.
+    including signal handling and `atexit` registration.
+
+    Returns
+    -------
+    subprocess.Popen
+        The subprocess object for the launched pipeline.
     """
+
     # Define the command to invoke the subprocess_entrypoint API function
     subprocess_command = [
         sys.executable,
@@ -295,9 +355,17 @@ def start_pipeline_subprocess():
 
 def read_stream(stream, prefix):
     """
-    Read lines from a subprocess stream (stdout or stderr) and print them with a prefix.
+    Reads lines from a subprocess stream (stdout or stderr) and prints them with a prefix.
     This function runs in a separate daemon thread.
+
+    Parameters
+    ----------
+    stream : IO
+        The stream object to read from.
+    prefix : str
+        The prefix to prepend to each line of output.
     """
+
     try:
         for line in iter(stream.readline, ''):
             if line:
@@ -312,7 +380,13 @@ def subprocess_entrypoint():
     """
     Entry point for the pipeline subprocess.
     Configures logging and runs the ingest pipeline.
+
+    Raises
+    ------
+    Exception
+        Any exception raised during pipeline execution.
     """
+
     # Configure logging to output to stdout with no buffering
     logging.basicConfig(
         level=logging.DEBUG,

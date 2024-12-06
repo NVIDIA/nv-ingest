@@ -1,11 +1,11 @@
-from typing import Tuple, Optional
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from unittest.mock import Mock, patch
-import cv2
 import numpy as np
 import packaging.version
 import pytest
-import sys
-import types
 
 import requests
 
@@ -29,7 +29,7 @@ class MockModelInterface:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response, protocol: str):
+    def parse_output(self, response, protocol: str, data):
         # Simulate parsing the output
         return f"parsed_output_{protocol}"
 

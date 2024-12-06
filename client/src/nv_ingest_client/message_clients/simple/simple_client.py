@@ -26,6 +26,29 @@ class SimpleClient(MessageBrokerClientBase):
 
     def __init__(self, host: str, port: int, db: int = 0, max_retries: int = 3, max_backoff: int = 32,
                  connection_timeout: int = 300, max_pool_size: int = 128, use_ssl: bool = False):
+        """
+        Initialize a SimpleClient instance with configuration for message broker connection.
+
+        Parameters
+        ----------
+        host : str
+            The hostname or IP address of the broker.
+        port : int
+            The port number of the broker.
+        db : int, optional
+            The database index to connect to (default is 0).
+        max_retries : int, optional
+            Maximum number of retries for operations (default is 3).
+        max_backoff : int, optional
+            Maximum backoff time in seconds for retries (default is 32).
+        connection_timeout : int, optional
+            Timeout in seconds for establishing a connection (default is 300).
+        max_pool_size : int, optional
+            Maximum pool size for socket connections (default is 128).
+        use_ssl : bool, optional
+            Whether to use SSL for connections (default is False).
+        """
+
         self._host = host
         self._port = port
         self._db = db
@@ -36,27 +59,114 @@ class SimpleClient(MessageBrokerClientBase):
         self._use_ssl = use_ssl
 
     def get_client(self):
+        """
+        Get the current instance of the SimpleClient.
+
+        Returns
+        -------
+        SimpleClient
+            The current instance of SimpleClient.
+        """
+
         return self
 
     def submit_message(self, queue_name: str, message: str, timeout: Optional[float] = None,
                        for_nv_ingest: bool = False) -> ResponseSchema:
+        """
+        Submit a message to the specified queue.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue to submit the message to.
+        message : str
+            The message to submit.
+        timeout : float, optional
+            Timeout in seconds for the operation (default is None).
+        for_nv_ingest : bool, optional
+            Whether this is a specialized NV ingest operation (default is False).
+
+        Returns
+        -------
+        ResponseSchema
+            The response from the message broker.
+        """
+
         return self._handle_push(queue_name, message, timeout, for_nv_ingest)
 
     def fetch_message(self, queue_name: str, timeout: Optional[float] = None) -> ResponseSchema:
+        """
+        Fetch a message from the specified queue.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue to fetch the message from.
+        timeout : float, optional
+            Timeout in seconds for the operation (default is None).
+
+        Returns
+        -------
+        ResponseSchema
+            The response containing the fetched message or an error.
+        """
+
         return self._handle_pop(queue_name, timeout)
 
     def ping(self) -> ResponseSchema:
+        """
+        Ping the message broker to check connectivity.
+
+        Returns
+        -------
+        ResponseSchema
+            The response indicating success or failure.
+        """
+
         command = {"command": "PING"}
         return self._execute_simple_command(command)
 
     def size(self, queue_name: str) -> ResponseSchema:
-        """Fetches the current number of items in the specified queue."""
+        """
+        Fetch the current number of items in the specified queue.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue.
+
+        Returns
+        -------
+        ResponseSchema
+            The response containing the size of the queue or an error.
+        """
+
         command = {"command": "SIZE", "queue_name": queue_name}
+
         return self._execute_simple_command(command)
 
     def _handle_push(self, queue_name: str, message: str, timeout: Optional[float],
                      for_nv_ingest: bool) -> ResponseSchema:
-        """Push a message to the queue, respecting the specified timeout."""
+        """
+        Push a message to the queue, respecting the specified timeout.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue.
+        message : str
+            The message to push.
+        timeout : float, optional
+            Timeout in seconds for the operation.
+        for_nv_ingest : bool
+            Whether this is a specialized NV ingest operation.
+
+        Returns
+        -------
+        ResponseSchema
+            The response from the message broker.
+        """
+
         if (not queue_name or not isinstance(queue_name, str)):
             return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
         if (not message or not isinstance(message, str)):
@@ -120,7 +230,22 @@ class SimpleClient(MessageBrokerClientBase):
             time.sleep(0.5)  # Backoff delay before retry
 
     def _handle_pop(self, queue_name: str, timeout: Optional[float]) -> ResponseSchema:
-        """Pop a message from the queue, respecting the specified timeout."""
+        """
+        Pop a message from the queue, respecting the specified timeout.
+
+        Parameters
+        ----------
+        queue_name : str
+            The name of the queue.
+        timeout : float, optional
+            Timeout in seconds for the operation.
+
+        Returns
+        -------
+        ResponseSchema
+            The response containing the fetched message or an error.
+        """
+
         if not queue_name or not isinstance(queue_name, str):
             return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
 
@@ -180,7 +305,20 @@ class SimpleClient(MessageBrokerClientBase):
             time.sleep(0.1)  # Backoff delay before retry
 
     def _execute_simple_command(self, command: dict) -> ResponseSchema:
-        """Send a simple command (without handshake) to the broker and process the response."""
+        """
+        Send a simple command (without handshake) to the broker and process the response.
+
+        Parameters
+        ----------
+        command : dict
+            The command to send to the broker.
+
+        Returns
+        -------
+        ResponseSchema
+            The response from the broker.
+        """
+
         if isinstance(command, dict):
             data = json.dumps(command).encode('utf-8')
         elif isinstance(command, str):
@@ -200,7 +338,22 @@ class SimpleClient(MessageBrokerClientBase):
             return ResponseSchema(response_code=1, response_reason=str(e))
 
     def _send(self, sock: socket.socket, data: bytes) -> None:
-        """Send data with a length header over the socket."""
+        """
+        Send data with a length header over the socket.
+
+        Parameters
+        ----------
+        sock : socket.socket
+            The socket connection to use.
+        data : bytes
+            The data to send.
+
+        Raises
+        ------
+        ConnectionError
+            If sending the data fails.
+        """
+
         total_length = len(data)
         if total_length == 0:
             raise ValueError("Cannot send an empty message.")
@@ -212,7 +365,25 @@ class SimpleClient(MessageBrokerClientBase):
             raise ConnectionError("Failed to send data.")
 
     def _recv(self, sock: socket.socket) -> str:
-        """Receive data based on the length header from the socket."""
+        """
+        Receive data based on the length header from the socket.
+
+        Parameters
+        ----------
+        sock : socket.socket
+            The socket connection to use.
+
+        Returns
+        -------
+        str
+            The received data.
+
+        Raises
+        ------
+        ConnectionError
+            If receiving the data fails.
+        """
+
         try:
             length_header = self._recv_exact(sock, 8)
             if not length_header:
@@ -226,7 +397,22 @@ class SimpleClient(MessageBrokerClientBase):
             raise ConnectionError("Failed to receive data.")
 
     def _recv_exact(self, sock: socket.socket, num_bytes: int) -> Optional[bytes]:
-        """Helper method to receive an exact number of bytes."""
+        """
+        Helper method to receive an exact number of bytes.
+
+        Parameters
+        ----------
+        sock : socket.socket
+            The socket connection to use.
+        num_bytes : int
+            The exact number of bytes to receive.
+
+        Returns
+        -------
+        Optional[bytes]
+            The received bytes, or None if an error occurs.
+        """
+
         data = bytearray()
         while len(data) < num_bytes:
             try:
