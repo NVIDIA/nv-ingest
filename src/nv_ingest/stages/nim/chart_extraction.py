@@ -2,22 +2,24 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
+from nv_ingest.util.nim.helpers import call_image_inference_model
+from nv_ingest.util.nim.helpers import create_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -62,7 +64,8 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
     # Only modify if content type is structured and subtype is 'chart' and chart_metadata exists
     if ((content_metadata.get("type") != "structured") or
             (content_metadata.get("subtype") != "chart") or
-            (chart_metadata is None)):
+            (chart_metadata is None) or
+            (chart_metadata.get("table_format") != TableFormatEnum.IMAGE)):
         return metadata
 
     # Modify chart metadata with the result from the inference model

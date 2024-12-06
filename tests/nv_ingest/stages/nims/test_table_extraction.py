@@ -101,7 +101,8 @@ def sample_dataframe(base64_encoded_image):
                 "subtype": "table"
             },
             "table_metadata": {
-                "table_content": ""
+                "table_content": "",
+                "table_format": "image",
             }
         }]
     }

@@ -4,6 +4,7 @@
 
 import logging
 import re
+import time
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -74,7 +75,7 @@ def create_inference_client(
 
 
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def call_image_inference_model(client, model_name: str, image_data):
+def call_image_inference_model(client, model_name: str, image_data: np.ndarray):
     """
     Calls an image inference model using the provided client.
 
@@ -107,9 +108,10 @@ def call_image_inference_model(client, model_name: str, image_data):
     return response
 
 
-def _call_image_inference_grpc_client(client, model_name: str, image_data):
+def _call_image_inference_grpc_client(client, model_name: str, image_data: np.ndarray):
     if image_data.ndim == 3:
         image_data = np.expand_dims(image_data, axis=0)
+
     inputs = [grpcclient.InferInput("input", image_data.shape, "FP32")]
     inputs[0].set_data_from_numpy(image_data.astype(np.float32))
 
@@ -118,17 +120,20 @@ def _call_image_inference_grpc_client(client, model_name: str, image_data):
     try:
         result = client.infer(model_name=model_name, inputs=inputs, outputs=outputs)
         return " ".join([output[0].decode("utf-8") for output in result.as_numpy("output")])
+
     except Exception as e:
         err_msg = f"Inference failed for model {model_name}: {str(e)}"
         logger.error(err_msg)
         raise RuntimeError(err_msg)
 
 
-def _call_image_inference_http_client(client, model_name: str, image_data):
+def _call_image_inference_http_client(client, model_name: str, image_data: np.ndarray):
     base64_img = numpy_to_base64(image_data)
 
     if model_name == "deplot":
         payload = _prepare_deplot_payload(base64_img)
+    elif model_name == "doughnut":
+        payload = _prepare_doughnut_payload(base64_img)
     elif model_name in {"paddle", "cached", "yolox"}:
         payload = _prepare_nim_payload(base64_img)
     else:
@@ -141,8 +146,11 @@ def _call_image_inference_http_client(client, model_name: str, image_data):
         response = requests.post(url, json=payload, headers=headers)
         response.raise_for_status()  # Raise an exception for HTTP errors
 
-        # Parse the JSON response
-        json_response = response.json()
+        if (response.status_code) == 202 and ("nvcf-reqid" in response.headers):
+            req_id = response.headers.get("nvcf-reqid")
+            json_response = _repoll_image_inference_http_client(url, req_id, payload=payload, headers=headers)
+        else:
+            json_response = response.json()
 
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"HTTP request failed: {e}")
@@ -151,12 +159,58 @@ def _call_image_inference_http_client(client, model_name: str, image_data):
     except Exception as e:
         raise RuntimeError(f"An error occurred during inference: {e}")
 
-    if model_name == "deplot":
-        result = _extract_content_from_deplot_response(json_response)
+    if model_name in {"deplot", "doughnut"}:
+        result = _extract_content_from_vlm_nim_response(json_response)
     else:
-        result = _extract_content_from_nim_response(json_response)
+        result = _extract_content_from_image_nim_response(json_response)
 
     return result
+
+
+def _repoll_image_inference_http_client(url, req_id, payload=None, headers=None, max_retries=100, poll_interval=3):
+    # Construct the base URL dynamically from the original URL
+    if "/v2/nvcf/pexec/functions" in url:
+        base_url = url.split("/pexec/functions")[0]
+    else:
+        raise ValueError("The endpoint URL does not contain the expected path structure.")
+
+    poll_url = f"{base_url}/exec/status/{req_id}"
+
+    poll_headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if "Authorization" in headers:
+        poll_headers.update({"Authorization": headers.get("Authorization")})
+
+    retry_count = 0
+
+    while retry_count < max_retries:
+        response = requests.get(poll_url, headers=poll_headers)
+
+        # Handle 404 by obtaining a new req_id if the request was pending too long
+        if (response.status_code == 404) and (payload is not None):
+            logger.debug("Received 404 (request might have been pending too long). Retrying.")
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+
+            if (response.status_code) == 202 and ("nvcf-reqid" in response.headers):
+                req_id = response.headers.get("nvcf-reqid")
+                retry_count += 1
+                continue
+            else:
+                # If we get a final response, return it
+                return response.json()
+
+        response.raise_for_status()
+
+        if response.status_code != 202:
+            return response.json().get("response")
+
+        time.sleep(poll_interval)
+        retry_count += 1
+
+    raise RuntimeError("Maximum number of retries reached without a final response.")
 
 
 def _prepare_deplot_payload(
@@ -184,6 +238,22 @@ def _prepare_deplot_payload(
     return payload
 
 
+def _prepare_doughnut_payload(base64_img: str) -> Dict[str, Any]:
+    messages = [
+        {
+            "role": "user",
+            "content": "<s><output_markdown><predict_bbox><predict_classes>"
+            f'<img src="data:image/png;base64,{base64_img}" />',
+        }
+    ]
+    payload = {
+        "model": "nvidia/eclair",
+        "messages": messages,
+    }
+
+    return payload
+
+
 def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
     image_url = f"data:image/png;base64,{base64_img}"
     image = {"type": "image_url", "image_url": {"url": image_url}}
@@ -194,7 +264,7 @@ def _prepare_nim_payload(base64_img: str) -> Dict[str, Any]:
     return payload
 
 
-def _extract_content_from_deplot_response(json_response):
+def _extract_content_from_vlm_nim_response(json_response):
     # Validate the response structure
     if "choices" not in json_response or not json_response["choices"]:
         raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
@@ -202,7 +272,7 @@ def _extract_content_from_deplot_response(json_response):
     return json_response["choices"][0]["message"]["content"]
 
 
-def _extract_content_from_nim_response(json_response):
+def _extract_content_from_image_nim_response(json_response):
     if "data" not in json_response or not json_response["data"]:
         raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 
@@ -211,7 +281,11 @@ def _extract_content_from_nim_response(json_response):
 
 # Perform inference and return predictions
 @traceable_func(trace_name="pdf_content_extractor::{model_name}")
-def perform_model_inference(client, model_name: str, input_array: np.ndarray):
+def perform_model_inference(
+    client,
+    model_name: str,
+    input_array: np.ndarray,
+):
     """
     Perform inference using the provided model and input data.
 
