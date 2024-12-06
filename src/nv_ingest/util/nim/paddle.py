@@ -152,7 +152,7 @@ class PaddleOCRModelInterface(ModelInterface):
 
         if (protocol == 'grpc'):
             logger.debug("Parsing output from gRPC PaddleOCR model")
-            return self._extract_content_from_paddle_grpc_response(response)
+            return self._extract_content_from_paddle_grpc_response(response, table_content_format)
         elif (protocol == 'http'):
             logger.debug("Parsing output from HTTP PaddleOCR model")
             return self._extract_content_from_paddle_http_response(response, table_content_format)
