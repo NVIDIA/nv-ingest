@@ -64,6 +64,9 @@ To get started using NVIDIA Ingest, you need to do a few things:
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
+Optional:
+1. [Direct Library Deployment](docs/deployment.md) 📦
+
 ### Step 1: Starting containers
 
 This example demonstrates how to use the provided [docker-compose.yaml](docker-compose.yaml) to start all needed services with a few commands.

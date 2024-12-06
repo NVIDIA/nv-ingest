@@ -141,7 +141,7 @@ RUN source activate nv_ingest \
 
 FROM nv_ingest_install AS runtime
 
-COPY src/pipeline.py ./
+COPY src/microservice_entrypoint.py ./
 COPY pyproject.toml ./
 
 RUN chmod +x /workspace/docker/entrypoint.sh
@@ -150,7 +150,7 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
 # Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
-CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
+CMD ["sh", "-c", "python /workspace/microservice_entrypoint.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM nv_ingest_install AS development
 

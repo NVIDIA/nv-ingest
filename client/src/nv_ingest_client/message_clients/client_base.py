@@ -2,10 +2,17 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# NOTE: This code is duplicated from the ingest service:
+# src/nv_ingest/util/message_brokers/client_base.py
+# Eventually we should move all client wrappers for the message broker into a shared library that both the ingest
+# service and the client can use.
+
 from abc import ABC
 from abc import abstractmethod
+from typing import Any
 
-class MessageClientBase(ABC):
+
+class MessageBrokerClientBase(ABC):
     """
     Abstract base class for a messaging client to interface with various messaging systems.
 
@@ -15,15 +22,15 @@ class MessageClientBase(ABC):
 
     @abstractmethod
     def __init__(
-        self,
-        host: str,
-        port: int,
-        db: int = 0,
-        max_retries: int = 0,
-        max_backoff: int = 32,
-        connection_timeout: int = 300,
-        max_pool_size: int = 128,
-        use_ssl: bool = False,
+            self,
+            host: str,
+            port: int,
+            db: int = 0,
+            max_retries: int = 0,
+            max_backoff: int = 32,
+            connection_timeout: int = 300,
+            max_pool_size: int = 128,
+            use_ssl: bool = False,
     ):
         """
         Initialize the messaging client with connection parameters.
@@ -48,7 +55,7 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def fetch_message(self, job_index: str, timeout: float = 0) -> str:
+    def fetch_message(self, job_index: str, timeout: float = 0) -> Any:
         """
         Fetches a message from the specified queue with retries on failure.
 
@@ -61,11 +68,12 @@ class MessageClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str) -> str:
+    def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> Any:
         """
         Submits a message to a specified queue with retries on failure.
 
         Parameters:
             channel_name (str): The name of the queue to submit the message to.
             message (str): The message to submit.
+            for_nv_ingest (bool): Whether the message is expected to be consumed by NV Ingest.
         """

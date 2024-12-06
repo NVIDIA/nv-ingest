@@ -16,20 +16,21 @@ from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
-from redis import RedisError
 
-from nv_ingest.schemas.redis_task_sink_schema import RedisTaskSinkSchema
+from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
+from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+from nv_ingest.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
 
 logger = logging.getLogger(__name__)
 
-MODULE_NAME = "redis_task_sink"
+MODULE_NAME = "message_broker_task_sink"
 MODULE_NAMESPACE = "nv_ingest"
 
-RedisTaskSinkLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
+MessageBrokerTaskSinkLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
 
 
 def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
@@ -48,7 +49,7 @@ def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
     """
     try:
         with message.payload().mutable_dataframe() as mdf:
-            logger.debug(f"Redis Sink Received DataFrame with {len(mdf)} rows.")
+            logger.debug(f"Message broker sink Received DataFrame with {len(mdf)} rows.")
             keep_cols = ["document_type", "metadata"]
             return mdf, mdf[keep_cols].to_pandas().to_dict(orient="records")
     except Exception as err:
@@ -158,22 +159,22 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
 
         ret_val_json_list.append(ret_val_json)
 
-    logger.debug(f"Redis Sink Created {len(ret_val_json_list)} JSON payloads.")
+    logger.debug(f"Message broker sink created {len(ret_val_json_list)} JSON payloads.")
 
     return ret_val_json_list
 
 
-def push_to_redis(redis_client: RedisClient, response_channel: str, json_payloads: List[str],
-                  retry_count: int = 2) -> None:
+def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str, json_payloads: List[str],
+                   retry_count: int = 2) -> None:
     """
-    Attempts to push a JSON payload to a Redis channel, retrying on failure up to a specified number of attempts.
+    Attempts to push a JSON payload to a message broker channel, retrying on failure up to a specified number of attempts.
 
     Parameters
     ----------
-    redis_client : RedisClient
-        The Redis client used to push the data.
+    broker_client : MessageBrokerClient
+        The broker client used to push the data.
     response_channel : str
-        The Redis channel to which the data is pushed.
+        The broker channel to which the data is pushed.
     json_payload : str
         The JSON string payload to be pushed.
     retry_count : int, optional
@@ -185,8 +186,8 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
 
     Raises
     ------
-    RedisError
-        If pushing to Redis fails after the specified number of retries.
+    Valuerror
+        If pushing to the message broker fails after the specified number of retries.
     """
 
     for json_payload in json_payloads:
@@ -194,38 +195,38 @@ def push_to_redis(redis_client: RedisClient, response_channel: str, json_payload
         size_limit = 2 ** 28  # 256 MB
 
         if payload_size > size_limit:
-            raise RedisError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
+            raise ValueError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
 
     for attempt in range(retry_count):
         try:
             for json_payload in json_payloads:
-                redis_client.get_client().rpush(response_channel, json_payload)
+                broker_client.submit_message(response_channel, json_payload)
 
-            logger.debug(f"Redis Sink Forwarded message to Redis channel '{response_channel}'.")
+            logger.debug(f"Message broker sink forwarded message to broker channel '{response_channel}'.")
+
             return
-        except RedisError as e:
+        except ValueError as e:
             logger.warning(f"Attempt {attempt + 1} failed: {e}")
             if attempt == retry_count - 1:
                 raise
 
 
 def handle_failure(
-        redis_client: Any,
+        broker_client: MessageBrokerClientBase,
         response_channel: str,
         json_result_fragments: List[Dict[str, Any]],
         e: Exception,
         mdf_size: int
 ) -> None:
     """
-    Handles failure scenarios by logging the error and pushing a failure message to a Redis channel.
+    Handles failure scenarios by logging the error and pushing a failure message to a broker channel.
 
     Parameters
     ----------
-    redis_client : Any
-        A Redis client instance capable of interacting with Redis.
-        It should have a `get_client()` method that returns a client object with an `rpush()` method.
+    broker_client : Any
+        A MessageBrokerClientBase instance.
     response_channel : str
-        The Redis channel to which the failure message will be sent.
+        The broker channel to which the failure message will be sent.
     json_result_fragments : List[Dict[str, Any]]
         A list of JSON result fragments, where each fragment is a dictionary containing the results of the operation.
         The first fragment is used to extract trace data in the failure message.
@@ -237,7 +238,8 @@ def handle_failure(
     Returns
     -------
     None
-        This function does not return any value. It handles the failure by logging the error and sending a message to Redis.
+        This function does not return any value. It handles the failure by logging the error and sending a message to
+        the message broker.
 
     Notes
     -----
@@ -247,39 +249,39 @@ def handle_failure(
 
     Examples
     --------
-    >>> redis_client = SomeRedisClient()
+    >>> broker_client = RedisClient()
     >>> response_channel = "response_channel_name"
     >>> json_result_fragments = [{"trace": {"event_1": 123456789}}]
     >>> e = Exception("Network failure")
     >>> mdf_size = 1000
-    >>> handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
+    >>> handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)
     """
     error_description = (
-        f"Failed to forward message to Redis after retries: {e}. "
+        f"Failed to forward message to message broker after retries: {e}. "
         f"Payload size: {sys.getsizeof(json.dumps(json_result_fragments)) / 1e6} MB, Rows: {mdf_size}"
     )
     logger.error(error_description)
 
-    # Construct a failure message and push it to Redis
+    # Construct a failure message and push it to the message broker
     fail_msg = {
         "data": None,
         "status": "failed",
         "description": error_description,
         "trace": json_result_fragments[0].get("trace", {}),
     }
-    redis_client.get_client().rpush(response_channel, json.dumps(fail_msg))
+    broker_client.submit_message(response_channel, json.dumps(fail_msg))
 
 
-def process_and_forward(message: ControlMessage, redis_client: RedisClient) -> ControlMessage:
+def process_and_forward(message: ControlMessage, broker_client: MessageBrokerClientBase) -> ControlMessage:
     """
-    Processes a message by extracting data, creating a JSON payload, and attempting to push it to Redis.
+    Processes a message by extracting data, creating a JSON payload, and attempting to push it to the message broker.
 
     Parameters
     ----------
     message : ControlMessage
         The message to process.
-    redis_client : RedisClient
-        The Redis client used for pushing data.
+    broker_client : MessageBrokerClientBase
+        The message broker client used for pushing data.
 
     Returns
     -------
@@ -305,31 +307,29 @@ def process_and_forward(message: ControlMessage, redis_client: RedisClient) -> C
 
         json_payloads = [json.dumps(fragment) for fragment in json_result_fragments]
         annotate_cm(message, message="Pushed")
-        push_to_redis(redis_client, response_channel, json_payloads)
-    except RedisError as e:
+        push_to_broker(broker_client, response_channel, json_payloads)
+    except ValueError as e:
         mdf_size = len(mdf) if not mdf.empty else 0
-        handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
+        handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
         traceback.print_exc()
         logger.error(f"Critical error processing message: {e}")
 
         mdf_size = len(mdf) if not mdf.empty else 0
-        handle_failure(redis_client, response_channel, json_result_fragments, e, mdf_size)
+        handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)
 
     return message
 
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
-def _redis_task_sink(builder: mrc.Builder) -> None:
+def _message_broker_task_sink(builder: mrc.Builder) -> None:
     """
-    Configures and registers a processing node for message handling, including Redis task sinking within a modular
-    processing chain. This function initializes a Redis client based on provided configuration, wraps the
-    `process_and_forward` function for message processing, and sets up a processing node.
+    Configures and registers a processing node for message handling, including message broker task sinking.
 
     Parameters
     ----------
     builder : mrc.Builder
-        The modular processing chain builder to which the Redis task sink node will be added.
+        The modular processing chain builder to which the message broker task sink node will be added.
 
     Returns
     -------
@@ -339,21 +339,35 @@ def _redis_task_sink(builder: mrc.Builder) -> None:
     -----
     This setup applies necessary decorators for failure handling and trace tagging. The node is then registered as
     both an input and an output module in the builder, completing the setup for message processing and
-    forwarding to Redis. It ensures that all messages passed through this node are processed and forwarded
-    efficiently with robust error handling and connection management to Redis.
+    forwarding to the message broker. It ensures that all messages passed through this node are processed and forwarded
+    efficiently with robust error handling and connection management to the message broker.
     """
-    validated_config = fetch_and_validate_module_config(builder, RedisTaskSinkSchema)
 
-    # Initialize RedisClient with the validated configuration
-    redis_client = RedisClient(
-        host=validated_config.redis_client.host,
-        port=validated_config.redis_client.port,
-        db=0,  # Assuming DB is always 0 for simplicity; make configurable if needed
-        max_retries=validated_config.redis_client.max_retries,
-        max_backoff=validated_config.redis_client.max_backoff,
-        connection_timeout=validated_config.redis_client.connection_timeout,
-        use_ssl=validated_config.redis_client.use_ssl,
-    )
+    validated_config = fetch_and_validate_module_config(builder, MessageBrokerTaskSinkSchema)
+    # Determine the client type and create the appropriate client
+    client_type = validated_config.broker_client.client_type.lower()
+    broker_params = validated_config.broker_client.broker_params
+
+    if (client_type == "redis"):
+        client = RedisClient(
+            host=validated_config.broker_client.host,
+            port=validated_config.broker_client.port,
+            db=broker_params.get("db", 0),
+            max_retries=validated_config.broker_client.max_retries,
+            max_backoff=validated_config.broker_client.max_backoff,
+            connection_timeout=validated_config.broker_client.connection_timeout,
+            use_ssl=broker_params.get("use_ssl", False),
+        )
+    elif (client_type == "simple"):
+        client = SimpleClient(
+            host=validated_config.broker_client.host,
+            port=validated_config.broker_client.port,
+            max_retries=validated_config.broker_client.max_retries,
+            max_backoff=validated_config.broker_client.max_backoff,
+            connection_timeout=validated_config.broker_client.connection_timeout,
+        )
+    else:
+        raise ValueError(f"Unsupported client_type: {client_type}")
 
     @traceable(MODULE_NAME)
     def _process_and_forward(message: ControlMessage) -> ControlMessage:
@@ -363,14 +377,14 @@ def _redis_task_sink(builder: mrc.Builder) -> None:
         Parameters
         ----------
         message : ControlMessage
-            The message to be processed and forwarded to Redis.
+            The message to be processed and forwarded to the message broker.
 
         Returns
         -------
         ControlMessage
-            The processed message, after attempting to forward to Redis.
+            The processed message, after attempting to forward to the message broker.
         """
-        return process_and_forward(message, redis_client)
+        return process_and_forward(message, client)
 
     process_node = builder.make_node("process_and_forward", ops.map(_process_and_forward))
     process_node.launch_options.engines_per_pe = validated_config.progress_engines
