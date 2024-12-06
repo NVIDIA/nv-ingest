@@ -17,6 +17,8 @@ from nv_ingest_client.cli.util.click import pre_process_dataset
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
+
 
 _MODULE_UNDER_TEST = "nv_ingest_client.cli.util.click"
 
@@ -115,6 +117,15 @@ def test_validate_task_with_valid_store_task():
 
     assert "store" in result
     assert isinstance(result["store"], StoreTask)
+
+
+def test_validate_task_with_valid_store_task():
+    """Test with valid stor task options."""
+    value = ['store_embedding:{"endpoint": "localhost:9000"}']
+    result = click_validate_task(None, None, value)
+
+    assert "store_embedding" in result
+    assert isinstance(result["store_embedding"], StoreEmbedTask)
 
 
 def test_validate_task_with_invalid_task_type():

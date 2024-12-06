@@ -44,6 +44,7 @@ class TaskTypeEnum(str, Enum):
     filter = "filter"
     split = "split"
     store = "store"
+    store_embedding = "store_embedding"
     vdb_upload = "vdb_upload"
     table_data_extract = "table_data_extract"
     chart_data_extract = "chart_data_extract"
@@ -88,6 +89,9 @@ class IngestTaskExtractSchema(BaseModelNoExt):
             raise ValueError(f"{v} is not a valid DocumentTypeEnum value")
 
 
+class IngestTaskStoreEmbedSchema(BaseModelNoExt):
+    params: dict
+
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
@@ -130,6 +134,9 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
+    bulk_ingest: bool = False
+    bulk_ingest_path: str = None
+    params: dict = None
     filter_errors: bool = True
 
 
@@ -146,6 +153,7 @@ class IngestTaskSchema(BaseModelNoExt):
     task_properties: Union[
         IngestTaskSplitSchema,
         IngestTaskExtractSchema,
+        IngestTaskStoreEmbedSchema,
         IngestTaskStoreSchema,
         IngestTaskEmbedSchema,
         IngestTaskCaptionSchema,
@@ -168,6 +176,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.extract: IngestTaskExtractSchema,
                 TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend this mapping as necessary
                 TaskTypeEnum.split: IngestTaskSplitSchema,
+                TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
                 TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,

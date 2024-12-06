@@ -30,6 +30,7 @@ from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
+from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 
@@ -396,6 +397,20 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
         )
     )
     return embed_extractions_stage
+
+
+def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
+
+    storage_stage = pipe.add_stage(
+        generate_embedding_storage_stage(
+            morpheus_pipeline_config,
+            pe_count=2,
+            task="store_embedding",
+            task_desc="store_embedding_minio",
+        )
+    )
+
+    return storage_stage
 
 
 def add_image_storage_stage(pipe, morpheus_pipeline_config):

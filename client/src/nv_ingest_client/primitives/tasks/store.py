@@ -20,6 +20,12 @@ logger = logging.getLogger(__name__)
 _DEFAULT_STORE_METHOD = "minio"
 
 
+class StoreEmbedTaskSchema(BaseModel):
+
+    class Config:
+        extra = "allow"
+
+
 class StoreTaskSchema(BaseModel):
     store_method: str = None
 
@@ -49,7 +55,8 @@ class StoreTask(Task):
         structured: bool = True,
         images: bool = False,
         store_method: _Type_Store_Method = None,
-        **extra_params,
+        params: dict = None,
+        **extra_params
     ) -> None:
         """
         Setup Store Task Config
@@ -59,7 +66,9 @@ class StoreTask(Task):
         self._structured = structured
         self._images = images
         self._store_method = store_method or "minio"
+        self._params = params
         self._extra_params = extra_params
+
 
     def __str__(self) -> str:
         """
@@ -72,6 +81,59 @@ class StoreTask(Task):
         info += f"  store method: {self._store_method}\n"
         for key, value in self._extra_params.items():
             info += f"  {key}: {value}\n"
+        for key, value in self._params.items():
+            info += f"  {key}: {value}\n"
+        return info
+
+    def to_dict(self) -> Dict:
+        """
+        Convert to a dict for submission to redis (fixme)
+        """
+
+        task_properties = {
+            "method": self._store_method,
+            "structured": self._structured,
+            "images": self._images,
+            "params": self._params,
+            **self._extra_params,
+        }
+
+        return {"type": "store", "task_properties": task_properties}
+
+
+class StoreEmbedTask(Task):
+    """
+    Object for image storage task.
+    """
+
+    _Type_Content_Type = Literal["embedding",]
+
+    _Type_Store_Method = Literal["minio",]
+
+
+    def __init__(
+        self,
+        params: dict = None,
+        **extra_params
+    ) -> None:
+        """
+        Setup Store Task Config
+        """
+        super().__init__()
+
+        self._params = params or {}
+        self._extra_params = extra_params
+
+    def __str__(self) -> str:
+        """
+        Returns a string with the object's config and run time state
+        """
+        info = ""
+        info += "Store Embed Task:\n"
+        for key, value in self._extra_params.items():
+            info += f"  {key}: {value}\n"
+        for key, value in self._params.items():
+            info += f"  {key}: {value}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -79,10 +141,9 @@ class StoreTask(Task):
         Convert to a dict for submission to redis (fixme)
         """
         task_properties = {
-            "method": self._store_method,
-            "structured": self._structured,
-            "images": self._images,
-            "params": self._extra_params,
+            "params": self._params,
+            **self._extra_params,
         }
 
-        return {"type": "store", "task_properties": task_properties}
+        return {"type": "store_embedding", "task_properties": task_properties}
+

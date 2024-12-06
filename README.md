@@ -113,6 +113,8 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+> 
+> If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```

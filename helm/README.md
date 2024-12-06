@@ -1,20 +1,15 @@
-# NVIDIA NVIngest
+# NVIDIA-Ingest Helm Charts
+
+> [!WARNING]
+> NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
+>
+> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.10`+ when available.
+
 
 ## Prerequisites
 
-### Hardware
-
-| GPU | Family | Memory | # of GPUs |
-| ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
-
-### Software
-
-- Linux operating systems (Ubuntu 20.04 or later recommended)
-- [Docker](https://docs.docker.com/engine/install/)
-- [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= 535)
-- [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+### Hardware/Software
+[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
 ## Setup Environment
 
@@ -100,20 +95,64 @@ minikube addons enable storage-provisioner-rancher
 
 ## Usage
 
-Jobs are submitted via the `nv-ingest-cli` command. See installation [here](https://github.com/NVIDIA/nv-ingest/tree/main/client)
+Jobs are submitted via the `nv-ingest-cli` command.
 
-### Access To NV Ingest API
+#### NV-Ingest CLI Installation
 
-It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the nv-ingest pod.
-You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the nv-ingest pod to your local environment.
+NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`. 
+
+> [!TIP]
+> This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.
+
+First, build `nv-ingest-cli` from the source to ensure you have the latest code. More information is provided [here](https://github.com/NVIDIA/nv-ingest/tree/main/client).
+
+```bash
+# Just to be cautious we remove any existing installation
+pip uninstall nv-ingest-cli
+
+# Build the wheel from source
+~~~~~~~[INSERT STEPS TO BUILD FROM SOURCE]~~~~~~~~~~~~~~~
+
+# Pip install that .whl
+pip install that wheel made above
+```
+
+#### Rest Endpoint Ingress
+
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the NV-Ingest pod.
+You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NV-Ingest pod to your local environment.
 
 Example:
 
+You can find the name of your NV-Ingest pod you want to forward traffic to by running:
+
 ```bash
+kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
 kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
 ```
 
-### Executing jobs
+The output will look similar to the following but with different auto-generated sequences.
+
+```
+nv-ingest-674f6b7477-65nvm
+nv-ingest-cached-0
+nv-ingest-deplot-0
+nv-ingest-etcd-0
+nv-ingest-milvus-standalone-7f8ffbdfbc-jpmlj
+nv-ingest-minio-7cbd4f5b9d-99hl4
+nv-ingest-opentelemetry-collector-7bb59d57fc-4h59q
+nv-ingest-paddle-0
+nv-ingest-redis-master-0
+nv-ingest-redis-replicas-0
+nv-ingest-yolox-0
+nv-ingest-zipkin-77b5fc459f-ptsj6
+```
+
+```bash
+kubectl port-forward -n ${NAMESPACE} nv-ingest-674f6b7477-65nvm 7670:7670
+```
+
+#### Executing Jobs
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
 
@@ -128,7 +167,7 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You can also use nv-ingest's python client API to interact with the service running in the cluster. Use the same host and port as in the above nv-ingest-cli example.
+You can also use NV-Ingest's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous nv-ingest-cli example.
 
 ## Parameters
 
@@ -138,10 +177,10 @@ You can also use nv-ingest's python client API to interact with the service runn
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------- |
 | `affinity`                          | [default: {}] Affinity settings for deployment.                                                                  | `{}`    |
 | `nodeSelector`                      | Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`                                  | `{}`    |
-| `logLevel`                          | Log level of NVIngest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
-| `extraEnvVarsCM`                    | [default: ""] A Config map holding Enviroment variables to include in the NVIngest containerextraEnvVarsCM: ""   | `""`    |
-| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Enviroment variables to include in the NVIngest container                   | `""`    |
-| `fullnameOverride`                  | [default: ""] A name to force the fullname of the NVIngest container to have, defaults to the Helm Release Name  | `""`    |
+| `logLevel`                          | Log level of NV-Ingest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
+| `extraEnvVarsCM`                    | [default: ""] A Config map holding Enviroment variables to include in the NV-Ingest containerextraEnvVarsCM: ""   | `""`    |
+| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Enviroment variables to include in the NV-Ingest container                   | `""`    |
+| `fullnameOverride`                  | [default: ""] A name to force the fullname of the NV-Ingest container to have, defaults to the Helm Release Name  | `""`    |
 | `nameOverride`                      | [default: ""] A name to base the objects created by this helm chart                                              | `""`    |
 | `image.repository`                  | NIM Image Repository                                                                                             | `""`    |
 | `image.tag`                         | Image tag or version                                                                                             | `""`    |
@@ -155,7 +194,7 @@ You can also use nv-ingest's python client API to interact with the service runn
 | `imagePullSecrets`                  | Specify list of secret names that are needed for the main container and any init containers.                     |         |
 | `containerSecurityContext`          | Sets privilege and access control settings for container (Only affects the main container, not pod-level)        | `{}`    |
 | `tolerations`                       | Specify tolerations for pod assignment. Allows the scheduler to schedule pods with matching taints.              |         |
-| `replicaCount`                      | The number of replicas for NVIngest when autoscaling is disabled                                                 | `1`     |
+| `replicaCount`                      | The number of replicas for NV-Ingest when autoscaling is disabled                                                 | `1`     |
 | `resources.limits."nvidia.com/gpu"` | Specify number of GPUs to present to the running service.                                                        |         |
 | `resources.limits.memory`           | Specify limit for memory                                                                                         | `32Gi`  |
 | `resources.requests.memory`         | Specify request for memory                                                                                       | `16Gi`  |
@@ -180,7 +219,7 @@ explicitly called out here.
 
 ### Milvus Deployment parameters
 
-NVIngest uses Milvus and Minio to store extracted images from a document
+NV-Ingest uses Milvus and Minio to store extracted images from a document
 This chart by default sets up a Milvus standalone instance in the namespace using the
 Helm chart at found https://artifacthub.io/packages/helm/milvus-helm/milvus
 
@@ -221,7 +260,7 @@ Define environment variables as key/value dictionary pairs
 | `envVars`                              | Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value | `sane {}`                  |
 | `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
 | `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"7670"`                   |
-| `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NVIngest requests.                                                            | `"1234"`                   |
+| `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NV-Ingest requests.                                                            | `"1234"`                   |
 | `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
 | `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |
 | `envVars.MINIO_BUCKET`                 | Override this for specific minio bucket to upload extracted images to                                     | `"nv-ingest"`              |
@@ -327,3 +366,46 @@ Manage the creation of secrets used by the helm chart
 | `imagePullSecret.password` | The password to use for the NVCR Image Pull Secret     | `""`    |
 
 
+## 24.08 CLI Setup and Usage
+
+#### NV-Ingest CLI Installation: `24.08`
+
+You can find the Python wheel for the `nv-ingest-cli` located in our [NV-Ingest 24.08 release artifacts](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08). Installation of the `nv-ingest-cli` goes as follows.
+
+```shell
+# Just to be cautious we remove any existing installation
+pip uninstall nv-ingest-cli
+
+# Download the 24.08 .whl
+wget https://github.com/NVIDIA/nv-ingest/releases/download/24.08/nv_ingest_client-24.08-py3-none-any.whl
+
+# Pip install that .whl
+pip install nv_ingest_client-24.08-py3-none-any.whl
+```
+
+### Access To Redis: `24.08`
+
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
+You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
+
+Example:
+
+```bash
+kubectl port-forward -n ${NAMESPACE} nv-ingest-redis-master-0 6379:6379
+```
+
+
+#### Executing Jobs: `24.08`
+
+Here is a sample invocation of a PDF extraction task using the port forward above:
+
+```bash
+mkdir -p ./processed_docs
+
+nv-ingest-cli \
+  --doc /path/to/your/unique.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true}' \
+  --client_host=localhost \
+  --client_port=6379
+```

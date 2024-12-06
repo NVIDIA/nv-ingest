@@ -113,6 +113,13 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
 
     _ = task_props  # unused
 
+    if trace_info is None:
+        trace_info = {}
+        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
+
+    if df.empty:
+        return df, trace_info
+
     deplot_client = create_inference_client(
         validated_config.stage_config.deplot_endpoints,
         validated_config.stage_config.auth_token,
@@ -124,10 +131,6 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
         validated_config.stage_config.auth_token,
         validated_config.stage_config.cached_infer_protocol
     )
-
-    if trace_info is None:
-        trace_info = {}
-        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
