@@ -1,9 +1,4 @@
-#!/usr/bin/env python3
-
-import atexit
 import logging
-import os
-import signal
 import sys
 import time
 

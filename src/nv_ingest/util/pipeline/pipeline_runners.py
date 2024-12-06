@@ -9,6 +9,7 @@ import signal
 import subprocess
 import sys
 import threading
+import time
 from ctypes import c_int, CDLL
 
 from datetime import datetime
@@ -175,17 +176,25 @@ def _set_pdeathsig(sig=signal.SIGTERM):
         logger.error(f"Exception in setting PDEATHSIG: {e}")
 
 
-def terminate_subprocess():
+def terminate_subprocess(process):
     """
     Terminate the pipeline subprocess and its entire process group.
+    Sends SIGTERM followed by SIGKILL if necessary.
     """
-    global pipeline_process
-    if pipeline_process and pipeline_process.poll() is None:
+    if process and process.poll() is None:
         logger.info("Terminating pipeline subprocess group...")
         try:
             # Send SIGTERM to the entire process group
-            os.killpg(os.getpgid(pipeline_process.pid), signal.SIGTERM)
+            os.killpg(os.getpgid(process.pid), signal.SIGTERM)
             logger.info("Sent SIGTERM to pipeline subprocess group.")
+
+            # Wait for a short duration to allow graceful termination
+            time.sleep(5)
+
+            if process.poll() is None:
+                # If still alive, send SIGKILL
+                os.killpg(os.getpgid(process.pid), signal.SIGKILL)
+                logger.info("Sent SIGKILL to pipeline subprocess group.")
         except Exception as e:
             logger.error(f"Failed to terminate process group: {e}")
 
