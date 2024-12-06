@@ -10,7 +10,7 @@ def ingest_json_results_to_blob(result_content):
     """
     try:
         # Load the JSON data
-        data = json.loads(result_content) if isinstance(result_content, str) else json.loads(result_content)
+        data = json.loads(result_content) if isinstance(result_content, str) else result_content
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
