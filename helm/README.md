@@ -3,7 +3,7 @@
 > [!WARNING]
 > NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
 >
-> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.10`+ when available.
+> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.12`+ when available.
 
 
 ## Prerequisites
@@ -44,7 +44,7 @@ helm upgrade \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
-    --set image.tag="24.10" \
+    --set image.tag="24.12" \
     https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
 
 ```

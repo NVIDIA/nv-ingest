@@ -117,7 +117,7 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10.1
+    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.12
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
