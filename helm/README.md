@@ -35,18 +35,17 @@ helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oau
 ```bash
 helm upgrade \
     --install \
+    nv-ingest \
+    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
+    -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
-    -n ${NAMESPACE} \
-    nv-ingest \
     --set imagePullSecret.create=true \
     --set imagePullSecret.password="${NGC_API_KEY}" \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
     --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
-    --set image.tag="24.12" \
-    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
-
+    --set image.tag="24.12"
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
