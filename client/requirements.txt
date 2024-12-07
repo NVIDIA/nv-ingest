@@ -11,3 +11,4 @@ tqdm
 httpx==0.27.2
 requests
 fsspec
+llama-index-embeddings-nvidia
