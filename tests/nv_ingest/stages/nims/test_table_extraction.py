@@ -19,23 +19,6 @@ PADDLE_MIN_HEIGHT = 32
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
 
-# Mock implementations of external functions and classes
-def mock_get_version(endpoint):
-    return '2.0.0'  # Mock PaddleOCR version
-
-
-def mock_get_version_fail(endpoint):
-    raise Exception("Connection failed")  # Simulate failure
-
-
-def mock_get_version_none(endpoint):
-    return None  # Simulate returning None
-
-
-def mock_update_metadata(row, client, trace_info):
-    return {'metadata_key': 'metadata_value'}
-
-
 # Mocked PaddleOCRModelInterface
 class MockPaddleOCRModelInterface:
     def __init__(self, paddle_version=None):
@@ -48,10 +31,15 @@ class MockPaddleOCRModelInterface:
         return data
 
     def parse_output(self, response, protocol, **kwargs):
-        return ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                'desk fan Cost')
+        table_content = (
+            "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+            "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+            "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+            "desk fan Cost"
+        )
+        table_content_format = "simple"
+
+        return table_content, table_content_format
 
     def process_inference_results(self, output, **kwargs):
         return output
@@ -68,19 +56,16 @@ def mock_paddle_client_and_requests():
     mock_response = Mock()
     mock_response.raise_for_status = Mock()
     mock_response.json.return_value = {
-        'object': 'list',
-        'data': [{
-            'index': 0,
-            'content': 'Mocked content from PaddleOCR',
-            'object': 'string'
-        }],
-        'model': 'paddleocr',
-        'usage': None
+        "object": "list",
+        "data": [{"index": 0, "content": "Mocked content from PaddleOCR", "object": "string"}],
+        "model": "paddleocr",
+        "usage": None,
     }
 
     # Patching create_inference_client and requests.post
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', return_value=paddle_client) as mock_create_client, \
-            patch('requests.post', return_value=mock_response) as mock_requests_post:
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=paddle_client) as mock_create_client, patch(
+        "requests.post", return_value=mock_response
+    ) as mock_requests_post:
         yield paddle_client, mock_create_client, mock_requests_post
 
 
@@ -97,7 +82,7 @@ def mock_paddle_client_and_requests_failure():
     paddle_client.infer = Mock(side_effect=Exception("Inference error"))
 
     # Patching create_inference_client
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', return_value=paddle_client) as mock_create_client:
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=paddle_client) as mock_create_client:
         yield paddle_client, mock_create_client
 
 
@@ -105,12 +90,12 @@ def mock_paddle_client_and_requests_failure():
 @pytest.fixture
 def base64_encoded_image():
     # Create a simple image using PIL
-    img = Image.new('RGB', (64, 64), color='white')
+    img = Image.new("RGB", (64, 64), color="white")
     buffered = BytesIO()
     img.save(buffered, format="PNG")
     img_bytes = buffered.getvalue()
     # Encode the image to base64
-    base64_str = base64.b64encode(img_bytes).decode('utf-8')
+    base64_str = base64.b64encode(img_bytes).decode("utf-8")
     return base64_str
 
 
@@ -120,24 +105,21 @@ def base64_encoded_image():
 def base64_encoded_small_image():
     # Generate a small image (e.g., 10x10 pixels) and encode it in base64
     small_image = np.zeros((10, 10, 3), dtype=np.uint8)
-    _, buffer = cv2.imencode('.png', small_image)
-    base64_image = base64.b64encode(buffer).decode('utf-8')
+    _, buffer = cv2.imencode(".png", small_image)
+    base64_image = base64.b64encode(buffer).decode("utf-8")
     return base64_image
 
 
 # Test function for _extract_table_data with an image that is too small
 def test_extract_table_data_image_too_small(base64_encoded_small_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_small_image,
-            "content_metadata": {
-                "type": "image",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_small_image,
+                "content_metadata": {"type": "image", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
 
@@ -162,28 +144,25 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_nim_client.infer.side_effect = mock_infer
 
     # Patch 'create_inference_client' to return the mocked NimClient
-    with patch('module_under_test.create_inference_client', return_value=mock_nim_client):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client):
         # Since the image is too small, we expect the table_content to remain unchanged
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
     # Verify that 'table_content' remains empty
-    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == ""
+    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == ""
 
 
 # Fixture for a sample DataFrame
 @pytest.fixture
 def sample_dataframe(base64_encoded_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
     return df
@@ -192,9 +171,7 @@ def sample_dataframe(base64_encoded_image):
 # Fixture for DataFrame with missing metadata
 @pytest.fixture
 def dataframe_missing_metadata():
-    data = {
-        "other_data": ["no metadata here"]
-    }
+    data = {"other_data": ["no metadata here"]}
     df = pd.DataFrame(data)
     return df
 
@@ -203,35 +180,21 @@ def dataframe_missing_metadata():
 @pytest.fixture
 def dataframe_non_table(base64_encoded_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_image,
-            "content_metadata": {
-                "type": "text",  # Not "structured"
-                "subtype": "paragraph"  # Not "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_image,
+                "content_metadata": {"type": "text", "subtype": "paragraph"},  # Not "structured"  # Not "table"
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
     return df
 
 
-# Dummy paddle client that simulates the external service
-class DummyPaddleClient:
-    def infer(self, *args, **kwargs):
-        return "{'object': 'list', 'data': [{'index': 0, 'content': 'Chart 1 This chart shows some gadgets, and some very fictitious costs Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 $40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium desk fan Cost', 'object': 'string'}], 'model': 'paddleocr', 'usage': None}"
-
-    def close(self):
-        pass
-
-
 # Tests for _update_metadata
 def test_update_metadata_missing_metadata():
-    row = pd.Series({
-        "other_data": "not metadata"
-    })
+    row = pd.Series({"other_data": "not metadata"})
     model_interface = PaddleOCRModelInterface()
     paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
     trace_info = {}
@@ -249,19 +212,16 @@ def test_update_metadata_non_table_content(dataframe_non_table):
     assert result == row["metadata"]
 
 
-def test_update_metadata_image_too_small(base64_encoded_small_image):
-    row = pd.Series({
-        "metadata": {
-            "content": base64_encoded_small_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+def test_update_metadata_image_too_small_1(base64_encoded_small_image):
+    row = pd.Series(
+        {
+            "metadata": {
+                "content": base64_encoded_small_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
         }
-    })
+    )
     model_interface = PaddleOCRModelInterface()
     paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
     trace_info = {}
@@ -279,10 +239,12 @@ def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_
     result = _update_metadata(row, paddle_client, trace_info)
 
     # Expected content from the mocked response
-    expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost')
+    expected_content = (
+        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+        "desk fan Cost"
+    )
 
     # The table_content should be updated with expected_content
     assert result["table_metadata"]["table_content"] == expected_content
@@ -296,22 +258,26 @@ def test_update_metadata_inference_failure(sample_dataframe, mock_paddle_client_
     mock_response = Mock()
     mock_response.raise_for_status.side_effect = RuntimeError("HTTP request failed: Inference error")
     mock_response.json.return_value = {
-        'object': 'list',
-        'data': [{
-            'index': 0,
-            'content': ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost'),
-            'object': 'string'
-        }],
-        'model': 'paddleocr',
-        'usage': None
+        "object": "list",
+        "data": [
+            {
+                "index": 0,
+                "content": (
+                    "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+                    "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+                    "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+                    "desk fan Cost"
+                ),
+                "object": "string",
+            }
+        ],
+        "model": "paddleocr",
+        "usage": None,
     }
 
     row = sample_dataframe.iloc[0]
     trace_info = {}
-    with patch('requests.post', return_value=mock_response):
+    with patch("requests.post", return_value=mock_response):
         with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
             _update_metadata(row, paddle_client, trace_info)
 
@@ -327,15 +293,17 @@ def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_
 
     trace_info = {}
 
-    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.3.3"):
+    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.3.3"):
         updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
     # Expected content from the mocked response
-    expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost')
-    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == expected_content
+    expected_content = (
+        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+        "desk fan Cost"
+    )
+    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
     assert trace_info_out == trace_info
 
     # Verify that the mocked methods were called
@@ -353,7 +321,7 @@ def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_pa
 
     trace_info = {}
 
-    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.2.1"):
+    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.2.1"):
         with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
             _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
 
@@ -371,23 +339,20 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
 
     trace_info = {}
 
-    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"):
+    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"):
         with pytest.raises(Exception, match="Inference error"):
             _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
 
-def test_extract_table_data_image_too_small(base64_encoded_small_image):
+def test_extract_table_data_image_too_small_2(base64_encoded_small_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_small_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_small_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
 
@@ -408,23 +373,27 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_response = Mock()
     mock_response.raise_for_status = Mock()  # Does nothing
     mock_response.json.return_value = {
-        'object': 'list',
-        'data': [{
-            'index': 0,
-            'content': ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost'),
-            'object': 'string'
-        }],
-        'model': 'paddleocr',
-        'usage': None
+        "object": "list",
+        "data": [
+            {
+                "index": 0,
+                "content": (
+                    "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+                    "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+                    "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+                    "desk fan Cost"
+                ),
+                "object": "string",
+            }
+        ],
+        "model": "paddleocr",
+        "usage": None,
     }
 
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', side_effect=mock_create_inference_client), \
-            patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"), \
-            patch('requests.post', return_value=mock_response):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", side_effect=mock_create_inference_client), patch(
+        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
+    ), patch("requests.post", return_value=mock_response):
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
     # The table_content should remain unchanged because the image is too small
-    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == ""
+    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == ""
