@@ -72,7 +72,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
 
         image_array = base64_to_numpy(base64_image)
 
-        paddle_result = ""
+        paddle_result = "", ""
         if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
             # Perform inference using the NimClient
             paddle_result = paddle_client.infer(

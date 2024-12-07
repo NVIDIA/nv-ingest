@@ -96,7 +96,6 @@ class PaddleOCRModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
-        image_data = data['image_array']
         if (protocol == 'grpc'):
             logger.debug("Formatting input for gRPC PaddleOCR model")
             image_data = data["image_array"]
@@ -211,7 +210,7 @@ class PaddleOCRModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_paddle_response(self, json_response: Dict[str, Any], table_content_format: Optional[str]) -> Any:
+    def _extract_content_from_paddle_http_response(self, json_response: Dict[str, Any], table_content_format: Optional[str]) -> Any:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.
 
@@ -255,7 +254,6 @@ class PaddleOCRModelInterface(ModelInterface):
         return content, table_content_format
 
     def _extract_content_from_paddle_grpc_response(self, response, table_content_format):
-        # Convert bytes output to string
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
