@@ -137,7 +137,7 @@ services:
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
       - CACHED_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted cached endpoints.
-      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/university-at-buffalo/cached
+      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
       #- CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
       #- DEPLOT_GRPC_ENDPOINT=""
@@ -166,7 +166,7 @@ services:
       - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
       - PADDLE_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted paddle endpoints.
-      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/baidu/paddleocr
+      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
@@ -175,7 +175,7 @@ services:
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
-      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:
