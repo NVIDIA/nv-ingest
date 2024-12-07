@@ -47,7 +47,7 @@ class ModelInterface:
 
         raise NotImplementedError("Subclasses should implement this method")
 
-    def parse_output(self, response, protocol: str, data: Optional[dict] = None):
+    def parse_output(self, response, protocol: str, data: Optional[dict] = None, **kwargs):
         """
         Parse the output data from the model's inference response.
 
@@ -200,7 +200,9 @@ class NimClient:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
         # Parse and process output
-        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=prepared_data)
+        parsed_output = self.model_interface.parse_output(
+            response, protocol=self.protocol, data=prepared_data, **kwargs
+        )
         results = self.model_interface.process_inference_results(
             parsed_output,
             original_image_shapes=data.get('original_image_shapes'),
@@ -541,8 +543,12 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         The version of the server, or an empty string if unavailable.
     """
 
-    if http_endpoint is None or http_endpoint == "":
+    if (http_endpoint is None) or (http_endpoint == ""):
         return ""
+
+    # TODO: Need a way to match NIM versions to API versions.
+    if "ai.api.nvidia.com" in http_endpoint:
+        return "0.2.0"
 
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)

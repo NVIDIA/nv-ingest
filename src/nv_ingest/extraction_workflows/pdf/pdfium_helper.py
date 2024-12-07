@@ -29,6 +29,7 @@ import pypdfium2 as libpdfium
 import nv_ingest.util.nim.yolox as yolox_utils
 
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
@@ -292,6 +293,8 @@ def pdfium_extractor(
     source_id = row_data["source_id"]
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
+    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
+    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -422,6 +425,9 @@ def pdfium_extractor(
             if (extract_tables and (table_and_charts.type_string == "table")) or (
                     extract_charts and (table_and_charts.type_string == "chart")
             ):
+                if (table_and_charts.type_string == "table"):
+                    table_and_charts.content_format = paddle_output_format
+
                 extracted_data.append(
                     construct_table_and_chart_metadata(
                         table_and_charts,

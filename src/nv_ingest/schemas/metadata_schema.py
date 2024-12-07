@@ -153,6 +153,8 @@ class TableFormatEnum(str, Enum):
     IMAGE = "image"
     LATEX = "latex"
     MARKDOWN = "markdown"
+    PSEUDO_MARKDOWN = "pseudo_markdown"
+    SIMPLE = "simple"
 
 
 class TaskTypeEnum(str, Enum):
@@ -280,6 +282,7 @@ class TableMetadataSchema(BaseModelNoExt):
     caption: str = ""
     table_format: TableFormatEnum
     table_content: str = ""
+    table_content_format: Union[TableFormatEnum, str] = ""
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
@@ -289,6 +292,7 @@ class ChartMetadataSchema(BaseModelNoExt):
     caption: str = ""
     table_format: TableFormatEnum
     table_content: str = ""
+    table_content_format: Union[TableFormatEnum, str] = ""
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
