@@ -138,20 +138,16 @@ def _extract_table_data(
 
     paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
 
-    if (paddle_infer_protocol == 'grpc'):
-        # Obtain paddle_version
-        # Assuming that the grpc endpoint is at index 0
-        paddle_endpoint = stage_config.paddle_endpoints[1]
-        try:
-            paddle_version = get_version(paddle_endpoint)
-            if not paddle_version:
-                raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
-        except Exception as e:
-            logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
-            raise e
-    else:
-        # If protocol is 'http', skip getting the version
-        paddle_version = None
+    # Obtain paddle_version
+    # Assuming that the grpc endpoint is at index 0
+    paddle_endpoint = stage_config.paddle_endpoints[1]
+    try:
+        paddle_version = get_version(paddle_endpoint)
+        if not paddle_version:
+            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
+    except Exception as e:
+        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
+        raise e
 
     # Create the PaddleOCRModelInterface with paddle_version
     paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
