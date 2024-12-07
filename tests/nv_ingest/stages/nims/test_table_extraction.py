@@ -144,7 +144,9 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_nim_client.infer.side_effect = mock_infer
 
     # Patch 'create_inference_client' to return the mocked NimClient
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client), patch(
+        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
+    ):
         # Since the image is too small, we expect the table_content to remain unchanged
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
