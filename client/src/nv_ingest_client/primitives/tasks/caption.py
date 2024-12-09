@@ -7,7 +7,8 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -27,10 +28,10 @@ class CaptionTaskSchema(BaseModel):
 
 class CaptionTask(Task):
     def __init__(
-            self,
-            api_key: str = None,
-            endpoint_url: str = None,
-            prompt: str = None,
+        self,
+        api_key: str = None,
+        endpoint_url: str = None,
+        prompt: str = None,
     ) -> None:
         super().__init__()
 
@@ -45,11 +46,11 @@ class CaptionTask(Task):
         info = ""
         info += "Image Caption Task:\n"
 
-        if (self._api_key):
+        if self._api_key:
             info += f"  api_key: [redacted]\n"
-        if (self._endpoint_url):
+        if self._endpoint_url:
             info += f"  endpoint_url: {self._endpoint_url}\n"
-        if (self._prompt):
+        if self._prompt:
             info += f"  prompt: {self._prompt}\n"
 
         return info
@@ -60,13 +61,13 @@ class CaptionTask(Task):
         """
         task_properties = {}
 
-        if (self._api_key):
+        if self._api_key:
             task_properties["api_key"] = self._api_key
 
-        if (self._endpoint_url):
+        if self._endpoint_url:
             task_properties["endpoint_url"] = self._endpoint_url
 
-        if (self._prompt):
+        if self._prompt:
             task_properties["prompt"] = self._prompt
 
         return {"type": "caption", "task_properties": task_properties}

@@ -68,8 +68,12 @@ logger = logging.getLogger(__name__)
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
 @click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
-@click.option("--client_type", default="rest", type=click.Choice(["rest", "simple"], case_sensitive=False),
-              help="Client type used to connect to the ingest service.")
+@click.option(
+    "--client_type",
+    default="rest",
+    type=click.Choice(["rest", "simple"], case_sensitive=False),
+    help="Client type used to connect to the ingest service.",
+)
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
 )
@@ -90,11 +94,13 @@ logger = logging.getLogger(__name__)
     show_default=True,
     help="Log level.",
 )
-@click.option("--save_images_separately", is_flag=True,
-              help="Save images separately from returned metadata. This can make metadata files more human readable")
 @click.option(
-    "--shuffle_dataset", is_flag=True, default=True, show_default=True,
-    help="Shuffle the dataset before processing."
+    "--save_images_separately",
+    is_flag=True,
+    help="Save images separately from returned metadata. This can make metadata files more human readable",
+)
+@click.option(
+    "--shuffle_dataset", is_flag=True, default=True, show_default=True, help="Shuffle the dataset before processing."
 )
 @click.option(
     "--task",
@@ -119,7 +125,7 @@ Example:
 
 \b
 Tasks and Options:
-- caption: Attempts to extract captions for unstructured images extracted from documents. 
+- caption: Attempts to extract captions for unstructured images extracted from documents.
     Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_BUILD_API_KEY).'
@@ -183,24 +189,24 @@ Note: The 'extract_method' automatically selects the optimal method based on 'do
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
-        ctx,
-        batch_size: int,
-        client_host: str,
-        client_kwargs: str,
-        client_port: int,
-        client_type: str,
-        concurrency_n: int,
-        dataset: str,
-        doc: List[str],
-        document_processing_timeout: int,
-        dry_run: bool,
-        fail_on_error: bool,
-        log_level: str,
-        output_directory: str,
-        save_images_separately: bool,
-        shuffle_dataset: bool,
-        task: [str],
-        version: [bool],
+    ctx,
+    batch_size: int,
+    client_host: str,
+    client_kwargs: str,
+    client_port: int,
+    client_type: str,
+    concurrency_n: int,
+    dataset: str,
+    doc: List[str],
+    document_processing_timeout: int,
+    dry_run: bool,
+    fail_on_error: bool,
+    log_level: str,
+    output_directory: str,
+    save_images_separately: bool,
+    shuffle_dataset: bool,
+    task: [str],
+    version: [bool],
 ):
     if version:
         click.echo(f"nv-ingest     : {NV_INGEST_VERSION}")
@@ -234,9 +240,9 @@ def main(
         if not dry_run:
             logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
 
-            if (client_type == "rest"):
+            if client_type == "rest":
                 client_allocator = RestClient
-            elif (client_type == "simple"):
+            elif client_type == "simple":
                 client_allocator = SimpleClient
             else:
                 raise ValueError(f"Unknown client type: {client_type}")

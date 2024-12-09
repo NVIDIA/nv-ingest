@@ -4,22 +4,28 @@
 
 
 import logging
+import os
 import pickle
 import time
 from dataclasses import dataclass
-import os
+from urllib.parse import urlparse
 
 import mrc
+from minio import Minio
 from morpheus.messages import ControlMessage
-from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
-from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
-from morpheus_llm.service.vdb.vector_db_service import VectorDBService
-from morpheus_llm.service.vdb.milvus_vector_db_service import MilvusVectorDBService
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
+from morpheus_llm.service.vdb.milvus_vector_db_service import MilvusVectorDBService
+from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
+from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from mrc.core import operators as ops
+from pymilvus import BulkInsertState
+from pymilvus import Collection
+from pymilvus import connections
+from pymilvus import utility
 
 import cudf
 
@@ -28,9 +34,6 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
-from pymilvus import BulkInsertState, Collection, connections, utility
-from minio import Minio
-from urllib.parse import urlparse
 
 logger = logging.getLogger(__name__)
 
@@ -43,11 +46,13 @@ _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
 
 
-def _bulk_ingest(milvus_uri: str = None,
-                collection_name: str = None, 
-                bucket_name: str = None, 
-                bulk_ingest_path: str = None, 
-                extra_params: dict = None):
+def _bulk_ingest(
+    milvus_uri: str = None,
+    collection_name: str = None,
+    bucket_name: str = None,
+    bulk_ingest_path: str = None,
+    extra_params: dict = None,
+):
 
     endpoint = extra_params.get("endpoint", _DEFAULT_ENDPOINT)
     access_key = extra_params.get("access_key", None)
@@ -64,7 +69,9 @@ def _bulk_ingest(milvus_uri: str = None,
     bucket_found = client.bucket_exists(bucket_name)
     if not bucket_found:
         raise ValueError(f"Could not find bucket {bucket_name}")
-    batch_files = [[f"{file.object_name}"] for file in client.list_objects(bucket_name, prefix=bulk_ingest_path, recursive=True)]
+    batch_files = [
+        [f"{file.object_name}"] for file in client.list_objects(bucket_name, prefix=bulk_ingest_path, recursive=True)
+    ]
 
     uri_parsed = urlparse(milvus_uri)
     conn = connections.connect(host=uri_parsed.hostname, port=uri_parsed.port)

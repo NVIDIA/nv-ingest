@@ -31,7 +31,7 @@ Password: <Your Key>
 
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
-# Container images must access resources from NGC. 
+# Container images must access resources from NGC.
 NGC_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
@@ -108,9 +108,9 @@ pip install .
 ```
 
 > **NOTE:** Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
-> 
+>
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
-> 
+>
 > To interact within the container:
 > ```
 > docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
@@ -119,7 +119,7 @@ pip install .
 > ```
 > (morpheus) root@aba77e2a4bde:/workspace#
 > ```
-> 
+>
 > From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
 ## Step 3: Ingesting Documents
@@ -134,7 +134,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 > **IMPORTANT:** `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
-### In Python 
+### In Python
 
 You can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb):
 
@@ -198,7 +198,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-### Using the `nv-ingest-cli` 
+### Using the `nv-ingest-cli`
 
 You can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb):
 

@@ -20,7 +20,7 @@ Using [RAPIDS](https://rapids.ai/) citations for reference.
 ```tex
 @misc{
       nolet2020bringing,
-      title={Bringing UMAP Closer to the Speed of Light with GPU Acceleration}, 
+      title={Bringing UMAP Closer to the Speed of Light with GPU Acceleration},
       author={Corey J. Nolet, Victor Lafargue, Edward Raff, Thejaswi Nanditale, Tim Oates, John Zedlewski, and Joshua Patterson},
       year={2020},
       eprint={2008.00325},

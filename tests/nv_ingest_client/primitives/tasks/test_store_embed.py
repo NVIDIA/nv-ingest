@@ -25,15 +25,8 @@ def test_store_task_initialization():
 
 
 def test_store_task_str_representation():
-    task = StoreEmbedTask(
-        params={
-            "endpoint": "minio:9000"
-        }
-    )
-    expected_str = (
-        "Store Embed Task:\n"
-        "  endpoint: minio:9000\n"
-    )
+    task = StoreEmbedTask(params={"endpoint": "minio:9000"})
+    expected_str = "Store Embed Task:\n" "  endpoint: minio:9000\n"
     assert str(task) == expected_str
 
 

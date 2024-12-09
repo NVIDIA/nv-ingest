@@ -11,6 +11,7 @@
 # pylint: skip-file
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -27,9 +28,44 @@ logger = logging.getLogger(__name__)
 # 4XX - Any 4XX status is considered a client derived error and will result in failure
 # 5XX - Not all 500's are terminal but most are. Those which are listed below
 _TERMINAL_RESPONSE_STATUSES = [
-    400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
-    414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451,
-    500, 501, 503, 505, 506, 507, 508, 510, 511
+    400,
+    401,
+    402,
+    403,
+    404,
+    405,
+    406,
+    407,
+    408,
+    409,
+    410,
+    411,
+    412,
+    413,
+    414,
+    415,
+    416,
+    417,
+    418,
+    421,
+    422,
+    423,
+    424,
+    425,
+    426,
+    428,
+    429,
+    431,
+    451,
+    500,
+    501,
+    503,
+    505,
+    506,
+    507,
+    508,
+    510,
+    511,
 ]
 
 
@@ -60,13 +96,13 @@ class RestClient(MessageBrokerClientBase):
     """
 
     def __init__(
-            self,
-            host: str,
-            port: int,
-            max_retries: int = 0,
-            max_backoff: int = 32,
-            connection_timeout: int = 300,
-            http_allocator: Any = httpx.AsyncClient,
+        self,
+        host: str,
+        port: int,
+        max_retries: int = 0,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        http_allocator: Any = httpx.AsyncClient,
     ):
         self._host = host
         self._port = port
@@ -140,7 +176,7 @@ class RestClient(MessageBrokerClientBase):
         Returns:
             str: Fully validated URL
         """
-        if not re.match(r'^https?://', user_provided_url):
+        if not re.match(r"^https?://", user_provided_url):
             # Add the default `http://` if it's not already present in the URL
             user_provided_url = f"http://{user_provided_url}:{user_provided_port}"
         else:
@@ -177,7 +213,7 @@ class RestClient(MessageBrokerClientBase):
                     return ResponseSchema(
                         response_code=1,
                         response_reason=f"Terminal response code {response_code} received when fetching JobSpec: {job_id}",
-                        response=result.text
+                        response=result.text,
                     )
                 else:
                     # If the result contains a 200 then return the raw JSON string response
@@ -207,20 +243,14 @@ class RestClient(MessageBrokerClientBase):
                     retries = self.perform_retry_backoff(retries)
                 except RuntimeError as rte:
                     # Max retries reached
-                    return ResponseSchema(
-                        response_code=1,
-                        response_reason=str(rte),
-                        response=str(err)
-                    )
+                    return ResponseSchema(response_code=1, response_reason=str(rte), response=str(err))
                 except TimeoutError:
                     raise
             except Exception as e:
                 # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during fetch from {url}: {e}")
                 return ResponseSchema(
-                    response_code=1,
-                    response_reason=f"Unexpected error during fetch: {e}",
-                    response=None
+                    response_code=1, response_reason=f"Unexpected error during fetch: {e}", response=None
                 )
 
     def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> ResponseSchema:
@@ -254,20 +284,20 @@ class RestClient(MessageBrokerClientBase):
                     return ResponseSchema(
                         response_code=1,
                         response_reason=f"Terminal response code {response_code} received when submitting JobSpec",
-                        trace_id=result.headers.get('x-trace-id')
+                        trace_id=result.headers.get("x-trace-id"),
                     )
                 else:
                     # If 200 we are good, otherwise let's try again
                     if response_code == 200:
                         logger.debug(f"JobSpec successfully submitted to http endpoint {self._submit_endpoint}")
                         # The REST interface returns a JobId, so we capture that here
-                        x_trace_id = result.headers.get('x-trace-id')
+                        x_trace_id = result.headers.get("x-trace-id")
                         return ResponseSchema(
                             response_code=0,
                             response_reason="OK",
                             response=result.text,
                             transaction_id=result.text,
-                            trace_id=x_trace_id
+                            trace_id=x_trace_id,
                         )
                     else:
                         # Retry the operation
@@ -279,18 +309,12 @@ class RestClient(MessageBrokerClientBase):
                     retries = self.perform_retry_backoff(retries)
                 except RuntimeError as rte:
                     # Max retries reached
-                    return ResponseSchema(
-                        response_code=1,
-                        response_reason=str(rte),
-                        response=str(e)
-                    )
+                    return ResponseSchema(response_code=1, response_reason=str(rte), response=str(e))
             except Exception as e:
                 # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during submission of JobSpec to {url}: {e}")
                 return ResponseSchema(
-                    response_code=1,
-                    response_reason=f"Unexpected error during JobSpec submission: {e}",
-                    response=None
+                    response_code=1, response_reason=f"Unexpected error during JobSpec submission: {e}", response=None
                 )
 
     def perform_retry_backoff(self, existing_retries) -> int:
@@ -315,9 +339,10 @@ class RestClient(MessageBrokerClientBase):
         RuntimeError
             Raised if the maximum number of retry attempts has been reached.
         """
-        backoff_delay = min(2 ** existing_retries, self._max_backoff)
+        backoff_delay = min(2**existing_retries, self._max_backoff)
         logger.debug(
-            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s")
+            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s"
+        )
 
         if self.max_retries > 0 and existing_retries < self.max_retries:
             logger.error(f"Operation failed, retrying in {backoff_delay}s...")

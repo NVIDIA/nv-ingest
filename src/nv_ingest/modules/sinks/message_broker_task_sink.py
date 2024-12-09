@@ -7,8 +7,9 @@ import json
 import logging
 import sys
 import traceback
-from typing import Any, List
+from typing import Any
 from typing import Dict
+from typing import List
 from typing import Tuple
 
 import mrc
@@ -140,8 +141,9 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
         ret_val_json = {
             "status": "success" if not message.get_metadata("cm_failed", False) else "failed",
             "description": (
-                "Successfully processed the message." if not message.get_metadata("cm_failed",
-                                                                                  False) else "Failed to process the message."
+                "Successfully processed the message."
+                if not message.get_metadata("cm_failed", False)
+                else "Failed to process the message."
             ),
             "data": fragment_data,  # Fragmented data
             "fragment": i,
@@ -164,8 +166,9 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
     return ret_val_json_list
 
 
-def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str, json_payloads: List[str],
-                   retry_count: int = 2) -> None:
+def push_to_broker(
+    broker_client: MessageBrokerClientBase, response_channel: str, json_payloads: List[str], retry_count: int = 2
+) -> None:
     """
     Attempts to push a JSON payload to a message broker channel, retrying on failure up to a specified number of attempts.
 
@@ -192,7 +195,7 @@ def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str
 
     for json_payload in json_payloads:
         payload_size = sys.getsizeof(json_payload)
-        size_limit = 2 ** 28  # 256 MB
+        size_limit = 2**28  # 256 MB
 
         if payload_size > size_limit:
             raise ValueError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")
@@ -212,11 +215,11 @@ def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str
 
 
 def handle_failure(
-        broker_client: MessageBrokerClientBase,
-        response_channel: str,
-        json_result_fragments: List[Dict[str, Any]],
-        e: Exception,
-        mdf_size: int
+    broker_client: MessageBrokerClientBase,
+    response_channel: str,
+    json_result_fragments: List[Dict[str, Any]],
+    e: Exception,
+    mdf_size: int,
 ) -> None:
     """
     Handles failure scenarios by logging the error and pushing a failure message to a broker channel.
@@ -348,7 +351,7 @@ def _message_broker_task_sink(builder: mrc.Builder) -> None:
     client_type = validated_config.broker_client.client_type.lower()
     broker_params = validated_config.broker_client.broker_params
 
-    if (client_type == "redis"):
+    if client_type == "redis":
         client = RedisClient(
             host=validated_config.broker_client.host,
             port=validated_config.broker_client.port,
@@ -358,7 +361,7 @@ def _message_broker_task_sink(builder: mrc.Builder) -> None:
             connection_timeout=validated_config.broker_client.connection_timeout,
             use_ssl=broker_params.get("use_ssl", False),
         )
-    elif (client_type == "simple"):
+    elif client_type == "simple":
         client = SimpleClient(
             host=validated_config.broker_client.host,
             port=validated_config.broker_client.port,

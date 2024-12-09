@@ -6,12 +6,13 @@ from morpheus.config import Config
 from morpheus.pipeline.pipeline import Pipeline
 
 from nv_ingest.util.pipeline.stage_builders import *
+from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
 
 def setup_ingestion_pipeline(
-        pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
+    pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
 ):
     message_provider_host, message_provider_port = get_message_provider_config()
 

@@ -94,7 +94,7 @@ Password: <Your Key>
 
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
-# Container images must access resources from NGC. 
+# Container images must access resources from NGC.
 NGC_API_KEY=...
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
@@ -116,7 +116,7 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
-> 
+>
 > If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
@@ -160,7 +160,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 > ```
 > docker compose build
 > ```
-> 
+>
 > After the image is built, run `docker compose up` per item 5 above.
 
 ### Step 2: Installing Python dependencies
@@ -179,9 +179,9 @@ pip install .
 
 > [!NOTE]
 > Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
-> 
+>
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
-> 
+>
 > To interact within the container:
 > ```
 > docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
@@ -190,7 +190,7 @@ pip install .
 > ```
 > (morpheus) root@aba77e2a4bde:/workspace#
 > ```
-> 
+>
 > From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
 ### Step 3: Ingesting Documents

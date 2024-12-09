@@ -4,24 +4,27 @@
 
 import base64
 import io
-import numpy as np
-import pytest
-
 from io import BytesIO
-from PIL import Image
 from typing import Tuple
 from unittest import mock
 
-from nv_ingest.util.image_processing.transforms import numpy_to_base64, base64_to_numpy, check_numpy_image_size, \
-    scale_image_to_encoding_size, ensure_base64_is_png
+import numpy as np
+import pytest
+from PIL import Image
+
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
+from nv_ingest.util.image_processing.transforms import check_numpy_image_size
+from nv_ingest.util.image_processing.transforms import ensure_base64_is_png
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
 
 
 # Helper function to create a base64-encoded string from an image
 def create_base64_image(width, height, color="white"):
-    img = Image.new('RGB', (width, height), color=color)
+    img = Image.new("RGB", (width, height), color=color)
     buffered = BytesIO()
     img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode('utf-8')
+    return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
 # Fixture for a valid base64-encoded image string
@@ -39,7 +42,7 @@ def corrupted_base64_image():
 # Fixture for a base64 string that decodes but is not a valid image
 @pytest.fixture
 def non_image_base64():
-    return base64.b64encode(b"This is not an image").decode('utf-8')
+    return base64.b64encode(b"This is not an image").decode("utf-8")
 
 
 def test_numpy_to_base64_valid_rgba_image():
@@ -121,7 +124,7 @@ def generate_base64_image(size: Tuple[int, int]) -> str:
     return base64.b64encode(buffered.getvalue()).decode("utf-8")
 
 
-def generate_base64_image_with_format(format: str = 'PNG', size: Tuple[int, int] = (100, 100)) -> str:
+def generate_base64_image_with_format(format: str = "PNG", size: Tuple[int, int] = (100, 100)) -> str:
     """Helper function to generate a base64-encoded image of a specified format and size."""
     img = Image.new("RGB", size, color="blue")  # Simple blue image
     buffered = io.BytesIO()

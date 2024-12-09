@@ -14,8 +14,9 @@ from typing import List
 from typing import Optional
 
 import pandas as pd
-import nv_ingest.extraction_workflows.image as image_helpers
 from morpheus.config import Config
+
+import nv_ingest.extraction_workflows.image as image_helpers
 from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
@@ -23,11 +24,11 @@ logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def decode_and_extract(
-        base64_row: pd.Series,
-        task_props: Dict[str, Any],
-        validated_config: Any,
-        default: str = "image",
-        trace_info: Optional[List] = None,
+    base64_row: pd.Series,
+    task_props: Dict[str, Any],
+    validated_config: Any,
+    default: str = "image",
+    trace_info: Optional[List] = None,
 ) -> Any:
     """
     Decodes base64 content from a row and extracts data from it using the specified extraction method.
@@ -87,14 +88,15 @@ def decode_and_extract(
         extract_params = task_props.get("params", {})
 
         logger.debug(
-            f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}")
-        if (validated_config.image_extraction_config is not None):
+            f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}"
+        )
+        if validated_config.image_extraction_config is not None:
             extract_params["image_extraction_config"] = validated_config.image_extraction_config
 
-        if (trace_info is not None):
+        if trace_info is not None:
             extract_params["trace_info"] = trace_info
 
-        if (not hasattr(image_helpers, extract_method)):
+        if not hasattr(image_helpers, extract_method):
             extract_method = default
 
         func = getattr(image_helpers, extract_method, default)
@@ -115,10 +117,7 @@ def decode_and_extract(
 
 
 def process_image(
-        df: pd.DataFrame,
-        task_props: Dict[str, Any],
-        validated_config: Any,
-        trace_info: Optional[Dict[str, Any]] = None
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict[str, Any]] = None
 ) -> pd.DataFrame:
     """
     Processes a pandas DataFrame containing image files in base64 encoding.
@@ -174,11 +173,11 @@ def process_image(
 
 
 def generate_image_extractor_stage(
-        c: Config,
-        extractor_config: Dict[str, Any],
-        task: str = "extract",
-        task_desc: str = "image_content_extractor",
-        pe_count: int = 24,
+    c: Config,
+    extractor_config: Dict[str, Any],
+    task: str = "extract",
+    task_desc: str = "image_content_extractor",
+    pe_count: int = 24,
 ):
     """
     Helper function to generate a multiprocessing stage to perform image content extraction.
@@ -205,6 +204,10 @@ def generate_image_extractor_stage(
     _wrapped_process_fn = functools.partial(process_image, validated_config=validated_config)
 
     return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn,
-        document_type="regex:^(png|svg|jpeg|jpg|tiff)$"
+        c=c,
+        pe_count=pe_count,
+        task=task,
+        task_desc=task_desc,
+        process_fn=_wrapped_process_fn,
+        document_type="regex:^(png|svg|jpeg|jpg|tiff)$",
     )

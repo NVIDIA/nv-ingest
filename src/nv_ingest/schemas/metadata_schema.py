@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from datetime import datetime
 import logging
+from datetime import datetime
 from enum import Enum
 from typing import Any
 from typing import Dict

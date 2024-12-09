@@ -41,4 +41,3 @@ CONTAINER ID   IMAGE                                        COMMAND             
 c1f1f6b9cc8c   .../tritonserver:24.05-py3       "/opt/nvidia/nvidia_…"   5 days ago     Up 8 hours            0.0.0.0:8000-8002->8000-8002/tcp   devin-nv-ingest-triton-1
 d277cf2c2703   redis/redis-stack                           "/entrypoint.sh"         2 weeks ago    Up 8 hours            0.0.0.0:6379->6379/tcp, 8001/tcp   devin-nv-ingest-redis-1
 ```
-
