@@ -25,8 +25,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
     runtime: nvidia
 
   deplot:
@@ -46,8 +46,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "0" ]
-              capabilities: [ gpu ]
+              device_ids: ["0"]
+              capabilities: [gpu]
     runtime: nvidia
 
   cached:
@@ -68,8 +68,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
     runtime: nvidia
 
   paddle:
@@ -90,8 +90,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
     runtime: nvidia
 
   embedding:
@@ -112,8 +112,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
     runtime: nvidia
 
   nv-ingest-ms-runtime:
@@ -188,8 +188,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
   
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
@@ -310,8 +310,8 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: [ "1" ]
-              capabilities: [ gpu ]
+              device_ids: ["1"]
+              capabilities: [gpu]
     depends_on:
       - "etcd"
       - "minio"
