@@ -38,7 +38,6 @@ from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim import doughnut as doughnut_utils
-from nv_ingest.util.nim.helpers import call_image_inference_model
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
@@ -146,8 +145,13 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     accumulated_tables = []
     accumulated_images = []
 
+    model_interface = doughnut_utils.DoughnutModelInterface()
     doughnut_client = create_inference_client(
-        doughnut_config.doughnut_endpoints, doughnut_config.auth_token, doughnut_config.doughnut_infer_protocol
+        doughnut_config.doughnut_endpoints,
+        model_interface,
+        doughnut_config.auth_token,
+        doughnut_config.doughnut_infer_protocol,
+        timeout=300,  # TODO: We shouldn't need this with an optimized endpoint.
     )
 
     for batch, batch_page_offset in zip(batches, batch_page_offsets):
@@ -326,7 +330,8 @@ def preprocess_and_send_requests(
     output = []
     for page_image in page_images:
         # Currently, the model only supports processing one page at a time (batch size = 1).
-        response = call_image_inference_model(doughnut_client, "doughnut", page_image)
+        data = {"image": page_image}
+        response = doughnut_client.infer(data, model_name="doughnut")
         output.append(response)
 
     if len(output) != len(batch):

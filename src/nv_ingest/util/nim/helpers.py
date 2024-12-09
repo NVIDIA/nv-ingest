@@ -6,7 +6,6 @@ import logging
 import re
 import time
 from typing import Any
-from typing import Dict
 from typing import Optional
 from typing import Tuple
 
@@ -107,12 +106,12 @@ class NimClient:
     """
 
     def __init__(
-            self,
-            model_interface: ModelInterface,
-            protocol: str,
-            endpoints: Tuple[str, str],
-            auth_token: Optional[str] = None,
-            timeout: float = 30.0
+        self,
+        model_interface: ModelInterface,
+        protocol: str,
+        endpoints: Tuple[str, str],
+        auth_token: Optional[str] = None,
+        timeout: float = 30.0,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -143,12 +142,12 @@ class NimClient:
 
         grpc_endpoint, http_endpoint = endpoints
 
-        if self.protocol == 'grpc':
+        if self.protocol == "grpc":
             if not grpc_endpoint:
                 raise ValueError("gRPC endpoint must be provided for gRPC protocol")
             logger.debug(f"Creating gRPC client with {grpc_endpoint}")
             self.client = grpcclient.InferenceServerClient(url=grpc_endpoint)
-        elif self.protocol == 'http':
+        elif self.protocol == "http":
             if not http_endpoint:
                 raise ValueError("HTTP endpoint must be provided for HTTP protocol")
             logger.debug(f"Creating HTTP client with {http_endpoint}")
@@ -190,11 +189,11 @@ class NimClient:
         formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
 
         # Perform inference
-        if self.protocol == 'grpc':
+        if self.protocol == "grpc":
             logger.debug("Performing gRPC inference...")
             response = self._grpc_infer(formatted_input, model_name)
             logger.debug("gRPC inference received response")
-        elif self.protocol == 'http':
+        elif self.protocol == "http":
             logger.debug("Performing HTTP inference...")
             response = self._http_infer(formatted_input)
             logger.debug("HTTP inference received response")
@@ -206,9 +205,7 @@ class NimClient:
             response, protocol=self.protocol, data=prepared_data, **kwargs
         )
         results = self.model_interface.process_inference_results(
-            parsed_output,
-            original_image_shapes=data.get('original_image_shapes'),
-            **kwargs
+            parsed_output, original_image_shapes=data.get("original_image_shapes"), **kwargs
         )
         return results
 
@@ -267,26 +264,31 @@ class NimClient:
         while attempt <= max_retries:
             try:
                 response = requests.post(
-                    self.endpoint_url,
-                    json=formatted_input,
-                    headers=self.headers,
-                    timeout=self.timeout
+                    self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
                 )
                 status_code = response.status_code
 
                 if status_code in [429, 503]:
                     # Warn and attempt to retry
-                    logger.warning(f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying...")
+                    logger.warning(
+                        f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying..."
+                    )
                     if attempt == max_retries:
                         # No more retries left
                         logger.error(f"Max retries exceeded after receiving HTTP {status_code}.")
                         response.raise_for_status()  # This will raise the appropriate HTTPError
                     else:
                         # Exponential backoff before retrying
-                        backoff_time = base_delay * (2 ** attempt)
+                        backoff_time = base_delay * (2**attempt)
                         time.sleep(backoff_time)
                         attempt += 1
                         continue
+                elif (response.status_code == 202) and ("nvcf-reqid" in response.headers):
+                    req_id = response.headers.get("nvcf-reqid")
+                    response = repoll_http_client(
+                        self.endpoint_url, req_id, payload=formatted_input, headers=self.headers
+                    )
+                    return response
                 else:
                     # Not a 429/503 - just raise_for_status or return the response
                     response.raise_for_status()
@@ -313,15 +315,16 @@ class NimClient:
         raise Exception(f"Failed to get a successful response after {max_retries} retries.")
 
     def close(self):
-        if self.protocol == 'grpc' and hasattr(self.client, 'close'):
+        if self.protocol == "grpc" and hasattr(self.client, "close"):
             self.client.close()
 
 
 def create_inference_client(
-        endpoints: Tuple[str, str],
-        model_interface: ModelInterface,
-        auth_token: Optional[str] = None,
-        infer_protocol: Optional[str] = None,
+    endpoints: Tuple[str, str],
+    model_interface: ModelInterface,
+    auth_token: Optional[str] = None,
+    infer_protocol: Optional[str] = None,
+    timeout: float = 30.0,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -355,10 +358,10 @@ def create_inference_client(
     elif infer_protocol is None and http_endpoint:
         infer_protocol = "http"
 
-    if infer_protocol not in ['grpc', 'http']:
+    if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    return NimClient(model_interface, infer_protocol, endpoints, auth_token)
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout=timeout)
 
 
 def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
@@ -431,7 +434,7 @@ def remove_url_endpoints(url) -> str:
     Returns:
         str: URL with just the hostname:port portion remaining
     """
-    if ("/v1" in url):
+    if "/v1" in url:
         url = url.split("/v1")[0]
 
     return url
@@ -592,3 +595,49 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
         return ""
+
+
+def repoll_http_client(url, req_id, payload=None, headers=None, max_retries=100, poll_interval=3):
+    # Construct the base URL dynamically from the original URL
+    if "/v2/nvcf/pexec/functions" in url:
+        base_url = url.split("/pexec/functions")[0]
+    else:
+        raise ValueError("The endpoint URL does not contain the expected path structure.")
+
+    poll_url = f"{base_url}/exec/status/{req_id}"
+
+    poll_headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if "Authorization" in headers:
+        poll_headers.update({"Authorization": headers.get("Authorization")})
+
+    retry_count = 0
+
+    while retry_count < max_retries:
+        response = requests.get(poll_url, headers=poll_headers)
+
+        # Handle 404 by obtaining a new req_id if the request was pending too long
+        if (response.status_code == 404) and (payload is not None):
+            logger.debug("Received 404 (request might have been pending too long). Retrying.")
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+
+            if (response.status_code) == 202 and ("nvcf-reqid" in response.headers):
+                req_id = response.headers.get("nvcf-reqid")
+                retry_count += 1
+                continue
+            else:
+                # If we get a final response, return it
+                return response.json()
+
+        response.raise_for_status()
+
+        if response.status_code != 202:
+            return response.json().get("response")
+
+        time.sleep(poll_interval)
+        retry_count += 1
+
+    raise RuntimeError("Maximum number of retries reached without a final response.")
