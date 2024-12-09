@@ -26,17 +26,15 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-import tritonclient.grpc as grpcclient
 import nv_ingest.util.nim.yolox as yolox_utils
 
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
-from nv_ingest.util.nim.yolox import prepare_images_for_inference
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
@@ -60,81 +58,21 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-        pages: List[libpdfium.PdfPage],
+        pages: List,  # List[libpdfium.PdfPage]
         config: PDFiumConfigSchema,
-        max_batch_size: int = YOLOX_MAX_BATCH_SIZE,
-        num_classes: int = YOLOX_NUM_CLASSES,
-        conf_thresh: float = YOLOX_CONF_THRESHOLD,
-        iou_thresh: float = YOLOX_IOU_THRESHOLD,
-        min_score: float = YOLOX_MIN_SCORE,
-        final_thresh: float = YOLOX_FINAL_SCORE,
         trace_info: Optional[List] = None,
-) -> List[Tuple[int, CroppedImageWithContent]]:
-    """
-    Extract tables and charts from a series of document pages using an ensemble of image-based models.
-
-    This function processes a list of document pages to detect and extract tables and charts.
-    It uses a sequence of models hosted on different inference servers to achieve this.
-
-    Parameters
-    ----------
-    pages : List[libpdfium.PdfPage]
-        A list of document pages to process.
-    yolox_nim_endpoint_url : str
-        The URL of the Triton inference server endpoint for the primary model.
-    model_name : str
-        The name of the model to use on the Triton server.
-    max_batch_size : int, optional
-        The maximum number of pages to process in a single batch (default is 16).
-    num_classes : int, optional
-        The number of classes the model is trained to detect (default is 3).
-    conf_thresh : float, optional
-        The confidence threshold for detection (default is 0.01).
-    iou_thresh : float, optional
-        The Intersection Over Union (IoU) threshold for non-maximum suppression (default is 0.5).
-    min_score : float, optional
-        The minimum score threshold for considering a detection valid (default is 0.1).
-    final_thresh: float, optional
-        Threshold for keeping a bounding box applied after postprocessing. (default is 0.48)
-
-
-    Returns
-    -------
-    List[Tuple[int, ImageTable]]
-        A list of tuples, each containing the page index and an `ImageTable` or `ImageChart` object
-        representing the detected table or chart along with its associated metadata.
-
-    Notes
-    -----
-    This function centralizes the management of inference clients, handles batch processing
-    of pages, and manages the inference and post-processing of results from multiple models.
-    It ensures that the results are properly associated with their corresponding pages and
-    regions within those pages.
-
-    Examples
-    --------
-    >>> pages = [libpdfium.PdfPage(), libpdfium.PdfPage()]  # List of pages from a document
-    >>> tables_and_charts = extract_tables_and_charts_using_image_ensemble(
-    ...     pages,
-    ...     yolox_nim_endpoint_url="http://localhost:8000",
-    ...     model_name="model",
-    ...     max_batch_size=8,
-    ...     num_classes=3,
-    ...     conf_thresh=0.5,
-    ...     iou_thresh=0.5,
-    ...     min_score=0.2
-    ... )
-    >>> for page_idx, image_obj in tables_and_charts:
-    ...     print(f"Page: {page_idx}, Object: {image_obj}")
-    """
+) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
     tables_and_charts = []
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_client = create_inference_client(config.yolox_endpoints, model_interface, config.auth_token,
+                                               config.yolox_infer_protocol)
 
         batches = []
         i = 0
+        max_batch_size = YOLOX_MAX_BATCH_SIZE
         while i < len(pages):
             batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
             batches.append(pages[i: i + batch_size])  # noqa: E203
@@ -146,33 +84,41 @@ def extract_tables_and_charts_using_image_ensemble(
                 batch, scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
             )
 
-            # original images is an implicitly indexed list of pages
-            original_image_shapes = [image.shape for image in original_images]
-            input_array = prepare_images_for_inference(original_images)
+            # Prepare data
+            data = {'images': original_images}
 
-            output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
-
-            # Get back inference results
-            yolox_annotated_detections = process_inference_results(
-                output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
+            # Perform inference using NimClient
+            inference_results = yolox_client.infer(
+                data,
+                model_name="yolox",
+                num_classes=YOLOX_NUM_CLASSES,
+                conf_thresh=YOLOX_CONF_THRESHOLD,
+                iou_thresh=YOLOX_IOU_THRESHOLD,
+                min_score=YOLOX_MIN_SCORE,
+                final_thresh=YOLOX_FINAL_SCORE,
             )
 
-            for annotation_dict, original_image in zip(yolox_annotated_detections, original_images):
+            # Process results
+            for annotation_dict, original_image in zip(inference_results, original_images):
                 extract_table_and_chart_images(
                     annotation_dict,
                     original_image,
                     page_index,
                     tables_and_charts,
                 )
-
                 page_index += 1
+
+    except TimeoutError:
+        logger.error("Timeout error during table/chart extraction.")
+        raise
 
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
         raise e
+
     finally:
-        if isinstance(yolox_client, grpcclient.InferenceServerClient):
+        if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
@@ -347,6 +293,8 @@ def pdfium_extractor(
     source_id = row_data["source_id"]
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
+    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
+    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -477,6 +425,9 @@ def pdfium_extractor(
             if (extract_tables and (table_and_charts.type_string == "table")) or (
                     extract_charts and (table_and_charts.type_string == "chart")
             ):
+                if (table_and_charts.type_string == "table"):
+                    table_and_charts.content_format = paddle_output_format
+
                 extracted_data.append(
                     construct_table_and_chart_metadata(
                         table_and_charts,

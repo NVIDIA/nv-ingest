@@ -10,10 +10,11 @@ import json
 import logging
 import math
 import time
+import traceback
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
-from typing import Any
+from typing import Any, Type
 from typing import Callable
 from typing import Dict
 from typing import List
@@ -21,6 +22,7 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
+from nv_ingest_client.message_clients import MessageBrokerClientBase
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec
@@ -61,7 +63,7 @@ class NvIngestClient:
 
     def __init__(
             self,
-            message_client_allocator: Callable[..., RestClient] = RestClient,
+            message_client_allocator: Type[MessageBrokerClientBase] = RestClient,
             message_client_hostname: Optional[str] = "localhost",
             message_client_port: Optional[int] = 7670,
             message_client_kwargs: Optional[Dict] = None,
@@ -304,10 +306,10 @@ class NvIngestClient:
                                                                                  JobStateEnum.SUBMITTED_ASYNC])
             response = self._message_client.fetch_message(job_state.job_id, timeout)
 
-            if response is not None:
+            if (response.response_code == 0):
                 try:
                     job_state.state = JobStateEnum.PROCESSING
-                    response_json = json.loads(response)
+                    response_json = json.loads(response.response)
                     if data_only:
                         response_json = response_json["data"]
 
@@ -388,21 +390,19 @@ class NvIngestClient:
                     # Attempt to fetch the job result
                     result = self._fetch_job_result(job_id, timeout, data_only=False)
                     return result, job_id
-                except Exception as e:
-                    # Check if the error is a retryable error
-                    if "Job is not ready yet. Retry later." in str(e):
-                        if verbose:
-                            logger.info(
-                                f"Job {job_id} is not ready. "
-                                f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
-                                f"after {retry_delay} seconds."
-                            )
-                        retries += 1
-                        time.sleep(retry_delay)  # Wait before retrying
-                    else:
-                        # For any other error, log and break out of the retry loop
-                        logger.error(f"Error while fetching result for job ID {job_id}: {e}")
-                        return None, job_id
+                except TimeoutError as err:
+                    if verbose:
+                        logger.info(
+                            f"Job {job_id} is not ready. "
+                            f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
+                            f"after {retry_delay} seconds."
+                        )
+                    retries += 1
+                    time.sleep(retry_delay)  # Wait before retrying
+                except (RuntimeError, Exception) as err:
+                    # For any other error, log and break out of the retry loop
+                    logger.error(f"Error while fetching result for job ID {job_id}: {e}")
+                    return None, job_id
             logger.error(f"Max retries exceeded for job {job_id}.")
             return None, job_id
 
@@ -513,7 +513,10 @@ class NvIngestClient:
         try:
             message = json.dumps(job_state.job_spec.to_dict())
 
-            x_trace_id, job_id = self._message_client.submit_message(job_queue_id, message)
+            response = self._message_client.submit_message(job_queue_id, message, for_nv_ingest=True)
+            x_trace_id = response.trace_id
+            job_id = response.transaction_id.replace('"', "")
+            logger.debug(f"Submitted job {job_index} to queue {job_queue_id} and got back job ID {job_id}")
 
             job_state.state = JobStateEnum.SUBMITTED
             job_state.job_id = job_id
@@ -523,6 +526,7 @@ class NvIngestClient:
 
             return x_trace_id
         except Exception as err:
+            traceback.print_exc()
             logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
             job_state.state = JobStateEnum.FAILED
             raise

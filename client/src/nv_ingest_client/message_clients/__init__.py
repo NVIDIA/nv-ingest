@@ -2,6 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .client_base import MessageClientBase
+from .client_base import MessageBrokerClientBase
 
-__all__ = ["MessageClientBase"]
+__all__ = ["MessageBrokerClientBase"]

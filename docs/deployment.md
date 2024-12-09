@@ -4,7 +4,7 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-### Launch nv-ingest micro-service(s)
+### Launch nv-ingest microservice(s)
 
 ```bash
 # Redis is our message broker for the ingest service, always required.
@@ -44,4 +44,19 @@ CONTAINER ID   IMAGE                                        COMMAND             
 6065c12d6034   .../nv-ingest:2024.6.3.dev0                 "/opt/conda/bin/tini…"   6 hours ago    Up 6 hours                                               nv-ingest-ms-runtime-1
 c1f1f6b9cc8c   .../tritonserver:24.05-py3       "/opt/nvidia/nvidia_…"   5 days ago     Up 8 hours            0.0.0.0:8000-8002->8000-8002/tcp   devin-nv-ingest-triton-1
 d277cf2c2703   redis/redis-stack                           "/entrypoint.sh"         2 weeks ago    Up 8 hours            0.0.0.0:6379->6379/tcp, 8001/tcp   devin-nv-ingest-redis-1
+```
+
+### Launch nv-ingest locally via library API
+
+#### Pre-requisites
+To run the nv-ingest service locally, we will require [Conda (Mamba) to be installed](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
+
+From the root of the repository, run the following commands to create a new Conda environment and install the required dependencies:
+```bash
+mamba env create --file ./docker/environments/nv_ingest_environment.yml --name nv_ingest_runtime
+
+conda activate nv_ingest_runtime
+
+pip install ./
+pip install ./client
 ```

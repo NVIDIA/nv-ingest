@@ -15,8 +15,6 @@ import uuid
 from json import JSONDecodeError
 from typing import Any
 
-from redis import RedisError
-
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
@@ -76,7 +74,7 @@ class RedisIngestService(IngestServiceMeta):
 
     async def fetch_job(self, job_id: str) -> Any:
         # Fetch message with a timeout
-        message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=5)
+        message = self._ingest_client.fetch_message(f"{job_id}", timeout=5)
         if message is None:
             raise TimeoutError()
 

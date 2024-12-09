@@ -44,8 +44,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 2 |
+| A100 | SXM or PCIe | 80GB | 2 |
 
 ### Software
 
@@ -63,6 +63,9 @@ To get started using NVIDIA Ingest, you need to do a few things:
 2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
+
+Optional:
+1. [Direct Library Deployment](docs/deployment.md) 📦
 
 ### Step 1: Starting containers
 
