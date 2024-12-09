@@ -187,7 +187,7 @@ Note: The 'extract_method' automatically selects the optimal method based on 'do
     default=False,
     help="""
 \b
-If enabled the CLI will collect the `trace_id` for each file that was submitted to the 
+If enabled the CLI will collect the 'profile' for each file that was submitted to the
 nv-ingest REST endpoint for processing.
 
 \b
