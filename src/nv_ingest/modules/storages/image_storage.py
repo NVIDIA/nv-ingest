@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = "image_storage"
 MODULE_NAMESPACE = "nv_ingest"
 
-# TODO: Move these into pipeline.py to populate the stage and validate them using the pydantic schema on startup.
+# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema on startup.
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_READ_ADDRESS = os.environ.get("MINIO_PUBLIC_ADDRESS", "http://minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
@@ -44,9 +44,27 @@ ImageStorageLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, I
 
 def upload_images(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     """
-    Identify contents (e.g., images) within a dataframe and uploads the data to MinIO.
-    The image metadata in the metadata column is updated with the URL of the uploaded data.
+    Identifies content within a DataFrame and uploads it to MinIO, updating metadata with the uploaded URL.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        The DataFrame containing the content to be uploaded.
+    params : dict
+        Configuration parameters for the upload, including content types, endpoint, bucket name,
+        and credentials.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame with metadata reflecting uploaded URLs.
+
+    Raises
+    ------
+    Exception
+        If the upload process encounters an error.
     """
+
     content_types = params.get("content_types")
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
@@ -115,6 +133,20 @@ def upload_images(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
 def _storage_images(builder: mrc.Builder):
+    """
+    A module for storing images or structured content in MinIO, updating the metadata with storage URLs.
+
+    Parameters
+    ----------
+    builder : mrc.Builder
+        The Morpheus pipeline builder object.
+
+    Raises
+    ------
+    ValueError
+        If storing extracted objects fails.
+    """
+
     validated_config = fetch_and_validate_module_config(builder, ImageStorageModuleSchema)
 
     @filter_by_task(["store"])

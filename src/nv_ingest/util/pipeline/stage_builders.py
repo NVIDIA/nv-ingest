@@ -14,9 +14,9 @@ from morpheus.stages.general.linear_modules_source import LinearModuleSourceStag
 from morpheus.stages.general.linear_modules_stage import LinearModulesStage
 
 from nv_ingest.modules.injectors.metadata_injector import MetadataInjectorLoaderFactory
-from nv_ingest.modules.sinks.redis_task_sink import RedisTaskSinkLoaderFactory
+from nv_ingest.modules.sinks.message_broker_task_sink import MessageBrokerTaskSinkLoaderFactory
 from nv_ingest.modules.sinks.vdb_task_sink import VDBTaskSinkLoaderFactory
-from nv_ingest.modules.sources.redis_task_source import RedisTaskSourceLoaderFactory
+from nv_ingest.modules.sources.message_broker_task_source import MessageBrokerTaskSourceLoaderFactory
 from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
@@ -90,8 +90,8 @@ def get_table_detection_service(env_var_prefix):
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
     )
 
-    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
-    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
     logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
 
     return grpc_endpoint, http_endpoint, auth_token, infer_protocol
@@ -104,15 +104,20 @@ def get_default_cpu_count():
 
 
 def add_source_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
-    source_module_loader = RedisTaskSourceLoaderFactory.get_instance(
-        module_name="redis_listener",
+    client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
+    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "morpheus_task_queue")
+
+    source_module_loader = MessageBrokerTaskSourceLoaderFactory.get_instance(
+        module_name="broker_listener",
         module_config=ingest_config.get(
-            "redis_task_source",
+            "broker_task_source",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
-                }
+                    "client_type": client_type,
+                },
+                "task_queue": task_queue_name,
             },
         ),
     )
@@ -225,6 +230,7 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
     # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+
     table_content_extractor_config = ingest_config.get("table_content_extraction_module",
                                                        {
                                                            "stage_config": {
@@ -352,7 +358,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         "",
     )
 
-    endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT")
+    endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
@@ -420,15 +426,18 @@ def add_image_storage_stage(pipe, morpheus_pipeline_config):
 
 
 def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
-    sink_module_loader = RedisTaskSinkLoaderFactory.get_instance(
-        module_name="redis_task_sink",
+    client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
+
+    sink_module_loader = MessageBrokerTaskSinkLoaderFactory.get_instance(
+        module_name="broker_task_sink",
         module_config=ingest_config.get(
-            "redis_task_sink",
+            "broker_task_sink",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
-                }
+                    "client_type": client_type,
+                },
             },
         ),
     )
@@ -479,9 +488,10 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config, message_
         module_config=ingest_config.get(
             "otel_meter_module",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
+                    "client_type": "redis",
                 },
                 "otel_endpoint": endpoint,
             },

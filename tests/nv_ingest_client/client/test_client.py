@@ -15,6 +15,7 @@ from unittest.mock import patch
 
 import pytest
 from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
 from nv_ingest_client.primitives.jobs import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum
@@ -44,18 +45,19 @@ class ExtendedMockClient(MockClient):
         super().__init__(host, port)
         self.submitted_messages = []
 
-    def submit_message(self, job_queue_id, job_spec_str):
+    def submit_message(self, job_queue_id, job_spec_str, trace_id=None, for_nv_ingest=False):
         # Simulate message submission by storing it
         random_x_trace_id = "123456789"
         job_id = 0
         self.submitted_messages.append((job_queue_id, job_spec_str))
-        return random_x_trace_id, job_id
+        return ResponseSchema(trace_id=random_x_trace_id, transaction_id=job_id, response_code=0)
 
 
 class ExtendedMockClientWithFailure(ExtendedMockClient):
-    def submit_message(self, job_queue_id, job_spec_str):
+    def submit_message(self, job_queue_id, job_spec_str, trace_id=None, for_nv_ingest=False):
         if "fail_queue" in job_queue_id:
             raise Exception("Simulated submission failure")
+
         return super().submit_message(job_queue_id, job_spec_str)
 
 
@@ -346,7 +348,7 @@ def test_submission_failure_sets_job_to_failed(nv_ingest_client_with_jobs):
         nv_ingest_client_with_jobs.submit_job(job_id, job_queue_id)
 
     assert (
-        nv_ingest_client_with_jobs._job_states[job_id].state == JobStateEnum.FAILED
+            nv_ingest_client_with_jobs._job_states[job_id].state == JobStateEnum.FAILED
     ), "Job state should be set to FAILED after a submission failure"
 
 
