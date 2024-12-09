@@ -14,3 +14,4 @@ fsspec
 pymilvus==2.4.9
 pymilvus[bulk_writer,model]
 azure-storage-blob
+llama-index-embeddings-nvidia
