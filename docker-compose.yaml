@@ -194,7 +194,7 @@ services:
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
-    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    command: ["--config=/etc/otel-collector-config.yaml"]
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:

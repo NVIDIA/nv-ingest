@@ -58,4 +58,3 @@ dependencies:
       - typing-extensions==4.12.2
       - urllib3==2.2.3
       - xlsxwriter==3.2.0
-prefix: /home/devin/miniforge3/envs/nv_ingest_client
