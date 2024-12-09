@@ -72,12 +72,18 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
 
         image_array = base64_to_numpy(base64_image)
 
-        paddle_result = ""
+        paddle_result = "", ""
         if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
             # Perform inference using the NimClient
-            paddle_result = paddle_client.infer(data, model_name="paddle")
+            paddle_result = paddle_client.infer(
+                data,
+                model_name="paddle",
+                table_content_format=table_metadata.get("table_content_format"),
+            )
 
-        table_metadata["table_content"] = paddle_result
+        table_content, table_content_format = paddle_result
+        table_metadata["table_content"] = table_content
+        table_metadata["table_content_format"] = table_content_format
     except Exception as e:
         logger.error(f"Unhandled error calling PaddleOCR inference model: {e}", exc_info=True)
         raise
@@ -132,20 +138,16 @@ def _extract_table_data(
 
     paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
 
-    if (paddle_infer_protocol == 'grpc'):
-        # Obtain paddle_version
-        # Assuming that the grpc endpoint is at index 0
-        paddle_endpoint = stage_config.paddle_endpoints[1]
-        try:
-            paddle_version = get_version(paddle_endpoint)
-            if not paddle_version:
-                raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
-        except Exception as e:
-            logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
-            raise e
-    else:
-        # If protocol is 'http', skip getting the version
-        paddle_version = None
+    # Obtain paddle_version
+    # Assuming that the grpc endpoint is at index 0
+    paddle_endpoint = stage_config.paddle_endpoints[1]
+    try:
+        paddle_version = get_version(paddle_endpoint)
+        if not paddle_version:
+            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
+    except Exception as e:
+        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
+        raise e
 
     # Create the PaddleOCRModelInterface with paddle_version
     paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
