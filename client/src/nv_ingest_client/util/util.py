@@ -300,14 +300,13 @@ def generate_matching_files(file_sources):
     It yields each matching file path, allowing for efficient processing of potentially large
     sets of files.
     """
-    files = [
-        file_path
-        for pattern in file_sources
-        for file_path in glob.glob(pattern, recursive=True)
-        if os.path.isfile(file_path)
-    ]
-    for file_path in files:
-        yield file_path
+    for pattern in file_sources:
+        if os.path.isdir(pattern):
+            pattern = os.path.join(pattern, "*")
+
+        for file_path in glob.glob(pattern, recursive=True):
+            if os.path.isfile(file_path):
+                yield file_path
 
 
 def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
