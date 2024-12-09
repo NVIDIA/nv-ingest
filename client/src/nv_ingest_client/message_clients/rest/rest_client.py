@@ -11,6 +11,7 @@
 # pylint: skip-file
 
 import logging
+import re
 import time
 from typing import Any
 
@@ -27,9 +28,44 @@ logger = logging.getLogger(__name__)
 # 4XX - Any 4XX status is considered a client derived error and will result in failure
 # 5XX - Not all 500's are terminal but most are. Those which are listed below
 _TERMINAL_RESPONSE_STATUSES = [
-    400, 401, 402, 403, 404, 405, 406, 407, 408, 409, 410, 411, 412, 413,
-    414, 415, 416, 417, 418, 421, 422, 423, 424, 425, 426, 428, 429, 431, 451,
-    500, 501, 503, 505, 506, 507, 508, 510, 511
+    400,
+    401,
+    402,
+    403,
+    404,
+    405,
+    406,
+    407,
+    408,
+    409,
+    410,
+    411,
+    412,
+    413,
+    414,
+    415,
+    416,
+    417,
+    418,
+    421,
+    422,
+    423,
+    424,
+    425,
+    426,
+    428,
+    429,
+    431,
+    451,
+    500,
+    501,
+    503,
+    505,
+    506,
+    507,
+    508,
+    510,
+    511,
 ]
 
 
@@ -60,13 +96,13 @@ class RestClient(MessageBrokerClientBase):
     """
 
     def __init__(
-            self,
-            host: str,
-            port: int,
-            max_retries: int = 0,
-            max_backoff: int = 32,
-            connection_timeout: int = 300,
-            http_allocator: Any = httpx.AsyncClient,
+        self,
+        host: str,
+        port: int,
+        max_retries: int = 0,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        http_allocator: Any = httpx.AsyncClient,
     ):
         self._host = host
         self._port = port

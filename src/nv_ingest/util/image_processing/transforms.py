@@ -6,16 +6,12 @@ import base64
 import io
 import logging
 from io import BytesIO
-from math import ceil
-from math import floor
-from typing import Optional
-from typing import Tuple
+from math import ceil, floor
+from typing import Optional, Tuple
 
 import numpy as np
-from PIL import Image
-from PIL import UnidentifiedImageError
-
 from nv_ingest.util.converters import bytetools
+from PIL import Image, UnidentifiedImageError
 
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280

@@ -135,16 +135,16 @@ def extract_pdf_metadata(doc: pdfium.PdfDocument, source_id: str) -> PDFMetadata
 
 
 def construct_text_metadata(
-        accumulated_text,
-        keywords,
-        page_idx,
-        block_idx,
-        line_idx,
-        span_idx,
-        page_count,
-        text_depth,
-        source_metadata,
-        base_unified_metadata,
+    accumulated_text,
+    keywords,
+    page_idx,
+    block_idx,
+    line_idx,
+    span_idx,
+    page_count,
+    text_depth,
+    source_metadata,
+    base_unified_metadata,
 ):
     extracted_text = " ".join(accumulated_text)
 
@@ -360,11 +360,11 @@ def construct_image_metadata_from_pdf_image(
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
 def construct_table_and_chart_metadata(
-        structured_image: CroppedImageWithContent,
-        page_idx: int,
-        page_count: int,
-        source_metadata: Dict,
-        base_unified_metadata: Dict,
+    structured_image: CroppedImageWithContent,
+    page_idx: int,
+    page_count: int,
+    source_metadata: Dict,
+    base_unified_metadata: Dict,
 ):
     """
     +--------------------------------+--------------------------+------------+---+
@@ -394,7 +394,7 @@ def construct_table_and_chart_metadata(
     +--------------------------------+--------------------------+------------+---+
     """
 
-    if (structured_image.type_string in ("table",)):
+    if structured_image.type_string in ("table",):
         content = structured_image.image
         structured_content_text = structured_image.content
         table_format = TableFormatEnum.IMAGE
@@ -402,7 +402,7 @@ def construct_table_and_chart_metadata(
         description = StdContentDescEnum.PDF_TABLE
         meta_name = "table_metadata"
 
-    elif (structured_image.type_string in ("chart",)):
+    elif structured_image.type_string in ("chart",):
         content = structured_image.image
         structured_content_text = structured_image.content
         table_format = TableFormatEnum.IMAGE

@@ -12,9 +12,21 @@ from pprint import pprint
 
 import click
 from nv_ingest_client.cli.util.processing import check_schema
+from nv_ingest_client.primitives.tasks import (
+    CaptionTask,
+    DedupTask,
+    EmbedTask,
+    ExtractTask,
+    FilterTask,
+    SplitTask,
+    StoreTask,
+    VdbUploadTask,
+)
 from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionSchema
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import (
+    ChartExtractionSchema,
+    ChartExtractionTask,
+)
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
@@ -116,11 +128,11 @@ def click_validate_task(ctx, param, value):
                 new_task_id = f"{task_id}_{task_options.document_type}"
                 new_task = [(new_task_id, ExtractTask(**task_options.dict()))]
 
-                if (task_options.extract_tables == True):
+                if task_options.extract_tables == True:
                     subtask_options = check_schema(TableExtractionSchema, {}, "table_data_extract", "{}")
                     new_task.append(("table_data_extract", TableExtractionTask(**subtask_options.dict())))
 
-                if (task_options.extract_charts == True):
+                if task_options.extract_charts == True:
                     subtask_options = check_schema(ChartExtractionSchema, {}, "chart_data_extract", "{}")
                     new_task.append(("chart_data_extract", ChartExtractionTask(**subtask_options.dict())))
 

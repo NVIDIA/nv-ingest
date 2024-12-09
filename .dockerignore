@@ -1,0 +1,34 @@
+# Ignore all __pycache__ directories recursively
+**/__pycache__/
+
+# Output from examples
+processed_docs
+
+# Build and test output
+.pytest_cache
+.coverage
+
+# Sensitive environment variables
+.env
+
+# Pre-commit configuration file
+.pre-commit-config.yaml
+
+# Skaffold
+skaffold
+
+# Helm
+helm
+
+# Docker
+Dockerfile
+docker-compose.yaml
+
+.github
+
+# General repo files unfit for the container
+CHANGELOG.md
+CITATION.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md

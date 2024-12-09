@@ -18,11 +18,8 @@
 
 import logging
 import traceback
-
 from math import log
-from typing import List
-from typing import Optional
-from typing import Tuple
+from typing import List, Optional, Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
@@ -74,7 +71,7 @@ def extract_tables_and_charts_using_image_ensemble(
         max_batch_size = YOLOX_MAX_BATCH_SIZE
         while i < len(pages):
             batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
-            batches.append(pages[i: i + batch_size])  # noqa: E203
+            batches.append(pages[i : i + batch_size])  # noqa: E203
             i += batch_size
 
         page_index = 0
@@ -126,13 +123,13 @@ def extract_tables_and_charts_using_image_ensemble(
 
 
 def process_inference_results(
-        output_array: np.ndarray,
-        original_image_shapes: List[Tuple[int, int]],
-        num_classes: int,
-        conf_thresh: float,
-        iou_thresh: float,
-        min_score: float,
-        final_thresh: float,
+    output_array: np.ndarray,
+    original_image_shapes: List[Tuple[int, int]],
+    num_classes: int,
+    conf_thresh: float,
+    iou_thresh: float,
+    min_score: float,
+    final_thresh: float,
 ):
     """
     Process the model output to generate detection results and expand bounding boxes.
@@ -197,10 +194,10 @@ def process_inference_results(
 
 # Handle individual table/chart extraction and model inference
 def extract_table_and_chart_images(
-        annotation_dict,
-        original_image,
-        page_idx,
-        tables_and_charts,
+    annotation_dict,
+    original_image,
+    page_idx,
+    tables_and_charts,
 ):
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -244,8 +241,12 @@ def extract_table_and_chart_images(
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
-                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
-                max_height=height, type_string=label
+                content="",
+                image=base64_img,
+                bbox=(w1, h1, w2, h2),
+                max_width=width,
+                max_height=height,
+                type_string=label,
             )
             tables_and_charts.append((page_idx, table_data))
 
@@ -374,8 +375,12 @@ def pdfium_extractor(
                         image_bbox = obj.get_pos()
                         image_size = obj.get_size()
                         image_data = Base64Image(
-                            image=image_base64, bbox=image_bbox, width=image_size[0], height=image_size[1],
-                            max_width=page_width, max_height=page_height
+                            image=image_base64,
+                            bbox=image_bbox,
+                            width=image_size[0],
+                            height=image_size[1],
+                            max_width=page_width,
+                            max_height=page_height,
                         )
 
                         extracted_image_data = construct_image_metadata_from_pdf_image(
@@ -415,9 +420,9 @@ def pdfium_extractor(
 
     if extract_tables or extract_charts:
         for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
-                pages,
-                pdfium_config,
-                trace_info=trace_info,
+            pages,
+            pdfium_config,
+            trace_info=trace_info,
         ):
             if (extract_tables and (table_and_charts.type_string == "table")) or (
                     extract_charts and (table_and_charts.type_string == "chart")

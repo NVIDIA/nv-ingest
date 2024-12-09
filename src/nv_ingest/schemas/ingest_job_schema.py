@@ -5,19 +5,11 @@
 
 import logging
 from enum import Enum
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Literal
-from typing import Optional
-from typing import Union
-
-from pydantic import conint
-from pydantic import root_validator
-from pydantic import validator
+from typing import Any, Dict, List, Literal, Optional, Union
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from pydantic import conint, root_validator, validator
 
 logger = logging.getLogger(__name__)
 
@@ -161,7 +153,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
         IngestTaskTableExtraction,
-        IngestChartTableExtraction
+        IngestChartTableExtraction,
     ]
     raise_on_failure: bool = False
 

@@ -7,14 +7,11 @@ import json
 import logging
 import sys
 import traceback
-from typing import Any, List
-from typing import Dict
-from typing import Tuple
+from typing import Any, Dict, List, Tuple
 
 import mrc
 from morpheus.messages import ControlMessage
-from morpheus.utils.module_utils import ModuleLoaderFactory
-from morpheus.utils.module_utils import register_module
+from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
 from mrc.core import operators as ops
 
 from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
@@ -24,6 +21,7 @@ from nv_ingest.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
+from redis import RedisError
 
 logger = logging.getLogger(__name__)
 
@@ -140,8 +138,9 @@ def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> Lis
         ret_val_json = {
             "status": "success" if not message.get_metadata("cm_failed", False) else "failed",
             "description": (
-                "Successfully processed the message." if not message.get_metadata("cm_failed",
-                                                                                  False) else "Failed to process the message."
+                "Successfully processed the message."
+                if not message.get_metadata("cm_failed", False)
+                else "Failed to process the message."
             ),
             "data": fragment_data,  # Fragmented data
             "fragment": i,
@@ -192,7 +191,7 @@ def push_to_broker(broker_client: MessageBrokerClientBase, response_channel: str
 
     for json_payload in json_payloads:
         payload_size = sys.getsizeof(json_payload)
-        size_limit = 2 ** 28  # 256 MB
+        size_limit = 2**28  # 256 MB
 
         if payload_size > size_limit:
             raise ValueError(f"Payload size {payload_size} bytes exceeds limit of {size_limit / 1e6} MB.")

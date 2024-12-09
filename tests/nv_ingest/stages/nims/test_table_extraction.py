@@ -6,6 +6,12 @@ import pandas as pd
 
 from unittest.mock import Mock, patch
 from io import BytesIO
+from unittest.mock import Mock, patch
+
+import pandas as pd
+import pytest
+import requests
+from nv_ingest.stages.nim.table_extraction import _extract_table_data, _update_metadata
 from PIL import Image
 
 from nv_ingest.stages.nim.table_extraction import _update_metadata, _extract_table_data
@@ -79,8 +85,9 @@ def mock_paddle_client_and_requests():
     }
 
     # Patching create_inference_client and requests.post
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', return_value=paddle_client) as mock_create_client, \
-            patch('requests.post', return_value=mock_response) as mock_requests_post:
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=paddle_client) as mock_create_client, patch(
+        "requests.post", return_value=mock_response
+    ) as mock_requests_post:
         yield paddle_client, mock_create_client, mock_requests_post
 
 
@@ -105,12 +112,12 @@ def mock_paddle_client_and_requests_failure():
 @pytest.fixture
 def base64_encoded_image():
     # Create a simple image using PIL
-    img = Image.new('RGB', (64, 64), color='white')
+    img = Image.new("RGB", (64, 64), color="white")
     buffered = BytesIO()
     img.save(buffered, format="PNG")
     img_bytes = buffered.getvalue()
     # Encode the image to base64
-    base64_str = base64.b64encode(img_bytes).decode('utf-8')
+    base64_str = base64.b64encode(img_bytes).decode("utf-8")
     return base64_str
 
 
@@ -174,16 +181,13 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
 @pytest.fixture
 def sample_dataframe(base64_encoded_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
     return df
@@ -192,9 +196,7 @@ def sample_dataframe(base64_encoded_image):
 # Fixture for DataFrame with missing metadata
 @pytest.fixture
 def dataframe_missing_metadata():
-    data = {
-        "other_data": ["no metadata here"]
-    }
+    data = {"other_data": ["no metadata here"]}
     df = pd.DataFrame(data)
     return df
 
@@ -203,16 +205,13 @@ def dataframe_missing_metadata():
 @pytest.fixture
 def dataframe_non_table(base64_encoded_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_image,
-            "content_metadata": {
-                "type": "text",  # Not "structured"
-                "subtype": "paragraph"  # Not "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_image,
+                "content_metadata": {"type": "text", "subtype": "paragraph"},  # Not "structured"  # Not "table"
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
     return df
@@ -250,15 +249,12 @@ def test_update_metadata_non_table_content(dataframe_non_table):
 
 
 def test_update_metadata_image_too_small(base64_encoded_small_image):
-    row = pd.Series({
-        "metadata": {
-            "content": base64_encoded_small_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+    row = pd.Series(
+        {
+            "metadata": {
+                "content": base64_encoded_small_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
         }
     })
@@ -279,10 +275,12 @@ def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_
     result = _update_metadata(row, paddle_client, trace_info)
 
     # Expected content from the mocked response
-    expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost')
+    expected_content = (
+        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+        "desk fan Cost"
+    )
 
     # The table_content should be updated with expected_content
     assert result["table_metadata"]["table_content"] == expected_content
@@ -327,15 +325,17 @@ def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_
 
     trace_info = {}
 
-    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.3.3"):
+    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.3.3"):
         updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
     # Expected content from the mocked response
-    expected_content = ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost')
-    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == expected_content
+    expected_content = (
+        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+        "desk fan Cost"
+    )
+    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
     assert trace_info_out == trace_info
 
     # Verify that the mocked methods were called
@@ -353,7 +353,7 @@ def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_pa
 
     trace_info = {}
 
-    with patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.2.1"):
+    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.2.1"):
         with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
             _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
 
@@ -378,16 +378,13 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
 
 def test_extract_table_data_image_too_small(base64_encoded_small_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_small_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": ""
+        "metadata": [
+            {
+                "content": base64_encoded_small_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {"table_content": ""},
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
 
@@ -408,23 +405,27 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_response = Mock()
     mock_response.raise_for_status = Mock()  # Does nothing
     mock_response.json.return_value = {
-        'object': 'list',
-        'data': [{
-            'index': 0,
-            'content': ('Chart 1 This chart shows some gadgets, and some very fictitious costs '
-                        'Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 '
-                        '$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium '
-                        'desk fan Cost'),
-            'object': 'string'
-        }],
-        'model': 'paddleocr',
-        'usage': None
+        "object": "list",
+        "data": [
+            {
+                "index": 0,
+                "content": (
+                    "Chart 1 This chart shows some gadgets, and some very fictitious costs "
+                    "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
+                    "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
+                    "desk fan Cost"
+                ),
+                "object": "string",
+            }
+        ],
+        "model": "paddleocr",
+        "usage": None,
     }
 
-    with patch(f'{MODULE_UNDER_TEST}.create_inference_client', side_effect=mock_create_inference_client), \
-            patch(f'{MODULE_UNDER_TEST}.get_version', return_value="0.1.0"), \
-            patch('requests.post', return_value=mock_response):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", side_effect=mock_create_inference_client), patch(
+        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
+    ), patch("requests.post", return_value=mock_response):
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
     # The table_content should remain unchanged because the image is too small
-    assert updated_df.loc[0, 'metadata']['table_metadata']['table_content'] == ""
+    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == ""
