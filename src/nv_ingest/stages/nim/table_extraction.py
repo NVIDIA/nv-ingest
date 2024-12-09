@@ -2,15 +2,17 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 from morpheus.config import Config
+
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
@@ -63,7 +65,8 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
     if ((content_metadata.get("type") != "structured") or
             (content_metadata.get("subtype") != "table") or
-            (table_metadata is None)):
+            (table_metadata is None) or
+            (table_metadata.get("table_format") != TableFormatEnum.IMAGE)):
         return metadata
 
     # Modify table metadata with the result from the inference model

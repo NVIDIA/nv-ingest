@@ -146,7 +146,11 @@ services:
       # build.nvidia.com hosted deplot
       - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
-      - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
+      - DOUGHNUT_GRPC_ENDPOINT=
+      # NVCF hosted doughnut endpoints.
+      - DOUGHNUT_HTTP_ENDPOINT=https://placeholder
+      - DOUGHNUT_INFER_PROTOCOL=http
+      - DOUGHNUT_NVCF_API_KEY=${DOUGHNUT_NVCF_API_KEY:-ngcapikey}
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
