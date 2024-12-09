@@ -20,6 +20,15 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+      # NIM OpenTelemetry Settings
+      - NIM_OTEL_SERVICE_NAME=yolox
+      - NIM_OTEL_TRACES_EXPORTER=otlp
+      - NIM_OTEL_METRICS_EXPORTER=console
+      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - NIM_ENABLE_OTEL=true
+      # Triton OpenTelemetry Settings
+      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -198,7 +207,7 @@ services:
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "9988:8888" # Prometheus metrics exposed by the collector
+      - "9988:9988" # Prometheus metrics exposed by the collector
       - "8889:8889" # Prometheus exporter metrics
       - "13133:13133" # health_check extension
       - "9411" # Zipkin receiver
@@ -211,7 +220,7 @@ services:
   zipkin:
     image: openzipkin/zipkin
     environment:
-      JAVA_OPTS: "-Xms2g -Xmx2g -XX:+ExitOnOutOfMemoryError"
+      JAVA_OPTS: "-Xms4g -Xmx8g -XX:+ExitOnOutOfMemoryError"
     ports:
       - "9411:9411" # Zipkin UI and API
 

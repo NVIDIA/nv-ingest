@@ -426,6 +426,9 @@ Here are the options provided by the CLI, explained:
 - `--log_level`: Sets the log level. Choices are DEBUG, INFO, WARNING, ERROR, CRITICAL. Default is INFO.
 - `--shuffle_dataset`: Shuffles the dataset before processing if enabled. Default is true.
 - `--task`: Allows for specification of tasks in JSON format. Supports multiple tasks.
+- `--collect_profiling_traces`: Collect the tracing profile for the run after processing.
+- `--zipkin_host`: Host used to connect to Zipkin to gather tracing profiles.
+- `--zipkin_port`: Port used to connect to Zipkin to gether tracing profiles.
 
 ## Examples
 
