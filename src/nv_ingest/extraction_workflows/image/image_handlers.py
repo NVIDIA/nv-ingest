@@ -43,6 +43,32 @@ from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_me
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import logging
+import traceback
+from datetime import datetime
+
+from typing import List, Dict
+from typing import Optional
+from typing import Tuple
+
+from wand.image import Image as WandImage
+from PIL import Image
+import io
+
+import numpy as np
+
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
+import nv_ingest.util.nim.yolox as yolox_utils
+from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
+from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.pdf.metadata_aggregators import (
+    CroppedImageWithContent,
+    construct_image_metadata_from_pdf_image,
+    construct_image_metadata_from_base64,
+)
+from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -298,30 +324,31 @@ def extract_tables_and_charts_from_image(
     try:
         yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
 
-        input_image = yolox_utils.prepare_images_for_inference([image])
-        image_shape = image.shape
+        data = {"images": [image]}
 
-        output_array = perform_model_inference(yolox_client, "yolox", input_image, trace_info=trace_info)
-
-        yolox_annotated_detections = process_inference_results(
-            output_array, [image_shape], num_classes, conf_thresh, iou_thresh, min_score, final_thresh
+        inference_results = yolox_client.infer(
+            data,
+            model_name="yolox",
+            num_classes=YOLOX_NUM_CLASSES,
+            conf_thresh=YOLOX_CONF_THRESHOLD,
+            iou_thresh=YOLOX_IOU_THRESHOLD,
+            min_score=YOLOX_MIN_SCORE,
+            final_thresh=YOLOX_FINAL_SCORE,
         )
 
-        for annotation_dict in yolox_annotated_detections:
-            extract_table_and_chart_images(
-                annotation_dict,
-                image,
-                page_idx=0,  # Single image treated as one page
-                tables_and_charts=tables_and_charts,
-            )
+        extract_table_and_chart_images(
+            inference_results,
+            image,
+            page_idx=0,  # Single image treated as one page
+            tables_and_charts=tables_and_charts,
+        )
 
     except Exception as e:
         logger.error(f"Error during table/chart extraction from image: {str(e)}")
         traceback.print_exc()
         raise e
     finally:
-        if isinstance(yolox_client, grpcclient.InferenceServerClient):
-            logger.debug("Closing YOLOX inference client.")
+        if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
