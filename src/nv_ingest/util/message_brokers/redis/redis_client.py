@@ -8,17 +8,15 @@ import time
 from typing import Any, Dict, List, Optional, Tuple, Union
 
 import redis
-from nv_ingest.util.message_brokers.client_base import MessageClientBase
 from redis.exceptions import RedisError
+
+from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
 
 # pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
-# TODO(Devin): Duplicate code with client side, consider moving to a shared location
-
-
-class RedisClient(MessageClientBase):
+class RedisClient(MessageBrokerClientBase):
     """
     A client for interfacing with Redis, providing mechanisms for sending and receiving messages
     with retry logic and connection management.

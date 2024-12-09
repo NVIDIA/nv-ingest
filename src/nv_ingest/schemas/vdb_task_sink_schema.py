@@ -7,7 +7,10 @@ import logging
 import typing
 
 import pymilvus
-from pydantic import BaseModel, Field, validator
+from pydantic import BaseModel
+from pydantic import Field
+from pydantic import validator
+from pydantic import conint
 
 logger = logging.getLogger(__name__)
 
@@ -91,6 +94,7 @@ class VdbTaskSinkSchema(BaseModel):
     write_time_interval: float = 1.0
     retry_interval: float = 60.0
     raise_on_failure: bool = False
+    progress_engines: conint(ge=1) = 1
 
     @validator("service", pre=True)
     def validate_service(cls, to_validate):  # pylint: disable=no-self-argument

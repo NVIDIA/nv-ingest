@@ -23,25 +23,23 @@ from typing import List, Optional, Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-import tritonclient.grpc as grpcclient
-from nv_ingest.extraction_workflows.pdf import yolox_utils
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum, TextTypeEnum
+import nv_ingest.util.nim.yolox as yolox_utils
+
+from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.image_processing.transforms import crop_image, numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client, perform_model_inference
-from nv_ingest.util.pdf.metadata_aggregators import (
-    Base64Image,
-    CroppedImageWithContent,
-    construct_image_metadata,
-    construct_table_and_chart_metadata,
-    construct_text_metadata,
-    extract_pdf_metadata,
-)
-from nv_ingest.util.pdf.pdfium import (
-    PDFIUM_PAGEOBJ_MAPPING,
-    pdfium_pages_to_numpy,
-    pdfium_try_get_bitmap_as_numpy,
-)
+from nv_ingest.util.image_processing.transforms import crop_image
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.pdf.metadata_aggregators import Base64Image
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
+from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
+from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
+from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
+from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
+from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 
 YOLOX_MAX_BATCH_SIZE = 8
 YOLOX_MAX_WIDTH = 1536
@@ -56,81 +54,21 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-    pages: List[libpdfium.PdfPage],
-    config: PDFiumConfigSchema,
-    max_batch_size: int = YOLOX_MAX_BATCH_SIZE,
-    num_classes: int = YOLOX_NUM_CLASSES,
-    conf_thresh: float = YOLOX_CONF_THRESHOLD,
-    iou_thresh: float = YOLOX_IOU_THRESHOLD,
-    min_score: float = YOLOX_MIN_SCORE,
-    final_thresh: float = YOLOX_FINAL_SCORE,
-    trace_info: Optional[List] = None,
-) -> List[Tuple[int, CroppedImageWithContent]]:
-    """
-    Extract tables and charts from a series of document pages using an ensemble of image-based models.
-
-    This function processes a list of document pages to detect and extract tables and charts.
-    It uses a sequence of models hosted on different inference servers to achieve this.
-
-    Parameters
-    ----------
-    pages : List[libpdfium.PdfPage]
-        A list of document pages to process.
-    yolox_nim_endpoint_url : str
-        The URL of the Triton inference server endpoint for the primary model.
-    model_name : str
-        The name of the model to use on the Triton server.
-    max_batch_size : int, optional
-        The maximum number of pages to process in a single batch (default is 16).
-    num_classes : int, optional
-        The number of classes the model is trained to detect (default is 3).
-    conf_thresh : float, optional
-        The confidence threshold for detection (default is 0.01).
-    iou_thresh : float, optional
-        The Intersection Over Union (IoU) threshold for non-maximum suppression (default is 0.5).
-    min_score : float, optional
-        The minimum score threshold for considering a detection valid (default is 0.1).
-    final_thresh: float, optional
-        Threshold for keeping a bounding box applied after postprocessing. (default is 0.48)
-
-
-    Returns
-    -------
-    List[Tuple[int, ImageTable]]
-        A list of tuples, each containing the page index and an `ImageTable` or `ImageChart` object
-        representing the detected table or chart along with its associated metadata.
-
-    Notes
-    -----
-    This function centralizes the management of inference clients, handles batch processing
-    of pages, and manages the inference and post-processing of results from multiple models.
-    It ensures that the results are properly associated with their corresponding pages and
-    regions within those pages.
-
-    Examples
-    --------
-    >>> pages = [libpdfium.PdfPage(), libpdfium.PdfPage()]  # List of pages from a document
-    >>> tables_and_charts = extract_tables_and_charts_using_image_ensemble(
-    ...     pages,
-    ...     yolox_nim_endpoint_url="http://localhost:8000",
-    ...     model_name="model",
-    ...     max_batch_size=8,
-    ...     num_classes=3,
-    ...     conf_thresh=0.5,
-    ...     iou_thresh=0.5,
-    ...     min_score=0.2
-    ... )
-    >>> for page_idx, image_obj in tables_and_charts:
-    ...     print(f"Page: {page_idx}, Object: {image_obj}")
-    """
+        pages: List,  # List[libpdfium.PdfPage]
+        config: PDFiumConfigSchema,
+        trace_info: Optional[List] = None,
+) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
     tables_and_charts = []
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_client = create_inference_client(config.yolox_endpoints, model_interface, config.auth_token,
+                                               config.yolox_infer_protocol)
 
         batches = []
         i = 0
+        max_batch_size = YOLOX_MAX_BATCH_SIZE
         while i < len(pages):
             batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
             batches.append(pages[i : i + batch_size])  # noqa: E203
@@ -142,69 +80,46 @@ def extract_tables_and_charts_using_image_ensemble(
                 batch, scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
             )
 
-            # original images is an implicitly indexed list of pages
-            original_image_shapes = [image.shape for image in original_images]
-            input_array = prepare_images_for_inference(original_images)
+            # Prepare data
+            data = {'images': original_images}
 
-            output_array = perform_model_inference(yolox_client, "yolox", input_array, trace_info=trace_info)
-
-            # Get back inference results
-            yolox_annotated_detections = process_inference_results(
-                output_array, original_image_shapes, num_classes, conf_thresh, iou_thresh, min_score, final_thresh
+            # Perform inference using NimClient
+            inference_results = yolox_client.infer(
+                data,
+                model_name="yolox",
+                num_classes=YOLOX_NUM_CLASSES,
+                conf_thresh=YOLOX_CONF_THRESHOLD,
+                iou_thresh=YOLOX_IOU_THRESHOLD,
+                min_score=YOLOX_MIN_SCORE,
+                final_thresh=YOLOX_FINAL_SCORE,
             )
 
-            for annotation_dict, original_image in zip(yolox_annotated_detections, original_images):
+            # Process results
+            for annotation_dict, original_image in zip(inference_results, original_images):
                 extract_table_and_chart_images(
                     annotation_dict,
                     original_image,
                     page_index,
                     tables_and_charts,
                 )
-
                 page_index += 1
+
+    except TimeoutError:
+        logger.error("Timeout error during table/chart extraction.")
+        raise
 
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
         raise e
+
     finally:
-        if isinstance(yolox_client, grpcclient.InferenceServerClient):
+        if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
 
     return tables_and_charts
-
-
-def prepare_images_for_inference(images: List[np.ndarray]) -> np.ndarray:
-    """
-    Prepare a list of images for model inference by resizing and reordering axes.
-
-    Parameters
-    ----------
-    images : List[np.ndarray]
-        A list of image arrays to be prepared for inference.
-
-    Returns
-    -------
-    np.ndarray
-        A numpy array suitable for model input, with the shape reordered to match the expected input format.
-
-    Notes
-    -----
-    The images are resized to 1024x1024 pixels and the axes are reordered to match the expected input shape for
-    the model (batch, channels, height, width).
-
-    Examples
-    --------
-    >>> images = [np.random.rand(1536, 1536, 3) for _ in range(2)]
-    >>> input_array = prepare_images_for_inference(images)
-    >>> input_array.shape
-    (2, 3, 1024, 1024)
-    """
-
-    resized_images = [yolox_utils.resize_image(image, (1024, 1024)) for image in images]
-    return np.einsum("bijk->bkij", resized_images).astype(np.float32)
 
 
 def process_inference_results(
@@ -289,7 +204,7 @@ def extract_table_and_chart_images(
 
     Parameters
     ----------
-    annotation_dict : dict
+    annotation_dict : dict/
         A dictionary containing detected objects and their bounding boxes.
     original_image : np.ndarray
         The original image from which objects were detected.
@@ -338,14 +253,14 @@ def extract_table_and_chart_images(
 
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestream PDF
-def pdfium(
-    pdf_stream,
-    extract_text: bool,
-    extract_images: bool,
-    extract_tables: bool,
-    extract_charts: bool,
-    trace_info=None,
-    **kwargs,
+def pdfium_extractor(
+        pdf_stream,
+        extract_text: bool,
+        extract_images: bool,
+        extract_tables: bool,
+        extract_charts: bool,
+        trace_info=None,
+        **kwargs,
 ):
     """
     Helper function to use pdfium to extract text from a bytestream PDF.
@@ -430,7 +345,8 @@ def pdfium(
             page_text = textpage.get_text_bounded()
             accumulated_text.append(page_text)
 
-            if text_depth == TextTypeEnum.PAGE:
+            if (text_depth == TextTypeEnum.PAGE
+                    and len(accumulated_text) > 0):
                 text_extraction = construct_text_metadata(
                     accumulated_text,
                     pdf_metadata.keywords,
@@ -467,7 +383,7 @@ def pdfium(
                             max_height=page_height,
                         )
 
-                        extracted_image_data = construct_image_metadata(
+                        extracted_image_data = construct_image_metadata_from_pdf_image(
                             image_data,
                             page_idx,
                             pdf_metadata.page_count,
@@ -484,7 +400,9 @@ def pdfium(
         if extract_tables or extract_charts:
             pages.append(page)
 
-    if extract_text and text_depth == TextTypeEnum.DOCUMENT:
+    if (extract_text
+            and text_depth == TextTypeEnum.DOCUMENT
+            and len(accumulated_text) > 0):
         text_extraction = construct_text_metadata(
             accumulated_text,
             pdf_metadata.keywords,
@@ -506,15 +424,18 @@ def pdfium(
             pdfium_config,
             trace_info=trace_info,
         ):
-            extracted_data.append(
-                construct_table_and_chart_metadata(
-                    table_and_charts,
-                    page_idx,
-                    pdf_metadata.page_count,
-                    source_metadata,
-                    base_unified_metadata,
+            if (extract_tables and (table_and_charts.type_string == "table")) or (
+                    extract_charts and (table_and_charts.type_string == "chart")
+            ):
+                extracted_data.append(
+                    construct_table_and_chart_metadata(
+                        table_and_charts,
+                        page_idx,
+                        pdf_metadata.page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
                 )
-            )
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
 

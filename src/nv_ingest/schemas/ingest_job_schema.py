@@ -16,15 +16,16 @@ logger = logging.getLogger(__name__)
 
 # Enums
 class DocumentTypeEnum(str, Enum):
-    pdf = "pdf"
-    txt = "text"
-    docx = "docx"
-    pptx = "pptx"
-    jpeg = "jpeg"
     bmp = "bmp"
-    png = "png"
-    svg = "svg"
+    docx = "docx"
     html = "html"
+    jpeg = "jpeg"
+    pdf = "pdf"
+    png = "png"
+    pptx = "pptx"
+    svg = "svg"
+    tiff = "tiff"
+    txt = "text"
 
 
 class TaskTypeEnum(str, Enum):
@@ -35,6 +36,7 @@ class TaskTypeEnum(str, Enum):
     filter = "filter"
     split = "split"
     store = "store"
+    store_embedding = "store_embedding"
     vdb_upload = "vdb_upload"
     table_data_extract = "table_data_extract"
     chart_data_extract = "chart_data_extract"
@@ -79,6 +81,9 @@ class IngestTaskExtractSchema(BaseModelNoExt):
             raise ValueError(f"{v} is not a valid DocumentTypeEnum value")
 
 
+class IngestTaskStoreEmbedSchema(BaseModelNoExt):
+    params: dict
+
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
@@ -86,9 +91,11 @@ class IngestTaskStoreSchema(BaseModelNoExt):
     params: dict
 
 
+# All optional, the captioning stage requires default parameters, each of these are just overrides.
 class IngestTaskCaptionSchema(BaseModelNoExt):
-    content_type: str = "image"
-    n_neighbors: int = 5
+    api_key: Optional[str]
+    endpoint_url: Optional[str]
+    prompt: Optional[str]
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -119,6 +126,9 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
+    bulk_ingest: bool = False
+    bulk_ingest_path: str = None
+    params: dict = None
     filter_errors: bool = True
 
 
@@ -135,6 +145,7 @@ class IngestTaskSchema(BaseModelNoExt):
     task_properties: Union[
         IngestTaskSplitSchema,
         IngestTaskExtractSchema,
+        IngestTaskStoreEmbedSchema,
         IngestTaskStoreSchema,
         IngestTaskEmbedSchema,
         IngestTaskCaptionSchema,
@@ -157,6 +168,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.extract: IngestTaskExtractSchema,
                 TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend this mapping as necessary
                 TaskTypeEnum.split: IngestTaskSplitSchema,
+                TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
                 TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
@@ -207,4 +219,5 @@ def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
     Raises:
     - ValidationError: If the input data does not conform to the IngestJobSchema.
     """
+
     return IngestJobSchema(**job_data)

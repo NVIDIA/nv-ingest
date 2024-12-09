@@ -44,8 +44,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 2 |
+| A100 | SXM or PCIe | 80GB | 2 |
 
 ### Software
 
@@ -63,6 +63,9 @@ To get started using NVIDIA Ingest, you need to do a few things:
 2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
+
+Optional:
+1. [Direct Library Deployment](docs/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -113,6 +116,8 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+> 
+> If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```

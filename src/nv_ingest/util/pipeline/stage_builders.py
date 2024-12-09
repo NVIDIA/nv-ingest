@@ -13,20 +13,23 @@ from morpheus.messages import ControlMessage
 from morpheus.stages.general.linear_modules_source import LinearModuleSourceStage
 from morpheus.stages.general.linear_modules_stage import LinearModulesStage
 from nv_ingest.modules.injectors.metadata_injector import MetadataInjectorLoaderFactory
-from nv_ingest.modules.sinks.redis_task_sink import RedisTaskSinkLoaderFactory
+from nv_ingest.modules.sinks.message_broker_task_sink import MessageBrokerTaskSinkLoaderFactory
 from nv_ingest.modules.sinks.vdb_task_sink import VDBTaskSinkLoaderFactory
-from nv_ingest.modules.sources.redis_task_source import RedisTaskSourceLoaderFactory
+from nv_ingest.modules.sources.message_broker_task_source import MessageBrokerTaskSourceLoaderFactory
 from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
 from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
-from nv_ingest.stages.filters import generate_dedup_stage, generate_image_filter_stage
+from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
+from nv_ingest.stages.filters import generate_dedup_stage
+from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
+from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 
@@ -86,8 +89,8 @@ def get_table_detection_service(env_var_prefix):
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
     )
 
-    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
-    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
     logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
 
     return grpc_endpoint, http_endpoint, auth_token, infer_protocol
@@ -100,15 +103,20 @@ def get_default_cpu_count():
 
 
 def add_source_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
-    source_module_loader = RedisTaskSourceLoaderFactory.get_instance(
-        module_name="redis_listener",
+    client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
+    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "morpheus_task_queue")
+
+    source_module_loader = MessageBrokerTaskSourceLoaderFactory.get_instance(
+        module_name="broker_listener",
         module_config=ingest_config.get(
-            "redis_task_source",
+            "broker_task_source",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
-                }
+                    "client_type": client_type,
+                },
+                "task_queue": task_queue_name,
             },
         ),
     )
@@ -219,26 +227,48 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
     # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
-    table_content_extractor_config = ingest_config.get(
-        "table_content_extraction_module",
-        {
-            "stage_config": {
-                "cached_endpoints": (cached_grpc, cached_http),
-                "cached_infer_protocol": cached_protocol,
-                "deplot_endpoints": (deplot_grpc, deplot_http),
-                "deplot_infer_protocol": deplot_protocol,
-                "paddle_endpoints": (paddle_grpc, paddle_http),
-                "paddle_infer_protocol": paddle_protocol,
-                "auth_token": yolox_auth,
-            }
-        },
-    )
+
+    table_content_extractor_config = ingest_config.get("table_content_extraction_module",
+                                                       {
+                                                           "stage_config": {
+                                                               "cached_endpoints": (cached_grpc, cached_http),
+                                                               "cached_infer_protocol": cached_protocol,
+                                                               "deplot_endpoints": (deplot_grpc, deplot_http),
+                                                               "deplot_infer_protocol": deplot_protocol,
+                                                               "paddle_endpoints": (paddle_grpc, paddle_http),
+                                                               "paddle_infer_protocol": paddle_protocol,
+                                                               "auth_token": yolox_auth,
+                                                           }
+                                                       })
 
     table_extractor_stage = pipe.add_stage(
         generate_chart_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
     )
 
     return table_extractor_stage
+
+
+def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    image_extractor_config = ingest_config.get("image_extraction_module",
+                                               {
+                                                   "image_extraction_config": {
+                                                       "yolox_endpoints": (yolox_grpc, yolox_http),
+                                                       "yolox_infer_protocol": yolox_protocol,
+                                                       "auth_token": yolox_auth,
+                                                       # All auth tokens are the same for the moment
+                                                   }
+                                               })
+    image_extractor_stage = pipe.add_stage(
+        generate_image_extractor_stage(
+            morpheus_pipeline_config,
+            extractor_config=image_extractor_config,
+            pe_count=8,
+            task="extract",
+            task_desc="docx_content_extractor",
+        )
+    )
+    return image_extractor_stage
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
@@ -313,14 +343,25 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    endpoint_url, model_name = get_caption_classifier_service()
+    auth_token = os.environ.get(
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
+        "",
+    )
+
+    endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
+
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
-            "caption_classifier_model_name": model_name,
+            "api_key": auth_token,
             "endpoint_url": endpoint_url,
+            "prompt": "Caption the content of this image:",
         },
     )
+
     image_caption_stage = pipe.add_stage(
         generate_caption_extraction_stage(
             morpheus_pipeline_config,
@@ -357,6 +398,20 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     return embed_extractions_stage
 
 
+def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
+
+    storage_stage = pipe.add_stage(
+        generate_embedding_storage_stage(
+            morpheus_pipeline_config,
+            pe_count=2,
+            task="store_embedding",
+            task_desc="store_embedding_minio",
+        )
+    )
+
+    return storage_stage
+
+
 def add_image_storage_stage(pipe, morpheus_pipeline_config):
     image_storage_stage = pipe.add_stage(ImageStorageStage(morpheus_pipeline_config))
 
@@ -364,15 +419,18 @@ def add_image_storage_stage(pipe, morpheus_pipeline_config):
 
 
 def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
-    sink_module_loader = RedisTaskSinkLoaderFactory.get_instance(
-        module_name="redis_task_sink",
+    client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
+
+    sink_module_loader = MessageBrokerTaskSinkLoaderFactory.get_instance(
+        module_name="broker_task_sink",
         module_config=ingest_config.get(
-            "redis_task_sink",
+            "broker_task_sink",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
-                }
+                    "client_type": client_type,
+                },
             },
         ),
     )
@@ -423,9 +481,10 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config, message_
         module_config=ingest_config.get(
             "otel_meter_module",
             {
-                "redis_client": {
+                "broker_client": {
                     "host": message_provider_host,
                     "port": message_provider_port,
+                    "client_type": "redis",
                 },
                 "otel_endpoint": endpoint,
             },

@@ -10,16 +10,19 @@ from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
-from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
+from nv_ingest_client.primitives.tasks import ChartExtractionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 
 MODULE_UNDER_TEST = "nv_ingest_client.client.interface"
@@ -80,7 +83,42 @@ def test_embed_task_some_args(ingestor):
 def test_extract_task_no_args(ingestor):
     ingestor.extract()
 
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], ExtractTask)
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, ExtractTask)
+    assert task._extract_tables is True
+    assert task._extract_charts is True
+
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[1], TableExtractionTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ChartExtractionTask)
+
+
+def test_extract_task_args_tables_false(ingestor):
+    ingestor.extract(extract_tables=False)
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, ExtractTask)
+    assert task._extract_tables is False
+    assert task._extract_charts is True
+
+
+def test_extract_task_args_charts_false(ingestor):
+    ingestor.extract(extract_charts=False)
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, ExtractTask)
+    assert task._extract_tables is True
+    assert task._extract_charts is False
+
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[1], TableExtractionTask)
+
+
+def test_extract_task_args_tables_and_charts_false(ingestor):
+    ingestor.extract(extract_tables=False, extract_charts=False)
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, ExtractTask)
+    assert task._extract_tables is False
+    assert task._extract_charts is False
 
 
 def test_extract_task_some_args(ingestor):
@@ -137,6 +175,20 @@ def test_store_task_some_args(ingestor):
     assert task._store_method == "s3"
 
 
+def test_store_embed_task_no_args(ingestor):
+    ingestor.store_embed()
+
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], StoreEmbedTask)
+
+
+def test_store_task_some_args(ingestor):
+    ingestor.store_embed(params={"extra_param": "extra"})
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, StoreEmbedTask)
+    assert task._params["extra_param"] == "extra"
+
+
 def test_vdb_upload_task_no_args(ingestor):
     ingestor.vdb_upload()
 
@@ -156,11 +208,13 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], DedupTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[1], EmbedTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ExtractTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[3], FilterTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[4], SplitTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], StoreTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], VdbUploadTask)
-    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 7
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[3], TableExtractionTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[4], ChartExtractionTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[8], VdbUploadTask)
+    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 9
 
 
 def test_ingest(ingestor, mock_client):
@@ -190,8 +244,8 @@ def test_ingest_async(ingestor, mock_client):
     ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
     ingestor._job_states["job_id_2"] = MagicMock(state=JobStateEnum.FAILED)
 
-    mock_client.fetch_job_result.side_effect = (
-        lambda job_id, *args, **kwargs: "result_1" if job_id == "job_id_1" else "result_2"
+    mock_client.fetch_job_result.side_effect = lambda job_id, *args, **kwargs: (
+        "result_1" if job_id == "job_id_1" else "result_2"
     )
 
     combined_future = ingestor.ingest_async(timeout=15)
@@ -276,7 +330,7 @@ def test_files_with_remote_files(ingestor_without_doc):
 def test_all_tasks_adds_default_tasks(ingestor):
     ingestor.all_tasks()
 
-    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask}
+    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask, StoreEmbedTask}
     added_tasks = {
         type(task) for job_specs in ingestor._job_specs._file_type_to_job_spec.values() for task in job_specs[0]._tasks
     }

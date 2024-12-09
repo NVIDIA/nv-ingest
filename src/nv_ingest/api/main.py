@@ -14,7 +14,7 @@ import os
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
+from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
@@ -22,7 +22,8 @@ from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
 
 # Set up the tracer provider and add a processor for exporting traces
-trace.set_tracer_provider(TracerProvider())
+resource = Resource(attributes={"service.name": "nv-ingest"})
+trace.set_tracer_provider(TracerProvider(resource=resource))
 tracer = trace.get_tracer(__name__)
 
 otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector:4317")

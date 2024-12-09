@@ -21,16 +21,17 @@ logger = logging.getLogger(__name__)
 
 # Enums
 class DocumentTypeEnum(str, Enum):
-    pdf = "pdf"
-    txt = "text"
-    docx = "docx"
-    pptx = "pptx"
-    jpeg = "jpeg"
     bmp = "bmp"
-    png = "png"
-    svg = "svg"
+    docx = "docx"
     html = "html"
+    jpeg = "jpeg"
     md = "md"
+    pdf = "pdf"
+    png = "png"
+    pptx = "pptx"
+    svg = "svg"
+    tiff = "tiff"
+    txt = "text"
 
 
 # Maps MIME types to DocumentTypeEnum
@@ -49,19 +50,20 @@ MIME_TO_DOCUMENT_TYPE = {
 
 # Maps file extensions to DocumentTypeEnum
 EXTENSION_TO_DOCUMENT_TYPE = {
-    "pdf": DocumentTypeEnum.pdf,
-    "txt": DocumentTypeEnum.txt,
-    "docx": DocumentTypeEnum.docx,
-    "pptx": DocumentTypeEnum.pptx,
-    "jpg": DocumentTypeEnum.jpeg,
-    "jpeg": DocumentTypeEnum.jpeg,
     "bmp": DocumentTypeEnum.bmp,
-    "png": DocumentTypeEnum.png,
-    "svg": DocumentTypeEnum.svg,
+    "docx": DocumentTypeEnum.docx,
     "html": DocumentTypeEnum.html,
-    "md": DocumentTypeEnum.txt,
-    "sh": DocumentTypeEnum.txt,
+    "jpeg": DocumentTypeEnum.jpeg,
+    "jpg": DocumentTypeEnum.jpeg,
     "json": DocumentTypeEnum.txt,
+    "md": DocumentTypeEnum.txt,
+    "pdf": DocumentTypeEnum.pdf,
+    "png": DocumentTypeEnum.png,
+    "pptx": DocumentTypeEnum.pptx,
+    "sh": DocumentTypeEnum.txt,
+    "svg": DocumentTypeEnum.svg,
+    "tiff": DocumentTypeEnum.tiff,
+    "txt": DocumentTypeEnum.txt,
     # Add more as needed
 }
 

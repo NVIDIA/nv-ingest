@@ -31,12 +31,20 @@ from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
+from nv_ingest_client.primitives.tasks import CaptionTask
+from nv_ingest_client.primitives.tasks import DedupTask
+from nv_ingest_client.primitives.tasks import EmbedTask
+from nv_ingest_client.primitives.tasks import ExtractTask
+from nv_ingest_client.primitives.tasks import FilterTask
+from nv_ingest_client.primitives.tasks import SplitTask
+from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import VdbUploadTask
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.primitives.tasks.table_extraction import (
-    TableExtractionSchema,
-    TableExtractionTask,
-)
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionSchema
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
@@ -131,7 +139,11 @@ def click_validate_task(ctx, param, value):
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = [(new_task_id, StoreTask(**task_options.dict()))]
+                new_task = StoreTask(**task_options.dict())
+            elif task_id == "store_embedding":
+                task_options = check_schema(StoreEmbedTaskSchema, options, task_id, json_options)
+                new_task_id = f"{task_id}"
+                new_task = [(new_task_id, StoreEmbedTask(**task_options.dict()))]
             elif task_id == "caption":
                 task_options = check_schema(CaptionTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"

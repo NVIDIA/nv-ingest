@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.2.2-base-ubuntu22.04
+ARG BASE_IMG_TAG=12.4.1-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -59,6 +59,7 @@ RUN source activate nv_ingest \
     && mamba install -y \
      nvidia/label/dev::morpheus-core \
      nvidia/label/dev::morpheus-llm \
+     imagemagick \
      # pin to earlier version of cuda-python until __pyx_capi__ fix is upstreamed.
      cuda-python=12.6.0 \
      -c rapidsai -c pytorch -c nvidia -c conda-forge
@@ -98,7 +99,8 @@ RUN source activate nv_ingest \
 
 FROM nv_ingest_install AS runtime
 
-COPY src/pipeline.py ./
+COPY src/microservice_entrypoint.py ./
+COPY pyproject.toml ./
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 
@@ -106,7 +108,7 @@ RUN chmod +x /workspace/docker/entrypoint.sh
 ENTRYPOINT ["/opt/conda/envs/nv_ingest/bin/tini", "--", "/workspace/docker/entrypoint.sh"]
 
 # Start both the core nv-ingest pipeline service and the FastAPI microservice in parallel
-CMD ["sh", "-c", "python /workspace/pipeline.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
+CMD ["sh", "-c", "python /workspace/microservice_entrypoint.py & uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 & wait"]
 
 FROM nv_ingest_install AS development
 

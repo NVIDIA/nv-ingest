@@ -642,7 +642,7 @@ def create_and_process_jobs(
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except RuntimeError as e:
                     source_name = job_id_map[job_id]
-                    logger.error(f"Error while processing {job_id}({source_name}) {e}")
+                    logger.error(f"Error while processing '{job_id}' - ({source_name}):\n{e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except Exception as e:
                     traceback.print_exc()
@@ -653,6 +653,7 @@ def create_and_process_jobs(
                     # Don't update progress bar if we're going to retry the job
                     if not retry:
                         pbar.update(1)
+
 
     return total_files, trace_times, total_pages_processed
 
