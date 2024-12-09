@@ -137,6 +137,23 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
      4. **trace**: A list of timing traces generated during the job's processing.
      5. **annotations**: A list of task annotations generated during the job's processing.
 
+### Updating Dependencies
+
+- Dependencies are managed via 'Conda' and 'Pip'.
+- Dependencies are stored in .yml files
+    1. **Service Dependencies** 'docker/environment/nv_ingest_environment.yml' file.
+    2. **Client Dependencies** 'docker/environment/nv_ingest_client_environment.yml' file.
+
+- To update dependencies:
+  - Create a clean environment using the relevant .yml file.
+  - Update the dependencies using 'Conda' or 'Pip' and validate the changes.
+  - Update the .yml file by exporting the updated environment.
+    - For example:
+      ```bash
+      conda env export --name nv_ingest_runtime --no-builds > docker/environment/nv_ingest_environment.yml
+      conda env export --name nv_ingest_client --no-builds > docker/environment/nv_ingest_client_environment.yml
+      ```
+
 ### Common Processing Patterns
 
 In NV-Ingest, decorators are used to enhance the functionality of functions by adding additional processing logic. These
