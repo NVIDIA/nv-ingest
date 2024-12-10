@@ -11,6 +11,7 @@ from typing import List
 
 import click
 import pkg_resources
+from nv_ingest_client.util.zipkin import collect_traces_from_zipkin, write_results_to_output_directory
 from nv_ingest_client.cli.util.click import LogLevel
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
@@ -186,6 +187,24 @@ Tasks and Options:
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
 )
+@click.option(
+    "--collect_profiling_traces",
+    is_flag=True,
+    default=False,
+    help="""
+\b
+If enabled the CLI will collect the 'profile' for each file that was submitted to the
+nv-ingest REST endpoint for processing.
+
+\b
+Those `trace_id` values will be consolidated and then a subsequent request will be made to
+Zipkin to collect the traces for each individual `trace_id`. The trace is rich with information
+that can further breakdown the runtimes for each section of the codebase. This is useful
+for locating portions of the system that might be bottlenecks for the overall runtimes.
+""",
+)
+@click.option("--zipkin_host", default="localhost", help="DNS name or Zipkin API.")
+@click.option("--zipkin_port", default=9411, type=int, help="Port for the Zipkin trace API")
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
@@ -205,6 +224,9 @@ def main(
     output_directory: str,
     save_images_separately: bool,
     shuffle_dataset: bool,
+    collect_profiling_traces: bool,
+    zipkin_host: str,
+    zipkin_port: int,
     task: [str],
     version: [bool],
 ):
@@ -256,7 +278,7 @@ def main(
             )
 
             start_time_ns = time.time_ns()
-            (total_files, trace_times, pages_processed) = create_and_process_jobs(
+            (total_files, trace_times, pages_processed, trace_ids) = create_and_process_jobs(
                 files=docs,
                 client=ingest_client,
                 tasks=task,
@@ -268,6 +290,14 @@ def main(
             )
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
+
+            # Gather profiling data after processing has completed.
+            if collect_profiling_traces:
+                logger.info("Collecting profiling traces ....")
+                trace_responses = collect_traces_from_zipkin(zipkin_host, zipkin_port, trace_ids, 1)
+
+                # Log the responses to a file in the configured results --output_directory
+                write_results_to_output_directory(output_directory, trace_responses)
 
     except Exception as err:
         logging.error(f"Error: {err}")

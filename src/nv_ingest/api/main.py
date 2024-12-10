@@ -14,13 +14,20 @@ import os
 from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
 
 from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter
+
+logger = logging.getLogger(__name__)
+
+# nv-ingest FastAPI app declaration
+app = FastAPI()
+
+app.include_router(IngestApiRouter)
+app.include_router(HealthApiRouter)
 
 # Set up the tracer provider and add a processor for exporting traces
 resource = Resource(attributes={"service.name": "nv-ingest"})
@@ -31,33 +38,3 @@ otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "otel-collector:4317")
 exporter = OTLPSpanExporter(endpoint=otel_endpoint, insecure=True)
 span_processor = BatchSpanProcessor(exporter)
 trace.get_tracer_provider().add_span_processor(span_processor)
-
-logger = logging.getLogger("uvicorn")
-
-# nv-ingest FastAPI app declaration
-app = FastAPI()
-
-app.include_router(IngestApiRouter)
-app.include_router(HealthApiRouter)
-
-# Instrument FastAPI with OpenTelemetry
-FastAPIInstrumentor.instrument_app(app)
-
-
-@app.middleware("http")
-async def add_trace_id_header(request, call_next):
-    with tracer.start_as_current_span("uvicorn-endpoint"):
-        response = await call_next(request)
-
-        # Inject the current x-trace-id into the HTTP headers response
-        span = trace.get_current_span()
-        if span:
-            raw_trace_id = span.get_span_context().trace_id
-            trace_id = format(raw_trace_id, "032x")
-            logger.debug(
-                f"MIDDLEWARE add_trace_id_header Raw \
-                Trace Id: {raw_trace_id} - Formatted Trace Id: {trace_id}"
-            )
-            response.headers["x-trace-id"] = trace_id
-
-        return response
