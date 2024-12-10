@@ -89,6 +89,17 @@ def test_generate_matching_files(patterns, mock_files, expected):
         assert list(generate_matching_files(patterns)) == expected
 
 
+def test_generate_matching_directory():
+    patterns = ["docs"]
+    mock_files = ["docs/README.md", "docs/CHANGES.md"]
+    expected = ["docs/README.md", "docs/CHANGES.md"]
+    with patch("glob.glob", return_value=mock_files), patch(
+        "os.path.isfile", side_effect=lambda path: path in mock_files
+    ), patch("os.path.isdir", side_effect=lambda path: path == "docs"):
+
+        assert list(generate_matching_files(patterns)) == expected
+
+
 def test_filter_function_kwargs_with_matching_kwargs():
     def sample_func(a, b, c):
         pass
