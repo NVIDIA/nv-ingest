@@ -9,6 +9,8 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
+
 from morpheus.config import Config
 
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
