@@ -164,17 +164,16 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
 @pytest.fixture
 def sample_dataframe(base64_encoded_image):
     data = {
-        "metadata": [{
-            "content": base64_encoded_image,
-            "content_metadata": {
-                "type": "structured",
-                "subtype": "table"
-            },
-            "table_metadata": {
-                "table_content": "",
-                "table_format": "image",
+        "metadata": [
+            {
+                "content": base64_encoded_image,
+                "content_metadata": {"type": "structured", "subtype": "table"},
+                "table_metadata": {
+                    "table_content": "",
+                    "table_format": "image",
+                },
             }
-        }]
+        ]
     }
     df = pd.DataFrame(data)
     return df
