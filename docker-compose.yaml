@@ -142,9 +142,9 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       #- DEPLOT_GRPC_ENDPOINT=""
       # Self-hosted deplot endpoints.
-      #- DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
+      - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
-      - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_ENDPOINT=
       # NVCF hosted doughnut endpoints.

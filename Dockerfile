@@ -40,7 +40,7 @@ RUN mamba env create -f /workspace/nv_ingest_environment.yml
 SHELL ["/bin/bash", "-c"]
 
 # Activate the environment (make it default for subsequent commands)
-RUN echo "source activate nv_ingest" >> ~/.bashrc
+RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
 
 # Install Tini via conda from the conda-forge channel
 RUN source activate nv_ingest_runtime \
