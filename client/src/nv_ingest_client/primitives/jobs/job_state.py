@@ -143,7 +143,7 @@ class JobState:
     def trace_id(self) -> Optional[str]:
         """Gets the trace_id from the job submission"""
         return self._trace_id
-    
+
     @trace_id.setter
     def trace_id(self, value: str) -> None:
         """Sets the trace_id that was received from the submission to the REST endpoint"""

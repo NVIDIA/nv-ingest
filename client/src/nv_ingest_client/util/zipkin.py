@@ -15,7 +15,7 @@ from typing import List
 logger = logging.getLogger(__name__)
 
 
-class AsyncZipkinClient():
+class AsyncZipkinClient:
 
     def __init__(self, host: str, port: int, concurrent_requests: int, max_retries: int = 10, retry_delay: int = 5):
         if host.startswith("http"):
@@ -49,10 +49,12 @@ class AsyncZipkinClient():
                     response = await client.get(url, timeout=timeout)
                     if response.status_code == 404:
                         attempt += 1
-                        logger.info(f"Attempt {attempt}/{self._max_retries} for trace_id: {trace_id} failed with 404. Retrying in {self._retry_delay} seconds...")
+                        logger.info(
+                            f"Attempt {attempt}/{self._max_retries} for trace_id: {trace_id} failed with 404. Retrying in {self._retry_delay} seconds..."
+                        )
                         await asyncio.sleep(self._retry_delay)
                     else:
-                        return {'trace_id': trace_id, 'json': response.text}
+                        return {"trace_id": trace_id, "json": response.text}
 
         raise RuntimeError(f"Max retries exceeded for URL: {url}")
 
@@ -70,13 +72,10 @@ class AsyncZipkinClient():
 
 
 def collect_traces_from_zipkin(
-    zipkin_host: str,
-    zipkin_port: int,
-    trace_id_map: Dict[str, str],
-    concurrent_requests: Optional[int] = 1
+    zipkin_host: str, zipkin_port: int, trace_id_map: Dict[str, str], concurrent_requests: Optional[int] = 1
 ) -> Dict[str, str]:
     zipkin_client = AsyncZipkinClient(zipkin_host, zipkin_port, concurrent_requests)
-    
+
     # Take the Dictionary of filenames -> trace_ids and build just a list of trace_ids to send to Zipkin
     trace_ids = []
     for filename in trace_id_map.keys():
@@ -91,7 +90,7 @@ def write_results_to_output_directory(
     trace_responses: List[Dict[str, str]],
 ) -> None:
     logger.info(f"Writing {len(trace_responses)} to output_directory: {output_directory}")
-    
+
     # Check if the output directory exists; if not, create it
     if not os.path.exists(output_directory):
         os.makedirs(output_directory)
@@ -104,12 +103,12 @@ def write_results_to_output_directory(
     if not os.path.exists(zipkin_profiles_directory):
         os.makedirs(zipkin_profiles_directory)
         logger.debug(f"Created subdirectory: {zipkin_profiles_directory}")
-        
+
     # For each input file, create an output file with its profile data
     for trace in trace_responses:
         with open(f"{zipkin_profiles_directory}/{trace['trace_id']}.json", "w") as trace_file:
-            trace_file.write(json.dumps(trace['json']))
-        
+            trace_file.write(json.dumps(trace["json"]))
+
     # Write all of the combined profile data to a single file
     with open(f"{zipkin_profiles_directory}/combined.json", "w") as combined_file:
         combined_file.write(json.dumps(trace_responses))
