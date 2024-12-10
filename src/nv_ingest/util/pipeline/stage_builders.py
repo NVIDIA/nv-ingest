@@ -240,6 +240,7 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     cached_grpc, cached_http, cached_auth, cached_protocol = get_nim_service("cached")
     # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {

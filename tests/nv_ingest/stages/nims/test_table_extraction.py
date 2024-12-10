@@ -6,6 +6,12 @@ import pandas as pd
 
 from unittest.mock import Mock, patch
 from io import BytesIO
+from unittest.mock import Mock
+from unittest.mock import patch
+
+import pandas as pd
+import pytest
+import requests
 from PIL import Image
 
 from nv_ingest.stages.nim.table_extraction import _update_metadata, _extract_table_data

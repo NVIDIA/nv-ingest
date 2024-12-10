@@ -12,12 +12,12 @@ from nv_ingest.util.message_brokers.simple_message_broker import SimpleMessageBr
 # Assuming the SimpleMessageBroker and related classes are imported from the module
 # from your_module import SimpleMessageBroker
 
-HOST = '127.0.0.1'
-PORT = 2000 + random.randint(0,10000)  # Use an available port
+HOST = "127.0.0.1"
+PORT = 2000 + random.randint(0, 10000)  # Use an available port
 MAX_QUEUE_SIZE = 5
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def broker_server():
     """Fixture to start and stop the SimpleMessageBroker server."""
     server = SimpleMessageBroker(HOST, PORT, MAX_QUEUE_SIZE)
@@ -37,18 +37,18 @@ def send_request(request_data):
     sock = socket.create_connection((HOST, PORT))
     try:
         # Send request
-        request_json = json.dumps(request_data).encode('utf-8')
-        sock.sendall(len(request_json).to_bytes(8, 'big') + request_json)
+        request_json = json.dumps(request_data).encode("utf-8")
+        sock.sendall(len(request_json).to_bytes(8, "big") + request_json)
 
         # Receive initial response
         response_length_bytes = recv_exact(sock, 8)
         if not response_length_bytes:
             raise ConnectionError("Failed to receive response length.")
-        response_length = int.from_bytes(response_length_bytes, 'big')
+        response_length = int.from_bytes(response_length_bytes, "big")
         response_data_bytes = recv_exact(sock, response_length)
         if not response_data_bytes:
             raise ConnectionError("Failed to receive response data.")
-        response_data = json.loads(response_data_bytes.decode('utf-8'))
+        response_data = json.loads(response_data_bytes.decode("utf-8"))
 
         return sock, response_data
     except Exception as e:
@@ -69,24 +69,19 @@ def recv_exact(sock, num_bytes):
 
 def send_ack(sock, transaction_id, ack=True):
     """Helper method to send an ACK to the server."""
-    ack_data = json.dumps({"transaction_id": transaction_id, "ack": ack}).encode('utf-8')
-    sock.sendall(len(ack_data).to_bytes(8, 'big') + ack_data)
+    ack_data = json.dumps({"transaction_id": transaction_id, "ack": ack}).encode("utf-8")
+    sock.sendall(len(ack_data).to_bytes(8, "big") + ack_data)
 
 
 def _push_message(queue_name, message):
     """Helper method to push a message into the queue without testing ACK behavior."""
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 5
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
     sock, response = send_request(request_data)
     transaction_id = response["transaction_id"]
     send_ack(sock, transaction_id)
     # Receive final response
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     recv_exact(sock, response_length)  # Discard final response
     sock.close()
 
@@ -98,12 +93,7 @@ def test_push_with_ack():
     message = "Test Message"
 
     # Send PUSH request
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 5
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
     sock, response = send_request(request_data)
 
     # Ensure initial response contains transaction ID
@@ -116,19 +106,16 @@ def test_push_with_ack():
 
     # Receive final response
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 0
     assert final_response["response"] == "Data stored."
     sock.close()
 
     # Verify that the message is in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
@@ -146,7 +133,7 @@ def test_push_without_ack():
         "command": "PUSH",
         "queue_name": queue_name,
         "message": message,
-        "timeout": 1  # Short timeout for the test
+        "timeout": 1,  # Short timeout for the test
     }
     sock, response = send_request(request_data)
 
@@ -155,19 +142,16 @@ def test_push_without_ack():
 
     # Receive final response indicating failure
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 1
     assert final_response["response_reason"] == "ACK not received."
     sock.close()
 
     # Verify that the message is not in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
@@ -184,11 +168,7 @@ def test_pop_with_ack():
     _push_message(queue_name, message)
 
     # Send POP request
-    request_data = {
-        "command": "POP",
-        "queue_name": queue_name,
-        "timeout": 5
-    }
+    request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
     sock, response = send_request(request_data)
 
     # Ensure initial response contains the message and transaction ID
@@ -202,19 +182,16 @@ def test_pop_with_ack():
 
     # Receive final response
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 0
     assert final_response["response"] == "Data processed."
     sock.close()
 
     # Verify that the queue is now empty
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
@@ -231,11 +208,7 @@ def test_pop_without_ack():
     _push_message(queue_name, message)
 
     # Send POP request
-    request_data = {
-        "command": "POP",
-        "queue_name": queue_name,
-        "timeout": 1  # Short timeout for the test
-    }
+    request_data = {"command": "POP", "queue_name": queue_name, "timeout": 1}  # Short timeout for the test
     sock, response = send_request(request_data)
 
     # Do not send ACK, wait for timeout
@@ -243,19 +216,16 @@ def test_pop_without_ack():
 
     # Receive final response indicating failure
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 1
     assert final_response["response_reason"] == "ACK not received."
     sock.close()
 
     # Verify that the message is back in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
@@ -273,10 +243,7 @@ def test_size_command():
         _push_message(queue_name, msg)
 
     # Send SIZE request
-    request_data = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    request_data = {"command": "SIZE", "queue_name": queue_name}
     sock, response = send_request(request_data)
 
     assert response["response_code"] == 0
@@ -287,10 +254,7 @@ def test_size_command():
 @pytest.mark.usefixtures("broker_server")
 def test_invalid_command():
     """Test handling of an invalid command."""
-    request_data = {
-        "command": "INVALID",
-        "queue_name": "test_queue"
-    }
+    request_data = {"command": "INVALID", "queue_name": "test_queue"}
     sock, response = send_request(request_data)
 
     assert response["response_code"] == 1
@@ -304,11 +268,7 @@ def test_queue_not_exist():
     queue_name = f"non_existent_queue_{uuid4()}"
 
     # Send POP request
-    request_data = {
-        "command": "POP",
-        "queue_name": queue_name,
-        "timeout": 1
-    }
+    request_data = {"command": "POP", "queue_name": queue_name, "timeout": 1}
     sock, response = send_request(request_data)
 
     assert response["response_code"] == 1
@@ -324,12 +284,7 @@ def test_queue_full():
 
     # Fill the queue to its maximum size
     for _ in range(MAX_QUEUE_SIZE):
-        request_data = {
-            "command": "PUSH",
-            "queue_name": queue_name,
-            "message": message,
-            "timeout": 5
-        }
+        request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
         sock, response = send_request(request_data)
 
         # Receive initial response with transaction ID
@@ -341,21 +296,16 @@ def test_queue_full():
 
         # Receive final response indicating success
         response_length_bytes = recv_exact(sock, 8)
-        response_length = int.from_bytes(response_length_bytes, 'big')
+        response_length = int.from_bytes(response_length_bytes, "big")
         response_data_bytes = recv_exact(sock, response_length)
-        final_response = json.loads(response_data_bytes.decode('utf-8'))
+        final_response = json.loads(response_data_bytes.decode("utf-8"))
 
         assert final_response["response_code"] == 0
         assert final_response["response"] == "Data stored."
         sock.close()
 
     # Attempt to push another message beyond capacity
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 5
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
     sock, response = send_request(request_data)
 
     # Receive immediate failure response (no transaction ID)
@@ -373,12 +323,7 @@ def test_ack_with_wrong_transaction_id():
     message = "Test Message"
 
     # Send PUSH request
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 5
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
     sock, response = send_request(request_data)
 
     # Send ACK with wrong transaction ID
@@ -387,19 +332,16 @@ def test_ack_with_wrong_transaction_id():
 
     # Receive final response indicating failure
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 1
     assert final_response["response_reason"] == "ACK not received."
     sock.close()
 
     # Verify that the message is not in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
@@ -413,12 +355,7 @@ def test_push_with_large_message():
     message = "A" * (1024 * 1024 * 5)  # 5MB message
 
     # Send PUSH request
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 5
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 5}
     sock, response = send_request(request_data)
     transaction_id = response["transaction_id"]
 
@@ -427,19 +364,16 @@ def test_push_with_large_message():
 
     # Receive final response
     response_length_bytes = recv_exact(sock, 8)
-    response_length = int.from_bytes(response_length_bytes, 'big')
+    response_length = int.from_bytes(response_length_bytes, "big")
     response_data_bytes = recv_exact(sock, response_length)
-    final_response = json.loads(response_data_bytes.decode('utf-8'))
+    final_response = json.loads(response_data_bytes.decode("utf-8"))
 
     assert final_response["response_code"] == 0
     assert final_response["response"] == "Data stored."
     sock.close()
 
     # Verify that the message is in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "1"
@@ -452,11 +386,7 @@ def test_pop_from_empty_queue():
     queue_name = f"test_queue_{uuid4()}"
 
     # Send POP request
-    request_data = {
-        "command": "POP",
-        "queue_name": queue_name,
-        "timeout": 5
-    }
+    request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
     sock, response = send_request(request_data)
 
     assert response["response_code"] == 1
@@ -471,12 +401,7 @@ def test_ack_timeout():
     message = "Test Message"
 
     # Send PUSH request with a short timeout
-    request_data = {
-        "command": "PUSH",
-        "queue_name": queue_name,
-        "message": message,
-        "timeout": 1  # 1-second timeout
-    }
+    request_data = {"command": "PUSH", "queue_name": queue_name, "message": message, "timeout": 1}  # 1-second timeout
     sock, response = send_request(request_data)
     transaction_id = response["transaction_id"]
 
@@ -489,9 +414,9 @@ def test_ack_timeout():
     # Receive final response indicating failure
     response_length_bytes = recv_exact(sock, 8)
     if response_length_bytes:
-        response_length = int.from_bytes(response_length_bytes, 'big')
+        response_length = int.from_bytes(response_length_bytes, "big")
         response_data_bytes = recv_exact(sock, response_length)
-        final_response = json.loads(response_data_bytes.decode('utf-8'))
+        final_response = json.loads(response_data_bytes.decode("utf-8"))
 
         # The server should have already timed out and discarded the data
         assert final_response["response_code"] == 1
@@ -502,10 +427,7 @@ def test_ack_timeout():
     sock.close()
 
     # Verify that the message is not in the queue
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response_code"] == 0
     assert size_response["response"] == "0"
@@ -531,11 +453,7 @@ def test_concurrent_push_pop():
     def pop_message():
         try:
             # Send POP request
-            request_data = {
-                "command": "POP",
-                "queue_name": queue_name,
-                "timeout": 5
-            }
+            request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
             sock, response = send_request(request_data)
             if response["response_code"] == 0:
                 transaction_id = response["transaction_id"]
@@ -544,7 +462,7 @@ def test_concurrent_push_pop():
                 send_ack(sock, transaction_id)
                 # Receive final response
                 response_length_bytes = recv_exact(sock, 8)
-                response_length = int.from_bytes(response_length_bytes, 'big')
+                response_length = int.from_bytes(response_length_bytes, "big")
                 recv_exact(sock, response_length)  # Discard final response
                 with lock:
                     results.append(f"Popped: {message}")
@@ -597,11 +515,7 @@ def test_multiple_clients():
         # Push message
         _push_message(queue_name, message)
         # Pop message
-        request_data = {
-            "command": "POP",
-            "queue_name": queue_name,
-            "timeout": 5
-        }
+        request_data = {"command": "POP", "queue_name": queue_name, "timeout": 5}
         sock, response = send_request(request_data)
         if response["response_code"] == 0:
             transaction_id = response["transaction_id"]
@@ -610,7 +524,7 @@ def test_multiple_clients():
             send_ack(sock, transaction_id)
             # Receive final response
             response_length_bytes = recv_exact(sock, 8)
-            response_length = int.from_bytes(response_length_bytes, 'big')
+            response_length = int.from_bytes(response_length_bytes, "big")
             recv_exact(sock, response_length)  # Discard final response
             with lock:
                 results.append(popped_message)
@@ -623,10 +537,7 @@ def test_multiple_clients():
         t.join()
 
     # Verify that the queue is empty
-    size_request = {
-        "command": "SIZE",
-        "queue_name": queue_name
-    }
+    size_request = {"command": "SIZE", "queue_name": queue_name}
     sock, size_response = send_request(size_request)
     assert size_response["response"] == "0"
     sock.close()

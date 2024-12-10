@@ -6,14 +6,15 @@ import base64
 import io
 import logging
 from functools import partial
-from typing import Any, Optional
+from typing import Any
 from typing import Dict
+from typing import Optional
 from typing import Tuple
 
 import pandas as pd
 import requests
-from PIL import Image
 from morpheus.config import Config
+from PIL import Image
 
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -58,24 +59,16 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
     # Ensure the base64 image size is within acceptable limits
     base64_image, _ = scale_image_to_encoding_size(base64_image)
 
-    headers = {
-        "Authorization": f"Bearer {api_key}",
-        "Accept": "application/json"
-    }
+    headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
 
     # Payload for the request
     payload = {
-        "model": 'meta/llama-3.2-90b-vision-instruct',
-        "messages": [
-            {
-                "role": "user",
-                "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'
-            }
-        ],
+        "model": "meta/llama-3.2-90b-vision-instruct",
+        "messages": [{"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'}],
         "max_tokens": 512,
         "temperature": 1.00,
         "top_p": 1.00,
-        "stream": stream
+        "stream": stream,
     }
 
     try:
@@ -90,17 +83,15 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
             return "\n".join(result)
         else:
             response_data = response.json()
-            return response_data.get('choices', [{}])[0].get('message', {}).get('content', 'No caption returned')
+            return response_data.get("choices", [{}])[0].get("message", {}).get("content", "No caption returned")
     except requests.exceptions.RequestException as e:
         logger.error(f"Error generating caption: {e}")
         raise
 
 
-def caption_extract_stage(df: pd.DataFrame,
-                          task_props: Dict[str, Any],
-                          validated_config: Any,
-                          trace_info: Optional[Dict[str, Any]] = None
-                          ) -> pd.DataFrame:
+def caption_extract_stage(
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict[str, Any]] = None
+) -> pd.DataFrame:
     """
     Extracts captions for image content in the DataFrame using an external NVIDIA API.
     Updates the 'metadata' column by adding the generated captions under 'image_metadata.caption'.
@@ -132,18 +123,18 @@ def caption_extract_stage(df: pd.DataFrame,
     endpoint_url = task_props.get("endpoint_url", validated_config.endpoint_url)
 
     # Create a mask for rows where the document type is IMAGE
-    df_mask = df['metadata'].apply(lambda meta: meta.get('content_metadata', {}).get('type') == "image")
+    df_mask = df["metadata"].apply(lambda meta: meta.get("content_metadata", {}).get("type") == "image")
 
     if not df_mask.any():
         return df
 
-    df.loc[df_mask, 'metadata'] = df.loc[df_mask, 'metadata'].apply(
+    df.loc[df_mask, "metadata"] = df.loc[df_mask, "metadata"].apply(
         lambda meta: {
             **meta,
-            'image_metadata': {
-                **meta.get('image_metadata', {}),
-                'caption': _generate_captions(meta['content'], prompt, api_key, endpoint_url)
-            }
+            "image_metadata": {
+                **meta.get("image_metadata", {}),
+                "caption": _generate_captions(meta["content"], prompt, api_key, endpoint_url),
+            },
         }
     )
 
@@ -153,11 +144,11 @@ def caption_extract_stage(df: pd.DataFrame,
 
 
 def generate_caption_extraction_stage(
-        c: Config,
-        caption_config: Dict[str, Any],
-        task: str = "caption",
-        task_desc: str = "caption_extraction",
-        pe_count: int = 8,
+    c: Config,
+    caption_config: Dict[str, Any],
+    task: str = "caption",
+    task_desc: str = "caption_extraction",
+    pe_count: int = 8,
 ):
     """
     Generates a caption extraction stage with the specified configuration.

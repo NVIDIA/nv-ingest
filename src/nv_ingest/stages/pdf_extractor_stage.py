@@ -14,6 +14,7 @@ from typing import Optional
 
 import pandas as pd
 from morpheus.config import Config
+
 from nv_ingest.extraction_workflows import pdf
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage

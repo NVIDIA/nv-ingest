@@ -46,14 +46,14 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             if not data_length_bytes:
                 logger.debug("No data length received. Closing connection.")
                 return
-            data_length = int.from_bytes(data_length_bytes, 'big')
+            data_length = int.from_bytes(data_length_bytes, "big")
 
             data_bytes = self._recv_exact(data_length)
             if not data_bytes:
                 logger.debug("No data received. Closing connection.")
                 return
 
-            data = data_bytes.decode('utf-8').strip()
+            data = data_bytes.decode("utf-8").strip()
             request_data = json.loads(data)
 
             command = request_data.get("command")
@@ -118,8 +118,9 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         response = ResponseSchema(response_code=0, response="PONG")
         self._send_response(response)
 
-    def _handle_push(self, data: PushRequestSchema, transaction_id: str,
-                     queue: OrderedMessageQueue, queue_lock: threading.Lock):
+    def _handle_push(
+        self, data: PushRequestSchema, transaction_id: str, queue: OrderedMessageQueue, queue_lock: threading.Lock
+    ):
         """
         Handles a PUSH command to add a message to the specified queue.
 
@@ -146,9 +147,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
         # Proceed with the 3-way handshake
         initial_response = ResponseSchema(
-            response_code=0,
-            response="Transaction initiated. Waiting for ACK.",
-            transaction_id=transaction_id
+            response_code=0, response="Transaction initiated. Waiting for ACK.", transaction_id=transaction_id
         )
         self._send_response(initial_response)
 
@@ -156,25 +155,20 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         if not self._wait_for_ack(transaction_id, timeout):
             logger.debug(f"Transaction {transaction_id}: ACK not received. Discarding data.")
             final_response = ResponseSchema(
-                response_code=1,
-                response_reason="ACK not received.",
-                transaction_id=transaction_id
+                response_code=1, response_reason="ACK not received.", transaction_id=transaction_id
             )
         else:
             # Perform the PUSH operation after ACK
             with queue_lock:
                 queue.push(data.message)
-            final_response = ResponseSchema(
-                response_code=0,
-                response="Data stored.",
-                transaction_id=transaction_id
-            )
+            final_response = ResponseSchema(response_code=0, response="Data stored.", transaction_id=transaction_id)
 
         # Send final response
         self._send_response(final_response)
 
-    def _handle_push_for_nv_ingest(self, data: PushRequestSchema,
-                                   queue: OrderedMessageQueue, queue_lock: threading.Lock):
+    def _handle_push_for_nv_ingest(
+        self, data: PushRequestSchema, queue: OrderedMessageQueue, queue_lock: threading.Lock
+    ):
         """
         Handles a PUSH_FOR_NV_INGEST command, which includes generating a unique job ID and
         updating the message payload accordingly.
@@ -201,7 +195,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
         # Generate a UUID for 'job_id' and use it as transaction_id
         transaction_id = str(uuid.uuid4())
-        message_dict['job_id'] = transaction_id
+        message_dict["job_id"] = transaction_id
 
         # Re-serialize the message
         updated_message = json.dumps(message_dict)
@@ -215,9 +209,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
         # Proceed with the 3-way handshake
         initial_response = ResponseSchema(
-            response_code=0,
-            response="Transaction initiated. Waiting for ACK.",
-            transaction_id=transaction_id
+            response_code=0, response="Transaction initiated. Waiting for ACK.", transaction_id=transaction_id
         )
         self._send_response(initial_response)
 
@@ -225,25 +217,18 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         if not self._wait_for_ack(transaction_id, timeout):
             logger.debug(f"Transaction {transaction_id}: ACK not received. Discarding data.")
             final_response = ResponseSchema(
-                response_code=1,
-                response_reason="ACK not received.",
-                transaction_id=transaction_id
+                response_code=1, response_reason="ACK not received.", transaction_id=transaction_id
             )
         else:
             # Perform the PUSH operation after ACK
             with queue_lock:
                 queue.push(updated_message)
-            final_response = ResponseSchema(
-                response_code=0,
-                response="Data stored.",
-                transaction_id=transaction_id
-            )
+            final_response = ResponseSchema(response_code=0, response="Data stored.", transaction_id=transaction_id)
 
         # Send final response
         self._send_response(final_response)
 
-    def _handle_pop(self, data: PopRequestSchema,
-                    queue: OrderedMessageQueue, queue_lock: threading.Lock):
+    def _handle_pop(self, data: PopRequestSchema, queue: OrderedMessageQueue, queue_lock: threading.Lock):
         """
         Handles a POP command to retrieve a message from the specified queue.
 
@@ -270,11 +255,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             message = queue.pop(transaction_id)
 
         # Proceed with the 3-way handshake
-        initial_response = ResponseSchema(
-            response_code=0,
-            response=message,
-            transaction_id=transaction_id
-        )
+        initial_response = ResponseSchema(response_code=0, response=message, transaction_id=transaction_id)
         self._send_response(initial_response)
 
         # Wait for ACK
@@ -283,24 +264,19 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             with queue_lock:
                 queue.return_message(transaction_id)
             final_response = ResponseSchema(
-                response_code=1,
-                response_reason="ACK not received.",
-                transaction_id=transaction_id
+                response_code=1, response_reason="ACK not received.", transaction_id=transaction_id
             )
         else:
             with queue_lock:
                 queue.acknowledge(transaction_id)
-            final_response = ResponseSchema(
-                response_code=0,
-                response="Data processed.",
-                transaction_id=transaction_id
-            )
+            final_response = ResponseSchema(response_code=0, response="Data processed.", transaction_id=transaction_id)
 
         # Send final response
         self._send_response(final_response)
 
-    def _size_of_queue(self, data: SizeRequestSchema,
-                       queue: OrderedMessageQueue, queue_lock: threading.Lock) -> ResponseSchema:
+    def _size_of_queue(
+        self, data: SizeRequestSchema, queue: OrderedMessageQueue, queue_lock: threading.Lock
+    ) -> ResponseSchema:
         """
         Retrieves the size of the specified queue.
 
@@ -345,11 +321,11 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
             ack_length_bytes = self._recv_exact(8)
             if not ack_length_bytes or len(ack_length_bytes) < 8:
                 return False
-            ack_length = int.from_bytes(ack_length_bytes, 'big')
+            ack_length = int.from_bytes(ack_length_bytes, "big")
             ack_data_bytes = self._recv_exact(ack_length)
             if not ack_data_bytes or len(ack_data_bytes) < ack_length:
                 return False
-            ack_data = ack_data_bytes.decode('utf-8')
+            ack_data = ack_data_bytes.decode("utf-8")
             ack_response = json.loads(ack_data)
             return ack_response.get("transaction_id") == transaction_id and ack_response.get("ack") is True
         except (socket.timeout, json.JSONDecodeError, ConnectionResetError) as e:
@@ -374,9 +350,9 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         """
 
         try:
-            response_json = response.json().encode('utf-8')
+            response_json = response.json().encode("utf-8")
             total_length = len(response_json)
-            self.request.sendall(total_length.to_bytes(8, 'big'))
+            self.request.sendall(total_length.to_bytes(8, "big"))
             self.request.sendall(response_json)
         except BrokenPipeError as e:
             logger.error(f"BrokenPipeError while sending response: {e}")
@@ -462,7 +438,7 @@ class SimpleMessageBroker(socketserver.ThreadingMixIn, socketserver.TCPServer):
         """
 
         # Prevent __init__ from running multiple times on the same instance
-        if hasattr(self, '_initialized') and self._initialized:
+        if hasattr(self, "_initialized") and self._initialized:
             return
         super().__init__((host, port), SimpleMessageBrokerHandler)
         self.max_queue_size = max_queue_size

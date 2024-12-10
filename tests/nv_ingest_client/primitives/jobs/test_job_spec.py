@@ -13,7 +13,10 @@ from unittest.mock import patch
 import pytest
 from nv_ingest_client.primitives.jobs.job_spec import BatchJobSpec
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.primitives.tasks import Task, DedupTask, EmbedTask, ExtractTask
+from nv_ingest_client.primitives.tasks import DedupTask
+from nv_ingest_client.primitives.tasks import EmbedTask
+from nv_ingest_client.primitives.tasks import ExtractTask
+from nv_ingest_client.primitives.tasks import Task
 
 MODULE_UNDER_TEST = "nv_ingest_client.primitives.jobs.job_spec"
 

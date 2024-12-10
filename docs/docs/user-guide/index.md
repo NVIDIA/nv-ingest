@@ -7,7 +7,7 @@ NV-Ingest also enables parallelization of the process of splitting documents int
 
 ## What NV-Ingest Does ✔️
 
-NV-Ingest is a microservice service that: 
+NV-Ingest is a microservice service that:
 
 - Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
 - Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, and processing annotations and timing/trace data.

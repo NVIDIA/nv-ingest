@@ -56,7 +56,7 @@ class StoreTask(Task):
         images: bool = False,
         store_method: _Type_Store_Method = None,
         params: dict = None,
-        **extra_params
+        **extra_params,
     ) -> None:
         """
         Setup Store Task Config
@@ -68,7 +68,6 @@ class StoreTask(Task):
         self._store_method = store_method or "minio"
         self._params = params
         self._extra_params = extra_params
-
 
     def __str__(self) -> str:
         """
@@ -110,12 +109,7 @@ class StoreEmbedTask(Task):
 
     _Type_Store_Method = Literal["minio",]
 
-
-    def __init__(
-        self,
-        params: dict = None,
-        **extra_params
-    ) -> None:
+    def __init__(self, params: dict = None, **extra_params) -> None:
         """
         Setup Store Task Config
         """
@@ -146,4 +140,3 @@ class StoreEmbedTask(Task):
         }
 
         return {"type": "store_embedding", "task_properties": task_properties}
-

@@ -26,13 +26,15 @@ def test_redis_task_source_schema_custom_values():
     Test RedisTaskSourceSchema with custom values for its fields.
     """
     custom_redis_client = MessageBrokerClientSchema(host="custom_host", port=12345, broker_params={"use_ssl": True})
-    schema = MessageBrokerTaskSourceSchema(broker_client=custom_redis_client, task_queue="custom_queue",
-                                           progress_engines=10)
+    schema = MessageBrokerTaskSourceSchema(
+        broker_client=custom_redis_client, task_queue="custom_queue", progress_engines=10
+    )
 
     assert schema.broker_client.host == "custom_host", "Custom host value for redis_client should be respected."
     assert schema.broker_client.port == 12345, "Custom port value for redis_client should be respected."
-    assert schema.broker_client.broker_params[
-               'use_ssl'] == True, "Custom use_ssl value for redis_client should be True."
+    assert (
+        schema.broker_client.broker_params["use_ssl"] == True
+    ), "Custom use_ssl value for redis_client should be True."
     assert schema.task_queue == "custom_queue", "Custom value for task_queue should be respected."
     assert schema.progress_engines == 10, "Custom value for progress_engines should be respected."
 

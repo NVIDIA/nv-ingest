@@ -194,7 +194,7 @@ services:
             - driver: nvidia
               device_ids: ["1"]
               capabilities: [gpu]
-  
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
@@ -336,4 +336,3 @@ services:
       - "milvus"
     profiles:
       - retrieval
-

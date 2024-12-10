@@ -26,8 +26,7 @@ class ChartExtractionTask(Task):
     Object for chart extraction task
     """
 
-    def __init__(
-            self) -> None:
+    def __init__(self) -> None:
         """
         Setup Dedup Task Config
         """
