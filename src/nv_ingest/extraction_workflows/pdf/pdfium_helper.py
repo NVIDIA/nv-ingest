@@ -18,7 +18,6 @@
 
 import logging
 import traceback
-
 from math import log
 from typing import List
 from typing import Optional
@@ -28,6 +27,7 @@ import numpy as np
 import pypdfium2 as libpdfium
 import nv_ingest.util.nim.yolox as yolox_utils
 
+import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
@@ -36,10 +36,10 @@ from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
+from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
@@ -58,24 +58,25 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-        pages: List,  # List[libpdfium.PdfPage]
-        config: PDFiumConfigSchema,
-        trace_info: Optional[List] = None,
+    pages: List,  # List[libpdfium.PdfPage]
+    config: PDFiumConfigSchema,
+    trace_info: Optional[List] = None,
 ) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
     tables_and_charts = []
 
     yolox_client = None
     try:
         model_interface = yolox_utils.YoloxModelInterface()
-        yolox_client = create_inference_client(config.yolox_endpoints, model_interface, config.auth_token,
-                                               config.yolox_infer_protocol)
+        yolox_client = create_inference_client(
+            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+        )
 
         batches = []
         i = 0
         max_batch_size = YOLOX_MAX_BATCH_SIZE
         while i < len(pages):
             batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
-            batches.append(pages[i: i + batch_size])  # noqa: E203
+            batches.append(pages[i : i + batch_size])  # noqa: E203
             i += batch_size
 
         page_index = 0
@@ -85,7 +86,7 @@ def extract_tables_and_charts_using_image_ensemble(
             )
 
             # Prepare data
-            data = {'images': original_images}
+            data = {"images": original_images}
 
             # Perform inference using NimClient
             inference_results = yolox_client.infer(
@@ -127,13 +128,13 @@ def extract_tables_and_charts_using_image_ensemble(
 
 
 def process_inference_results(
-        output_array: np.ndarray,
-        original_image_shapes: List[Tuple[int, int]],
-        num_classes: int,
-        conf_thresh: float,
-        iou_thresh: float,
-        min_score: float,
-        final_thresh: float,
+    output_array: np.ndarray,
+    original_image_shapes: List[Tuple[int, int]],
+    num_classes: int,
+    conf_thresh: float,
+    iou_thresh: float,
+    min_score: float,
+    final_thresh: float,
 ):
     """
     Process the model output to generate detection results and expand bounding boxes.
@@ -198,10 +199,10 @@ def process_inference_results(
 
 # Handle individual table/chart extraction and model inference
 def extract_table_and_chart_images(
-        annotation_dict,
-        original_image,
-        page_idx,
-        tables_and_charts,
+    annotation_dict,
+    original_image,
+    page_idx,
+    tables_and_charts,
 ):
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -245,8 +246,12 @@ def extract_table_and_chart_images(
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
-                content="", image=base64_img, bbox=(w1, h1, w2, h2), max_width=width,
-                max_height=height, type_string=label
+                content="",
+                image=base64_img,
+                bbox=(w1, h1, w2, h2),
+                max_width=width,
+                max_height=height,
+                type_string=label,
             )
             tables_and_charts.append((page_idx, table_data))
 
@@ -254,13 +259,13 @@ def extract_table_and_chart_images(
 # Define a helper function to use unstructured-io to extract text from a base64
 # encoded bytestream PDF
 def pdfium_extractor(
-        pdf_stream,
-        extract_text: bool,
-        extract_images: bool,
-        extract_tables: bool,
-        extract_charts: bool,
-        trace_info=None,
-        **kwargs,
+    pdf_stream,
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    trace_info=None,
+    **kwargs,
 ):
     """
     Helper function to use pdfium to extract text from a bytestream PDF.
@@ -347,8 +352,7 @@ def pdfium_extractor(
             page_text = textpage.get_text_bounded()
             accumulated_text.append(page_text)
 
-            if (text_depth == TextTypeEnum.PAGE
-                    and len(accumulated_text) > 0):
+            if text_depth == TextTypeEnum.PAGE and len(accumulated_text) > 0:
                 text_extraction = construct_text_metadata(
                     accumulated_text,
                     pdf_metadata.keywords,
@@ -377,8 +381,12 @@ def pdfium_extractor(
                         image_bbox = obj.get_pos()
                         image_size = obj.get_size()
                         image_data = Base64Image(
-                            image=image_base64, bbox=image_bbox, width=image_size[0], height=image_size[1],
-                            max_width=page_width, max_height=page_height
+                            image=image_base64,
+                            bbox=image_bbox,
+                            width=image_size[0],
+                            height=image_size[1],
+                            max_width=page_width,
+                            max_height=page_height,
                         )
 
                         extracted_image_data = construct_image_metadata_from_pdf_image(
@@ -398,9 +406,7 @@ def pdfium_extractor(
         if extract_tables or extract_charts:
             pages.append(page)
 
-    if (extract_text
-            and text_depth == TextTypeEnum.DOCUMENT
-            and len(accumulated_text) > 0):
+    if extract_text and text_depth == TextTypeEnum.DOCUMENT and len(accumulated_text) > 0:
         text_extraction = construct_text_metadata(
             accumulated_text,
             pdf_metadata.keywords,
@@ -418,14 +424,14 @@ def pdfium_extractor(
 
     if extract_tables or extract_charts:
         for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
-                pages,
-                pdfium_config,
-                trace_info=trace_info,
+            pages,
+            pdfium_config,
+            trace_info=trace_info,
         ):
             if (extract_tables and (table_and_charts.type_string == "table")) or (
-                    extract_charts and (table_and_charts.type_string == "chart")
+                extract_charts and (table_and_charts.type_string == "chart")
             ):
-                if (table_and_charts.type_string == "table"):
+                if table_and_charts.type_string == "table":
                     table_and_charts.content_format = paddle_output_format
 
                 extracted_data.append(

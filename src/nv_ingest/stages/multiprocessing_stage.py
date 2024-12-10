@@ -13,7 +13,6 @@ import uuid
 from datetime import datetime
 from functools import partial
 
-import cudf
 import mrc
 import pandas as pd
 from morpheus.config import Config
@@ -24,6 +23,9 @@ from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
 from mrc.core import operators as ops
 from mrc.core.subscriber import Observer
+
+import cudf
+
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
@@ -155,7 +157,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         task_desc: str,
         pe_count: int,
         process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        document_type: typing.Union[typing.List[str],str] = None,
+        document_type: typing.Union[typing.List[str], str] = None,
         filter_properties: dict = None,
     ):
         super().__init__(c)
@@ -252,7 +254,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                     if extra_results:
                         for extra_result in extra_results:
                             if isinstance(extra_result, dict) and ("trace_info" in extra_result):
-                               work_package["trace_info"] = extra_result["trace_info"]
+                                work_package["trace_info"] = extra_result["trace_info"]
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:

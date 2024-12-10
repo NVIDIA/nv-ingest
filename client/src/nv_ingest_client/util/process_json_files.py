@@ -1,5 +1,7 @@
-import click
 import json
+
+import click
+
 
 def ingest_json_results_to_blob(result_content):
     """
@@ -14,15 +16,15 @@ def ingest_json_results_to_blob(result_content):
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
-            page = entry['metadata']['content_metadata']['page_number']
-            if entry['document_type'] == 'structured':
+            page = entry["metadata"]["content_metadata"]["page_number"]
+            if entry["document_type"] == "structured":
                 # Use table location's x0 and y0 as secondary keys
-                x0 = entry['metadata']['table_metadata']['table_location'][0]
-                y0 = entry['metadata']['table_metadata']['table_location'][1]
+                x0 = entry["metadata"]["table_metadata"]["table_location"][0]
+                y0 = entry["metadata"]["table_metadata"]["table_location"][1]
             else:
                 # Non-structured objects are sorted after structured ones
-                x0 = float('inf')
-                y0 = float('inf')
+                x0 = float("inf")
+                y0 = float("inf")
             return page, x0, y0
 
         data.sort(key=sorting_key)
@@ -31,35 +33,40 @@ def ingest_json_results_to_blob(result_content):
         blob = []
 
         for entry in data:
-            document_type = entry.get('document_type', '')
+            document_type = entry.get("document_type", "")
 
-            if document_type == 'structured':
+            if document_type == "structured":
                 # Add table content to the blob
-                blob.append(entry['metadata']['table_metadata']['table_content'])
+                blob.append(entry["metadata"]["table_metadata"]["table_content"])
                 blob.append("\n")
 
-            elif document_type == 'text':
+            elif document_type == "text":
                 # Add content to the blob
-                blob.append(entry['metadata']['content'])
+                blob.append(entry["metadata"]["content"])
                 blob.append("\n")
 
-            elif document_type == 'image':
+            elif document_type == "image":
                 # Add image caption to the blob
-                caption = entry['metadata']['image_metadata'].get('caption', '')
+                caption = entry["metadata"]["image_metadata"].get("caption", "")
                 blob.append(f"image_caption:[{caption}]")
                 blob.append("\n")
 
         # Join all parts of the blob into a single string
-        return ''.join(blob)
+        return "".join(blob)
 
     except Exception as e:
         print(f"[ERROR] An error occurred while processing JSON content: {e}")
         return ""
 
+
 @click.command()
-@click.argument('json_files', type=click.Path(exists=True), nargs=-1, required=True)
-@click.option('--output-file', type=click.Path(dir_okay=False, writable=True, resolve_path=True), required=True,
-              help="Path to save the combined blob output file.")
+@click.argument("json_files", type=click.Path(exists=True), nargs=-1, required=True)
+@click.option(
+    "--output-file",
+    type=click.Path(dir_okay=False, writable=True, resolve_path=True),
+    required=True,
+    help="Path to save the combined blob output file.",
+)
 def main(json_files, output_file):
     """
     Process multiple JSON files, combine and sort entries, and generate a single blob file.
@@ -73,7 +80,7 @@ def main(json_files, output_file):
         # Read and collect entries from all files
         for json_file in json_files:
             click.echo(f"Reading file: {json_file}")
-            with open(json_file, 'r') as file:
+            with open(json_file, "r") as file:
                 content = file.read()
                 all_entries.extend(json.loads(content))
 
@@ -85,7 +92,7 @@ def main(json_files, output_file):
 
         if blob_string:
             # Write the blob to the output file
-            with open(output_file, 'w+') as file:
+            with open(output_file, "w+") as file:
                 file.write(blob_string)
             click.echo(f"Blob string has been generated and saved to: {output_file}")
         else:

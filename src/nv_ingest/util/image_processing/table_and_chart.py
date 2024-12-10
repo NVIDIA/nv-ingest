@@ -41,7 +41,7 @@ def join_cached_and_deplot_output(cached_text, deplot_text):
     """
     chart_content = ""
 
-    if (cached_text is not None):
+    if cached_text is not None:
         try:
             if isinstance(cached_text, str):
                 cached_text_dict = json.loads(cached_text)
@@ -52,7 +52,7 @@ def join_cached_and_deplot_output(cached_text, deplot_text):
 
             chart_content += cached_text_dict.get("chart_title", "")
 
-            if (deplot_text is not None):
+            if deplot_text is not None:
                 chart_content += f" {deplot_text}"
 
             chart_content += " " + cached_text_dict.get("caption", "")
@@ -69,11 +69,11 @@ def join_cached_and_deplot_output(cached_text, deplot_text):
         except json.JSONDecodeError:
             chart_content += cached_text
 
-            if (deplot_text is not None):
+            if deplot_text is not None:
                 chart_content += f" {deplot_text}"
 
     else:
-        if (deplot_text is not None):
+        if deplot_text is not None:
             chart_content += f" {deplot_text}"
 
     return chart_content

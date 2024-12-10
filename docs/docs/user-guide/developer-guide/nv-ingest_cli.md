@@ -241,4 +241,3 @@ buttons.
     ```
     --file_path "/path/to/your/images.json"
     ```
-

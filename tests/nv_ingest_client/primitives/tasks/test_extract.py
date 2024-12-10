@@ -48,7 +48,9 @@ def test_extract_task_str_representation(document_type, extract_method, extract_
         ("txt", None, None, None, False, False),
     ],
 )
-def test_extract_task_str_representation_extract_charts_false(document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts):
+def test_extract_task_str_representation_extract_charts_false(
+    document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts
+):
     task = ExtractTask(
         document_type=document_type,
         extract_method=extract_method,
@@ -113,7 +115,13 @@ def test_extract_task_initialization(extract_method, extract_text, extract_image
     ],
 )
 def test_extract_task_to_dict_basic(
-    document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method, paddle_output_format,
+    document_type,
+    extract_method,
+    extract_text,
+    extract_images,
+    extract_tables,
+    extract_tables_method,
+    paddle_output_format,
 ):
     task = ExtractTask(
         document_type=document_type,
@@ -153,7 +161,14 @@ def test_extract_task_to_dict_basic(
     ],
 )
 def test_extract_task_to_dict_extract_charts_false(
-    document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method, extract_charts, paddle_output_format,
+    document_type,
+    extract_method,
+    extract_text,
+    extract_images,
+    extract_tables,
+    extract_tables_method,
+    extract_charts,
+    paddle_output_format,
 ):
     task = ExtractTask(
         document_type=document_type,

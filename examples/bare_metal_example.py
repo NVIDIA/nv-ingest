@@ -17,9 +17,7 @@ def run_ingestor():
     """
     logger.info("Setting up Ingestor client...")
     client = NvIngestClient(
-        message_client_allocator=SimpleClient,
-        message_client_port=7671,
-        message_client_hostname="localhost"
+        message_client_allocator=SimpleClient, message_client_port=7671, message_client_hostname="localhost"
     )
 
     ingestor = (
@@ -30,7 +28,8 @@ def run_ingestor():
             extract_tables=True,
             extract_charts=True,
             extract_images=False,
-        ).split(
+        )
+        .split(
             split_by="word",
             split_length=300,
             split_overlap=10,

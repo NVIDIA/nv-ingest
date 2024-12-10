@@ -99,7 +99,7 @@ Jobs are submitted via the `nv-ingest-cli` command.
 
 #### NV-Ingest CLI Installation
 
-NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`. 
+NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`.
 
 > [!TIP]
 > This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.

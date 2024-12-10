@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 class VdbUploadTaskSchema(BaseModel):
     filter_errors: bool = False
-    bulk_ingest: bool = False,
-    bulk_ingest_path: str = None,
+    bulk_ingest: bool = (False,)
+    bulk_ingest_path: str = (None,)
     params: dict = None
 
     class Config:
@@ -36,7 +36,7 @@ class VdbUploadTask(Task):
         filter_errors: bool = False,
         bulk_ingest: bool = False,
         bulk_ingest_path: str = "embeddings/",
-        params: dict = None
+        params: dict = None,
     ) -> None:
         """
         Setup VDB Upload Task Config

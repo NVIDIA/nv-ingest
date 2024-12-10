@@ -6,7 +6,7 @@ from uuid import uuid4
 
 from nv_ingest.util.message_brokers.simple_message_broker import SimpleClient, SimpleMessageBroker
 
-HOST = '127.0.0.1'
+HOST = "127.0.0.1"
 PORT = 9999  # Use an available port
 MAX_QUEUE_SIZE = 10
 
@@ -14,7 +14,7 @@ PUSH_TIMEOUT_MSG = "PUSH operation timed out."
 POP_TIMEOUT_MSG = "POP operation timed out."
 
 
-@pytest.fixture(scope='module')
+@pytest.fixture(scope="module")
 def broker_server():
     """Fixture to start and stop the SimpleMessageBroker server."""
     server = SimpleMessageBroker(HOST, PORT, MAX_QUEUE_SIZE)
@@ -35,6 +35,7 @@ def client():
 
 
 # Existing tests...
+
 
 @pytest.mark.usefixtures("broker_server")
 def test_message_ordering():
@@ -135,7 +136,7 @@ def test_client_retry_logic():
     elapsed_time = time.time() - start_time
 
     # Expected total backoff delay is sum of backoff delays: 2^1 + 2^2 = 2 + 4 = 6 seconds
-    expected_delay = sum(min(2 ** i, client._max_backoff) for i in range(1, client._max_retries + 1))
+    expected_delay = sum(min(2**i, client._max_backoff) for i in range(1, client._max_retries + 1))
 
     assert response.response_code == 1
     assert response.response_reason == PUSH_TIMEOUT_MSG

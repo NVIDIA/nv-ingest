@@ -9,10 +9,17 @@ import pytest
 
 import requests
 
-from nv_ingest.util.nim.helpers import NimClient, create_inference_client, preprocess_image_for_paddle, generate_url, \
-    remove_url_endpoints, is_ready, get_version
+from nv_ingest.util.nim.helpers import (
+    NimClient,
+    create_inference_client,
+    preprocess_image_for_paddle,
+    generate_url,
+    remove_url_endpoints,
+    is_ready,
+    get_version,
+)
 
-MODULE_UNDER_TEST = 'nv_ingest.util.nim.helpers'
+MODULE_UNDER_TEST = "nv_ingest.util.nim.helpers"
 
 
 class MockModelInterface:
@@ -22,10 +29,10 @@ class MockModelInterface:
 
     def format_input(self, data, protocol: str, **kwargs):
         # Return different data based on the protocol
-        if protocol == 'grpc':
+        if protocol == "grpc":
             return np.array([1, 2, 3], dtype=np.float32)
-        elif protocol == 'http':
-            return {'input': 'formatted_data'}
+        elif protocol == "http":
+            return {"input": "formatted_data"}
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -43,12 +50,12 @@ def mock_backoff(mocker):
     """
     Mock backoff functionality to avoid actual delays during testing.
     """
-    return mocker.patch(f'{MODULE_UNDER_TEST}.backoff')
+    return mocker.patch(f"{MODULE_UNDER_TEST}.backoff")
 
 
 @pytest.fixture
 def mock_requests_get():
-    with patch(f'{MODULE_UNDER_TEST}.requests.get') as mock_get:
+    with patch(f"{MODULE_UNDER_TEST}.requests.get") as mock_get:
         yield mock_get
 
 
@@ -66,32 +73,32 @@ def sample_image():
 # Fixtures for endpoints
 @pytest.fixture
 def grpc_endpoint():
-    return 'grpc_endpoint'
+    return "grpc_endpoint"
 
 
 @pytest.fixture
 def http_endpoint():
-    return 'http_endpoint'
+    return "http_endpoint"
 
 
 @pytest.fixture
 def empty_endpoint():
-    return ''
+    return ""
 
 
 @pytest.fixture
 def grpc_endpoints():
-    return ('grpc_endpoint', None)
+    return ("grpc_endpoint", None)
 
 
 @pytest.fixture
 def http_endpoints():
-    return (None, 'http_endpoint')
+    return (None, "http_endpoint")
 
 
 @pytest.fixture
 def both_endpoints():
-    return ('grpc_endpoint', 'http_endpoint')
+    return ("grpc_endpoint", "http_endpoint")
 
 
 @pytest.fixture
@@ -101,143 +108,144 @@ def mock_model_interface():
 
 # Black-box tests for NimClient
 
+
 # Test initialization with valid gRPC parameters
 def test_nimclient_init_grpc_valid(mock_model_interface, grpc_endpoints):
-    client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
-    assert client.protocol == 'grpc'
+    client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
+    assert client.protocol == "grpc"
 
 
 # Test initialization with valid HTTP parameters
 def test_nimclient_init_http_valid(mock_model_interface, http_endpoints):
-    client = NimClient(mock_model_interface, 'http', http_endpoints, auth_token='test_token')
-    assert client.protocol == 'http'
-    assert 'Authorization' in client.headers
-    assert client.headers['Authorization'] == 'Bearer test_token'
+    client = NimClient(mock_model_interface, "http", http_endpoints, auth_token="test_token")
+    assert client.protocol == "http"
+    assert "Authorization" in client.headers
+    assert client.headers["Authorization"] == "Bearer test_token"
 
 
 # Test initialization with invalid protocol
 def test_nimclient_init_invalid_protocol(mock_model_interface, both_endpoints):
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        NimClient(mock_model_interface, 'invalid_protocol', both_endpoints)
+        NimClient(mock_model_interface, "invalid_protocol", both_endpoints)
 
 
 # Test initialization missing gRPC endpoint
 def test_nimclient_init_missing_grpc_endpoint(mock_model_interface):
     with pytest.raises(ValueError, match="gRPC endpoint must be provided for gRPC protocol"):
-        NimClient(mock_model_interface, 'grpc', (None, 'http_endpoint'))
+        NimClient(mock_model_interface, "grpc", (None, "http_endpoint"))
 
 
 # Test initialization missing HTTP endpoint
 def test_nimclient_init_missing_http_endpoint(mock_model_interface):
     with pytest.raises(ValueError, match="HTTP endpoint must be provided for HTTP protocol"):
-        NimClient(mock_model_interface, 'http', ('grpc_endpoint', None))
+        NimClient(mock_model_interface, "http", ("grpc_endpoint", None))
 
 
 # Test infer with gRPC protocol
 def test_nimclient_infer_grpc(mock_model_interface, grpc_endpoints):
-    data = {'input_data': 'test'}
+    data = {"input_data": "test"}
 
     # Mock the gRPC client
-    with patch(f'{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient') as mock_grpc_client:
+    with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
         # Instantiate the NimClient after the patch is in place
-        client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+        client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
 
         # Mock the infer response
         mock_response = Mock()
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
 
-        result = client.infer(data, model_name='test_model')
+        result = client.infer(data, model_name="test_model")
 
-    assert result == 'processed_parsed_output_grpc'
+    assert result == "processed_parsed_output_grpc"
 
 
 # Test infer with HTTP protocol
 def test_nimclient_infer_http(mock_model_interface, http_endpoints):
-    data = {'input_data': 'test'}
-    client = NimClient(mock_model_interface, 'http', http_endpoints)
+    data = {"input_data": "test"}
+    client = NimClient(mock_model_interface, "http", http_endpoints)
 
     # Mock the HTTP request
-    with patch(f'{MODULE_UNDER_TEST}.requests.post') as mock_post:
+    with patch(f"{MODULE_UNDER_TEST}.requests.post") as mock_post:
         mock_response = Mock()
-        mock_response.json.return_value = {'output': 'response_data'}
+        mock_response.json.return_value = {"output": "response_data"}
         mock_response.raise_for_status = Mock()
         mock_post.return_value = mock_response
 
-        result = client.infer(data, model_name='test_model')
+        result = client.infer(data, model_name="test_model")
 
-    assert result == 'processed_parsed_output_http'
+    assert result == "processed_parsed_output_http"
 
 
 # Test infer raises exception on HTTP error
 def test_nimclient_infer_http_error(mock_model_interface, http_endpoints):
-    data = {'input_data': 'test'}
+    data = {"input_data": "test"}
 
-    with patch(f'{MODULE_UNDER_TEST}.requests.post') as mock_post:
-        client = NimClient(mock_model_interface, 'http', http_endpoints)
+    with patch(f"{MODULE_UNDER_TEST}.requests.post") as mock_post:
+        client = NimClient(mock_model_interface, "http", http_endpoints)
         mock_response = Mock()
         mock_response.raise_for_status.side_effect = Exception("HTTP Inference error")
         mock_post.return_value = mock_response
 
         with pytest.raises(Exception, match="HTTP Inference error"):
-            client.infer(data, model_name='test_model')
+            client.infer(data, model_name="test_model")
 
 
 # Test infer raises exception on gRPC error
 def test_nimclient_infer_grpc_error(mock_model_interface, grpc_endpoints):
-    data = {'input_data': 'test'}
+    data = {"input_data": "test"}
 
-    with patch(f'{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient') as mock_grpc_client:
-        client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+    with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
+        client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
         mock_grpc_client.return_value.infer.side_effect = Exception("gRPC Inference error")
 
         with pytest.raises(Exception, match="gRPC Inference error"):
-            client.infer(data, model_name='test_model')
+            client.infer(data, model_name="test_model")
 
 
 # Test infer raises exception on invalid protocol
 def test_nimclient_infer_invalid_protocol(mock_model_interface, both_endpoints):
-    client = NimClient(mock_model_interface, 'grpc', both_endpoints)
-    client.protocol = 'invalid_protocol'
+    client = NimClient(mock_model_interface, "grpc", both_endpoints)
+    client.protocol = "invalid_protocol"
 
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        client.infer({}, model_name='test_model')
+        client.infer({}, model_name="test_model")
 
 
 # Test close method for gRPC protocol
 def test_nimclient_close_grpc(mock_model_interface, grpc_endpoints):
-    with patch(f'{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient') as mock_grpc_client:
-        client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+    with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
+        client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
         mock_grpc_instance = mock_grpc_client.return_value
         client.close()
 
 
 # Test close method for HTTP protocol
 def test_nimclient_close_http(mock_model_interface, http_endpoints):
-    client = NimClient(mock_model_interface, 'http', http_endpoints)
+    client = NimClient(mock_model_interface, "http", http_endpoints)
     # Calling close should not raise an exception
     client.close()
 
 
 # Test that NimClient handles exceptions from model_interface methods
 def test_nimclient_infer_model_interface_exception(mock_model_interface, grpc_endpoints):
-    data = {'input_data': 'test'}
-    client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+    data = {"input_data": "test"}
+    client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
 
     # Simulate exception in prepare_data_for_inference
     mock_model_interface.prepare_data_for_inference = Mock(side_effect=Exception("Preparation error"))
 
     with pytest.raises(Exception, match="Preparation error"):
-        client.infer(data, model_name='test_model')
+        client.infer(data, model_name="test_model")
 
 
 # Test that NimClient handles exceptions from parse_output
 def test_nimclient_infer_parse_output_exception(mock_model_interface, grpc_endpoints):
-    data = {'input_data': 'test'}
+    data = {"input_data": "test"}
 
     # Mock the gRPC client
-    with patch(f'{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient') as mock_grpc_client:
-        client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+    with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
+        client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
         mock_response = Mock()
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
@@ -246,16 +254,16 @@ def test_nimclient_infer_parse_output_exception(mock_model_interface, grpc_endpo
         mock_model_interface.parse_output = Mock(side_effect=Exception("Parsing error"))
 
         with pytest.raises(Exception, match="Parsing error"):
-            client.infer(data, model_name='test_model')
+            client.infer(data, model_name="test_model")
 
 
 # Test that NimClient handles exceptions from process_inference_results
 def test_nimclient_infer_process_results_exception(mock_model_interface, grpc_endpoints):
-    data = {'input_data': 'test'}
+    data = {"input_data": "test"}
 
     # Mock the gRPC client
-    with patch(f'{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient') as mock_grpc_client:
-        client = NimClient(mock_model_interface, 'grpc', grpc_endpoints)
+    with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
+        client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
         mock_response = Mock()
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
@@ -264,21 +272,22 @@ def test_nimclient_infer_process_results_exception(mock_model_interface, grpc_en
         mock_model_interface.process_inference_results = Mock(side_effect=Exception("Processing error"))
 
         with pytest.raises(Exception, match="Processing error"):
-            client.infer(data, model_name='test_model')
+            client.infer(data, model_name="test_model")
 
 
 # create_inference_client
+
 
 # Test Case 1: infer_protocol is None, both endpoints provided
 def test_create_inference_client_both_endpoints(mock_model_interface, grpc_endpoint, http_endpoint):
     client = create_inference_client(
         endpoints=(grpc_endpoint, http_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol=None
+        auth_token="test_token",
+        infer_protocol=None,
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'grpc'  # Should default to 'grpc' if both endpoints are provided
+    assert client.protocol == "grpc"  # Should default to 'grpc' if both endpoints are provided
 
 
 # Test Case 2: infer_protocol is None, only grpc_endpoint provided
@@ -286,11 +295,11 @@ def test_create_inference_client_grpc_only(mock_model_interface, grpc_endpoint, 
     client = create_inference_client(
         endpoints=(grpc_endpoint, empty_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol=None
+        auth_token="test_token",
+        infer_protocol=None,
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'grpc'
+    assert client.protocol == "grpc"
 
 
 # Test Case 3: infer_protocol is None, only http_endpoint provided
@@ -298,11 +307,11 @@ def test_create_inference_client_http_only(mock_model_interface, empty_endpoint,
     client = create_inference_client(
         endpoints=(empty_endpoint, http_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol=None
+        auth_token="test_token",
+        infer_protocol=None,
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'http'
+    assert client.protocol == "http"
 
 
 # Test Case 4: infer_protocol is 'grpc', grpc_endpoint provided
@@ -310,11 +319,11 @@ def test_create_inference_client_infer_protocol_grpc(mock_model_interface, grpc_
     client = create_inference_client(
         endpoints=(grpc_endpoint, empty_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol='grpc'
+        auth_token="test_token",
+        infer_protocol="grpc",
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'grpc'
+    assert client.protocol == "grpc"
 
 
 # Test Case 5: infer_protocol is 'http', http_endpoint provided
@@ -322,11 +331,11 @@ def test_create_inference_client_infer_protocol_http(mock_model_interface, empty
     client = create_inference_client(
         endpoints=(empty_endpoint, http_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol='http'
+        auth_token="test_token",
+        infer_protocol="http",
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'http'
+    assert client.protocol == "http"
 
 
 # Test Case 6: infer_protocol is 'grpc', but grpc_endpoint is empty
@@ -335,8 +344,8 @@ def test_create_inference_client_infer_protocol_grpc_no_endpoint(mock_model_inte
         create_inference_client(
             endpoints=(empty_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='grpc'
+            auth_token="test_token",
+            infer_protocol="grpc",
         )
 
 
@@ -346,8 +355,8 @@ def test_create_inference_client_infer_protocol_http_no_endpoint(mock_model_inte
         create_inference_client(
             endpoints=(grpc_endpoint, empty_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='http'
+            auth_token="test_token",
+            infer_protocol="http",
         )
 
 
@@ -357,8 +366,8 @@ def test_create_inference_client_invalid_infer_protocol(mock_model_interface, gr
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='invalid_protocol'
+            auth_token="test_token",
+            infer_protocol="invalid_protocol",
         )
 
 
@@ -368,42 +377,39 @@ def test_create_inference_client_no_endpoints(mock_model_interface, empty_endpoi
         create_inference_client(
             endpoints=(empty_endpoint, empty_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol=None
+            auth_token="test_token",
+            infer_protocol=None,
         )
 
 
 # Test Case 10: infer_protocol is None, grpc_endpoint is whitespace
 def test_create_inference_client_grpc_endpoint_whitespace(mock_model_interface, http_endpoint):
-    grpc_endpoint = '   '
+    grpc_endpoint = "   "
     client = create_inference_client(
         endpoints=(grpc_endpoint, http_endpoint),
         model_interface=mock_model_interface,
-        auth_token='test_token',
-        infer_protocol=None
+        auth_token="test_token",
+        infer_protocol=None,
     )
     assert isinstance(client, NimClient)
-    assert client.protocol == 'http'  # Should default to 'http' since grpc_endpoint is empty/whitespace
+    assert client.protocol == "http"  # Should default to 'http' since grpc_endpoint is empty/whitespace
 
 
 # Test Case 11: Check that NimClient is instantiated with correct parameters
 def test_create_inference_client_nimclient_parameters(mock_model_interface, grpc_endpoint, http_endpoint):
-    infer_protocol = 'grpc'
-    auth_token = 'test_token'
+    infer_protocol = "grpc"
+    auth_token = "test_token"
 
     # Mock NimClient to capture the initialization parameters
-    with patch(f'{MODULE_UNDER_TEST}.NimClient') as mock_nim_client_class:
+    with patch(f"{MODULE_UNDER_TEST}.NimClient") as mock_nim_client_class:
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
             auth_token=auth_token,
-            infer_protocol=infer_protocol
+            infer_protocol=infer_protocol,
         )
         mock_nim_client_class.assert_called_once_with(
-            mock_model_interface,
-            infer_protocol,
-            (grpc_endpoint, http_endpoint),
-            auth_token
+            mock_model_interface, infer_protocol, (grpc_endpoint, http_endpoint), auth_token
         )
 
 
@@ -414,8 +420,8 @@ def test_create_inference_client_grpc_endpoint_none(mock_model_interface, http_e
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='grpc'
+            auth_token="test_token",
+            infer_protocol="grpc",
         )
 
 
@@ -426,8 +432,8 @@ def test_create_inference_client_http_endpoint_none(mock_model_interface, grpc_e
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='http'
+            auth_token="test_token",
+            infer_protocol="http",
         )
 
 
@@ -439,8 +445,8 @@ def test_create_inference_client_endpoints_none(mock_model_interface):
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol=None
+            auth_token="test_token",
+            infer_protocol=None,
         )
 
 
@@ -451,8 +457,8 @@ def test_create_inference_client_grpc_endpoint_whitespace_with_infer_protocol(mo
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='grpc'
+            auth_token="test_token",
+            infer_protocol="grpc",
         )
 
 
@@ -463,25 +469,26 @@ def test_create_inference_client_http_endpoint_whitespace_with_infer_protocol(mo
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol='http'
+            auth_token="test_token",
+            infer_protocol="http",
         )
 
 
 # Test Case 17: infer_protocol is None, grpc_endpoint is empty, http_endpoint is whitespace
 def test_create_inference_client_http_endpoint_whitespace_no_infer_protocol(mock_model_interface, empty_endpoint):
-    grpc_endpoint = ''
+    grpc_endpoint = ""
     http_endpoint = None
     with pytest.raises(ValueError, match="Invalid infer_protocol specified. Must be 'grpc' or 'http'."):
         create_inference_client(
             endpoints=(grpc_endpoint, http_endpoint),
             model_interface=mock_model_interface,
-            auth_token='test_token',
-            infer_protocol=None
+            auth_token="test_token",
+            infer_protocol=None,
         )
 
 
 # Preprocess image for paddle
+
 
 @pytest.fixture
 def sample_image():
@@ -498,8 +505,9 @@ def test_preprocess_image_paddle_version_none(sample_image):
     Test that when paddle_version is None, the function returns the input image unchanged.
     """
     result = preprocess_image_for_paddle(sample_image, paddle_version=None)
-    assert np.array_equal(result,
-                          sample_image), "The output should be the same as the input when paddle_version is None."
+    assert np.array_equal(
+        result, sample_image
+    ), "The output should be the same as the input when paddle_version is None."
 
 
 def test_preprocess_image_paddle_version_old(sample_image):
@@ -507,8 +515,9 @@ def test_preprocess_image_paddle_version_old(sample_image):
     Test that when paddle_version is less than '0.2.0-rc1', the function returns the input image unchanged.
     """
     result = preprocess_image_for_paddle(sample_image, paddle_version="0.1.0")
-    assert np.array_equal(result,
-                          sample_image), "The output should be the same as the input when paddle_version is less than '0.2.0-rc1'."
+    assert np.array_equal(
+        result, sample_image
+    ), "The output should be the same as the input when paddle_version is less than '0.2.0-rc1'."
 
 
 def test_preprocess_image_paddle_version_new(sample_image):
@@ -516,8 +525,9 @@ def test_preprocess_image_paddle_version_new(sample_image):
     Test that when paddle_version is '0.2.0-rc1' or higher, the function processes the image.
     """
     result = preprocess_image_for_paddle(sample_image, paddle_version="0.2.0-rc1")
-    assert not np.array_equal(result,
-                              sample_image), "The output should be different from the input when paddle_version is '0.2.0-rc1' or higher."
+    assert not np.array_equal(
+        result, sample_image
+    ), "The output should be different from the input when paddle_version is '0.2.0-rc1' or higher."
     assert result.shape[0] == sample_image.shape[2], "The output should have shape (channels, height, width)."
 
 
@@ -551,8 +561,9 @@ def test_preprocess_image_large_image():
     new_width = int(width * scale_factor)
     expected_height = ((new_height + 31) // 32) * 32
     expected_width = ((new_width + 31) // 32) * 32
-    assert result.shape[1] == expected_height and result.shape[
-        2] == expected_width, "The output shape is incorrect for a large image."
+    assert (
+        result.shape[1] == expected_height and result.shape[2] == expected_width
+    ), "The output shape is incorrect for a large image."
 
 
 def test_preprocess_image_small_image():
@@ -567,8 +578,9 @@ def test_preprocess_image_small_image():
     new_width = int(width * scale_factor)
     expected_height = ((new_height + 31) // 32) * 32
     expected_width = ((new_width + 31) // 32) * 32
-    assert result.shape[1] == expected_height and result.shape[
-        2] == expected_width, "The output shape is incorrect for a small image."
+    assert (
+        result.shape[1] == expected_height and result.shape[2] == expected_width
+    ), "The output shape is incorrect for a small image."
 
 
 def test_preprocess_image_non_multiple_of_32():
@@ -583,8 +595,9 @@ def test_preprocess_image_non_multiple_of_32():
     new_width = int(width * scale_factor)
     expected_height = ((new_height + 31) // 32) * 32
     expected_width = ((new_width + 31) // 32) * 32
-    assert result.shape[1] == expected_height and result.shape[
-        2] == expected_width, "The image should be padded to the next multiple of 32."
+    assert (
+        result.shape[1] == expected_height and result.shape[2] == expected_width
+    ), "The image should be padded to the next multiple of 32."
 
 
 def test_preprocess_image_dtype_uint8():
@@ -608,8 +621,9 @@ def test_preprocess_image_max_dimension_less_than_960():
     new_width = int(width * scale_factor)
     expected_height = ((new_height + 31) // 32) * 32
     expected_width = ((new_width + 31) // 32) * 32
-    assert result.shape[1] == expected_height and result.shape[
-        2] == expected_width, "The image should be scaled up to have max dimension 960."
+    assert (
+        result.shape[1] == expected_height and result.shape[2] == expected_width
+    ), "The image should be scaled up to have max dimension 960."
 
 
 def test_preprocess_image_zero_dimension():
@@ -638,11 +652,13 @@ def test_preprocess_image_different_paddle_versions(sample_image):
     for version in versions:
         result = preprocess_image_for_paddle(sample_image, paddle_version=version)
         if packaging.version.parse(version) < packaging.version.parse("0.2.0-rc1"):
-            assert np.array_equal(result,
-                                  sample_image), f"The output should be the same as the input when paddle_version is {version}."
+            assert np.array_equal(
+                result, sample_image
+            ), f"The output should be the same as the input when paddle_version is {version}."
         else:
-            assert not np.array_equal(result,
-                                      sample_image), f"The output should be different from the input when paddle_version is {version}."
+            assert not np.array_equal(
+                result, sample_image
+            ), f"The output should be different from the input when paddle_version is {version}."
 
 
 # Tests for `remove_url_endpoints`

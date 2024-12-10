@@ -204,16 +204,16 @@ def test_multiple_task_types():
             },
             {
                 "type": "table_data_extract",
-                "task_properties":{
+                "task_properties": {
                     "params": {},
-                }
+                },
             },
             {
                 "type": "chart_data_extract",
-                "task_properties":{
+                "task_properties": {
                     "params": {},
-                }
-            }
+                },
+            },
         ],
     }
 
