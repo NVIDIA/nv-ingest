@@ -34,7 +34,8 @@ RUN conda install -y mamba -n base -c conda-forge
 
 COPY ./docker/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
 # Create nv_ingest base environment
-RUN mamba env create -f /workspace/nv_ingest_environment.yml
+RUN mamba env create -f /workspace/nv_ingest_environment.yml \
+    && conda clean --all --yes
 
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
@@ -44,7 +45,8 @@ RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
 
 # Install Tini via conda from the conda-forge channel
 RUN source activate nv_ingest_runtime \
-    && mamba install -y -c conda-forge tini
+    && mamba install -y -c conda-forge tini \
+    && conda clean --all --yes
 
 # Set the working directory in the container
 WORKDIR /workspace

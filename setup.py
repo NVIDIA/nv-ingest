@@ -13,7 +13,6 @@ from setuptools import find_packages
 from setuptools import setup
 
 
-# TODO(Devin): This is duplicated in nv_ingest_client's setup.py, should be moved to common once Jermey's PR is merged
 def get_version():
     release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
     version = os.getenv("NV_INGEST_VERSION")
