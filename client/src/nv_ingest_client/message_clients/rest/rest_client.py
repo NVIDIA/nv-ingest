@@ -13,13 +13,13 @@
 import logging
 import time
 from typing import Any
-from typing import Optional
 
 import httpx
 import requests
 import re
 
-from nv_ingest_client.message_clients import MessageClientBase
+from nv_ingest_client.message_clients import MessageBrokerClientBase
+from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ _TERMINAL_RESPONSE_STATUSES = [
 ]
 
 
-class RestClient(MessageClientBase):
+class RestClient(MessageBrokerClientBase):
     """
     A client for interfacing with the nv-ingest HTTP endpoint, providing mechanisms for sending and receiving messages
     with retry logic and connection management.
@@ -49,7 +49,7 @@ class RestClient(MessageClientBase):
     max_backoff : int, optional
         The maximum backoff delay between retries in seconds. Default is 32 seconds.
     connection_timeout : int, optional
-        The timeout in seconds for connecting to the Redis server. Default is 300 seconds.
+        The timeout in seconds for connecting to the HTTP server. Default is 300 seconds.
     http_allocator : Any, optional
         The HTTP client allocator.
 
@@ -84,7 +84,9 @@ class RestClient(MessageClientBase):
         """
         Attempts to reconnect to the HTTP server if the current connection is not responsive.
         """
-        if not self.ping():
+        ping_result = self.ping()
+
+        if ping_result.response_code != 0:
             logger.debug("Reconnecting to HTTP server")
             self._client = self._http_allocator()
 
@@ -105,13 +107,13 @@ class RestClient(MessageClientBase):
         Any
             The HTTP client instance.
         """
-        if self._client is None or not self.ping():
+        if self._client is None:
             self._connect()
         return self._client
 
-    def ping(self) -> bool:
+    def ping(self) -> ResponseSchema:
         """
-        Checks if the Redis server is responsive.
+        Checks if the HTTP server is responsive.
 
         Returns
         -------
@@ -119,10 +121,11 @@ class RestClient(MessageClientBase):
             True if the server responds to a ping, False otherwise.
         """
         try:
+            # Implement a simple GET request to a health endpoint or root
             self._client.ping()
-            return True
+            return ResponseSchema(response_code=0)
         except (httpx.HTTPError, AttributeError):
-            return False
+            return ResponseSchema(response_code=1, response_reason="Failed to ping HTTP server")
 
     def generate_url(self, user_provided_url, user_provided_port) -> str:
         """Examines the user defined URL for http*://. If that
@@ -138,13 +141,13 @@ class RestClient(MessageClientBase):
             str: Fully validated URL
         """
         if not re.match(r'^https?://', user_provided_url):
-            # Add the default `http://` if its not already present in the URL
+            # Add the default `http://` if it's not already present in the URL
             user_provided_url = f"http://{user_provided_url}:{user_provided_port}"
         else:
             user_provided_url = f"{user_provided_url}:{user_provided_port}"
         return user_provided_url
 
-    def fetch_message(self, job_id: str, timeout: float = 10) -> Optional[str]:
+    def fetch_message(self, job_id: str, timeout: float = 10) -> ResponseSchema:
         """
         Fetches a message from the specified queue with retries on failure.
 
@@ -157,13 +160,8 @@ class RestClient(MessageClientBase):
 
         Returns
         -------
-        Optional[str]
-            The fetched message, or None if no message could be fetched.
-
-        Raises
-        ------
-        ValueError
-            If fetching the message fails after the specified number of retries or due to other critical errors.
+        ResponseSchema
+            The fetched message wrapped in a ResponseSchema object.
         """
         retries = 0
         while True:
@@ -171,46 +169,61 @@ class RestClient(MessageClientBase):
                 # Fetch via HTTP
                 url = f"{self.generate_url(self._host, self._port)}{self._fetch_endpoint}/{job_id}"
                 logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
-                result = requests.get(url)
+                result = requests.get(url, timeout=self._connection_timeout)
 
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
-                    # Any terminal response code results in a RuntimeError
-                    raise RuntimeError(f"A terminal response code: {response_code} was received \
-                                       when fetching JobSpec: {job_id} with server response \
-                                        '{result.text}'")
+                    # Terminal response code; return error ResponseSchema
+                    return ResponseSchema(
+                        response_code=1,
+                        response_reason=f"Terminal response code {response_code} received when fetching JobSpec: {job_id}",
+                        response=result.text
+                    )
                 else:
                     # If the result contains a 200 then return the raw JSON string response
                     if response_code == 200:
-                        return result.text
+                        return ResponseSchema(
+                            response_code=0,
+                            response_reason="OK",
+                            response=result.text,
+                        )
                     elif response_code == 202:
-                        raise TimeoutError("Job is not ready yet. Retry later.")
+                        # Job is not ready yet
+                        return ResponseSchema(
+                            response_code=1,
+                            response_reason="Job is not ready yet. Retry later.",
+                        )
                     else:
-                        # We could just let this exception bubble, but we capture for clarity
-                        # we may also choose to use more specific exceptions in the future
                         try:
+                            # Retry the operation
                             retries = self.perform_retry_backoff(retries)
                         except RuntimeError as rte:
                             raise rte
 
-            except httpx.HTTPError as err:
+            except requests.HTTPError as err:
                 logger.error(f"Error during fetching, retrying... Error: {err}")
                 self._client = None  # Invalidate client to force reconnection
                 try:
                     retries = self.perform_retry_backoff(retries)
-                except RuntimeError:
-                    # This RuntimeError is captured from reaching max number of retries
-                    # however, we are in an except for httpx error, so we should raise
-                    # that exception to ensure the most visibility to the root cause
+                except RuntimeError as rte:
+                    # Max retries reached
+                    return ResponseSchema(
+                        response_code=1,
+                        response_reason=str(rte),
+                        response=str(err)
+                    )
+                except TimeoutError:
                     raise
-            except TimeoutError:
-                raise
             except Exception as e:
                 # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during fetch from {url}: {e}")
-                raise ValueError(f"Unexpected error during fetch: {e}")
+                return ResponseSchema(
+                    response_code=1,
+                    response_reason=f"Unexpected error during fetch: {e}",
+                    response=None
+                )
 
-    def submit_message(self, _: str, message: str) -> str:
+    def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> ResponseSchema:
         """
         Submits a JobSpec to a specified HTTP endpoint with retries on failure.
 
@@ -220,14 +233,13 @@ class RestClient(MessageClientBase):
             Not used as part of RestClient but defined in MessageClientBase
         message: str
             The message to submit.
+        for_nv_ingest: bool
+            Not used as part of RestClient but defined in Message
 
-        Raises
-        ------
-        httpx.HTTPError
-            Any HTTP related errors that occur while attempting to submit the JobSpec
-
-        RuntimeError
-            Raised if the maximum number of retry attempts has been reached for a submission
+        Returns
+        -------
+        ResponseSchema
+            The response from the server wrapped in a ResponseSchema object.
         """
         retries = 0
         while True:
@@ -238,59 +250,65 @@ class RestClient(MessageClientBase):
 
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
-                    # Any terminal response code results in a RuntimeError
-                    raise RuntimeError(f"A terminal response code: {response_code} was received \
-                                       when submitting JobSpec: {'TODO'} with server response \
-                                        '{result.text}'")
+                    # Terminal response code; return error ResponseSchema
+                    return ResponseSchema(
+                        response_code=1,
+                        response_reason=f"Terminal response code {response_code} received when submitting JobSpec",
+                        trace_id=result.headers.get('x-trace-id')
+                    )
                 else:
                     # If 200 we are good, otherwise let's try again
                     if response_code == 200:
-                        logger.debug(f"JobSpec successfully submitted to http \
-                                     endpoint {self._submit_endpoint}, Resulting JobId: {result.json()}")
+                        logger.debug(f"JobSpec successfully submitted to http endpoint {self._submit_endpoint}")
                         # The REST interface returns a JobId, so we capture that here
-                        x_trace_id = result.headers['x-trace-id']
-                        return x_trace_id, result.json()
+                        x_trace_id = result.headers.get('x-trace-id')
+                        return ResponseSchema(
+                            response_code=0,
+                            response_reason="OK",
+                            response=result.text,
+                            transaction_id=result.text,
+                            trace_id=x_trace_id
+                        )
                     else:
-                        # We could just let this exception bubble, but we capture for clarity
-                        # we may also choose to use more specific exceptions in the future
-                        try:
-                            retries = self.perform_retry_backoff(retries)
-                        except RuntimeError as rte:
-                            raise rte
-
-            except httpx.HTTPError as e:
+                        # Retry the operation
+                        retries = self.perform_retry_backoff(retries)
+            except requests.RequestException as e:
                 logger.error(f"Failed to submit job, retrying... Error: {e}")
                 self._client = None  # Invalidate client to force reconnection
                 try:
                     retries = self.perform_retry_backoff(retries)
-                except RuntimeError:
-                    # This RuntimeError is captured from reaching max number of retries
-                    # however, we are in an except for httpx error, so we should raise
-                    # that exception to ensure the most visibility to the root cause
-                    raise e
+                except RuntimeError as rte:
+                    # Max retries reached
+                    return ResponseSchema(
+                        response_code=1,
+                        response_reason=str(rte),
+                        response=str(e)
+                    )
             except Exception as e:
                 # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during submission of JobSpec to {url}: {e}")
-                raise ValueError(f"Unexpected error during JobSpec submission: {e}")
+                return ResponseSchema(
+                    response_code=1,
+                    response_reason=f"Unexpected error during JobSpec submission: {e}",
+                    response=None
+                )
 
     def perform_retry_backoff(self, existing_retries) -> int:
         """
         Attempts to perform a backoff retry delay. This function accepts the
         current number of retries that have been attempted and compares
         that with the maximum number of retries allowed. If the current
-        number of retries excedes the max then a RuntimeError is raised.
+        number of retries exceeds the max then a RuntimeError is raised.
 
         Parameters
         ----------
         existing_retries : int
-            The number of retries that have been attempting for this submission thus far
-        job_id: str
-            The server-side job identifier
+            The number of retries that have been attempted for this operation thus far
 
         Returns
         -------
         int
-            The updated number of retry attempts that have been made for this submission
+            The updated number of retry attempts that have been made for this operation
 
         Raises
         ------
@@ -298,13 +316,12 @@ class RestClient(MessageClientBase):
             Raised if the maximum number of retry attempts has been reached.
         """
         backoff_delay = min(2 ** existing_retries, self._max_backoff)
-        logger.debug(f"Retry #: {existing_retries} of max_retries: {self.max_retries} \
-                        | current backoff_delay: {backoff_delay} of max_backoff: {self._max_backoff}")
+        logger.debug(
+            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s")
 
-        if self.max_retries > 0 and existing_retries <= self.max_retries:
-            logger.error(f"Fetch attempt failed, retrying in {backoff_delay}s...")
+        if self.max_retries > 0 and existing_retries < self.max_retries:
+            logger.error(f"Operation failed, retrying in {backoff_delay}s...")
             time.sleep(backoff_delay)
+            return existing_retries + 1
         else:
             raise RuntimeError(f"Max retry attempts of {self.max_retries} reached")
-
-        return existing_retries + 1

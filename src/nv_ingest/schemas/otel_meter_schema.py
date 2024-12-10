@@ -5,11 +5,12 @@
 
 from pydantic import BaseModel
 
-from nv_ingest.schemas.redis_client_schema import RedisClientSchema
+from nv_ingest.schemas.message_broker_client_schema import MessageBrokerClientSchema
 
 
 class OpenTelemetryMeterSchema(BaseModel):
-    redis_client: RedisClientSchema = RedisClientSchema()
+    broker_client: MessageBrokerClientSchema = MessageBrokerClientSchema()
+
     otel_endpoint: str = "localhost:4317"
     raise_on_failure: bool = False
 

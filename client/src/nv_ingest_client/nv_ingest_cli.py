@@ -22,6 +22,7 @@ from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.message_clients.rest.rest_client import RestClient
+from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 from pkg_resources import DistributionNotFound
@@ -67,6 +68,8 @@ logger = logging.getLogger(__name__)
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
 @click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
+@click.option("--client_type", default="rest", type=click.Choice(["rest", "simple"], case_sensitive=False),
+              help="Client type used to connect to the ingest service.")
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
 )
@@ -185,6 +188,7 @@ def main(
         client_host: str,
         client_kwargs: str,
         client_port: int,
+        client_type: str,
         concurrency_n: int,
         dataset: str,
         doc: List[str],
@@ -228,9 +232,14 @@ def main(
             logger.info(_msg)
 
         if not dry_run:
-            logging.debug(f"Creating REST message client: {client_host} and port: {client_port} -> {client_kwargs}")
+            logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
 
-            client_allocator = RestClient
+            if (client_type == "rest"):
+                client_allocator = RestClient
+            elif (client_type == "simple"):
+                client_allocator = SimpleClient
+            else:
+                raise ValueError(f"Unknown client type: {client_type}")
 
             ingest_client = NvIngestClient(
                 message_client_allocator=client_allocator,

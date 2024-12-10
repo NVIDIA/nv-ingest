@@ -10,14 +10,15 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
-import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client, preprocess_image_for_paddle
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import NimClient
 from nv_ingest.util.nim.helpers import get_version
+from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -25,7 +26,7 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, trace_info: Dict) -> Dict:
+def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -34,8 +35,8 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
     row : pd.Series
         A row from the DataFrame containing metadata for the table extraction.
 
-    paddle_client : Any
-        The client used to call the image inference model.
+    paddle_client : NimClient
+        The client used to call the PaddleOCR inference model.
 
     trace_info : Dict
         Trace information used for logging or debugging.
@@ -50,7 +51,6 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
     ValueError
         If critical information (such as metadata) is missing from the row.
     """
-
     metadata = row.get("metadata")
     if metadata is None:
         logger.error("Row does not contain 'metadata'.")
@@ -68,25 +68,35 @@ def _update_metadata(row: pd.Series, paddle_client: Any, paddle_version: Any, tr
 
     # Modify table metadata with the result from the inference model
     try:
+        data = {'base64_image': base64_image}
+
         image_array = base64_to_numpy(base64_image)
 
-        paddle_result = ""
+        paddle_result = "", ""
         if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
-            if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
-                image_array = preprocess_image_for_paddle(image_array, paddle_version=paddle_version)
+            # Perform inference using the NimClient
+            paddle_result = paddle_client.infer(
+                data,
+                model_name="paddle",
+                table_content_format=table_metadata.get("table_content_format"),
+            )
 
-            paddle_result = call_image_inference_model(paddle_client, "paddle", image_array, trace_info=trace_info)
-
-        table_metadata["table_content"] = paddle_result
+        table_content, table_content_format = paddle_result
+        table_metadata["table_content"] = table_content
+        table_metadata["table_content_format"] = table_content_format
     except Exception as e:
-        logger.error(f"Unhandled error calling image inference model: {e}", exc_info=True)
+        logger.error(f"Unhandled error calling PaddleOCR inference model: {e}", exc_info=True)
         raise
 
     return metadata
 
 
-def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
-                        validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
+def _extract_table_data(
+        df: pd.DataFrame,
+        task_props: Dict[str, Any],
+        validated_config: Any,
+        trace_info: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts table data from a DataFrame.
 
@@ -124,16 +134,35 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
     if df.empty:
         return df, trace_info
 
+    stage_config = validated_config.stage_config
+
+    paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
+
+    # Obtain paddle_version
+    # Assuming that the grpc endpoint is at index 0
+    paddle_endpoint = stage_config.paddle_endpoints[1]
+    try:
+        paddle_version = get_version(paddle_endpoint)
+        if not paddle_version:
+            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
+    except Exception as e:
+        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
+        raise e
+
+    # Create the PaddleOCRModelInterface with paddle_version
+    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
+
+    # Create the NimClient for PaddleOCR
     paddle_client = create_inference_client(
-        validated_config.stage_config.paddle_endpoints,
-        validated_config.stage_config.auth_token,
-        validated_config.stage_config.paddle_infer_protocol
+        endpoints=stage_config.paddle_endpoints,
+        model_interface=paddle_model_interface,
+        auth_token=stage_config.auth_token,
+        infer_protocol=stage_config.paddle_infer_protocol
     )
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        paddle_version = get_version(validated_config.stage_config.paddle_endpoints[1])
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, paddle_version, trace_info))
+        df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
 
         return df, trace_info
 
@@ -141,7 +170,7 @@ def _extract_table_data(df: pd.DataFrame, task_props: Dict[str, Any],
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
-        if (isinstance(paddle_client, grpcclient.InferenceServerClient)):
+        if isinstance(paddle_client, NimClient):
             paddle_client.close()
 
 

@@ -16,13 +16,16 @@ from morpheus.config import Config
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import call_image_inference_model, create_inference_client
+from nv_ingest.util.nim.cached import CachedModelInterface
+from nv_ingest.util.nim.deplot import DeplotModelInterface
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import NimClient
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
-def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, trace_info: Dict) -> Dict:
+# Modify the _update_metadata function
+def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: NimClient, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for chart extraction are met.
 
@@ -31,10 +34,10 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
     row : pd.Series
         A row from the DataFrame containing metadata for the chart extraction.
 
-    cached_client : Any
+    cached_client : NimClient
         The client used to call the cached inference model.
 
-    deplot_client : Any
+    deplot_client : NimClient
         The client used to call the deplot inference model.
 
     trace_info : Dict
@@ -65,12 +68,14 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
             (chart_metadata is None)):
         return metadata
 
-    # Modify chart metadata with the result from the inference model
+    # Modify chart metadata with the result from the inference models
     try:
-        image_array = base64_to_numpy(base64_image)
+        data = {'base64_image': base64_image}
 
-        deplot_result = call_image_inference_model(deplot_client, "deplot", image_array, trace_info=trace_info)
-        cached_result = call_image_inference_model(cached_client, "cached", image_array, trace_info=trace_info)
+        # Perform inference using the NimClients
+        deplot_result = deplot_client.infer(data, model_name="deplot")
+        cached_result = cached_client.infer(data, model_name="cached")
+
         chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
 
         chart_metadata["table_content"] = chart_content
@@ -79,6 +84,31 @@ def _update_metadata(row: pd.Series, cached_client: Any, deplot_client: Any, tra
         raise
 
     return metadata
+
+
+def _create_clients(cached_endpoints: Tuple[str, str], cached_protocol: str,
+                    deplot_endpoints: Tuple[str, str], deplot_protocol: str, auth_token: str,
+                    ) -> Tuple[NimClient, NimClient]:
+    cached_model_interface = CachedModelInterface()
+    deplot_model_interface = DeplotModelInterface()
+
+    logger.debug(f"Inference protocols: cached={cached_protocol}, deplot={deplot_protocol}")
+
+    cached_client = create_inference_client(
+        endpoints=cached_endpoints,
+        model_interface=cached_model_interface,
+        auth_token=auth_token,
+        infer_protocol=cached_protocol
+    )
+
+    deplot_client = create_inference_client(
+        endpoints=deplot_endpoints,
+        model_interface=deplot_model_interface,
+        auth_token=auth_token,
+        infer_protocol=deplot_protocol
+    )
+
+    return cached_client, deplot_client
 
 
 def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
@@ -120,17 +150,14 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
     if df.empty:
         return df, trace_info
 
-    deplot_client = create_inference_client(
-        validated_config.stage_config.deplot_endpoints,
-        validated_config.stage_config.auth_token,
-        validated_config.stage_config.deplot_infer_protocol
-    )
+    stage_config = validated_config.stage_config
+    cached_client, deplot_client = _create_clients(stage_config.cached_endpoints, stage_config.cached_infer_protocol,
+                                                   stage_config.deplot_endpoints, stage_config.deplot_infer_protocol,
+                                                   stage_config.auth_token)
 
-    cached_client = create_inference_client(
-        validated_config.stage_config.cached_endpoints,
-        validated_config.stage_config.auth_token,
-        validated_config.stage_config.cached_infer_protocol
-    )
+    if trace_info is None:
+        trace_info = {}
+        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame

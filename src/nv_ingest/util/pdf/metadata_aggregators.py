@@ -38,6 +38,7 @@ class CroppedImageWithContent:
     max_width: int
     max_height: int
     type_string: str
+    content_format: str = ""
 
 
 @dataclass
@@ -397,6 +398,7 @@ def construct_table_and_chart_metadata(
     if (structured_image.type_string in ("table",)):
         content = structured_image.image
         structured_content_text = structured_image.content
+        structured_content_format = structured_image.content_format
         table_format = TableFormatEnum.IMAGE
         subtype = ContentSubtypeEnum.TABLE
         description = StdContentDescEnum.PDF_TABLE
@@ -405,6 +407,7 @@ def construct_table_and_chart_metadata(
     elif (structured_image.type_string in ("chart",)):
         content = structured_image.image
         structured_content_text = structured_image.content
+        structured_content_format = structured_image.content_format
         table_format = TableFormatEnum.IMAGE
         subtype = ContentSubtypeEnum.CHART
         description = StdContentDescEnum.PDF_CHART
@@ -431,6 +434,7 @@ def construct_table_and_chart_metadata(
         "caption": "",
         "table_format": table_format,
         "table_content": structured_content_text,
+        "table_content_format": structured_content_format,
         "table_location": structured_image.bbox,
         "table_location_max_dimensions": (structured_image.max_width, structured_image.max_height),
     }

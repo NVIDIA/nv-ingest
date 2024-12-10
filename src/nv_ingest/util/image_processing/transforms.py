@@ -23,8 +23,11 @@ DEFAULT_MAX_HEIGHT = 1280
 logger = logging.getLogger(__name__)
 
 
-def scale_image_to_encoding_size(base64_image: str, max_base64_size: int = 180_000,
-                                 initial_reduction: float = 0.9) -> str:
+def scale_image_to_encoding_size(
+        base64_image: str,
+        max_base64_size: int = 180_000,
+        initial_reduction: float = 0.9
+) -> Tuple[str, Tuple[int, int]]:
     """
     Decodes a base64-encoded image, resizes it if needed, and re-encodes it as base64.
     Ensures the final image size is within the specified limit.
@@ -40,8 +43,10 @@ def scale_image_to_encoding_size(base64_image: str, max_base64_size: int = 180_0
 
     Returns
     -------
-    str
-        Base64-encoded PNG image string, resized if necessary.
+    Tuple[str, Tuple[int, int]]
+        A tuple containing:
+        - Base64-encoded PNG image string, resized if necessary.
+        - The new size as a tuple (width, height).
 
     Raises
     ------
@@ -53,35 +58,34 @@ def scale_image_to_encoding_size(base64_image: str, max_base64_size: int = 180_0
         image_data = base64.b64decode(base64_image)
         img = Image.open(io.BytesIO(image_data)).convert("RGB")
 
+        # Initial image size
+        original_size = img.size
+
         # Check initial size
         if len(base64_image) <= max_base64_size:
-            logger.debug("Initial image is within the size limit.")
-            return base64_image
+            return base64_image, original_size
 
         # Initial reduction step
         reduction_step = initial_reduction
+        new_size = original_size
         while len(base64_image) > max_base64_size:
             width, height = img.size
             new_size = (int(width * reduction_step), int(height * reduction_step))
-            logger.debug(f"Resizing image to {new_size}")
 
             img_resized = img.resize(new_size, Image.LANCZOS)
             buffered = io.BytesIO()
             img_resized.save(buffered, format="PNG")
             base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-            logger.debug(f"Resized base64 image size: {len(base64_image)} characters.")
-
             # Adjust the reduction step if necessary
             if len(base64_image) > max_base64_size:
                 reduction_step *= 0.95  # Reduce size further if needed
-                logger.debug(f"Reducing step size for further resizing: {reduction_step:.3f}")
 
             # Safety check
             if new_size[0] < 1 or new_size[1] < 1:
                 raise Exception("Image cannot be resized further without becoming too small.")
 
-        return base64_image
+        return base64_image, new_size
 
     except Exception as e:
         logger.error(f"Error resizing the image: {e}")

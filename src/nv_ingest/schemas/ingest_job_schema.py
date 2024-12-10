@@ -227,4 +227,5 @@ def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
     Raises:
     - ValidationError: If the input data does not conform to the IngestJobSchema.
     """
+
     return IngestJobSchema(**job_data)
