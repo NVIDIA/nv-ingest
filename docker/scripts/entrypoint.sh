@@ -15,13 +15,26 @@
 # limitations under the License.
 
 
-# Activate the `morpheus` conda environment.
+#!/bin/bash
+
+# Activate the `nv_ingest_runtime` conda environment
 . /opt/conda/etc/profile.d/conda.sh
-conda activate nv_ingest
+conda activate nv_ingest_runtime
 
 # Source "source" file if it exists
 SRC_FILE="/opt/docker/bin/entrypoint_source"
 [ -f "${SRC_FILE}" ] && source "${SRC_FILE}"
 
-# Run whatever the user wants.
-exec "$@"
+# Check if user supplied a command
+if [ "$#" -gt 0 ]; then
+    # If a command is provided, run it
+    exec "$@"
+else
+    # If no command is provided, run the default startup launch
+    if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
+      # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'
+      uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
+    fi
+
+    python /workspace/microservice_entrypoint.py
+fi

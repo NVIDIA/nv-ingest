@@ -25,23 +25,6 @@ PADDLE_MIN_HEIGHT = 32
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
 
-# Mock implementations of external functions and classes
-def mock_get_version(endpoint):
-    return "2.0.0"  # Mock PaddleOCR version
-
-
-def mock_get_version_fail(endpoint):
-    raise Exception("Connection failed")  # Simulate failure
-
-
-def mock_get_version_none(endpoint):
-    return None  # Simulate returning None
-
-
-def mock_update_metadata(row, client, trace_info):
-    return {"metadata_key": "metadata_value"}
-
-
 # Mocked PaddleOCRModelInterface
 class MockPaddleOCRModelInterface:
     def __init__(self, paddle_version=None):
@@ -53,13 +36,16 @@ class MockPaddleOCRModelInterface:
     def format_input(self, data, protocol, **kwargs):
         return data
 
-    def parse_output(self, response, protocol, data):
-        return (
+    def parse_output(self, response, protocol, **kwargs):
+        table_content = (
             "Chart 1 This chart shows some gadgets, and some very fictitious costs "
             "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
             "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
             "desk fan Cost"
         )
+        table_content_format = "simple"
+
+        return table_content, table_content_format
 
     def process_inference_results(self, output, **kwargs):
         return output
@@ -164,7 +150,9 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_nim_client.infer.side_effect = mock_infer
 
     # Patch 'create_inference_client' to return the mocked NimClient
-    with patch("module_under_test.create_inference_client", return_value=mock_nim_client):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client), patch(
+        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
+    ):
         # Since the image is too small, we expect the table_content to remain unchanged
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
@@ -212,15 +200,6 @@ def dataframe_non_table(base64_encoded_image):
     return df
 
 
-# Dummy paddle client that simulates the external service
-class DummyPaddleClient:
-    def infer(self, *args, **kwargs):
-        return "{'object': 'list', 'data': [{'index': 0, 'content': 'Chart 1 This chart shows some gadgets, and some very fictitious costs Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 $40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium desk fan Cost', 'object': 'string'}], 'model': 'paddleocr', 'usage': None}"
-
-    def close(self):
-        pass
-
-
 # Tests for _update_metadata
 def test_update_metadata_missing_metadata():
     row = pd.Series({"other_data": "not metadata"})
@@ -241,7 +220,7 @@ def test_update_metadata_non_table_content(dataframe_non_table):
     assert result == row["metadata"]
 
 
-def test_update_metadata_image_too_small(base64_encoded_small_image):
+def test_update_metadata_image_too_small_1(base64_encoded_small_image):
     row = pd.Series(
         {
             "metadata": {
@@ -373,7 +352,7 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
             _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
 
-def test_extract_table_data_image_too_small(base64_encoded_small_image):
+def test_extract_table_data_image_too_small_2(base64_encoded_small_image):
     data = {
         "metadata": [
             {

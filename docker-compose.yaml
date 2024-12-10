@@ -133,30 +133,29 @@ services:
       - sys_nice
     environment:
       # Self-hosted cached endpoints.
-      #- CACHED_GRPC_ENDPOINT=cached:8001
+      - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
-      #- CACHED_INFER_PROTOCOL=grpc
+      - CACHED_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted cached endpoints.
-      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/university-at-buffalo/cached
-      - CACHED_INFER_PROTOCOL=http
+      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
+      #- CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
       #- DEPLOT_GRPC_ENDPOINT=""
       # Self-hosted deplot endpoints.
-      #- DEPLOT_HEALTH_ENDPOINT=deplot:8000
-      #- DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
+      - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
+      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
-      - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - INGEST_LOG_LEVEL=DEBUG
+      - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
-      - MESSAGE_CLIENT_HOST=0.0.0.0
-      - MESSAGE_CLIENT_PORT=7671
-      - MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
+      #- MESSAGE_CLIENT_HOST=0.0.0.0
+      #- MESSAGE_CLIENT_PORT=7671
+      #- MESSAGE_CLIENT_TYPE=simple # Configure the ingest service to use the simple broker
       # Message client for production
-      #- MESSAGE_CLIENT_HOST=redis
-      #- MESSAGE_CLIENT_PORT=6379
-      #- MESSAGE_CLIENT_TYPE=redis
+      - MESSAGE_CLIENT_HOST=redis
+      - MESSAGE_CLIENT_PORT=6379
+      - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
@@ -167,7 +166,7 @@ services:
       - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
       - PADDLE_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted paddle endpoints.
-      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/baidu/paddleocr
+      #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
@@ -176,7 +175,7 @@ services:
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
-      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
     healthcheck:
@@ -240,55 +239,55 @@ services:
       - "3000:3000"
 
   etcd:
-   # Turn on to leverage the `vdb_upload` task
-   restart: always
-   container_name: milvus-etcd
-   image: quay.io/coreos/etcd:v3.5.5
-   environment:
-     - ETCD_AUTO_COMPACTION_MODE=revision
-     - ETCD_AUTO_COMPACTION_RETENTION=1000
-     - ETCD_QUOTA_BACKEND_BYTES=4294967296
-     - ETCD_SNAPSHOT_COUNT=50000
-   volumes:
-     - ./.volumes/etcd:/etcd
-   command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
-   healthcheck:
-     test: ["CMD", "etcdctl", "endpoint", "health"]
-     interval: 30s
-     timeout: 20s
-     retries: 3
-   profiles:
-     - retrieval
+    # Turn on to leverage the `vdb_upload` task
+    restart: always
+    container_name: milvus-etcd
+    image: quay.io/coreos/etcd:v3.5.5
+    environment:
+      - ETCD_AUTO_COMPACTION_MODE=revision
+      - ETCD_AUTO_COMPACTION_RETENTION=1000
+      - ETCD_QUOTA_BACKEND_BYTES=4294967296
+      - ETCD_SNAPSHOT_COUNT=50000
+    volumes:
+      - ./.volumes/etcd:/etcd
+    command: etcd -advertise-client-urls=http://127.0.0.1:2379 -listen-client-urls http://0.0.0.0:2379 --data-dir /etcd
+    healthcheck:
+      test: [ "CMD", "etcdctl", "endpoint", "health" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    profiles:
+      - retrieval
 
   minio:
-   # Turn on to leverage the `store` and `vdb_upload` task
-   restart: always
-   container_name: minio
-   hostname: minio
-   image: minio/minio:RELEASE.2023-03-20T20-16-18Z
-   environment:
-     MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
-     MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
-   ports:
-     - "9001:9001"
-     - "9000:9000"
-   volumes:
-     - ./.volumes/minio:/minio_data
-   command: minio server /minio_data --console-address ":9001"
-   healthcheck:
-     test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
-     interval: 30s
-     timeout: 20s
-     retries: 3
-   profiles:
-     - retrieval
+    # Turn on to leverage the `store` and `vdb_upload` task
+    restart: always
+    container_name: minio
+    hostname: minio
+    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    environment:
+      MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
+    ports:
+      - "9001:9001"
+      - "9000:9000"
+    volumes:
+      - ./.volumes/minio:/minio_data
+    command: minio server /minio_data --console-address ":9001"
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9000/minio/health/live" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    profiles:
+      - retrieval
 
   milvus:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-standalone
     image: milvusdb/milvus:v2.4.9-gpu
-    command: ["milvus", "run", "standalone"]
+    command: [ "milvus", "run", "standalone" ]
     hostname: milvus
     security_opt:
       - seccomp:unconfined
@@ -298,7 +297,7 @@ services:
     volumes:
       - ./.volumes/milvus:/var/lib/milvus
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:9091/healthz"]
+      test: [ "CMD", "curl", "-f", "http://localhost:9091/healthz" ]
       interval: 30s
       start_period: 90s
       timeout: 20s
@@ -317,19 +316,19 @@ services:
       - "etcd"
       - "minio"
     profiles:
-     - retrieval
+      - retrieval
 
   attu:
-   # Turn on to leverage the `vdb_upload` task
-   restart: always
-   container_name: milvus-attu
-   image: zilliz/attu:v2.3.5
-   hostname: attu
-   environment:
-     MILVUS_URL: http://milvus:19530
-   ports:
-     - "3001:3000"
-   depends_on:
-     - "milvus"
-   profiles:
-     - retrieval
+    # Turn on to leverage the `vdb_upload` task
+    restart: always
+    container_name: milvus-attu
+    image: zilliz/attu:v2.3.5
+    hostname: attu
+    environment:
+      MILVUS_URL: http://milvus:19530
+    ports:
+      - "3001:3000"
+    depends_on:
+      - "milvus"
+    profiles:
+      - retrieval
