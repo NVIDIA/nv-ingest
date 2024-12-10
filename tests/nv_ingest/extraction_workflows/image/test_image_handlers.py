@@ -1,13 +1,8 @@
 import io
-import urllib
-from typing import List
 from typing import Tuple
-from xml.etree.ElementTree import ParseError
 
 import numpy as np
 from PIL import Image
-from pyexpat import ExpatError
-from wand.exceptions import WandException
 
 from nv_ingest.extraction_workflows.image.image_handlers import convert_svg_to_bitmap
 from nv_ingest.extraction_workflows.image.image_handlers import extract_table_and_chart_images
