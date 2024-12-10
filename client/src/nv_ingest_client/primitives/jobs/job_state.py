@@ -66,12 +66,14 @@ class JobState:
         future: Optional[Future] = None,
         response: Optional[Dict] = None,
         response_channel: Optional[str] = None,
+        trace_id: Optional[str] = None,
     ) -> None:
         self._job_spec = job_spec
         self._state = state
         self._future = future
         self._response = response  # TODO(Devin): Not currently used
         self._response_channel = response_channel
+        self._trace_id = trace_id
         self._telemetry = {}
 
     @property
@@ -136,3 +138,13 @@ class JobState:
     def response(self, value: Dict) -> None:
         """Sets the response data received for the job, with constraints."""
         self._response = value
+
+    @property
+    def trace_id(self) -> Optional[str]:
+        """Gets the trace_id from the job submission"""
+        return self._trace_id
+
+    @trace_id.setter
+    def trace_id(self, value: str) -> None:
+        """Sets the trace_id that was received from the submission to the REST endpoint"""
+        self._trace_id = value
