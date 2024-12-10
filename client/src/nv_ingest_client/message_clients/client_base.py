@@ -22,15 +22,15 @@ class MessageBrokerClientBase(ABC):
 
     @abstractmethod
     def __init__(
-            self,
-            host: str,
-            port: int,
-            db: int = 0,
-            max_retries: int = 0,
-            max_backoff: int = 32,
-            connection_timeout: int = 300,
-            max_pool_size: int = 128,
-            use_ssl: bool = False,
+        self,
+        host: str,
+        port: int,
+        db: int = 0,
+        max_retries: int = 0,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        max_pool_size: int = 128,
+        use_ssl: bool = False,
     ):
         """
         Initialize the messaging client with connection parameters.

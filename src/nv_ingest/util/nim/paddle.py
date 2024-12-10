@@ -96,7 +96,7 @@ class PaddleOCRModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
-        if (protocol == 'grpc'):
+        if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model")
             image_data = data["image_array"]
             image_data = preprocess_image_for_paddle(image_data, self.paddle_version)
@@ -104,7 +104,7 @@ class PaddleOCRModelInterface(ModelInterface):
             image_data = np.expand_dims(image_data, axis=0)
 
             return image_data
-        elif (protocol == 'http'):
+        elif protocol == "http":
             logger.debug("Formatting input for HTTP PaddleOCR model")
             # For HTTP, preprocessing is not necessary
             base64_img = data["base64_image"]
@@ -149,10 +149,10 @@ class PaddleOCRModelInterface(ModelInterface):
             )
             table_content_format = TableFormatEnum.SIMPLE
 
-        if (protocol == 'grpc'):
+        if protocol == "grpc":
             logger.debug("Parsing output from gRPC PaddleOCR model")
             return self._extract_content_from_paddle_grpc_response(response, table_content_format)
-        elif (protocol == 'http'):
+        elif protocol == "http":
             logger.debug("Parsing output from HTTP PaddleOCR model")
             return self._extract_content_from_paddle_http_response(response, table_content_format)
         else:
@@ -210,7 +210,9 @@ class PaddleOCRModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_paddle_http_response(self, json_response: Dict[str, Any], table_content_format: Optional[str]) -> Any:
+    def _extract_content_from_paddle_http_response(
+        self, json_response: Dict[str, Any], table_content_format: Optional[str]
+    ) -> Any:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.
 
@@ -230,7 +232,7 @@ class PaddleOCRModelInterface(ModelInterface):
             If the response does not contain the expected "data" key or if it is empty.
         """
 
-        if ("data" not in json_response or not json_response["data"]):
+        if "data" not in json_response or not json_response["data"]:
             raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 
         if self._is_version_early_access_legacy_api():
