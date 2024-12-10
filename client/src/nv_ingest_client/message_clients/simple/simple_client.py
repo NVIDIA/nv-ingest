@@ -18,14 +18,24 @@ from nv_ingest_client.schemas.response_schema import ResponseSchema
 
 logger = logging.getLogger(__name__)
 
+
 class SimpleClient(MessageBrokerClientBase):
     """
     A client for interfacing with SimpleMessageBroker, creating a new socket connection per request
     to ensure thread safety and robustness. Respects timeouts for all operations.
     """
 
-    def __init__(self, host: str, port: int, db: int = 0, max_retries: int = 3, max_backoff: int = 32,
-                 connection_timeout: int = 300, max_pool_size: int = 128, use_ssl: bool = False):
+    def __init__(
+        self,
+        host: str,
+        port: int,
+        db: int = 0,
+        max_retries: int = 3,
+        max_backoff: int = 32,
+        connection_timeout: int = 300,
+        max_pool_size: int = 128,
+        use_ssl: bool = False,
+    ):
         """
         Initialize a SimpleClient instance with configuration for message broker connection.
 
@@ -70,8 +80,9 @@ class SimpleClient(MessageBrokerClientBase):
 
         return self
 
-    def submit_message(self, queue_name: str, message: str, timeout: Optional[float] = None,
-                       for_nv_ingest: bool = False) -> ResponseSchema:
+    def submit_message(
+        self, queue_name: str, message: str, timeout: Optional[float] = None, for_nv_ingest: bool = False
+    ) -> ResponseSchema:
         """
         Submit a message to the specified queue.
 
@@ -145,8 +156,9 @@ class SimpleClient(MessageBrokerClientBase):
 
         return self._execute_simple_command(command)
 
-    def _handle_push(self, queue_name: str, message: str, timeout: Optional[float],
-                     for_nv_ingest: bool) -> ResponseSchema:
+    def _handle_push(
+        self, queue_name: str, message: str, timeout: Optional[float], for_nv_ingest: bool
+    ) -> ResponseSchema:
         """
         Push a message to the queue, respecting the specified timeout.
 
@@ -167,51 +179,53 @@ class SimpleClient(MessageBrokerClientBase):
             The response from the message broker.
         """
 
-        if (not queue_name or not isinstance(queue_name, str)):
+        if not queue_name or not isinstance(queue_name, str):
             return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
-        if (not message or not isinstance(message, str)):
+        if not message or not isinstance(message, str):
             return ResponseSchema(response_code=1, response_reason="Invalid message.")
 
-        if (for_nv_ingest):
+        if for_nv_ingest:
             command = {"command": "PUSH_FOR_NV_INGEST", "queue_name": queue_name, "message": message}
         else:
             command = {"command": "PUSH", "queue_name": queue_name, "message": message}
 
-        if (timeout is not None):
+        if timeout is not None:
             command["timeout"] = timeout
 
         start_time = time.time()
         while True:
             elapsed = time.time() - start_time
             remaining_timeout = (timeout - elapsed) if (timeout is not None) else None
-            if ((remaining_timeout is not None) and (remaining_timeout <= 0)):
+            if (remaining_timeout is not None) and (remaining_timeout <= 0):
                 return ResponseSchema(response_code=1, response_reason="PUSH operation timed out.")
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
-                    self._send(sock, json.dumps(command).encode('utf-8'))
+                    self._send(sock, json.dumps(command).encode("utf-8"))
                     # Receive initial response with transaction ID
                     response_data = self._recv(sock)
                     response = json.loads(response_data)
 
-                    if (response.get('response_code') != 0):
-                        if (response.get('response_reason') == "Queue is full" or
-                                response.get('response_reason') == "Queue is not available"):
+                    if response.get("response_code") != 0:
+                        if (
+                            response.get("response_reason") == "Queue is full"
+                            or response.get("response_reason") == "Queue is not available"
+                        ):
                             time.sleep(0.5)
                             continue
                         else:
                             return ResponseSchema(**response)
 
-                    if ('transaction_id' not in response):
+                    if "transaction_id" not in response:
                         error_msg = "No transaction_id in response."
                         logger.error(error_msg)
 
                         return ResponseSchema(response_code=1, response_reason=error_msg)
 
-                    transaction_id = response['transaction_id']
+                    transaction_id = response["transaction_id"]
 
                     # Send ACK
-                    ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode('utf-8')
+                    ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode("utf-8")
                     self._send(sock, ack_data)
 
                     # Receive final response
@@ -262,35 +276,35 @@ class SimpleClient(MessageBrokerClientBase):
 
             try:
                 with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
-                    self._send(sock, json.dumps(command).encode('utf-8'))
+                    self._send(sock, json.dumps(command).encode("utf-8"))
                     # Receive initial response with transaction ID and message
                     response_data = self._recv(sock)
                     response = json.loads(response_data)
 
-                    if (response.get('response_code') != 0):
-                        if response.get('response_reason') == "Queue is empty":
+                    if response.get("response_code") != 0:
+                        if response.get("response_reason") == "Queue is empty":
                             time.sleep(0.1)
                             continue
                         else:
                             return ResponseSchema(**response)
 
-                    if ('transaction_id' not in response):
+                    if "transaction_id" not in response:
                         error_msg = "No transaction_id in response."
 
                         return ResponseSchema(response_code=1, response_reason=error_msg)
 
-                    transaction_id = response['transaction_id']
-                    message = response.get('response')
+                    transaction_id = response["transaction_id"]
+                    message = response.get("response")
 
                     # Send ACK
-                    ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode('utf-8')
+                    ack_data = json.dumps({"transaction_id": transaction_id, "ack": True}).encode("utf-8")
                     self._send(sock, ack_data)
 
                     # Receive final response
                     final_response_data = self._recv(sock)
                     final_response = json.loads(final_response_data)
 
-                    if final_response.get('response_code') == 0:
+                    if final_response.get("response_code") == 0:
                         return ResponseSchema(response_code=0, response=message, transaction_id=transaction_id)
                     else:
                         return ResponseSchema(**final_response)
@@ -320,9 +334,9 @@ class SimpleClient(MessageBrokerClientBase):
         """
 
         if isinstance(command, dict):
-            data = json.dumps(command).encode('utf-8')
+            data = json.dumps(command).encode("utf-8")
         elif isinstance(command, str):
-            data = command.encode('utf-8')
+            data = command.encode("utf-8")
 
         try:
             with socket.create_connection((self._host, self._port), timeout=self._connection_timeout) as sock:
@@ -359,7 +373,7 @@ class SimpleClient(MessageBrokerClientBase):
             raise ValueError("Cannot send an empty message.")
 
         try:
-            sock.sendall(total_length.to_bytes(8, 'big'))
+            sock.sendall(total_length.to_bytes(8, "big"))
             sock.sendall(data)
         except (socket.error, BrokenPipeError) as e:
             raise ConnectionError("Failed to send data.")
@@ -388,11 +402,11 @@ class SimpleClient(MessageBrokerClientBase):
             length_header = self._recv_exact(sock, 8)
             if not length_header:
                 raise ConnectionError("Incomplete length header received.")
-            total_length = int.from_bytes(length_header, 'big')
+            total_length = int.from_bytes(length_header, "big")
             data_bytes = self._recv_exact(sock, total_length)
             if not data_bytes:
                 raise ConnectionError("Incomplete message received.")
-            return data_bytes.decode('utf-8')
+            return data_bytes.decode("utf-8")
         except (socket.error, BrokenPipeError, ConnectionError) as e:
             raise ConnectionError("Failed to receive data.")
 

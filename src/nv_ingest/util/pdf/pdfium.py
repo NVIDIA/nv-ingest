@@ -91,22 +91,22 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 
     # First attempt with rendering enabled
     try:
-        #logger.debug("Attempting to get rendered bitmap.")
+        # logger.debug("Attempting to get rendered bitmap.")
         image_bitmap = image_obj.get_bitmap(render=True)
     except pdfium.PdfiumError as e:
         logger.debug(f"Failed to get rendered bitmap: {e}")
 
     # If rendering failed or returned None, try without rendering
-    if (image_bitmap is None):
+    if image_bitmap is None:
         try:
-            #logger.debug("Attempting to get raw bitmap without rendering.")
+            # logger.debug("Attempting to get raw bitmap without rendering.")
             image_bitmap = image_obj.get_bitmap(render=False)
         except pdfium.PdfiumError as e:
             logger.debug(f"Failed to get raw bitmap: {e}")
             raise  # Re-raise the exception to ensure the failure is handled upstream
 
     # Final check if bitmap is still None
-    if (image_bitmap is None):
+    if image_bitmap is None:
         logger.debug("Failed to obtain bitmap from the image object after both attempts.")
         raise ValueError("Failed to retrieve bitmap from the PdfImage object.")
 
@@ -157,7 +157,7 @@ def pdfium_pages_to_numpy(
     IOError
         If there is an error saving the image to disk.
     """
-    if (not (50 <= render_dpi <= 1200)):
+    if not (50 <= render_dpi <= 1200):
         raise ValueError("render_dpi must be between 50 and 1200.")
 
     images = []

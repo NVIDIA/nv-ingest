@@ -18,7 +18,6 @@ def test_store_task_initialization():
             "endpoint": "minio:9000",
         },
         store_method="s3",
-
     )
     assert task._structured
     assert task._images
@@ -32,14 +31,7 @@ def test_store_task_initialization():
 
 
 def test_store_task_str_representation():
-    task = StoreTask(
-        structured=True, 
-        images=True, 
-        store_method="minio", 
-        params={
-            "endpoint":"minio:9000"
-        }
-        )
+    task = StoreTask(structured=True, images=True, store_method="minio", params={"endpoint": "minio:9000"})
     expected_str = (
         "Store Task:\n"
         "  store structured types: True\n"
@@ -79,7 +71,7 @@ def test_store_task_to_dict(
         params={
             "extra_param_1": extra_param_1,
             "extra_param_2": extra_param_2,
-        }
+        },
     )
 
     expected_dict = {"type": "store", "task_properties": {"params": {}}}

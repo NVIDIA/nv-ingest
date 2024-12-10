@@ -46,8 +46,8 @@ class DeplotModelInterface(ModelInterface):
         """
 
         # Expecting base64_image in data
-        base64_image = data['base64_image']
-        data['image_array'] = base64_to_numpy(base64_image)
+        base64_image = data["base64_image"]
+        data["image_array"] = base64_to_numpy(base64_image)
         return data
 
     def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
@@ -74,10 +74,10 @@ class DeplotModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
-        if protocol == 'grpc':
+        if protocol == "grpc":
             logger.debug("Formatting input for gRPC Deplot model")
             # Convert image array to expected format
-            image_data = data['image_array']
+            image_data = data["image_array"]
             if image_data.ndim == 3:
                 image_data = np.expand_dims(image_data, axis=0)
             # Convert to float32 and normalize if required
@@ -85,15 +85,15 @@ class DeplotModelInterface(ModelInterface):
             # Normalize pixel values to [0, 1] if needed
             image_data /= 255.0
             return image_data
-        elif protocol == 'http':
+        elif protocol == "http":
             logger.debug("Formatting input for HTTP Deplot model")
             # Prepare payload for HTTP request
-            base64_img = data['base64_image']
+            base64_img = data["base64_image"]
             payload = self._prepare_deplot_payload(
                 base64_img,
-                max_tokens=kwargs.get('max_tokens', 500),
-                temperature=kwargs.get('temperature', 0.5),
-                top_p=kwargs.get('top_p', 0.9)
+                max_tokens=kwargs.get("max_tokens", 500),
+                temperature=kwargs.get("temperature", 0.5),
+                top_p=kwargs.get("top_p", 0.9),
             )
             return payload
         else:
@@ -123,11 +123,11 @@ class DeplotModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
-        if protocol == 'grpc':
+        if protocol == "grpc":
             logger.debug("Parsing output from gRPC Deplot model")
             # Convert bytes output to string
             return " ".join([output[0].decode("utf-8") for output in response])
-        elif protocol == 'http':
+        elif protocol == "http":
             logger.debug("Parsing output from HTTP Deplot model")
             return self._extract_content_from_deplot_response(response)
         else:
@@ -152,11 +152,7 @@ class DeplotModelInterface(ModelInterface):
         return output
 
     def _prepare_deplot_payload(
-            self,
-            base64_img: str,
-            max_tokens: int = 500,
-            temperature: float = 0.5,
-            top_p: float = 0.9
+        self, base64_img: str, max_tokens: int = 500, temperature: float = 0.5, top_p: float = 0.9
     ) -> Dict[str, Any]:
         """
         Prepare a payload for the Deplot HTTP API using a base64-encoded image.
@@ -182,7 +178,7 @@ class DeplotModelInterface(ModelInterface):
             {
                 "role": "user",
                 "content": f"Generate the underlying data table of the figure below: "
-                           f'<img src="data:image/png;base64,{base64_img}" />',
+                f'<img src="data:image/png;base64,{base64_img}" />',
             }
         ]
         payload = {

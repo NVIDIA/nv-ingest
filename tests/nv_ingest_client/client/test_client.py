@@ -348,7 +348,7 @@ def test_submission_failure_sets_job_to_failed(nv_ingest_client_with_jobs):
         nv_ingest_client_with_jobs.submit_job(job_id, job_queue_id)
 
     assert (
-            nv_ingest_client_with_jobs._job_states[job_id].state == JobStateEnum.FAILED
+        nv_ingest_client_with_jobs._job_states[job_id].state == JobStateEnum.FAILED
     ), "Job state should be set to FAILED after a submission failure"
 
 

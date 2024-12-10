@@ -10,23 +10,24 @@
 
 # pylint: skip-file
 
-from io import BytesIO
-from typing import Annotated
 import base64
 import json
 import logging
 import time
 import traceback
+from io import BytesIO
+from typing import Annotated
 
 from fastapi import APIRouter, Request, Response
 from fastapi import Depends
-from fastapi import File, UploadFile
+from fastapi import File
 from fastapi import HTTPException
+from fastapi import UploadFile
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
 from redis import RedisError
 
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
@@ -59,10 +60,7 @@ INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
     summary="submit document to the core nv ingestion service for processing",
     operation_id="submit",
 )
-async def submit_job_curl_friendly(
-    ingest_service: INGEST_SERVICE_T,
-    file: UploadFile = File(...)
-):
+async def submit_job_curl_friendly(ingest_service: INGEST_SERVICE_T, file: UploadFile = File(...)):
     """
     A multipart/form-data friendly Job submission endpoint that makes interacting with
     the nv-ingest service through tools like Curl easier.
@@ -80,30 +78,20 @@ async def submit_job_curl_friendly(
             source_name=file.filename,
             # TODO: Update this to accept user defined options
             extended_options={
-                "tracing_options":
-                {
+                "tracing_options": {
                     "trace": True,
                     "ts_send": time.time_ns(),
-                    "trace_id": trace.get_current_span().get_span_context().trace_id
+                    "trace_id": trace.get_current_span().get_span_context().trace_id,
                 }
-            }
+            },
         )
 
         # This is the "easy submission path" just default to extracting everything
-        extract_task = ExtractTask(
-            document_type="pdf",
-            extract_text=True,
-            extract_images=True,
-            extract_tables=True
-        )
+        extract_task = ExtractTask(document_type="pdf", extract_text=True, extract_images=True, extract_tables=True)
 
         job_spec.add_task(extract_task)
 
-        submitted_job_id = await ingest_service.submit_job(
-            MessageWrapper(
-                payload=json.dumps(job_spec.to_dict())
-            )
-        )
+        submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()
@@ -112,9 +100,7 @@ async def submit_job_curl_friendly(
 
 def trace_id_to_uuid(trace_id: str) -> str:
     """Convert a 32-character OpenTelemetry trace ID to a UUID-like format."""
-    trace_id = trace.format_trace_id(trace_id)
-    print(f"Converting trace_id: {trace_id} of type: {type(trace_id)}")
-    trace_id = str(trace_id)
+    trace_id = str(trace.format_trace_id(trace_id))
     if len(trace_id) != 32:
         raise ValueError("Trace ID must be a 32-character hexadecimal string")
     return f"{trace_id[:8]}-{trace_id[8:12]}-{trace_id[12:16]}-{trace_id[16:20]}-{trace_id[20:]}"
@@ -145,10 +131,8 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             current_trace_id = span.get_span_context().trace_id
 
             job_spec_dict = json.loads(job_spec.payload)
-            job_spec_dict['tracing_options']['trace_id'] = current_trace_id
-            updated_job_spec = MessageWrapper(
-                payload=json.dumps(job_spec_dict)
-            )
+            job_spec_dict["tracing_options"]["trace_id"] = current_trace_id
+            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
             job_id = trace_id_to_uuid(current_trace_id)
             print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
@@ -168,6 +152,7 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
         except Exception as ex:
             traceback.print_exc()
             raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+
 
 # GET /fetch_job
 @router.get(

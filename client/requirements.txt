@@ -1,5 +1,5 @@
 charset-normalizer
-pydantic
+pydantic==1.10.14
 python-magic
 redis~=5.0.1
 setuptools
@@ -11,3 +11,7 @@ tqdm
 httpx==0.27.2
 requests
 fsspec
+pymilvus==2.4.9
+pymilvus[bulk_writer,model]
+azure-storage-blob
+llama-index-embeddings-nvidia

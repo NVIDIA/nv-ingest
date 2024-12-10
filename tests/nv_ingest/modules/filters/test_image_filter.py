@@ -16,9 +16,10 @@ from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    import cudf
     from morpheus.messages import ControlMessage
     from morpheus.messages import MessageMeta
+
+    import cudf
 
     from nv_ingest.modules.filters.image_filter import _apply_filter
     from nv_ingest.modules.filters.image_filter import _cpu_only_apply_filter

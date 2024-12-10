@@ -26,8 +26,7 @@ class TableExtractionTask(Task):
     Object for table extraction tasks
     """
 
-    def __init__(
-            self) -> None:
+    def __init__(self) -> None:
         """
         Setup Dedup Task Config
         """

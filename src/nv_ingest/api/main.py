@@ -11,12 +11,12 @@
 import logging
 import os
 
+from fastapi import FastAPI
 from opentelemetry import trace
 from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from fastapi import FastAPI
 
 from .v1.health import router as HealthApiRouter
 from .v1.ingest import router as IngestApiRouter

@@ -34,7 +34,7 @@ jobs:
       - name: Run Pytest inside Docker container
         run: |
           docker run nv-ingest:latest pytest -rs --cov nv_ingest --cov nv_ingest_client --cov-report term --cov-report xml:coverage.xml tests/nv_ingest tests/nv_ingest_client
-  
+
       - name: Upload test report
         uses: actions/upload-artifact@v4
         with:

@@ -10,10 +10,8 @@ import os
 import re
 import time
 import traceback
-
 from collections import defaultdict
 from concurrent.futures import as_completed
-from PIL import Image
 from statistics import mean
 from statistics import median
 from typing import Any
@@ -23,13 +21,13 @@ from typing import Tuple
 from typing import Type
 
 from click import style
-from pydantic import BaseModel
-from pydantic import ValidationError
-from tqdm import tqdm
-
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.processing import handle_future_result
 from nv_ingest_client.util.util import estimate_page_count
+from PIL import Image
+from pydantic import BaseModel
+from pydantic import ValidationError
+from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
@@ -133,9 +131,7 @@ def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_
         raise ValueError(error_message) from e
 
 
-def report_stage_statistics(
-        stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float
-) -> None:
+def report_stage_statistics(stage_elapsed_times: defaultdict, total_trace_elapsed: float, abs_elapsed: float) -> None:
     """
     Reports the statistics for each processing stage, including average, median, total time spent,
     and their respective percentages of the total processing time.
@@ -209,10 +205,10 @@ def report_overall_speed(total_pages_processed: int, start_time_ns: int, total_f
 
 
 def report_statistics(
-        start_time_ns: int,
-        stage_elapsed_times: defaultdict,
-        total_pages_processed: int,
-        total_files: int,
+    start_time_ns: int,
+    stage_elapsed_times: defaultdict,
+    total_pages_processed: int,
+    total_files: int,
 ) -> None:
     """
     Aggregates and reports statistics for the entire processing session.
@@ -395,19 +391,19 @@ def save_response_data(response, output_directory, images_to_disk=False):
     doc_map = organize_documents_by_type(response_data)
     for doc_type, documents in doc_map.items():
         doc_type_path = os.path.join(output_directory, doc_type)
-        if (not os.path.exists(doc_type_path)):
+        if not os.path.exists(doc_type_path):
             os.makedirs(doc_type_path)
 
-        if (doc_type in ("image", "structured") and images_to_disk):
+        if doc_type in ("image", "structured") and images_to_disk:
             for i, doc in enumerate(documents):
                 meta = doc.get("metadata", {})
                 image_content = meta.get("content")
-                if (doc_type == "image"):
+                if doc_type == "image":
                     image_type = meta.get("image_metadata", {}).get("image_type", "png").lower()
                 else:
                     image_type = "png"
 
-                if (image_content and image_type in {"png", "svg", "jpeg", "jpg", "tiff"}):
+                if image_content and image_type in {"png", "svg", "jpeg", "jpg", "tiff"}:
                     try:
                         # Decode the base64 content
                         image_data = base64.b64decode(image_content)
@@ -438,14 +434,14 @@ def save_response_data(response, output_directory, images_to_disk=False):
 
 
 def generate_job_batch_for_iteration(
-        client: Any,
-        pbar: Any,
-        files: List[str],
-        tasks: Dict,
-        processed: int,
-        batch_size: int,
-        retry_job_ids: List[str],
-        fail_on_error: bool = False,
+    client: Any,
+    pbar: Any,
+    files: List[str],
+    tasks: Dict,
+    processed: int,
+    batch_size: int,
+    retry_job_ids: List[str],
+    fail_on_error: bool = False,
 ) -> Tuple[List[str], Dict[str, str], int]:
     """
     Generates a batch of job specifications for the current iteration of file processing.
@@ -495,7 +491,7 @@ def generate_job_batch_for_iteration(
 
     if (cur_job_count < batch_size) and (processed < len(files)):
         new_job_count = min(batch_size - cur_job_count, len(files) - processed)
-        batch_files = files[processed: processed + new_job_count]  # noqa: E203
+        batch_files = files[processed : processed + new_job_count]  # noqa: E203
 
         new_job_indices = client.create_jobs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
@@ -517,14 +513,14 @@ def generate_job_batch_for_iteration(
 
 
 def create_and_process_jobs(
-        files: List[str],
-        client: NvIngestClient,
-        tasks: Dict[str, Any],
-        output_directory: str,
-        batch_size: int,
-        timeout: int = 10,
-        fail_on_error: bool = False,
-        save_images_separately: bool = False,
+    files: List[str],
+    client: NvIngestClient,
+    tasks: Dict[str, Any],
+    output_directory: str,
+    batch_size: int,
+    timeout: int = 10,
+    fail_on_error: bool = False,
+    save_images_separately: bool = False,
 ) -> Tuple[int, Dict[str, List[float]], int, Dict[str, str]]:
     """
     Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.

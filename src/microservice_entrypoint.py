@@ -21,14 +21,18 @@ from nv_ingest.util.pipeline.stage_builders import *
 
 logger = logging.getLogger(__name__)
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
-if (local_log_level in ("DEFAULT",)):
+if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
 configure_local_logging(logger, local_log_level)
 
+
 @click.command()
 @click.option(
-    "--ingest_config_path", type=str, envvar="NV_INGEST_CONFIG_PATH", help="Path to the JSON configuration file.",
-    hidden=True
+    "--ingest_config_path",
+    type=str,
+    envvar="NV_INGEST_CONFIG_PATH",
+    help="Path to the JSON configuration file.",
+    hidden=True,
 )
 @click.option("--use_cpp", is_flag=True, help="Use C++ backend.")
 @click.option("--pipeline_batch_size", default=256, type=int, help="Batch size for the pipeline.")
@@ -50,15 +54,15 @@ configure_local_logging(logger, local_log_level)
     help="Log level.",
 )
 def cli(
-        ingest_config_path,
-        use_cpp,
-        pipeline_batch_size,
-        enable_monitor,
-        feature_length,
-        num_threads,
-        model_max_batch_size,
-        mode,
-        log_level,
+    ingest_config_path,
+    use_cpp,
+    pipeline_batch_size,
+    enable_monitor,
+    feature_length,
+    num_threads,
+    model_max_batch_size,
+    mode,
+    log_level,
 ):
     """
     Command line interface for configuring and running the pipeline with specified options.
@@ -76,7 +80,7 @@ def cli(
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
     if env_log_level:
         log_level = env_log_level
-        if (log_level in ("DEFAULT",)):
+        if log_level in ("DEFAULT",):
             log_level = "INFO"
 
     log_level = log_level_mapping.get(log_level.upper(), logging.INFO)
