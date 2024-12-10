@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import io
-import json
 import logging
 import traceback
 from datetime import datetime
@@ -13,7 +12,6 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
-import tritonclient.grpc as grpcclient
 from PIL import Image
 from wand.image import Image as WandImage
 
@@ -23,10 +21,8 @@ from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import perform_model_inference
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 # Copyright (c) 2024, NVIDIA CORPORATION.
