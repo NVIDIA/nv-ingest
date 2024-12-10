@@ -415,7 +415,7 @@ def test_create_inference_client_nimclient_parameters(mock_model_interface, grpc
             infer_protocol,
             (grpc_endpoint, http_endpoint),
             auth_token,
-            timeout,
+            timeout=timeout,
         )
 
 
