@@ -206,15 +206,16 @@ class YoloxPageElementsModelInterface(ModelInterface):
                 response_data = response.get("data", [])
                 batch_results = []
                 for idx, detections in enumerate(response_data):
-                    curr_batch = {"index": idx}
+                    curr_batch = {"index": idx, "bounding_boxes": {}}
                     for obj in detections:
                         obj_type = obj.get("type", "")
                         bboxes = obj.get("bboxes", [])
                         if not obj_type:
                             continue
                         if obj_type not in curr_batch:
-                            curr_batch[obj_type] = []
-                        curr_batch[obj_type].extend(bboxes)
+                            curr_batch["bounding_boxes"][obj_type] = []
+                        curr_batch["bounding_boxes"][obj_type].extend(bboxes)
+                    batch_results.append(curr_batch)
             else:
                 batch_results = response.get("data", [])
 
