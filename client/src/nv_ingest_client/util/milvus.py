@@ -422,7 +422,7 @@ def dense_retrieval(queries, collection: Collection, dense_model, top_k: int, de
         dense_embeddings.append(dense_model.get_query_embedding(query))
 
     results = collection.search(
-        data=dense_embeddings, anns_field=dense_field, param={"metric_type": "L2"}, limit=top_k, output_fields=["text"]
+        data=dense_embeddings, anns_field=dense_field, param={"metric_type": "L2"}, limit=top_k, output_fields=["text", "source", "content_metadata"]
     )
     return results
 
@@ -493,7 +493,7 @@ def hybrid_retrieval(
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
-    results = collection.hybrid_search([sparse_req, dense_req], rerank=RRFRanker(), limit=top_k, output_fields=["text"])
+    results = collection.hybrid_search([sparse_req, dense_req], rerank=RRFRanker(), limit=top_k, output_fields=["text", "source", "content_metadata"])
     return results
 
 
