@@ -5,7 +5,8 @@
 import logging
 import re
 import time
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 from typing import Tuple
 
 import backoff
@@ -282,6 +283,12 @@ class NimClient:
                         time.sleep(backoff_time)
                         attempt += 1
                         continue
+                elif (response.status_code == 202) and ("nvcf-reqid" in response.headers):
+                    req_id = response.headers.get("nvcf-reqid")
+                    response = repoll_http_client(
+                        self.endpoint_url, req_id, payload=formatted_input, headers=self.headers
+                    )
+                    return response
                 else:
                     # Not a 429/503 - just raise_for_status or return the response
                     response.raise_for_status()
@@ -317,6 +324,7 @@ def create_inference_client(
     model_interface: ModelInterface,
     auth_token: Optional[str] = None,
     infer_protocol: Optional[str] = None,
+    timeout: float = 30.0,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -353,7 +361,7 @@ def create_inference_client(
     if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    return NimClient(model_interface, infer_protocol, endpoints, auth_token)
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout=timeout)
 
 
 def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
@@ -587,3 +595,49 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
         return ""
+
+
+def repoll_http_client(url, req_id, payload=None, headers=None, max_retries=100, poll_interval=3):
+    # Construct the base URL dynamically from the original URL
+    if "/v2/nvcf/pexec/functions" in url:
+        base_url = url.split("/pexec/functions")[0]
+    else:
+        raise ValueError("The endpoint URL does not contain the expected path structure.")
+
+    poll_url = f"{base_url}/exec/status/{req_id}"
+
+    poll_headers = {
+        "Accept": "application/json",
+        "Content-Type": "application/json",
+    }
+    if "Authorization" in headers:
+        poll_headers.update({"Authorization": headers.get("Authorization")})
+
+    retry_count = 0
+
+    while retry_count < max_retries:
+        response = requests.get(poll_url, headers=poll_headers)
+
+        # Handle 404 by obtaining a new req_id if the request was pending too long
+        if (response.status_code == 404) and (payload is not None):
+            logger.debug("Received 404 (request might have been pending too long). Retrying.")
+            response = requests.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+
+            if (response.status_code) == 202 and ("nvcf-reqid" in response.headers):
+                req_id = response.headers.get("nvcf-reqid")
+                retry_count += 1
+                continue
+            else:
+                # If we get a final response, return it
+                return response.json()
+
+        response.raise_for_status()
+
+        if response.status_code != 202:
+            return response.json().get("response")
+
+        time.sleep(poll_interval)
+        retry_count += 1
+
+    raise RuntimeError("Maximum number of retries reached without a final response.")

@@ -4,15 +4,14 @@
 
 import logging
 import re
-from math import ceil
-from math import floor
+from typing import Any
+from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
 
-import numpy as np
-
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
+from nv_ingest.util.nim.helpers import ModelInterface
 
 ACCEPTED_TEXT_CLASSES = set(
     [
@@ -48,6 +47,164 @@ _re_extract_class_bbox = re.compile(
 )
 
 logger = logging.getLogger(__name__)
+
+
+class DoughnutModelInterface(ModelInterface):
+    """
+    An interface for handling inference with a Doughnut model.
+    """
+
+    def name(self) -> str:
+        """
+        Get the name of the model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+        return "doughnut"
+
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Prepare input data for inference by resizing images and storing their original shapes.
+
+        Parameters
+        ----------
+        data : dict
+            The input data containing a list of images.
+
+        Returns
+        -------
+        dict
+            The updated data dictionary with resized images and original image shapes.
+        """
+
+        return data
+
+    def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
+        """
+        Format input data for the specified protocol.
+
+        Parameters
+        ----------
+        data : dict
+            The input data to format.
+        protocol : str
+            The protocol to use ("grpc" or "http").
+        **kwargs : dict
+            Additional parameters for HTTP payload formatting.
+
+        Returns
+        -------
+        Any
+            The formatted input data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
+
+        if protocol == "grpc":
+            raise ValueError("gRPC protocol is not supported for Doughnut.")
+        elif protocol == "http":
+            logger.debug("Formatting input for HTTP Doughnut model")
+            # Prepare payload for HTTP request
+            base64_img = numpy_to_base64(data["image"])
+            payload = self._prepare_doughnut_payload(base64_img)
+            return payload
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
+        """
+        Parse the output from the model's inference response.
+
+        Parameters
+        ----------
+        response : Any
+            The response from the model inference.
+        protocol : str
+            The protocol used ("grpc" or "http").
+        data : dict, optional
+            Additional input data passed to the function.
+
+        Returns
+        -------
+        Any
+            The parsed output data.
+
+        Raises
+        ------
+        ValueError
+            If an invalid protocol is specified.
+        """
+
+        if protocol == "grpc":
+            raise ValueError("gRPC protocol is not supported for Doughnut.")
+        elif protocol == "http":
+            logger.debug("Parsing output from HTTP Doughnut model")
+            return self._extract_content_from_doughnut_response(response)
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def process_inference_results(self, output: Any, **kwargs) -> Any:
+        """
+        Process inference results for the Doughnut model.
+
+        Parameters
+        ----------
+        output : Any
+            The raw output from the model.
+
+        Returns
+        -------
+        Any
+            The processed inference results.
+        """
+
+        return output
+
+    def _prepare_doughnut_payload(self, base64_img: str) -> Dict[str, Any]:
+        messages = [
+            {
+                "role": "user",
+                "content": "<s><output_markdown><predict_bbox><predict_classes>"
+                f'<img src="data:image/png;base64,{base64_img}" />',
+            }
+        ]
+        payload = {
+            "model": "nvidia/eclair",
+            "messages": messages,
+        }
+
+        return payload
+
+    def _extract_content_from_doughnut_response(self, json_response: Dict[str, Any]) -> Any:
+        """
+        Extract content from the JSON response of a Deplot HTTP API request.
+
+        Parameters
+        ----------
+        json_response : dict
+            The JSON response from the Deplot API.
+
+        Returns
+        -------
+        Any
+            The extracted content from the response.
+
+        Raises
+        ------
+        RuntimeError
+            If the response does not contain the expected "choices" key or if it is empty.
+        """
+
+        if "choices" not in json_response or not json_response["choices"]:
+            raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
+
+        return json_response["choices"][0]["message"]["content"]
 
 
 def extract_classes_bboxes(text: str) -> Tuple[List[str], List[Tuple[int, int, int, int]], List[str]]:

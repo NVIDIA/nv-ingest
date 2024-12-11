@@ -10,15 +10,15 @@ from typing import Optional
 from typing import Tuple
 
 import pandas as pd
-
 from morpheus.config import Config
 
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
@@ -67,6 +67,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
         (content_metadata.get("type") != "structured")
         or (content_metadata.get("subtype") != "table")
         or (table_metadata is None)
+        or (table_metadata.get("table_format") != TableFormatEnum.IMAGE)
     ):
         return metadata
 
