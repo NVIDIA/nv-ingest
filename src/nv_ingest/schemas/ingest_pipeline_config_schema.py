@@ -6,14 +6,14 @@ import logging
 
 from pydantic import BaseModel
 
-from nv_ingest.schemas import VdbTaskSinkSchema
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
-from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
+from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.image_storage_schema import ImageStorageModuleSchema
+from nv_ingest.schemas.vdb_task_sink_schema import VdbTaskSinkSchema
 from nv_ingest.schemas.job_counter_schema import JobCounterSchema
 from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from nv_ingest.schemas.message_broker_source_schema import MessageBrokerTaskSourceSchema

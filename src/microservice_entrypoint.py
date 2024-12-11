@@ -102,7 +102,7 @@ def cli(
     cli_ingest_config = {}  # TODO: Create a config for CLI overrides -- not necessary yet.
 
     if ingest_config_path:
-        ingest_config = validate_schema(ingest_config_path)
+        ingest_config = validate_schema(ingest_config_path, PipelineConfigSchema)
     else:
         ingest_config = {}
 
