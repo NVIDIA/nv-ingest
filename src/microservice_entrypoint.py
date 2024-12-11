@@ -11,7 +11,7 @@ from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
 from pydantic import ValidationError
 
-from nv_ingest.schemas.ingest_pipeline_config_schema import IngestPipelineConfigSchema
+from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.logging.configuration import LogLevel
 from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
@@ -111,7 +111,7 @@ def cli(
 
     # Validate final configuration using Pydantic
     try:
-        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        validated_config = PipelineConfigSchema(**final_ingest_config)
         click.echo(f"Configuration loaded and validated: {validated_config}")
     except ValidationError as e:
         click.echo(f"Validation error: {e}")

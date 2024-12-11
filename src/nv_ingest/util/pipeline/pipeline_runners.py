@@ -18,7 +18,7 @@ from datetime import datetime
 from morpheus.config import PipelineModes, CppConfig, Config
 from pydantic import ValidationError
 
-from nv_ingest.schemas import IngestPipelineConfigSchema
+from nv_ingest.schemas import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
@@ -191,7 +191,7 @@ def run_ingest_pipeline(
 
     # Validate final configuration using Pydantic
     try:
-        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        validated_config = PipelineConfigSchema(**final_ingest_config)
         print(f"Configuration loaded and validated: {validated_config}")
     except ValidationError as e:
         print(f"Validation error: {e}")
@@ -253,11 +253,16 @@ def terminate_subprocess(process):
             logger.error(f"Failed to terminate process group: {e}")
 
 
-def start_pipeline_subprocess():
+def start_pipeline_subprocess(config: PipelineConfigSchema):
     """
     Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
     including signal handling and `atexit` registration.
+
+    Parameters
+    ----------
+    config : PipelineConfigSchema
+        The pipeline configuration schema, fully validated and defined.
 
     Returns
     -------
@@ -272,28 +277,28 @@ def start_pipeline_subprocess():
         "from nv_ingest.util.pipeline.pipeline_runners import subprocess_entrypoint; subprocess_entrypoint()",
     ]
 
-    # Prepare environment variables
+    # Prepare environment variables from the config
     env = os.environ.copy()
     env.update(
         {
-            "CACHED_GRPC_ENDPOINT": "localhost:8007",
-            "CACHED_INFER_PROTOCOL": "grpc",
-            "DEPLOT_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot",
-            "DEPLOT_INFER_PROTOCOL": "http",
-            "INGEST_LOG_LEVEL": "DEBUG",
-            "MESSAGE_CLIENT_HOST": "localhost",
-            "MESSAGE_CLIENT_PORT": "7671",
-            "MESSAGE_CLIENT_TYPE": "simple",
-            "MINIO_BUCKET": "nv-ingest",
-            "MRC_IGNORE_NUMA_CHECK": "1",
-            "OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4317",
-            "PADDLE_GRPC_ENDPOINT": "localhost:8010",
-            "PADDLE_HTTP_ENDPOINT": "http://localhost:8009/v1/infer",
-            "PADDLE_INFER_PROTOCOL": "grpc",
-            "REDIS_MORPHEUS_TASK_QUEUE": "morpheus_task_queue",
-            "YOLOX_INFER_PROTOCOL": "grpc",
-            "YOLOX_GRPC_ENDPOINT": "localhost:8001",
-            "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
+            "CACHED_GRPC_ENDPOINT": config.CACHED_GRPC_ENDPOINT,
+            "CACHED_INFER_PROTOCOL": config.CACHED_INFER_PROTOCOL,
+            "DEPLOT_HTTP_ENDPOINT": config.DEPLOT_HTTP_ENDPOINT,
+            "DEPLOT_INFER_PROTOCOL": config.DEPLOT_INFER_PROTOCOL,
+            "INGEST_LOG_LEVEL": config.INGEST_LOG_LEVEL,
+            "MESSAGE_CLIENT_HOST": config.MESSAGE_CLIENT_HOST,
+            "MESSAGE_CLIENT_PORT": str(config.MESSAGE_CLIENT_PORT),
+            "MESSAGE_CLIENT_TYPE": config.MESSAGE_CLIENT_TYPE,
+            "MINIO_BUCKET": config.MINIO_BUCKET,
+            "MRC_IGNORE_NUMA_CHECK": config.MRC_IGNORE_NUMA_CHECK,
+            "OTEL_EXPORTER_OTLP_ENDPOINT": config.OTEL_EXPORTER_OTLP_ENDPOINT,
+            "PADDLE_GRPC_ENDPOINT": config.PADDLE_GRPC_ENDPOINT,
+            "PADDLE_HTTP_ENDPOINT": config.PADDLE_HTTP_ENDPOINT,
+            "PADDLE_INFER_PROTOCOL": config.PADDLE_INFER_PROTOCOL,
+            "REDIS_MORPHEUS_TASK_QUEUE": config.REDIS_MORPHEUS_TASK_QUEUE,
+            "YOLOX_INFER_PROTOCOL": config.YOLOX_INFER_PROTOCOL,
+            "YOLOX_GRPC_ENDPOINT": config.YOLOX_GRPC_ENDPOINT,
+            "VLM_CAPTION_ENDPOINT": config.VLM_CAPTION_ENDPOINT,
         }
     )
 
@@ -312,7 +317,7 @@ def start_pipeline_subprocess():
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            preexec_fn=combined_preexec_fn,  # Start new process group and set pdeathsig
+            preexec_fn=combined_preexec_fn,
             env=env,
         )
         logger.debug(f"Pipeline subprocess started with PID: {process.pid}")
@@ -338,13 +343,13 @@ def start_pipeline_subprocess():
             target=read_stream,
             args=(process.stdout, "Pipeline STDOUT"),
             name="StdoutReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
+            daemon=True,
         )
         stderr_thread = threading.Thread(
             target=read_stream,
             args=(process.stderr, "Pipeline STDERR"),
             name="StderrReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
+            daemon=True,
         )
         stdout_thread.start()
         stderr_thread.start()

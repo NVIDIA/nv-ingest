@@ -103,7 +103,10 @@ def get_default_cpu_count():
     return default_cpu_count
 
 
-def add_source_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
+def add_source_stage(pipe, morpheus_pipeline_config, ingest_config):
+    task_broker_host = os.environ.get("MESSAGE_CLIENT_HOST", "localhost")
+    task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
+
     client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
     task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "morpheus_task_queue")
 
@@ -113,8 +116,8 @@ def add_source_stage(pipe, morpheus_pipeline_config, ingest_config, message_prov
             "broker_task_source",
             {
                 "broker_client": {
-                    "host": message_provider_host,
-                    "port": message_provider_port,
+                    "host": task_broker_host,
+                    "port": task_broker_port,
                     "client_type": client_type,
                 },
                 "task_queue": task_queue_name,
@@ -404,7 +407,6 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
 
 
 def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
-
     storage_stage = pipe.add_stage(
         generate_embedding_storage_stage(
             morpheus_pipeline_config,
@@ -423,7 +425,9 @@ def add_image_storage_stage(pipe, morpheus_pipeline_config):
     return image_storage_stage
 
 
-def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
+def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
+    task_broker_host = os.environ.get("MESSAGE_CLIENT_HOST", "localhost")
+    task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
     client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
 
     sink_module_loader = MessageBrokerTaskSinkLoaderFactory.get_instance(
@@ -432,8 +436,8 @@ def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config, message_provid
             "broker_task_sink",
             {
                 "broker_client": {
-                    "host": message_provider_host,
-                    "port": message_provider_port,
+                    "host": task_broker_host,
+                    "port": task_broker_port,
                     "client_type": client_type,
                 },
             },
@@ -478,7 +482,10 @@ def add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config):
     return otel_tracer_stage
 
 
-def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port):
+def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config):
+    task_broker_host = os.environ.get("MESSAGE_CLIENT_HOST", "localhost")
+    task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
+
     endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
     otel_meter_loader = OpenTelemetryMeterLoaderFactory.get_instance(
@@ -487,8 +494,8 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config, message_
             "otel_meter_module",
             {
                 "broker_client": {
-                    "host": message_provider_host,
-                    "port": message_provider_port,
+                    "host": task_broker_host,
+                    "port": task_broker_port,
                     "client_type": "redis",
                 },
                 "otel_endpoint": endpoint,

@@ -7,7 +7,7 @@ from .image_caption_extraction_schema import ImageCaptionExtractionSchema
 from .image_storage_schema import ImageStorageModuleSchema
 from .ingest_job_schema import IngestJobSchema
 from .ingest_job_schema import validate_ingest_job
-from .ingest_pipeline_config_schema import IngestPipelineConfigSchema
+from .ingest_pipeline_config_schema import PipelineConfigSchema
 from .message_broker_client_schema import MessageBrokerClientSchema
 from .message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from .message_broker_source_schema import MessageBrokerTaskSourceSchema
@@ -23,7 +23,7 @@ __all__ = [
     "ImageCaptionExtractionSchema",
     "ImageStorageModuleSchema",
     "IngestJobSchema",
-    "IngestPipelineConfigSchema",
+    "PipelineConfigSchema",
     "MessageBrokerClientSchema",
     "MessageBrokerTaskSinkSchema",
     "MessageBrokerTaskSourceSchema",
