@@ -520,7 +520,8 @@ class NvIngestClient:
 
             response = self._message_client.submit_message(job_queue_id, message, for_nv_ingest=True)
             x_trace_id = response.trace_id
-            job_id = response.transaction_id.replace('"', "")
+            transaction_id = response.transaction_id
+            job_id = "" if transaction_id is None else transaction_id.replace('"', "")
             logger.debug(f"Submitted job {job_index} to queue {job_queue_id} and got back job ID {job_id}")
 
             job_state.state = JobStateEnum.SUBMITTED
