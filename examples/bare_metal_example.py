@@ -53,6 +53,7 @@ def run_ingestor(config: PipelineConfigSchema):
             max_character_length=5000,
             sentence_window_size=0,
         )
+        .embed()
     )
 
     try:
