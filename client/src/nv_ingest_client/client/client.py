@@ -15,7 +15,6 @@ from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from typing import Any, Type
-from typing import Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -415,7 +414,7 @@ class NvIngestClient:
             for future in as_completed(futures):
                 job_id = futures[future]
                 try:
-                    result = handle_future_result(future, timeout=timeout)
+                    result, _ = handle_future_result(future, timeout=timeout)
                     results.append(result.get("data"))
                     del self._job_index_to_job_spec[job_id]
                 except concurrent.futures.TimeoutError:
