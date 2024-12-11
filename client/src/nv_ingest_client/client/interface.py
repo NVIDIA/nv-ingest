@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any
+from typing import Any, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -24,9 +24,9 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -66,11 +66,11 @@ class Ingestor:
     """
 
     def __init__(
-            self,
-            documents: Optional[List[str]] = None,
-            client: Optional[NvIngestClient] = None,
-            job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
-            **kwargs,
+        self,
+        documents: Optional[List[str]] = None,
+        client: Optional[NvIngestClient] = None,
+        job_queue_id: str = DEFAULT_JOB_QUEUE_ID,
+        **kwargs,
     ):
         self._documents = documents or []
         self._client = client
@@ -127,7 +127,7 @@ class Ingestor:
 
         return True
 
-    def files(self, documents: List[str]) -> "Ingestor":
+    def files(self, documents: Union[str, List[str]]) -> "Ingestor":
         """
         Add documents to the manager for processing and check if they are all local.
 

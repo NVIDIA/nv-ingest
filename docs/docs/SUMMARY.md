@@ -1,4 +1,2 @@
 - [Home](index.md)
 - [User Guide](user-guide/)
-- [Topic A](topicA/)
-- [Topic B](topicB/)
