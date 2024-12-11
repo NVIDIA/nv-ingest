@@ -25,7 +25,6 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-import nv_ingest.util.nim.yolox as yolox_utils
 
 import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
@@ -35,6 +34,7 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
@@ -64,9 +64,21 @@ def extract_tables_and_charts_using_image_ensemble(
 ) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
     tables_and_charts = []
 
-    yolox_client = None
+    # Obtain yolox_version
+    # Assuming that the grpc endpoint is at index 0
+    yolox_http_endpoint = config.yolox_endpoints[1]
     try:
-        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_version = get_version(yolox_http_endpoint)
+        if not yolox_version:
+            raise Exception("Failed to obtain yolox-page-elements version from the endpoint.")
+    except Exception as e:
+        logger.error("Failed to get yolox-page-elements version after 30 seconds. Failing the job.", exc_info=True)
+        raise e
+
+    yolox_client = None
+
+    try:
+        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_version=yolox_version)
         yolox_client = create_inference_client(
             config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
         )
