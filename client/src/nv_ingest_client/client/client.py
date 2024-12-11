@@ -283,7 +283,7 @@ class NvIngestClient:
 
         return self.add_task(job_index, task_factory(task_type, **task_params))
 
-    def _fetch_job_result(self, job_index: str, timeout: float = 100, data_only: bool = True) -> Tuple[Dict, str]:
+    def _fetch_job_result(self, job_index: str, timeout: float = 100, data_only: bool = True) -> Tuple[Dict, str, str]:
         """
         Fetches the job result from a message client, handling potential errors and state changes.
 
@@ -293,7 +293,7 @@ class NvIngestClient:
             data_only (bool): If True, only returns the data part of the job result.
 
         Returns:
-            Tuple[Dict, str]: The job result and the job ID.
+            Tuple[Dict, str]: The job result, job ID, and trace_id.
 
         Raises:
             ValueError: If there is an error in decoding the job result.
@@ -314,7 +314,7 @@ class NvIngestClient:
                     if data_only:
                         response_json = response_json["data"]
 
-                    return response_json, job_index
+                    return response_json, job_index, job_state.trace_id
                 except json.JSONDecodeError as err:
                     logger.error(f"Error decoding job result for job ID {job_index}: {err}")
                     raise ValueError(f"Error decoding job result: {err}") from err
@@ -453,6 +453,7 @@ class NvIngestClient:
         for future in as_completed(submission_futures.keys()):
             job_state = submission_futures[future]
             job_state.state = JobStateEnum.SUBMITTED
+            job_state.trace_id = future.result()[0]  # Trace_id from `submit_job` endpoint submission
             job_state.future = None
 
     def fetch_job_result_async(
@@ -478,7 +479,6 @@ class NvIngestClient:
         future_to_job_id = {}
         for job_id in job_ids:
             job_state = self._get_and_check_job_state(job_id)
-
             future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, timeout, data_only)
             job_state.future = future
             future_to_job_id[future] = job_id

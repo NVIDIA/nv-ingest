@@ -235,10 +235,11 @@ def write_records_minio(
     for result in records:
         for element in result:
             text = _pull_text(element, enable_text, enable_charts, enable_tables)
-            if text and sparse_model is not None:
-                writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
-            else:
-                writer.append_row(record_func(text, element))
+            if text:
+                if sparse_model is not None:
+                    writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
+                else:
+                    writer.append_row(record_func(text, element))
 
     writer.commit()
     print(f"Wrote data to: {writer.batch_files}")
