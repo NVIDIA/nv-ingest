@@ -151,12 +151,12 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       #- DEPLOT_GRPC_ENDPOINT=""
       # Self-hosted deplot endpoints.
-      - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
+      #- DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
       # build.nvidia.com hosted deplot
-      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
+      - DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - EMBEDDING_NIM_MODEL_NAME=nvidia/nv-embedqa-e5-v5
+      #- EMBEDDING_NIM_MODEL_NAME=nvidia/llama-3.2-nv-embedqa-1b-v2
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0

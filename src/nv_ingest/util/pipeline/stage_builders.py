@@ -386,7 +386,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     api_key = os.getenv("NGC_API_KEY", "ngc_api_key")
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
-    embedding_model = os.getenv("EMBEDDING_NIM_MODLE_NAME", "nvidia/nv-embedqa-e5-v5")
+    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
 
     embed_extractions_loader = EmbedExtractionsLoaderFactory.get_instance(
         module_name="embed_extractions",
