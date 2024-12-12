@@ -173,6 +173,11 @@ def create_nvingest_collection(
     return schema
 
 
+def _format_sparse_embedding(sparse_vector: csr_array):
+    sparse_embedding = {int(k[1]): float(v) for k, v in sparse_vector.todok()._dict.items()}
+    return sparse_embedding if len(sparse_embedding) > 0 else {int(0): float(0)}
+
+
 def _record_dict(text, element, sparse_vector: csr_array = None):
     record = {
         "text": text,
@@ -181,8 +186,7 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "content_metadata": element["metadata"]["content_metadata"],
     }
     if sparse_vector is not None:
-        sparse_embedding = {int(k[1]): float(v) for k, v in sparse_vector.todok()._dict.items()}
-        record["sparse"] = sparse_embedding if len(sparse_embedding) > 0 else {int(0): float(0)}
+        record["sparse"] = _format_sparse_embedding(sparse_vector)
     return record
 
 
@@ -555,9 +559,7 @@ def hybrid_retrieval(
     sparse_embeddings = []
     for query in queries:
         dense_embeddings.append(dense_model.get_query_embedding(query))
-        sparse_embedding = {int(k[1]): float(v) for k, v in sparse_model.encode_queries([query]).todok()._dict.items()}
-        sparse_embedding = sparse_embedding if len(sparse_embedding) > 0 else {int(1): float(0)}
-        sparse_embeddings.append(sparse_embedding)
+        sparse_embeddings.append(_format_sparse_embedding(sparse_model.encode_queries([query])))
 
     # Create search requests for both vector types
     search_param_1 = {
