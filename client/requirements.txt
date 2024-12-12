@@ -13,6 +13,6 @@ requests
 fsspec
 pymilvus==2.4.9
 pymilvus[bulk_writer,model]
-azure-storage-blob
-llama-index-embeddings-nvidia
-openai
+azure-storage-blob==12.24.0
+llama-index-embeddings-nvidia==0.1.5
+openai==1.40.6
