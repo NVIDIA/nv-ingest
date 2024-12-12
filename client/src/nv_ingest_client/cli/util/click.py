@@ -127,7 +127,7 @@ def click_validate_task(ctx, param, value):
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = StoreTask(**task_options.dict())
+                new_task = [(new_task_id, StoreTask(**task_options.dict()))]
             elif task_id == "store_embedding":
                 task_options = check_schema(StoreEmbedTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
