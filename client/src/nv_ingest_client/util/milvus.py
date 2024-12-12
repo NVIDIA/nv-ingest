@@ -181,7 +181,8 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "content_metadata": element["metadata"]["content_metadata"],
     }
     if sparse_vector is not None:
-        record["sparse"] = {int(k[1]): float(v) for k, v in sparse_vector.todok()._dict.items()}
+        sparse_embedding = {int(k[1]): float(v) for k, v in sparse_vector.todok()._dict.items()}
+        record["sparse"] = sparse_embedding if len(sparse_embedding) > 0 else {int(0): float(0)}
     return record
 
 
