@@ -35,7 +35,7 @@ logger = logging.getLogger(__name__)
 class PipelineCreationSchema(BaseModel):
     cached_grpc_endpoint: str = "localhost:8007"
     cached_infer_protocol: str = "grpc"
-    deplot_http_endpoint: str = "https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot"
+    deplot_http_endpoint: str = "http://localhost:8003/v1/chat/completions"
     deplot_infer_protocol: str = "http"
     embedding_nim_endpoint: str = "http://localhost:8012/v1"
     ingest_log_level: str = "DEBUG"
