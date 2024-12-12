@@ -17,6 +17,7 @@ from datetime import datetime
 
 from morpheus.config import PipelineModes, CppConfig, Config
 from pydantic import ValidationError
+from pydantic import BaseModel
 
 from nv_ingest.schemas import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
@@ -28,6 +29,32 @@ from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, valida
 from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
+
+
+# TODO(Devin) Name this function something more descriptive
+class PipelineCreationSchema(BaseModel):
+    cached_grpc_endpoint: str = "localhost:8007"
+    cached_infer_protocol: str = "grpc"
+    deplot_http_endpoint: str = "https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot"
+    deplot_infer_protocol: str = "http"
+    embedding_nim_endpoint: str = "http://localhost:8012/v1"
+    ingest_log_level: str = "DEBUG"
+    message_client_host: str = "localhost"
+    message_client_port: str = "7671"
+    message_client_type: str = "simple"
+    minio_bucket: str = "nv-ingest"
+    mrc_ignore_numa_check: str = "1"
+    otel_exporter_otlp_endpoint: str = "localhost:4317"
+    paddle_grpc_endpoint: str = "localhost:8010"
+    paddle_http_endpoint: str = "http://localhost:8009/v1/infer"
+    paddle_infer_protocol: str = "grpc"
+    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    yolox_infer_protocol: str = "grpc"
+    yolox_grpc_endpoint: str = "localhost:8001"
+    vlm_caption_endpoint: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+
+    class Config:
+        extra = "forbid"
 
 
 def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:
@@ -253,7 +280,7 @@ def terminate_subprocess(process):
             logger.error(f"Failed to terminate process group: {e}")
 
 
-def start_pipeline_subprocess(config: PipelineConfigSchema):
+def start_pipeline_subprocess(config: PipelineCreationSchema):
     """
     Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
@@ -261,8 +288,8 @@ def start_pipeline_subprocess(config: PipelineConfigSchema):
 
     Parameters
     ----------
-    config : PipelineConfigSchema
-        The pipeline configuration schema, fully validated and defined.
+    config : PipelineCreationSchema
+        Validated pipeline configuration.
 
     Returns
     -------
@@ -279,28 +306,7 @@ def start_pipeline_subprocess(config: PipelineConfigSchema):
 
     # Prepare environment variables from the config
     env = os.environ.copy()
-    env.update(
-        {
-            "CACHED_GRPC_ENDPOINT": config.CACHED_GRPC_ENDPOINT,
-            "CACHED_INFER_PROTOCOL": config.CACHED_INFER_PROTOCOL,
-            "DEPLOT_HTTP_ENDPOINT": config.DEPLOT_HTTP_ENDPOINT,
-            "DEPLOT_INFER_PROTOCOL": config.DEPLOT_INFER_PROTOCOL,
-            "INGEST_LOG_LEVEL": config.INGEST_LOG_LEVEL,
-            "MESSAGE_CLIENT_HOST": config.MESSAGE_CLIENT_HOST,
-            "MESSAGE_CLIENT_PORT": str(config.MESSAGE_CLIENT_PORT),
-            "MESSAGE_CLIENT_TYPE": config.MESSAGE_CLIENT_TYPE,
-            "MINIO_BUCKET": config.MINIO_BUCKET,
-            "MRC_IGNORE_NUMA_CHECK": config.MRC_IGNORE_NUMA_CHECK,
-            "OTEL_EXPORTER_OTLP_ENDPOINT": config.OTEL_EXPORTER_OTLP_ENDPOINT,
-            "PADDLE_GRPC_ENDPOINT": config.PADDLE_GRPC_ENDPOINT,
-            "PADDLE_HTTP_ENDPOINT": config.PADDLE_HTTP_ENDPOINT,
-            "PADDLE_INFER_PROTOCOL": config.PADDLE_INFER_PROTOCOL,
-            "REDIS_MORPHEUS_TASK_QUEUE": config.REDIS_MORPHEUS_TASK_QUEUE,
-            "YOLOX_INFER_PROTOCOL": config.YOLOX_INFER_PROTOCOL,
-            "YOLOX_GRPC_ENDPOINT": config.YOLOX_GRPC_ENDPOINT,
-            "VLM_CAPTION_ENDPOINT": config.VLM_CAPTION_ENDPOINT,
-        }
-    )
+    env.update({key.upper(): val for key, val in config.dict().items()})
 
     logger.info("Starting pipeline subprocess...")
 
@@ -317,7 +323,7 @@ def start_pipeline_subprocess(config: PipelineConfigSchema):
             stdout=subprocess.PIPE,
             stderr=subprocess.PIPE,
             text=True,
-            preexec_fn=combined_preexec_fn,
+            preexec_fn=combined_preexec_fn,  # Start new process group and set pdeathsig
             env=env,
         )
         logger.debug(f"Pipeline subprocess started with PID: {process.pid}")
@@ -328,7 +334,7 @@ def start_pipeline_subprocess(config: PipelineConfigSchema):
         # Define and register signal handlers within this function
         def signal_handler(signum, frame):
             """
-            Handle termination signals to gracefully shutdown the subprocess.
+            Handle termination signals to gracefully shut down the subprocess.
             """
             logger.info(f"Received signal {signum}. Terminating pipeline subprocess group...")
             terminate_subprocess(process)
@@ -343,13 +349,13 @@ def start_pipeline_subprocess(config: PipelineConfigSchema):
             target=read_stream,
             args=(process.stdout, "Pipeline STDOUT"),
             name="StdoutReader",
-            daemon=True,
+            daemon=True,  # Daemon thread will terminate when the main program exits
         )
         stderr_thread = threading.Thread(
             target=read_stream,
             args=(process.stderr, "Pipeline STDERR"),
             name="StderrReader",
-            daemon=True,
+            daemon=True,  # Daemon thread will terminate when the main program exits
         )
         stdout_thread.start()
         stderr_thread.start()
