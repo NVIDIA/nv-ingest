@@ -17,7 +17,6 @@ from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtrac
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
-from nv_ingest.util.tracing.tagging import traceable_func  # TODO: Verify we don't need this # noqa: F401
 
 logger = logging.getLogger(__name__)
 

@@ -18,7 +18,6 @@ import tritonclient.grpc as grpcclient
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.nim.decorators import multiprocessing_cache
-from nv_ingest.util.tracing.tagging import traceable_func  # TODO: Verify we don't nedd this # noqa: F401
 
 logger = logging.getLogger(__name__)
 
