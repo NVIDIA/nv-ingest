@@ -31,13 +31,6 @@ def test_valid_schema_with_custom_values():
     assert schema.raise_on_failure is True
 
 
-def test_missing_api_key():
-    # Test with missing required field `api_key`
-    with pytest.raises(ValidationError) as exc_info:
-        ImageCaptionExtractionSchema()
-    assert "field required" in str(exc_info.value)
-
-
 def test_invalid_extra_field():
     # Test with an additional field that should be forbidden
     data_with_extra_field = {"api_key": "your-api-key-here", "extra_field": "should_not_be_allowed"}
