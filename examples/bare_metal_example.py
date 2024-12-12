@@ -38,8 +38,7 @@ def run_ingestor():
             max_character_length=5000,
             sentence_window_size=0,
         )
-        .embed()
-    )
+    ).embed()
 
     try:
         results = ingestor.ingest()

@@ -43,9 +43,7 @@ def read_requirements(file_name):
 
 # Specify your requirements files
 base_dir = os.path.abspath(os.path.dirname(__file__))
-requirements_files = [
-    # os.path.join(base_dir, "requirements.txt"),
-]
+requirements_files = []
 
 # Read and combine requirements from all specified files
 combined_requirements = []

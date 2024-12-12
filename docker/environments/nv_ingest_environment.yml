@@ -43,6 +43,8 @@ dependencies:
   - wand>=0.6.10
   - pip
   - pip:
+      - llama-index-embeddings-nvidia
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - pymilvus>=2.5.0
-      - pymilvus[bulk_writer]
+      - pymilvus[bulk_writer, model]
+      - pydantic<2.0.0 # Prevent llamas from installing pydantic>=2.0.0
