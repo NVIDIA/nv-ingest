@@ -135,7 +135,12 @@ def create_collection(
 
 
 def create_nvingest_collection(
-    collection_name: str, milvus_uri: str, sparse: bool = False, recreate: bool = True, gpu_cagra: bool = True
+    collection_name: str,
+    milvus_uri: str,
+    sparse: bool = False,
+    recreate: bool = True,
+    gpu_cagra: bool = True,
+    dense_dim: int = 2048,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -155,6 +160,8 @@ def create_nvingest_collection(
         again with the provided information (schema, index_params).
     gpu_cagra : bool, optional
         If true, creates a GPU_CAGRA index for dense embeddings.
+    dense_dim : int, optional
+        Sets the dimension size for the dense embedding in the milvus schema.
 
     Returns
     -------
@@ -167,7 +174,7 @@ def create_nvingest_collection(
     if "lite" in server_version:
         gpu_cagra = False
     client = MilvusClient(milvus_uri)
-    schema = create_nvingest_schema(sparse=sparse)
+    schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse)
     index_params = create_nvingest_index_params(sparse=sparse, gpu_cagra=gpu_cagra)
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
     return schema
