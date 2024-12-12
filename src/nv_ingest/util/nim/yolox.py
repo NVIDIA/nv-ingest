@@ -5,6 +5,7 @@
 
 import base64
 import io
+import json
 import warnings
 from typing import Dict, Any, List, Optional
 
@@ -30,6 +31,9 @@ YOLOX_IOU_THRESHOLD = 0.5
 YOLOX_MIN_SCORE = 0.1
 YOLOX_FINAL_SCORE = 0.48
 YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
+
+YOLOX_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_IMAGE_PREPROC_WIDTH = 1024
 
 
 # Implementing YoloxModelInterface with required methods
@@ -67,7 +71,9 @@ class YoloxModelInterface(ModelInterface):
 
         original_images = data["images"]
         # Our yolox model expects images to be resized to 1024x1024
-        resized_images = [resize_image(image, (1024, 1024)) for image in original_images]
+        resized_images = [
+            resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in original_images
+        ]
         data["original_image_shapes"] = [image.shape for image in original_images]
         data["resized_images"] = resized_images
 
@@ -125,19 +131,17 @@ class YoloxModelInterface(ModelInterface):
                     logger.warning(f"Image was scaled from {original_size} to {new_size} to meet size constraints.")
 
                 # Compute scaling factor
-                scaling_factor_x = new_size[0] / 1024
-                scaling_factor_y = new_size[1] / 1024
+                scaling_factor_x = new_size[0] / YOLOX_IMAGE_PREPROC_WIDTH
+                scaling_factor_y = new_size[1] / YOLOX_IMAGE_PREPROC_HEIGHT
                 scaling_factors.append((scaling_factor_x, scaling_factor_y))
 
                 # Add to content_list
-                content_list.append(
-                    {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{scaled_image_b64}"}}
-                )
+                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
 
             # Store scaling factors in data
             data["scaling_factors"] = scaling_factors
 
-            payload = {"messages": [{"content": content_list}]}
+            payload = {"input": content_list}
 
             return payload
         else:
@@ -173,32 +177,34 @@ class YoloxModelInterface(ModelInterface):
         elif protocol == "http":
             logger.debug("Parsing output from HTTP Yolox model")
             # Convert JSON response to numpy array similar to gRPC response
+
             batch_results = response.get("data", [])
             batch_size = len(batch_results)
             processed_outputs = []
 
             scaling_factors = data.get("scaling_factors", [(1.0, 1.0)] * batch_size)
 
-            for idx, detections in enumerate(batch_results):
+            # Batch results should abe a list of dictionaries each list item is a dictionary with an 'index' and
+            # 'bounding_box' key. bounding_box is a dictionary of lists, keyed on 'chart', 'table', 'title'
+            for idx, yolox_response_item in enumerate(batch_results):
                 scale_factor_x, scale_factor_y = scaling_factors[idx]
-                image_width = 1024
-                image_height = 1024
+                image_width = YOLOX_IMAGE_PREPROC_WIDTH
+                image_height = YOLOX_IMAGE_PREPROC_HEIGHT
 
                 # Initialize an empty tensor for detections
                 max_detections = 100
                 detection_tensor = np.zeros((max_detections, 85), dtype=np.float32)
 
                 index = 0
-                for obj in detections:
-                    obj_type = obj.get("type", "")
-                    bboxes = obj.get("bboxes", [])
+                _ = yolox_response_item.get("index")  # Currently unused object index
+                for obj_type, bboxes in yolox_response_item.get("bounding_boxes", {}).items():
                     for bbox in bboxes:
                         if index >= max_detections:
                             break
-                        xmin_norm = bbox["xmin"]
-                        ymin_norm = bbox["ymin"]
-                        xmax_norm = bbox["xmax"]
-                        ymax_norm = bbox["ymax"]
+                        xmin_norm = bbox["x_min"]
+                        ymin_norm = bbox["y_min"]
+                        xmax_norm = bbox["x_max"]
+                        ymax_norm = bbox["y_max"]
                         confidence = bbox["confidence"]
 
                         # Convert normalized coordinates to absolute pixel values in scaled image
@@ -378,7 +384,10 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
             result = result[scores > min_score]
 
             # ratio is used when image was padded
-            ratio = min(1024 / original_image_shape[0], 1024 / original_image_shape[1])
+            ratio = min(
+                YOLOX_IMAGE_PREPROC_WIDTH / original_image_shape[0],
+                YOLOX_IMAGE_PREPROC_HEIGHT / original_image_shape[1],
+            )
             bboxes = result[:, :4] / ratio
 
             bboxes[:, [0, 2]] /= original_image_shape[1]

@@ -182,7 +182,7 @@ services:
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      - YOLOX_INFER_PROTOCOL=http
       # build.nvidia.com hosted yolox endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
