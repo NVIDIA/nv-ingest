@@ -9,6 +9,7 @@ dependencies:
   - azure-core>=1.32.0
   - click>=8.1.7
   - fastapi>=0.115.6
+  - fastparquet>=2024.11.0
   - fsspec>=2024.10.0
   - httpx>=0.28.1
   - isodate>=0.7.2
@@ -22,6 +23,7 @@ dependencies:
   - opentelemetry-sdk>=1.27.0
   - pydantic<2.0.0
   - pypdfium2>=4.30.0
+  - pytest>=8.0.2
   - python>=3.10
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
@@ -32,6 +34,7 @@ dependencies:
   - setuptools>=58.2.0
   - torchvision
   - torchaudio
+  - transformers>=4.47.0
   - tqdm>=4.67.1
   - unstructured-client>=0.25.9
   - uvicorn
