@@ -11,7 +11,6 @@ from setuptools import find_packages
 from setuptools import setup
 
 
-# TODO(Devin): This is duplicated in nv_ingest's setup.py, should be moved to common once Jermey's PR is merged
 def get_version():
     release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
     version = os.getenv("NV_INGEST_CLIENT_VERSION")
@@ -43,8 +42,9 @@ def read_requirements(file_name):
 
 
 # Specify your requirements files
+base_dir = os.path.abspath(os.path.dirname(__file__))
 requirements_files = [
-    "requirements.txt",
+    # os.path.join(base_dir, "requirements.txt"),
 ]
 
 # Read and combine requirements from all specified files

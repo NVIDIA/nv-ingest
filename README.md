@@ -170,10 +170,10 @@ To interact with the nv-ingest service, you can do so from the host, or by `dock
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required, but makes it easy to create a fresh python environment
-conda create --name nv-ingest-dev python=3.10
+conda create --name nv-ingest-dev --file ./docker/environments/nv_ingest_environment.yml
 conda activate nv-ingest-dev
+
 cd client
-pip install -r ./requirements.txt
 pip install .
 ```
 
@@ -214,7 +214,6 @@ import logging, time
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.util.file_processing.extract import extract_file_content
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask

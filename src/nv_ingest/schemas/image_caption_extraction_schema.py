@@ -7,7 +7,7 @@ from pydantic import BaseModel
 
 
 class ImageCaptionExtractionSchema(BaseModel):
-    api_key: str
+    api_key: str = "api_key"
     endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
     prompt: str = "Caption the content of this image:"
     raise_on_failure: bool = False
