@@ -18,12 +18,10 @@ from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
-from morpheus_llm.service.vdb.milvus_vector_db_service import MilvusVectorDBService
 from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
 from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from mrc.core import operators as ops
 from pymilvus import BulkInsertState
-from pymilvus import Collection
 from pymilvus import connections
 from pymilvus import utility
 
@@ -74,8 +72,7 @@ def _bulk_ingest(
     ]
 
     uri_parsed = urlparse(milvus_uri)
-    conn = connections.connect(host=uri_parsed.hostname, port=uri_parsed.port)
-    collection = Collection(name=collection_name)
+    _ = connections.connect(host=uri_parsed.hostname, port=uri_parsed.port)
 
     task_ids = []
     for file in batch_files:

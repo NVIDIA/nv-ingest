@@ -103,4 +103,4 @@ def main(json_files, output_file):
 
 
 if __name__ == "__main__":
-    process_json_files()
+    main()

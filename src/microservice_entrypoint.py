@@ -2,8 +2,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
+import click
 import json
+import logging
+import os
 
 from morpheus.config import Config
 from morpheus.config import CppConfig
@@ -20,6 +22,7 @@ from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.pipeline.stage_builders import *
 
 logger = logging.getLogger(__name__)
+
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"

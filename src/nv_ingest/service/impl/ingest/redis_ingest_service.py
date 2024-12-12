@@ -11,7 +11,6 @@
 import json
 import logging
 import os
-import uuid
 from json import JSONDecodeError
 from typing import Any
 

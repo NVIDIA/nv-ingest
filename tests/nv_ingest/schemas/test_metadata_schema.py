@@ -98,11 +98,6 @@ def test_image_metadata_schema_invalid_type():
         ImageMetadataSchema(image_type=3.14)  # Using a float value
 
 
-def test_image_metadata_schema_invalid_type():
-    with pytest.raises(ValidationError):
-        ImageMetadataSchema(image_type=3.14)
-
-
 # Test cases for TableMetadataSchema
 @pytest.mark.parametrize("table_format", ["html", "markdown", "latex", "image"])
 def test_table_metadata_schema_defaults(table_format):

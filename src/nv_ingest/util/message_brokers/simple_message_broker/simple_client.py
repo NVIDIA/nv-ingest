@@ -11,9 +11,7 @@ import socket
 import json
 import time
 import logging
-from typing import Optional, Union
-
-from pydantic import BaseModel
+from typing import Optional
 
 from nv_ingest.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_client.message_clients.client_base import MessageBrokerClientBase
@@ -230,9 +228,9 @@ class SimpleClient(MessageBrokerClientBase):
 
                     return ResponseSchema(**final_response)
 
-            except (ConnectionError, socket.error, BrokenPipeError) as e:
+            except (ConnectionError, socket.error, BrokenPipeError):
                 pass
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
             except Exception as e:
                 return ResponseSchema(response_code=1, response_reason=str(e))
@@ -305,9 +303,9 @@ class SimpleClient(MessageBrokerClientBase):
                     else:
                         return ResponseSchema(**final_response)
 
-            except (ConnectionError, socket.error, BrokenPipeError) as e:
+            except (ConnectionError, socket.error, BrokenPipeError):
                 pass
-            except json.JSONDecodeError as e:
+            except json.JSONDecodeError:
                 return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
             except Exception as e:
                 return ResponseSchema(response_code=1, response_reason=str(e))
@@ -342,7 +340,7 @@ class SimpleClient(MessageBrokerClientBase):
                 return ResponseSchema(**response)
         except (ConnectionError, socket.error, BrokenPipeError) as e:
             return ResponseSchema(response_code=1, response_reason=f"Connection error: {e}")
-        except json.JSONDecodeError as e:
+        except json.JSONDecodeError:
             return ResponseSchema(response_code=1, response_reason="Invalid JSON response from server.")
         except Exception as e:
             return ResponseSchema(response_code=1, response_reason=str(e))
@@ -371,7 +369,7 @@ class SimpleClient(MessageBrokerClientBase):
         try:
             sock.sendall(total_length.to_bytes(8, "big"))
             sock.sendall(data)
-        except (socket.error, BrokenPipeError) as e:
+        except (socket.error, BrokenPipeError):
             raise ConnectionError("Failed to send data.")
 
     def _recv(self, sock: socket.socket) -> str:
@@ -403,7 +401,7 @@ class SimpleClient(MessageBrokerClientBase):
             if not data_bytes:
                 raise ConnectionError("Incomplete message received.")
             return data_bytes.decode("utf-8")
-        except (socket.error, BrokenPipeError, ConnectionError) as e:
+        except (socket.error, BrokenPipeError, ConnectionError):
             raise ConnectionError("Failed to receive data.")
 
     def _recv_exact(self, sock: socket.socket, num_bytes: int) -> Optional[bytes]:
@@ -430,8 +428,8 @@ class SimpleClient(MessageBrokerClientBase):
                 if not packet:
                     return None
                 data.extend(packet)
-            except socket.timeout as e:
+            except socket.timeout:
                 return None
-            except Exception as e:
+            except Exception:
                 return None
         return bytes(data)

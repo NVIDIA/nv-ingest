@@ -293,7 +293,7 @@ def start_pipeline_subprocess():
             "REDIS_MORPHEUS_TASK_QUEUE": "morpheus_task_queue",
             "YOLOX_INFER_PROTOCOL": "grpc",
             "YOLOX_GRPC_ENDPOINT": "localhost:8001",
-            "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
+            "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",  # noqa: E501
         }
     )
 

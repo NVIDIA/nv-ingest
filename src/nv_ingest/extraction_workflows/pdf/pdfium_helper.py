@@ -27,7 +27,6 @@ import numpy as np
 import pypdfium2 as libpdfium
 import nv_ingest.util.nim.yolox as yolox_utils
 
-import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum

@@ -4,9 +4,11 @@
 
 
 import logging
-from typing import Union, Optional
+from typing import Optional
 
-from pydantic import BaseModel, Field, Extra
+from pydantic import BaseModel
+from pydantic import Extra
+from pydantic import Field
 
 logger = logging.getLogger(__name__)
 

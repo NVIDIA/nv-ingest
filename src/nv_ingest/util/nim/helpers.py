@@ -18,7 +18,7 @@ import tritonclient.grpc as grpcclient
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.nim.decorators import multiprocessing_cache
-from nv_ingest.util.tracing.tagging import traceable_func
+from nv_ingest.util.tracing.tagging import traceable_func  # TODO: Verify we don't nedd this # noqa: F401
 
 logger = logging.getLogger(__name__)
 
@@ -270,7 +270,8 @@ class NimClient:
                 if status_code in [429, 503]:
                     # Warn and attempt to retry
                     logger.warning(
-                        f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying..."
+                        f"Received HTTP {status_code} ({response.reason}) from "
+                        f"{self.model_interface.name()}. Retrying..."
                     )
                     if attempt == max_retries:
                         # No more retries left
@@ -289,7 +290,10 @@ class NimClient:
                     return response.json()
 
             except requests.Timeout:
-                err_msg = f"HTTP request timed out during {self.model_interface.name()} inference after {self.timeout} seconds"
+                err_msg = (
+                    f"HTTP request timed out during {self.model_interface.name()} "
+                    f"inference after {self.timeout} seconds"
+                )
                 logger.error(err_msg)
                 raise TimeoutError(err_msg)
 

@@ -69,8 +69,6 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
             # Validate and extract common fields
             queue_name = request_data.get("queue_name")
-            message = request_data.get("message")
-            timeout = request_data.get("timeout", 100)
 
             # Initialize the queue and its lock if necessary
             if queue_name:

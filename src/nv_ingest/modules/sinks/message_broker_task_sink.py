@@ -170,7 +170,8 @@ def push_to_broker(
     broker_client: MessageBrokerClientBase, response_channel: str, json_payloads: List[str], retry_count: int = 2
 ) -> None:
     """
-    Attempts to push a JSON payload to a message broker channel, retrying on failure up to a specified number of attempts.
+    Attempts to push a JSON payload to a message broker channel, retrying on failure up to a specified number of
+    attempts.
 
     Parameters
     ----------

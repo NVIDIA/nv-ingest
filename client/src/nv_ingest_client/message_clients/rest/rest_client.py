@@ -17,8 +17,6 @@ from typing import Any
 
 import httpx
 import requests
-import re
-
 from nv_ingest_client.message_clients import MessageBrokerClientBase
 from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
 
@@ -212,7 +210,9 @@ class RestClient(MessageBrokerClientBase):
                     # Terminal response code; return error ResponseSchema
                     return ResponseSchema(
                         response_code=1,
-                        response_reason=f"Terminal response code {response_code} received when fetching JobSpec: {job_id}",
+                        response_reason=(
+                            f"Terminal response code {response_code} received when fetching JobSpec: {job_id}"
+                        ),
                         response=result.text,
                     )
                 else:
@@ -341,7 +341,8 @@ class RestClient(MessageBrokerClientBase):
         """
         backoff_delay = min(2**existing_retries, self._max_backoff)
         logger.debug(
-            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s"
+            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | "
+            f"current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s"
         )
 
         if self.max_retries > 0 and existing_retries < self.max_retries:

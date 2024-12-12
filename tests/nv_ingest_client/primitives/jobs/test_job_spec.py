@@ -147,7 +147,7 @@ def test_init_with_files(mocker, job_spec_fixture):
     assert len(batch_job_spec._file_type_to_job_spec["pdf"]) > 0
 
 
-def test_add_task_to_specific_document_type(batch_job_spec_fixture):
+def test_add_task_to_specific_document_type_batch_job_spec(batch_job_spec_fixture):
     task = MockTask()
 
     # Add task to jobs with document_type 'pdf'
@@ -249,7 +249,7 @@ def test_add_task_to_all_documents():
         assert dedup_task in job_specs[0]._tasks
 
 
-def test_add_task_to_specific_document_type():
+def test_add_task_to_specific_document_type_job_spec():
     batch_job_spec = BatchJobSpec([JobSpec(document_type="pdf"), JobSpec(document_type="txt")])
 
     embed_task = EmbedTask()

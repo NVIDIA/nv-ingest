@@ -176,7 +176,7 @@ def _extract_chart_data(
 
         return df, trace_info
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:

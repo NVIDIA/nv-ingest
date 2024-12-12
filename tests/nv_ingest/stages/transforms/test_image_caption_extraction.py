@@ -10,14 +10,14 @@ import pytest
 import requests
 from PIL import Image
 
-MODULE_UNDER_TEST = "nv_ingest.stages.transforms.image_caption_extraction"
-
 import pandas as pd
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.transforms.image_caption_extraction import _generate_captions
 from nv_ingest.stages.transforms.image_caption_extraction import _prepare_dataframes_mod
 from nv_ingest.stages.transforms.image_caption_extraction import caption_extract_stage
+
+MODULE_UNDER_TEST = "nv_ingest.stages.transforms.image_caption_extraction"
 
 
 def generate_base64_png_image() -> str:

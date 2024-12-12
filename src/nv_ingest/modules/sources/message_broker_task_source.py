@@ -65,14 +65,14 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
                 if job.response_code != 0:
                     continue
 
-                logger.debug(f"Received ResponseSchema, converting to dict")
+                logger.debug("Received ResponseSchema, converting to dict")
                 job = json.loads(job.response)
             else:
-                logger.debug(f"Received something not a ResponseSchema")
+                logger.debug("Received something not a ResponseSchema")
 
             ts_fetched = datetime.now()
             yield process_message(job, ts_fetched)
-        except TimeoutError as err:
+        except TimeoutError:
             continue
         except Exception as err:
             logger.error(

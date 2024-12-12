@@ -6,12 +6,9 @@ import functools
 import logging
 import os
 import traceback
-import typing
-import uuid
 from typing import Any
 from typing import Dict
 
-import mrc
 import pandas as pd
 from minio import Minio
 from morpheus.config import Config
@@ -35,11 +32,9 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     Identify contents (e.g., images) within a dataframe and uploads the data to MinIO.
     The image metadata in the metadata column is updated with the URL of the uploaded data.
     """
-    dimension = params.get("dim", 1024)
     access_key = params.get("access_key", None)
     secret_key = params.get("secret_key", None)
 
-    content_types = params.get("content_types")
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
     bucket_path = params.get("bucket_path", "embeddings")
@@ -73,7 +68,6 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     )
 
     for idx, row in df.iterrows():
-        uu_id = row["uuid"]
         metadata = row["metadata"].copy()
         metadata["embedding_metadata"] = {}
         metadata["embedding_metadata"]["uploaded_embedding_url"] = bucket_path

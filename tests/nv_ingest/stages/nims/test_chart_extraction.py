@@ -1,12 +1,12 @@
-import pytest
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import pytest
+import requests
 import pandas as pd
-from unittest.mock import Mock, patch
+
 from nv_ingest.stages.nim.chart_extraction import _update_metadata
 from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
-import requests
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 

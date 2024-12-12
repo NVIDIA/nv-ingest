@@ -139,15 +139,16 @@ class MultiProcessingBaseStage(SinglePortStage):
        forwards the task to a global multi-process worker pool where the heavy-lifting occurs.
 
     3. **Global Worker Pool**: The work is executed in parallel across multiple process engines via the worker pool.
-       Each process engine applies the `process_fn` to the task data, which includes a pandas DataFrame and task-specific arguments.
+       Each process engine applies the `process_fn` to the task data, which includes a pandas DataFrame and
+       task-specific arguments.
 
     4. **Response Queue**: After the work is completed by the worker pool, the results are pushed into a response queue.
 
-    5. **Post-Processing and Emission**: The results from the response queue are post-processed, reconstructed into their
-       original format, and emitted from an observable source for further downstream processing or final output.
+    5. **Post-Processing and Emission**: The results from the response queue are post-processed, reconstructed into
+        their original format, and emitted from an observable source for further downstream processing or final output.
 
-    This design enhances parallelism and resource utilization across multiple processes, especially for tasks that involve
-    heavy computations, such as large DataFrame operations.
+    This design enhances parallelism and resource utilization across multiple processes, especially for tasks that
+    involve heavy computations, such as large DataFrame operations.
     """
 
     def __init__(

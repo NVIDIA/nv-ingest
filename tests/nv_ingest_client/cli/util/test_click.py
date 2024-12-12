@@ -118,7 +118,7 @@ def test_validate_task_with_valid_store_task():
     assert isinstance(result["store"], StoreTask)
 
 
-def test_validate_task_with_valid_store_task():
+def test_validate_task_with_valid_store_embed_task():
     """Test with valid stor task options."""
     value = ['store_embedding:{"endpoint": "localhost:9000"}']
     result = click_validate_task(None, None, value)

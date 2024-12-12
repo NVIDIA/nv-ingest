@@ -45,7 +45,8 @@ def decode_and_extract(
     validated_config : Any
         Configuration object that contains `image_config`. Used if the `image` method is selected.
     default : str, optional
-        The default extraction method to use if the specified method in `task_props` is not available (default is "image").
+        The default extraction method to use if the specified method in `task_props` is not available
+        (default is "image").
 
     Returns
     -------
@@ -138,7 +139,8 @@ def process_image(
     -------
     Tuple[pd.DataFrame, Dict[str, Any]]
         A tuple containing:
-        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata', and 'uuid'.
+        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata',
+          and 'uuid'.
         - A dictionary with trace information collected during processing.
 
     Raises

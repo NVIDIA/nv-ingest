@@ -2,15 +2,15 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
-from typing import Dict, Optional
-from typing import List
-import httpx
-import json
-import os
 import asyncio
+import json
+import logging
+import os
+from typing import Dict
 from typing import List
+from typing import Optional
 
+import httpx
 
 logger = logging.getLogger(__name__)
 
@@ -50,7 +50,8 @@ class AsyncZipkinClient:
                     if response.status_code == 404:
                         attempt += 1
                         logger.info(
-                            f"Attempt {attempt}/{self._max_retries} for trace_id: {trace_id} failed with 404. Retrying in {self._retry_delay} seconds..."
+                            f"Attempt {attempt}/{self._max_retries} for trace_id: {trace_id} failed with 404. "
+                            f"Retrying in {self._retry_delay} seconds..."
                         )
                         await asyncio.sleep(self._retry_delay)
                     else:

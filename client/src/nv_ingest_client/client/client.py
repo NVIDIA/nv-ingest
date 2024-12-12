@@ -390,7 +390,7 @@ class NvIngestClient:
                     # Attempt to fetch the job result
                     result = self._fetch_job_result(job_id, timeout, data_only=False)
                     return result, job_id
-                except TimeoutError as err:
+                except TimeoutError:
                     if verbose:
                         logger.info(
                             f"Job {job_id} is not ready. "
@@ -401,7 +401,7 @@ class NvIngestClient:
                     time.sleep(retry_delay)  # Wait before retrying
                 except (RuntimeError, Exception) as err:
                     # For any other error, log and break out of the retry loop
-                    logger.error(f"Error while fetching result for job ID {job_id}: {e}")
+                    logger.error(f"Error while fetching result for job ID {job_id}: {err}")
                     return None, job_id
             logger.error(f"Max retries exceeded for job {job_id}.")
             return None, job_id
@@ -419,19 +419,23 @@ class NvIngestClient:
                     del self._job_index_to_job_spec[job_id]
                 except concurrent.futures.TimeoutError:
                     logger.error(
-                        f"Timeout while fetching result for job ID {job_id}: {self._job_index_to_job_spec[job_id].source_id}"
+                        f"Timeout while fetching result for job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}"
                     )
                 except json.JSONDecodeError as e:
                     logger.error(
-                        f"Decoding while processing job ID {job_id}: {self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                        f"Decoding while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
                 except RuntimeError as e:
                     logger.error(
-                        f"Error while processing job ID {job_id}: {self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                        f"Error while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
                 except Exception as e:
                     logger.error(
-                        f"Error while fetching result for job ID {job_id}: {self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                        f"Error while fetching result for job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
 
         return results

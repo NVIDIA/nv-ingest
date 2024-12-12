@@ -262,7 +262,7 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
             source_id = (
                 json_payload.get("data", [])[0].get("metadata", {}).get("source_metadata", {}).get("source_name", "")
             )
-        except Exception as e:
+        except Exception:
             source_id = ""
 
         description = f"[{source_id}]: {json_payload.get('status', '')}\n"
@@ -349,7 +349,7 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
     >>> client = NvIngestClient()
     >>> job_specs = create_job_specs_for_batch(files_batch)
     >>> print(job_specs)
-    [nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb468bb0>, <nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb469270>]
+    [nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb468bb0>, <nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb469270>]  # noqa: E501,W505
 
     See Also
     --------
