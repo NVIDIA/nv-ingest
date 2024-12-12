@@ -31,7 +31,7 @@ def test_redis_task_sink_schema_custom_values():
     assert schema.broker_client.host == "custom_host", "Custom host value for broker_client should be respected."
     assert schema.broker_client.port == 12345, "Custom port value for broker_client should be respected."
     assert (
-        schema.broker_client.broker_params["use_ssl"] == True
+        schema.broker_client.broker_params["use_ssl"] is True
     ), "Custom use_ssl value for redis_client should be True."
     assert schema.raise_on_failure is True, "Custom value for raise_on_failure should be respected."
     assert schema.progress_engines == 10, "Custom value for progress_engines should be respected."

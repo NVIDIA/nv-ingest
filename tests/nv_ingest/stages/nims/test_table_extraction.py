@@ -1,20 +1,17 @@
-import pytest
 import base64
-import cv2
-import numpy as np
-import pandas as pd
-
-from unittest.mock import Mock, patch
 from io import BytesIO
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import cv2
+import numpy as np
 import pandas as pd
 import pytest
 import requests
 from PIL import Image
 
-from nv_ingest.stages.nim.table_extraction import _update_metadata, _extract_table_data
+from nv_ingest.stages.nim.table_extraction import _extract_table_data
+from nv_ingest.stages.nim.table_extraction import _update_metadata
 from nv_ingest.util.nim.helpers import NimClient
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 

@@ -47,7 +47,7 @@ class CaptionTask(Task):
         info += "Image Caption Task:\n"
 
         if self._api_key:
-            info += f"  api_key: [redacted]\n"
+            info += "  api_key: [redacted]\n"
         if self._endpoint_url:
             info += f"  endpoint_url: {self._endpoint_url}\n"
         if self._prompt:

@@ -143,6 +143,8 @@ def test_parse_output_http_valid(model_interface):
                 {
                     "type": "table",
                     "bboxes": [{"xmin": 0.1, "ymin": 0.1, "xmax": 0.2, "ymax": 0.2, "confidence": 0.9}],
+                },
+                {
                     "type": "chart",
                     "bboxes": [{"xmin": 0.3, "ymin": 0.3, "xmax": 0.4, "ymax": 0.4, "confidence": 0.8}],
                 },
@@ -152,6 +154,8 @@ def test_parse_output_http_valid(model_interface):
                 {
                     "type": "table",
                     "bboxes": [{"xmin": 0.15, "ymin": 0.15, "xmax": 0.25, "ymax": 0.25, "confidence": 0.85}],
+                },
+                {
                     "type": "chart",
                     "bboxes": [{"xmin": 0.35, "ymin": 0.35, "xmax": 0.45, "ymax": 0.45, "confidence": 0.75}],
                 },
@@ -166,7 +170,7 @@ def test_parse_output_http_valid(model_interface):
     data = {"scaling_factors": scaling_factors}
     parsed_output = model_interface.parse_output(response, "http", data)
     assert isinstance(parsed_output, np.ndarray)
-    assert parsed_output.shape == (2, 2, 85)
+    assert parsed_output.shape == (2, 3, 85)
     assert parsed_output.dtype == np.float32
 
 

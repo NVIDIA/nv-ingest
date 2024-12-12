@@ -6,7 +6,6 @@ from morpheus.config import Config
 from morpheus.pipeline.pipeline import Pipeline
 
 from nv_ingest.util.pipeline.stage_builders import *
-from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
