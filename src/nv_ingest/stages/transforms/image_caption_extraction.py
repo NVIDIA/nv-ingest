@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import base64
-import io
 import logging
 from functools import partial
 from typing import Any
@@ -14,13 +12,11 @@ from typing import Tuple
 import pandas as pd
 import requests
 from morpheus.config import Config
-from PIL import Image
 
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
-from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 

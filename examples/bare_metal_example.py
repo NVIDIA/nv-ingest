@@ -41,7 +41,7 @@ def run_ingestor():
     ).embed()
 
     try:
-        results = ingestor.ingest()
+        _ = ingestor.ingest()
         logger.info("Ingestion completed successfully.")
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")

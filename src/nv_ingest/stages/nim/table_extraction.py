@@ -139,8 +139,6 @@ def _extract_table_data(
 
     stage_config = validated_config.stage_config
 
-    paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
-
     # Obtain paddle_version
     # Assuming that the grpc endpoint is at index 0
     paddle_endpoint = stage_config.paddle_endpoints[1]
@@ -169,7 +167,7 @@ def _extract_table_data(
 
         return df, {"trace_info": trace_info}
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
