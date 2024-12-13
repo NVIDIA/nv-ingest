@@ -1,0 +1,49 @@
+{% set version = load_setup_py_data().get('version') %}
+{% set name = "nv_ingest_client" %}
+
+package:
+  name: {{ name }}         # This should match the name from setup.py (e.g. nv_ingest)
+  version: {{ version }}   # Version automatically extracted from setup.py
+
+source:
+  path: ../../..
+
+build:
+  number: 0
+  script:
+    - {{ PYTHON }} -m pip install ./client --no-deps -vv
+
+requirements:
+  build:
+    - pip
+    - python==3.10
+    - setuptools>=58.2.0
+  run:
+    - click>=8.1.7
+    - fsspec>=2024.10.0
+    - httpx>=0.28.1
+    - pydantic<2.0.0
+    - pypdfium2>=4.30.0
+    - python>=3.10
+    - python-docx>=1.1.2
+    - python-pptx>=1.0.2
+    - requests>=2.32.3
+    - setuptools>=58.2.0
+    - tqdm>=4.67.1
+
+  test:
+    commands:
+      - pytest ./tests
+
+about:
+  home: "https://github.com/NVIDIA/nv-ingest"
+  license: "Apache-2.0"
+  summary: "Python module supporting document ingestion."
+  description: "Python module supporting document ingestion."
+
+extra:
+  recipe-maintainers:
+    - drobison@nvidia.com
+
+channels:
+  - conda-forge
