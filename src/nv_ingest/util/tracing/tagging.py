@@ -163,7 +163,7 @@ def traceable_func(trace_name=None, dedupe=True):
                     elif name in kwargs:
                         arg_val = kwargs.get(name)
                     else:
-                        continue
+                        arg_val = name
                     format_kwargs[name] = arg_val
                 trace_prefix = trace_prefix.format(**format_kwargs)
 
