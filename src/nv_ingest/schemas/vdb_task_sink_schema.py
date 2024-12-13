@@ -89,7 +89,7 @@ class VdbTaskSinkSchema(BaseModel):
     default_resource_name: str = "nv_ingest_collection"
     resource_schemas: dict = {default_resource_name: build_default_milvus_config()}
     resource_kwargs: dict = Field(default_factory=dict)
-    service_kwargs: dict
+    service_kwargs: dict = {}
     batch_size: int = 5120
     write_time_interval: float = 1.0
     retry_interval: float = 60.0
