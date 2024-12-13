@@ -157,6 +157,7 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
+    @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
         """
         Perform inference using the specified model and input data.
