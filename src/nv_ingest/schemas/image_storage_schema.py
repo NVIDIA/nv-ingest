@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 
 class ImageStorageModuleSchema(BaseModel):
     structured: bool = True
-    images: bool = False
+    images: bool = True
     raise_on_failure: bool = False
 
     class Config:

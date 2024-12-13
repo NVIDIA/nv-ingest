@@ -44,11 +44,7 @@ def read_requirements(file_name):
 
 
 # Specify your requirements files
-requirements_files = [
-    "requirements.txt",
-    "util-requirements.txt",
-    "test-requirements.txt",
-]
+requirements_files = []
 
 # Read and combine requirements from all specified files
 combined_requirements = []

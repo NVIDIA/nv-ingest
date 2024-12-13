@@ -309,7 +309,7 @@ def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_
         "desk fan Cost"
     )
     assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
-    assert trace_info_out == trace_info
+    assert trace_info_out == {"trace_info": trace_info}
 
     # Verify that the mocked methods were called
     mock_create_client.assert_called_once()
