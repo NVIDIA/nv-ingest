@@ -1,12 +1,16 @@
-{% set version = load_setup_py_data().get('version') %}
-{% set name = "nv_ingest_client" %}
+{% set data = load_setup_py_data() %}
+  {% set name = data.get('name', 'nv_ingest_client') | lower %}
+{% set version = data.get('version') %}
+
+# Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
+{% set git_root = environ.get('GIT_ROOT', '../../..') %}
 
 package:
-  name: {{ name }}         # This should match the name from setup.py (e.g. nv_ingest)
-  version: {{ version }}   # Version automatically extracted from setup.py
+  name: {{ name }}
+  version: {{ version }}
 
 source:
-  path: ../../..
+  path: {{ git_root }}
 
 build:
   number: 0
