@@ -1,5 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 {% set data = load_setup_py_data() %}
-  {% set name = data.get('name', 'nv_ingest_client') | lower %}
+{% set name = data.get('name', 'nv_ingest_client') | lower %}
 {% set version = data.get('version') %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
