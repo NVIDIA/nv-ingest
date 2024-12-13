@@ -25,8 +25,8 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-
 import nv_ingest.util.nim.yolox as yolox_utils
+
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
@@ -109,6 +109,8 @@ def extract_tables_and_charts_using_image_ensemble(
                 iou_thresh=YOLOX_IOU_THRESHOLD,
                 min_score=YOLOX_MIN_SCORE,
                 final_thresh=YOLOX_FINAL_SCORE,
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="pdf_content_extractor",  # traceable_func arg
             )
 
             # Process results

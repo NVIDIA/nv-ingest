@@ -1,12 +1,12 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+import os
 
 from morpheus.config import Config
 from morpheus.pipeline.pipeline import Pipeline
 
 from nv_ingest.util.pipeline.stage_builders import *
-from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -14,16 +14,13 @@ logger = logging.getLogger(__name__)
 def setup_ingestion_pipeline(
     pipe: Pipeline, morpheus_pipeline_config: Config, ingest_config: typing.Dict[str, typing.Any]
 ):
-    message_provider_host, message_provider_port = get_message_provider_config()
-
     default_cpu_count = get_default_cpu_count()
+    add_meter_stage = os.environ.get("MESSAGE_CLIENT_TYPE") != "simple"
 
     ########################################################################################################
     ## Insertion and Pre-processing stages
     ########################################################################################################
-    source_stage = add_source_stage(
-        pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
-    )
+    source_stage = add_source_stage(pipe, morpheus_pipeline_config, ingest_config)
     submitted_job_counter_stage = add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
     metadata_injector_stage = add_metadata_injector_stage(pipe, morpheus_pipeline_config)
     ########################################################################################################
@@ -58,18 +55,17 @@ def setup_ingestion_pipeline(
     embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
     vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
-    sink_stage = add_sink_stage(
-        pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
-    )
+    sink_stage = add_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
     #######################################################################################################
     ## Telemetry (Note: everything after the sync stage is out of the hot path, please keep it that way) ##
     #######################################################################################################
     otel_tracer_stage = add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config)
-    otel_meter_stage = add_otel_meter_stage(
-        pipe, morpheus_pipeline_config, ingest_config, message_provider_host, message_provider_port
-    )
+    if add_meter_stage:
+        otel_meter_stage = add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config)
+    else:
+        otel_meter_stage = None
     completed_job_counter_stage = add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
@@ -91,6 +87,9 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_storage_stage, embedding_storage_stage)
     pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
-    pipe.add_edge(sink_stage, otel_meter_stage)
-    pipe.add_edge(otel_meter_stage, otel_tracer_stage)
+    if add_meter_stage:
+        pipe.add_edge(sink_stage, otel_meter_stage)
+        pipe.add_edge(otel_meter_stage, otel_tracer_stage)
+    else:
+        pipe.add_edge(sink_stage, otel_tracer_stage)
     pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)

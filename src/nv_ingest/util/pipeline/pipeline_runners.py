@@ -17,8 +17,9 @@ from datetime import datetime
 
 from morpheus.config import PipelineModes, CppConfig, Config
 from pydantic import ValidationError
+from pydantic import BaseModel
 
-from nv_ingest.schemas import IngestPipelineConfigSchema
+from nv_ingest.schemas import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
@@ -28,6 +29,33 @@ from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, valida
 from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
+
+
+# TODO(Devin) Name this function something more descriptive
+class PipelineCreationSchema(BaseModel):
+    cached_grpc_endpoint: str = "localhost:8007"
+    cached_infer_protocol: str = "grpc"
+    deplot_http_endpoint: str = "http://localhost:8003/v1/chat/completions"
+    deplot_infer_protocol: str = "http"
+    embedding_nim_endpoint: str = "http://localhost:8012/v1"
+    embedding_nim_model_name: str = "nvidia/nv-embedqa-e5-v5"
+    ingest_log_level: str = "DEBUG"
+    message_client_host: str = "localhost"
+    message_client_port: str = "7671"
+    message_client_type: str = "simple"
+    minio_bucket: str = "nv-ingest"
+    mrc_ignore_numa_check: str = "1"
+    otel_exporter_otlp_endpoint: str = "localhost:4317"
+    paddle_grpc_endpoint: str = "localhost:8010"
+    paddle_http_endpoint: str = "http://localhost:8009/v1/infer"
+    paddle_infer_protocol: str = "grpc"
+    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    yolox_infer_protocol: str = "grpc"
+    yolox_grpc_endpoint: str = "localhost:8001"
+    vlm_caption_endpoint: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+
+    class Config:
+        extra = "forbid"
 
 
 def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:
@@ -191,7 +219,7 @@ def run_ingest_pipeline(
 
     # Validate final configuration using Pydantic
     try:
-        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        validated_config = PipelineConfigSchema(**final_ingest_config)
         print(f"Configuration loaded and validated: {validated_config}")
     except ValidationError as e:
         print(f"Validation error: {e}")
@@ -253,11 +281,16 @@ def terminate_subprocess(process):
             logger.error(f"Failed to terminate process group: {e}")
 
 
-def start_pipeline_subprocess():
+def start_pipeline_subprocess(config: PipelineCreationSchema):
     """
     Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
     including signal handling and `atexit` registration.
+
+    Parameters
+    ----------
+    config : PipelineCreationSchema
+        Validated pipeline configuration.
 
     Returns
     -------
@@ -272,30 +305,9 @@ def start_pipeline_subprocess():
         "from nv_ingest.util.pipeline.pipeline_runners import subprocess_entrypoint; subprocess_entrypoint()",
     ]
 
-    # Prepare environment variables
+    # Prepare environment variables from the config
     env = os.environ.copy()
-    env.update(
-        {
-            "CACHED_GRPC_ENDPOINT": "localhost:8007",
-            "CACHED_INFER_PROTOCOL": "grpc",
-            "DEPLOT_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot",
-            "DEPLOT_INFER_PROTOCOL": "http",
-            "INGEST_LOG_LEVEL": "DEBUG",
-            "MESSAGE_CLIENT_HOST": "localhost",
-            "MESSAGE_CLIENT_PORT": "7671",
-            "MESSAGE_CLIENT_TYPE": "simple",
-            "MINIO_BUCKET": "nv-ingest",
-            "MRC_IGNORE_NUMA_CHECK": "1",
-            "OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4317",
-            "PADDLE_GRPC_ENDPOINT": "localhost:8010",
-            "PADDLE_HTTP_ENDPOINT": "http://localhost:8009/v1/infer",
-            "PADDLE_INFER_PROTOCOL": "grpc",
-            "REDIS_MORPHEUS_TASK_QUEUE": "morpheus_task_queue",
-            "YOLOX_INFER_PROTOCOL": "grpc",
-            "YOLOX_GRPC_ENDPOINT": "localhost:8001",
-            "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
-        }
-    )
+    env.update({key.upper(): val for key, val in config.dict().items()})
 
     logger.info("Starting pipeline subprocess...")
 
@@ -323,7 +335,7 @@ def start_pipeline_subprocess():
         # Define and register signal handlers within this function
         def signal_handler(signum, frame):
             """
-            Handle termination signals to gracefully shutdown the subprocess.
+            Handle termination signals to gracefully shut down the subprocess.
             """
             logger.info(f"Received signal {signum}. Terminating pipeline subprocess group...")
             terminate_subprocess(process)

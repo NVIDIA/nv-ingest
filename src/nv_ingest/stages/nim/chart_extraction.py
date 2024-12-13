@@ -75,8 +75,18 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
         data = {"base64_image": base64_image}
 
         # Perform inference using the NimClients
-        deplot_result = deplot_client.infer(data, model_name="deplot")
-        cached_result = cached_client.infer(data, model_name="cached")
+        deplot_result = deplot_client.infer(
+            data,
+            model_name="deplot",
+            trace_info=trace_info,  # traceable_func arg
+            stage_name="chart_data_extraction",  # traceable_func arg
+        )
+        cached_result = cached_client.infer(
+            data,
+            model_name="cached",
+            stage_name="chart_data_extraction",  # traceable_func arg
+            trace_info=trace_info,  # traceable_func arg
+        )
 
         chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
 
@@ -174,9 +184,9 @@ def _extract_chart_data(
         # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(cached_client, deplot_client, trace_info))
 
-        return df, trace_info
+        return df, {"trace_info": trace_info}
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:

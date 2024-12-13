@@ -58,7 +58,7 @@ def handle_future_result(
     and a directory for saving results:
 
     >>> future = concurrent.futures.Future()
-    >>> result = handle_future_result(future, timeout=60)
+    >>> result, trace_id = handle_future_result(future, timeout=60)
 
     In this example, the function processes the completed job and returns the result dictionary.
     If the job fails, it raises a `RuntimeError`.

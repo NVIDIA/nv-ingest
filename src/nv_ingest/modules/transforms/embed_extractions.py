@@ -472,7 +472,6 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
     """
 
     with ctrl_msg.payload().mutable_dataframe() as mdf:
-
         # build unified mask
         unified_mask = cudf.Series(False, index=mdf.index)
         for mask in masks:

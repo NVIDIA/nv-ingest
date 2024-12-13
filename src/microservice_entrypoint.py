@@ -2,8 +2,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
+import click
 import json
+import logging
+import os
 
 from morpheus.config import Config
 from morpheus.config import CppConfig
@@ -11,7 +13,7 @@ from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
 from pydantic import ValidationError
 
-from nv_ingest.schemas.ingest_pipeline_config_schema import IngestPipelineConfigSchema
+from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from nv_ingest.util.logging.configuration import LogLevel
 from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
@@ -20,6 +22,7 @@ from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.pipeline.stage_builders import *
 
 logger = logging.getLogger(__name__)
+
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
@@ -102,7 +105,7 @@ def cli(
     cli_ingest_config = {}  # TODO: Create a config for CLI overrides -- not necessary yet.
 
     if ingest_config_path:
-        ingest_config = validate_schema(ingest_config_path)
+        ingest_config = validate_schema(ingest_config_path, PipelineConfigSchema)
     else:
         ingest_config = {}
 
@@ -111,7 +114,7 @@ def cli(
 
     # Validate final configuration using Pydantic
     try:
-        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        validated_config = PipelineConfigSchema(**final_ingest_config)
         click.echo(f"Configuration loaded and validated: {validated_config}")
     except ValidationError as e:
         click.echo(f"Validation error: {e}")
