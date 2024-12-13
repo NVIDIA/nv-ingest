@@ -97,6 +97,8 @@ def extract_tables_and_charts_using_image_ensemble(
                 iou_thresh=YOLOX_IOU_THRESHOLD,
                 min_score=YOLOX_MIN_SCORE,
                 final_thresh=YOLOX_FINAL_SCORE,
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="pdf_content_extractor",  # traceable_func arg
             )
 
             # Process results
