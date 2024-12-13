@@ -25,6 +25,7 @@ dependencies:
   - pypdfium2>=4.30.0
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
+  - pytest-cov>=6.0.0
   - python>=3.10
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
