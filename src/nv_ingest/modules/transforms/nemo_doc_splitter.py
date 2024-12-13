@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
+import os
 import copy
 import logging
 import traceback
@@ -13,6 +14,7 @@ from typing import Literal
 
 import mrc
 import pandas as pd
+from transformers import AutoTokenizer
 from more_itertools import windowed
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
@@ -33,24 +35,16 @@ from nv_ingest.util.tracing import traceable
 logger = logging.getLogger(__name__)
 
 
-def _build_split_documents(row, text_splits: List[str], sentence_window_size: int) -> List[dict[str, Any]]:
-    """Build documents from text splits with window text."""
+def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
+    """Build documents from text chunks"""
     documents: List[dict] = []
 
-    window_size = sentence_window_size
-    for i, text in enumerate(text_splits):
+    for i, text in enumerate(chunks):
         if text is None or not text.strip():
             continue
 
         metadata = row.metadata if hasattr(row, "metadata") and isinstance(row.metadata, dict) else {}
         metadata = copy.deepcopy(metadata)
-        if window_size > 0:
-            window_text = "".join(
-                text_splits[max(0, i - window_size) : min(i + 1 + window_size, len(text_splits))]  # noqa: E203
-            )
-
-            metadata["window"] = window_text
-            metadata["original_text"] = text
 
         metadata["content"] = text
 
@@ -59,70 +53,33 @@ def _build_split_documents(row, text_splits: List[str], sentence_window_size: in
     return documents
 
 
-def _split_into_units(text: str, split_by: Literal["word", "sentence", "passage"]) -> List[str]:
-    if split_by == "passage":
-        split_at = "\n\n"
-    elif split_by == "sentence":
-        split_at = "."  # why not ?,!, etc..?
-    elif split_by == "word":
-        split_at = " "
-    else:
-        raise NotImplementedError("DocumentSplitter only supports 'passage', 'sentence'" " or 'word' split_by options.")
-    units = text.split(split_at)
-    # Add the delimiter back to all units except the last one
-    for i in range(len(units) - 1):
-        units[i] += split_at
+def _split_into_chunks(text, tokenizer, chunk_size=300):
+    # Tokenize the text into token IDs
+    encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
 
-    return units
+    # Get the token IDs and offsets for splitting
+    tokens = encoding['input_ids']
+    offsets = encoding['offset_mapping']
 
+    # Split the tokens into chunks of the desired size
+    chunks = [tokens[i:i + chunk_size] for i in range(0, len(tokens), chunk_size)]
 
-def _concatenate_units(units: List[str], split_length: int, split_overlap: int, max_character_length: int) -> List[str]:
-    text_splits = []
-    segments = windowed(units, n=split_length, step=split_length - split_overlap)
-    for seg in segments:
-        current_units = [unit for unit in seg if unit is not None]
-        txt = "".join(current_units)
-        if max_character_length and len(txt) > max_character_length:
-            text_splits.extend(_split_long_text(txt, max_character_length))
-        elif len(txt) > 0:
-            text_splits.append(txt)
+    # Convert token chunks back to text while preserving original spacing and case
+    text_chunks = []
+    for chunk in chunks:
+        # Find the start and end offsets for the current chunk
+        chunk_offsets = offsets[:len(chunk)]
+        start_offset = chunk_offsets[0][0]
+        end_offset = chunk_offsets[-1][1]
 
-    return text_splits
+        # Extract the original text for this chunk based on offsets
+        text_chunk = text[start_offset:end_offset]
+        text_chunks.append(text_chunk)
 
+        # Remove processed offsets for the next iteration
+        offsets = offsets[len(chunk):]
 
-def _split_long_text(text: str, max_character_length: int) -> List[str]:
-    """
-    Splits a long text into smaller segments that
-    do not exceed max_character_length.
-    """
-    split_texts = []
-    while text:
-        # Take the maximum possible substring without exceeding max_character_length
-        segment = text[:max_character_length]
-        split_texts.append(segment)
-        text = text[max_character_length:]  # noqa: E203
-
-    return split_texts
-
-
-def _process_content(row, validated_config):
-    content = row["metadata"]["content"]
-
-    if content is None:
-        raise ValueError(
-            "DocumentSplitter only works with text documents but one or more 'content' " "values are None."
-        )
-
-    units = _split_into_units(content, validated_config.split_by)
-    text_splits = _concatenate_units(
-        units,
-        validated_config.split_length,
-        validated_config.split_overlap,
-        max_character_length=validated_config.max_character_length,
-    )
-    split_docs = _build_split_documents(row, text_splits, sentence_window_size=validated_config.sentence_window_size)
-
-    return split_docs
+    return text_chunks
 
 
 MODULE_NAME = "nemo_document_splitter"
@@ -167,16 +124,11 @@ def _nemo_document_splitter(builder: mrc.Builder):
                 return message
 
             # Override parameters if set
-            split_by = task_props.get("split_by", validated_config.split_by)
-            split_length = task_props.get("split_length", validated_config.split_length)
-            split_overlap = task_props.get("split_overlap", validated_config.split_overlap)
-            max_character_length = task_props.get("max_character_length", validated_config.max_character_length)
-            sentence_window_size = task_props.get("sentence_window_size", validated_config.sentence_window_size)
+            tokenizer  = task_props.get("tokenizer", validated_config.tokenizer)
+            chunk_size = task_props.get("chunk_size", validated_config.chunk_size)
 
             logger.info(
-                f"Splitting documents with split_by: {split_by}, split_length: {split_length}, "
-                f"split_overlap: {split_overlap}, max_character_length: {max_character_length}, "
-                f"sentence_window_size: {sentence_window_size}"
+                f"Splitting documents with tokenizer: {tokenizer}, chunk_size: {chunk_size} tokens"
             )
 
             split_docs = []
@@ -188,14 +140,11 @@ def _nemo_document_splitter(builder: mrc.Builder):
                         "DocumentSplitter only works with text documents but one or more " "'content' values are None."
                     )
 
-                units = _split_into_units(content, split_by)
-                text_splits = _concatenate_units(
-                    units,
-                    split_length,
-                    split_overlap,
-                    max_character_length=max_character_length,
-                )
-                split_docs.extend(_build_split_documents(row, text_splits, sentence_window_size=sentence_window_size))
+                os.environ['TOKENIZERS_PARALLELISM'] = "False"
+                tokenizer_model = AutoTokenizer.from_pretrained(tokenizer)
+
+                chunks = _split_into_chunks(content, tokenizer_model, chunk_size)
+                split_docs.extend(_build_split_documents(row, chunks))
 
             split_docs_df = pd.DataFrame(split_docs)
 
