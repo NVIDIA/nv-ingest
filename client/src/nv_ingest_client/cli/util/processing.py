@@ -521,7 +521,7 @@ def create_and_process_jobs(
     timeout: int = 10,
     fail_on_error: bool = False,
     save_images_separately: bool = False,
-) -> Tuple[int, Dict[str, List[float]], int]:
+) -> Tuple[int, Dict[str, List[float]], int, Dict[str, str]]:
     """
     Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.
 
@@ -564,6 +564,7 @@ def create_and_process_jobs(
         - `trace_times` (Dict[str, List[float]]): A dictionary mapping job IDs to a list of trace times for
           diagnostic purposes.
         - `total_pages_processed` (int): The total number of pages processed from the files.
+        - `trace_ids`  (Dict[str, str]): A dictionary mapping a source file to its correlating trace_id
 
     Raises
     ------
@@ -602,6 +603,7 @@ def create_and_process_jobs(
     total_files = len(files)
     total_pages_processed = 0
     trace_times = defaultdict(list)
+    trace_ids = defaultdict(list)
     failed_jobs = []
     retry_job_ids = []
     job_id_map = {}
@@ -625,7 +627,8 @@ def create_and_process_jobs(
                 job_id = futures_dict[future]
                 source_name = job_id_map[job_id]
                 try:
-                    future_response = handle_future_result(future, futures_dict)
+                    future_response, trace_id = handle_future_result(future, futures_dict)
+                    trace_ids[source_name] = trace_id
 
                     if output_directory:
                         save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
@@ -660,7 +663,7 @@ def create_and_process_jobs(
                     if not retry:
                         pbar.update(1)
 
-    return total_files, trace_times, total_pages_processed
+    return total_files, trace_times, total_pages_processed, trace_ids
 
 
 def get_valid_filename(name):

@@ -5,7 +5,7 @@
 import concurrent
 import json
 import logging
-from typing import Any
+from typing import Any, Tuple
 from typing import Dict
 from typing import Optional
 
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 def handle_future_result(
     future: concurrent.futures.Future,
     timeout: Optional[int] = None,
-) -> Dict[str, Any]:
+) -> Tuple[Dict[str, Any], str]:
     """
     Handle the result of a completed future job and process annotations.
 
@@ -35,8 +35,9 @@ def handle_future_result(
 
     Returns
     -------
-    Dict[str, Any]
-        The result of the job as a dictionary, after processing and validation.
+    Tuple[Dict[str, Any], str]
+        - The result of the job as a dictionary, after processing and validation.
+        - The trace_id returned by the submission endpoint
 
     Raises
     ------
@@ -57,7 +58,7 @@ def handle_future_result(
     and a directory for saving results:
 
     >>> future = concurrent.futures.Future()
-    >>> result = handle_future_result(future, timeout=60)
+    >>> result, trace_id = handle_future_result(future, timeout=60)
 
     In this example, the function processes the completed job and returns the result dictionary.
     If the job fails, it raises a `RuntimeError`.
@@ -68,7 +69,7 @@ def handle_future_result(
     """
 
     try:
-        result, _ = future.result(timeout=timeout)[0]
+        result, _, trace_id = future.result(timeout=timeout)[0]
         if ("annotations" in result) and result["annotations"]:
             annotations = result["annotations"]
             for key, value in annotations.items():
@@ -82,4 +83,4 @@ def handle_future_result(
         logger.debug(f"Error processing future result: {e}")
         raise e
 
-    return result
+    return (result, trace_id)

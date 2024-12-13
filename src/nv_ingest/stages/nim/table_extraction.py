@@ -84,6 +84,8 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
                 data,
                 model_name="paddle",
                 table_content_format=table_metadata.get("table_content_format"),
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="table_data_extraction",  # traceable_func arg
             )
 
         table_content, table_content_format = paddle_result
@@ -166,7 +168,7 @@ def _extract_table_data(
         # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
 
-        return df, trace_info
+        return df, {"trace_info": trace_info}
 
     except Exception as e:
         logger.error("Error occurred while extracting table data.", exc_info=True)
