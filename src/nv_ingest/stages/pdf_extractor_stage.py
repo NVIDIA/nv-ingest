@@ -44,7 +44,8 @@ def decode_and_extract(
     validated_config : Any
         Configuration object that contains `pdfium_config`. Used if the `pdfium` method is selected.
     default : str, optional
-        The default extraction method to use if the specified method in `task_props` is not available (default is "pdfium").
+        The default extraction method to use if the specified method in `task_props` is not available
+        (default is "pdfium").
 
     Returns
     -------

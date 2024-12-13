@@ -145,9 +145,12 @@ class RedisClient(MessageBrokerClientBase):
         -------
         Tuple[Optional[Dict[str, Any]], Optional[int], Optional[int]]
             A tuple containing:
-                - message: A dictionary containing the decoded message if successful, or None if no message was retrieved.
-                - fragment: An integer representing the fragment number of the message, or None if no fragment was found.
-                - fragment_count: An integer representing the total number of message fragments, or None if no fragment count was found.
+                - message: A dictionary containing the decoded message if successful,
+                    or None if no message was retrieved.
+                - fragment: An integer representing the fragment number of the message,
+                    or None if no fragment was found.
+                - fragment_count: An integer representing the total number of message fragments,
+                    or None if no fragment count was found.
 
         Raises
         ------

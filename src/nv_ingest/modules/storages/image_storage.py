@@ -34,7 +34,8 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = "image_storage"
 MODULE_NAMESPACE = "nv_ingest"
 
-# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema on startup.
+# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema
+# on startup.
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_READ_ADDRESS = os.environ.get("MINIO_PUBLIC_ADDRESS", "http://minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
