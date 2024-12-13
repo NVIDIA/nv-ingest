@@ -7,7 +7,7 @@
 {% set version = data.get('version') %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
-{% set git_root = environ.get('GIT_ROOT', '../../..') %}
+{% set git_root = environ.get('GIT_ROOT', '../../../client') %}
 
 package:
   name: {{ name }}
@@ -19,7 +19,7 @@ source:
 build:
   number: 0
   script:
-    - {{ PYTHON }} -m pip install ./client --no-deps -vv
+    - {{ PYTHON }} -m pip install ./ --no-deps -vv
 
 requirements:
   build:

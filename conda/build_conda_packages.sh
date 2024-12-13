@@ -25,6 +25,8 @@ GIT_ROOT=$(determine_git_root)
 ##############################
 OUTPUT_DIR=${1:-"${BUILD_SCRIPT_BASE}/output_conda_channel"}
 CONDA_CHANNEL=${2:-""}
+BUILD_NV_INGEST=${BUILD_NV_INGEST:-1} # 1 = build by default, 0 = skip
+BUILD_NV_INGEST_CLIENT=${BUILD_NV_INGEST_CLIENT:-1} # 1 = build by default, 0 = skip
 
 ##############################
 # Package Directories
@@ -41,15 +43,23 @@ mkdir -p "${OUTPUT_DIR}/linux-64"
 ##############################
 # Build Packages
 ##############################
-echo "Building nv_ingest..."
-GIT_ROOT="${GIT_ROOT}" conda build "${NV_INGEST_DIR}" \
-    -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
-    --output-folder "${OUTPUT_DIR}"
+if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
+    echo "Building nv_ingest..."
+    GIT_ROOT="${GIT_ROOT}" conda build "${NV_INGEST_DIR}" \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        --output-folder "${OUTPUT_DIR}"
+else
+    echo "Skipping nv_ingest build."
+fi
 
-echo "Building nv_ingest_client..."
-GIT_ROOT="${GIT_ROOT}" conda build "${NV_INGEST_CLIENT_DIR}" \
-    -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
-    --output-folder "${OUTPUT_DIR}"
+if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
+    echo "Building nv_ingest_client..."
+    GIT_ROOT="${GIT_ROOT}/client" conda build "${NV_INGEST_CLIENT_DIR}" \
+        -c conda-forge \
+        --output-folder "${OUTPUT_DIR}"
+else
+    echo "Skipping nv_ingest_client build."
+fi
 
 ##############################
 # Index the Conda Channel
