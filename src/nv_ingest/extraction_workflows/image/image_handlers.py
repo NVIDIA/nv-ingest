@@ -291,7 +291,10 @@ def extract_tables_and_charts_from_image(
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_client = create_inference_client(
+            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+        )
 
         data = {"images": [image]}
 
