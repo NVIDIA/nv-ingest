@@ -5,7 +5,8 @@
 import logging
 import re
 import time
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 from typing import Tuple
 
 import backoff
@@ -18,6 +19,7 @@ import tritonclient.grpc as grpcclient
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.nim.decorators import multiprocessing_cache
+from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
