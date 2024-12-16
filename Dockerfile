@@ -99,6 +99,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
 
 RUN --mount=type=cache,target=/opt/conda/pkgs\
+    --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
     && pip install ./dist/*.whl \
     && pip install ./client/dist/*.whl
