@@ -1,6 +1,5 @@
 {
     "build": {
-      // "context": "${localWorkspaceFolder}/.devcontainer",
       "context": "..",
       "dockerfile": "${localWorkspaceFolder}/.devcontainer/Dockerfile",
     },
