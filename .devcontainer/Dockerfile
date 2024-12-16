@@ -34,9 +34,6 @@ ENV PATH=/opt/conda/bin:$PATH
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN conda install -y mamba -n base -c conda-forge
 
-RUN pwd
-RUN ls -l
-
 COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
 
 # Create nv_ingest base environment
