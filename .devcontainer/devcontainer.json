@@ -1,6 +1,7 @@
 {
     "build": {
-      "context": "${localWorkspaceFolder}/.devcontainer",
+      // "context": "${localWorkspaceFolder}/.devcontainer",
+      "context": "..",
       "dockerfile": "${localWorkspaceFolder}/.devcontainer/Dockerfile",
     },
     "privileged": true,
@@ -13,13 +14,8 @@
     ],
     "containerEnv": {
       "HOST_REPO_ROOT": "${localWorkspaceFolder}",
-      "REPO_ROOT": "~/dev/nv-ingest",
-      "NVIDIA_IMEX_CHANNELS": ""
+      "REPO_ROOT": "~/dev/nv-ingest"
     },
-    "mounts": [
-      "source=${localWorkspaceFolder}/docker,target=/workspace/docker,type=volume"
-      // "source=${localWorkspaceFolder}/conda,target=/workspace/conda,type=bind,consistency=consistent"
-    ],
     "workspaceFolder": "/workspace",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=consistent",
     "forwardPorts": [ 7670, 7671 ],
