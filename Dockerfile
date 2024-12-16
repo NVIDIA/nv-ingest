@@ -31,11 +31,13 @@ ENV PATH=/opt/conda/bin:$PATH
 
 # Install Mamba, a faster alternative to conda, within the base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
     conda install -y mamba conda-build==24.5.1 -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
 # Create nv_ingest base environment
 RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
     mamba env create -f /workspace/nv_ingest_environment.yml
 
 # Set default shell to bash
@@ -46,6 +48,7 @@ RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
 
 # Install Tini via conda from the conda-forge channel
 RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
     && mamba install -y -c conda-forge tini
 
@@ -90,6 +93,7 @@ RUN rm -rf ./src/nv_ingest/dist ./client/dist
 
 # Add pip cache path to match conda's package cache
 RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
     chmod +x ./ci/scripts/build_pip_packages.sh \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib client \
     && ./ci/scripts/build_pip_packages.sh --type ${RELEASE_TYPE} --lib service
@@ -115,6 +119,7 @@ FROM nv_ingest_install AS development
 
 RUN source activate nv_ingest_runtime && \
     --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
     pip install -e ./client
 
 CMD ["/bin/bash"]
