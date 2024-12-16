@@ -6,19 +6,21 @@
 from typing import Literal
 from typing import Optional
 
-from pydantic import BaseModel
-from pydantic import conint
+from pydantic import Field, BaseModel
 from pydantic import validator
+from typing_extensions import Annotated
 
 
 class DocumentSplitterSchema(BaseModel):
     split_by: Literal["word", "sentence", "passage"] = "word"
-    split_length: conint(gt=0) = 60
-    split_overlap: conint(ge=0) = 10
-    max_character_length: Optional[conint(gt=0)] = 450
-    sentence_window_size: Optional[conint(ge=0)] = 0
+    split_length: Annotated[int, Field(gt=0)] = 60
+    split_overlap: Annotated[int, Field(ge=0)] = 10
+    max_character_length: Optional[Annotated[int, Field(gt=0)]] = 450
+    sentence_window_size: Optional[Annotated[int, Field(ge=0)]] = 0
     raise_on_failure: bool = False
 
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
     @validator("sentence_window_size")
     def check_sentence_window_size(cls, v, values, **kwargs):
         if v is not None and v > 0 and values["split_by"] != "sentence":

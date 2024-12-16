@@ -9,7 +9,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from pydantic import Field
 
 logger = logging.getLogger(__name__)
@@ -27,6 +27,4 @@ class FileSourcePipeSchema(BaseModel):
     vdb_resource_name: str
     watch: bool = False  # Flag to watch file changes
     watch_interval: float = -5.0  # Interval to watch file changes
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

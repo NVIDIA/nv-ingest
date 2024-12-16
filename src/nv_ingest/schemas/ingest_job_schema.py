@@ -12,12 +12,12 @@ from typing import Literal
 from typing import Optional
 from typing import Union
 
-from pydantic import conint
-from pydantic import root_validator
+from pydantic import field_validator, model_validator, Field
 from pydantic import validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from typing_extensions import Annotated
 
 logger = logging.getLogger(__name__)
 
@@ -62,11 +62,13 @@ class TracingOptionsSchema(BaseModelNoExt):
 
 class IngestTaskSplitSchema(BaseModelNoExt):
     split_by: Literal["word", "sentence", "passage"]
-    split_length: conint(gt=0)
-    split_overlap: conint(ge=0)
-    max_character_length: Optional[conint(gt=0)]
-    sentence_window_size: Optional[conint(ge=0)]
+    split_length: Annotated[int, Field(gt=0)]
+    split_overlap: Annotated[int, Field(ge=0)]
+    max_character_length: Optional[Annotated[int, Field(gt=0)]] = None
+    sentence_window_size: Optional[Annotated[int, Field(ge=0)]] = None
 
+    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
+    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
     @validator("sentence_window_size")
     def check_sentence_window_size(cls, v, values, **kwargs):
         if v is not None and v > 0 and values["split_by"] != "sentence":
@@ -79,7 +81,8 @@ class IngestTaskExtractSchema(BaseModelNoExt):
     method: str
     params: dict
 
-    @validator("document_type", pre=True)
+    @field_validator("document_type", mode="before")
+    @classmethod
     def case_insensitive_document_type(cls, v):
         if isinstance(v, str):
             v = v.lower()
@@ -102,9 +105,9 @@ class IngestTaskStoreSchema(BaseModelNoExt):
 
 # All optional, the captioning stage requires default parameters, each of these are just overrides.
 class IngestTaskCaptionSchema(BaseModelNoExt):
-    api_key: Optional[str]
-    endpoint_url: Optional[str]
-    prompt: Optional[str]
+    api_key: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    prompt: Optional[str] = None
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -166,7 +169,8 @@ class IngestTaskSchema(BaseModelNoExt):
     ]
     raise_on_failure: bool = False
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_task_properties_type(cls, values):
         task_type, task_properties = values.get("type"), values.get("task_properties")
         if task_type and task_properties:
@@ -191,7 +195,8 @@ class IngestTaskSchema(BaseModelNoExt):
             values["task_properties"] = validated_task_properties
         return values
 
-    @validator("type", pre=True)
+    @field_validator("type", mode="before")
+    @classmethod
     def case_insensitive_task_type(cls, v):
         if isinstance(v, str):
             v = v.lower()
@@ -212,7 +217,7 @@ class IngestJobSchema(BaseModelNoExt):
     job_payload: JobPayloadSchema
     job_id: Union[str, int]
     tasks: List[IngestTaskSchema]
-    tracing_options: Optional[TracingOptionsSchema]
+    tracing_options: Optional[TracingOptionsSchema] = None
 
 
 def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
