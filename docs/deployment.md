@@ -53,7 +53,7 @@ To run the nv-ingest service locally, we will require [Conda (Mamba) to be insta
 
 From the root of the repository, run the following commands to create a new Conda environment and install the required dependencies:
 ```bash
-mamba env create --file ./docker/environments/nv_ingest_environment.yml --name nv_ingest_runtime
+mamba env create --file ./conda/environments/nv_ingest_environment.yml --name nv_ingest_runtime
 
 conda activate nv_ingest_runtime
 
