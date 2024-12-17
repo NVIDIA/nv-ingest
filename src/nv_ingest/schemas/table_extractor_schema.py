@@ -7,8 +7,8 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import model_validator, ConfigDict, BaseModel
-from pydantic import validator
+from pydantic import field_validator, model_validator, ConfigDict, BaseModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -112,9 +112,7 @@ class TableExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
-    @validator("max_queue_size", "n_workers", pre=True, always=True)
+    @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):
         if v <= 0:
             raise ValueError(f"{field.name} must be greater than 10.")

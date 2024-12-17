@@ -13,7 +13,6 @@ from typing import Optional
 from typing import Union
 
 from pydantic import field_validator, model_validator, Field
-from pydantic import validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -67,9 +66,7 @@ class IngestTaskSplitSchema(BaseModelNoExt):
     max_character_length: Optional[Annotated[int, Field(gt=0)]] = None
     sentence_window_size: Optional[Annotated[int, Field(ge=0)]] = None
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
-    @validator("sentence_window_size")
+    @field_validator("sentence_window_size")
     def check_sentence_window_size(cls, v, values, **kwargs):
         if v is not None and v > 0 and values["split_by"] != "sentence":
             raise ValueError("When using sentence_window_size, split_by must be 'sentence'.")

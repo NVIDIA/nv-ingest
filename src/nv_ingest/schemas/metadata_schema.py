@@ -13,7 +13,6 @@ from typing import Optional
 from typing import Union
 
 from pydantic import field_validator, model_validator
-from pydantic import validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.util.converters import datetools
@@ -196,7 +195,6 @@ class SourceMetadataSchema(BaseModelNoExt):
 
     @field_validator("date_created", "last_modified")
     @classmethod
-    @classmethod
     def validate_fields(cls, field_value):
         datetools.validate_iso8601(field_value)
         return field_value
@@ -265,17 +263,13 @@ class ImageMetadataSchema(BaseModelNoExt):
     width: int = 0
     height: int = 0
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
-    @validator("image_type", pre=True, always=True)
+    @field_validator("image_type")
     def validate_image_type(cls, v):
         if not isinstance(v, (ImageTypeEnum, str)):
             raise ValueError("image_type must be a string or ImageTypeEnum")
         return v
 
-    # TODO[pydantic]: We couldn't refactor the `validator`, please replace it by `field_validator` manually.
-    # Check https://docs.pydantic.dev/dev-v2/migration/#changes-to-validators for more information.
-    @validator("width", "height", pre=True, always=True)
+    @field_validator("width", "height")
     def clamp_non_negative(cls, v, field):
         if v < 0:
             logger.warning(f"{field.name} is negative; clamping to 0. Original value: {v}")
