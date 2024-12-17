@@ -191,8 +191,8 @@ class IngestTaskSchema(BaseModelNoExt):
 
             # Ensure task_properties is validated against the expected schema
             validated_task_properties = expected_type(**task_properties)
-            values["task_properties"] = validated_task_properties
-        return values
+            v["task_properties"] = validated_task_properties
+        return v
 
     @field_validator("type", mode="before")
     @classmethod
