@@ -135,7 +135,6 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
             job_id = trace_id_to_uuid(current_trace_id)
-            print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
 
             # Submit the job async
             await ingest_service.submit_job(updated_job_spec, job_id)
