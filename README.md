@@ -220,8 +220,6 @@ from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.util.file_processing.extract import extract_file_content
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 
 logger = logging.getLogger("nv_ingest_client")
 
@@ -254,12 +252,7 @@ extract_task = ExtractTask(
   extract_tables=True
 )
 
-table_data_extract = TableExtractionTask()
-chart_data_extract = ChartExtractionTask()
-
 job_spec.add_task(extract_task)
-job_spec.add_task(table_data_extract)
-job_spec.add_task(chart_data_extract)
 
 # Create the client and inform it about the JobSpec we want to process.
 client = NvIngestClient(
