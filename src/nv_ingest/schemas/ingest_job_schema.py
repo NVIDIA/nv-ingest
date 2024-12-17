@@ -169,6 +169,8 @@ class IngestTaskSchema(BaseModelNoExt):
     @model_validator(mode="before")
     @classmethod
     def check_task_properties_type(cls, v, values):
+        print(f"V: {v} or type: {type(v)}")
+        print(f"Values: {values} of type: {type(values)}")
         task_type, task_properties = values.data.get("type"), values.data.get("task_properties")
         if task_type and task_properties:
             expected_type = {
