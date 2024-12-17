@@ -56,7 +56,8 @@ def test_create_exception_tag_without_source_id():
         ValueError,
         match=re.escape(
             "1 validation error for MetadataSchema\n"
-            "error_metadata.source_id\n  Input should be a valid string [type=string_type, input_value=None, input_type=NoneType]"
+            "error_metadata.source_id\n  Input should be a valid string \
+                [type=string_type, input_value=None, input_type=NoneType]"
         ),
     ):
         create_exception_tag(error_message)
