@@ -272,7 +272,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     @field_validator("width", "height")
     def clamp_non_negative(cls, v, field):
         if v < 0:
-            logger.warning(f"{field.name} is negative; clamping to 0. Original value: {v}")
+            logger.warning(f"{field.field_name} is negative; clamping to 0. Original value: {v}")
             return 0
         return v
 

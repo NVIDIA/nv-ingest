@@ -115,7 +115,7 @@ class TableExtractorSchema(BaseModel):
     @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):
         if v <= 0:
-            raise ValueError(f"{field.name} must be greater than 10.")
+            raise ValueError(f"{field.field_name} must be greater than 10.")
         return v
 
     stage_config: Optional[TableExtractorConfigSchema] = None
