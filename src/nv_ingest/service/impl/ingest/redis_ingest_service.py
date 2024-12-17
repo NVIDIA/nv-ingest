@@ -53,7 +53,7 @@ class RedisIngestService(IngestServiceMeta):
 
     async def submit_job(self, job_spec: MessageWrapper, trace_id: str) -> str:
         try:
-            json_data = job_spec.dict()["payload"]
+            json_data = job_spec.model_dump()["payload"]
             job_spec = json.loads(json_data)
             validate_ingest_job(job_spec)
 

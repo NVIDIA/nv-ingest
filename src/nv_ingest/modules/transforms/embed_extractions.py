@@ -112,7 +112,7 @@ async def _make_async_request(
             "filter": filter_errors,
         }
 
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
         response["embedding"] = [None] * len(prompts)
         response["info_msg"] = validated_info_msg
