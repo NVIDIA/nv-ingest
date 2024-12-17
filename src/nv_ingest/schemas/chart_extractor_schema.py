@@ -92,16 +92,16 @@ class ChartExtractorConfigSchema(BaseModel):
             return service
 
         for endpoint_name in ["cached_endpoints", "deplot_endpoints", "paddle_endpoints"]:
-            grpc_service, http_service = values.data.get(endpoint_name, (None, None))
+            grpc_service, http_service = v.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 
             if not grpc_service and not http_service:
                 raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
 
-            values[endpoint_name] = (grpc_service, http_service)
+            v[endpoint_name] = (grpc_service, http_service)
 
-        return values
+        return v
 
     model_config = ConfigDict(extra="forbid")
 
