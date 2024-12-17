@@ -77,16 +77,16 @@ class TableExtractorConfigSchema(BaseModel):
 
         print(f"TableExtractorConfigSchema V: {v} type: {type(v)}")
         print(f"TableExtractorConfigSchema Values: {values} type: {type(values)}")
-        grpc_service, http_service = values.data.get("paddle_endpoints", (None, None))
+        grpc_service, http_service = v.get("paddle_endpoints", (None, None))
         grpc_service = clean_service(grpc_service)
         http_service = clean_service(http_service)
 
         if not grpc_service and not http_service:
             raise ValueError("Both gRPC and HTTP services cannot be empty for paddle_endpoints.")
 
-        values["paddle_endpoints"] = (grpc_service, http_service)
+        v["paddle_endpoints"] = (grpc_service, http_service)
 
-        return values
+        return v
 
     model_config = ConfigDict(extra="forbid")
 
