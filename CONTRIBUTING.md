@@ -141,8 +141,8 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 
 - Dependencies are managed via 'Conda' and 'Pip'.
 - Dependencies are stored in .yml files
-    1. **Service Dependencies** 'docker/environment/nv_ingest_environment.yml' file.
-    2. **Client Dependencies** 'docker/environment/nv_ingest_client_environment.yml' file.
+    1. **Service Dependencies** 'conda/environments/nv_ingest_environment.yml' file.
+    2. **Client Dependencies** 'conda/environments/nv_ingest_client_environment.yml' file.
 
 - To update dependencies:
   - Create a clean environment using the relevant .yml file.
@@ -150,8 +150,8 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
   - Update the .yml file by exporting the updated environment.
     - For example:
       ```bash
-      conda env export --name nv_ingest_runtime --no-builds > docker/environment/nv_ingest_environment.yml
-      conda env export --name nv_ingest_client --no-builds > docker/environment/nv_ingest_client_environment.yml
+      conda env export --name nv_ingest_runtime --no-builds > conda/environment/nv_ingest_environment.yml
+      conda env export --name nv_ingest_client --no-builds > conda/environment/nv_ingest_client_environment.yml
       ```
 
 ### Common Processing Patterns

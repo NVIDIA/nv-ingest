@@ -39,7 +39,7 @@ class PipelineCreationSchema(BaseModel):
     deplot_infer_protocol: str = "http"
     embedding_nim_endpoint: str = "http://localhost:8012/v1"
     embedding_nim_model_name: str = "nvidia/nv-embedqa-e5-v5"
-    ingest_log_level: str = "DEBUG"
+    ingest_log_level: str = "INFO"
     message_client_host: str = "localhost"
     message_client_port: str = "7671"
     message_client_type: str = "simple"
@@ -178,6 +178,7 @@ def run_ingest_pipeline(
 
     log_level_mapping = {
         "DEBUG": logging.DEBUG,
+        "DEFAULT": logging.INFO,
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
         "ERROR": logging.ERROR,
@@ -186,6 +187,7 @@ def run_ingest_pipeline(
 
     # Check for INGEST_LOG_LEVEL environment variable
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
+    log_level = "INFO"
     if env_log_level:
         log_level = env_log_level
         if log_level in ("DEFAULT",):
@@ -401,16 +403,6 @@ def subprocess_entrypoint():
     Exception
         Any exception raised during pipeline execution.
     """
-
-    # Configure logging to output to stdout with no buffering
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-        force=True,  # Ensures that any existing handlers are overridden
-    )
-    logger = logging.getLogger(__name__)
-
     logger.info("Starting pipeline subprocess...")
 
     try:
