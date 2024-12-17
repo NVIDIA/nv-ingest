@@ -75,6 +75,8 @@ class TableExtractorConfigSchema(BaseModel):
                 return None
             return service
 
+        print(f"TableExtractorConfigSchema V: {v} type: {type(v)}")
+        print(f"TableExtractorConfigSchema Values: {values} type: {type(values)}")
         grpc_service, http_service = values.data.get("paddle_endpoints", (None, None))
         grpc_service = clean_service(grpc_service)
         http_service = clean_service(http_service)
