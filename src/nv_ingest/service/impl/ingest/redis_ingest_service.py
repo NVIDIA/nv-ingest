@@ -59,7 +59,9 @@ class RedisIngestService(IngestServiceMeta):
 
             job_spec["job_id"] = trace_id
 
-            self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
+            job_spec_json = job_spec.model_dump_json()
+            # self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
+            self._ingest_client.submit_message(self._redis_task_queue, job_spec_json)
 
             return trace_id
 
