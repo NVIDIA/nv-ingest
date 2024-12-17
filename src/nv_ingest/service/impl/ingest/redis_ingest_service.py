@@ -60,6 +60,21 @@ class RedisIngestService(IngestServiceMeta):
             job_spec["job_id"] = trace_id
 
             print(f"JobSpec: {job_spec} Type: {type(job_spec)}")
+
+            tasks = job_spec["tasks"]
+            updated_tasks = []
+
+            for task in tasks:
+                task_prop = task["task_properties"]
+                print(f"Type TaskProperty: {type(task_prop)}")
+                task_prop_dict = task_prop.dict()
+                print(f"TaskPropDict: {task_prop_dict}")
+                task["task_properties"] = task_prop_dict
+                updated_tasks.append(task)
+
+            print(f"!!!! Updated Tasks: {updated_tasks}")
+            job_spec["tasks"] = updated_tasks
+
             self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
 
             return trace_id

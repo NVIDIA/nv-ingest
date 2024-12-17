@@ -12,7 +12,7 @@ from typing import Literal
 from typing import Optional
 from typing import Union
 
-from pydantic import field_serializer, field_validator, model_validator, Field
+from pydantic import field_validator, model_validator, Field
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -77,10 +77,6 @@ class IngestTaskExtractSchema(BaseModelNoExt):
     document_type: DocumentTypeEnum
     method: str
     params: dict
-
-    @field_serializer("document_type")
-    def serialize_document_type(self, document_type: DocumentTypeEnum, _info):
-        return str(document_type)
 
     @field_validator("document_type", mode="before")
     @classmethod
