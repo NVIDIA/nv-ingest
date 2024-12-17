@@ -40,6 +40,9 @@ COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environme
 RUN mamba env create -f /workspace/nv_ingest_environment.yml \
     && conda clean --all --yes
 
+RUN source activate nv_ingest_runtime \
+    && mamba install pre-commit
+
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
 
