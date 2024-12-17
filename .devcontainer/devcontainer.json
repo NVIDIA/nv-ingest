@@ -1,4 +1,21 @@
 {
+    "name": "nv-ingest-devcontainer",
+    "dockerComposeFile": [
+      "../docker-compose.yaml"
+    ],
+    "runServices": [
+      "attu",
+      "etcd",
+      "grafana",
+      "milvus",
+      "minio",
+      "nv-ingest-ms-runtime",
+      "otel-collector",
+      "prometheus",
+      "redis",
+      "zipkin"
+    ],
+    "shutdownAction": "stopContainer",
     "build": {
       "context": "..",
       "dockerfile": "${localWorkspaceFolder}/.devcontainer/Dockerfile",
