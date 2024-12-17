@@ -13,9 +13,7 @@
     ],
     "containerEnv": {
       "HOST_REPO_ROOT": "${localWorkspaceFolder}",
-      "REPO_ROOT": "~/dev/nv-ingest",
-      "UID": "$(id -u)",
-      "GID": "$(id -g)"
+      "REPO_ROOT": "~/dev/nv-ingest"
     },
     "workspaceFolder": "/workspace",
     "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=consistent",
@@ -57,6 +55,9 @@
             "**/.git/objects/**": true,
             "**/.git/subtree-cache/**": true,
             "**/.cache/**": true
+          },
+          "terminal.integrated.env.linux": {
+            "PYTHONPATH": "/workspace/src:/workspace/client/src"
           }
         }
       }

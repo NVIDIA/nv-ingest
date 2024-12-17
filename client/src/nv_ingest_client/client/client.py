@@ -568,8 +568,8 @@ class NvIngestClient:
             error_msg = str(submission_errors[0])
             if len(submission_errors) > 1:
                 error_msg += f"... [{len(submission_errors) - 1} more messages truncated]"
-            # raise type(submission_errors[0])
-            raise submission_errors[0]
+            raise type(submission_errors[0])
+            # raise submission_errors[0]
         return results
 
     def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
