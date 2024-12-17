@@ -27,8 +27,6 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
@@ -372,11 +370,6 @@ class Ingestor:
                 document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
-
-            if extract_tables is True:
-                self._job_specs.add_task(TableExtractionTask())
-            if extract_charts is True:
-                self._job_specs.add_task(ChartExtractionTask())
 
         return self
 
