@@ -76,6 +76,7 @@ class PDFiumConfigSchema(BaseModel):
 
         for model_name in ["yolox"]:
             endpoint_name = f"{model_name}_endpoints"
+            print(f"PDF Extract V Values: {v}")
             print(f"PDF Extractor Schema Values: {values}")
             grpc_service, http_service = values.data.get(endpoint_name)
             grpc_service = clean_service(grpc_service)
