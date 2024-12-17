@@ -48,7 +48,7 @@ class ImageConfigSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_endpoints(cls, values):
+    def validate_endpoints(cls, v, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
 
@@ -76,7 +76,7 @@ class ImageConfigSchema(BaseModel):
 
         for model_name in ["yolox"]:
             endpoint_name = f"{model_name}_endpoints"
-            grpc_service, http_service = values.get(endpoint_name)
+            grpc_service, http_service = values.data.get(endpoint_name)
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 
@@ -86,7 +86,7 @@ class ImageConfigSchema(BaseModel):
             values[endpoint_name] = (grpc_service, http_service)
 
             protocol_name = f"{model_name}_infer_protocol"
-            protocol_value = values.get(protocol_name)
+            protocol_value = values.data.get(protocol_name)
             if not protocol_value:
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
             protocol_value = protocol_value.lower()

@@ -62,7 +62,7 @@ class ChartExtractorConfigSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_endpoints(cls, values):
+    def validate_endpoints(cls, v, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
 
@@ -92,7 +92,7 @@ class ChartExtractorConfigSchema(BaseModel):
             return service
 
         for endpoint_name in ["cached_endpoints", "deplot_endpoints", "paddle_endpoints"]:
-            grpc_service, http_service = values.get(endpoint_name, (None, None))
+            grpc_service, http_service = values.data.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
 

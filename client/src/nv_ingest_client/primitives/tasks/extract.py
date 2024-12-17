@@ -116,16 +116,16 @@ class ExtractTaskSchema(BaseModel):
         return values
 
     @field_validator("extract_charts")
-    def set_default_extract_charts(cls, values):
+    def set_default_extract_charts(cls, v, values):
         # `extract_charts` is initially set to None for backward compatibility.
         # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
-        extract_charts = values.get("extract_charts")
+        extract_charts = v
         if extract_charts is None:
-            values["extract_charts"] = values.get("extract_tables")
+            extract_charts = values.data.get("extract_tables")
 
-        return values
+        return extract_charts
 
     @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
@@ -146,7 +146,7 @@ class ExtractTaskSchema(BaseModel):
 
     @field_validator("extract_tables_method")
     def extract_tables_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
+        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
         valid_methods = set(_Type_Extract_Tables_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
