@@ -13,7 +13,7 @@ from typing import Literal
 from typing import Optional
 from typing import get_args
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from .task_base import Task
 
@@ -98,10 +98,11 @@ class ExtractTaskSchema(BaseModel):
     text_depth: str = "document"
     paddle_output_format: str = "pseudo_markdown"
 
-    @field_validator("extract_method")
+    @model_validator(mode="after")
+    @classmethod
     def set_default_extract_method(cls, values):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
-        extract_method = values.get("extract_method")
+        document_type = values.document_type.lower()  # Ensure case-insensitive comparison
+        extract_method = values.extract_method
 
         if document_type not in _DEFAULT_EXTRACTOR_MAP:
             raise ValueError(
@@ -110,7 +111,7 @@ class ExtractTaskSchema(BaseModel):
             )
 
         if extract_method is None:
-            values["extract_method"] = _DEFAULT_EXTRACTOR_MAP[document_type]
+            values.extract_method = _DEFAULT_EXTRACTOR_MAP[document_type]
 
         return values
 
@@ -128,7 +129,7 @@ class ExtractTaskSchema(BaseModel):
 
     @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
+        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
         valid_methods = set(_Type_Extract_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
