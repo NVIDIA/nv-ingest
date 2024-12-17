@@ -18,3 +18,5 @@ setuptools
 tqdm
 langchain_milvus
 langchain-nvidia-ai-endpoints
+minio
+pyarrow
