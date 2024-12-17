@@ -16,3 +16,7 @@ redis~=5.0.1
 requests
 setuptools
 tqdm
+langchain-milvus
+langchain-nvidia-ai-endpoints
+minio
+pyarrow
