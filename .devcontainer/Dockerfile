@@ -32,16 +32,13 @@ RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/lat
 ENV PATH=/opt/conda/bin:$PATH
 
 # Install Mamba, a faster alternative to conda, within the base environment
-RUN conda install -y mamba -n base -c conda-forge
+RUN conda install -y mamba pre-commit -n base -c conda-forge
 
 COPY conda/environments/nv_ingest_environment.yml /workspace/nv_ingest_environment.yml
 
 # Create nv_ingest base environment
 RUN mamba env create -f /workspace/nv_ingest_environment.yml \
     && conda clean --all --yes
-
-RUN source activate nv_ingest_runtime \
-    && mamba install pre-commit
 
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
