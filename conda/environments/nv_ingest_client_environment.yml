@@ -1,0 +1,15 @@
+name: nv_ingest_client
+channels:
+  - conda-forge
+dependencies:
+  - click>=8.1.7
+  - fsspec>=2024.10.0
+  - httpx>=0.28.1
+  - pydantic>=2.10.3
+  - pypdfium2>=4.30.0
+  - python>=3.10
+  - python-docx>=1.1.2
+  - python-pptx>=1.0.2
+  - requests>=2.32.3
+  - setuptools>=58.2.0
+  - tqdm>=4.67.1

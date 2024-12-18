@@ -2,6 +2,20 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# Copyright (c) 2024, NVIDIA CORPORATION.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
 import io
 import logging
 import traceback
@@ -23,47 +37,6 @@ from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
-
-# Copyright (c) 2024, NVIDIA CORPORATION.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
-import logging
-import traceback
-from datetime import datetime
-
-from typing import List, Dict
-from typing import Optional
-from typing import Tuple
-
-from wand.image import Image as WandImage
-from PIL import Image
-import io
-
-import numpy as np
-
-from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
-import nv_ingest.util.nim.yolox as yolox_utils
-from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.pdf.metadata_aggregators import (
-    CroppedImageWithContent,
-    construct_image_metadata_from_pdf_image,
-    construct_image_metadata_from_base64,
-)
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
@@ -318,7 +291,10 @@ def extract_tables_and_charts_from_image(
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_client = create_inference_client(
+            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+        )
 
         data = {"images": [image]}
 
@@ -454,7 +430,7 @@ def image_data_extractor(
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
-            logger.debug(f"Extracted table/chart data from image")
+            logger.debug("Extracted table/chart data from image")
             for _, table_chart_data in tables_and_charts:
                 extracted_data.append(
                     construct_table_and_chart_metadata(

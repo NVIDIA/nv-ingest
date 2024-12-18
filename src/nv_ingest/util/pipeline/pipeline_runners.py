@@ -17,8 +17,9 @@ from datetime import datetime
 
 from morpheus.config import PipelineModes, CppConfig, Config
 from pydantic import ValidationError
+from pydantic import BaseModel
 
-from nv_ingest.schemas import IngestPipelineConfigSchema
+from nv_ingest.schemas import PipelineConfigSchema
 from nv_ingest.util.converters.containers import merge_dict
 from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
@@ -28,6 +29,33 @@ from nv_ingest.util.pipeline.stage_builders import get_default_cpu_count, valida
 from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
+
+
+# TODO(Devin) Name this function something more descriptive
+class PipelineCreationSchema(BaseModel):
+    cached_grpc_endpoint: str = "localhost:8007"
+    cached_infer_protocol: str = "grpc"
+    deplot_http_endpoint: str = "http://localhost:8003/v1/chat/completions"
+    deplot_infer_protocol: str = "http"
+    embedding_nim_endpoint: str = "http://localhost:8012/v1"
+    embedding_nim_model_name: str = "nvidia/nv-embedqa-e5-v5"
+    ingest_log_level: str = "INFO"
+    message_client_host: str = "localhost"
+    message_client_port: str = "7671"
+    message_client_type: str = "simple"
+    minio_bucket: str = "nv-ingest"
+    mrc_ignore_numa_check: str = "1"
+    otel_exporter_otlp_endpoint: str = "localhost:4317"
+    paddle_grpc_endpoint: str = "localhost:8010"
+    paddle_http_endpoint: str = "http://localhost:8009/v1/infer"
+    paddle_infer_protocol: str = "grpc"
+    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    yolox_infer_protocol: str = "grpc"
+    yolox_grpc_endpoint: str = "localhost:8001"
+    vlm_caption_endpoint: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+
+    class Config:
+        extra = "forbid"
 
 
 def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:
@@ -150,6 +178,7 @@ def run_ingest_pipeline(
 
     log_level_mapping = {
         "DEBUG": logging.DEBUG,
+        "DEFAULT": logging.INFO,
         "INFO": logging.INFO,
         "WARNING": logging.WARNING,
         "ERROR": logging.ERROR,
@@ -158,6 +187,7 @@ def run_ingest_pipeline(
 
     # Check for INGEST_LOG_LEVEL environment variable
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
+    log_level = "INFO"
     if env_log_level:
         log_level = env_log_level
         if log_level in ("DEFAULT",):
@@ -191,7 +221,7 @@ def run_ingest_pipeline(
 
     # Validate final configuration using Pydantic
     try:
-        validated_config = IngestPipelineConfigSchema(**final_ingest_config)
+        validated_config = PipelineConfigSchema(**final_ingest_config)
         print(f"Configuration loaded and validated: {validated_config}")
     except ValidationError as e:
         print(f"Validation error: {e}")
@@ -253,11 +283,20 @@ def terminate_subprocess(process):
             logger.error(f"Failed to terminate process group: {e}")
 
 
-def start_pipeline_subprocess():
+def start_pipeline_subprocess(config: PipelineCreationSchema, stdout=None, stderr=None):
     """
     Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
     including signal handling and `atexit` registration.
+
+    Parameters
+    ----------
+    config : PipelineCreationSchema
+        Validated pipeline configuration.
+    stdout : file-like object or None, optional
+        File-like object for capturing stdout. If None, output is ignored.
+    stderr : file-like object or None, optional
+        File-like object for capturing stderr. If None, output is ignored.
 
     Returns
     -------
@@ -272,30 +311,9 @@ def start_pipeline_subprocess():
         "from nv_ingest.util.pipeline.pipeline_runners import subprocess_entrypoint; subprocess_entrypoint()",
     ]
 
-    # Prepare environment variables
+    # Prepare environment variables from the config
     env = os.environ.copy()
-    env.update(
-        {
-            "CACHED_GRPC_ENDPOINT": "localhost:8007",
-            "CACHED_INFER_PROTOCOL": "grpc",
-            "DEPLOT_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/nvdev/vlm/google/deplot",
-            "DEPLOT_INFER_PROTOCOL": "http",
-            "INGEST_LOG_LEVEL": "DEBUG",
-            "MESSAGE_CLIENT_HOST": "localhost",
-            "MESSAGE_CLIENT_PORT": "7671",
-            "MESSAGE_CLIENT_TYPE": "simple",
-            "MINIO_BUCKET": "nv-ingest",
-            "MRC_IGNORE_NUMA_CHECK": "1",
-            "OTEL_EXPORTER_OTLP_ENDPOINT": "localhost:4317",
-            "PADDLE_GRPC_ENDPOINT": "localhost:8010",
-            "PADDLE_HTTP_ENDPOINT": "http://localhost:8009/v1/infer",
-            "PADDLE_INFER_PROTOCOL": "grpc",
-            "REDIS_MORPHEUS_TASK_QUEUE": "morpheus_task_queue",
-            "YOLOX_INFER_PROTOCOL": "grpc",
-            "YOLOX_GRPC_ENDPOINT": "localhost:8001",
-            "VLM_CAPTION_ENDPOINT": "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions",
-        }
-    )
+    env.update({key.upper(): val for key, val in config.dict().items()})
 
     logger.info("Starting pipeline subprocess...")
 
@@ -307,12 +325,16 @@ def start_pipeline_subprocess():
             # Set the parent death signal to SIGTERM
             _set_pdeathsig(signal.SIGTERM)
 
+        # If stdout/stderr is None, redirect to DEVNULL; otherwise, use PIPE
+        stdout_stream = subprocess.DEVNULL if stdout is None else subprocess.PIPE
+        stderr_stream = subprocess.DEVNULL if stderr is None else subprocess.PIPE
+
         process = subprocess.Popen(
             subprocess_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=stdout_stream,
+            stderr=stderr_stream,
             text=True,
-            preexec_fn=combined_preexec_fn,  # Start new process group and set pdeathsig
+            preexec_fn=combined_preexec_fn,
             env=env,
         )
         logger.debug(f"Pipeline subprocess started with PID: {process.pid}")
@@ -320,59 +342,61 @@ def start_pipeline_subprocess():
         # Register the atexit handler to terminate the subprocess group on exit
         atexit.register(terminate_subprocess, process)
 
-        # Define and register signal handlers within this function
+        # Define and register signal handlers for graceful shutdown
         def signal_handler(signum, frame):
-            """
-            Handle termination signals to gracefully shutdown the subprocess.
-            """
             logger.info(f"Received signal {signum}. Terminating pipeline subprocess group...")
             terminate_subprocess(process)
             sys.exit(0)
 
-        # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-        # Start daemon threads to handle stdout and stderr
-        stdout_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stdout, "Pipeline STDOUT"),
-            name="StdoutReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
-        )
-        stderr_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stderr, "Pipeline STDERR"),
-            name="StderrReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
-        )
-        stdout_thread.start()
-        stderr_thread.start()
+        # Start threads to read stdout and stderr only if user provided handlers
+        if stdout is not None:
+            stdout_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stdout, "Pipeline STDOUT", stdout),
+                name="StdoutReader",
+                daemon=True,
+            )
+            stdout_thread.start()
 
-        logger.info("Pipeline subprocess and output readers started successfully.")
+        if stderr is not None:
+            stderr_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stderr, "Pipeline STDERR", stderr),
+                name="StderrReader",
+                daemon=True,
+            )
+            stderr_thread.start()
+
+        logger.info("Pipeline subprocess started successfully.")
         return process
+
     except Exception as e:
         logger.error(f"Failed to start pipeline subprocess: {e}")
         raise
 
 
-def read_stream(stream, prefix):
+def read_stream(stream, prefix, output_stream):
     """
-    Reads lines from a subprocess stream (stdout or stderr) and prints them with a prefix.
-    This function runs in a separate daemon thread.
+    Reads lines from a subprocess stream (stdout or stderr) and writes them
+    to the provided output stream with a prefix. This function runs in a separate daemon thread.
 
     Parameters
     ----------
     stream : IO
-        The stream object to read from.
+        The stream object to read from (subprocess stdout or stderr).
     prefix : str
         The prefix to prepend to each line of output.
+    output_stream : IO
+        The file-like object where the output should be written (e.g., a file, sys.stdout).
     """
-
     try:
         for line in iter(stream.readline, ""):
             if line:
-                print(f"[{prefix}] {line}", end="", flush=True)
+                output_stream.write(f"[{prefix}] {line}")
+                output_stream.flush()
     except Exception as e:
         logger.error(f"Error reading {prefix}: {e}")
     finally:
@@ -389,16 +413,6 @@ def subprocess_entrypoint():
     Exception
         Any exception raised during pipeline execution.
     """
-
-    # Configure logging to output to stdout with no buffering
-    logging.basicConfig(
-        level=logging.DEBUG,
-        format="%(asctime)s - %(levelname)s - %(message)s",
-        stream=sys.stdout,
-        force=True,  # Ensures that any existing handlers are overridden
-    )
-    logger = logging.getLogger(__name__)
-
     logger.info("Starting pipeline subprocess...")
 
     try:

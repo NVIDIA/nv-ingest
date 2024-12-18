@@ -5,7 +5,8 @@
 import logging
 import re
 import time
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 from typing import Tuple
 
 import backoff
@@ -157,6 +158,7 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
+    @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
         """
         Perform inference using the specified model and input data.
@@ -270,7 +272,8 @@ class NimClient:
                 if status_code in [429, 503]:
                     # Warn and attempt to retry
                     logger.warning(
-                        f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying..."
+                        f"Received HTTP {status_code} ({response.reason}) from "
+                        f"{self.model_interface.name()}. Retrying..."
                     )
                     if attempt == max_retries:
                         # No more retries left
@@ -289,7 +292,10 @@ class NimClient:
                     return response.json()
 
             except requests.Timeout:
-                err_msg = f"HTTP request timed out during {self.model_interface.name()} inference after {self.timeout} seconds"
+                err_msg = (
+                    f"HTTP request timed out during {self.model_interface.name()} "
+                    f"inference after {self.timeout} seconds"
+                )
                 logger.error(err_msg)
                 raise TimeoutError(err_msg)
 

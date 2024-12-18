@@ -488,18 +488,6 @@ def test_create_inference_client_http_endpoint_whitespace_no_infer_protocol(mock
 
 
 # Preprocess image for paddle
-
-
-@pytest.fixture
-def sample_image():
-    """
-    Returns a sample image array of shape (height, width, channels) with random pixel values.
-    """
-    height, width = 800, 600  # Example dimensions
-    image = np.random.randint(0, 256, size=(height, width, 3), dtype=np.uint8)
-    return image
-
-
 def test_preprocess_image_paddle_version_none(sample_image):
     """
     Test that when paddle_version is None, the function returns the input image unchanged.
