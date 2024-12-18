@@ -20,7 +20,7 @@ logger = logging.getLogger(__name__)
 
 
 class SplitTaskSchema(BaseModel):
-    split_by: str = "intfloat/e5-large-unsupervised"
+    tokenizer: str = "intfloat/e5-large-unsupervised"
     chunk_size: int = 300
 
     class Config:
