@@ -1,7 +1,6 @@
 from pymilvus import (
     MilvusClient,
     DataType,
-    Collection,
     CollectionSchema,
     connections,
     utility,
@@ -17,6 +16,7 @@ from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from scipy.sparse import csr_array
 from typing import List
 import time
+from urllib.parse import urlparse
 
 
 def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False) -> CollectionSchema:
@@ -169,9 +169,12 @@ def create_nvingest_collection(
         Returns a milvus collection schema, that represents the fields in the created
         collection.
     """
-    connections.connect(uri=milvus_uri)
-    server_version = utility.get_server_version()
-    if "lite" in server_version:
+    if urlparse(milvus_uri).scheme:
+        connections.connect(uri=milvus_uri)
+        server_version = utility.get_server_version()
+        if "lite" in server_version:
+            gpu_cagra = False
+    else:
         gpu_cagra = False
     client = MilvusClient(milvus_uri)
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse)
@@ -337,6 +340,7 @@ def create_bm25_model(
 
 def stream_insert_milvus(
     records,
+    client: MilvusClient,
     collection_name: str,
     sparse_model=None,
     enable_text: bool = True,
@@ -368,7 +372,6 @@ def stream_insert_milvus(
         This function will be used to parse the records for necessary information.
 
     """
-    collection = Collection(name=collection_name)
     data = []
     for result in records:
         for element in result:
@@ -378,7 +381,7 @@ def stream_insert_milvus(
                     data.append(record_func(text, element, sparse_model.encode_documents([text])))
                 else:
                     data.append(record_func(text, element))
-    collection.insert(data)
+    client.insert(collection_name=collection_name, data=data)
 
 
 def write_to_nvingest_collection(
@@ -431,9 +434,12 @@ def write_to_nvingest_collection(
         When true, ensure all table type records are used.
     """
     stream = False
-    connections.connect(uri=milvus_uri)
-    server_version = utility.get_server_version()
-    if "lite" in server_version:
+    if urlparse(milvus_uri).scheme:
+        connections.connect(uri=milvus_uri)
+        server_version = utility.get_server_version()
+        if "lite" in server_version:
+            stream = True
+    else:
         stream = True
     bm25_ef = None
     if sparse:
@@ -442,8 +448,10 @@ def write_to_nvingest_collection(
         )
         bm25_ef.save(bm25_save_path)
     if stream:
+        client = MilvusClient(milvus_uri)
         stream_insert_milvus(
             records,
+            client,
             collection_name,
             bm25_ef,
             enable_text=enable_text,
@@ -478,7 +486,8 @@ def write_to_nvingest_collection(
 
 def dense_retrieval(
     queries,
-    collection: Collection,
+    collection_name: str,
+    client: MilvusClient,
     dense_model,
     top_k: int,
     dense_field: str = "vector",
@@ -512,7 +521,8 @@ def dense_retrieval(
     for query in queries:
         dense_embeddings.append(dense_model.get_query_embedding(query))
 
-    results = collection.search(
+    results = client.search(
+        collection_name=collection_name,
         data=dense_embeddings,
         anns_field=dense_field,
         param={"metric_type": "L2"},
@@ -524,7 +534,8 @@ def dense_retrieval(
 
 def hybrid_retrieval(
     queries,
-    collection: Collection,
+    collection_name: str,
+    client: MilvusClient,
     dense_model,
     sparse_model,
     top_k: int,
@@ -587,8 +598,8 @@ def hybrid_retrieval(
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
-    results = collection.hybrid_search(
-        [sparse_req, dense_req], rerank=RRFRanker(), limit=top_k, output_fields=output_fields
+    results = client.hybrid_search(
+        collection_name, [sparse_req, dense_req], RRFRanker(), limit=top_k, output_fields=output_fields
     )
     return results
 
@@ -596,6 +607,7 @@ def hybrid_retrieval(
 def nvingest_retrieval(
     queries,
     collection_name: str,
+    milvus_uri: str,
     schema: CollectionSchema,
     top_k: int = 5,
     hybrid: bool = False,
@@ -642,12 +654,15 @@ def nvingest_retrieval(
         Nested list of top_k results per query.
     """
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name)
-    collection = Collection(name=collection_name, schema=schema)
+    # collection = Collection(name=collection_name, schema=schema)
+    client = MilvusClient(milvus_uri)
 
     if hybrid:
         bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
         bm25_ef.load(sparse_model_filepath)
-        results = hybrid_retrieval(queries, collection, embed_model, bm25_ef, top_k, output_fields=output_fields)
+        results = hybrid_retrieval(
+            queries, collection_name, client, embed_model, bm25_ef, top_k, output_fields=output_fields
+        )
     else:
-        results = dense_retrieval(queries, collection, embed_model, top_k, output_fields=output_fields)
+        results = dense_retrieval(queries, collection_name, client, embed_model, top_k, output_fields=output_fields)
     return results
