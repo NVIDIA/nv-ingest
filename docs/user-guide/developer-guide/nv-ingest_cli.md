@@ -160,7 +160,7 @@ nv-ingest-cli \
 
 ```
 
-## Command line dataset creation with enumeration and sampling
+## Command Line Dataset Creation with Enumeration and Sampling
 
 ### gen_dataset.py
 

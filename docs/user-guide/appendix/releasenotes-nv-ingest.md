@@ -1,3 +1,3 @@
 # Release Notes
 
-good place for them here!
+There are no release notes avaiable at this time.
