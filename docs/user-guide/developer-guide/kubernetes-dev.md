@@ -9,9 +9,9 @@ This page describes how to use Kubernetes generally, and how to deploy nv-ingest
 ## Kubernetes cluster
 
 To start you need a Kubernetes cluster.
-To get started, we recommend using `kind` which creates a single Docker container with a Kubernetes cluster inside it.
+To get started we recommend using `kind` which creates a single Docker container with a Kubernetes cluster inside it.
 
-Also, because this the `kind` cluster needs access to the GPUs on your system you need to install `kind-with-gpus`. The easiest way to do this is following the instructions laid out in this GitHub repo https://github.com/klueska/kind-with-gpus-examples/tree/master
+Also because this the `kind` cluster needs access to the GPUs on your system you need to install `kind-with-gpus`. The easiest way to do this is following the instructions laid out in this Github repo https://github.com/klueska/kind-with-gpus-examples/tree/master
 
 Benefits of this:
 
@@ -103,7 +103,7 @@ jdyer-control-plane   Ready    control-plane   63s   v1.27.11
 
 Note: All of the containers created inside your Kubernetes cluster will not show up when you run `docker ps` as they are nested within a separate containerd namespace.
 
-For more information, refer to "debugging tools" in the "Troubleshooting" section below.
+Refer to "debugging tools" in the "Troubleshooting" section.
 
 ## Skaffold
 
@@ -139,7 +139,7 @@ Skaffold does a few things for you in a single command:
 #### Add Helm repos
 
 The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
-e.g. Elasticsearch, OpenTelemetry, and Postgres.
+for example, Elasticsearch, OpenTelemetry, and Postgres.
 
 The first time you try to deploy this project to a local Kubernetes, you may need to tell
 your local version of `Helm` (a package manager for Kubernetes configurations) where to find those
@@ -167,11 +167,11 @@ helm repo add \
   https://charts.bitnami.com/bitnami
 ```
 
-For the full list of repositories, see the `dependencies` section in [this project's Chart.yaml](../../helm/Chart.yaml).
+For the full list of repositories, refer to the `dependencies` section in [this project's Chart.yaml](../../helm/Chart.yaml).
 
-#### NVIDIA GPU Support
+#### Nvidia GPU Support
 
-In order for the deployed kubernetes pods to access the NVIDIA GPU resources the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
+In order for the deployed Kubernetes pods to access the NVIDIA GPU resources the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
 
 ```shell
 kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
@@ -217,7 +217,7 @@ kubectl create secret generic ngcapisecrets \
   > skaffold/sensitive/ngcapi.yaml
 ```
 
-### Deploy the Service
+### Deploy the service
 
 Run the following to deploy the retriever-ingest to your cluster.
 
@@ -335,7 +335,7 @@ You should see something like the following.
 
 ![k9s example](./media/k9s-example.png){width=80%}
 
-For details on how to use it, see https://k9scli.io/topics/commands/.
+For details on how to use it, refer to https://k9scli.io/topics/commands/.
 
 ### Installing Helm Repositories
 
@@ -356,7 +356,7 @@ helm repo add \
 
 ### Getting more logs from `skaffold`
 
-You may encounter an error like this:
+You could encounter an error like this:
 
 ```shell
 Generating tags...
@@ -370,7 +370,7 @@ building helm dependencies: exit status 1
 
 Seeing only "building helm dependencies" likely means you ran `skaffold dev` or `skaffold run` in a fairly quiet mode.
 
-Re-run those commands with something like `-v info` or `-v debug` to get more information about what specifically failed.
+Rerun those commands with something like `-v info` or `-v debug` to get more information about what specifically failed.
 
 ## References
 
