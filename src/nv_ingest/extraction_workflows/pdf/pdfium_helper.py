@@ -70,9 +70,12 @@ def extract_tables_and_charts_using_image_ensemble(
     try:
         yolox_version = get_version(yolox_http_endpoint)
         if not yolox_version:
-            raise Exception("Failed to obtain yolox-page-elements version from the endpoint.")
+            logger.warning(
+                "Failed to obtain yolox-page-elements version from the endpoint. Falling back to the latest version."
+            )
+            yolox_version = None  # Default to the latest version
     except Exception:
-        logger.error("Failed to get yolox-page-elements version after 30 seconds. Failing the job.", exc_info=True)
+        logger.waring("Failed to get yolox-page-elements version after 30 seconds. Falling back to the latest version.")
         yolox_version = None  # Default to the latest version
 
     try:

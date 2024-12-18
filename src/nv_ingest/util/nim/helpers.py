@@ -525,8 +525,8 @@ def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
         return False
 
 
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
-@multiprocessing_cache(max_calls=100)
 def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
     """
     Get the version of the server from its metadata endpoint.
