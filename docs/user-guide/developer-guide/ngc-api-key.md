@@ -14,7 +14,7 @@ When creating an NGC API key, ensure that all of the following are selected from
 
 ![Generate Personal Key](./images/generate_personal_key.png)
 
-#### Docker Login to NGC
+### Docker Login to NGC
 
 To pull the NIM container image from NGC, use your API key to log in to the NGC registry by entering the following command and following the prompts:
 ```shell
