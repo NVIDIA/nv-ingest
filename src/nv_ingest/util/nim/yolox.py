@@ -14,9 +14,9 @@ from typing import Optional
 
 import cv2
 import numpy as np
-import packaging
 import torch
 import torchvision
+from packaging import version as pkgversion
 from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
@@ -349,9 +349,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
         return inference_results
 
     def _is_version_early_access_legacy_api(self):
-        return self.yolox_version and (
-            packaging.version.parse(self.yolox_version) < packaging.version.parse("1.0.0-rc0")
-        )
+        return self.yolox_version and (pkgversion.parse(self.yolox_version) < pkgversion.parse("1.0.0-rc0"))
 
 
 def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
