@@ -131,6 +131,8 @@ def _nemo_document_splitter(builder: mrc.Builder):
                 f"Splitting documents with tokenizer: {tokenizer}, chunk_size: {chunk_size} tokens"
             )
 
+            tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token="")
+
             split_docs = []
             for _, row in df_filtered.iterrows():
                 content = row["metadata"]["content"]
@@ -139,9 +141,6 @@ def _nemo_document_splitter(builder: mrc.Builder):
                     raise ValueError(
                         "DocumentSplitter only works with text documents but one or more " "'content' values are None."
                     )
-
-                os.environ['TOKENIZERS_PARALLELISM'] = "False"
-                tokenizer_model = AutoTokenizer.from_pretrained(tokenizer)
 
                 chunks = _split_into_chunks(content, tokenizer_model, chunk_size)
                 split_docs.extend(_build_split_documents(row, chunks))
