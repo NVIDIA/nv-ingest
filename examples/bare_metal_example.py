@@ -7,10 +7,16 @@ from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
 from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
+from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
 
 # Configure the logger
 logger = logging.getLogger(__name__)
-logging.basicConfig(level=logging.DEBUG, format="%(asctime)s - %(levelname)s - %(message)s")
+
+local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
+if local_log_level in ("DEFAULT",):
+    local_log_level = "INFO"
+
+configure_local_logging(logger, local_log_level)
 
 
 def run_ingestor():
@@ -38,7 +44,8 @@ def run_ingestor():
             max_character_length=5000,
             sentence_window_size=0,
         )
-    ).embed()
+        .embed()
+    )
 
     try:
         _ = ingestor.ingest()

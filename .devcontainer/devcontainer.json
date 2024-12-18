@@ -1,0 +1,62 @@
+{
+    "build": {
+      "context": "..",
+      "dockerfile": "${localWorkspaceFolder}/.devcontainer/Dockerfile",
+    },
+    "privileged": true,
+    "hostRequirements": {
+      "gpu": "optional"
+    },
+    "capAdd": [
+      "SYS_NICE",
+      "SYS_PTRACE"
+    ],
+    "containerEnv": {
+      "HOST_REPO_ROOT": "${localWorkspaceFolder}",
+      "REPO_ROOT": "~/dev/nv-ingest"
+    },
+    "workspaceFolder": "/workspace",
+    "workspaceMount": "source=${localWorkspaceFolder},target=/workspace,type=bind,consistency=consistent",
+    "forwardPorts": [ 7670, 7671 ],
+    "customizations": {
+      "vscode": {
+        "extensions": [
+          "cschlosser.doxdocgen", // Adding docstrings to C++ code
+          "eamodio.gitlens", // Enhanced Git support
+          "eeyore.yapf", // Python code formatter
+          "josetr.cmake-language-support-vscode", // CMake language support
+          "llvm-vs-code-extensions.vscode-clangd",
+          "llvm-vs-code-extensions.vscode-clangd", // Clangd language server for C++
+          "matepek.vscode-catch2-test-adapter",
+          "mechatroner.rainbow-csv", // Colorizing CSV files
+          "mhutchie.git-graph", // Visualizing Git history and branching
+          "ms-azuretools.vscode-docker", // Docker support
+          "ms-python.debugpy", // Python debugger
+          "ms-python.flake8", // Python linter
+          "ms-python.isort", // Python import sorter
+          "ms-python.pylint", // Python linter
+          "ms-python.python", // Python language support
+          "ms-python.vscode-pylance", // Python language server
+          "ms-toolsai.jupyter", // Jupyter notebook support
+          "ms-vscode.cmake-tools", // CMake support for building
+          "ms-vscode.cpptools", // C++ language support
+          "njpwerner.autodocstring", // Adding docstrings to python code
+          "nvidia.nsight-vscode-edition", // CUDA integration and debugging
+          "stkb.rewrap", // Wrapping all text in any language
+          "twxs.cmake",
+          "vadimcn.vscode-lldb", // LLDB debugger (better than GDB for C++ debugging)
+          "xaver.clang-format"
+        ],
+        "settings": {
+          "cmake.cmakePath": "/tmp/.current-conda-env/bin/cmake",
+          "C_Cpp.intelliSenseEngine": "disabled",
+          "python.terminal.activateEnvironment": false,
+          "files.watcherExclude": {
+            "**/.git/objects/**": true,
+            "**/.git/subtree-cache/**": true,
+            "**/.cache/**": true
+          }
+        }
+      }
+    }
+  }

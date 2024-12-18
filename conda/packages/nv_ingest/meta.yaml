@@ -1,0 +1,86 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{% set data = load_setup_py_data() %}
+{% set name = data.get('name', 'nv_ingest') | lower %}
+{% set version = data.get('version') %}
+
+# Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
+{% set git_root = environ.get('GIT_ROOT', '../../..') %}
+
+package:
+  name: {{ name }}
+  version: {{ version }}
+
+source:
+  path: {{ git_root }}
+
+build:
+  number: 0
+  script:
+    - {{ PYTHON }} -m pip install . --no-deps -vv
+
+requirements:
+  build:
+    - pip
+    - python==3.10
+    - setuptools>=58.2.0
+  run:
+    - azure-core>=1.32.0
+    - click>=8.1.7
+    - fastapi>=0.115.6
+    - fastparquet>=2024.11.0
+    - fsspec>=2024.10.0
+    - httpx>=0.28.1
+    - isodate>=0.7.2
+    - langdetect>=1.0.9
+    - minio>=7.2.12
+    - morpheus-core=25.02.00a
+    - morpheus-llm=25.02.00a
+    - openai>=1.57.1
+    - opentelemetry-api>=1.27.0
+    - opentelemetry-exporter-otlp>=1.27.0
+    - opentelemetry-sdk>=1.27.0
+    - pydantic<2.0.0
+    - pypdfium2>=4.30.0
+    - pytest>=8.0.2
+    - pytest-mock>=3.14.0
+    - python>=3.10
+    - python-docx>=1.1.2
+    - python-dotenv>=1.0.1
+    - python-magic>=0.4.27
+    - python-pptx>=1.0.2
+    - pytorch
+    - redis-py>=5.2.1
+    - requests>=2.32.3
+    - setuptools>=58.2.0
+    - tabulate>=0.9.0
+    - torchaudio
+    - torchvision
+    - tqdm>=4.67.1
+    - transformers>=4.47.0
+    - unstructured-client>=0.25.9
+    - uvicorn
+    - wand>=0.6.10
+
+  test:
+    commands:
+      - pytest ./tests
+
+about:
+  home: "https://github.com/NVIDIA/nv-ingest"
+  license: "Apache-2.0"
+  summary: "Python module supporting document ingestion."
+  description: "Python module supporting document ingestion."
+
+extra:
+  recipe-maintainers:
+    - drobison@nvidia.com
+
+channels:
+  - nvidia/label/dev
+  - rapidsai
+  - nvidia
+  - conda-forge
+  - pytorch
