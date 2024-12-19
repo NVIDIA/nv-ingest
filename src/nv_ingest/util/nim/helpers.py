@@ -550,8 +550,8 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         return ""
 
     # TODO: Need a way to match NIM versions to API versions.
-    if "ai.api.nvidia.com" in http_endpoint:
-        return "0.2.0"
+    if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
+        return "1.0.0"
 
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)
