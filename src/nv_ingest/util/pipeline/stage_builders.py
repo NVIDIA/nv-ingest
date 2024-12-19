@@ -68,7 +68,7 @@ def get_caption_classifier_service():
     return triton_service_caption_classifier, triton_service_caption_classifier_name
 
 
-def get_table_detection_service(env_var_prefix):
+def get_nim_service(env_var_prefix):
     prefix = env_var_prefix.upper()
     grpc_endpoint = os.environ.get(
         f"{prefix}_GRPC_ENDPOINT",
@@ -85,6 +85,12 @@ def get_table_detection_service(env_var_prefix):
         "NGC_API_KEY",
         "",
     )
+
+    # TODO: This is a temporary workaround for the private endpoint on NVCF.
+    # It should be removed after the endpoint is moved to Preview API on Build.
+    if prefix == "DOUGHNUT":
+        auth_token = os.environ.get("DOUGHNUT_NVCF_API_KEY", "")
+
     infer_protocol = os.environ.get(
         f"{prefix}_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
@@ -179,7 +185,8 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
+    doughnut_grpc, doughnut_http, doughnut_auth, doughnut_protocol = get_nim_service("doughnut")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -187,7 +194,12 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
-            }
+            },
+            "doughnut_config": {
+                "doughnut_endpoints": (doughnut_grpc, doughnut_http),
+                "doughnut_infer_protocol": doughnut_protocol,
+                "auth_token": doughnut_auth,  # All auth tokens are the same for the moment
+            },
         },
     )
     pdf_extractor_stage = pipe.add_stage(
@@ -204,8 +216,8 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    _, _, yolox_auth, _ = get_nim_service("yolox")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
@@ -225,12 +237,12 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
+    _, _, yolox_auth, _ = get_nim_service("yolox")
 
-    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
-    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
+    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_nim_service("deplot")
+    cached_grpc, cached_http, cached_auth, cached_protocol = get_nim_service("cached")
     # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
@@ -255,15 +267,14 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     image_extractor_config = ingest_config.get(
         "image_extraction_module",
         {
             "image_extraction_config": {
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
-                "auth_token": yolox_auth,
-                # All auth tokens are the same for the moment
+                "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             }
         },
     )

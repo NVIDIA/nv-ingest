@@ -399,6 +399,7 @@ def test_create_inference_client_grpc_endpoint_whitespace(mock_model_interface, 
 def test_create_inference_client_nimclient_parameters(mock_model_interface, grpc_endpoint, http_endpoint):
     infer_protocol = "grpc"
     auth_token = "test_token"
+    timeout = 42
 
     # Mock NimClient to capture the initialization parameters
     with patch(f"{MODULE_UNDER_TEST}.NimClient") as mock_nim_client_class:
@@ -407,9 +408,14 @@ def test_create_inference_client_nimclient_parameters(mock_model_interface, grpc
             model_interface=mock_model_interface,
             auth_token=auth_token,
             infer_protocol=infer_protocol,
+            timeout=timeout,
         )
         mock_nim_client_class.assert_called_once_with(
-            mock_model_interface, infer_protocol, (grpc_endpoint, http_endpoint), auth_token
+            mock_model_interface,
+            infer_protocol,
+            (grpc_endpoint, http_endpoint),
+            auth_token,
+            timeout=timeout,
         )
 
 
