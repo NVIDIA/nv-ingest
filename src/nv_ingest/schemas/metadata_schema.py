@@ -355,4 +355,5 @@ def validate_metadata(metadata: Dict[str, Any]) -> MetadataSchema:
     - ValidationError: If the metadata does not conform to the schema.
     """
     logger.debug(f"!!!!Validating Metadataschema: {type(metadata)} - {' '.join(metadata.keys())}")
+    logger.debug(f"content_metadata.hierarchy.nearby_objects: {metadata['content_metadata']['hierarchy']['nearby_objects']}")
     return MetadataSchema(**metadata)
