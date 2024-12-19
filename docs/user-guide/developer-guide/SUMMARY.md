@@ -2,7 +2,7 @@
 - [Content Metadata](content-metadata.md)
 - [NV-Ingest Deployment](nv-ingest.md)
 - [Environment Configuration Variables](environment-config.md)
-- [Developing with Kubernetes](kubernetes.md)
+- [Developing with Kubernetes](kubernetes-dev.md)
 - [NV-Ingest Command Line (CLI)](nv-ingest_cli.md)
 - [Telemetry](telemetry.md)
 - [Environment Configuration Variables](environment-config.md)
