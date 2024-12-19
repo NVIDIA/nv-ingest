@@ -5,8 +5,8 @@ from typing import Dict
 from typing import Optional
 
 import numpy as np
-import packaging
 import pandas as pd
+from packaging import version as pkgversion
 from sklearn.cluster import DBSCAN
 
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
@@ -179,9 +179,7 @@ class PaddleOCRModelInterface(ModelInterface):
         return output
 
     def _is_version_early_access_legacy_api(self):
-        return self.paddle_version and (
-            packaging.version.parse(self.paddle_version) < packaging.version.parse("0.2.1-rc2")
-        )
+        return self.paddle_version and (pkgversion.parse(self.paddle_version) < pkgversion.parse("0.2.1-rc2"))
 
     def _prepare_paddle_payload(self, base64_img: str) -> Dict[str, Any]:
         """
