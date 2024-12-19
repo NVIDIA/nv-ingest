@@ -281,7 +281,7 @@ def terminate_subprocess(process):
             logger.error(f"Failed to terminate process group: {e}")
 
 
-def start_pipeline_subprocess(config: PipelineCreationSchema):
+def start_pipeline_subprocess(config: PipelineCreationSchema, stdout=None, stderr=None):
     """
     Launches the pipeline in a subprocess and ensures that it terminates
     if the parent process dies. This function encapsulates all subprocess-related setup,
@@ -291,6 +291,10 @@ def start_pipeline_subprocess(config: PipelineCreationSchema):
     ----------
     config : PipelineCreationSchema
         Validated pipeline configuration.
+    stdout : file-like object or None, optional
+        File-like object for capturing stdout. If None, output is ignored.
+    stderr : file-like object or None, optional
+        File-like object for capturing stderr. If None, output is ignored.
 
     Returns
     -------
@@ -319,12 +323,16 @@ def start_pipeline_subprocess(config: PipelineCreationSchema):
             # Set the parent death signal to SIGTERM
             _set_pdeathsig(signal.SIGTERM)
 
+        # If stdout/stderr is None, redirect to DEVNULL; otherwise, use PIPE
+        stdout_stream = subprocess.DEVNULL if stdout is None else subprocess.PIPE
+        stderr_stream = subprocess.DEVNULL if stderr is None else subprocess.PIPE
+
         process = subprocess.Popen(
             subprocess_command,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.PIPE,
+            stdout=stdout_stream,
+            stderr=stderr_stream,
             text=True,
-            preexec_fn=combined_preexec_fn,  # Start new process group and set pdeathsig
+            preexec_fn=combined_preexec_fn,
             env=env,
         )
         logger.debug(f"Pipeline subprocess started with PID: {process.pid}")
@@ -332,59 +340,61 @@ def start_pipeline_subprocess(config: PipelineCreationSchema):
         # Register the atexit handler to terminate the subprocess group on exit
         atexit.register(terminate_subprocess, process)
 
-        # Define and register signal handlers within this function
+        # Define and register signal handlers for graceful shutdown
         def signal_handler(signum, frame):
-            """
-            Handle termination signals to gracefully shut down the subprocess.
-            """
             logger.info(f"Received signal {signum}. Terminating pipeline subprocess group...")
             terminate_subprocess(process)
             sys.exit(0)
 
-        # Register signal handlers for graceful shutdown
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
-        # Start daemon threads to handle stdout and stderr
-        stdout_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stdout, "Pipeline STDOUT"),
-            name="StdoutReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
-        )
-        stderr_thread = threading.Thread(
-            target=read_stream,
-            args=(process.stderr, "Pipeline STDERR"),
-            name="StderrReader",
-            daemon=True,  # Daemon thread will terminate when the main program exits
-        )
-        stdout_thread.start()
-        stderr_thread.start()
+        # Start threads to read stdout and stderr only if user provided handlers
+        if stdout is not None:
+            stdout_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stdout, "Pipeline STDOUT", stdout),
+                name="StdoutReader",
+                daemon=True,
+            )
+            stdout_thread.start()
 
-        logger.info("Pipeline subprocess and output readers started successfully.")
+        if stderr is not None:
+            stderr_thread = threading.Thread(
+                target=read_stream,
+                args=(process.stderr, "Pipeline STDERR", stderr),
+                name="StderrReader",
+                daemon=True,
+            )
+            stderr_thread.start()
+
+        logger.info("Pipeline subprocess started successfully.")
         return process
+
     except Exception as e:
         logger.error(f"Failed to start pipeline subprocess: {e}")
         raise
 
 
-def read_stream(stream, prefix):
+def read_stream(stream, prefix, output_stream):
     """
-    Reads lines from a subprocess stream (stdout or stderr) and prints them with a prefix.
-    This function runs in a separate daemon thread.
+    Reads lines from a subprocess stream (stdout or stderr) and writes them
+    to the provided output stream with a prefix. This function runs in a separate daemon thread.
 
     Parameters
     ----------
     stream : IO
-        The stream object to read from.
+        The stream object to read from (subprocess stdout or stderr).
     prefix : str
         The prefix to prepend to each line of output.
+    output_stream : IO
+        The file-like object where the output should be written (e.g., a file, sys.stdout).
     """
-
     try:
         for line in iter(stream.readline, ""):
             if line:
-                print(f"[{prefix}] {line}", end="", flush=True)
+                output_stream.write(f"[{prefix}] {line}")
+                output_stream.flush()
     except Exception as e:
         logger.error(f"Error reading {prefix}: {e}")
     finally:
