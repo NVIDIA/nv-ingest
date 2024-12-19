@@ -354,4 +354,5 @@ def validate_metadata(metadata: Dict[str, Any]) -> MetadataSchema:
     Raises:
     - ValidationError: If the metadata does not conform to the schema.
     """
+    print(f"!!!!Validating Metadataschema: {type(metadata)} - {metadata}")
     return MetadataSchema(**metadata)
