@@ -14,6 +14,7 @@ from morpheus.config import Config
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
+from pydantic import BaseModel
 
 import cudf
 
@@ -301,6 +302,9 @@ def dedup_image_stage(df: pd.DataFrame, task_props: Dict[str, Any], validated_co
     ValueError
         If the DataFrame does not contain the necessary columns for deduplication.
     """
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
+
     task_props.get("content_type")
     task_params = task_props.get("params", {})
     filter_flag = task_params.get("filter", True)

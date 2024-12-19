@@ -16,6 +16,7 @@ from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from pydantic import BaseModel
 
 import cudf
 
@@ -208,6 +209,9 @@ def _filter_images(builder: mrc.Builder):
 
 
 def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
+
     task_props.get("content_type")
     task_params = task_props.get("params", {})
     filter_flag = task_params.get("filter", True)

@@ -21,6 +21,7 @@ from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
 from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
 from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from mrc.core import operators as ops
+from pydantic import BaseModel
 from pymilvus import BulkInsertState
 from pymilvus import connections
 from pymilvus import utility
@@ -304,6 +305,9 @@ def _vdb_task_sink(builder: mrc.Builder):
 
         try:
             task_props = ctrl_msg.remove_task("vdb_upload")
+            if isinstance(task_props, BaseModel):
+                task_props = task_props.model_dump()
+
             bulk_ingest = task_props.get("bulk_ingest", False)
             bulk_ingest_path = task_props.get("bulk_ingest_path", None)
             bucket_name = task_props.get("bucket_name", _DEFAULT_BUCKET_NAME)
