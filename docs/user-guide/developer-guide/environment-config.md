@@ -16,7 +16,7 @@
 
   - **Description**: The endpoint where the caption classifier model is hosted using gRPC for communication. This is
     used to send requests for caption classification.
-    You must specify only **one** HTTP or gRPC endpoint. If both are specified, gRPC takes precedence.
+    You must specify only ONE of an http or gRPC endpoint. If both are specified gRPC will take precedence.
   - **Example**: `triton:8001`
 
 - **`CAPTION_CLASSIFIER_MODEL_NAME`**:
@@ -61,8 +61,8 @@
 
 - **`NVIDIA_BUILD_API_KEY`**:
   - **Description**: This key is for when you are using the build.nvidia.com endpoint instead of a self hosted Deplot NIM.
-    This is necessary only in some cases when it's different from `NGC_API_KEY`. If this isn't specified, `NGC_API_KEY` will be used for bulid.nvidia.com.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used for bulid.nvidia.com.
 
 - **`NIM_NGC_API_KEY`**:
   - **Description**: This key is by NIM microservices inside docker containers to access NGC resources.
-    This is necessary only in some cases when it's different from `NGC_API_KEY`. If this isn't specified, `NGC_API_KEY` will be used to access NGC resources.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used to access NGC resources.

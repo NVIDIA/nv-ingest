@@ -160,7 +160,7 @@ nv-ingest-cli \
 
 ```
 
-## Command line dataset creation with enumeration and sampling
+## Command Line Dataset Creation with Enumeration and Sampling
 
 ### gen_dataset.py
 
@@ -226,9 +226,7 @@ offers options for caching the file list, outputting a sampled file list, and va
 The script performs a sampling process that respects the specified size and type proportions, generates a detailed file
 list, and provides options for caching and validation to facilitate efficient data handling and integrity checking.
 
-## Command line interface for the Image Viewer application, displays paginated images from a JSON file
-
-viewer. Each image is resized for uniform display, and users can navigate through the images using "Next" and "Previous"
+Command line interface for the Image Viewer application, displays paginated images from a JSON file viewer. Each image is resized for uniform display, and users can navigate through the images using "Next" and "Previous"
 buttons.
 
 ### image_viewer.py
