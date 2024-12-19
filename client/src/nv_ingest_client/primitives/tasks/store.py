@@ -31,11 +31,11 @@ class StoreTaskSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def set_default_store_method(cls, v, values):
-        store_method = values.data.get("store_method")
+    def set_default_store_method(cls, values):
+        store_method = values.get("store_method")
 
         if store_method is None:
-            values.data["store_method"] = _DEFAULT_STORE_METHOD
+            values["store_method"] = _DEFAULT_STORE_METHOD
         return values
 
     class Config:

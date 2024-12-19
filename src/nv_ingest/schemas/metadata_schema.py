@@ -331,7 +331,7 @@ class MetadataSchema(BaseModelNoExt):
     @model_validator(mode="before")
     @classmethod
     def check_metadata_type(cls, values):
-        content_type = values.data.get("content_metadata", {}).get("type", None)
+        content_type = values.get("content_metadata", {}).get("type", None)
         if content_type != ContentTypeEnum.TEXT:
             values["text_metadata"] = None
         if content_type != ContentTypeEnum.IMAGE:
