@@ -49,7 +49,7 @@ class TableExtractorConfigSchema(BaseModel):
 
     @model_validator(mode="before")
     @classmethod
-    def validate_endpoints(cls, v, values):
+    def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for the yolox endpoint.
 
@@ -75,16 +75,16 @@ class TableExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        grpc_service, http_service = v.get("paddle_endpoints", (None, None))
+        grpc_service, http_service = values.get("paddle_endpoints", (None, None))
         grpc_service = clean_service(grpc_service)
         http_service = clean_service(http_service)
 
         if not grpc_service and not http_service:
             raise ValueError("Both gRPC and HTTP services cannot be empty for paddle_endpoints.")
 
-        v["paddle_endpoints"] = (grpc_service, http_service)
+        values["paddle_endpoints"] = (grpc_service, http_service)
 
-        return v
+        return values
 
     model_config = ConfigDict(extra="forbid")
 

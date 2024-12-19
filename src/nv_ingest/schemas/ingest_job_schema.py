@@ -168,8 +168,8 @@ class IngestTaskSchema(BaseModelNoExt):
 
     @model_validator(mode="before")
     @classmethod
-    def check_task_properties_type(cls, v, values):
-        task_type, task_properties = v.get("type"), v.get("task_properties")
+    def check_task_properties_type(cls, values):
+        task_type, task_properties = values.get("type"), values.get("task_properties")
         if task_type and task_properties:
             expected_type = {
                 TaskTypeEnum.caption: IngestTaskCaptionSchema,
@@ -189,8 +189,8 @@ class IngestTaskSchema(BaseModelNoExt):
 
             # Ensure task_properties is validated against the expected schema
             validated_task_properties = expected_type(**task_properties)
-            v["task_properties"] = validated_task_properties
-        return v
+            values["task_properties"] = validated_task_properties
+        return values
 
     @field_validator("type", mode="before")
     @classmethod
