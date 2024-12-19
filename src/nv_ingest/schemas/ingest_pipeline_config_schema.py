@@ -4,7 +4,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
@@ -47,6 +47,4 @@ class PipelineConfigSchema(BaseModel):
     redis_task_source: MessageBrokerTaskSourceSchema = MessageBrokerTaskSourceSchema()
     table_extractor_module: TableExtractorSchema = TableExtractorSchema()
     vdb_task_sink: VdbTaskSinkSchema = VdbTaskSinkSchema()
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

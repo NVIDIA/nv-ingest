@@ -18,7 +18,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +27,4 @@ class ImageStorageModuleSchema(BaseModel):
     structured: bool = True
     images: bool = True
     raise_on_failure: bool = False
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

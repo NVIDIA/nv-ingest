@@ -11,8 +11,7 @@ from typing import Dict
 from typing import Literal
 from typing import Optional
 
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import BaseModel, field_validator
 
 from .task_base import Task
 
@@ -26,7 +25,7 @@ class SplitTaskSchema(BaseModel):
     max_character_length: Optional[int] = 1024
     sentence_window_size: Optional[int] = 0
 
-    @validator("split_by")
+    @field_validator("split_by")
     def split_by_must_be_valid(cls, v):
         valid_criteria = ["page", "size", "word", "sentence"]
         if v not in valid_criteria:

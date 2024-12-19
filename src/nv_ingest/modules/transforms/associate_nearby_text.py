@@ -114,7 +114,7 @@ def _associate_nearby_text_blocks(df: pd.DataFrame, n_neighbors):
                     metadata_dict[text_block_indices[indices_stack[row_idx, col_idx]]]["text_metadata"]["text_location"]
                 )
 
-            metadata_dict[img_indices[row_idx]] = validate_metadata(metadata_dict[img_indices[row_idx]]).dict()
+            metadata_dict[img_indices[row_idx]] = validate_metadata(metadata_dict[img_indices[row_idx]]).model_dump()
 
         df["metadata"] = metadata_dict
 

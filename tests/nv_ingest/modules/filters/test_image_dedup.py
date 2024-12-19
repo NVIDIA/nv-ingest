@@ -56,7 +56,7 @@ def valid_image_dedup_payload(content, width=1, height=1):
     metadata = valid_image_metadata(content, width, height)
 
     unified_metadata.update(metadata)
-    validated_unified_metadata = validate_metadata(unified_metadata).dict()
+    validated_unified_metadata = validate_metadata(unified_metadata).model_dump()
 
     return [ContentTypeEnum.IMAGE, validated_unified_metadata]
 

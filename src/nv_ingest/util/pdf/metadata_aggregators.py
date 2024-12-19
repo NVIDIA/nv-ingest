@@ -188,7 +188,7 @@ def construct_text_metadata(
 
     validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
-    return [ContentTypeEnum.TEXT, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.TEXT, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
 def construct_image_metadata_from_base64(
@@ -275,7 +275,7 @@ def construct_image_metadata_from_base64(
 
     # Validate and return the unified metadata
     validated_unified_metadata = validate_metadata(unified_metadata)
-    return [ContentTypeEnum.IMAGE, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.IMAGE, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
 def construct_image_metadata_from_pdf_image(
@@ -355,7 +355,7 @@ def construct_image_metadata_from_pdf_image(
 
     # Validate and return the unified metadata
     validated_unified_metadata = validate_metadata(unified_metadata)
-    return [ContentTypeEnum.IMAGE, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.IMAGE, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
@@ -452,4 +452,4 @@ def construct_table_and_chart_metadata(
 
     validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
-    return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.model_dump(), str(uuid.uuid4())]

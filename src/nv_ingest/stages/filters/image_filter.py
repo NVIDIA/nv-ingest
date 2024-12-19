@@ -16,6 +16,7 @@ from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from pydantic import BaseModel
 
 import cudf
 
@@ -86,7 +87,7 @@ def _cpu_only_apply_filter(df: pd.DataFrame, task_params: dict):
             "filter": True,
         }
 
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
         filtered_df["info_message_metadata"] = [validated_info_msg] * filtered_df.shape[0]
         filtered_df["metadata"] = filtered_df["metadata"].apply(add_info_message, args=(info_msg,))
@@ -149,7 +150,7 @@ def _apply_filter(ctrl_msg: ControlMessage, task_params: dict):
                 "filter": True,
             }
 
-            validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+            validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
             # update payload with `info_message_metadata` and `document_type`
             filtered_images_gdf["info_message_metadata"] = [validated_info_msg] * filtered_images_gdf.shape[0]
@@ -208,6 +209,9 @@ def _filter_images(builder: mrc.Builder):
 
 
 def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
+
     task_props.get("content_type")
     task_params = task_props.get("params", {})
     filter_flag = task_params.get("filter", True)

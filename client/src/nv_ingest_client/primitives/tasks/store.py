@@ -11,7 +11,7 @@ from typing import Dict
 from typing import Literal
 
 from pydantic import BaseModel
-from pydantic import root_validator
+from pydantic import model_validator
 
 from .task_base import Task
 
@@ -29,7 +29,8 @@ class StoreEmbedTaskSchema(BaseModel):
 class StoreTaskSchema(BaseModel):
     store_method: str = None
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def set_default_store_method(cls, values):
         store_method = values.get("store_method")
 
