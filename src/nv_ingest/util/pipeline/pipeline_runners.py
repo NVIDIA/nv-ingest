@@ -16,7 +16,7 @@ from ctypes import c_int, CDLL
 from datetime import datetime
 
 from morpheus.config import PipelineModes, CppConfig, Config
-from pydantic import ValidationError
+from pydantic import ConfigDict, ValidationError
 from pydantic import BaseModel
 
 from nv_ingest.schemas import PipelineConfigSchema
@@ -53,9 +53,7 @@ class PipelineCreationSchema(BaseModel):
     yolox_infer_protocol: str = "grpc"
     yolox_grpc_endpoint: str = "localhost:8001"
     vlm_caption_endpoint: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 def _launch_pipeline(morpheus_pipeline_config, ingest_config) -> float:

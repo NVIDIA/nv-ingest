@@ -74,7 +74,7 @@ def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool):
     }
 
     # update payload with `info_message_metadata` and `document_type`
-    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
     duplicate_images_df["info_message_metadata"] = [validated_info_msg] * duplicate_images_df.shape[0]
     duplicate_images_df["metadata"] = duplicate_images_df["metadata"].apply(add_info_message, args=(info_msg,))
@@ -132,7 +132,7 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag):
     }
 
     # update payload with `info_message_metadata` and `document_type`
-    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
     duplicate_images_gdf["info_message_metadata"] = [validated_info_msg] * duplicate_images_gdf.shape[0]
     gdf.drop(labels=["info_message_metadata", "metadata"], inplace=True, axis=1)
     gdf["info_message_metadata"] = duplicate_images_gdf["info_message_metadata"]

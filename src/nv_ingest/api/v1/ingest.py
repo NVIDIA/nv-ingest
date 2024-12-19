@@ -81,7 +81,7 @@ async def submit_job_curl_friendly(ingest_service: INGEST_SERVICE_T, file: Uploa
                 "tracing_options": {
                     "trace": True,
                     "ts_send": time.time_ns(),
-                    "trace_id": trace.get_current_span().get_span_context().trace_id,
+                    "trace_id": str(trace.get_current_span().get_span_context().trace_id),
                 }
             },
         )
@@ -131,11 +131,10 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             current_trace_id = span.get_span_context().trace_id
 
             job_spec_dict = json.loads(job_spec.payload)
-            job_spec_dict["tracing_options"]["trace_id"] = current_trace_id
+            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
             updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
             job_id = trace_id_to_uuid(current_trace_id)
-            print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
 
             # Submit the job async
             await ingest_service.submit_job(updated_job_spec, job_id)

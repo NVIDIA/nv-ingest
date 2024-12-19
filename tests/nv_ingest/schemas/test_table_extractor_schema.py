@@ -37,7 +37,7 @@ def test_invalid_extra_fields():
         TableExtractorConfigSchema(
             auth_token="valid_token", paddle_endpoints=("grpc://paddle_service", None), extra_field="invalid"
         )
-    assert "extra fields not permitted" in str(exc_info.value)
+    assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
 def test_cleaning_empty_strings_in_endpoints():

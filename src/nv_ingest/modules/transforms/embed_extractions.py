@@ -112,7 +112,7 @@ async def _make_async_request(
             "filter": filter_errors,
         }
 
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
         response["embedding"] = [None] * len(prompts)
         response["info_msg"] = validated_info_msg
@@ -518,9 +518,10 @@ def _embed_extractions(builder: mrc.Builder):
     def embed_extractions_fn(message: ControlMessage):
         try:
             task_props = message.remove_task("embed")
-            embed_text = task_props.get("text")
-            embed_tables = task_props.get("tables")
-            filter_errors = task_props.get("filter_errors", False)
+            model_dump = task_props.model_dump()
+            embed_text = model_dump.get("text")
+            embed_tables = model_dump.get("tables")
+            filter_errors = model_dump.get("filter_errors", False)
 
             logger.debug(f"Generating embeddings: text={embed_text}, tables={embed_tables}")
             embedding_dataframes = []

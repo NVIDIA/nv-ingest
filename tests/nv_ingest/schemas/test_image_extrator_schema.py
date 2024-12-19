@@ -91,7 +91,7 @@ def test_image_extractor_schema_invalid_max_queue_size():
     with pytest.raises(ValidationError) as exc_info:
         ImageExtractorSchema(max_queue_size="invalid_type")
     errors = exc_info.value.errors()
-    assert any(error["loc"] == ("max_queue_size",) and error["type"] == "type_error.integer" for error in errors)
+    assert any(error["loc"] == ("max_queue_size",) and error["type"] == "int_parsing" for error in errors)
 
 
 def test_image_extractor_schema_invalid_n_workers():
@@ -99,7 +99,7 @@ def test_image_extractor_schema_invalid_n_workers():
     with pytest.raises(ValidationError) as exc_info:
         ImageExtractorSchema(n_workers="invalid_type")
     errors = exc_info.value.errors()
-    assert any(error["loc"] == ("n_workers",) and error["type"] == "type_error.integer" for error in errors)
+    assert any(error["loc"] == ("n_workers",) and error["type"] == "int_parsing" for error in errors)
 
 
 def test_image_extractor_schema_invalid_nested_config():

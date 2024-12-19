@@ -13,9 +13,7 @@ from typing import Literal
 from typing import Optional
 from typing import get_args
 
-from pydantic import BaseModel
-from pydantic import root_validator
-from pydantic import validator
+from pydantic import BaseModel, field_validator, model_validator
 
 from .task_base import Task
 
@@ -100,10 +98,11 @@ class ExtractTaskSchema(BaseModel):
     text_depth: str = "document"
     paddle_output_format: str = "pseudo_markdown"
 
-    @root_validator(pre=True)
+    @model_validator(mode="after")
+    @classmethod
     def set_default_extract_method(cls, values):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
-        extract_method = values.get("extract_method")
+        document_type = values.document_type.lower()  # Ensure case-insensitive comparison
+        extract_method = values.extract_method
 
         if document_type not in _DEFAULT_EXTRACTOR_MAP:
             raise ValueError(
@@ -112,32 +111,32 @@ class ExtractTaskSchema(BaseModel):
             )
 
         if extract_method is None:
-            values["extract_method"] = _DEFAULT_EXTRACTOR_MAP[document_type]
+            values.extract_method = _DEFAULT_EXTRACTOR_MAP[document_type]
 
         return values
 
-    @root_validator(pre=True)
-    def set_default_extract_charts(cls, values):
+    @field_validator("extract_charts")
+    def set_default_extract_charts(cls, v, values):
         # `extract_charts` is initially set to None for backward compatibility.
         # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
-        extract_charts = values.get("extract_charts")
+        extract_charts = v
         if extract_charts is None:
-            values["extract_charts"] = values.get("extract_tables")
+            extract_charts = values.data.get("extract_tables")
 
-        return values
+        return extract_charts
 
-    @validator("extract_method")
+    @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
+        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
         valid_methods = set(_Type_Extract_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
 
         return v
 
-    @validator("document_type")
+    @field_validator("document_type")
     def document_type_must_be_supported(cls, v):
         if v.lower() not in _DEFAULT_EXTRACTOR_MAP:
             raise ValueError(
@@ -145,9 +144,9 @@ class ExtractTaskSchema(BaseModel):
             )
         return v.lower()
 
-    @validator("extract_tables_method")
+    @field_validator("extract_tables_method")
     def extract_tables_method_must_be_valid(cls, v, values, **kwargs):
-        document_type = values.get("document_type", "").lower()  # Ensure case-insensitive comparison
+        document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
         valid_methods = set(_Type_Extract_Tables_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")

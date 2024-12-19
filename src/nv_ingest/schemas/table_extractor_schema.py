@@ -7,9 +7,8 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import BaseModel
-from pydantic import root_validator
-from pydantic import validator
+from pydantic import field_validator, model_validator, ConfigDict, BaseModel
+
 
 logger = logging.getLogger(__name__)
 
@@ -48,7 +47,8 @@ class TableExtractorConfigSchema(BaseModel):
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     paddle_infer_protocol: str = ""
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for the yolox endpoint.
@@ -86,8 +86,7 @@ class TableExtractorConfigSchema(BaseModel):
 
         return values
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class TableExtractorSchema(BaseModel):
@@ -113,13 +112,11 @@ class TableExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    @validator("max_queue_size", "n_workers", pre=True, always=True)
+    @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):
         if v <= 0:
-            raise ValueError(f"{field.name} must be greater than 10.")
+            raise ValueError(f"{field.field_name} must be greater than 10.")
         return v
 
     stage_config: Optional[TableExtractorConfigSchema] = None
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

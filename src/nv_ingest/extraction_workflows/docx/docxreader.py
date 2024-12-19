@@ -387,7 +387,7 @@ class DocxReader:
         validated_unified_metadata = validate_metadata(unified_metadata)
 
         # Work around until https://github.com/apache/arrow/pull/40412 is resolved
-        return [ContentTypeEnum.IMAGE.value, validated_unified_metadata.dict(), str(uuid.uuid4())]
+        return [ContentTypeEnum.IMAGE.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
     def _extract_para_images(self, images, para_idx, caption, base_unified_metadata, extracted_data):
         """
@@ -445,7 +445,7 @@ class DocxReader:
 
         validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
-        return [ContentTypeEnum.TEXT.value, validated_unified_metadata.dict(), str(uuid.uuid4())]
+        return [ContentTypeEnum.TEXT.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
     def _extract_para_data(
         self, child, base_unified_metadata, text_depth: TextTypeEnum, extract_images: bool, para_idx: int

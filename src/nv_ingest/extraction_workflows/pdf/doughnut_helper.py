@@ -362,4 +362,4 @@ def _construct_table_metadata(
 
     validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
-    return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
