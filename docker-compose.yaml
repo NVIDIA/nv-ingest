@@ -296,7 +296,7 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.4.9-gpu
+    image: milvusdb/milvus:v2.4.17-gpu
     command: [ "milvus", "run", "standalone" ]
     hostname: milvus
     security_opt:
