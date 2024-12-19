@@ -247,7 +247,6 @@ def construct_image_metadata_from_base64(
             "block": -1,
             "line": -1,
             "span": -1,
-            "nearby_objects": [],
         },
     }
 
@@ -327,7 +326,6 @@ def construct_image_metadata_from_pdf_image(
             "block": -1,
             "line": -1,
             "span": -1,
-            "nearby_objects": [],
         },
     }
 
