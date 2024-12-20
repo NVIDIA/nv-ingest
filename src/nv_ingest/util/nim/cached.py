@@ -44,8 +44,8 @@ class CachedModelInterface(ModelInterface):
             The updated data dictionary with the decoded image array.
         """
         # Expecting base64_image in data
-        base64_image = data['base64_image']
-        data['image_array'] = base64_to_numpy(base64_image)
+        base64_image = data["base64_image"]
+        data["image_array"] = base64_to_numpy(base64_image)
         return data
 
     def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
@@ -69,18 +69,18 @@ class CachedModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified.
         """
-        if protocol == 'grpc':
+        if protocol == "grpc":
             logger.debug("Formatting input for gRPC Cached model")
             # Convert image array to expected format
-            image_data = data['image_array']
+            image_data = data["image_array"]
             if image_data.ndim == 3:
                 image_data = np.expand_dims(image_data, axis=0)
             image_data = image_data.astype(np.float32)
             return image_data
-        elif protocol == 'http':
+        elif protocol == "http":
             logger.debug("Formatting input for HTTP Cached model")
             # Prepare payload for HTTP request
-            base64_img = data['base64_image']
+            base64_img = data["base64_image"]
             payload = self._prepare_nim_payload(base64_img)
             return payload
         else:
@@ -109,11 +109,11 @@ class CachedModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified.
         """
-        if protocol == 'grpc':
+        if protocol == "grpc":
             logger.debug("Parsing output from gRPC Cached model")
             # Convert bytes output to string
             return " ".join([output[0].decode("utf-8") for output in response])
-        elif protocol == 'http':
+        elif protocol == "http":
             logger.debug("Parsing output from HTTP Cached model")
             return self._extract_content_from_nim_response(response)
         else:

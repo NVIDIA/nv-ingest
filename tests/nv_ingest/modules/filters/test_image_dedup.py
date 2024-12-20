@@ -17,11 +17,13 @@ from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
 if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    import cudf
     from morpheus.messages import ControlMessage
     from morpheus.messages import MessageMeta
-    from nv_ingest.modules.filters.image_dedup import _cpu_only_apply_dedup_filter
+
+    import cudf
+
     from nv_ingest.modules.filters.image_dedup import _apply_dedup_filter
+    from nv_ingest.modules.filters.image_dedup import _cpu_only_apply_dedup_filter
 
 
 def valid_image_dedup_task(should_filter):
@@ -89,7 +91,7 @@ def test_apply_dedup(should_filter, expected0, expected1, expected2):
 
     payload_list = []
     for _ in range(3):
-        payload_list.append(valid_image_dedup_payload(f"test", 1, 1))
+        payload_list.append(valid_image_dedup_payload("test", 1, 1))
 
     extracted_df = pd.DataFrame(payload_list, columns=["document_type", "metadata"])
     extracted_gdf = cudf.from_pandas(extracted_df)

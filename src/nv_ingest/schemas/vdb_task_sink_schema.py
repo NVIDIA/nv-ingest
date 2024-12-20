@@ -9,8 +9,8 @@ import typing
 import pymilvus
 from pydantic import BaseModel
 from pydantic import Field
-from pydantic import validator
 from pydantic import conint
+from pydantic import validator
 
 logger = logging.getLogger(__name__)
 
@@ -40,8 +40,8 @@ def build_default_milvus_config(embedding_size: int = 1024) -> typing.Dict[str, 
             "metric_type": "L2",
             "index_type": "GPU_CAGRA",
             "params": {
-                'intermediate_graph_degree':128,
-                'graph_degree': 64,
+                "intermediate_graph_degree": 128,
+                "graph_degree": 64,
                 "build_algo": "NN_DESCENT",
             },
         },
@@ -89,7 +89,7 @@ class VdbTaskSinkSchema(BaseModel):
     default_resource_name: str = "nv_ingest_collection"
     resource_schemas: dict = {default_resource_name: build_default_milvus_config()}
     resource_kwargs: dict = Field(default_factory=dict)
-    service_kwargs: dict
+    service_kwargs: dict = {}
     batch_size: int = 5120
     write_time_interval: float = 1.0
     retry_interval: float = 60.0

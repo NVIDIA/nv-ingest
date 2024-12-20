@@ -11,7 +11,6 @@ from setuptools import find_packages
 from setuptools import setup
 
 
-# TODO(Devin): This is duplicated in nv_ingest's setup.py, should be moved to common once Jermey's PR is merged
 def get_version():
     release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
     version = os.getenv("NV_INGEST_CLIENT_VERSION")
@@ -43,9 +42,8 @@ def read_requirements(file_name):
 
 
 # Specify your requirements files
-requirements_files = [
-    "requirements.txt",
-]
+base_dir = os.path.abspath(os.path.dirname(__file__))
+requirements_files = []
 
 # Read and combine requirements from all specified files
 combined_requirements = []
@@ -59,7 +57,12 @@ setup(
     author_email="anuradhak@nvidia.com",
     classifiers=[],
     description="Python client for the nv-ingest service",
-    entry_points={"console_scripts": ["nv-ingest-cli=nv_ingest_client.nv_ingest_cli:main", "process-json-files=nv_ingest_client.util.process_json_files:main"]},
+    entry_points={
+        "console_scripts": [
+            "nv-ingest-cli=nv_ingest_client.nv_ingest_cli:main",
+            "process-json-files=nv_ingest_client.util.process_json_files:main",
+        ]
+    },
     install_requires=combined_requirements,
     name="nv_ingest_client",
     package_dir={"": "src"},

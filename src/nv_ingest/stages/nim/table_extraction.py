@@ -2,15 +2,17 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
+
 from morpheus.config import Config
+
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
@@ -61,14 +63,16 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
     table_metadata = metadata.get("table_metadata")
 
     # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if ((content_metadata.get("type") != "structured") or
-            (content_metadata.get("subtype") != "table") or
-            (table_metadata is None)):
+    if (
+        (content_metadata.get("type") != "structured")
+        or (content_metadata.get("subtype") != "table")
+        or (table_metadata is None)
+    ):
         return metadata
 
     # Modify table metadata with the result from the inference model
     try:
-        data = {'base64_image': base64_image}
+        data = {"base64_image": base64_image}
 
         image_array = base64_to_numpy(base64_image)
 
@@ -79,6 +83,8 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
                 data,
                 model_name="paddle",
                 table_content_format=table_metadata.get("table_content_format"),
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="table_data_extraction",  # traceable_func arg
             )
 
         table_content, table_content_format = paddle_result
@@ -92,10 +98,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
 
 
 def _extract_table_data(
-        df: pd.DataFrame,
-        task_props: Dict[str, Any],
-        validated_config: Any,
-        trace_info: Optional[Dict] = None
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts table data from a DataFrame.
@@ -136,18 +139,17 @@ def _extract_table_data(
 
     stage_config = validated_config.stage_config
 
-    paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
-
     # Obtain paddle_version
     # Assuming that the grpc endpoint is at index 0
     paddle_endpoint = stage_config.paddle_endpoints[1]
     try:
         paddle_version = get_version(paddle_endpoint)
         if not paddle_version:
-            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
-    except Exception as e:
-        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
-        raise e
+            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
+            paddle_version = None  # Default to the latest version
+    except Exception:
+        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
+        paddle_version = None  # Default to the latest version
 
     # Create the PaddleOCRModelInterface with paddle_version
     paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
@@ -157,16 +159,16 @@ def _extract_table_data(
         endpoints=stage_config.paddle_endpoints,
         model_interface=paddle_model_interface,
         auth_token=stage_config.auth_token,
-        infer_protocol=stage_config.paddle_infer_protocol
+        infer_protocol=stage_config.paddle_infer_protocol,
     )
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
 
-        return df, trace_info
+        return df, {"trace_info": trace_info}
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
@@ -175,11 +177,11 @@ def _extract_table_data(
 
 
 def generate_table_extractor_stage(
-        c: Config,
-        stage_config: Dict[str, Any],
-        task: str = "table_data_extract",
-        task_desc: str = "table_data_extraction",
-        pe_count: int = 1,
+    c: Config,
+    stage_config: Dict[str, Any],
+    task: str = "table_data_extract",
+    task_desc: str = "table_data_extraction",
+    pe_count: int = 1,
 ):
     """
     Generates a multiprocessing stage to perform table data extraction from PDF content.

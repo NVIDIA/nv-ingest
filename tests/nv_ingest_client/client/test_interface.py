@@ -20,8 +20,8 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 
@@ -181,7 +181,7 @@ def test_store_embed_task_no_args(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], StoreEmbedTask)
 
 
-def test_store_task_some_args(ingestor):
+def test_store_task_some_args_extra_param(ingestor):
     ingestor.store_embed(params={"extra_param": "extra"})
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]

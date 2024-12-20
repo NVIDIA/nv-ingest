@@ -49,7 +49,7 @@ def test_redis_client_schema_optional_fields(use_ssl, connection_timeout, max_ba
         max_retries=max_retries,
     )
     # Check each field, assuming None values remain None and provided values are correctly set
-    assert schema.broker_params['use_ssl'] == use_ssl
+    assert schema.broker_params["use_ssl"] == use_ssl
     assert schema.connection_timeout == connection_timeout
     assert schema.max_backoff == max_backoff
     assert schema.max_retries == max_retries

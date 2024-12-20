@@ -5,15 +5,16 @@
 import logging
 import re
 import time
-from typing import Optional, Any
+from typing import Any
+from typing import Optional
 from typing import Tuple
 
 import backoff
 import cv2
 import numpy as np
-import packaging
 import requests
 import tritonclient.grpc as grpcclient
+from packaging import version as pkgversion
 
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
@@ -105,12 +106,12 @@ class NimClient:
     """
 
     def __init__(
-            self,
-            model_interface: ModelInterface,
-            protocol: str,
-            endpoints: Tuple[str, str],
-            auth_token: Optional[str] = None,
-            timeout: float = 30.0
+        self,
+        model_interface: ModelInterface,
+        protocol: str,
+        endpoints: Tuple[str, str],
+        auth_token: Optional[str] = None,
+        timeout: float = 30.0,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -141,12 +142,12 @@ class NimClient:
 
         grpc_endpoint, http_endpoint = endpoints
 
-        if self.protocol == 'grpc':
+        if self.protocol == "grpc":
             if not grpc_endpoint:
                 raise ValueError("gRPC endpoint must be provided for gRPC protocol")
             logger.debug(f"Creating gRPC client with {grpc_endpoint}")
             self.client = grpcclient.InferenceServerClient(url=grpc_endpoint)
-        elif self.protocol == 'http':
+        elif self.protocol == "http":
             if not http_endpoint:
                 raise ValueError("HTTP endpoint must be provided for HTTP protocol")
             logger.debug(f"Creating HTTP client with {http_endpoint}")
@@ -157,6 +158,7 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
+    @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
         """
         Perform inference using the specified model and input data.
@@ -188,11 +190,11 @@ class NimClient:
         formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
 
         # Perform inference
-        if self.protocol == 'grpc':
+        if self.protocol == "grpc":
             logger.debug("Performing gRPC inference...")
             response = self._grpc_infer(formatted_input, model_name)
             logger.debug("gRPC inference received response")
-        elif self.protocol == 'http':
+        elif self.protocol == "http":
             logger.debug("Performing HTTP inference...")
             response = self._http_infer(formatted_input)
             logger.debug("HTTP inference received response")
@@ -204,9 +206,7 @@ class NimClient:
             response, protocol=self.protocol, data=prepared_data, **kwargs
         )
         results = self.model_interface.process_inference_results(
-            parsed_output,
-            original_image_shapes=data.get('original_image_shapes'),
-            **kwargs
+            parsed_output, original_image_shapes=data.get("original_image_shapes"), **kwargs
         )
         return results
 
@@ -265,23 +265,23 @@ class NimClient:
         while attempt <= max_retries:
             try:
                 response = requests.post(
-                    self.endpoint_url,
-                    json=formatted_input,
-                    headers=self.headers,
-                    timeout=self.timeout
+                    self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
                 )
                 status_code = response.status_code
 
                 if status_code in [429, 503]:
                     # Warn and attempt to retry
-                    logger.warning(f"Received HTTP {status_code} ({response.reason}) from {self.model_interface.name()}. Retrying...")
+                    logger.warning(
+                        f"Received HTTP {status_code} ({response.reason}) from "
+                        f"{self.model_interface.name()}. Retrying..."
+                    )
                     if attempt == max_retries:
                         # No more retries left
                         logger.error(f"Max retries exceeded after receiving HTTP {status_code}.")
                         response.raise_for_status()  # This will raise the appropriate HTTPError
                     else:
                         # Exponential backoff before retrying
-                        backoff_time = base_delay * (2 ** attempt)
+                        backoff_time = base_delay * (2**attempt)
                         time.sleep(backoff_time)
                         attempt += 1
                         continue
@@ -292,7 +292,10 @@ class NimClient:
                     return response.json()
 
             except requests.Timeout:
-                err_msg = f"HTTP request timed out during {self.model_interface.name()} inference after {self.timeout} seconds"
+                err_msg = (
+                    f"HTTP request timed out during {self.model_interface.name()} "
+                    f"inference after {self.timeout} seconds"
+                )
                 logger.error(err_msg)
                 raise TimeoutError(err_msg)
 
@@ -311,15 +314,15 @@ class NimClient:
         raise Exception(f"Failed to get a successful response after {max_retries} retries.")
 
     def close(self):
-        if self.protocol == 'grpc' and hasattr(self.client, 'close'):
+        if self.protocol == "grpc" and hasattr(self.client, "close"):
             self.client.close()
 
 
 def create_inference_client(
-        endpoints: Tuple[str, str],
-        model_interface: ModelInterface,
-        auth_token: Optional[str] = None,
-        infer_protocol: Optional[str] = None,
+    endpoints: Tuple[str, str],
+    model_interface: ModelInterface,
+    auth_token: Optional[str] = None,
+    infer_protocol: Optional[str] = None,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -353,7 +356,7 @@ def create_inference_client(
     elif infer_protocol is None and http_endpoint:
         infer_protocol = "http"
 
-    if infer_protocol not in ['grpc', 'http']:
+    if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
     return NimClient(model_interface, infer_protocol, endpoints, auth_token)
@@ -392,7 +395,7 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if (not paddle_version) or (packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1")):
+    if (not paddle_version) or (pkgversion.parse(paddle_version) < pkgversion.parse("0.2.0-rc1")):
         return array
 
     height, width = array.shape[:2]
@@ -429,7 +432,7 @@ def remove_url_endpoints(url) -> str:
     Returns:
         str: URL with just the hostname:port portion remaining
     """
-    if ("/v1" in url):
+    if "/v1" in url:
         url = url.split("/v1")[0]
 
     return url
@@ -522,8 +525,8 @@ def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
         return False
 
 
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
-@multiprocessing_cache(max_calls=100)
 def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
     """
     Get the version of the server from its metadata endpoint.
@@ -547,8 +550,8 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         return ""
 
     # TODO: Need a way to match NIM versions to API versions.
-    if "ai.api.nvidia.com" in http_endpoint:
-        return "0.2.0"
+    if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
+        return "1.0.0"
 
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)

@@ -61,18 +61,18 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
         try:
             job = client.fetch_message(validated_config.task_queue, 100)
             logger.debug(f"Received Job Type: {type(job)}")
-            if (isinstance(job, BaseModel)):
-                if (job.response_code != 0):
+            if isinstance(job, BaseModel):
+                if job.response_code != 0:
                     continue
 
-                logger.debug(f"Received ResponseSchema, converting to dict")
+                logger.debug("Received ResponseSchema, converting to dict")
                 job = json.loads(job.response)
             else:
-                logger.debug(f"Received something not a ResponseSchema")
+                logger.debug("Received something not a ResponseSchema")
 
             ts_fetched = datetime.now()
             yield process_message(job, ts_fetched)
-        except TimeoutError as err:
+        except TimeoutError:
             continue
         except Exception as err:
             logger.error(
@@ -214,13 +214,13 @@ def _message_broker_task_source(builder: mrc.Builder):
         server_port = validated_config.broker_client.port
 
         # TODO(Devin) add config param for server_host
-        server_host = '0.0.0.0'
+        server_host = "0.0.0.0"
 
         # Obtain the singleton instance
         server = SimpleMessageBroker(server_host, server_port, max_queue_size)
 
         # Start the server if not already running
-        if not hasattr(server, 'server_thread') or not server.server_thread.is_alive():
+        if not hasattr(server, "server_thread") or not server.server_thread.is_alive():
             server_thread = threading.Thread(target=server.serve_forever)
             server_thread.daemon = True  # Allows program to exit even if thread is running
             server.server_thread = server_thread  # Attach the thread to the server instance

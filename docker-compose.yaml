@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-0.2.0}
+    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-page-elements-v1}:${YOLOX_TAG:-1.0.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -20,6 +20,15 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+      # NIM OpenTelemetry Settings
+      - NIM_OTEL_SERVICE_NAME=yolox
+      - NIM_OTEL_TRACES_EXPORTER=otlp
+      - NIM_OTEL_METRICS_EXPORTER=console
+      - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
+      - NIM_ENABLE_OTEL=true
+      # Triton OpenTelemetry Settings
+      - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
+      - TRITON_OTEL_RATE=1
     deploy:
       resources:
         reservations:
@@ -51,7 +60,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.0}
+    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.1}
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -73,7 +82,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-0.2.0}
+    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-1.0.0}
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -147,6 +156,7 @@ services:
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
+      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
@@ -190,7 +200,7 @@ services:
             - driver: nvidia
               device_ids: ["1"]
               capabilities: [gpu]
-  
+
   otel-collector:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
@@ -198,7 +208,7 @@ services:
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
-      - "9988:8888" # Prometheus metrics exposed by the collector
+      - "9988:9988" # Prometheus metrics exposed by the collector
       - "8889:8889" # Prometheus exporter metrics
       - "13133:13133" # health_check extension
       - "9411" # Zipkin receiver
@@ -211,7 +221,7 @@ services:
   zipkin:
     image: openzipkin/zipkin
     environment:
-      JAVA_OPTS: "-Xms2g -Xmx2g -XX:+ExitOnOutOfMemoryError"
+      JAVA_OPTS: "-Xms4g -Xmx8g -XX:+ExitOnOutOfMemoryError"
     ports:
       - "9411:9411" # Zipkin UI and API
 
@@ -286,7 +296,7 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.4.9-gpu
+    image: milvusdb/milvus:v2.4.17-gpu
     command: [ "milvus", "run", "standalone" ]
     hostname: milvus
     security_opt:
@@ -332,4 +342,3 @@ services:
       - "milvus"
     profiles:
       - retrieval
-

@@ -257,17 +257,17 @@ def check_ingest_result(json_payload: Dict) -> typing.Tuple[bool, str]:
 
     is_failed = json_payload.get("status", "") in "failed"
     description = ""
-    if (is_failed):
+    if is_failed:
         try:
-            source_id = json_payload.get("data", [])[0].get("metadata", {}).get("source_metadata", {}).get(
-                "source_name",
-                "")
-        except Exception as e:
+            source_id = (
+                json_payload.get("data", [])[0].get("metadata", {}).get("source_metadata", {}).get("source_name", "")
+            )
+        except Exception:
             source_id = ""
 
         description = f"[{source_id}]: {json_payload.get('status', '')}\n"
 
-    description += (json_payload.get("description", ""))
+    description += json_payload.get("description", "")
 
     # Look to see if we have any failure annotations to augment the description
     if is_failed and "annotations" in json_payload:
@@ -300,14 +300,13 @@ def generate_matching_files(file_sources):
     It yields each matching file path, allowing for efficient processing of potentially large
     sets of files.
     """
-    files = [
-        file_path
-        for pattern in file_sources
-        for file_path in glob.glob(pattern, recursive=True)
-        if os.path.isfile(file_path)
-    ]
-    for file_path in files:
-        yield file_path
+    for pattern in file_sources:
+        if os.path.isdir(pattern):
+            pattern = os.path.join(pattern, "*")
+
+        for file_path in glob.glob(pattern, recursive=True):
+            if os.path.isfile(file_path):
+                yield file_path
 
 
 def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
@@ -350,7 +349,7 @@ def create_job_specs_for_batch(files_batch: List[str]) -> List[JobSpec]:
     >>> client = NvIngestClient()
     >>> job_specs = create_job_specs_for_batch(files_batch)
     >>> print(job_specs)
-    [nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb468bb0>, <nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb469270>]
+    [nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb468bb0>, <nv_ingest_client.primitives.jobs.job_spec.JobSpec object at 0x743acb469270>]  # noqa: E501,W505
 
     See Also
     --------
@@ -428,14 +427,8 @@ def get_content(results: List[any]):
         A dictionary containing the extracted text content and the extracted table content
     """
 
-    text_elems = [
-        elem for result in results
-        for elem in result if elem["document_type"] == "text"
-    ]
-    structured_elems = [
-        elem for result in results
-        for elem in result if elem["document_type"] == "structured"
-    ]
+    text_elems = [elem for result in results for elem in result if elem["document_type"] == "text"]
+    structured_elems = [elem for result in results for elem in result if elem["document_type"] == "structured"]
 
     text_content = [
         {
@@ -447,7 +440,7 @@ def get_content(results: List[any]):
     structured_content = [
         {
             "page_number": elem["metadata"]["content_metadata"]["page_number"],
-            "content": elem["metadata"]["table_content"]
+            "content": elem["metadata"]["table_content"],
         }
         for elem in structured_elems
     ]

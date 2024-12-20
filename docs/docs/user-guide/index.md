@@ -2,12 +2,12 @@
 
 NV-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. NV-Ingest uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
-NV-Ingest also enables parallelization of the process of splitting documents into pages where contents are classified (such as tables, charts, images, text), extracted into discrete content, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NV-Ingest also enables parallelization of the process of splitting documents into pages where contents are classified (such as tables, charts, images, text), extracted into discrete content, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA-Ingest can optionally manage computation of embeddings for the extracted content, and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 
 ## What NV-Ingest Does ✔️
 
-NV-Ingest is a microservice service that: 
+NV-Ingest is a microservice service that:
 
 - Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
 - Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, and processing annotations and timing/trace data.

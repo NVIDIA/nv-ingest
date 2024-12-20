@@ -149,19 +149,21 @@ def traceable_func(trace_name=None, dedupe=True):
                 trace_info = {}
             trace_prefix = trace_name if trace_name else func.__name__
 
+            arg_names = list(inspect.signature(func).parameters)
+            args_name_to_val = dict(zip(arg_names, args))
+
             # If `trace_name` is a formattable string, e.g., "pdf_extractor::{model_name}",
             # search `args` and `kwargs` to replace the placeholder.
             placeholders = [x[1] for x in string.Formatter().parse(trace_name) if x[1] is not None]
             if placeholders:
                 format_kwargs = {}
                 for name in placeholders:
-                    arg_names = inspect.signature(func).parameters
-                    if name in arg_names:
-                        arg_val = dict(zip(arg_names, args))[name]
+                    if name in args_name_to_val:
+                        arg_val = args_name_to_val[name]
                     elif name in kwargs:
                         arg_val = kwargs.get(name)
                     else:
-                        continue
+                        arg_val = name
                     format_kwargs[name] = arg_val
                 trace_prefix = trace_prefix.format(**format_kwargs)
 

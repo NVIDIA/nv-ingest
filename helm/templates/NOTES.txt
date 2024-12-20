@@ -1,5 +1,5 @@
 Installed {{ .Chart.Name }}-{{ .Chart.Version }}, named {{ .Release.Name }}.
-Visit the application via: 
+Visit the application via:
 {{- if .Values.ingress.enabled }}
 {{- range $host := .Values.ingress.hosts }}
   {{- range .paths }}

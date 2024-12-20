@@ -6,8 +6,4 @@ from .broker import SimpleMessageBroker
 from .broker import ResponseSchema
 from .simple_client import SimpleClient
 
-__all__ = [
-    "SimpleMessageBroker",
-    "SimpleClient",
-    "ResponseSchema"
-]
+__all__ = ["SimpleMessageBroker", "SimpleClient", "ResponseSchema"]

@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import json
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,28 +16,27 @@ import json
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import logging
 import traceback
 from datetime import datetime
-
-from typing import List, Dict
+from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 
-from wand.image import Image as WandImage
-from PIL import Image
-import io
-
 import numpy as np
+from PIL import Image
+from wand.image import Image as WandImage
 
-from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
 import nv_ingest.util.nim.yolox as yolox_utils
+from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
 from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent, construct_image_metadata_from_pdf_image, \
-    construct_image_metadata_from_base64
+from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
+from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
@@ -111,13 +109,13 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
 
 # TODO(Devin): Move to common file
 def process_inference_results(
-        output_array: np.ndarray,
-        original_image_shapes: List[Tuple[int, int]],
-        num_classes: int,
-        conf_thresh: float,
-        iou_thresh: float,
-        min_score: float,
-        final_thresh: float,
+    output_array: np.ndarray,
+    original_image_shapes: List[Tuple[int, int]],
+    num_classes: int,
+    conf_thresh: float,
+    iou_thresh: float,
+    min_score: float,
+    final_thresh: float,
 ):
     """
     Process the model output to generate detection results and expand bounding boxes.
@@ -183,10 +181,10 @@ def process_inference_results(
 
 
 def extract_table_and_chart_images(
-        annotation_dict: Dict[str, List[List[float]]],
-        original_image: np.ndarray,
-        page_idx: int,
-        tables_and_charts: List[Tuple[int, "CroppedImageWithContent"]],
+    annotation_dict: Dict[str, List[List[float]]],
+    original_image: np.ndarray,
+    page_idx: int,
+    tables_and_charts: List[Tuple[int, "CroppedImageWithContent"]],
 ) -> None:
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -249,14 +247,14 @@ def extract_table_and_chart_images(
 
 
 def extract_tables_and_charts_from_image(
-        image: np.ndarray,
-        config: ImageExtractorSchema,
-        num_classes: int = YOLOX_NUM_CLASSES,
-        conf_thresh: float = YOLOX_CONF_THRESHOLD,
-        iou_thresh: float = YOLOX_IOU_THRESHOLD,
-        min_score: float = YOLOX_MIN_SCORE,
-        final_thresh: float = YOLOX_FINAL_SCORE,
-        trace_info: Optional[List] = None,
+    image: np.ndarray,
+    config: ImageExtractorSchema,
+    num_classes: int = YOLOX_NUM_CLASSES,
+    conf_thresh: float = YOLOX_CONF_THRESHOLD,
+    iou_thresh: float = YOLOX_IOU_THRESHOLD,
+    min_score: float = YOLOX_MIN_SCORE,
+    final_thresh: float = YOLOX_FINAL_SCORE,
+    trace_info: Optional[List] = None,
 ) -> List[CroppedImageWithContent]:
     """
     Extract tables and charts from a single image using an ensemble of image-based models.
@@ -293,18 +291,22 @@ def extract_tables_and_charts_from_image(
 
     yolox_client = None
     try:
-        yolox_client = create_inference_client(config.yolox_endpoints, config.auth_token)
+        model_interface = yolox_utils.YoloxModelInterface()
+        yolox_client = create_inference_client(
+            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+        )
 
-        data = {'images': [image]}
+        data = {"images": [image]}
 
-        inference_results = yolox_client.infer(data,
-                                               model_name="yolox",
-                                               num_classes=YOLOX_NUM_CLASSES,
-                                               conf_thresh=YOLOX_CONF_THRESHOLD,
-                                               iou_thresh=YOLOX_IOU_THRESHOLD,
-                                               min_score=YOLOX_MIN_SCORE,
-                                               final_thresh=YOLOX_FINAL_SCORE
-                                               )
+        inference_results = yolox_client.infer(
+            data,
+            model_name="yolox",
+            num_classes=YOLOX_NUM_CLASSES,
+            conf_thresh=YOLOX_CONF_THRESHOLD,
+            iou_thresh=YOLOX_IOU_THRESHOLD,
+            min_score=YOLOX_MIN_SCORE,
+            final_thresh=YOLOX_FINAL_SCORE,
+        )
 
         extract_table_and_chart_images(
             inference_results,
@@ -318,7 +320,7 @@ def extract_tables_and_charts_from_image(
         traceback.print_exc()
         raise e
     finally:
-        if (yolox_client):
+        if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
@@ -326,14 +328,16 @@ def extract_tables_and_charts_from_image(
     return tables_and_charts
 
 
-def image_data_extractor(image_stream,
-                         document_type: str,
-                         extract_text: bool,
-                         extract_images: bool,
-                         extract_tables: bool,
-                         extract_charts: bool,
-                         trace_info: dict = None,
-                         **kwargs):
+def image_data_extractor(
+    image_stream,
+    document_type: str,
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    trace_info: dict = None,
+    **kwargs,
+):
     """
     Helper function to extract text, images, tables, and charts from an image bytestream.
 
@@ -361,7 +365,7 @@ def image_data_extractor(image_stream,
     """
     logger.debug(f"Extracting {document_type.upper()} image with image extractor.")
 
-    if (document_type not in SUPPORTED_FILE_TYPES):
+    if document_type not in SUPPORTED_FILE_TYPES:
         raise ValueError(f"Unsupported document type: {document_type}")
 
     row_data = kwargs.get("row_data")
@@ -391,10 +395,10 @@ def image_data_extractor(image_stream,
     logger.debug(f"Extract charts: {extract_charts}")
 
     # Preprocess based on image type
-    if (document_type in RAW_FILE_FORMATS):
+    if document_type in RAW_FILE_FORMATS:
         logger.debug(f"Loading and preprocessing {document_type} image.")
         image_array = load_and_preprocess_image(image_stream)
-    elif (document_type in PREPROC_FILE_FORMATS):
+    elif document_type in PREPROC_FILE_FORMATS:
         logger.debug(f"Converting {document_type} to bitmap.")
         image_array = convert_svg_to_bitmap(image_stream)
     else:
@@ -426,7 +430,7 @@ def image_data_extractor(image_stream,
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
-            logger.debug(f"Extracted table/chart data from image")
+            logger.debug("Extracted table/chart data from image")
             for _, table_chart_data in tables_and_charts:
                 extracted_data.append(
                     construct_table_and_chart_metadata(

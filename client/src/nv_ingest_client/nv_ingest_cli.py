@@ -11,6 +11,7 @@ from typing import List
 
 import click
 import pkg_resources
+from nv_ingest_client.util.zipkin import collect_traces_from_zipkin, write_results_to_output_directory
 from nv_ingest_client.cli.util.click import LogLevel
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
 from nv_ingest_client.cli.util.click import click_validate_batch_size
@@ -68,8 +69,12 @@ logger = logging.getLogger(__name__)
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
 @click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
-@click.option("--client_type", default="rest", type=click.Choice(["rest", "simple"], case_sensitive=False),
-              help="Client type used to connect to the ingest service.")
+@click.option(
+    "--client_type",
+    default="rest",
+    type=click.Choice(["rest", "simple"], case_sensitive=False),
+    help="Client type used to connect to the ingest service.",
+)
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
 )
@@ -90,11 +95,13 @@ logger = logging.getLogger(__name__)
     show_default=True,
     help="Log level.",
 )
-@click.option("--save_images_separately", is_flag=True,
-              help="Save images separately from returned metadata. This can make metadata files more human readable")
 @click.option(
-    "--shuffle_dataset", is_flag=True, default=True, show_default=True,
-    help="Shuffle the dataset before processing."
+    "--save_images_separately",
+    is_flag=True,
+    help="Save images separately from returned metadata. This can make metadata files more human readable",
+)
+@click.option(
+    "--shuffle_dataset", is_flag=True, default=True, show_default=True, help="Shuffle the dataset before processing."
 )
 @click.option(
     "--task",
@@ -119,7 +126,7 @@ Example:
 
 \b
 Tasks and Options:
-- caption: Attempts to extract captions for unstructured images extracted from documents. 
+- caption: Attempts to extract captions for unstructured images extracted from documents.
     Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_BUILD_API_KEY).'
@@ -180,27 +187,48 @@ Tasks and Options:
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
 )
+@click.option(
+    "--collect_profiling_traces",
+    is_flag=True,
+    default=False,
+    help="""
+\b
+If enabled the CLI will collect the 'profile' for each file that was submitted to the
+nv-ingest REST endpoint for processing.
+
+\b
+Those `trace_id` values will be consolidated and then a subsequent request will be made to
+Zipkin to collect the traces for each individual `trace_id`. The trace is rich with information
+that can further breakdown the runtimes for each section of the codebase. This is useful
+for locating portions of the system that might be bottlenecks for the overall runtimes.
+""",
+)
+@click.option("--zipkin_host", default="localhost", help="DNS name or Zipkin API.")
+@click.option("--zipkin_port", default=9411, type=int, help="Port for the Zipkin trace API")
 @click.option("--version", is_flag=True, help="Show version.")
 @click.pass_context
 def main(
-        ctx,
-        batch_size: int,
-        client_host: str,
-        client_kwargs: str,
-        client_port: int,
-        client_type: str,
-        concurrency_n: int,
-        dataset: str,
-        doc: List[str],
-        document_processing_timeout: int,
-        dry_run: bool,
-        fail_on_error: bool,
-        log_level: str,
-        output_directory: str,
-        save_images_separately: bool,
-        shuffle_dataset: bool,
-        task: [str],
-        version: [bool],
+    ctx,
+    batch_size: int,
+    client_host: str,
+    client_kwargs: str,
+    client_port: int,
+    client_type: str,
+    concurrency_n: int,
+    dataset: str,
+    doc: List[str],
+    document_processing_timeout: int,
+    dry_run: bool,
+    fail_on_error: bool,
+    log_level: str,
+    output_directory: str,
+    save_images_separately: bool,
+    shuffle_dataset: bool,
+    collect_profiling_traces: bool,
+    zipkin_host: str,
+    zipkin_port: int,
+    task: [str],
+    version: [bool],
 ):
     if version:
         click.echo(f"nv-ingest     : {NV_INGEST_VERSION}")
@@ -234,9 +262,9 @@ def main(
         if not dry_run:
             logging.debug(f"Creating message client: {client_host} and port: {client_port} -> {client_kwargs}")
 
-            if (client_type == "rest"):
+            if client_type == "rest":
                 client_allocator = RestClient
-            elif (client_type == "simple"):
+            elif client_type == "simple":
                 client_allocator = SimpleClient
             else:
                 raise ValueError(f"Unknown client type: {client_type}")
@@ -250,7 +278,7 @@ def main(
             )
 
             start_time_ns = time.time_ns()
-            (total_files, trace_times, pages_processed) = create_and_process_jobs(
+            (total_files, trace_times, pages_processed, trace_ids) = create_and_process_jobs(
                 files=docs,
                 client=ingest_client,
                 tasks=task,
@@ -262,6 +290,14 @@ def main(
             )
 
             report_statistics(start_time_ns, trace_times, pages_processed, total_files)
+
+            # Gather profiling data after processing has completed.
+            if collect_profiling_traces:
+                logger.info("Collecting profiling traces ....")
+                trace_responses = collect_traces_from_zipkin(zipkin_host, zipkin_port, trace_ids, 1)
+
+                # Log the responses to a file in the configured results --output_directory
+                write_results_to_output_directory(output_directory, trace_responses)
 
     except Exception as err:
         logging.error(f"Error: {err}")

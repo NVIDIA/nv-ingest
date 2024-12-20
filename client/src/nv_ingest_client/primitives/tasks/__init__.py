@@ -24,7 +24,7 @@ __all__ = [
     "ExtractTask",
     "is_valid_task_type",
     "SplitTask",
-    "StoreEmbedTask"
+    "StoreEmbedTask",
     "StoreTask",
     "TableExtractionTask",
     "Task",

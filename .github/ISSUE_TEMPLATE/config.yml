@@ -1,6 +1,6 @@
 # GitHub info on config.yml
 # https://docs.github.com/en/communities/using-templates-to-encourage-useful-issues-and-pull-requests/configuring-issue-templates-for-your-repository#configuring-the-template-chooser
-# Set to 'false' if you only want the templates to be used. 
+# Set to 'false' if you only want the templates to be used.
 blank_issues_enabled: true
 
 # When using discussions instead of Question issue templates,

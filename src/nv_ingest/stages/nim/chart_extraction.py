@@ -2,14 +2,14 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
-import pandas as pd
+import logging
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 
@@ -63,18 +63,30 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
     chart_metadata = metadata.get("table_metadata")
 
     # Only modify if content type is structured and subtype is 'chart' and chart_metadata exists
-    if ((content_metadata.get("type") != "structured") or
-            (content_metadata.get("subtype") != "chart") or
-            (chart_metadata is None)):
+    if (
+        (content_metadata.get("type") != "structured")
+        or (content_metadata.get("subtype") != "chart")
+        or (chart_metadata is None)
+    ):
         return metadata
 
     # Modify chart metadata with the result from the inference models
     try:
-        data = {'base64_image': base64_image}
+        data = {"base64_image": base64_image}
 
         # Perform inference using the NimClients
-        deplot_result = deplot_client.infer(data, model_name="deplot")
-        cached_result = cached_client.infer(data, model_name="cached")
+        deplot_result = deplot_client.infer(
+            data,
+            model_name="deplot",
+            trace_info=trace_info,  # traceable_func arg
+            stage_name="chart_data_extraction",  # traceable_func arg
+        )
+        cached_result = cached_client.infer(
+            data,
+            model_name="cached",
+            stage_name="chart_data_extraction",  # traceable_func arg
+            trace_info=trace_info,  # traceable_func arg
+        )
 
         chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
 
@@ -86,9 +98,13 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
     return metadata
 
 
-def _create_clients(cached_endpoints: Tuple[str, str], cached_protocol: str,
-                    deplot_endpoints: Tuple[str, str], deplot_protocol: str, auth_token: str,
-                    ) -> Tuple[NimClient, NimClient]:
+def _create_clients(
+    cached_endpoints: Tuple[str, str],
+    cached_protocol: str,
+    deplot_endpoints: Tuple[str, str],
+    deplot_protocol: str,
+    auth_token: str,
+) -> Tuple[NimClient, NimClient]:
     cached_model_interface = CachedModelInterface()
     deplot_model_interface = DeplotModelInterface()
 
@@ -98,21 +114,22 @@ def _create_clients(cached_endpoints: Tuple[str, str], cached_protocol: str,
         endpoints=cached_endpoints,
         model_interface=cached_model_interface,
         auth_token=auth_token,
-        infer_protocol=cached_protocol
+        infer_protocol=cached_protocol,
     )
 
     deplot_client = create_inference_client(
         endpoints=deplot_endpoints,
         model_interface=deplot_model_interface,
         auth_token=auth_token,
-        infer_protocol=deplot_protocol
+        infer_protocol=deplot_protocol,
     )
 
     return cached_client, deplot_client
 
 
-def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
-                        validated_config: Any, trace_info: Optional[Dict] = None) -> Tuple[pd.DataFrame, Dict]:
+def _extract_chart_data(
+    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts chart data from a DataFrame.
 
@@ -151,9 +168,13 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
         return df, trace_info
 
     stage_config = validated_config.stage_config
-    cached_client, deplot_client = _create_clients(stage_config.cached_endpoints, stage_config.cached_infer_protocol,
-                                                   stage_config.deplot_endpoints, stage_config.deplot_infer_protocol,
-                                                   stage_config.auth_token)
+    cached_client, deplot_client = _create_clients(
+        stage_config.cached_endpoints,
+        stage_config.cached_infer_protocol,
+        stage_config.deplot_endpoints,
+        stage_config.deplot_infer_protocol,
+        stage_config.auth_token,
+    )
 
     if trace_info is None:
         trace_info = {}
@@ -163,24 +184,24 @@ def _extract_chart_data(df: pd.DataFrame, task_props: Dict[str, Any],
         # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(cached_client, deplot_client, trace_info))
 
-        return df, trace_info
+        return df, {"trace_info": trace_info}
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:
-        if (isinstance(cached_client, grpcclient.InferenceServerClient)):
+        if isinstance(cached_client, grpcclient.InferenceServerClient):
             cached_client.close()
-        if (isinstance(deplot_client, grpcclient.InferenceServerClient)):
+        if isinstance(deplot_client, grpcclient.InferenceServerClient):
             deplot_client.close()
 
 
 def generate_chart_extractor_stage(
-        c: Config,
-        stage_config: Dict[str, Any],
-        task: str = "chart_data_extract",
-        task_desc: str = "chart_data_extraction",
-        pe_count: int = 1,
+    c: Config,
+    stage_config: Dict[str, Any],
+    task: str = "chart_data_extract",
+    task_desc: str = "chart_data_extraction",
+    pe_count: int = 1,
 ):
     """
     Generates a multiprocessing stage to perform chart data extraction from PDF content.
