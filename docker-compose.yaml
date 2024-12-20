@@ -82,7 +82,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-0.2.0}
+    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-1.0.0}
     shm_size: 2gb
     ports:
       - "8009:8000"
