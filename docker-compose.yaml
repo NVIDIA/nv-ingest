@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-0.2.0}
+    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1}:${YOLOX_TAG:-1.0.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -60,7 +60,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.0}
+    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.1}
     shm_size: 2gb
     ports:
       - "8006:8000"
