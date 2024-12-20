@@ -165,7 +165,10 @@ def sample_dataframe(base64_encoded_image):
             {
                 "content": base64_encoded_image,
                 "content_metadata": {"type": "structured", "subtype": "table"},
-                "table_metadata": {"table_content": ""},
+                "table_metadata": {
+                    "table_content": "",
+                    "table_format": "image",
+                },
             }
         ]
     }
