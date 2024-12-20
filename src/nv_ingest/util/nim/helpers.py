@@ -12,9 +12,9 @@ from typing import Tuple
 import backoff
 import cv2
 import numpy as np
-import packaging
 import requests
 import tritonclient.grpc as grpcclient
+from packaging import version as pkgversion
 
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
@@ -395,7 +395,7 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if (not paddle_version) or (packaging.version.parse(paddle_version) < packaging.version.parse("0.2.0-rc1")):
+    if (not paddle_version) or (pkgversion.parse(paddle_version) < pkgversion.parse("0.2.0-rc1")):
         return array
 
     height, width = array.shape[:2]
@@ -525,8 +525,8 @@ def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
         return False
 
 
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
-@multiprocessing_cache(max_calls=100)
 def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
     """
     Get the version of the server from its metadata endpoint.
@@ -550,8 +550,8 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         return ""
 
     # TODO: Need a way to match NIM versions to API versions.
-    if "ai.api.nvidia.com" in http_endpoint:
-        return "0.2.0"
+    if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
+        return "1.0.0"
 
     url = generate_url(http_endpoint)
     url = remove_url_endpoints(url)
