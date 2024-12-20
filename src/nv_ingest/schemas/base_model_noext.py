@@ -3,10 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 
 # Define a base class with extra fields forbidden
 class BaseModelNoExt(BaseModel):
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

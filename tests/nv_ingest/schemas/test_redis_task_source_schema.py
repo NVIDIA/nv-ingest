@@ -46,6 +46,6 @@ def test_redis_task_source_schema_invalid_progress_engines(progress_engines):
     """
     with pytest.raises(ValidationError) as excinfo:
         MessageBrokerTaskSourceSchema(progress_engines=progress_engines)
-    assert "ensure this value is greater than or equal to 1" in str(
+    assert "Input should be greater than or equal to 1" in str(
         excinfo.value
     ), "Schema should validate progress_engines to be >= 1."

@@ -44,7 +44,7 @@ def test_schema_exception_handler_with_validation_error(mock_logger):
         function_fail()
 
     # Verify the correct error message was logged
-    expected_error_message = "Invalid configuration: name: field required"
+    expected_error_message = "Invalid configuration: name: Field required"
     mock_logger.error.assert_called_once_with(expected_error_message)
 
     # Verify the ValueError contains the correct message

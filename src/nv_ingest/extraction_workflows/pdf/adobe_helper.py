@@ -410,7 +410,7 @@ def _construct_image_metadata(
 
     validated_unified_metadata = validate_metadata(unified_metadata)
 
-    return [ContentTypeEnum.IMAGE.value, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.IMAGE.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
 
 def _construct_table_metadata(
@@ -454,4 +454,4 @@ def _construct_table_metadata(
 
     validated_unified_metadata = validate_metadata(unified_metadata)
 
-    return [ContentTypeEnum.STRUCTURED.value, validated_unified_metadata.dict(), str(uuid.uuid4())]
+    return [ContentTypeEnum.STRUCTURED.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]

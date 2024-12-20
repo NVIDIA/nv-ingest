@@ -48,7 +48,7 @@ class ExtendedMockClient(MockClient):
     def submit_message(self, job_queue_id, job_spec_str, trace_id=None, for_nv_ingest=False):
         # Simulate message submission by storing it
         random_x_trace_id = "123456789"
-        job_id = 0
+        job_id = str(0)
         self.submitted_messages.append((job_queue_id, job_spec_str))
         return ResponseSchema(trace_id=random_x_trace_id, transaction_id=job_id, response_code=0)
 

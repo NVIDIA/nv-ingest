@@ -348,7 +348,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         """
 
         try:
-            response_json = response.json().encode("utf-8")
+            response_json = response.model_dump_json().encode("utf-8")
             total_length = len(response_json)
             self.request.sendall(total_length.to_bytes(8, "big"))
             self.request.sendall(response_json)
