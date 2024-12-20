@@ -145,10 +145,11 @@ def _extract_table_data(
     try:
         paddle_version = get_version(paddle_endpoint)
         if not paddle_version:
-            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
-    except Exception as e:
-        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
-        raise e
+            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
+            paddle_version = None  # Default to the latest version
+    except Exception:
+        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
+        paddle_version = None  # Default to the latest version
 
     # Create the PaddleOCRModelInterface with paddle_version
     paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)

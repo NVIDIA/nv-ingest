@@ -6,17 +6,16 @@ This page describes how to use Kubernetes generally, and how to deploy nv-ingest
 
 > **NOTE:** _Unless otherwise noted, all commands below should be run from the root of this repo._
 
-## Kubernetes cluster
+## Kubernetes Cluster
 
-To start you need a Kubernetes cluster.
-To get started, we recommend using `kind` which creates a single Docker container with a Kubernetes cluster inside it.
+To start you need a Kubernetes cluster. We recommend using `kind` that creates a single Docker container with a Kubernetes cluster inside it.
 
 Also, because this the `kind` cluster needs access to the GPUs on your system you need to install `kind-with-gpus`. The easiest way to do this is following the instructions laid out in this GitHub repo https://github.com/klueska/kind-with-gpus-examples/tree/master
 
 Benefits of this:
 
-- allows many developers on the same system to have isolated Kubernetes clusters
-- enables easy creation/deletion of clusters
+- Allows many developers on the same system to have isolated Kubernetes clusters
+- Enables easy creation and deletion of clusters
 
 Run the following **from the root of the repo** to create a configuration file for your cluster.
 
@@ -42,7 +41,7 @@ nodes:
 EOF
 ```
 
-Then use the `nvkind` CLI to create your cluster.
+Then, use the `nvkind` CLI to create your cluster.
 
 ```shell
 nvkind cluster create \
@@ -103,11 +102,11 @@ jdyer-control-plane   Ready    control-plane   63s   v1.27.11
 
 Note: All of the containers created inside your Kubernetes cluster will not show up when you run `docker ps` as they are nested within a separate containerd namespace.
 
-For more information, refer to "debugging tools" in the "Troubleshooting" section below.
+Refer to "debugging tools" in the "Troubleshooting" section.
 
 ## Skaffold
 
-Now that you have a Kubernetes cluster you can use `skaffold` to build and deploy your development environment.
+Now that you have a Kubernetes cluster, you can use `skaffold` to build and deploy your development environment.
 
 Skaffold does a few things for you in a single command:
 
@@ -118,7 +117,7 @@ Skaffold does a few things for you in a single command:
   - _for details on this, see "Hot reloading" below ([link](#hot-reloading))_
 - Port forwards the -ingest service to the host.
 
-### Directory structure
+### Directory Structure
 
 - `skaffold/sensitive/` contains any secrets or manifests you want deployed to your cluster, but not checked into git, as your local cluster is unlikely to have ESO installed. If it does, feel free to use `kind: ExternalSecret` instead.
 - `skaffold/components` contains any k8s manifests you want deployed in any skaffold file. The paths are relative and can be used in either `kustomize` or `rawYaml` formats:
@@ -136,14 +135,12 @@ Skaffold does a few things for you in a single command:
 
 ### Prerequisites
 
-#### Add Helm repos
+#### Add Helm Repos
 
 The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
-e.g. Elasticsearch, OpenTelemetry, and Postgres.
+for example, Elasticsearch, OpenTelemetry, and Postgres.
 
-The first time you try to deploy this project to a local Kubernetes, you may need to tell
-your local version of `Helm` (a package manager for Kubernetes configurations) where to find those
-third-party things, by running something like the following.
+The first time you try to deploy this project to a local Kubernetes, you may need to tell your local version of `Helm` (a package manager for Kubernetes configurations) where to find those third-party things, by running something like the following.
 
 ```shell
 helm repo add \
@@ -167,17 +164,17 @@ helm repo add \
   https://charts.bitnami.com/bitnami
 ```
 
-For the full list of repositories, see the `dependencies` section in [this project's Chart.yaml](../../helm/Chart.yaml).
+For the full list of repositories, refer to the `dependencies` section in [this project's Chart.yaml](../../helm/Chart.yaml).
 
 #### NVIDIA GPU Support
 
-In order for the deployed kubernetes pods to access the NVIDIA GPU resources the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
+In order for the deployed Kubernetes pods to access the NVIDIA GPU resources, the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
 
 ```shell
 kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
 ```
 
-#### Create an image pull secret
+#### Create an Image Pull Secret
 
 You'll also need to provide a Kubernetes Secret with credentials to pull NVIDIA-private Docker images.
 
@@ -201,14 +198,13 @@ EOF
 ```
 
 An NGC personal API key is needed to access models and images hosted on NGC.
-Make sure that you have followed the steps of _[Ensure you have access to NGC](./index.md#ensure-you-have-access-to-ngc)_.
-Next, store the key in an environment variable:
+Make sure that you have followed the steps of _[Ensure you have access to NGC](./index.md#ensure-you-have-access-to-ngc)_. Next, store the key in an environment variable:
 
 ```shell
 export NGC_API_KEY="<YOUR_KEY_HERE>"
 ```
 
-Then create the secret manifest with:
+Then, create the secret manifest with:
 
 ```shell
 kubectl create secret generic ngcapisecrets \
@@ -287,7 +283,7 @@ curl \
   "${API_HOST}/health"
 ```
 
-Additionally, running `skaffold verify` in a new terminal will run verification tests against the service (i.e. [integration tests](https://skaffold.dev/docs/verify/)). These are very lightweight health checks, and should not be confused with actual integration tests.
+Additionally, running `skaffold verify` in a new terminal will run verification tests against the service ([integration tests](https://skaffold.dev/docs/verify/)). These are very lightweight health checks, and should not be confused with actual integration tests.
 
 ## Clean Up
 
@@ -302,7 +298,7 @@ kind delete cluster \
 
 ### Debugging Tools
 
-`kubectl` is the official CLI for Kubernetes, and supports a lot of useful functionality.
+`kubectl` is the official CLI for Kubernetes and supports a lot of useful functionality.
 
 For example, to get a shell inside the `nv-ingest-ms-runtime` container in your deployment, run the following:
 
@@ -325,7 +321,7 @@ kubectl exec \
 ```
 
 For an interactive, live-updating experience, try `k9s`.
-To launch it, just run `k9s`.
+To launch it, run `k9s`.
 
 ```shell
 k9s
@@ -335,16 +331,15 @@ You should see something like the following.
 
 ![k9s example](./media/k9s-example.png){width=80%}
 
-For details on how to use it, see https://k9scli.io/topics/commands/.
+For details on how to use it, refer to https://k9scli.io/topics/commands/.
 
 ### Installing Helm Repositories
 
-You may encounter an error like this:
+You could encounter an error like this:
 
 > _Error: no repository definition for https://helm.dask.org. Please add the missing repos via 'helm repo add'_
 
-That indicates that your local installation of `Helm` (sort of a package manager for Kubernetes configurations) doesn't know
-how to access a remote repository containing Kubernetes configurations.
+This indicates that your local installation of `Helm` (sort of a package manager for Kubernetes configurations) doesn't know how to access a remote repository containing Kubernetes configurations.
 
 As that error message says, run `help repo add` with that URL and an informative name.
 
@@ -354,9 +349,9 @@ helm repo add \
     https://charts.bitnami.com/bitnami
 ```
 
-### Getting more logs from `skaffold`
+### Getting More Logs From `skaffold`
 
-You may encounter an error like this:
+You could encounter an error like this:
 
 ```shell
 Generating tags...
@@ -370,7 +365,7 @@ building helm dependencies: exit status 1
 
 Seeing only "building helm dependencies" likely means you ran `skaffold dev` or `skaffold run` in a fairly quiet mode.
 
-Re-run those commands with something like `-v info` or `-v debug` to get more information about what specifically failed.
+Rerun those commands with something like `-v info` or `-v debug` to get more information about what specifically failed.
 
 ## References
 
