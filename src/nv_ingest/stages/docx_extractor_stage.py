@@ -10,6 +10,7 @@ import logging
 import traceback
 
 import pandas as pd
+from pydantic import BaseModel
 from morpheus.config import Config
 
 from nv_ingest.extraction_workflows import docx
@@ -33,6 +34,9 @@ def _process_docx_bytes(df, task_props):
     """
 
     def decode_and_extract(base64_row, task_props, default="python_docx"):
+        if isinstance(task_props, BaseModel):
+            task_props = task_props.model_dump()
+
         # Base64 content to extract
         base64_content = base64_row["content"]
         # Row data to include in extraction

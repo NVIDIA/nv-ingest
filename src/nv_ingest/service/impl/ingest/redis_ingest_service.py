@@ -53,11 +53,22 @@ class RedisIngestService(IngestServiceMeta):
 
     async def submit_job(self, job_spec: MessageWrapper, trace_id: str) -> str:
         try:
-            json_data = job_spec.dict()["payload"]
+            json_data = job_spec.model_dump()["payload"]
             job_spec = json.loads(json_data)
             validate_ingest_job(job_spec)
 
             job_spec["job_id"] = trace_id
+
+            tasks = job_spec["tasks"]
+            updated_tasks = []
+
+            for task in tasks:
+                task_prop = task["task_properties"]
+                task_prop_dict = task_prop.dict()
+                task["task_properties"] = task_prop_dict
+                updated_tasks.append(task)
+
+            job_spec["tasks"] = updated_tasks
 
             self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
 

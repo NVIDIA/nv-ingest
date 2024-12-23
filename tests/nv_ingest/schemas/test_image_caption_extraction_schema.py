@@ -36,7 +36,7 @@ def test_invalid_extra_field():
     data_with_extra_field = {"api_key": "your-api-key-here", "extra_field": "should_not_be_allowed"}
     with pytest.raises(ValidationError) as exc_info:
         ImageCaptionExtractionSchema(**data_with_extra_field)
-    assert "extra fields not permitted" in str(exc_info.value)
+    assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
 def test_invalid_field_types():

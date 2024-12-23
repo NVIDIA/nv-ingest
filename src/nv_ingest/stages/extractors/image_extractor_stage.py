@@ -14,6 +14,7 @@ from typing import List
 from typing import Optional
 
 import pandas as pd
+from pydantic import BaseModel
 from morpheus.config import Config
 
 import nv_ingest.extraction_workflows.image as image_helpers
@@ -151,6 +152,9 @@ def process_image(
     logger.debug("Processing image content")
     if trace_info is None:
         trace_info = {}
+
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
 
     try:
         # Apply the helper function to each row in the 'content' column

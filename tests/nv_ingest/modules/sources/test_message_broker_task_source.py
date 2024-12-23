@@ -93,7 +93,7 @@ def test_process_message_valid_job(job_payload):
     assert isinstance(message_meta, MessageMeta)
 
     # Check that the DataFrame contains the job payload
-    df = message_meta.df
+    df = message_meta.copy_dataframe()
     assert isinstance(df, cudf.DataFrame)
     for column in job["job_payload"]:
         assert column in df.columns
