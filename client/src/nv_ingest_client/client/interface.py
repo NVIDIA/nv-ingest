@@ -10,7 +10,7 @@ import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any
+from typing import Any, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -24,10 +24,9 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
@@ -83,6 +82,7 @@ class Ingestor:
         self._job_specs = None
         self._job_ids = None
         self._job_states = None
+        self._job_id_to_source_id = {}
 
         if self._check_files_local():
             self._job_specs = BatchJobSpec(self._documents)
@@ -125,7 +125,7 @@ class Ingestor:
 
         return True
 
-    def files(self, documents: List[str]) -> "Ingestor":
+    def files(self, documents: Union[str, List[str]]) -> "Ingestor":
         """
         Add documents to the manager for processing and check if they are all local.
 
@@ -242,6 +242,7 @@ class Ingestor:
         self._prepare_ingest_run()
 
         self._job_ids = self._client.add_job(self._job_specs)
+
         future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
         self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
@@ -299,9 +300,10 @@ class Ingestor:
             .dedup() \
             .filter() \
             .split() \
-            .embed()
-            # .store() \
-            # .vdb_upload()
+            .embed() \
+            .store_embed()
+        # .store() \
+        # .vdb_upload()
         # fmt: on
         return self
 
@@ -369,11 +371,6 @@ class Ingestor:
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 
-            if extract_tables is True:
-                self._job_specs.add_task(TableExtractionTask())
-            if extract_charts is True:
-                self._job_specs.add_task(ChartExtractionTask())
-
         return self
 
     @ensure_job_specs
@@ -432,6 +429,26 @@ class Ingestor:
             Returns self for chaining.
         """
         store_task = StoreTask(**kwargs)
+        self._job_specs.add_task(store_task)
+
+        return self
+
+    @ensure_job_specs
+    def store_embed(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a StoreTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the StoreTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        store_task = StoreEmbedTask(**kwargs)
         self._job_specs.add_task(store_task)
 
         return self

@@ -91,7 +91,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 
     # First attempt with rendering enabled
     try:
-        logger.debug("Attempting to get rendered bitmap.")
+        # logger.debug("Attempting to get rendered bitmap.")
         image_bitmap = image_obj.get_bitmap(render=True)
     except pdfium.PdfiumError as e:
         logger.debug(f"Failed to get rendered bitmap: {e}")
@@ -99,7 +99,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
     # If rendering failed or returned None, try without rendering
     if image_bitmap is None:
         try:
-            logger.debug("Attempting to get raw bitmap without rendering.")
+            # logger.debug("Attempting to get raw bitmap without rendering.")
             image_bitmap = image_obj.get_bitmap(render=False)
         except pdfium.PdfiumError as e:
             logger.debug(f"Failed to get raw bitmap: {e}")

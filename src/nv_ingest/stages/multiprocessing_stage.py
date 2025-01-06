@@ -13,7 +13,6 @@ import uuid
 from datetime import datetime
 from functools import partial
 
-import cudf
 import mrc
 import pandas as pd
 from morpheus.config import Config
@@ -24,6 +23,9 @@ from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
 from mrc.core import operators as ops
 from mrc.core.subscriber import Observer
+
+import cudf
+
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
@@ -137,15 +139,16 @@ class MultiProcessingBaseStage(SinglePortStage):
        forwards the task to a global multi-process worker pool where the heavy-lifting occurs.
 
     3. **Global Worker Pool**: The work is executed in parallel across multiple process engines via the worker pool.
-       Each process engine applies the `process_fn` to the task data, which includes a pandas DataFrame and task-specific arguments.
+       Each process engine applies the `process_fn` to the task data, which includes a pandas DataFrame and
+       task-specific arguments.
 
     4. **Response Queue**: After the work is completed by the worker pool, the results are pushed into a response queue.
 
-    5. **Post-Processing and Emission**: The results from the response queue are post-processed, reconstructed into their
-       original format, and emitted from an observable source for further downstream processing or final output.
+    5. **Post-Processing and Emission**: The results from the response queue are post-processed, reconstructed into
+        their original format, and emitted from an observable source for further downstream processing or final output.
 
-    This design enhances parallelism and resource utilization across multiple processes, especially for tasks that involve
-    heavy computations, such as large DataFrame operations.
+    This design enhances parallelism and resource utilization across multiple processes, especially for tasks that
+    involve heavy computations, such as large DataFrame operations.
     """
 
     def __init__(
@@ -155,7 +158,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         task_desc: str,
         pe_count: int,
         process_fn: typing.Callable[[pd.DataFrame, dict], pd.DataFrame],
-        document_type: typing.Union[typing.List[str],str] = None,
+        document_type: typing.Union[typing.List[str], str] = None,
         filter_properties: dict = None,
     ):
         super().__init__(c)
@@ -252,7 +255,7 @@ class MultiProcessingBaseStage(SinglePortStage):
                     if extra_results:
                         for extra_result in extra_results:
                             if isinstance(extra_result, dict) and ("trace_info" in extra_result):
-                               work_package["trace_info"] = extra_result["trace_info"]
+                                work_package["trace_info"] = extra_result["trace_info"]
 
                     work_package_response_queue.put({"type": "on_next", "value": work_package})
                 except Exception as e:

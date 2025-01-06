@@ -1,16 +1,12 @@
-import urllib
-from pyexpat import ExpatError
-from xml.etree.ElementTree import ParseError
-
-from wand.exceptions import WandException
-
-from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image, convert_svg_to_bitmap, \
-    extract_table_and_chart_images
-from PIL import Image
 import io
-import numpy as np
-from typing import List, Tuple
+from typing import Tuple
 
+import numpy as np
+from PIL import Image
+
+from nv_ingest.extraction_workflows.image.image_handlers import convert_svg_to_bitmap
+from nv_ingest.extraction_workflows.image.image_handlers import extract_table_and_chart_images
+from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.extraction_workflows.image.image_handlers import process_inference_results
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 
@@ -262,7 +258,7 @@ def test_process_inference_results_varied_num_classes():
 def crop_image(image: np.ndarray, bbox: Tuple[int, int, int, int]) -> np.ndarray:
     """Mock function to simulate cropping an image."""
     h1, w1, h2, w2 = bbox
-    return image[int(h1):int(h2), int(w1):int(w2)]
+    return image[int(h1) : int(h2), int(w1) : int(w2)]
 
 
 def test_extract_table_and_chart_images_empty_annotations():
@@ -321,7 +317,7 @@ def test_extract_table_and_chart_images_multiple_objects():
     """Test extraction with multiple table and chart objects."""
     annotation_dict = {
         "table": [[0.1, 0.1, 0.3, 0.3, 0.8], [0.5, 0.5, 0.7, 0.7, 0.85]],
-        "chart": [[0.2, 0.2, 0.4, 0.4, 0.9]]
+        "chart": [[0.2, 0.2, 0.4, 0.4, 0.9]],
     }
     original_image = np.random.rand(640, 640, 3)
     tables_and_charts = []

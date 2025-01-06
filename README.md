@@ -44,8 +44,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM/NVLink or PCIe | 80GB | 2 |
-| A100 | SXM/NVLink or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 2 |
+| A100 | SXM or PCIe | 80GB | 2 |
 
 ### Software
 
@@ -63,6 +63,9 @@ To get started using NVIDIA Ingest, you need to do a few things:
 2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
+
+Optional:
+1. [Direct Library Deployment](docs/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -91,10 +94,9 @@ Password: <Your Key>
 
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
-# Container images must access resources from NGC. 
-NGC_API_KEY=...
-DATASET_ROOT=<PATH_TO_THIS_REPO>/data
-NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
+# Container images must access resources from NGC.
+NGC_API_KEY=... # Optional, set this if you are deploying NIMs locally from NGC
+NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com NIMs
 ```
 
 > [!NOTE]
@@ -113,6 +115,8 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+>
+> If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
@@ -155,7 +159,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 > ```
 > docker compose build
 > ```
-> 
+>
 > After the image is built, run `docker compose up` per item 5 above.
 
 ### Step 2: Installing Python dependencies
@@ -163,20 +167,26 @@ ac27e5297d57   prom/prometheus:latest                                           
 To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
-```
+```bash
 # conda not required, but makes it easy to create a fresh python environment
-conda create --name nv-ingest-dev python=3.10
+conda create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
 conda activate nv-ingest-dev
+
 cd client
-pip install -r ./requirements.txt
+pip install .
+
+# When not using Conda, pip dependencies for the client can be installed directly via pip. Pip based installation of
+# the ingest service is not supported.
+cd client
+pip install -r requirements.txt
 pip install .
 ```
 
 > [!NOTE]
 > Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
-> 
+>
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
-> 
+>
 > To interact within the container:
 > ```
 > docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
@@ -185,7 +195,7 @@ pip install .
 > ```
 > (morpheus) root@aba77e2a4bde:/workspace#
 > ```
-> 
+>
 > From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
 
 ### Step 3: Ingesting Documents
@@ -209,10 +219,7 @@ import logging, time
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.util.file_processing.extract import extract_file_content
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 
 logger = logging.getLogger("nv_ingest_client")
 
@@ -245,12 +252,7 @@ extract_task = ExtractTask(
   extract_tables=True
 )
 
-table_data_extract = TableExtractionTask()
-chart_data_extract = ChartExtractionTask()
-
 job_spec.add_task(extract_task)
-job_spec.add_task(table_data_extract)
-job_spec.add_task(chart_data_extract)
 
 # Create the client and inform it about the JobSpec we want to process.
 client = NvIngestClient(

@@ -302,7 +302,7 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                 extracted_data.append(table_extraction)
 
         # Extract text - slide (b)
-        if (extract_text) and (text_depth == TextTypeEnum.PAGE):
+        if (extract_text) and (text_depth == TextTypeEnum.PAGE) and (len(accumulated_text) > 0):
             text_extraction = _construct_text_metadata(
                 presentation,
                 shape,
@@ -324,7 +324,7 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
             accumulated_text = []
 
     # Extract text - presentation (c)
-    if (extract_text) and (text_depth == TextTypeEnum.DOCUMENT):
+    if (extract_text) and (text_depth == TextTypeEnum.DOCUMENT) and (len(accumulated_text) > 0):
         text_extraction = _construct_text_metadata(
             presentation,
             shape,

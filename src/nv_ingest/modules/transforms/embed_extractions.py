@@ -405,6 +405,9 @@ def _generate_embeddings(
     """
 
     with ctrl_msg.payload().mutable_dataframe() as mdf:
+        if mdf.empty:
+            return None, None
+
         # generate table text mask
         if content_type == ContentTypeEnum.TEXT:
             content_mask = (mdf["document_type"] == content_type.value) & (
@@ -469,7 +472,6 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
     """
 
     with ctrl_msg.payload().mutable_dataframe() as mdf:
-
         # build unified mask
         unified_mask = cudf.Series(False, index=mdf.index)
         for mask in masks:

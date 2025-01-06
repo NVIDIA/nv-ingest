@@ -1,3 +1,0 @@
-# Requirements for NV-ingest utils.
-click~=8.1
-tqdm

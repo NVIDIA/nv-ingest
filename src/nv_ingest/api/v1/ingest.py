@@ -11,7 +11,7 @@
 # pylint: skip-file
 
 from io import BytesIO
-from typing import Annotated, Dict, List, Optional
+from typing import Annotated, Dict, List
 import base64
 import json
 import logging
@@ -21,12 +21,13 @@ import uuid
 import os
 import requests
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Request, Response
 from fastapi import Depends
 from fastapi import File, UploadFile, Form
 from fastapi import HTTPException
 from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
+from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
 from redis import RedisError
 
@@ -34,14 +35,12 @@ from nv_ingest.util.converters.formats import ingest_json_results_to_blob
 from nv_ingest.util.vdb.milvus import bulk_upload_results_to_milvus, search_milvus, check_bulk_upload_status
 from nv_ingest.schemas.vdb_query_job_schema import OpenAIRequest, OpenAIResponse
 
-from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.vdb_upload import VdbUploadTask
 from nv_ingest_client.primitives.tasks.embed import EmbedTask
 from nv_ingest_client.primitives.tasks.split import SplitTask
 
@@ -73,10 +72,7 @@ INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
     summary="submit document to the core nv ingestion service for processing",
     operation_id="submit",
 )
-async def submit_job_curl_friendly(
-    ingest_service: INGEST_SERVICE_T,
-    file: UploadFile = File(...)
-):
+async def submit_job_curl_friendly(ingest_service: INGEST_SERVICE_T, file: UploadFile = File(...)):
     """
     A multipart/form-data friendly Job submission endpoint that makes interacting with
     the nv-ingest service through tools like Curl easier.
@@ -94,34 +90,33 @@ async def submit_job_curl_friendly(
             source_name=file.filename,
             # TODO: Update this to accept user defined options
             extended_options={
-                "tracing_options":
-                {
+                "tracing_options": {
                     "trace": True,
                     "ts_send": time.time_ns(),
-                    "trace_id": trace.get_current_span().get_span_context().trace_id
+                    "trace_id": trace.get_current_span().get_span_context().trace_id,
                 }
-            }
+            },
         )
 
         # This is the "easy submission path" just default to extracting everything
-        extract_task = ExtractTask(
-            document_type="pdf",
-            extract_text=True,
-            extract_images=True,
-            extract_tables=True
-        )
+        extract_task = ExtractTask(document_type="pdf", extract_text=True, extract_images=True, extract_tables=True)
 
         job_spec.add_task(extract_task)
 
-        submitted_job_id = await ingest_service.submit_job(
-            MessageWrapper(
-                payload=json.dumps(job_spec.to_dict())
-            )
-        )
+        submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
         return submitted_job_id
     except Exception as ex:
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+
+
+def trace_id_to_uuid(trace_id: str) -> str:
+    """Convert a 32-character OpenTelemetry trace ID to a UUID-like format."""
+    trace_id = str(trace.format_trace_id(trace_id))
+    if len(trace_id) != 32:
+        raise ValueError("Trace ID must be a 32-character hexadecimal string")
+    return f"{trace_id[:8]}-{trace_id[8:12]}-{trace_id[12:16]}-{trace_id[16:20]}-{trace_id[20:]}"
+
 
 # POST /submit_job
 @router.post(
@@ -135,23 +130,40 @@ async def submit_job_curl_friendly(
     summary="submit jobs to the core nv ingestion service for processing",
     operation_id="submit_job",
 )
-async def submit_job(job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
-    try:
-        # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
-        # will be able to trace across uvicorn -> morpheus
-        current_trace_id = trace.get_current_span().get_span_context().trace_id
-        
-        job_spec_dict = json.loads(job_spec.payload)
-        job_spec_dict['tracing_options']['trace_id'] = current_trace_id
-        updated_job_spec = MessageWrapper(
-            payload=json.dumps(job_spec_dict)
-        )
+async def submit_job(request: Request, response: Response, job_spec: MessageWrapper, ingest_service: INGEST_SERVICE_T):
+    with tracer.start_as_current_span("http-submit-job") as span:
+        try:
+            # Add custom attributes to the span
+            span.set_attribute("http.method", request.method)
+            span.set_attribute("http.url", str(request.url))
+            span.add_event("Submitting file for processing")
 
-        submitted_job_id = await ingest_service.submit_job(updated_job_spec)
-        return submitted_job_id
-    except Exception as ex:
-        traceback.print_exc()
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+            # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
+            # will be able to trace across uvicorn -> morpheus
+            current_trace_id = span.get_span_context().trace_id
+
+            job_spec_dict = json.loads(job_spec.payload)
+            job_spec_dict["tracing_options"]["trace_id"] = current_trace_id
+            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
+
+            job_id = trace_id_to_uuid(current_trace_id)
+            print(f"Converted trace_id: {current_trace_id} -> UUID: {job_id}")
+
+            # Submit the job async
+            await ingest_service.submit_job(updated_job_spec, job_id)
+
+            # Add another event
+            span.add_event("Finished processing")
+
+            # We return the trace-id as a 32-byte hexidecimal string which is the format you would use when
+            # searching in Zipkin for traces. The original value is a 128 bit integer ...
+            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+
+            return job_id
+
+        except Exception as ex:
+            traceback.print_exc()
+            raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
 # GET /fetch_job
@@ -187,49 +199,39 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
-
 @router.post("/convert")
 async def convert_pdf(
     ingest_service: INGEST_SERVICE_T,
     files: List[UploadFile] = File(...),
     job_id: str = Form(...),
-    vdb_task: bool = Form(False)
+    vdb_task: bool = Form(False),
 ) -> Dict[str, str]:
     try:
-        
+
         print(f"Processing: {len(files)} PDFs ....; vdb_task: {vdb_task}")
-        
+
         submitted_jobs: List[ProcessingJob] = []
         for file in files:
             if file.content_type != "application/pdf":
-                raise HTTPException(
+                raise HTTPException(status_code=400, detail=f"File {files[0].filename} must be a PDF")
 
-                    status_code=400, detail=f"File {files[0].filename} must be a PDF"
-                )
-            
             file_stream = BytesIO(file.file.read())
             doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
-            
+
             job_spec = JobSpec(
                 document_type="pdf",
                 payload=doc_content,
                 source_id=file.filename,
                 source_name=file.filename,
                 extended_options={
-                    "tracing_options":
-                    {
+                    "tracing_options": {
                         "trace": True,
                         "ts_send": time.time_ns(),
                     }
-                }
+                },
             )
 
-            extract_task = ExtractTask(
-                document_type="pdf",
-                extract_text=True,
-                extract_images=True,
-                extract_tables=True
-            )
+            extract_task = ExtractTask(document_type="pdf", extract_text=True, extract_images=True, extract_tables=True)
 
             table_data_extract = TableExtractionTask()
             chart_data_extract = ChartExtractionTask()
@@ -240,10 +242,7 @@ async def convert_pdf(
                 max_character_length=5000,
                 sentence_window_size=0,
             )
-            embed_task = EmbedTask(
-                text=True,
-                tables=True
-            )
+            embed_task = EmbedTask(text=True, tables=True)
 
             job_spec.add_task(extract_task)
             job_spec.add_task(table_data_extract)
@@ -251,19 +250,15 @@ async def convert_pdf(
             job_spec.add_task(split_task)
             job_spec.add_task(embed_task)
 
-            submitted_job_id = await ingest_service.submit_job(
-                MessageWrapper(
-                    payload=json.dumps(job_spec.to_dict())
-                )
-            )
+            submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
 
             processing_job = ProcessingJob(
                 submitted_job_id=submitted_job_id,
                 filename=file.filename,
                 status=ConversionStatus.IN_PROGRESS,
-                vdb_task=vdb_task
+                vdb_task=vdb_task,
             )
-            
+
             submitted_jobs.append(processing_job)
 
         # Each invocation of this endpoint creates a "job" that could have multiple PDFs being parsed ...
@@ -273,8 +268,8 @@ async def convert_pdf(
         else:
             job_id = job_id
 
-        await ingest_service.set_processing_cache(job_id, submitted_jobs) 
-        
+        await ingest_service.set_processing_cache(job_id, submitted_jobs)
+
         print(f"Submitted: {len(submitted_jobs)} PDFs for processing")
 
         return {
@@ -299,28 +294,28 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
         logger.error(f"Error getting status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
     print(f"Job contains: {len(processing_jobs)} PDFs that are processing. Lets check them now ...")
-    
+
     updated_cache: List[ProcessingJob] = []
     num_ready_docs = 0
-    
+
     for processing_job in processing_jobs:
         print(f"Checking on submitted_job_id: {processing_job.submitted_job_id}")
-    
+
         print(f"Processing Job Status: {processing_job.status}")
         if processing_job.status == ConversionStatus.IN_PROGRESS:
             # Attempt to fetch the job from the ingest service
             try:
                 job_response = await ingest_service.fetch_job(processing_job.submitted_job_id)
-                
+
                 job_response = json.dumps(job_response)
                 blob_response = ingest_json_results_to_blob(job_response)
-                
+
                 processing_job.raw_result = job_response
                 processing_job.content = blob_response
                 processing_job.status = ConversionStatus.SUCCESS
                 num_ready_docs = num_ready_docs + 1
                 updated_cache.append(processing_job)
-                
+
             except TimeoutError:
                 print(f"TimeoutError getting result for job_id: {processing_job.submitted_job_id}")
                 updated_cache.append(processing_job)
@@ -334,7 +329,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
             num_ready_docs = num_ready_docs + 1
             updated_cache.append(processing_job)
 
-    await ingest_service.set_processing_cache(job_id, updated_cache) 
+    await ingest_service.set_processing_cache(job_id, updated_cache)
 
     print(f"{num_ready_docs}/{len(updated_cache)} complete")
     if num_ready_docs == len(updated_cache):
@@ -351,15 +346,15 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
             )
             raw_results.append(result.raw_result)
             print(f"reuslt.vdb_task: {result.vdb_task}")
-            if result.vdb_task == True:
+            if result.vdb_task is True:
                 vdb_task = True
-        
-        if vdb_task:    
+
+        if vdb_task:
             # The bulk upload task takes time. It is running Async so we return a 202 and store
             # the bulk upload task_id to query for the status on subsequent queries here.
             if vdb_task_id is None:
-                print(f"Inserting results into Milvus vector database ...")
-                vdb_task_id = bulk_upload_results_to_milvus(raw_results, collection_name = job_id)
+                print("Inserting results into Milvus vector database ...")
+                vdb_task_id = bulk_upload_results_to_milvus(raw_results, collection_name=job_id)
                 await ingest_service.set_vdb_bulk_upload_status(job_id, vdb_task_id)
                 print(f"VDB Task Id Insertion: {vdb_task_id}")
                 print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
@@ -373,9 +368,10 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                     )
                 else:
                     print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
-                    raise HTTPException(status_code=202, detail="VDB Bulk upload running but is not ready yet. Retry later.")
-            
-        
+                    raise HTTPException(
+                        status_code=202, detail="VDB Bulk upload running but is not ready yet. Retry later."
+                    )
+
         return JSONResponse(
             content={"status": "completed", "result": results},
             status_code=200,
@@ -391,75 +387,63 @@ def perform_text_embedding(text: str) -> List[float]:
     try:
         embedding_http_endpoint = os.getenv("EMBEDDING_HTTP_ENDPOINT", "http://embedding:8000/v1/embeddings")
         logger.debug(f"Embedding endpoint: {embedding_http_endpoint}")
-        
+
         # embedding JSON payload
-        payload = {
-            "input": [text],
-            "model": "nvidia/nv-embedqa-e5-v5",
-            "input_type": "query"
-        }
+        payload = {"input": [text], "model": "nvidia/nv-embedqa-e5-v5", "input_type": "query"}
 
         # Headers
-        headers = {
-            "Content-Type": "application/json",
-            "accept": "application/json"
-        }
-        
+        headers = {"Content-Type": "application/json", "accept": "application/json"}
+
         result = requests.post(embedding_http_endpoint, data=json.dumps(payload), headers=headers)
         logger.debug(f"Embedding result: {result.text}")
         if result.status_code == 200:
             resp_json = json.loads(result.text)
-            return resp_json['data'][0]['embedding'] # List of floats
+            return resp_json["data"][0]["embedding"]  # List of floats
         else:
             # Exception in embedding ...
             raise HTTPException(status_code=500, detail=f"Embedding generation failed: {result.status_code}")
-            
+
     except Exception as e:
         logger.error(f"Exception embedding text: {e}")
         raise HTTPException(status_code=500, detail=f"Embedding generation failed: {e}")
 
+
 @router.post("/query", response_model=OpenAIResponse)
 async def query_milvus(request: OpenAIRequest):
-    
+
     # Adaptation for needs from another team. Sorry for the clutter
-    model = "nvidia/nv-embedqa-e5-v5"
+    # model = "nvidia/nv-embedqa-e5-v5"
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": request.query}
+        {"role": "user", "content": request.query},
     ]
-    max_tokens = 100
-    temperature = 0.7
-    top_p = 1.0
-    
+
     # Extract user query from the last message
-    user_message = next(
-        (message for message in reversed(messages) if message["role"] == "user"), None
-    )
+    user_message = next((message for message in reversed(messages) if message["role"] == "user"), None)
     if not user_message:
         raise HTTPException(status_code=400, detail="No user query message found in request.")
 
     logger.debug(f"Received user_message: {user_message}")
     user_query = user_message["content"]
     logger.debug(f"User query: {user_query}")
-    
+
     # Generate embedding for the query
     query_embedding = perform_text_embedding(user_query)
 
     logger.debug(f"Query Embedding: {query_embedding}")
     # Query Milvus for relevant documents
     try:
-        docs = search_milvus(query_embedding, top_k = request.k, collection_name = request.job_id)
+        docs = search_milvus(query_embedding, top_k=request.k, collection_name=request.job_id)
         logger.debug(f"Results from milvus: {docs}")
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
-    
-    
+
     results = []
     # Construct the response (combine docs into one or summarize, depending on your application)
-    if docs != None:
+    if docs is not None:
         print(f"Docs Type: {type(docs)}")
         print(f"Len of docs: {len(docs)}")
-        
+
         for doc in docs:
             if doc is not None:
                 print(f"Doc: {doc}")
@@ -467,23 +451,8 @@ async def query_milvus(request: OpenAIRequest):
                 if len(results) >= request.k:
                     break
             else:
-                print(f"Doc is None ...")
-                
-    print(f"Query Results: {results}")
-            
-    #     response_content = "\n".join([s for s in docs if s is not None])
-    # else:
-    #     # No hits from the VDB ....
-    #     response_content = ""
+                print("Doc is None ...")
 
-    # return OpenAIResponse(
-    #     id="query-response-001",
-    #     object="chat.completion",
-    #     created=int(time.time()),
-    #     model="nvidia/nv-embedqa-e5-v5",
-    #     choices=[{"message": {"role": "assistant", "content": response_content}}]
-    # )
-    
-    return OpenAIResponse(
-        content=results
-    )
+    print(f"Query Results: {results}")
+
+    return OpenAIResponse(content=results)

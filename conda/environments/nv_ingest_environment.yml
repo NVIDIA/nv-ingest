@@ -1,0 +1,51 @@
+name: nv_ingest_runtime
+channels:
+  - nvidia/label/dev
+  - rapidsai
+  - nvidia
+  - conda-forge
+  - pytorch
+dependencies:
+  - azure-core>=1.32.0
+  - click>=8.1.7
+  - fastapi>=0.115.6
+  - fastparquet>=2024.11.0
+  - fsspec>=2024.10.0
+  - httpx>=0.28.1
+  - isodate>=0.7.2
+  - langdetect>=1.0.9
+  - minio>=7.2.12
+  - morpheus-core=25.02.00a
+  - morpheus-llm=25.02.00a
+  - openai>=1.57.1
+  - opentelemetry-api>=1.27.0
+  - opentelemetry-exporter-otlp>=1.27.0
+  - opentelemetry-sdk>=1.27.0
+  - pydantic<2.0.0
+  - pypdfium2>=4.30.0
+  - pytest>=8.0.2
+  - pytest-mock>=3.14.0
+  - pytest-cov>=6.0.0
+  - python>=3.10
+  - python-docx>=1.1.2
+  - python-dotenv>=1.0.1
+  - python-pptx>=1.0.2
+  - pytorch
+  - redis-py>=5.2.1
+  - requests>=2.32.3
+  - setuptools>=58.2.0
+  - tabulate>=0.9.0
+  - torchvision
+  - torchaudio
+  - transformers>=4.47.0
+  - tqdm>=4.67.1
+  - unstructured-client>=0.25.9
+  - uvicorn
+  - wand>=0.6.10
+  - pip
+  - pip:
+      - llama-index-embeddings-nvidia
+      - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
+      - pymilvus>=2.5.0
+      - pymilvus[bulk_writer, model]
+      - pydantic<2.0.0 # Prevent llama-index from installing pydantic>=2.0.0

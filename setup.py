@@ -2,9 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-
 import datetime
 import os
 import re
@@ -13,7 +10,6 @@ from setuptools import find_packages
 from setuptools import setup
 
 
-# TODO(Devin): This is duplicated in nv_ingest_client's setup.py, should be moved to common once Jermey's PR is merged
 def get_version():
     release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
     version = os.getenv("NV_INGEST_VERSION")
@@ -45,11 +41,7 @@ def read_requirements(file_name):
 
 
 # Specify your requirements files
-requirements_files = [
-    "requirements.txt",
-    "util-requirements.txt",
-    "test-requirements.txt",
-]
+requirements_files = []
 
 # Read and combine requirements from all specified files
 combined_requirements = []

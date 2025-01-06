@@ -4,15 +4,8 @@
 
 import logging
 import re
-from math import ceil
-from math import floor
 from typing import List
-from typing import Optional
 from typing import Tuple
-
-import numpy as np
-
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
 
 ACCEPTED_TEXT_CLASSES = set(
     [

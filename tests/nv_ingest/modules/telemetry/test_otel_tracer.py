@@ -1,4 +1,5 @@
 from datetime import datetime
+
 from morpheus.messages import ControlMessage
 
 from nv_ingest.modules.telemetry.otel_tracer import extract_annotated_task_results

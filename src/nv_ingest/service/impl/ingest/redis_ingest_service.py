@@ -11,7 +11,6 @@
 import json
 import logging
 import os
-import uuid
 from json import JSONDecodeError
 from typing import Any
 
@@ -52,21 +51,21 @@ class RedisIngestService(IngestServiceMeta):
         self._cache_prefix = "processing_cache:"
         self._bulk_vdb_cache_prefix = "vdb_bulk_upload_cache:"
 
-        self._ingest_client = RedisClient(host=self._redis_hostname, port=self._redis_port,
-                                          max_pool_size=self._concurrency_level)
+        self._ingest_client = RedisClient(
+            host=self._redis_hostname, port=self._redis_port, max_pool_size=self._concurrency_level
+        )
 
-    async def submit_job(self, job_spec: MessageWrapper) -> str:
+    async def submit_job(self, job_spec: MessageWrapper, trace_id: str) -> str:
         try:
             json_data = job_spec.dict()["payload"]
             job_spec = json.loads(json_data)
             validate_ingest_job(job_spec)
 
-            job_id = str(uuid.uuid4())
-            job_spec["job_id"] = job_id
+            job_spec["job_id"] = trace_id
 
             self._ingest_client.submit_message(self._redis_task_queue, json.dumps(job_spec))
 
-            return job_id
+            return trace_id
 
         except JSONDecodeError as err:
             logger.error("Error: %s", err)
@@ -78,25 +77,21 @@ class RedisIngestService(IngestServiceMeta):
 
     async def fetch_job(self, job_id: str) -> Any:
         # Fetch message with a timeout
-        message = self._ingest_client.fetch_message(f"response_{job_id}", timeout=5)
+        message = self._ingest_client.fetch_message(f"{job_id}", timeout=5)
         if message is None:
             raise TimeoutError()
 
         return message
-    
+
     async def set_processing_cache(self, job_id: str, jobs_data: List[ProcessingJob]) -> None:
         """Store processing jobs data using simple key-value"""
         cache_key = f"{self._cache_prefix}{job_id}"
         try:
-            self._ingest_client.get_client().set(
-                cache_key,
-                json.dumps([job.dict() for job in jobs_data]),
-                ex=3600
-            )
+            self._ingest_client.get_client().set(cache_key, json.dumps([job.dict() for job in jobs_data]), ex=3600)
         except Exception as err:
             logger.error(f"Error setting cache for {cache_key}: {err}")
             raise
-    
+
     async def get_processing_cache(self, job_id: str) -> List[ProcessingJob]:
         """Retrieve processing jobs data using simple key-value"""
         cache_key = f"{self._cache_prefix}{job_id}"
@@ -109,20 +104,14 @@ class RedisIngestService(IngestServiceMeta):
             logger.error(f"Error getting cache for {cache_key}: {err}")
             raise
 
-
     async def set_vdb_bulk_upload_status(self, job_id: str, task_id: str):
         """Set the task_id for the vdb upload task"""
         cache_key = f"{self._bulk_vdb_cache_prefix}{job_id}"
         try:
-            self._ingest_client.get_client().set(
-                cache_key,
-                task_id,
-                ex=3600
-            )
+            self._ingest_client.get_client().set(cache_key, task_id, ex=3600)
         except Exception as err:
             logger.error(f"Error setting cache for {cache_key}: {err}")
             raise
-
 
     async def get_vdb_bulk_upload_status(self, job_id: str) -> str:
         """Get the task_id for the VDB upload task to query Milvus for status"""

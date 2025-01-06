@@ -18,7 +18,7 @@ from nv_ingest.schemas.processing_job_schema import ProcessingJob
 
 class IngestServiceMeta(ABC):
     @abstractmethod
-    async def submit_job(self, job_spec: MessageWrapper) -> str:
+    async def submit_job(self, job_spec: MessageWrapper, trace_id: str) -> str:
         """Abstract method for submitting one or more jobs to the ingestion pipeline"""
 
     @abstractmethod
@@ -28,15 +28,15 @@ class IngestServiceMeta(ABC):
     @abstractmethod
     async def set_processing_cache(self, job_id: str, jobs_data: List[ProcessingJob]) -> None:
         """Abstract method for setting processing cache"""
-    
+
     @abstractmethod
     async def get_processing_cache(self, job_id: str) -> List[ProcessingJob]:
         """Abstract method for getting processing cache"""
-        
+
     @abstractmethod
     async def set_vdb_bulk_upload_status(self, job_id: str, task_id: str):
         """When bulk inserting VDB data we maintain a status"""
-        
+
     @abstractmethod
     async def get_vdb_bulk_upload_status(self, job_id: str) -> str:
         """Get the task_id for the VDB upload task to query Milvus for status"""

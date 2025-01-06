@@ -2,11 +2,12 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from nv_ingest_client.primitives.tasks.caption import CaptionTask
+from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
 from pydantic import ValidationError
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema, CaptionTask
-
 
 # Testing CaptionTaskSchema
+
 
 def test_valid_schema_initialization():
     """Test valid initialization of CaptionTaskSchema with all fields."""
@@ -41,6 +42,7 @@ def test_schema_invalid_extra_field():
 
 
 # Testing CaptionTask
+
 
 def test_caption_task_initialization():
     """Test initializing CaptionTask with all fields."""
@@ -95,8 +97,8 @@ def test_caption_task_to_dict_all_fields():
         "task_properties": {
             "api_key": "test_key",
             "endpoint_url": "http://example.com",
-            "prompt": "Generate a caption"
-        }
+            "prompt": "Generate a caption",
+        },
     }
 
 
@@ -104,22 +106,14 @@ def test_caption_task_to_dict_partial_fields():
     """Test to_dict method of CaptionTask with partial fields."""
     task = CaptionTask(api_key="test_key")
     task_dict = task.to_dict()
-    assert task_dict == {
-        "type": "caption",
-        "task_properties": {
-            "api_key": "test_key"
-        }
-    }
+    assert task_dict == {"type": "caption", "task_properties": {"api_key": "test_key"}}
 
 
 def test_caption_task_to_dict_empty_fields():
     """Test to_dict method of CaptionTask with no fields."""
     task = CaptionTask()
     task_dict = task.to_dict()
-    assert task_dict == {
-        "type": "caption",
-        "task_properties": {}
-    }
+    assert task_dict == {"type": "caption", "task_properties": {}}
 
 
 # Execute tests
