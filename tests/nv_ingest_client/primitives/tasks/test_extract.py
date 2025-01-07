@@ -7,20 +7,23 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
 
 @pytest.mark.parametrize(
-    "document_type, extract_method, extract_text, extract_images, extract_tables",
+    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts",
     [
-        ("pdf", "tika", True, False, True),
-        (None, "pdfium", False, True, None),
-        ("txt", None, None, None, False),
+        ("pdf", "tika", True, False, True, True),
+        (None, "pdfium", False, True, None, False),
+        ("txt", None, None, None, False, False),
     ],
 )
-def test_extract_task_str_representation(document_type, extract_method, extract_text, extract_images, extract_tables):
+def test_extract_task_str_representation(
+    document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts
+):
     task = ExtractTask(
         document_type=document_type,
         extract_method=extract_method,
         extract_text=extract_text,
         extract_images=extract_images,
         extract_tables=extract_tables,
+        extract_charts=extract_charts,
     )
 
     task_str = str(task)
@@ -32,7 +35,7 @@ def test_extract_task_str_representation(document_type, extract_method, extract_
         f"extract text: {extract_text}",
         f"extract images: {extract_images}",
         f"extract tables: {extract_tables}",
-        f"extract charts: {extract_tables}",  # If extract_charts is not specified,
+        f"extract charts: {extract_charts}",  # If extract_charts is not specified,
         # it defaults to the same value as extract_tables.
         "text depth: document",  # Assuming this is a fixed value for all instances
     ]

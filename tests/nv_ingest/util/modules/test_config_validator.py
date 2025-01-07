@@ -67,7 +67,7 @@ def test_fetch_and_validate_module_config_invalid(mock_logger):
 
     # Check if the correct error message was logged
     mock_logger.error.assert_called_once()
-    assert "Invalid configuration: age: field required" in str(exc_info.value)
+    assert "Invalid configuration: age: Field required" in str(exc_info.value)
 
 
 @pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")

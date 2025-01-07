@@ -5,7 +5,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 from nv_ingest.util.logging.configuration import LogLevel
 
@@ -22,6 +22,4 @@ class EmbedExtractionsSchema(BaseModel):
     input_type: str = "passage"
     raise_on_failure: bool = False
     truncate: str = "END"
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

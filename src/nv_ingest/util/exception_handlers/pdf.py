@@ -114,4 +114,4 @@ def create_exception_tag(error_message, source_id=None):
 
     validated_unified_metadata = validate_metadata(unified_metadata)
 
-    return [[None, validated_unified_metadata.dict()]]
+    return [[None, validated_unified_metadata.model_dump()]]

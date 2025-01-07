@@ -21,7 +21,8 @@ dependencies:
   - opentelemetry-api>=1.27.0
   - opentelemetry-exporter-otlp>=1.27.0
   - opentelemetry-sdk>=1.27.0
-  - pydantic<2.0.0
+  - pydantic>2.0.0
+  - pydantic-settings>2.0.0
   - pypdfium2>=4.30.0
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
@@ -48,4 +49,3 @@ dependencies:
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
-      - pydantic<2.0.0 # Prevent llama-index from installing pydantic>=2.0.0

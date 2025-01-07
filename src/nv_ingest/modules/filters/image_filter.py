@@ -81,7 +81,7 @@ def _cpu_only_apply_filter(df: pd.DataFrame, task_params: dict):
             "filter": True,
         }
 
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
         filtered_df["info_message_metadata"] = [validated_info_msg] * filtered_df.shape[0]
         filtered_df["metadata"] = filtered_df["metadata"].apply(add_info_message, args=(info_msg,))
@@ -144,7 +144,7 @@ def _apply_filter(ctrl_msg: ControlMessage, task_params: dict):
                 "filter": True,
             }
 
-            validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).dict()
+            validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
             # update payload with `info_message_metadata` and `document_type`
             filtered_images_gdf["info_message_metadata"] = [validated_info_msg] * filtered_images_gdf.shape[0]
