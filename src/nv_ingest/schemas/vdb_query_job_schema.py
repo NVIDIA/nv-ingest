@@ -9,25 +9,16 @@
 # its affiliates is strictly prohibited.
 
 from pydantic import BaseModel
-from enum import Enum
 from typing import List
+
 
 # Define request schema
 class OpenAIRequest(BaseModel):
-    # model: str
-    # messages: List[dict]  # [{"role": "user", "content": "question"}]
-    # max_tokens: int = 256
-    # temperature: float = 0.7
-    # top_p: float = 1.0
     query: str
     k: int
     job_id: str
 
+
 # OpenAI-compatible response schema
 class OpenAIResponse(BaseModel):
-    # id: str
-    # object: str
-    # created: int
-    # model: str
-    # choices: List[dict]  # [{"message": {"role": "assistant", "content": "answer"}}]
     content: List[str]
