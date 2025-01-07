@@ -13,13 +13,13 @@ from urllib.parse import urlparse
 import mrc
 from minio import Minio
 from morpheus.messages import ControlMessage
-from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
-from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
-from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
+from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
+from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from mrc.core import operators as ops
 from pymilvus import BulkInsertState
 from pymilvus import connections

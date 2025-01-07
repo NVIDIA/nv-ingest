@@ -2,25 +2,24 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import os
+import functools
 import logging
+import os
+import traceback
 from typing import Any
 from typing import Dict
-import functools
-from minio import Minio
-
-import traceback
-from morpheus.config import Config
 
 import pandas as pd
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-
+from minio import Minio
+from morpheus.config import Config
 from pymilvus import Collection
 from pymilvus import connections
 from pymilvus.bulk_writer.constants import BulkFileType
 from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter
+
+from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
+from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
 logger = logging.getLogger(__name__)
 

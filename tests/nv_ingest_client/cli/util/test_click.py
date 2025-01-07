@@ -19,7 +19,6 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 
-
 _MODULE_UNDER_TEST = "nv_ingest_client.cli.util.click"
 
 
