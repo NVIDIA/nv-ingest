@@ -57,9 +57,14 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
 
     headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
 
+    model_name = "meta/llama-3.2-90b-vision-instruct"
+    # Add nvdev/ in the model name for internal development endpoints.
+    if "/nvdev/" in endpoint_url:
+        model_name = "nvdev/" + model_name
+
     # Payload for the request
     payload = {
-        "model": "meta/llama-3.2-90b-vision-instruct",
+        "model": model_name,
         "messages": [{"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'}],
         "max_tokens": 512,
         "temperature": 1.00,
