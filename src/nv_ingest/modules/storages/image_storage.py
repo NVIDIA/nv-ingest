@@ -19,6 +19,7 @@ from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from pydantic import BaseModel
 
 import cudf
 
@@ -159,6 +160,9 @@ def _storage_images(builder: mrc.Builder):
     def on_data(ctrl_msg: ControlMessage):
         try:
             task_props = ctrl_msg.remove_task("store")
+            if isinstance(task_props, BaseModel):
+                task_props = task_props.model_dump()
+
             store_structured = task_props.get("structured", True)
             store_images = task_props.get("images", False)
 

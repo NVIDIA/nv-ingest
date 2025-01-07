@@ -30,7 +30,7 @@ def test_metadata_injector_schema_forbids_extra():
     """
     with pytest.raises(ValidationError) as excinfo:
         MetadataInjectorSchema(raise_on_failure=False, unexpected_field="value")
-    assert "extra fields not permitted" in str(excinfo.value), "Schema should not allow extra fields."
+    assert "Extra inputs are not permitted" in str(excinfo.value), "Schema should not allow extra fields."
 
 
 @pytest.mark.parametrize("input_value", [True, False])
