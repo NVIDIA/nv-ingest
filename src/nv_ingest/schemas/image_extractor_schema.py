@@ -7,8 +7,7 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import BaseModel
-from pydantic import root_validator
+from pydantic import model_validator, ConfigDict, BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,8 @@ class ImageConfigSchema(BaseModel):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
@@ -94,8 +94,7 @@ class ImageConfigSchema(BaseModel):
 
         return values
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class ImageExtractorSchema(BaseModel):
@@ -122,6 +121,4 @@ class ImageExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     image_extraction_config: Optional[ImageConfigSchema] = None
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

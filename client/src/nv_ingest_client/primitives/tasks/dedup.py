@@ -10,8 +10,8 @@ import logging
 from typing import Dict
 from typing import Literal
 
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import BaseModel, field_validator
+
 
 from .task_base import Task
 
@@ -22,7 +22,7 @@ class DedupTaskSchema(BaseModel):
     content_type: str = "image"
     filter: bool = False
 
-    @validator("content_type")
+    @field_validator("content_type")
     def content_type_must_be_valid(cls, v):
         valid_criteria = ["image"]
         if v not in valid_criteria:
