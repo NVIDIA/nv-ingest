@@ -19,7 +19,6 @@ from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import NimClient
-from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 logger = logging.getLogger(f"morpheus.{__name__}")
@@ -139,20 +138,8 @@ def _extract_table_data(
 
     stage_config = validated_config.stage_config
 
-    # Obtain paddle_version
-    # Assuming that the grpc endpoint is at index 0
-    paddle_endpoint = stage_config.paddle_endpoints[1]
-    try:
-        paddle_version = get_version(paddle_endpoint)
-        if not paddle_version:
-            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
-            paddle_version = None  # Default to the latest version
-    except Exception:
-        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
-        paddle_version = None  # Default to the latest version
-
-    # Create the PaddleOCRModelInterface with paddle_version
-    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
+    # Create the PaddleOCRModelInterface
+    paddle_model_interface = PaddleOCRModelInterface()
 
     # Create the NimClient for PaddleOCR
     paddle_client = create_inference_client(

@@ -14,12 +14,7 @@ _MODULE_UNDER_TEST = "nv_ingest.util.nim.paddle"
 
 @pytest.fixture
 def paddle_ocr_model():
-    return PaddleOCRModelInterface(paddle_version="0.2.1")
-
-
-@pytest.fixture
-def legacy_paddle_ocr_model():
-    return PaddleOCRModelInterface(paddle_version="0.2.0")
+    return PaddleOCRModelInterface()
 
 
 @pytest.fixture
@@ -87,16 +82,6 @@ def test_format_input_http(paddle_ocr_model):
     assert result["input"][0]["url"] == "data:image/png;base64,mock_base64_string"
 
 
-def test_format_input_http_legacy(legacy_paddle_ocr_model):
-    data = {"base64_image": "mock_base64_string"}
-    result = legacy_paddle_ocr_model.format_input(data, protocol="http")
-
-    assert "messages" in result
-    content = result["messages"][0]["content"][0]
-    assert content["type"] == "image_url"
-    assert content["image_url"]["url"] == "data:image/png;base64,mock_base64_string"
-
-
 def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
@@ -121,22 +106,6 @@ def test_parse_output_http_simple(paddle_ocr_model, mock_paddle_http_response):
     assert result[1] == "simple"
 
 
-def test_parse_output_http_simple_legacy(legacy_paddle_ocr_model):
-    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
-        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
-
-        data = {"base64_image": "mock_base64_string"}
-        result = legacy_paddle_ocr_model.prepare_data_for_inference(data)
-
-    mock_legacy_paddle_http_response = {"data": [{"content": "mock_text"}]}
-
-    result = legacy_paddle_ocr_model.parse_output(
-        mock_legacy_paddle_http_response, protocol="http", table_content_format="foo"
-    )
-    assert result[0] == "mock_text"
-    assert result[1] == "simple"
-
-
 def test_parse_output_grpc_pseudo_markdown(paddle_ocr_model, mock_paddle_grpc_response):
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
         mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
@@ -157,21 +126,5 @@ def test_parse_output_grpc_simple(paddle_ocr_model, mock_paddle_grpc_response):
         result = paddle_ocr_model.prepare_data_for_inference(data)
 
     result = paddle_ocr_model.parse_output(mock_paddle_grpc_response, protocol="grpc", table_content_format="simple")
-    assert result[0] == "mock_text"
-    assert result[1] == "simple"
-
-
-def test_parse_output_grpc_legacy(legacy_paddle_ocr_model):
-    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
-        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
-
-        data = {"base64_image": "mock_base64_string"}
-        result = legacy_paddle_ocr_model.prepare_data_for_inference(data)
-
-    mock_paddle_grpc_response = np.array([[b"mock_text"]])
-
-    result = legacy_paddle_ocr_model.parse_output(
-        mock_paddle_grpc_response, protocol="grpc", table_content_format="foo"
-    )
     assert result[0] == "mock_text"
     assert result[1] == "simple"

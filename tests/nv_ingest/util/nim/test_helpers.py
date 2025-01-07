@@ -488,34 +488,12 @@ def test_create_inference_client_http_endpoint_whitespace_no_infer_protocol(mock
 
 
 # Preprocess image for paddle
-def test_preprocess_image_paddle_version_none(sample_image):
+def test_preprocess_image_paddle(sample_image):
     """
-    Test that when paddle_version is None, the function returns the input image unchanged.
+    Test the function processes the image.
     """
-    result = preprocess_image_for_paddle(sample_image, paddle_version=None)
-    assert np.array_equal(
-        result, sample_image
-    ), "The output should be the same as the input when paddle_version is None."
-
-
-def test_preprocess_image_paddle_version_old(sample_image):
-    """
-    Test that when paddle_version is less than '0.2.0-rc1', the function returns the input image unchanged.
-    """
-    result = preprocess_image_for_paddle(sample_image, paddle_version="0.1.0")
-    assert np.array_equal(
-        result, sample_image
-    ), "The output should be the same as the input when paddle_version is less than '0.2.0-rc1'."
-
-
-def test_preprocess_image_paddle_version_new(sample_image):
-    """
-    Test that when paddle_version is '0.2.0-rc1' or higher, the function processes the image.
-    """
-    result = preprocess_image_for_paddle(sample_image, paddle_version="0.2.0-rc1")
-    assert not np.array_equal(
-        result, sample_image
-    ), "The output should be different from the input when paddle_version is '0.2.0-rc1' or higher."
+    result = preprocess_image_for_paddle(sample_image)
+    assert not np.array_equal(result, sample_image), "The output should be different from the input"
     assert result.shape[0] == sample_image.shape[2], "The output should have shape (channels, height, width)."
 
 
@@ -523,7 +501,7 @@ def test_preprocess_image_transpose(sample_image):
     """
     Test that the output image is transposed correctly.
     """
-    result = preprocess_image_for_paddle(sample_image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(sample_image)
     # The output should have shape (channels, height, width)
     assert result.shape[0] == sample_image.shape[2], "The output should have channels in the first dimension."
     assert result.shape[1] > 0 and result.shape[2] > 0, "The output height and width should be greater than zero."
@@ -533,7 +511,7 @@ def test_preprocess_image_dtype(sample_image):
     """
     Test that the output image has dtype float32.
     """
-    result = preprocess_image_for_paddle(sample_image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(sample_image)
     assert result.dtype == np.float32, "The output image should have dtype float32."
 
 
@@ -542,7 +520,7 @@ def test_preprocess_image_large_image():
     Test processing of a large image.
     """
     image = np.random.randint(0, 256, size=(3000, 2000, 3), dtype=np.uint8)
-    result = preprocess_image_for_paddle(image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(image)
     height, width = image.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
@@ -559,7 +537,7 @@ def test_preprocess_image_small_image():
     Test processing of a small image.
     """
     image = np.random.randint(0, 256, size=(50, 50, 3), dtype=np.uint8)
-    result = preprocess_image_for_paddle(image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(image)
     height, width = image.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
@@ -576,7 +554,7 @@ def test_preprocess_image_non_multiple_of_32():
     Test that images with dimensions not multiples of 32 are padded correctly.
     """
     image = np.random.randint(0, 256, size=(527, 319, 3), dtype=np.uint8)
-    result = preprocess_image_for_paddle(image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(image)
     height, width = image.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
@@ -593,7 +571,7 @@ def test_preprocess_image_dtype_uint8():
     Test that the function works with images of dtype uint8.
     """
     image = np.random.randint(0, 256, size=(700, 500, 3), dtype=np.uint8)
-    result = preprocess_image_for_paddle(image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(image)
     assert result.dtype == np.float32, "The output image should be converted to dtype float32."
 
 
@@ -602,7 +580,7 @@ def test_preprocess_image_max_dimension_less_than_960():
     Test that images with max dimension less than 960 are scaled up.
     """
     image = np.random.randint(0, 256, size=(800, 600, 3), dtype=np.uint8)
-    result = preprocess_image_for_paddle(image, paddle_version="0.2.0")
+    result = preprocess_image_for_paddle(image)
     height, width = image.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
@@ -620,7 +598,7 @@ def test_preprocess_image_zero_dimension():
     """
     image = np.zeros((0, 0, 3), dtype=np.uint8)
     with pytest.raises(Exception):
-        preprocess_image_for_paddle(image, paddle_version="0.2.0")
+        preprocess_image_for_paddle(image)
 
 
 def test_preprocess_image_invalid_input():
@@ -629,24 +607,7 @@ def test_preprocess_image_invalid_input():
     """
     image = "not an image"
     with pytest.raises(Exception):
-        preprocess_image_for_paddle(image, paddle_version="0.2.0")
-
-
-def test_preprocess_image_different_paddle_versions(sample_image):
-    """
-    Test the function with different paddle_version inputs.
-    """
-    versions = ["0.1.0", "0.2.0-rc0", "0.2.0-rc1", "0.2.1"]
-    for version in versions:
-        result = preprocess_image_for_paddle(sample_image, paddle_version=version)
-        if packaging.version.parse(version) < packaging.version.parse("0.2.0-rc1"):
-            assert np.array_equal(
-                result, sample_image
-            ), f"The output should be the same as the input when paddle_version is {version}."
-        else:
-            assert not np.array_equal(
-                result, sample_image
-            ), f"The output should be different from the input when paddle_version is {version}."
+        preprocess_image_for_paddle(image)
 
 
 # Tests for `remove_url_endpoints`

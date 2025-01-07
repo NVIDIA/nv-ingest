@@ -16,7 +16,6 @@ import cv2
 import numpy as np
 import torch
 import torchvision
-from packaging import version as pkgversion
 from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
@@ -44,20 +43,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
     An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(
-        self,
-        yolox_version: Optional[str] = None,
-    ):
-        """
-        Initialize the YOLOX model interface.
-
-        Parameters
-        ----------
-        yolox_version : str, optional
-            The version of the YOLOX model (default: None).
-        """
-        self.yolox_version = yolox_version
-
     def name(
         self,
     ) -> str:
@@ -70,7 +55,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
             The name of the model interface.
         """
 
-        return f"yolox-page-elements (version {self.yolox_version})"
+        return "yolox-page-elements"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -153,21 +138,14 @@ class YoloxPageElementsModelInterface(ModelInterface):
                 scaling_factor_y = new_size[1] / YOLOX_IMAGE_PREPROC_HEIGHT
                 scaling_factors.append((scaling_factor_x, scaling_factor_y))
 
-                # Add to content_list
-                if self._is_version_early_access_legacy_api():
-                    content = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{scaled_image_b64}"}}
-                else:
-                    content = {"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"}
+                content = {"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"}
 
                 content_list.append(content)
 
             # Store scaling factors in data
             data["scaling_factors"] = scaling_factors
 
-            if self._is_version_early_access_legacy_api():
-                payload = {"messages": [{"content": content_list}]}
-            else:
-                payload = {"input": content_list}
+            payload = {"input": content_list}
 
             return payload
         else:
@@ -203,36 +181,17 @@ class YoloxPageElementsModelInterface(ModelInterface):
         elif protocol == "http":
             logger.debug("Parsing output from HTTP Yolox model")
 
-            is_legacy_version = self._is_version_early_access_legacy_api()
-
-            # Convert JSON response to numpy array similar to gRPC response
-            if is_legacy_version:
-                # Convert response data to GA API format.
-                response_data = response.get("data", [])
-                batch_results = []
-                for idx, detections in enumerate(response_data):
-                    curr_batch = {"index": idx, "bounding_boxes": {}}
-                    for obj in detections:
-                        obj_type = obj.get("type", "")
-                        bboxes = obj.get("bboxes", [])
-                        if not obj_type:
-                            continue
-                        if obj_type not in curr_batch:
-                            curr_batch["bounding_boxes"][obj_type] = []
-                        curr_batch["bounding_boxes"][obj_type].extend(bboxes)
-                    batch_results.append(curr_batch)
-            else:
-                batch_results = response.get("data", [])
+            batch_results = response.get("data", [])
 
             batch_size = len(batch_results)
             processed_outputs = []
 
             scaling_factors = data.get("scaling_factors", [(1.0, 1.0)] * batch_size)
 
-            x_min_label = "xmin" if is_legacy_version else "x_min"
-            y_min_label = "ymin" if is_legacy_version else "y_min"
-            x_max_label = "xmax" if is_legacy_version else "x_max"
-            y_max_label = "ymax" if is_legacy_version else "y_max"
+            x_min_label = "x_min"
+            y_min_label = "y_min"
+            x_max_label = "x_max"
+            y_max_label = "y_max"
             confidence_label = "confidence"
 
             for detections in batch_results:
@@ -347,9 +306,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
             inference_results.append(new_dict)
 
         return inference_results
-
-    def _is_version_early_access_legacy_api(self):
-        return self.yolox_version and (pkgversion.parse(self.yolox_version) < pkgversion.parse("1.0.0-rc0"))
 
 
 def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):

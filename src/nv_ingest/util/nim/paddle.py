@@ -6,7 +6,6 @@ from typing import Optional
 
 import numpy as np
 import pandas as pd
-from packaging import version as pkgversion
 from sklearn.cluster import DBSCAN
 
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
@@ -22,20 +21,6 @@ class PaddleOCRModelInterface(ModelInterface):
     An interface for handling inference with a PaddleOCR model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(
-        self,
-        paddle_version: Optional[str] = None,
-    ):
-        """
-        Initialize the PaddleOCR model interface.
-
-        Parameters
-        ----------
-        paddle_version : str, optional
-            The version of the PaddleOCR model (default: None).
-        """
-        self.paddle_version = paddle_version
-
     def name(self) -> str:
         """
         Get the name of the model interface.
@@ -43,9 +28,9 @@ class PaddleOCRModelInterface(ModelInterface):
         Returns
         -------
         str
-            The name of the model interface, including the PaddleOCR version.
+            The name of the model interface.
         """
-        return f"PaddleOCR - {self.paddle_version}"
+        return "PaddleOCR"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -99,7 +84,7 @@ class PaddleOCRModelInterface(ModelInterface):
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model")
             image_data = data["image_array"]
-            image_data = preprocess_image_for_paddle(image_data, self.paddle_version)
+            image_data = preprocess_image_for_paddle(image_data)
             image_data = image_data.astype(np.float32)
             image_data = np.expand_dims(image_data, axis=0)
 
@@ -137,17 +122,7 @@ class PaddleOCRModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified or the response format is unexpected.
         """
-        default_table_content_format = (
-            TableFormatEnum.SIMPLE if self._is_version_early_access_legacy_api() else TableFormatEnum.PSEUDO_MARKDOWN
-        )
-        table_content_format = kwargs.get("table_content_format", default_table_content_format)
-
-        if self._is_version_early_access_legacy_api() and (table_content_format != TableFormatEnum.SIMPLE):
-            logger.warning(
-                f"Paddle version {self.paddle_version} does not support {table_content_format} format. "
-                "The table content will be in `simple` format."
-            )
-            table_content_format = TableFormatEnum.SIMPLE
+        table_content_format = kwargs.get("table_content_format", TableFormatEnum.PSEUDO_MARKDOWN)
 
         if protocol == "grpc":
             logger.debug("Parsing output from gRPC PaddleOCR model")
@@ -178,9 +153,6 @@ class PaddleOCRModelInterface(ModelInterface):
         # For PaddleOCR, the output is the table content as a string
         return output
 
-    def _is_version_early_access_legacy_api(self):
-        return self.paddle_version and (pkgversion.parse(self.paddle_version) < pkgversion.parse("0.2.1-rc2"))
-
     def _prepare_paddle_payload(self, base64_img: str) -> Dict[str, Any]:
         """
         Prepare a payload for the PaddleOCR HTTP API using a base64-encoded image.
@@ -198,13 +170,8 @@ class PaddleOCRModelInterface(ModelInterface):
 
         image_url = f"data:image/png;base64,{base64_img}"
 
-        if self._is_version_early_access_legacy_api():
-            image = {"type": "image_url", "image_url": {"url": image_url}}
-            message = {"content": [image]}
-            payload = {"messages": [message]}
-        else:
-            image = {"type": "image_url", "url": image_url}
-            payload = {"input": [image]}
+        image = {"type": "image_url", "url": image_url}
+        payload = {"input": [image]}
 
         return payload
 
@@ -233,23 +200,20 @@ class PaddleOCRModelInterface(ModelInterface):
         if "data" not in json_response or not json_response["data"]:
             raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
 
-        if self._is_version_early_access_legacy_api():
-            content = json_response["data"][0]["content"]
+        text_detections = json_response["data"][0]["text_detections"]
+
+        text_predictions = []
+        bounding_boxes = []
+        for text_detection in text_detections:
+            text_predictions.append(text_detection["text_prediction"]["text"])
+            bounding_boxes.append([(point["x"], point["y"]) for point in text_detection["bounding_box"]["points"]])
+
+        if table_content_format == TableFormatEnum.SIMPLE:
+            content = " ".join(text_predictions)
+        elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
         else:
-            text_detections = json_response["data"][0]["text_detections"]
-
-            text_predictions = []
-            bounding_boxes = []
-            for text_detection in text_detections:
-                text_predictions.append(text_detection["text_prediction"]["text"])
-                bounding_boxes.append([(point["x"], point["y"]) for point in text_detection["bounding_box"]["points"]])
-
-            if table_content_format == TableFormatEnum.SIMPLE:
-                content = " ".join(text_predictions)
-            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
-            else:
-                raise ValueError(f"Unexpected table format: {table_content_format}")
+            raise ValueError(f"Unexpected table format: {table_content_format}")
 
         return content, table_content_format
 
@@ -257,19 +221,16 @@ class PaddleOCRModelInterface(ModelInterface):
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
 
-        if self._is_version_early_access_legacy_api():
-            content = " ".join([output[0].decode("utf-8") for output in response])
-        else:
-            bboxes_bytestr, texts_bytestr, _ = response
-            bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))[0]
-            text_predictions = json.loads(texts_bytestr.decode("utf8"))[0]
+        bboxes_bytestr, texts_bytestr, _ = response
+        bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))[0]
+        text_predictions = json.loads(texts_bytestr.decode("utf8"))[0]
 
-            if table_content_format == TableFormatEnum.SIMPLE:
-                content = " ".join(text_predictions)
-            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
-            else:
-                raise ValueError(f"Unexpected table format: {table_content_format}")
+        if table_content_format == TableFormatEnum.SIMPLE:
+            content = " ".join(text_predictions)
+        elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+        else:
+            raise ValueError(f"Unexpected table format: {table_content_format}")
 
         return content, table_content_format
 

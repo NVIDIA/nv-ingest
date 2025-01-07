@@ -24,8 +24,8 @@ MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
 # Mocked PaddleOCRModelInterface
 class MockPaddleOCRModelInterface:
-    def __init__(self, paddle_version=None):
-        self.paddle_version = paddle_version
+    def __init__(self):
+        pass
 
     def prepare_data_for_inference(self, data):
         return data
@@ -147,9 +147,7 @@ def test_extract_table_data_image_too_small(base64_encoded_small_image):
     mock_nim_client.infer.side_effect = mock_infer
 
     # Patch 'create_inference_client' to return the mocked NimClient
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client), patch(
-        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
-    ):
+    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client):
         # Since the image is too small, we expect the table_content to remain unchanged
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
@@ -298,8 +296,7 @@ def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_
 
     trace_info = {}
 
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.3.3"):
-        updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
+    updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
     # Expected content from the mocked response
     expected_content = (
@@ -326,9 +323,8 @@ def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_pa
 
     trace_info = {}
 
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.2.1"):
-        with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-            _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
+    with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
+        _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
 
     # Verify that the mocked methods were called
     mock_create_client.assert_called_once()
@@ -344,9 +340,8 @@ def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_clie
 
     trace_info = {}
 
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"):
-        with pytest.raises(Exception, match="Inference error"):
-            _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
+    with pytest.raises(Exception, match="Inference error"):
+        _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
 
 
 def test_extract_table_data_image_too_small_2(base64_encoded_small_image):
@@ -396,8 +391,8 @@ def test_extract_table_data_image_too_small_2(base64_encoded_small_image):
     }
 
     with patch(f"{MODULE_UNDER_TEST}.create_inference_client", side_effect=mock_create_inference_client), patch(
-        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
-    ), patch("requests.post", return_value=mock_response):
+        "requests.post", return_value=mock_response
+    ):
         updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
 
     # The table_content should remain unchanged because the image is too small

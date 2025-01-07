@@ -14,7 +14,6 @@ import cv2
 import numpy as np
 import requests
 import tritonclient.grpc as grpcclient
-from packaging import version as pkgversion
 
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
@@ -362,7 +361,7 @@ def create_inference_client(
     return NimClient(model_interface, infer_protocol, endpoints, auth_token)
 
 
-def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
+def preprocess_image_for_paddle(array: np.ndarray) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -395,9 +394,6 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if (not paddle_version) or (pkgversion.parse(paddle_version) < pkgversion.parse("0.2.0-rc1")):
-        return array
-
     height, width = array.shape[:2]
     scale_factor = 960 / max(height, width)
     new_height = int(height * scale_factor)
