@@ -41,8 +41,6 @@ from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestServic
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.embed import EmbedTask
-from nv_ingest_client.primitives.tasks.split import SplitTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -204,21 +202,22 @@ async def convert_pdf(
     files: List[UploadFile] = File(...),
     job_id: str = Form(...),
     vdb_task: bool = Form(False),
+    extract_text: bool = Form(True),
+    extract_images: bool = Form(True),
+    extract_tables: bool = Form(True),
+    extract_charts: bool = Form(False),
 ) -> Dict[str, str]:
     try:
 
-        print(f"Processing: {len(files)} PDFs ....; vdb_task: {vdb_task}")
-
         submitted_jobs: List[ProcessingJob] = []
         for file in files:
-            if file.content_type != "application/pdf":
-                raise HTTPException(status_code=400, detail=f"File {files[0].filename} must be a PDF")
-
             file_stream = BytesIO(file.file.read())
             doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+            content_type = file.content_type.split("/")[1]
+            print(f"Content Type: {content_type}")
 
             job_spec = JobSpec(
-                document_type="pdf",
+                document_type=content_type,
                 payload=doc_content,
                 source_id=file.filename,
                 source_name=file.filename,
@@ -230,24 +229,20 @@ async def convert_pdf(
                 },
             )
 
-            extract_task = ExtractTask(document_type="pdf", extract_text=True, extract_images=True, extract_tables=True)
+            extract_task = ExtractTask(
+                document_type=content_type,
+                extract_text=extract_text,
+                extract_images=extract_images,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+            )
 
             table_data_extract = TableExtractionTask()
             chart_data_extract = ChartExtractionTask()
-            split_task = SplitTask(
-                split_by="word",
-                split_length=300,
-                split_overlap=10,
-                max_character_length=5000,
-                sentence_window_size=0,
-            )
-            embed_task = EmbedTask(text=True, tables=True)
 
             job_spec.add_task(extract_task)
             job_spec.add_task(table_data_extract)
             job_spec.add_task(chart_data_extract)
-            job_spec.add_task(split_task)
-            job_spec.add_task(embed_task)
 
             submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
 
