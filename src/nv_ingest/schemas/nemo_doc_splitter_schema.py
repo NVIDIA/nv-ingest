@@ -10,4 +10,5 @@ from pydantic import conint
 class DocumentSplitterSchema(BaseModel):
     tokenizer: str = "intfloat/e5-large-unsupervised"
     chunk_size: conint(gt=0) = 300
+    chunk_overlap: conint(ge=0) = 0
     raise_on_failure: bool = False

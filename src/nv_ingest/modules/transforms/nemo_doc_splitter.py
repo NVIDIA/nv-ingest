@@ -58,17 +58,17 @@ def _split_into_chunks(text, tokenizer, chunk_size=300):
     encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
 
     # Get the token IDs and offsets for splitting
-    tokens = encoding['input_ids']
-    offsets = encoding['offset_mapping']
+    tokens = encoding["input_ids"]
+    offsets = encoding["offset_mapping"]
 
     # Split the tokens into chunks of the desired size
-    chunks = [tokens[i:i + chunk_size] for i in range(0, len(tokens), chunk_size)]
+    chunks = [tokens[i : i + chunk_size] for i in range(0, len(tokens), chunk_size)]
 
     # Convert token chunks back to text while preserving original spacing and case
     text_chunks = []
     for chunk in chunks:
         # Find the start and end offsets for the current chunk
-        chunk_offsets = offsets[:len(chunk)]
+        chunk_offsets = offsets[: len(chunk)]
         start_offset = chunk_offsets[0][0]
         end_offset = chunk_offsets[-1][1]
 
@@ -77,7 +77,7 @@ def _split_into_chunks(text, tokenizer, chunk_size=300):
         text_chunks.append(text_chunk)
 
         # Remove processed offsets for the next iteration
-        offsets = offsets[len(chunk):]
+        offsets = offsets[len(chunk) :]
 
     return text_chunks
 
@@ -124,11 +124,12 @@ def _nemo_document_splitter(builder: mrc.Builder):
                 return message
 
             # Override parameters if set
-            tokenizer  = task_props.get("tokenizer", validated_config.tokenizer)
+            tokenizer = task_props.get("tokenizer", validated_config.tokenizer)
             chunk_size = task_props.get("chunk_size", validated_config.chunk_size)
+            chunk_overlap = task_props.get("chunk_overlap", validated_config.chunk_overlap)
 
             logger.info(
-                f"Splitting documents with tokenizer: {tokenizer}, chunk_size: {chunk_size} tokens"
+                f"Splitting text with tokenizer: {tokenizer}, chunk_size: {chunk_size} tokens, chunk_overlap: {chunk_overlap}"
             )
 
             tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token="")

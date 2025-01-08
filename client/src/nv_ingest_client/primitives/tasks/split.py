@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 class SplitTaskSchema(BaseModel):
     tokenizer: str = "intfloat/e5-large-unsupervised"
     chunk_size: int = 300
+    chunk_overlap: int = 0
 
     class Config:
         extra = "forbid"
@@ -34,8 +35,9 @@ class SplitTask(Task):
 
     def __init__(
         self,
-        tokenizer: str = None,
-        chunk_size: int = None,
+        tokenizer: str = "intfloat/e5-large-unsupervised",
+        chunk_size: int = 300,
+        chunk_overlap: int = 0,
     ) -> None:
         """
         Setup Split Task Config
@@ -43,6 +45,7 @@ class SplitTask(Task):
         super().__init__()
         self._tokenizer = tokenizer
         self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
 
     def __str__(self) -> str:
         """
@@ -52,6 +55,7 @@ class SplitTask(Task):
         info += "Split Task:\n"
         info += f"  tokenizer: {self._tokenizer}\n"
         info += f"  chunk_size: {self._chunk_size}\n"
+        info += f"  chunk_overlap: {self._chunk_overlap}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -64,5 +68,7 @@ class SplitTask(Task):
             split_params["tokenizer"] = self._tokenizer
         if self._chunk_size is not None:
             split_params["chunk_size"] = self._chunk_size
+        if self._chunk_overlap is not None:
+            split_params["chunk_overlap"] = self._chunk_overlap
 
         return {"type": "split", "task_properties": split_params}

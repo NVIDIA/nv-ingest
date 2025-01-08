@@ -63,6 +63,7 @@ class TracingOptionsSchema(BaseModelNoExt):
 class IngestTaskSplitSchema(BaseModelNoExt):
     tokenizer: str
     chunk_size: conint(gt=0)
+    chunk_overlap: conint(ge=0)
 
 
 class IngestTaskExtractSchema(BaseModelNoExt):
