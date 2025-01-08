@@ -237,12 +237,16 @@ async def convert_pdf(
                 extract_charts=extract_charts,
             )
 
-            table_data_extract = TableExtractionTask()
-            chart_data_extract = ChartExtractionTask()
-
             job_spec.add_task(extract_task)
-            job_spec.add_task(table_data_extract)
-            job_spec.add_task(chart_data_extract)
+
+            # Conditionally add tasks as needed.
+            if extract_tables:
+                table_data_extract = TableExtractionTask()
+                job_spec.add_task(table_data_extract)
+
+            if extract_charts:
+                chart_data_extract = ChartExtractionTask()
+                job_spec.add_task(chart_data_extract)
 
             submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
 
