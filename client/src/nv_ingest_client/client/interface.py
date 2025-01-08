@@ -19,6 +19,7 @@ import fsspec
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
+from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
@@ -470,6 +471,26 @@ class Ingestor:
         """
         vdb_upload_task = VdbUploadTask(**kwargs)
         self._job_specs.add_task(vdb_upload_task)
+
+        return self
+
+    @ensure_job_specs
+    def caption(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a CaptionTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the CaptionTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        caption_task = CaptionTask(**kwargs)
+        self._job_specs.add_task(caption_task)
 
         return self
 
