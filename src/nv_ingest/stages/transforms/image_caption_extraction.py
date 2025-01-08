@@ -118,10 +118,10 @@ def caption_extract_stage(
     if isinstance(task_props, BaseModel):
         task_props = task_props.model_dump()
 
-    api_key = task_props.get("api_key", validated_config.api_key)
-    prompt = task_props.get("prompt", validated_config.prompt)
-    endpoint_url = task_props.get("endpoint_url", validated_config.endpoint_url)
-    model_name = task_props.get("model_name", validated_config.model_name)
+    api_key = task_props.get("api_key") or validated_config.api_key
+    prompt = task_props.get("prompt") or validated_config.prompt
+    endpoint_url = task_props.get("endpoint_url") or validated_config.endpoint_url
+    model_name = task_props.get("model_name") or validated_config.model_name
 
     # Create a mask for rows where the document type is IMAGE
     df_mask = df["metadata"].apply(lambda meta: meta.get("content_metadata", {}).get("type") == "image")
