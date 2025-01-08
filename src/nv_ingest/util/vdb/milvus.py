@@ -30,11 +30,10 @@ def reformat_collection_name(collection_name: str = None):
     return collection_name
 
 
-# Connect to Milvus
-connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
-
-
 def search_milvus(question_embedding: List[float], top_k: int = 5, collection_name: str = "nv_ingest_jeremy"):
+
+    # Connect to Milvus
+    connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
 
     # Reformat to remove "-" characters from UUID
     collection_name = reformat_collection_name(collection_name)
@@ -68,6 +67,9 @@ def search_milvus(question_embedding: List[float], top_k: int = 5, collection_na
 
 
 def bulk_upload_results_to_milvus(ingest_results, collection_name: str = "nv_ingest_jeremy"):
+    # Connect to Milvus
+    connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
+
     collection_name = reformat_collection_name(collection_name)
     milvus_url = os.getenv("MILVUS_ENDPOINT", "http://milvus:19530")
     minio_url = os.getenv("MINIO_ENDPOINT", "minio:9000")
@@ -151,6 +153,9 @@ def bulk_upload_results_to_milvus(ingest_results, collection_name: str = "nv_ing
 
 
 def check_bulk_upload_status(task_id: str) -> bool:
+    # Connect to Milvus
+    connections.connect("default", host="milvus", port="19530")  # Update with your Milvus host/port
+
     if isinstance(task_id, bytes):
         task_id = int(task_id.decode("utf-8"))  # Decode to string, then convert to int
     elif isinstance(task_id, str):
