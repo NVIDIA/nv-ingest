@@ -216,3 +216,6 @@ helm/charts/*
 
 # Ignore output from common examples
 processed_docs
+
+# Ignore devcontainer volumes
+.volumes

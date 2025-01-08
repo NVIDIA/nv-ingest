@@ -5,7 +5,7 @@ fsspec
 httpx==0.27.2
 llama-index-embeddings-nvidia==0.1.5
 openai==1.40.6
-pydantic==1.10.14
+pydantic>=2.0.0
 pymilvus==2.4.9
 pymilvus[bulk_writer,model]
 pypdfium2
@@ -16,3 +16,7 @@ redis~=5.0.1
 requests
 setuptools
 tqdm
+langchain-milvus
+langchain-nvidia-ai-endpoints
+minio
+pyarrow

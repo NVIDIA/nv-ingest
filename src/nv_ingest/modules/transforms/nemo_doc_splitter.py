@@ -22,6 +22,7 @@ from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
+from pydantic import BaseModel
 
 import cudf
 
@@ -107,6 +108,9 @@ def _nemo_document_splitter(builder: mrc.Builder):
         try:
             # Assume that df is going to have a 'content' column
             task_props = message.remove_task("split")
+
+            if isinstance(task_props, BaseModel):
+                task_props = task_props.model_dump()
 
             # Validate that all 'content' values are not None
             with message.payload().mutable_dataframe() as mdf:

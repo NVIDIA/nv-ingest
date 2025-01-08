@@ -11,8 +11,7 @@ from typing import Dict
 from typing import Literal
 from typing import Optional
 
-from pydantic import BaseModel
-from pydantic import validator
+from pydantic import BaseModel, field_validator
 
 from .task_base import Task
 
