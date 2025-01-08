@@ -51,7 +51,7 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
     return documents
 
 
-def _split_into_chunks(text, tokenizer, chunk_size=300):
+def _split_into_chunks(text, tokenizer, chunk_size=300, chunk_overlap=0):
     # Tokenize the text into token IDs
     encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
 
@@ -60,7 +60,7 @@ def _split_into_chunks(text, tokenizer, chunk_size=300):
     offsets = encoding["offset_mapping"]
 
     # Split the tokens into chunks of the desired size
-    chunks = [tokens[i : i + chunk_size] for i in range(0, len(tokens), chunk_size)]
+    chunks = [tokens[i : i + chunk_size] for i in range(0, len(tokens), chunk_size - chunk_overlap)]
 
     # Convert token chunks back to text while preserving original spacing and case
     text_chunks = []
@@ -146,7 +146,7 @@ def _nemo_document_splitter(builder: mrc.Builder):
                         "DocumentSplitter only works with text documents but one or more " "'content' values are None."
                     )
 
-                chunks = _split_into_chunks(content, tokenizer_model, chunk_size)
+                chunks = _split_into_chunks(content, tokenizer_model, chunk_size, chunk_overlap)
                 split_docs.extend(_build_split_documents(row, chunks))
 
             split_docs_df = pd.DataFrame(split_docs)
