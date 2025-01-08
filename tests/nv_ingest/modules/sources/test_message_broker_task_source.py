@@ -39,9 +39,9 @@ def job_payload():
                 {
                     "type": "split",
                     "task_properties": {
-                        "split_by": "word",
-                        "split_length": 100,
-                        "split_overlap": 0,
+                        "tokenizer": "intfloat/e5-large-unsupervised",
+                        "chunk_size": 100,
+                        "chunk_overlap": 0,
                     },
                 },
                 {

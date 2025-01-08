@@ -3,12 +3,13 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from pydantic import BaseModel
-from pydantic import conint
+from pydantic import Field, BaseModel
+
+from typing_extensions import Annotated
 
 
 class DocumentSplitterSchema(BaseModel):
     tokenizer: str = "intfloat/e5-large-unsupervised"
-    chunk_size: conint(gt=0) = 300
-    chunk_overlap: conint(ge=0) = 0
+    chunk_size: Annotated[int, Field(gt=0)] = 300
+    chunk_overlap: Annotated[int, Field(ge=0)] = 0
     raise_on_failure: bool = False

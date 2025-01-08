@@ -3,19 +3,16 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import os
 import copy
 import logging
 import traceback
 import uuid
 from typing import Any
 from typing import List
-from typing import Literal
 
 import mrc
 import pandas as pd
 from transformers import AutoTokenizer
-from more_itertools import windowed
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
@@ -133,7 +130,9 @@ def _nemo_document_splitter(builder: mrc.Builder):
             chunk_overlap = task_props.get("chunk_overlap", validated_config.chunk_overlap)
 
             logger.info(
-                f"Splitting text with tokenizer: {tokenizer}, chunk_size: {chunk_size} tokens, chunk_overlap: {chunk_overlap}"
+                f"Splitting text with tokenizer: {tokenizer}, "
+                f"chunk_size: {chunk_size} tokens, "
+                f"chunk_overlap: {chunk_overlap}"
             )
 
             tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token="")

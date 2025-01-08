@@ -8,10 +8,8 @@
 
 import logging
 from typing import Dict
-from typing import Literal
-from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from .task_base import Task
 

@@ -8,7 +8,6 @@ from enum import Enum
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Literal
 from typing import Optional
 from typing import Union
 
@@ -61,8 +60,8 @@ class TracingOptionsSchema(BaseModelNoExt):
 
 class IngestTaskSplitSchema(BaseModelNoExt):
     tokenizer: str
-    chunk_size: conint(gt=0)
-    chunk_overlap: conint(ge=0)
+    chunk_size: Annotated[int, Field(gt=0)]
+    chunk_overlap: Annotated[int, Field(ge=0)]
 
 
 class IngestTaskExtractSchema(BaseModelNoExt):
