@@ -11,6 +11,7 @@ from typing import Tuple
 
 import pandas as pd
 import requests
+from pydantic import BaseModel
 from morpheus.config import Config
 
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
@@ -34,7 +35,7 @@ def _prepare_dataframes_mod(df) -> Tuple[pd.DataFrame, pd.DataFrame, pd.Series]:
     return df, df_matched, bool_index
 
 
-def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_url: str) -> str:
+def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_url: str, model_name: str) -> str:
     """
     Sends a base64-encoded PNG image to the NVIDIA LLaMA model API and retrieves the generated caption.
 
@@ -56,11 +57,6 @@ def _generate_captions(base64_image: str, prompt: str, api_key: str, endpoint_ur
     base64_image, _ = scale_image_to_encoding_size(base64_image)
 
     headers = {"Authorization": f"Bearer {api_key}", "Accept": "application/json"}
-
-    model_name = "meta/llama-3.2-90b-vision-instruct"
-    # Add nvdev/ in the model name for internal development endpoints.
-    if "/nvdev/" in endpoint_url:
-        model_name = "nvdev/" + model_name
 
     # Payload for the request
     payload = {
@@ -119,9 +115,13 @@ def caption_extract_stage(
     # Ensure the validated configuration is available for future use
     _ = trace_info
 
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
+
     api_key = task_props.get("api_key", validated_config.api_key)
     prompt = task_props.get("prompt", validated_config.prompt)
     endpoint_url = task_props.get("endpoint_url", validated_config.endpoint_url)
+    model_name = task_props.get("model_name", validated_config.model_name)
 
     # Create a mask for rows where the document type is IMAGE
     df_mask = df["metadata"].apply(lambda meta: meta.get("content_metadata", {}).get("type") == "image")
@@ -134,7 +134,7 @@ def caption_extract_stage(
             **meta,
             "image_metadata": {
                 **meta.get("image_metadata", {}),
-                "caption": _generate_captions(meta["content"], prompt, api_key, endpoint_url),
+                "caption": _generate_captions(meta["content"], prompt, api_key, endpoint_url, model_name),
             },
         }
     )
