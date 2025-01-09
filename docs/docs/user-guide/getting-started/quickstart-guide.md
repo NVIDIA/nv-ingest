@@ -9,18 +9,18 @@ To get started using NVIDIA-Ingest, you need to do a few things:
 
 ## Step 1: Starting Containers
 
-This example demonstrates how to use the provided [docker-compose.yaml](docker-compose.yaml) to start all needed services with a few commands.
+This example demonstrates how to use the provided [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) to start all needed services with a few commands.
 
 **IMPORTANT:** NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you want to configure.
+If preferred, you can also [start services one by one](../../user-guide/developer-guide/deployment.md) or run on Kubernetes via [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](../../user-guide/developer-guide/environment-config.md) you want to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
-2. Change directory to the cloned repo
+2. Change the directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](../../user-guide/developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -28,9 +28,9 @@ Username: $oauthtoken
 Password: <Your Key>
 ```
 
-> **NOTE:** During the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+> **NOTE:** During the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` that you might join by applying for early access [here:](https://developer.nvidia.com/nemo-microservices-early-access/join). When approved, switch your profile to this organization or team. Then, the key you generate will have access to the resources outlined below.
 
-4. Create a .env file containing your NGC API key, and the following paths:
+4. Create a .env file containing your NGC API key and the following paths:
 ```
 # Container images must access resources from NGC.
 NGC_API_KEY=...
@@ -38,9 +38,9 @@ DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 ```
 
-> **NOTE:** As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
+> **NOTE:** As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device.
 
-> Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
+> Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
 > **IMPORTANT:** Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
@@ -49,13 +49,13 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 5. Start all services:
 `docker compose up`
 
-> **TIP:** By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
+> **TIP:** By default, we have [configured log levels to be verbose]([docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L27).
 >
-> It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+> It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
 6. When all services have fully started, `nvidia-smi` should show processes like the following:
 ```
-# If it's taking > 1m for `nvidia-smi` to return, it's likely the bus is still busy setting up the models.
+# If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
 +---------------------------------------------------------------------------------------+
 | Processes:                                                                            |
 |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
@@ -88,7 +88,7 @@ bda9a2a9c8b5   openzipkin/zipkin                                                
 ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
 ```
 
-> **TIP:** NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+> **TIP:** NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can:
 > ```
 > docker compose build
 > ```
@@ -96,11 +96,11 @@ ac27e5297d57   prom/prometheus:latest                                           
 
 ## Step 2: Installing Python Dependencies
 
-To interact with the NV-Ingest service, you can do so from the host or by `docker exec`-ing into the NV-Ingest container.
+You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
-# conda not required but makes it easy to create a fresh python environment
+# conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
@@ -108,20 +108,20 @@ pip install -r ./requirements.txt
 pip install .
 ```
 
-> **NOTE:** Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+> **NOTE:** Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141).
 >
-> If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
+> If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container.
 >
 > To interact within the container:
 > ```
 > docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
 > ```
-> You'll be in the `/workspace` directory, which has `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the python client libraries pre-installed:
+> You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed:
 > ```
 > (morpheus) root@aba77e2a4bde:/workspace#
 > ```
 >
-> From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
+> From the bash prompt above, you can run the nv-ingest-cli and Python examples described below.
 
 ## Step 3: Ingesting Documents
 
@@ -137,7 +137,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 ### In Python
 
-You can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb):
+You can find more documentation and examples [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb):
 
 ```python
 import logging, time
@@ -193,7 +193,7 @@ print(f"Got {len(result)} results")
 
 ### Using the `nv-ingest-cli`
 
-You can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb):
+You can find more nv-ingest-cli examples [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb):
 
 ```shell
 nv-ingest-cli \
@@ -204,7 +204,7 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You should notice output indicating document processing status, followed by a breakdown of time spent during job execution:
+You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
 ```
 INFO:nv_ingest_client.nv_ingest_cli:Processing 1 documents.
 INFO:nv_ingest_client.nv_ingest_cli:Output will be written to: ./processed_docs
@@ -235,7 +235,7 @@ INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.10
 
 ## Step 4: Inspecting and Consuming Results
 
-After the ingestion steps above have completed, you should be able to find `text` and `image` subfolders inside your processed docs folder. Each will contain JSON formatted extracted content and metadata.
+After the ingestion steps above have been completed, you should be able to find the `text` and `image` subfolders inside your processed docs folder. Each will contain JSON-formatted extracted content and metadata.
 
 When processing has completed, you'll have separate result files for text and image data:
 ```shell
@@ -254,7 +254,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md). We also provide a script for inspecting [extracted images](src/util/image_viewer.py).
+You can view the full JSON extracts and the metadata definitions [here](../../user-guide/developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 
 First, install `tkinter` by running the following commands depending on your OS.
 - For Ubuntu/Debian Linux:
@@ -275,48 +275,48 @@ Then, run the following command to execute the script for inspecting the extract
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
-> **TIP:** Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
+> **TIP:** Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 >
 > Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
 
 ## Repo Structure
 
-Beyond the relevant documentation, examples, and other links above, below is a description of contents in this repo's folders:
+Beyond the relevant documentation, examples, and other links above, below is a description of the contents in this repo's folders:
 
-1. [.github](.github): GitHub repo configuration files
-2. [ci](ci): scripts used to build the nv-ingest container and other packages
-3. [client](client): docs and source code for the nv-ingest-cli utility
-4. [config](config): various yaml files defining configuration for OTEL, Prometheus
-5. [data](data): Sample PDFs provided for testing convenience
-6. [docker](docker): houses scripts used by the nv-ingest docker container
-7. [docs](docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
-8. [examples](examples): Example notebooks, scripts, and longer form tutorial content
-9. [helm](helm): Documentation for deploying nv-ingest to a Kubernetes cluster via Helm chart
-10. [skaffold](skaffold): Skaffold configuration
-11. [src](src): source code for the nv-ingest pipelines and service
-12. [tests](tests): unit tests for nv-ingest
+1. [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
+2. [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NV-Ingest container and other packages
+3. [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the nv-ingest-cli utility
+4. [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
+5. [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
+6. [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the nv-ingest docker container
+7. [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
+8. [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
+9. [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NV-Ingest to a Kubernetes cluster via Helm chart
+10. [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
+11. [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NV-Ingest pipelines and service
+12. [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NV-Ingest
 
 ## Notices
 
 ### Third-Party License Notice:
 
-If configured to do so, this project will download and install additional third-party open source software projects. Review the license terms of these open source projects before use:
+If configured to do so, this project will download and install additional third-party open-source software projects. Review the license terms of these open-source projects before use:
 
 https://pypi.org/project/pdfservices-sdk/
 
 - **`INSTALL_ADOBE_SDK`**:
   - **Description**: If set to `true`, the Adobe SDK will be installed in the container at launch time. This is
-    required if you want to use the Adobe extraction service for PDF decomposition. Please review the
+    required if you want to use the Adobe extraction service for PDF decomposition. Review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
 
 
 ### Contributing
 
-We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original
-work, or you have rights to submit it under the same license, or a compatible license.
+We require that all contributors "sign off" on their commits. This certifies that the contribution is your original
+work, or you have rights to submit it under the same license or a compatible license.
 
-Any contribution which contains commits that aren't Signed-Off won't be accepted.
+Any contribution that contains commits that aren't signed off won't be accepted.
 
 To sign off on a commit, use the --signoff (or -s) option when committing your changes:
 
@@ -351,7 +351,7 @@ Signed-off-by: Your Name <your@email.com>
 
   (a) The contribution was created in whole or in part by me and I have the right to submit it under the open source license indicated in the file; or
 
-  (b) The contribution is based upon previous work that, to the best of my knowledge, is covered under an appropriate open source license and I have the right under that license to submit that work with modifications, whether created in whole or in part by me, under the same open source license (unless I am permitted to submit under a different license), as indicated in the file; or
+  (b) The contribution is based upon previous work that, to the best of my knowledge, is covered under an appropriate open-source license and I have the right under that license to submit that work with modifications, whether created in whole or in part by me, under the same open source license (unless I am permitted to submit under a different license), as indicated in the file; or
 
   (c) The contribution was provided directly to me by some other person who certified (a), (b) or (c) and I have not modified it.
 
