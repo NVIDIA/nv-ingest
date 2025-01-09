@@ -32,8 +32,9 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineCreationSchema(BaseModel):
-    cached_http_endpoint: str = os.getenv("CACHED_HTTP_ENDPOINT",
-                                          "https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached")
+    cached_http_endpoint: str = os.getenv(
+        "CACHED_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached"
+    )
     cached_infer_protocol: str = "http"
     deplot_http_endpoint: str = os.getenv("DEPLOT_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/google/deplot")
     deplot_infer_protocol: str = "http"
@@ -51,10 +52,12 @@ class PipelineCreationSchema(BaseModel):
     paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
     paddle_infer_protocol: str = "http"
     redis_morpheus_task_queue: str = "morpheus_task_queue"
-    vlm_caption_endpoint: str = os.getenv("VLM_CAPTION_ENDPOINT",
-                                          "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions")
-    yolox_http_endpoint: str = os.getenv("YOLOX_HTTP_ENDPOINT",
-                                         "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1")
+    vlm_caption_endpoint: str = os.getenv(
+        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+    )
+    yolox_http_endpoint: str = os.getenv(
+        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1"
+    )
     yolox_infer_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
@@ -129,16 +132,16 @@ def run_pipeline(morpheus_pipeline_config, ingest_config) -> float:
 
 
 def run_ingest_pipeline(
-        ingest_config_path=None,
-        caption_batch_size=8,
-        use_cpp=False,
-        pipeline_batch_size=256,
-        enable_monitor=False,
-        feature_length=512,
-        num_threads=None,
-        model_max_batch_size=256,
-        mode=PipelineModes.NLP.value,
-        log_level="INFO",
+    ingest_config_path=None,
+    caption_batch_size=8,
+    use_cpp=False,
+    pipeline_batch_size=256,
+    enable_monitor=False,
+    feature_length=512,
+    num_threads=None,
+    model_max_batch_size=256,
+    mode=PipelineModes.NLP.value,
+    log_level="INFO",
 ):
     """
     Configures and runs the pipeline with specified options.
