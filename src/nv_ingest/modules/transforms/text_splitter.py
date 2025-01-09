@@ -24,7 +24,7 @@ from pydantic import BaseModel
 import cudf
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.nemo_doc_splitter_schema import DocumentSplitterSchema
+from nv_ingest.schemas.text_splitter_schema import TextSplitterSchema
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
@@ -80,19 +80,19 @@ def _split_into_chunks(text, tokenizer, chunk_size=300, chunk_overlap=0):
     return text_chunks
 
 
-MODULE_NAME = "nemo_document_splitter"
+MODULE_NAME = "text_splitter"
 MODULE_NAMESPACE = "nv_ingest"
 
-NemoDocSplitterLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, DocumentSplitterSchema)
+TextSplitterLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, TextSplitterSchema)
 
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
-def _nemo_document_splitter(builder: mrc.Builder):
+def _text_splitter(builder: mrc.Builder):
     """
     A pipeline module that splits documents into smaller parts based on the specified criteria.
     """
 
-    validated_config = fetch_and_validate_module_config(builder, DocumentSplitterSchema)
+    validated_config = fetch_and_validate_module_config(builder, TextSplitterSchema)
 
     @filter_by_task(["split"])
     @traceable(MODULE_NAME)
@@ -143,7 +143,7 @@ def _nemo_document_splitter(builder: mrc.Builder):
 
                 if content is None:
                     raise ValueError(
-                        "DocumentSplitter only works with text documents but one or more " "'content' values are None."
+                        "TextSplitter only works with text documents but one or more " "'content' values are None."
                     )
 
                 chunks = _split_into_chunks(content, tokenizer_model, chunk_size, chunk_overlap)

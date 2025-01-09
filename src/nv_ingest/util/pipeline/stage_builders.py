@@ -21,7 +21,7 @@ from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
 from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
-from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
+from nv_ingest.modules.transforms.text_splitter import TextSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
@@ -331,15 +331,15 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
     return image_filter_stage
 
 
-def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
-    nemo_splitter_loader = NemoDocSplitterLoaderFactory.get_instance(
-        module_name="nemo_doc_splitter",
+def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
+    text_splitter_loader = TextSplitterLoaderFactory.get_instance(
+        module_name="text_splitter",
         module_config=ingest_config.get("text_splitting_module", {}),
     )
-    nemo_splitter_stage = pipe.add_stage(
+    text_splitter_stage = pipe.add_stage(
         LinearModulesStage(
             morpheus_pipeline_config,
-            nemo_splitter_loader,
+            text_splitter_loader,
             input_type=ControlMessage,
             output_type=ControlMessage,
             input_port_name="input",
@@ -347,7 +347,7 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
         )
     )
 
-    return nemo_splitter_stage
+    return text_splitter_stage
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):

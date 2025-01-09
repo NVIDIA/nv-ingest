@@ -5,14 +5,14 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import DocumentSplitterSchema
+from nv_ingest.schemas import TextSplitterSchema
 
 
-def test_document_splitter_schema_defaults():
+def test_text_splitter_schema_defaults():
     """
-    Test the DocumentSplitterSchema with default values.
+    Test the TextSplitterSchema with default values.
     """
-    schema = DocumentSplitterSchema()
+    schema = TextSplitterSchema()
     assert schema.tokenizer == "intfloat/e5-large-unsupervised"
     assert schema.chunk_size == 300
     assert schema.chunk_overlap == 0
@@ -20,9 +20,9 @@ def test_document_splitter_schema_defaults():
 
 
 @pytest.mark.parametrize("invalid_value", [-1, 0])
-def test_document_splitter_schema_invalid_split_length(invalid_value):
+def test_text_splitter_schema_invalid_split_length(invalid_value):
     """
-    Test DocumentSplitterSchema with invalid chunk_size values.
+    Test TextSplitterSchema with invalid chunk_size values.
     """
     with pytest.raises(ValidationError):
-        DocumentSplitterSchema(chunk_size=invalid_value)
+        TextSplitterSchema(chunk_size=invalid_value)
