@@ -14,6 +14,7 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
+from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import ChartExtractionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
@@ -201,6 +202,20 @@ def test_vdb_upload_task_some_args(ingestor):
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, VdbUploadTask)
     assert task._filter_errors is True
+
+
+def test_caption_task_no_args(ingestor):
+    ingestor.caption()
+
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], CaptionTask)
+
+
+def test_caption_task_some_args(ingestor):
+    ingestor.caption(model_name="foo")
+
+    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
+    assert isinstance(task, CaptionTask)
+    assert task._model_name == "foo"
 
 
 def test_chain(ingestor):
