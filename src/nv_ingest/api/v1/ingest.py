@@ -209,6 +209,10 @@ async def convert_pdf(
 ) -> Dict[str, str]:
     try:
 
+        if job_id is None:
+            job_id = str(uuid.uuid4())
+            print(f"JobId is None, Created JobId: {job_id}")
+
         submitted_jobs: List[ProcessingJob] = []
         for file in files:
             file_stream = BytesIO(file.file.read())
@@ -248,7 +252,9 @@ async def convert_pdf(
                 chart_data_extract = ChartExtractionTask()
                 job_spec.add_task(chart_data_extract)
 
-            submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
+            submitted_job_id = await ingest_service.submit_job(
+                MessageWrapper(payload=json.dumps(job_spec.to_dict())), job_id
+            )
 
             processing_job = ProcessingJob(
                 submitted_job_id=submitted_job_id,
