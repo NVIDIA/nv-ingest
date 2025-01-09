@@ -135,7 +135,7 @@ def _text_splitter(builder: mrc.Builder):
                 f"chunk_overlap: {chunk_overlap}"
             )
 
-            tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token="")
+            tokenizer_model = AutoTokenizer.from_pretrained(tokenizer)
 
             split_docs = []
             for _, row in df_filtered.iterrows():
