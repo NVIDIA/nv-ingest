@@ -219,3 +219,6 @@ processed_docs
 
 # Ignore devcontainer volumes
 .volumes
+
+# Ignore conda build output
+conda/output_conda_channel

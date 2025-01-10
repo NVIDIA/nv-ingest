@@ -1,0 +1,28 @@
+name: Nv-Ingest Nightly Conda Package Publish
+
+# Trigger for pull requests and pushing to main
+on:
+  schedule:
+    # Runs every day at 11:30PM (UTC)
+    - cron: "30 23 * * *"
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: linux-large-disk
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Build the Conda packages
+      - name: Build Conda Packages
+        run: |
+          ./conda/build_conda_packages.sh
+
+      # Publish nv-ingest conda packages
+      - name: Publish conda package
+        run: anaconda -t "${{ secrets.NVIDIA_CONDA_TOKEN }}" upload --label dev ./conda/output_conda_channel/linux-64/*.conda
