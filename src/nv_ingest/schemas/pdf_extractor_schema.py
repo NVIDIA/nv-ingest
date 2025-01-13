@@ -126,7 +126,8 @@ class DoughnutConfigSchema(BaseModel):
     doughnut_infer_protocol: str = ""
     doughnut_batch_size: int = 32
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
@@ -171,8 +172,7 @@ class DoughnutConfigSchema(BaseModel):
 
         return values
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class PDFExtractorSchema(BaseModel):

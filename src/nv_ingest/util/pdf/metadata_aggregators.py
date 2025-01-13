@@ -22,6 +22,7 @@ from pypdfium2 import PdfImage
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
+from nv_ingest.schemas.metadata_schema import NearbyObjectsSchema
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
@@ -163,7 +164,7 @@ def construct_text_metadata(
             "block": -1,
             "line": -1,
             "span": -1,
-            "nearby_objects": nearby_objects or [],
+            "nearby_objects": nearby_objects or NearbyObjectsSchema(),
         },
     }
 
