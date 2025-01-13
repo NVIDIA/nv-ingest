@@ -593,3 +593,54 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
         # Don't let anything squeeze by
         logger.warning(f"Exception: {ex}")
         return ""
+
+
+def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_info: dict):
+    """
+    Calls an audio inference model using the provided client.
+
+    If the client is a gRPC client, the inference is performed using gRPC. Otherwise, it is performed using HTTP.
+
+    Parameters
+    ----------
+    client : grpcclient.InferenceServerClient or dict
+        The inference client, which is an HTTP client.
+    audio_source : str
+        The audio source to transcribe.
+
+    Returns
+    -------
+    str or None
+        The result of the inference as a string if successful, otherwise `None`.
+
+    Raises
+    ------
+    RuntimeError
+        If the HTTP request fails or if the response format is not as expected.
+    """
+
+    try:
+        url = client["endpoint_url"]
+        headers = client["headers"]
+
+        payload = {"audio_content": audio_content, "audio_id": audio_id}
+        response = requests.post(url, json=payload, headers=headers)            
+        
+        response.raise_for_status()  # Raise an exception for HTTP errors
+
+        # Parse the JSON response
+        json_response = response.json()
+
+    except requests.exceptions.RequestException as e:
+        raise RuntimeError(f"HTTP request failed: {e}")
+    except KeyError as e:
+        raise RuntimeError(f"Missing expected key in response: {e}")
+    except Exception as e:
+        raise RuntimeError(f"An error occurred during inference: {e}")
+
+    return json_response
+
+
+
+
+

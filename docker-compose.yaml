@@ -125,6 +125,29 @@ services:
               capabilities: [gpu]
     runtime: nvidia
 
+  audio:
+    image: ads/audio:latest
+    shm_size: 2gb
+    ports:
+      - "8015:8000"
+    user: root
+    environment:
+      - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_LOG_VERBOSE=1
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    working_dir: /app/audio_retrieval/src
+
+
+
   nv-ingest-ms-runtime:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10.1
     build:
@@ -141,6 +164,9 @@ services:
     cap_add:
       - sys_nice
     environment:
+      # Self-hosted audio endpoints.
+      - AUDIO_HTTP_ENDPOINT=http://audio:8000/v1/transcribe
+      - AUDIO_INFER_PROTOCOL=http
       # Self-hosted cached endpoints.
       - CACHED_GRPC_ENDPOINT=cached:8001
       - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer

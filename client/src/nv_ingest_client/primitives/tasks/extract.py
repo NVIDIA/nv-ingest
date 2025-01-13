@@ -45,6 +45,8 @@ _DEFAULT_EXTRACTOR_MAP = {
     "svg": "image",
     "tiff": "image",
     "xml": "lxml",
+    "mp3": "audio",
+    "wav": "audio",    
 }
 
 _Type_Extract_Method_PDF = Literal[
@@ -63,6 +65,8 @@ _Type_Extract_Method_PPTX = Literal["python_pptx", "haystack", "unstructured_loc
 
 _Type_Extract_Method_Image = Literal["image"]
 
+_Type_Extract_Method_Audio = Literal["audio"]
+
 _Type_Extract_Method_Map = {
     "docx": get_args(_Type_Extract_Method_DOCX),
     "jpeg": get_args(_Type_Extract_Method_Image),
@@ -72,6 +76,8 @@ _Type_Extract_Method_Map = {
     "pptx": get_args(_Type_Extract_Method_PPTX),
     "svg": get_args(_Type_Extract_Method_Image),
     "tiff": get_args(_Type_Extract_Method_Image),
+    "mp3": get_args(_Type_Extract_Method_Audio),
+    "wav": get_args(_Type_Extract_Method_Audio),
 }
 
 _Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]

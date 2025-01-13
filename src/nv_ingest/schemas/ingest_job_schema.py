@@ -33,7 +33,8 @@ class DocumentTypeEnum(str, Enum):
     svg = "svg"
     tiff = "tiff"
     txt = "text"
-
+    mp3 = "mp3"
+    wav = "wav"
 
 class TaskTypeEnum(str, Enum):
     caption = "caption"
