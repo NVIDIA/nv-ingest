@@ -5,7 +5,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 from pydantic import StrictBool
 
 logger = logging.getLogger(__name__)
@@ -14,6 +14,4 @@ logger = logging.getLogger(__name__)
 class ImageDedupSchema(BaseModel):
     raise_on_failure: StrictBool = False
     cpu_only: StrictBool = False
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

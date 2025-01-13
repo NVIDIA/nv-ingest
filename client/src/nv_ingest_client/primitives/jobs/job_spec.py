@@ -13,6 +13,9 @@ from typing import Union
 from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
+from nv_ingest_client.primitives.tasks import ExtractTask
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 
@@ -161,6 +164,11 @@ class JobSpec:
             raise ValueError("Task must derive from nv_ingest_client.primitives.Task class")
 
         self._tasks.append(task)
+
+        if isinstance(task, ExtractTask) and (task._extract_tables is True):
+            self._tasks.append(TableExtractionTask())
+        if isinstance(task, ExtractTask) and (task._extract_charts is True):
+            self._tasks.append(ChartExtractionTask())
 
 
 class BatchJobSpec:

@@ -19,7 +19,7 @@ spec:
     - port: {{ .Values.service.port }}
       targetPort: http
       protocol: TCP
-      name: http
+      name: nv-ingest-http
     {{- end }}
     {{- if .Values.service.nodePort }}
       {{- with .Values.service.nodePort }}

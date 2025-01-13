@@ -2,10 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import click
 import json
-import logging
-import os
 
 from morpheus.config import Config
 from morpheus.config import CppConfig
@@ -81,6 +78,7 @@ def cli(
 
     # Check for INGEST_LOG_LEVEL environment variable
     env_log_level = os.getenv("INGEST_LOG_LEVEL")
+    log_level = "DEFAULT"
     if env_log_level:
         log_level = env_log_level
         if log_level in ("DEFAULT",):

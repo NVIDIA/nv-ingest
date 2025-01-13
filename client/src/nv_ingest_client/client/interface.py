@@ -19,6 +19,7 @@ import fsspec
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
+from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
@@ -27,8 +28,6 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
-from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
-from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.util.util import filter_function_kwargs
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
@@ -373,11 +372,6 @@ class Ingestor:
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 
-            if extract_tables is True:
-                self._job_specs.add_task(TableExtractionTask())
-            if extract_charts is True:
-                self._job_specs.add_task(ChartExtractionTask())
-
         return self
 
     @ensure_job_specs
@@ -477,6 +471,26 @@ class Ingestor:
         """
         vdb_upload_task = VdbUploadTask(**kwargs)
         self._job_specs.add_task(vdb_upload_task)
+
+        return self
+
+    @ensure_job_specs
+    def caption(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a CaptionTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the CaptionTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        caption_task = CaptionTask(**kwargs)
+        self._job_specs.add_task(caption_task)
 
         return self
 

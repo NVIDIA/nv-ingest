@@ -7,8 +7,7 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import BaseModel
-from pydantic import root_validator
+from pydantic import model_validator, ConfigDict, BaseModel
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +46,8 @@ class PDFiumConfigSchema(BaseModel):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
@@ -88,8 +88,7 @@ class PDFiumConfigSchema(BaseModel):
 
         return values
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 class DoughnutConfigSchema(BaseModel):
@@ -202,8 +201,7 @@ class PDFExtractorSchema(BaseModel):
     pdfium_config: Optional[PDFiumConfigSchema] = None
     doughnut_config: Optional[DoughnutConfigSchema] = None
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
 def _clean_service(service):
