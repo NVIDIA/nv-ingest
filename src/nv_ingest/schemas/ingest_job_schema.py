@@ -63,6 +63,12 @@ class IngestTaskSplitSchema(BaseModelNoExt):
     chunk_size: Annotated[int, Field(gt=0)]
     chunk_overlap: Annotated[int, Field(ge=0)]
 
+    @field_validator("chunk_overlap")
+    def check_chunk_overlap(cls, v, values, **kwargs):
+        if v is not None and "chunk_size" in values.data and v >= values.data["chunk_size"]:
+            raise ValueError("chunk_overlap must be less than chunk_size")
+        return v
+
 
 class IngestTaskExtractSchema(BaseModelNoExt):
     document_type: DocumentTypeEnum

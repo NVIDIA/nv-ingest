@@ -117,6 +117,26 @@ def test_field_type_correctness():
         validate_ingest_job(job_data)
 
 
+def test_custom_validator_logic_for_sentence_window_size():
+    """Tests custom validator logic related to chunk_size and chunk_overlap in split tasks."""
+    task = {
+        "type": "split",
+        "task_properties": {
+            "tokanizer": "intfloat/e5-large-unsupervised",
+            "chunk_size": 200,
+            "chunk_overlap": 250,  # chunk_overlap should always be less than chunk_size
+        },
+    }
+    job_data = {
+        "job_payload": valid_job_payload(),
+        "job_id": "123",
+        "tasks": [task],
+    }
+    with pytest.raises(ValidationError) as exc_info:
+        validate_ingest_job(job_data)
+    assert "chunk_overlap must be less than chunk_size" in str(exc_info.value)
+
+
 def test_multiple_task_types():
     job_data = {
         "job_payload": {

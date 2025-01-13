@@ -118,10 +118,6 @@ def _text_splitter(builder: mrc.Builder):
             df_filtered = df.loc[bool_index]
 
             if df_filtered.empty:
-                gdf = cudf.from_pandas(df)
-                message_meta = MessageMeta(df=gdf)
-                message.payload(message_meta)
-
                 return message
 
             # Override parameters if set
@@ -139,12 +135,7 @@ def _text_splitter(builder: mrc.Builder):
 
             split_docs = []
             for _, row in df_filtered.iterrows():
-                content = row["metadata"]["content"]
-
-                if content is None:
-                    raise ValueError(
-                        "TextSplitter only works with text documents but one or more " "'content' values are None."
-                    )
+                content = row["metadata"]["content"] if row["metadata"]["content"] is not None else ""
 
                 chunks = _split_into_chunks(content, tokenizer_model, chunk_size, chunk_overlap)
                 split_docs.extend(_build_split_documents(row, chunks))
