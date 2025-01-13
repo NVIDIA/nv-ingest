@@ -92,7 +92,7 @@ class DocxProperties:
 
     def _update_source_meta_data(self):
         """
-        Update the source meta data with the document's core properties
+        Update the source metadata with the document's core properties
         """
         self.source_metadata.update(
             {
@@ -135,6 +135,7 @@ class DocxReader:
     ):
         if paragraph_format not in PARAGRAPH_FORMATS:
             raise ValueError(f"Unknown paragraph format {paragraph_format}. Supported formats are: {PARAGRAPH_FORMATS}")
+
         if table_format not in TABLE_FORMATS:
             raise ValueError(f"Unknown table format {table_format}. Supported formats are: {TABLE_FORMATS}")
 
@@ -448,7 +449,14 @@ class DocxReader:
         return [ContentTypeEnum.TEXT.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
 
     def _extract_para_data(
-        self, child, base_unified_metadata, text_depth: TextTypeEnum, extract_images: bool, para_idx: int
+        self,
+        child,
+        base_unified_metadata,
+        text_depth: TextTypeEnum,
+        extract_images: bool,
+        extract_charts: bool,
+        extract_tables: bool,
+        para_idx: int,
     ):
         """
         Process the text and images in a docx paragraph
@@ -468,7 +476,7 @@ class DocxReader:
             )
             self._prev_para_images = []
 
-        if extract_images and paragraph_images:
+        if (extract_charts or extract_images or extract_tables) and paragraph_images:
             # cache the images till the next paragraph is read
             self._prev_para_images = paragraph_images
             self._prev_para_image_idx = para_idx
@@ -517,6 +525,7 @@ class DocxReader:
         base_unified_metadata,
         text_depth: TextTypeEnum,
         extract_text: bool,
+        extract_charts: bool,
         extract_tables: bool,
         extract_images: bool,
     ) -> Dict:
@@ -537,7 +546,7 @@ class DocxReader:
                 self._extract_para_data(child, base_unified_metadata, text_depth, extract_images, para_idx)
 
             if isinstance(child, CT_Tbl):
-                if not extract_tables:
+                if not (extract_tables or extract_charts):
                     continue
                 self._extract_table_data(child, base_unified_metadata, text_depth, para_idx)
 

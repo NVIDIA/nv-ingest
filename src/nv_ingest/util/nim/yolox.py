@@ -32,7 +32,7 @@ YOLOX_CONF_THRESHOLD = 0.01
 YOLOX_IOU_THRESHOLD = 0.5
 YOLOX_MIN_SCORE = 0.1
 YOLOX_FINAL_SCORE = 0.48
-YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
+YOLOX_NIM_MAX_IMAGE_SIZE = 512_000
 
 YOLOX_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_IMAGE_PREPROC_WIDTH = 1024
@@ -167,7 +167,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
             if self._is_version_early_access_legacy_api():
                 payload = {"messages": [{"content": content_list}]}
             else:
-                payload = {"input": content_list}
+                payload = {"model": "nvidia/nv-yolox-structured-images-v1", "input": content_list}
 
             return payload
         else:

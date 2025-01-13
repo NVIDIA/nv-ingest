@@ -36,7 +36,14 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 logger = logging.getLogger(__name__)
 
 
-def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+def python_docx(
+    docx: Union[str, Path, IO],
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    **kwargs
+):
     """
     Helper function that use python-docx to extract text from a bytestream document
 
@@ -104,6 +111,8 @@ def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: 
 
     # Extract data from the document using python-docx
     doc = DocxReader(docx, source_metadata)
-    extracted_data = doc.extract_data(base_unified_metadata, text_depth, extract_text, extract_tables, extract_images)
+    extracted_data = doc.extract_data(
+        base_unified_metadata, text_depth, extract_text, extract_charts, extract_tables, extract_images
+    )
 
     return extracted_data
