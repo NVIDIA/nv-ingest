@@ -47,7 +47,7 @@ if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
     GIT_ROOT="${GIT_ROOT}" conda build "${NV_INGEST_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
-        --output-folder "${OUTPUT_DIR}"
+        --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest build."
 fi
@@ -56,7 +56,7 @@ if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
     echo "Building nv_ingest_client..."
     GIT_ROOT="${GIT_ROOT}/client" conda build "${NV_INGEST_CLIENT_DIR}" \
         -c conda-forge \
-        --output-folder "${OUTPUT_DIR}"
+        --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_client build."
 fi
