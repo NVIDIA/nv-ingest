@@ -126,7 +126,7 @@ services:
     runtime: nvidia
 
   audio:
-    image: ads/audio:latest
+    image: nvcr.io/nvidian/audio_retrieval:latest 
     shm_size: 2gb
     ports:
       - "8015:8000"
