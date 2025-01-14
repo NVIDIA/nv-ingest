@@ -8,7 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from enum import Enum
 
 
@@ -16,6 +16,8 @@ class ConversionStatus(str, Enum):
     IN_PROGRESS = "in_progress"
     SUCCESS = "success"
     FAILED = "failed"
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ProcessingJob(BaseModel):
@@ -26,3 +28,5 @@ class ProcessingJob(BaseModel):
     content: str = ""
     status: ConversionStatus
     error: str | None = None
+
+    model_config = ConfigDict(extra="forbid")

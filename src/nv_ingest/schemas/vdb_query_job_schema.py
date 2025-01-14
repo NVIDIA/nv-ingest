@@ -8,7 +8,7 @@
 # without an express license agreement from NVIDIA CORPORATION or
 # its affiliates is strictly prohibited.
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 from typing import List
 
 
@@ -18,7 +18,11 @@ class OpenAIRequest(BaseModel):
     k: int
     job_id: str
 
+    model_config = ConfigDict(extra="forbid")
+
 
 # OpenAI-compatible response schema
 class OpenAIResponse(BaseModel):
     content: List[str]
+
+    model_config = ConfigDict(extra="forbid")
