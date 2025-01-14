@@ -10,9 +10,9 @@ This page describes how to use Kubernetes generally, and how to deploy nv-ingest
 
 To start you need a Kubernetes cluster. We recommend that you use `kind`, which creates a single Docker container with a Kubernetes cluster inside it.
 
-Because the `kind` cluster needs access to the GPUs on your system, you need to install `nvkind`. 
-For details, see [Running kind clusters with GPUs using nvkind](https://github.com/NVIDIA/nvkind/tree/main). 
-`nvkind` provides the following benefits: 
+Because the `kind` cluster needs access to the GPUs on your system, you need to install `nvkind`.
+For details, see [Running kind clusters with GPUs using nvkind](https://github.com/NVIDIA/nvkind/tree/main).
+`nvkind` provides the following benefits:
 
 - Multiple developers on the same system can have isolated Kubernetes clusters
 - Easy to create and delete clusters
@@ -100,7 +100,7 @@ NAME                  STATUS   ROLES           AGE   VERSION
 jdyer-control-plane   Ready    control-plane   63s   v1.27.11
 ```
 
-Note: Not all of the containers created inside your Kubernetes cluster appear when you run `docker ps` 
+Note: Not all of the containers created inside your Kubernetes cluster appear when you run `docker ps`
 because some of them are are nested within a separate namespace. 
 
 For help with issues that arise, see [Troubleshooting](#troubleshooting).
@@ -141,7 +141,9 @@ In a single command, Skaffold does the following:
 The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
 for example, Elasticsearch, OpenTelemetry, and Postgres.
 
-The first time you try to deploy this project to a local Kubernetes, you may need to tell your local version of `Helm` (a package manager for Kubernetes configurations) where to find those third-party things, by running something like the following.
+The first time you deploy this project to a local Kubernetes,
+you might need to tell your local version of `Helm` (a package manager for Kubernetes configurations)
+where to find third-party services by running code similar to the following.
 
 ```shell
 helm repo add \
@@ -169,7 +171,7 @@ For the full list of repositories, refer to the `dependencies` section in the [C
 
 #### NVIDIA GPU Support
 
-For the Kubernetes pods to access the NVIDIA GPU resources, you must install the [NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin). 
+For the Kubernetes pods to access the NVIDIA GPU resources, you must install the [NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin).
 There are many configurations for this plugin, but to start development simply run the following code.
 
 ```shell
@@ -199,8 +201,8 @@ data:
 EOF
 ```
 
-You need an NGC personal API key to access models and images that are hosted on NGC. 
-First, [Generate an API key](ngc-api-key.md#generate-an-api-key). 
+You need an NGC personal API key to access models and images that are hosted on NGC.
+First, [Generate an API key](ngc-api-key.md#generate-an-api-key).
 Next, store the key in an environment variable by running the following code.
 
 ```shell
@@ -256,7 +258,7 @@ Deployments stabilized in 23.08 seconds
 Watching for changes...
 ```
 
-When you run this command, `skaffold dev` finds a random open port on the system and exposes the retriever-ingest service on that port. 
+When you run this command, `skaffold dev` finds a random open port on the system and exposes the retriever-ingest service on that port.
 For more information, see [Port Forwarding](https://skaffold.dev/docs/port-forwarding/).
 
 You can find that port in `skaffold`'s logs by running the following code.
@@ -287,8 +289,8 @@ curl \
   "${API_HOST}/health"
 ```
 
-When you run `skaffold verify` in a new terminal, Skaffold runs verification tests against the service.  
-These are very lightweight health checks, and should not be confused with integration tests. 
+When you run `skaffold verify` in a new terminal, Skaffold runs verification tests against the service.
+These are very lightweight health checks, and should not be confused with integration tests.
 For more information, see [Verify](https://skaffold.dev/docs/verify/).
 
 ## Clean Up
@@ -336,8 +338,8 @@ k9s
 
 ### Installing Helm Repositories
 
-You could encounter an error like the following. 
-This indicates that your local installation of `Helm` (a package manager for Kubernetes configurations) 
+You could encounter an error like the following.
+This indicates that your local installation of `Helm` (a package manager for Kubernetes configurations)
 doesn't know how to access a remote repository containing Kubernetes configurations.
 
 ```shell
@@ -366,7 +368,7 @@ Cleaning up...
 building helm dependencies: exit status 1
 ```
 
-If you only see `building helm dependencies`, you probably ran `skaffold dev` or `skaffold run` in quiet mode. 
+If you only see `building helm dependencies`, you probably ran `skaffold dev` or `skaffold run` in quiet mode.
 Rerun the commands with `-v info` or `-v debug` to get more information about what failed.
 
 ## References
