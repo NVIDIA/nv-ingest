@@ -211,14 +211,22 @@ async def convert_pdf(
 
         if job_id is None:
             job_id = str(uuid.uuid4())
-            print(f"JobId is None, Created JobId: {job_id}")
+            logger.debug(f"JobId is None, Created JobId: {job_id}")
 
         submitted_jobs: List[ProcessingJob] = []
         for file in files:
             file_stream = BytesIO(file.file.read())
             doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
-            content_type = file.content_type.split("/")[1]
-            print(f"Content Type: {content_type}")
+
+            try:
+                content_type = file.content_type.split("/")[1]
+            except Exception:
+                err_message = f"Unsupported content_type: {file.content_type}"
+                logger.error(err_message)
+                raise HTTPException(
+                    status_code=500, 
+                    detail=err_message
+                )
 
             job_spec = JobSpec(
                 document_type=content_type,
@@ -265,16 +273,9 @@ async def convert_pdf(
 
             submitted_jobs.append(processing_job)
 
-        # Each invocation of this endpoint creates a "job" that could have multiple PDFs being parsed ...
-        # keep a local cache of those job ids to the submitted job ids so that they can all be checked later
-        if job_id is None:
-            job_id = str(uuid.uuid4())
-        else:
-            job_id = job_id
-
         await ingest_service.set_processing_cache(job_id, submitted_jobs)
 
-        print(f"Submitted: {len(submitted_jobs)} PDFs for processing")
+        logger.debug(f"Submitted: {len(submitted_jobs)} documents of type: '{content_type}' for processing")
 
         return {
             "task_id": job_id,
@@ -293,25 +294,24 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
     try:
         processing_jobs = await ingest_service.get_processing_cache(job_id)
         vdb_task_id = await ingest_service.get_vdb_bulk_upload_status(job_id)
-    # TO DO: return 400 when job_id dne
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
-    print(f"Job contains: {len(processing_jobs)} PDFs that are processing. Lets check them now ...")
 
     updated_cache: List[ProcessingJob] = []
     num_ready_docs = 0
 
     for processing_job in processing_jobs:
-        print(f"Checking on submitted_job_id: {processing_job.submitted_job_id}")
+        logger.debug(f"submitted_job_id: {processing_job.submitted_job_id} - Status: {processing_job.status}")
 
-        print(f"Processing Job Status: {processing_job.status}")
         if processing_job.status == ConversionStatus.IN_PROGRESS:
             # Attempt to fetch the job from the ingest service
             try:
                 job_response = await ingest_service.fetch_job(processing_job.submitted_job_id)
 
                 job_response = json.dumps(job_response)
+
+                # Convert JSON into pseudo markdown format
                 blob_response = ingest_json_results_to_blob(job_response)
 
                 processing_job.raw_result = job_response
@@ -321,21 +321,21 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 updated_cache.append(processing_job)
 
             except TimeoutError:
-                print(f"TimeoutError getting result for job_id: {processing_job.submitted_job_id}")
+                logger.error(f"TimeoutError getting result for job_id: {processing_job.submitted_job_id}")
                 updated_cache.append(processing_job)
                 continue
             except RedisError:
-                print(f"RedisError getting result for job_id: {processing_job.submitted_job_id}")
+                logger.error(f"RedisError getting result for job_id: {processing_job.submitted_job_id}")
                 updated_cache.append(processing_job)
                 continue
         else:
-            print(f"{processing_job.submitted_job_id} has already finished successfully ....")
+            logger.debug(f"{processing_job.submitted_job_id} has already finished successfully ....")
             num_ready_docs = num_ready_docs + 1
             updated_cache.append(processing_job)
 
     await ingest_service.set_processing_cache(job_id, updated_cache)
 
-    print(f"{num_ready_docs}/{len(updated_cache)} complete")
+    logger.debug(f"{num_ready_docs}/{len(updated_cache)} complete")
     if num_ready_docs == len(updated_cache):
         results = []
         raw_results = []
@@ -349,7 +349,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 }
             )
             raw_results.append(result.raw_result)
-            print(f"reuslt.vdb_task: {result.vdb_task}")
+            logger.debug(f"reuslt.vdb_task: {result.vdb_task}")
             if result.vdb_task is True:
                 vdb_task = True
 
@@ -357,21 +357,21 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
             # The bulk upload task takes time. It is running Async so we return a 202 and store
             # the bulk upload task_id to query for the status on subsequent queries here.
             if vdb_task_id is None:
-                print("Inserting results into Milvus vector database ...")
+                logger.debug("Inserting results into Milvus vector database ...")
                 vdb_task_id = bulk_upload_results_to_milvus(raw_results, collection_name=job_id)
                 await ingest_service.set_vdb_bulk_upload_status(job_id, vdb_task_id)
-                print(f"VDB Task Id Insertion: {vdb_task_id}")
-                print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+                logger.debug(f"VDB Task Id Insertion: {vdb_task_id}")
+                logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
                 raise HTTPException(status_code=202, detail="VDB Bulk upload started. Retry later.")
             else:
                 if check_bulk_upload_status(vdb_task_id):
-                    print(f"VDB Bulk upload with task_id: {vdb_task_id} complete.")
+                    logger.debug(f"VDB Bulk upload with task_id: {vdb_task_id} complete.")
                     return JSONResponse(
                         content={"status": "completed", "result": results},
                         status_code=200,
                     )
                 else:
-                    print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+                    logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
                     raise HTTPException(
                         status_code=202, detail="VDB Bulk upload running but is not ready yet. Retry later."
                     )
@@ -382,7 +382,7 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
         )
     else:
         # Not yet ready ...
-        print(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+        logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
 
 
@@ -415,7 +415,6 @@ def perform_text_embedding(text: str) -> List[float]:
 @router.post("/query", response_model=OpenAIResponse)
 async def query_milvus(request: OpenAIRequest):
 
-    # Adaptation for needs from another team. Sorry for the clutter
     # model = "nvidia/nv-embedqa-e5-v5"
     messages = [
         {"role": "system", "content": "You are a helpful assistant."},
@@ -445,18 +444,15 @@ async def query_milvus(request: OpenAIRequest):
     results = []
     # Construct the response (combine docs into one or summarize, depending on your application)
     if docs is not None:
-        print(f"Docs Type: {type(docs)}")
-        print(f"Len of docs: {len(docs)}")
+        logger.debug(f"Docs Type: {type(docs)} - Len of docs: {len(docs)}")
 
         for doc in docs:
             if doc is not None:
-                print(f"Doc: {doc}")
+                logger.debug(f"Doc: {doc}")
                 results.append(doc)
                 if len(results) >= request.k:
                     break
-            else:
-                print("Doc is None ...")
 
-    print(f"Query Results: {results}")
+    logger.debug(f"Query Results: {results}")
 
     return OpenAIResponse(content=results)
