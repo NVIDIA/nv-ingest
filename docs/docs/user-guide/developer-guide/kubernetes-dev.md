@@ -101,7 +101,7 @@ jdyer-control-plane   Ready    control-plane   63s   v1.27.11
 ```
 
 Note: Not all of the containers created inside your Kubernetes cluster appear when you run `docker ps`
-because some of them are are nested within a separate namespace. 
+because some of them are are nested within a separate namespace.
 
 For help with issues that arise, see [Troubleshooting](#troubleshooting).
 
