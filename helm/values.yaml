@@ -319,8 +319,6 @@ envVars:
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedding:8000/v1"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
-  MILVUS_HOST: "nv-ingest-milvus"
-  MILVUS_PORT: "19530"
 
   VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
 
