@@ -384,13 +384,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
-    api_key = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
-        "",
-    )
+    api_key = os.getenv("NGC_API_KEY", "ngc_api_key")
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
     embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
 
@@ -548,10 +542,7 @@ def add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
 
 
 def add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
-    milvus_host = os.getenv("MILVUS_HOST", "milvus")
-    milvus_port = os.getenv("MILVUS_PORT", "19530")
-    milvus_endpoint = f"http://{milvus_host}:{milvus_port}"
-    logger.debug("add_vdb_task_sink_stage milvus_endpoint: {milvus_endpoint}")
+    milvus_endpoint = os.getenv("MILVUS_ENDPOINT", "http://milvus:19530")
 
     vdb_task_sink_loader = VDBTaskSinkLoaderFactory.get_instance(
         module_name="vdb_task_sink",

@@ -114,22 +114,3 @@ class RedisIngestService(IngestServiceMeta):
         except Exception as err:
             logger.error(f"Error getting cache for {cache_key}: {err}")
             raise
-
-    async def set_vdb_bulk_upload_status(self, job_id: str, task_id: str):
-        """Set the task_id for the vdb upload task"""
-        cache_key = f"{self._bulk_vdb_cache_prefix}{job_id}"
-        try:
-            self._ingest_client.get_client().set(cache_key, task_id, ex=3600)
-        except Exception as err:
-            logger.error(f"Error setting cache for {cache_key}: {err}")
-            raise
-
-    async def get_vdb_bulk_upload_status(self, job_id: str) -> str:
-        """Get the task_id for the VDB upload task to query Milvus for status"""
-        cache_key = f"{self._bulk_vdb_cache_prefix}{job_id}"
-        try:
-            data = self._ingest_client.get_client().get(cache_key)
-            return data
-        except Exception as err:
-            logger.error(f"Error getting cache for {cache_key}: {err}")
-            raise
