@@ -12,12 +12,14 @@
 
 import json
 import os
+import logging
 
 from fastapi import HTTPException
 from pymilvus import Collection, MilvusClient, DataType, connections, utility, BulkInsertState
 from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
 from typing import List
 
+logger = logging.getLogger(__name__)
 
 # We are using UUIDs for the collection_name. However, Milvus collection names
 # cannot have `-` characters so we replace them with `_`
@@ -39,7 +41,7 @@ def search_milvus(question_embedding: List[float], top_k: int = 5, collection_na
     collection_name = reformat_collection_name(collection_name)
 
     """Query Milvus for nearest neighbors of the question embedding."""
-    print(f"Searching for milvus collection: {collection_name}")
+    logger.debug(f"Searching for milvus collection: {collection_name}")
     if not utility.has_collection(collection_name):
         raise HTTPException(status_code=500, detail=f"Milvus collection '{collection_name}' not found.")
 
@@ -74,7 +76,7 @@ def bulk_upload_results_to_milvus(ingest_results, collection_name: str = "nv_ing
     milvus_url = os.getenv("MILVUS_ENDPOINT", "http://milvus:19530")
     minio_url = os.getenv("MINIO_ENDPOINT", "minio:9000")
 
-    print(f"Milvus URL: {milvus_url}")
+    logger.debug(f"Milvus URL: {milvus_url}")
     client = MilvusClient(milvus_url)
 
     schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=True)
