@@ -223,10 +223,7 @@ async def convert_pdf(
             except Exception:
                 err_message = f"Unsupported content_type: {file.content_type}"
                 logger.error(err_message)
-                raise HTTPException(
-                    status_code=500, 
-                    detail=err_message
-                )
+                raise HTTPException(status_code=500, detail=err_message)
 
             job_spec = JobSpec(
                 document_type=content_type,

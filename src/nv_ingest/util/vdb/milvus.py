@@ -21,6 +21,7 @@ from typing import List
 
 logger = logging.getLogger(__name__)
 
+
 # We are using UUIDs for the collection_name. However, Milvus collection names
 # cannot have `-` characters so we replace them with `_`
 def reformat_collection_name(collection_name: str = None):
@@ -142,7 +143,9 @@ def bulk_upload_results_to_milvus(ingest_results, collection_name: str = "nv_ing
                     }
                 )
 
-        logger.debug(f"{num_none_types}/{num_total} text elements were None. {num_non_none_types} actually had content.")
+        logger.debug(
+            f"{num_none_types}/{num_total} text elements were None. {num_non_none_types} actually had content."
+        )
 
     remote_writer.commit()
     logger.debug(f"Wrote data to: {remote_writer.batch_files}")
