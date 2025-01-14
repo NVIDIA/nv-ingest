@@ -18,8 +18,6 @@ import logging
 import time
 import traceback
 import uuid
-import os
-import requests
 
 from fastapi import APIRouter, Request, Response
 from fastapi import Depends
@@ -32,8 +30,6 @@ from opentelemetry import trace
 from redis import RedisError
 
 from nv_ingest.util.converters.formats import ingest_json_results_to_blob
-from nv_ingest.util.vdb.milvus import bulk_upload_results_to_milvus, search_milvus, check_bulk_upload_status
-from nv_ingest.schemas.vdb_query_job_schema import OpenAIRequest, OpenAIResponse
 
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob
@@ -201,7 +197,6 @@ async def convert_pdf(
     ingest_service: INGEST_SERVICE_T,
     files: List[UploadFile] = File(...),
     job_id: str = Form(...),
-    vdb_task: bool = Form(False),
     extract_text: bool = Form(True),
     extract_images: bool = Form(True),
     extract_tables: bool = Form(True),
@@ -265,7 +260,6 @@ async def convert_pdf(
                 submitted_job_id=submitted_job_id,
                 filename=file.filename,
                 status=ConversionStatus.IN_PROGRESS,
-                vdb_task=vdb_task,
             )
 
             submitted_jobs.append(processing_job)
@@ -290,7 +284,6 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
     t_start = time.time()
     try:
         processing_jobs = await ingest_service.get_processing_cache(job_id)
-        vdb_task_id = await ingest_service.get_vdb_bulk_upload_status(job_id)
     except Exception as e:
         logger.error(f"Error getting status: {str(e)}")
         raise HTTPException(status_code=500, detail=str(e))
@@ -336,7 +329,6 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
     if num_ready_docs == len(updated_cache):
         results = []
         raw_results = []
-        vdb_task = False
         for result in updated_cache:
             results.append(
                 {
@@ -346,32 +338,6 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
                 }
             )
             raw_results.append(result.raw_result)
-            logger.debug(f"reuslt.vdb_task: {result.vdb_task}")
-            if result.vdb_task is True:
-                vdb_task = True
-
-        if vdb_task:
-            # The bulk upload task takes time. It is running Async so we return a 202 and store
-            # the bulk upload task_id to query for the status on subsequent queries here.
-            if vdb_task_id is None:
-                logger.debug("Inserting results into Milvus vector database ...")
-                vdb_task_id = bulk_upload_results_to_milvus(raw_results, collection_name=job_id)
-                await ingest_service.set_vdb_bulk_upload_status(job_id, vdb_task_id)
-                logger.debug(f"VDB Task Id Insertion: {vdb_task_id}")
-                logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
-                raise HTTPException(status_code=202, detail="VDB Bulk upload started. Retry later.")
-            else:
-                if check_bulk_upload_status(vdb_task_id):
-                    logger.debug(f"VDB Bulk upload with task_id: {vdb_task_id} complete.")
-                    return JSONResponse(
-                        content={"status": "completed", "result": results},
-                        status_code=200,
-                    )
-                else:
-                    logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
-                    raise HTTPException(
-                        status_code=202, detail="VDB Bulk upload running but is not ready yet. Retry later."
-                    )
 
         return JSONResponse(
             content={"status": "completed", "result": results},
@@ -381,75 +347,3 @@ async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
         # Not yet ready ...
         logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-
-
-def perform_text_embedding(text: str) -> List[float]:
-    """Get the text embeddings use the nvcr.io/nim/nvidia/nv-embedqa-e5-v5 NIM"""
-    try:
-        embedding_http_endpoint = os.getenv("EMBEDDING_HTTP_ENDPOINT", "http://embedding:8000/v1/embeddings")
-        logger.debug(f"Embedding endpoint: {embedding_http_endpoint}")
-
-        # embedding JSON payload
-        payload = {"input": [text], "model": "nvidia/nv-embedqa-e5-v5", "input_type": "query"}
-
-        # Headers
-        headers = {"Content-Type": "application/json", "accept": "application/json"}
-
-        result = requests.post(embedding_http_endpoint, data=json.dumps(payload), headers=headers)
-        logger.debug(f"Embedding result: {result.text}")
-        if result.status_code == 200:
-            resp_json = json.loads(result.text)
-            return resp_json["data"][0]["embedding"]  # List of floats
-        else:
-            # Exception in embedding ...
-            raise HTTPException(status_code=500, detail=f"Embedding generation failed: {result.status_code}")
-
-    except Exception as e:
-        logger.error(f"Exception embedding text: {e}")
-        raise HTTPException(status_code=500, detail=f"Embedding generation failed: {e}")
-
-
-@router.post("/query", response_model=OpenAIResponse)
-async def query_milvus(request: OpenAIRequest):
-
-    # model = "nvidia/nv-embedqa-e5-v5"
-    messages = [
-        {"role": "system", "content": "You are a helpful assistant."},
-        {"role": "user", "content": request.query},
-    ]
-
-    # Extract user query from the last message
-    user_message = next((message for message in reversed(messages) if message["role"] == "user"), None)
-    if not user_message:
-        raise HTTPException(status_code=400, detail="No user query message found in request.")
-
-    logger.debug(f"Received user_message: {user_message}")
-    user_query = user_message["content"]
-    logger.debug(f"User query: {user_query}")
-
-    # Generate embedding for the query
-    query_embedding = perform_text_embedding(user_query)
-
-    logger.debug(f"Query Embedding: {query_embedding}")
-    # Query Milvus for relevant documents
-    try:
-        docs = search_milvus(query_embedding, top_k=request.k, collection_name=request.job_id)
-        logger.debug(f"Results from milvus: {docs}")
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Milvus query failed: {e}")
-
-    results = []
-    # Construct the response (combine docs into one or summarize, depending on your application)
-    if docs is not None:
-        logger.debug(f"Docs Type: {type(docs)} - Len of docs: {len(docs)}")
-
-        for doc in docs:
-            if doc is not None:
-                logger.debug(f"Doc: {doc}")
-                results.append(doc)
-                if len(results) >= request.k:
-                    break
-
-    logger.debug(f"Query Results: {results}")
-
-    return OpenAIResponse(content=results)

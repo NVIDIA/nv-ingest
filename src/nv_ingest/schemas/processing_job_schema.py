@@ -24,7 +24,6 @@ class ProcessingJob(BaseModel):
     submitted_job_id: str
     filename: str
     raw_result: str = ""
-    vdb_task: bool = False
     content: str = ""
     status: ConversionStatus
     error: str | None = None
