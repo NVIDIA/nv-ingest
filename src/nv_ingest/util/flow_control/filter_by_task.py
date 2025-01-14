@@ -8,6 +8,7 @@ import re
 import typing
 from functools import wraps
 
+from pydantic import BaseModel
 from morpheus.messages import ControlMessage
 
 logger = logging.getLogger(__name__)
@@ -54,6 +55,9 @@ def filter_by_task(required_tasks, forward_func=None):
                         logger.debug(f"Checking task properties for: {required_task_name}")
                         logger.debug(f"Required task properties: {required_task_props_list}")
                         for task_props in task_props_list:
+                            if isinstance(task_props, BaseModel):
+                                task_props = task_props.model_dump()
+
                             if all(
                                 _is_subset(task_props, required_task_props)
                                 for required_task_props in required_task_props_list

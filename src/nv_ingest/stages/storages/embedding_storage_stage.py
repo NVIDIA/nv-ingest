@@ -16,6 +16,7 @@ from pymilvus import Collection
 from pymilvus import connections
 from pymilvus.bulk_writer.constants import BulkFileType
 from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter
+from pydantic import BaseModel
 
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -95,6 +96,9 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
 
 def _store_embeddings(df, task_props, validated_config, trace_info=None):
     try:
+        if isinstance(task_props, BaseModel):
+            task_props = task_props.model_dump()
+
         content_types = {}
         content_types[ContentTypeEnum.EMBEDDING] = True
 

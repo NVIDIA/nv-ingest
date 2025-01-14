@@ -4,12 +4,22 @@ from io import BytesIO
 import base64
 from PIL import Image
 
-from nv_ingest.util.nim.yolox import YoloxModelInterface
+from nv_ingest.util.nim.yolox import YoloxPageElementsModelInterface
+
+
+@pytest.fixture(params=["0.2.0", "1.0.0"])
+def model_interface(request):
+    return YoloxPageElementsModelInterface(yolox_version=request.param)
 
 
 @pytest.fixture
-def model_interface():
-    return YoloxModelInterface()
+def legacy_model_interface():
+    return YoloxPageElementsModelInterface(yolox_version="0.2.0")
+
+
+@pytest.fixture
+def ga_model_interface():
+    return YoloxPageElementsModelInterface(yolox_version="1.0.0")
 
 
 def create_test_image(width=800, height=600, color=(255, 0, 0)):
@@ -58,8 +68,13 @@ def create_base64_image(width=1024, height=1024, color=(255, 0, 0)):
         return base64.b64encode(buffer.getvalue()).decode("utf-8")
 
 
-def test_name_returns_yolox(model_interface):
-    assert model_interface.name() == "yolox"
+def test_name_returns_yolox_legacy(legacy_model_interface):
+    assert legacy_model_interface.name() == "yolox-page-elements (version 0.2.0)"
+
+
+def test_name_returns_yolox(ga_model_interface):
+    ga_model_interface = YoloxPageElementsModelInterface(yolox_version="1.0.0")
+    assert ga_model_interface.name() == "yolox-page-elements (version 1.0.0)"
 
 
 def test_prepare_data_for_inference_valid(model_interface):
@@ -103,11 +118,11 @@ def test_format_input_grpc(model_interface):
     assert formatted_input.shape[1:] == (3, 1024, 1024)
 
 
-def test_format_input_http(model_interface):
+def test_format_input_legacy(legacy_model_interface):
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
-    prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "http")
+    prepared_data = legacy_model_interface.prepare_data_for_inference(input_data)
+    formatted_input = legacy_model_interface.format_input(prepared_data, "http")
     assert "messages" in formatted_input
     assert isinstance(formatted_input["messages"], list)
     for message in formatted_input["messages"]:
@@ -118,6 +133,20 @@ def test_format_input_http(model_interface):
             assert "image_url" in content
             assert "url" in content["image_url"]
             assert content["image_url"]["url"].startswith("data:image/png;base64,")
+
+
+def test_format_input(ga_model_interface):
+    images = [create_test_image(), create_test_image()]
+    input_data = {"images": images}
+    prepared_data = ga_model_interface.prepare_data_for_inference(input_data)
+    formatted_input = ga_model_interface.format_input(prepared_data, "http")
+    assert "input" in formatted_input
+    assert isinstance(formatted_input["input"], list)
+    for content in formatted_input["input"]:
+        assert "type" in content
+        assert content["type"] == "image_url"
+        assert "url" in content
+        assert content["url"].startswith("data:image/png;base64,")
 
 
 def test_format_input_invalid_protocol(model_interface):
@@ -136,7 +165,7 @@ def test_parse_output_grpc(model_interface):
     assert parsed_output.dtype == np.float32
 
 
-def test_parse_output_http_valid(model_interface):
+def test_parse_output_http_valid_legacy(legacy_model_interface):
     response = {
         "data": [
             [
@@ -168,7 +197,36 @@ def test_parse_output_http_valid(model_interface):
     }
     scaling_factors = [(1.0, 1.0), (1.0, 1.0)]
     data = {"scaling_factors": scaling_factors}
-    parsed_output = model_interface.parse_output(response, "http", data)
+    parsed_output = legacy_model_interface.parse_output(response, "http", data)
+    assert isinstance(parsed_output, np.ndarray)
+    assert parsed_output.shape == (2, 3, 85)
+    assert parsed_output.dtype == np.float32
+
+
+def test_parse_output_http_valid(ga_model_interface):
+    response = {
+        "data": [
+            {
+                "index": 0,
+                "bounding_boxes": {
+                    "table": [{"x_min": 0.1, "y_min": 0.1, "x_max": 0.2, "y_max": 0.2, "confidence": 0.9}],
+                    "chart": [{"x_min": 0.3, "y_min": 0.3, "x_max": 0.4, "y_max": 0.4, "confidence": 0.8}],
+                    "title": [{"x_min": 0.5, "y_min": 0.5, "x_max": 0.6, "y_max": 0.6, "confidence": 0.95}],
+                },
+            },
+            {
+                "index": 1,
+                "bounding_boxes": {
+                    "table": [{"x_min": 0.15, "y_min": 0.15, "x_max": 0.25, "y_max": 0.25, "confidence": 0.85}],
+                    "chart": [{"x_min": 0.35, "y_min": 0.35, "x_max": 0.45, "y_max": 0.45, "confidence": 0.75}],
+                    "title": [{"x_min": 0.55, "y_min": 0.55, "x_max": 0.65, "y_max": 0.65, "confidence": 0.92}],
+                },
+            },
+        ]
+    }
+    scaling_factors = [(1.0, 1.0), (1.0, 1.0)]
+    data = {"scaling_factors": scaling_factors}
+    parsed_output = ga_model_interface.parse_output(response, "http", data)
     assert isinstance(parsed_output, np.ndarray)
     assert parsed_output.shape == (2, 3, 85)
     assert parsed_output.dtype == np.float32

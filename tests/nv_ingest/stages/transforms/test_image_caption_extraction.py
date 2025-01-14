@@ -95,7 +95,12 @@ def test_prepare_dataframes_all_matches():
 def test_caption_extract_no_image_content(mock_generate_captions):
     # DataFrame with no image content
     df = pd.DataFrame({"metadata": [{"content_metadata": {"type": "text"}}, {"content_metadata": {"type": "pdf"}}]})
-    task_props = {"api_key": "test_api_key", "prompt": "Describe the image", "endpoint_url": "https://api.example.com"}
+    task_props = {
+        "api_key": "test_api_key",
+        "prompt": "Describe the image",
+        "endpoint_url": "https://api.example.com",
+        "model_name": "some-vlm-model",
+    }
     validated_config = MagicMock()
     trace_info = {}
 
@@ -114,7 +119,12 @@ def test_caption_extract_with_image_content(mock_generate_captions):
 
     # DataFrame with image content
     df = pd.DataFrame({"metadata": [{"content_metadata": {"type": "image"}, "content": "base64_encoded_image_data"}]})
-    task_props = {"api_key": "test_api_key", "prompt": "Describe the image", "endpoint_url": "https://api.example.com"}
+    task_props = {
+        "api_key": "test_api_key",
+        "prompt": "Describe the image",
+        "endpoint_url": "https://api.example.com",
+        "model_name": "some-vlm-model",
+    }
     validated_config = MagicMock()
     trace_info = {}
 
@@ -123,7 +133,11 @@ def test_caption_extract_with_image_content(mock_generate_captions):
 
     # Check that _generate_captions was called once
     mock_generate_captions.assert_called_once_with(
-        "base64_encoded_image_data", "Describe the image", "test_api_key", "https://api.example.com"
+        "base64_encoded_image_data",
+        "Describe the image",
+        "test_api_key",
+        "https://api.example.com",
+        "some-vlm-model",
     )
 
     # Verify that the caption was added to image_metadata
@@ -145,7 +159,12 @@ def test_caption_extract_mixed_content(mock_generate_captions):
             ]
         }
     )
-    task_props = {"api_key": "test_api_key", "prompt": "Describe the image", "endpoint_url": "https://api.example.com"}
+    task_props = {
+        "api_key": "test_api_key",
+        "prompt": "Describe the image",
+        "endpoint_url": "https://api.example.com",
+        "model_name": "some-vlm-model",
+    }
     validated_config = MagicMock()
     trace_info = {}
 
@@ -155,10 +174,18 @@ def test_caption_extract_mixed_content(mock_generate_captions):
     # Check that _generate_captions was called twice for images only
     assert mock_generate_captions.call_count == 2
     mock_generate_captions.assert_any_call(
-        "image_data_1", "Describe the image", "test_api_key", "https://api.example.com"
+        "image_data_1",
+        "Describe the image",
+        "test_api_key",
+        "https://api.example.com",
+        "some-vlm-model",
     )
     mock_generate_captions.assert_any_call(
-        "image_data_2", "Describe the image", "test_api_key", "https://api.example.com"
+        "image_data_2",
+        "Describe the image",
+        "test_api_key",
+        "https://api.example.com",
+        "some-vlm-model",
     )
 
     # Verify that captions were added only for image rows
@@ -212,9 +239,10 @@ def test_generate_captions_successful(mock_post):
     prompt = "Describe the image"
     api_key = "test_api_key"
     endpoint_url = "https://api.example.com"
+    model_name = "some-vlm-model"
 
     # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url)
+    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
 
     # Verify that the correct caption was returned
     assert result == "A beautiful sunset over the mountains."
@@ -222,7 +250,7 @@ def test_generate_captions_successful(mock_post):
         endpoint_url,
         headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
         json={
-            "model": "meta/llama-3.2-90b-vision-instruct",
+            "model": "some-vlm-model",
             "messages": [{"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'}],
             "max_tokens": 512,
             "temperature": 1.00,
@@ -244,10 +272,11 @@ def test_generate_captions_api_error(mock_post):
     prompt = "Describe the image"
     api_key = "test_api_key"
     endpoint_url = "https://api.example.com"
+    model_name = "some-vlm-model"
 
     # Expect an exception due to the server error
     with pytest.raises(requests.exceptions.RequestException, match="500 Server Error"):
-        _generate_captions(base64_image, prompt, api_key, endpoint_url)
+        _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
 
 
 @patch(f"{MODULE_UNDER_TEST}.requests.post")
@@ -263,9 +292,10 @@ def test_generate_captions_malformed_json(mock_post):
     prompt = "Describe the image"
     api_key = "test_api_key"
     endpoint_url = "https://api.example.com"
+    model_name = "some-vlm-model"
 
     # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url)
+    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
 
     # Verify fallback response when JSON is malformed
     assert result == "No caption returned"
@@ -284,9 +314,10 @@ def test_generate_captions_empty_caption_content(mock_post):
     prompt = "Describe the image"
     api_key = "test_api_key"
     endpoint_url = "https://api.example.com"
+    model_name = "some-vlm-model"
 
     # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url)
+    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
 
     # Verify that the fallback response is returned
     assert result == ""

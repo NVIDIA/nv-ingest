@@ -710,3 +710,33 @@ def nvingest_retrieval(
     else:
         results = dense_retrieval(queries, collection_name, client, embed_model, top_k, output_fields=output_fields)
     return results
+
+
+def remove_records(source_name: str, collection_name: str, milvus_uri: str = "http://localhost:19530"):
+    """
+    This function allows a user to remove chunks associated with an ingested file.
+    Supply the full path of the file you would like to remove and this function will
+    remove all the chunks associated with that file in the target collection.
+
+    Parameters
+    ----------
+    source_name : str
+        The full file path of the file you would like to remove from the collection.
+    collection_name : str
+        Milvus Collection to query against
+    milvus_uri : str,
+        Milvus address with http(s) preffix and port. Can also be a file path, to activate
+        milvus-lite.
+
+    Returns
+    -------
+    Dict
+        Dictionary with one key, `delete_cnt`. The value represents the number of entities
+        removed.
+    """
+    client = MilvusClient(milvus_uri)
+    result_ids = client.delete(
+        collection_name=collection_name,
+        filter=f'(source["source_name"] == "{source_name}")',
+    )
+    return result_ids

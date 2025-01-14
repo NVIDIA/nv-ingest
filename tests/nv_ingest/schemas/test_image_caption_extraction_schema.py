@@ -13,6 +13,7 @@ def test_valid_schema():
     assert schema.api_key == "your-api-key-here"
     assert schema.endpoint_url == "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
     assert schema.prompt == "Caption the content of this image:"
+    assert schema.model_name == "meta/llama-3.2-90b-vision-instruct"
     assert schema.raise_on_failure is False
 
 
@@ -22,12 +23,14 @@ def test_valid_schema_with_custom_values():
         "api_key": "your-api-key-here",
         "endpoint_url": "https://custom.api.endpoint",
         "prompt": "Describe the image:",
+        "model_name": "some-vlm-model",
         "raise_on_failure": True,
     }
     schema = ImageCaptionExtractionSchema(**valid_data)
     assert schema.api_key == "your-api-key-here"
     assert schema.endpoint_url == "https://custom.api.endpoint"
     assert schema.prompt == "Describe the image:"
+    assert schema.model_name == "some-vlm-model"
     assert schema.raise_on_failure is True
 
 
@@ -36,7 +39,7 @@ def test_invalid_extra_field():
     data_with_extra_field = {"api_key": "your-api-key-here", "extra_field": "should_not_be_allowed"}
     with pytest.raises(ValidationError) as exc_info:
         ImageCaptionExtractionSchema(**data_with_extra_field)
-    assert "extra fields not permitted" in str(exc_info.value)
+    assert "Extra inputs are not permitted" in str(exc_info.value)
 
 
 def test_invalid_field_types():
@@ -49,12 +52,3 @@ def test_invalid_field_types():
     }
     with pytest.raises(ValidationError) as exc_info:
         ImageCaptionExtractionSchema(**invalid_data)
-
-
-def test_default_values():
-    # Test that default values are correctly assigned when not provided
-    data = {"api_key": "your-api-key-here"}
-    schema = ImageCaptionExtractionSchema(**data)
-    assert schema.endpoint_url == "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
-    assert schema.prompt == "Caption the content of this image:"
-    assert schema.raise_on_failure is False
