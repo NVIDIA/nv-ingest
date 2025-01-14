@@ -164,6 +164,7 @@ class DocxReader:
         self._extracted_data = []
         self._prev_para_images = []
         self._prev_para_image_idx = 0
+        self._pending_images = []
 
     def is_text_empty(self, text: str) -> bool:
         """
@@ -260,7 +261,7 @@ class DocxReader:
 
     def format_cell(self, cell: _Cell) -> Tuple[str, List[Image]]:
         """
-        Format a table cell into markdown text
+        Format a table cell into Markdown text
         """
         if self.paragraph_format == "markdown":
             newline = "<br>"
@@ -333,7 +334,7 @@ class DocxReader:
         base64_img = bytetools.base64frombytes(image.blob)
 
         # For docx there is no bounding box. The paragraph that follows the image is typically
-        # the caption. Add that para to the page nearby for now. fixme
+        # the caption. Add that para to the page nearby for now.
         bbox = (0, 0, 0, 0)
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
@@ -346,9 +347,7 @@ class DocxReader:
             page_nearby_blocks["text"]["bbox"] = [[-1, -1, -1, -1]] * caption_len
 
         page_block = para_idx
-
-        # python-docx treats the entire document as a single page
-        page_count = 1
+        page_count = 1  # python-docx => single page
         page_idx = 0
 
         content_metadata = {
@@ -375,7 +374,6 @@ class DocxReader:
         }
 
         unified_metadata = base_unified_metadata.copy()
-
         unified_metadata.update(
             {
                 "content": base64_img,
@@ -387,18 +385,25 @@ class DocxReader:
 
         validated_unified_metadata = validate_metadata(unified_metadata)
 
-        # Work around until https://github.com/apache/arrow/pull/40412 is resolved
-        return [ContentTypeEnum.IMAGE.value, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
+        return [
+            ContentTypeEnum.IMAGE.value,
+            validated_unified_metadata.model_dump(),
+            str(uuid.uuid4()),
+        ]
 
-    def _extract_para_images(self, images, para_idx, caption, base_unified_metadata, extracted_data):
+    def _extract_para_images(self, images, para_idx, caption, base_unified_metadata):
         """
-        Extract all images in a paragraph. These images share the same metadata.
+        Instead of directly appending to self._extracted_data,
+        we accumulate images in self._pending_images.
         """
         for image in images:
             logger.debug("image content_type %s para_idx %d", image.content_type, para_idx)
             logger.debug("image caption %s", caption)
+
+            # Construct image metadata, but do NOT put in extracted_data yet -- we need to disambiguate images of
+            # tables and charts at the end of processing.
             extracted_image = self._construct_image_metadata(image, para_idx, caption, base_unified_metadata)
-            extracted_data.append(extracted_image)
+            self._pending_images.append(extracted_image)
 
     def _construct_text_metadata(self, accumulated_text, para_idx, text_depth, base_unified_metadata):
         """
@@ -459,32 +464,30 @@ class DocxReader:
         para_idx: int,
     ):
         """
-        Process the text and images in a docx paragraph
+        Process the text and images in a docx paragraph.
         """
-        # Paragraph
         paragraph = Paragraph(child, self.document)
         paragraph_text, paragraph_images = self.format_paragraph(paragraph)
 
+        # If there's a cached image from the previous paragraph, assume this paragraph might be its caption
         if self._prev_para_images:
-            # build image metadata with image from previous paragraph and text from current
             self._extract_para_images(
                 self._prev_para_images,
                 self._prev_para_image_idx,
-                paragraph_text,
+                paragraph_text,  # treat the current paragraph's text as the caption
                 base_unified_metadata,
-                self._extracted_data,
             )
             self._prev_para_images = []
 
+        # If user wants images/charts/tables, accumulate them
         if (extract_charts or extract_images or extract_tables) and paragraph_images:
-            # cache the images till the next paragraph is read
             self._prev_para_images = paragraph_images
             self._prev_para_image_idx = para_idx
 
         self.images += paragraph_images
 
+        # Handle text styles if desired
         if self.handle_text_styles:
-            # Get the level of the paragraph (especially for lists)
             try:
                 numPr = paragraph._element.xpath("./w:pPr/w:numPr")[0]
                 level = int(numPr.xpath("./w:ilvl/@w:val")[0])
@@ -494,6 +497,7 @@ class DocxReader:
 
         self._accumulated_text.append(paragraph_text + "\n")
 
+        # If text_depth is BLOCK, we flush after each paragraph
         if text_depth == TextTypeEnum.BLOCK:
             text_extraction = self._construct_text_metadata(
                 self._accumulated_text, para_idx, text_depth, base_unified_metadata
@@ -564,6 +568,7 @@ class DocxReader:
             if len(text_extraction) > 0:
                 self._extracted_data.append(text_extraction)
 
+        # TODO(Devin): Part 2 images need to be collected for processing before adding them to extracted data
         if self._prev_para_images:
             # if we got here it means that image was at the end of the document and there
             # was no caption for the image

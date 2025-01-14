@@ -107,7 +107,6 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     return image_array
 
 
-# TODO(Devin): Move to common file
 def process_inference_results(
     output_array: np.ndarray,
     original_image_shapes: List[Tuple[int, int]],

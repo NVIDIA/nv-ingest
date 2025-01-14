@@ -64,6 +64,8 @@ def python_docx(
         Specifies whether to extract images.
     extract_tables : bool
         Specifies whether to extract tables.
+    extract_charts : bool
+        Specifies whether to extract charts.
     **kwargs
         The keyword arguments are used for additional extraction parameters.
 
@@ -80,7 +82,7 @@ def python_docx(
     source_id = row_data["source_id"]
     # get text_depth
     text_depth = kwargs.get("text_depth", "document")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    text_depth = TextTypeEnum(text_depth.upper())
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
 
