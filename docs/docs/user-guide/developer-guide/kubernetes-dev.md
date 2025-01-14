@@ -1,16 +1,16 @@
 # Developing with Kubernetes
 
-Developing directly on Kubernetes gives us more confidence that things will work as expected in end user deployments.
+Developing directly on Kubernetes gives us more confidence that end-user deployments will work as expected.
 
-This page describes how to use Kubernetes generally, and how to deploy nv-ingest on a local Kubernetes clusters.
+This page describes how to use Kubernetes generally and how to deploy nv-ingest on a local Kubernetes cluster.
 
 > **NOTE:** _Unless otherwise noted, all commands below should be run from the root of this repo._
 
 ## Kubernetes Cluster
 
-To start you need a Kubernetes cluster. We recommend using `kind` that creates a single Docker container with a Kubernetes cluster inside it.
+To start, you need a Kubernetes cluster. We recommend using `kind`, which creates a single Docker container with a Kubernetes cluster inside it.
 
-Also, because this the `kind` cluster needs access to the GPUs on your system you need to install `kind-with-gpus`. The easiest way to do this is following the instructions laid out in this GitHub repo https://github.com/klueska/kind-with-gpus-examples/tree/master
+Also, because this `kind` cluster needs access to the GPUs on your system, you need to install `kind-with-GPUs.` The easiest way to do this is by following the instructions laid out in this GitHub repo https://github.com/klueska/kind-with-gpus-examples/tree/master
 
 Benefits of this:
 
@@ -87,13 +87,13 @@ docker ps | grep kind
 
 You should be able to use `kubectl` immediately, and it should be pointed at that cluster you just created.
 
-For example, to ensure the cluster was set up successfully, try listing nodes.
+For example, try listing nodes to ensure the cluster was set up successfully.
 
 ```shell
 kubectl get nodes
 ```
 
-If that worked, you should see a single node, like this:
+If that worked, you should see a single node like this:
 
 ```text
 NAME                  STATUS   ROLES           AGE   VERSION
@@ -119,7 +119,7 @@ Skaffold does a few things for you in a single command:
 
 ### Directory Structure
 
-- `skaffold/sensitive/` contains any secrets or manifests you want deployed to your cluster, but not checked into git, as your local cluster is unlikely to have ESO installed. If it does, feel free to use `kind: ExternalSecret` instead.
+- `skaffold/sensitive/` contains any secrets or manifests you want deployed to your cluster but not checked into git, as your local cluster is unlikely to have ESO installed. If it does, feel free to use `kind: ExternalSecret` instead.
 - `skaffold/components` contains any k8s manifests you want deployed in any skaffold file. The paths are relative and can be used in either `kustomize` or `rawYaml` formats:
 
   ```yaml
@@ -137,10 +137,9 @@ Skaffold does a few things for you in a single command:
 
 #### Add Helm Repos
 
-The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
-for example, Elasticsearch, OpenTelemetry, and Postgres.
+The retriever-ingest service's deployment requires pulling configurations for other services from third-party sources, such as Elasticsearch, OpenTelemetry, and Postgres.
 
-The first time you try to deploy this project to a local Kubernetes, you may need to tell your local version of `Helm` (a package manager for Kubernetes configurations) where to find those third-party things, by running something like the following.
+The first time you try to deploy this project to a local Kubernetes, you may need to tell your local version of `Helm` (a package manager for Kubernetes configurations) where to find those third-party things by running something like the following.
 
 ```shell
 helm repo add \
@@ -168,7 +167,7 @@ For the full list of repositories, refer to the `dependencies` section in [this 
 
 #### NVIDIA GPU Support
 
-In order for the deployed Kubernetes pods to access the NVIDIA GPU resources, the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
+The [NVIDIA k8s-device-plugin] (https://github.com/NVIDIA/k8s-device-plugin) must be installed for the deployed Kubernetes pods to access the NVIDIA GPU resources. This plugin has many configurations, but running it is a straightforward way to start development.
 
 ```shell
 kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
