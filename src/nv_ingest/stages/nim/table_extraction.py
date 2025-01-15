@@ -173,8 +173,7 @@ def _extract_table_data(
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
-        if isinstance(paddle_client, NimClient):
-            paddle_client.close()
+        paddle_client.close()
 
 
 def generate_table_extractor_stage(

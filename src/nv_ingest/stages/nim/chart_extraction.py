@@ -10,7 +10,6 @@ from typing import Optional
 from typing import Tuple
 
 import pandas as pd
-import tritonclient.grpc as grpcclient
 from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
@@ -192,10 +191,8 @@ def _extract_chart_data(
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:
-        if isinstance(cached_client, grpcclient.InferenceServerClient):
-            cached_client.close()
-        if isinstance(deplot_client, grpcclient.InferenceServerClient):
-            deplot_client.close()
+        cached_client.close()
+        deplot_client.close()
 
 
 def generate_chart_extractor_stage(
