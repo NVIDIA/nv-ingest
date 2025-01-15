@@ -31,28 +31,35 @@ from nv_ingest.util.schema.schema_validator import validate_schema
 logger = logging.getLogger(__name__)
 
 
-# TODO(Devin) Name this function something more descriptive
 class PipelineCreationSchema(BaseModel):
-    cached_grpc_endpoint: str = "localhost:8007"
-    cached_infer_protocol: str = "grpc"
-    deplot_http_endpoint: str = "http://localhost:8003/v1/chat/completions"
+    cached_http_endpoint: str = os.getenv(
+        "CACHED_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached"
+    )
+    cached_infer_protocol: str = "http"
+    deplot_http_endpoint: str = os.getenv("DEPLOT_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/google/deplot")
     deplot_infer_protocol: str = "http"
-    embedding_nim_endpoint: str = "http://localhost:8012/v1"
-    embedding_nim_model_name: str = "nvidia/nv-embedqa-e5-v5"
-    ingest_log_level: str = "INFO"
+    doughnut_grpc_triton: str = "triton-doughnut:8001"
+    embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
+    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+    ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
     message_client_host: str = "localhost"
     message_client_port: str = "7671"
     message_client_type: str = "simple"
-    minio_bucket: str = "nv-ingest"
     mrc_ignore_numa_check: str = "1"
+    ngc_api_key: str = os.getenv("NGC_API_KEY", "")
+    nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
     otel_exporter_otlp_endpoint: str = "localhost:4317"
-    paddle_grpc_endpoint: str = "localhost:8010"
-    paddle_http_endpoint: str = "http://localhost:8009/v1/infer"
-    paddle_infer_protocol: str = "grpc"
+    paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
+    paddle_infer_protocol: str = "http"
     redis_morpheus_task_queue: str = "morpheus_task_queue"
-    yolox_infer_protocol: str = "grpc"
-    yolox_grpc_endpoint: str = "localhost:8001"
-    vlm_caption_endpoint: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+    vlm_caption_endpoint: str = os.getenv(
+        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+    )
+    yolox_http_endpoint: str = os.getenv(
+        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1"
+    )
+    yolox_infer_protocol: str = "http"
+
     model_config = ConfigDict(extra="forbid")
 
 
@@ -311,7 +318,7 @@ def start_pipeline_subprocess(config: PipelineCreationSchema, stdout=None, stder
 
     # Prepare environment variables from the config
     env = os.environ.copy()
-    env.update({key.upper(): val for key, val in config.dict().items()})
+    env.update({key.upper(): val for key, val in config.model_dump().items()})
 
     logger.info("Starting pipeline subprocess...")
 
