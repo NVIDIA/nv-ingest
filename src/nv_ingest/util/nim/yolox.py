@@ -403,7 +403,7 @@ def expand_table_bboxes(annotation_dict, labels=None):
                 height = bbox[3] - bbox[1]
                 bbox[1] = max(0.0, min(1.0, bbox[1] - height * 0.2))
 
-        new_annotation_dict[label].append([round(float(x), 4) for x in bbox + [score]])
+            new_annotation_dict[label].append([round(float(x), 4) for x in bbox + [score]])
 
     return new_annotation_dict
 
