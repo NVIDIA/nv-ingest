@@ -29,6 +29,7 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import VdbUploadTask
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.milvus import MilvusOperator
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -223,7 +224,10 @@ class Ingestor:
 
         fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
         result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
-
+        if self._vdb_bulk_upload:
+            self._vdb_bulk_upload.run(result)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
         return result
 
     def ingest_async(self, **kwargs: Any) -> Future:
@@ -270,6 +274,11 @@ class Ingestor:
 
         for future in future_to_job_id:
             future.add_done_callback(_done_callback)
+
+        if self._vdb_bulk_upload:
+            self._vdb_bulk_upload.run(combined_future)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
 
         return combined_future
 
@@ -492,6 +501,10 @@ class Ingestor:
         caption_task = CaptionTask(**kwargs)
         self._job_specs.add_task(caption_task)
 
+        return self
+
+    def vdb_bulk_upload(self, **kwargs):
+        self._vdb_bulk_upload = MilvusOperator(**kwargs)
         return self
 
     def _count_job_states(self, job_states: set[JobStateEnum]) -> int:

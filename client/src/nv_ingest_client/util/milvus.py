@@ -18,6 +18,74 @@ from scipy.sparse import csr_array
 from typing import List
 import time
 from urllib.parse import urlparse
+from typing import Union, Dict
+
+
+class MilvusOperator:
+    def __init__(
+        self,
+        collection_name: Union[str, Dict] = "nv_ingest_collection",
+        milvus_uri: str = "http://localhost:19530",
+        sparse: bool = False,
+        recreate: bool = True,
+        gpu_index: bool = True,
+        gpu_search: bool = False,
+        dense_dim: int = 1024,
+        minio_endpoint: str = "localhost:9000",
+        enable_text: bool = True,
+        enable_charts: bool = True,
+        enable_tables: bool = True,
+        bm25_save_path: str = "bm25_model.json",
+        access_key: str = "minioadmin",
+        secret_key: str = "minioadmin",
+        bucket_name: str = "a-bucket",
+    ):
+        self.milvus_kwargs = locals()
+        self.collection_name = self.milvus_kwargs.pop("collection_name")
+        self.milvus_kwargs.pop("self")
+
+    def get_connection_params(self):
+        conn_dict = {
+            "milvus_uri": self.milvus_kwargs["milvus_uri"],
+            "sparse": self.milvus_kwargs["sparse"],
+            "recreate": self.milvus_kwargs["recreate"],
+            "gpu_index": self.milvus_kwargs["gpu_index"],
+            "gpu_search": self.milvus_kwargs["gpu_search"],
+            "dense_dim": self.milvus_kwargs["dense_dim"],
+        }
+        return (self.collection_name, conn_dict)
+
+    def get_write_params(self):
+        write_params = self.milvus_kwargs.copy()
+        del write_params["recreate"]
+        del write_params["gpu_index"]
+        del write_params["gpu_search"]
+        del write_params["dense_dim"]
+
+        return (self.collection_name, write_params)
+
+    def run(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            create_nvingest_collection(collection_name, **create_params)
+            write_to_nvingest_collection(records, collection_name, **write_params)
+        elif isinstance(collection_name, dict):
+            for coll_name, data_type in collection_name.items():
+                create_nvingest_collection(collection_name, **create_params)
+                enabled_dtypes = {
+                    "enable_text": False,
+                    "enable_charts": False,
+                    "enable_tables": False,
+                }
+                if not isinstance(data_type, list):
+                    data_type = [data_type]
+                for d_type in data_type:
+                    enabled_dtypes[f"enable_{d_type}"] = True
+                write_params.update(enabled_dtypes)
+                write_to_nvingest_collection(records, collection_name, **write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
 
 
 def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False) -> CollectionSchema:
