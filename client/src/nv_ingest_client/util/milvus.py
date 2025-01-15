@@ -21,6 +21,24 @@ from urllib.parse import urlparse
 from typing import Union, Dict
 
 
+def _dict_to_params(collections_dict: dict, write_params: dict):
+    params_tuple_list = []
+    for coll_name, data_type in collections_dict.items():
+        cp_write_params = write_params.copy()
+        enabled_dtypes = {
+            "enable_text": False,
+            "enable_charts": False,
+            "enable_tables": False,
+        }
+        if not isinstance(data_type, list):
+            data_type = [data_type]
+        for d_type in data_type:
+            enabled_dtypes[f"enable_{d_type}"] = True
+        cp_write_params.update(enabled_dtypes)
+        params_tuple_list.append((coll_name, cp_write_params))
+    return params_tuple_list
+
+
 class MilvusOperator:
     def __init__(
         self,
@@ -71,19 +89,11 @@ class MilvusOperator:
             create_nvingest_collection(collection_name, **create_params)
             write_to_nvingest_collection(records, collection_name, **write_params)
         elif isinstance(collection_name, dict):
-            for coll_name, data_type in collection_name.items():
-                create_nvingest_collection(collection_name, **create_params)
-                enabled_dtypes = {
-                    "enable_text": False,
-                    "enable_charts": False,
-                    "enable_tables": False,
-                }
-                if not isinstance(data_type, list):
-                    data_type = [data_type]
-                for d_type in data_type:
-                    enabled_dtypes[f"enable_{d_type}"] = True
-                write_params.update(enabled_dtypes)
-                write_to_nvingest_collection(records, collection_name, **write_params)
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                create_nvingest_collection(coll_name, **create_params)
+                write_to_nvingest_collection(records, coll_name, **sub_write_params)
         else:
             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
 
