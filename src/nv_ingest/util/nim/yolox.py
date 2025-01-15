@@ -71,6 +71,11 @@ class YoloxPageElementsModelInterface(ModelInterface):
         dict
             The updated data dictionary with resized images and original image shapes.
         """
+        if (not isinstance(data, dict)) or ("images" not in data):
+            raise KeyError("Input data must be a dictionary containing an 'images' key with a list of images.")
+
+        if not all(isinstance(x, np.ndarray) for x in data["images"]):
+            raise ValueError("All elements in the 'images' list must be numpy.ndarray objects.")
 
         original_images = data["images"]
         data["original_image_shapes"] = [image.shape for image in original_images]
