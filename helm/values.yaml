@@ -100,8 +100,8 @@ yoloxDeployed: true
 yolox-nim:
   fullnameOverride: nv-ingest-yolox
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1
-    tag: "0.2.0"
+    repository: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-page-elements-v1
+    tag: "1.0.0"
   service:
     name: nv-ingest-yolox
     grpcPort: 8001
@@ -121,7 +121,7 @@ cached-nim:
   fullnameOverride: nv-ingest-cached
   image:
     repository: nvcr.io/ohlfw0olaadg/ea-participants/cached
-    tag: "0.2.0"
+    tag: "0.2.1"
   service:
     name: nv-ingest-cached
     grpcPort: 8001
@@ -140,7 +140,7 @@ paddleocr-nim:
   fullnameOverride: nv-ingest-paddle
   image:
     repository: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr
-    tag: "0.2.0"
+    tag: "1.0.0"
   service:
     name: nv-ingest-paddle
     grpcPort: 8001
