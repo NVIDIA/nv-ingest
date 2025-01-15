@@ -317,11 +317,11 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
     Keep only bboxes with high enough confidence.
     """
-    labels = ["table", "chart", "title"]
+    class_labels = ["table", "chart", "title"]
     out = []
 
     for original_image_shape, result in zip(original_image_shapes, results):
-        annotation_dict = {label: [] for label in labels}
+        annotation_dict = {label: [] for label in class_labels}
 
         if result is None:
             out.append(annotation_dict)
@@ -343,13 +343,13 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
             bboxes[:, [1, 3]] /= original_image_shape[0]
             bboxes = np.clip(bboxes, 0.0, 1.0)
 
+            labels = result[:, 6]
             scores = scores[scores > min_score]
         except Exception as e:
             raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
 
-        # bboxes are in format [x_min, y_min, x_max, y_max]
         for box, score, label in zip(bboxes, scores, labels):
-            class_name = labels[int(label)]
+            class_name = class_labels[int(label)]
             annotation_dict[class_name].append([round(float(x), 4) for x in np.concatenate((box, [score]))])
 
         out.append(annotation_dict)
