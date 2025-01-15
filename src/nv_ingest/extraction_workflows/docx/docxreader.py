@@ -27,7 +27,7 @@ Parse document content and properties using python-docx
 import logging
 import re
 import uuid
-from typing import Dict
+from typing import Dict, Optional, Union
 from typing import List
 from typing import Tuple
 
@@ -42,7 +42,10 @@ from docx.table import _Cell
 from docx.text.hyperlink import Hyperlink
 from docx.text.paragraph import Paragraph
 from docx.text.run import Run
+from pandas import DataFrame
 
+from nv_ingest.extraction_workflows.image.image_handlers import extract_tables_and_charts_from_image
+from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
@@ -50,6 +53,8 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.util.converters import bytetools
 from nv_ingest.util.detectors.language import detect_language
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
+from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 PARAGRAPH_FORMATS = ["text", "markdown"]
 TABLE_FORMATS = ["markdown", "markdown_light", "csv", "tag"]
@@ -132,6 +137,7 @@ class DocxReader:
         handle_text_styles: bool = True,
         image_tag="<image {}>",
         table_tag="<table {}>",
+        extraction_config: Dict = None,
     ):
         if paragraph_format not in PARAGRAPH_FORMATS:
             raise ValueError(f"Unknown paragraph format {paragraph_format}. Supported formats are: {PARAGRAPH_FORMATS}")
@@ -162,19 +168,47 @@ class DocxReader:
         # placeholders for metadata extraction
         self._accumulated_text = []
         self._extracted_data = []
-        self._prev_para_images = []
-        self._prev_para_image_idx = 0
+        self._extraction_config = extraction_config if extraction_config else {}
         self._pending_images = []
+        self._prev_para_image_idx = 0
+        self._prev_para_images = []
 
     def is_text_empty(self, text: str) -> bool:
         """
-        Check if text is available
+        Check if the given text is empty or matches the empty text pattern.
+
+        Parameters
+        ----------
+        text : str
+            The text to check.
+
+        Returns
+        -------
+        bool
+            True if the text is empty or matches the empty text pattern, False otherwise.
         """
+
         return self.empty_text_pattern.match(text) is not None
 
-    def format_text(self, text, bold: bool, italic: bool, underline: bool) -> str:
+    def format_text(self, text: str, bold: bool, italic: bool, underline: bool) -> str:
         """
-        Apply markdown style to text (bold, italic, underline).
+        Apply markdown styling (bold, italic, underline) to the given text.
+
+        Parameters
+        ----------
+        text : str
+            The text to format.
+        bold : bool
+            Whether to apply bold styling.
+        italic : bool
+            Whether to apply italic styling.
+        underline : bool
+            Whether to apply underline styling.
+
+        Returns
+        -------
+        str
+            The formatted text with the applied styles.
         """
 
         if self.is_text_empty(text):
@@ -200,9 +234,20 @@ class DocxReader:
 
         return text
 
-    def format_paragraph(self, paragraph: Paragraph) -> Tuple[str, List[Image]]:
-        f"""
-        Format a paragraph into text. Supported formats are: {PARAGRAPH_FORMATS}
+    def format_paragraph(self, paragraph: "Paragraph") -> Tuple[str, List["Image"]]:
+        """
+        Format a paragraph into styled text and extract associated images.
+
+        Parameters
+        ----------
+        paragraph : Paragraph
+            The paragraph to format. This includes text and potentially embedded images.
+
+        Returns
+        -------
+        tuple of (str, list of Image)
+            - The formatted paragraph text with markdown styling applied.
+            - A list of extracted images from the paragraph.
         """
 
         paragraph_images = []
@@ -259,10 +304,22 @@ class DocxReader:
         paragraph_text = paragraph_text.strip()
         return paragraph_text, paragraph_images
 
-    def format_cell(self, cell: _Cell) -> Tuple[str, List[Image]]:
+    def format_cell(self, cell: "_Cell") -> Tuple[str, List["Image"]]:
         """
-        Format a table cell into Markdown text
+        Format a table cell into Markdown text and extract associated images.
+
+        Parameters
+        ----------
+        cell : _Cell
+            The table cell to format.
+
+        Returns
+        -------
+        tuple of (str, list of Image)
+            - The formatted text of the cell with markdown styling applied.
+            - A list of images extracted from the cell.
         """
+
         if self.paragraph_format == "markdown":
             newline = "<br>"
         else:
@@ -270,10 +327,23 @@ class DocxReader:
         paragraph_texts, paragraph_images = zip(*[self.format_paragraph(p) for p in cell.paragraphs])
         return newline.join(paragraph_texts), paragraph_images
 
-    def format_table(self, table: Table) -> Tuple[str, List[Image]]:
-        f"""
-        Format a table into text. Supported formats are: {TABLE_FORMATS}
+    def format_table(self, table: "Table") -> Tuple[Optional[str], List["Image"], DataFrame]:
         """
+        Format a table into text, extract images, and represent it as a DataFrame.
+
+        Parameters
+        ----------
+        table : Table
+            The table to format.
+
+        Returns
+        -------
+        tuple of (str or None, list of Image, DataFrame)
+            - The formatted table as text, using the specified format (e.g., markdown, CSV).
+            - A list of images extracted from the table.
+            - A DataFrame representation of the table's content.
+        """
+
         rows = [[self.format_cell(cell) for cell in row.cells] for row in table.rows]
         texts = [[text for text, _ in row] for row in rows]
         table_images = [image for row in rows for _, images in row for image in images]
@@ -297,9 +367,24 @@ class DocxReader:
     @staticmethod
     def apply_text_style(style: str, text: str, level: int = 0) -> str:
         """
-        Apply style on a paragraph (heading, list, title, subtitle).
-        Not recommended if the document has been converted from pdf.
+        Apply a specific text style (e.g., heading, list, title, subtitle) to the given text.
+
+        Parameters
+        ----------
+        style : str
+            The style to apply. Supported styles include headings ("Heading 1" to "Heading 9"),
+            list items ("List"), and document structures ("Title", "Subtitle").
+        text : str
+            The text to style.
+        level : int, optional
+            The indentation level for the styled text. Default is 0.
+
+        Returns
+        -------
+        str
+            The text with the specified style and indentation applied.
         """
+
         if re.match(r"^Heading [1-9]$", style):
             n = int(style.split(" ")[-1])
             text = f"{'#' * n} {text}"
@@ -315,40 +400,61 @@ class DocxReader:
         return text
 
     @staticmethod
-    def docx_content_type_to_image_type(content_type: MIME_TYPE) -> str:
+    def docx_content_type_to_image_type(content_type: "MIME_TYPE") -> str:
         """
-        python-docx stores the content type in the image header as a string of format
-        "image/jpeg" etc. This is converted into one of ImageTypeEnum.
-        Reference: src/docx/image/jpeg.py
+        Convert a DOCX content type string to an image type.
+
+        Parameters
+        ----------
+        content_type : MIME_TYPE
+            The content type string from the image header, e.g., "image/jpeg".
+
+        Returns
+        -------
+        str
+            The image type extracted from the content type string.
         """
+
         return content_type.split("/")[1]
 
-    def _construct_image_metadata(self, image, para_idx, caption, base_unified_metadata):
+    def _construct_image_metadata(
+        self, para_idx: int, caption: str, base_unified_metadata: Dict, base64_img: str
+    ) -> List[Union[str, dict]]:
         """
-        Fill the metadata for the extracted image
+        Build metadata for an image in a DOCX file.
+
+        Parameters
+        ----------
+        para_idx : int
+            The paragraph index containing the image.
+        caption : str
+            The caption associated with the image.
+        base_unified_metadata : dict
+            The base metadata to build upon.
+        base64_img : str
+            The image content encoded as a base64 string.
+
+        Returns
+        -------
+        list
+            A list containing the content type, validated metadata, and a unique identifier.
         """
-        image_type = self.docx_content_type_to_image_type(image.content_type)
-        if ImageTypeEnum.has_value(image_type):
-            image_type = ImageTypeEnum[image_type.upper()]
 
-        base64_img = bytetools.base64frombytes(image.blob)
-
-        # For docx there is no bounding box. The paragraph that follows the image is typically
-        # the caption. Add that para to the page nearby for now.
         bbox = (0, 0, 0, 0)
+        caption_len = len(caption.splitlines())
+
+        page_idx = 0  # docx => single page
+        page_count = 1
+
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
             "images": {"content": [], "bbox": []},
             "structured": {"content": [], "bbox": []},
         }
-        caption_len = len(caption.splitlines())
+
         if caption_len:
             page_nearby_blocks["text"]["content"].append(caption)
             page_nearby_blocks["text"]["bbox"] = [[-1, -1, -1, -1]] * caption_len
-
-        page_block = para_idx
-        page_count = 1  # python-docx => single page
-        page_idx = 0
 
         content_metadata = {
             "type": ContentTypeEnum.IMAGE,
@@ -357,16 +463,15 @@ class DocxReader:
             "hierarchy": {
                 "page_count": page_count,
                 "page": page_idx,
-                "block": page_block,
+                "block": para_idx,
                 "line": -1,
                 "span": -1,
                 "nearby_objects": page_nearby_blocks,
             },
         }
 
-        # bbox is not available in docx. the para following the image is typically the caption.
         image_metadata = {
-            "image_type": image_type,
+            "image_type": ImageTypeEnum.image_type_1,
             "structured_image_type": ImageTypeEnum.image_type_1,
             "caption": caption,
             "text": "",
@@ -391,25 +496,58 @@ class DocxReader:
             str(uuid.uuid4()),
         ]
 
-    def _extract_para_images(self, images, para_idx, caption, base_unified_metadata):
+    def _extract_para_images(
+        self, images: List["Image"], para_idx: int, caption: str, base_unified_metadata: Dict
+    ) -> None:
         """
-        Instead of directly appending to self._extracted_data,
-        we accumulate images in self._pending_images.
+        Collect images from a paragraph and store them for metadata construction.
+
+        Parameters
+        ----------
+        images : list of Image
+            The images found in the paragraph.
+        para_idx : int
+            The index of the paragraph containing the images.
+        caption : str
+            The caption associated with the images.
+        base_unified_metadata : dict
+            The base metadata to associate with the images.
+
+        Returns
+        -------
+        None
         """
+
         for image in images:
             logger.debug("image content_type %s para_idx %d", image.content_type, para_idx)
             logger.debug("image caption %s", caption)
 
-            # Construct image metadata, but do NOT put in extracted_data yet -- we need to disambiguate images of
-            # tables and charts at the end of processing.
-            extracted_image = self._construct_image_metadata(image, para_idx, caption, base_unified_metadata)
-            self._pending_images.append(extracted_image)
+            # Simply append a tuple so we can build the final metadata in _finalize_images
+            self._pending_images.append((image, para_idx, caption, base_unified_metadata))
 
-    def _construct_text_metadata(self, accumulated_text, para_idx, text_depth, base_unified_metadata):
+    def _construct_text_metadata(
+        self, accumulated_text: List[str], para_idx: int, text_depth: "TextTypeEnum", base_unified_metadata: Dict
+    ) -> List[Union[str, dict]]:
         """
-        Store the text with associated metadata. Docx uses the same scheme as
-        PDF.
+        Build metadata for text content in a DOCX file.
+
+        Parameters
+        ----------
+        accumulated_text : list of str
+            The accumulated text to include in the metadata.
+        para_idx : int
+            The paragraph index containing the text.
+        text_depth : TextTypeEnum
+            The depth of the text content (e.g., page-level, paragraph-level).
+        base_unified_metadata : dict
+            The base metadata to build upon.
+
+        Returns
+        -------
+        list
+            A list containing the content type, validated metadata, and a unique identifier.
         """
+
         if len(accumulated_text) < 1:
             return []
 
@@ -456,16 +594,38 @@ class DocxReader:
     def _extract_para_data(
         self,
         child,
-        base_unified_metadata,
-        text_depth: TextTypeEnum,
+        base_unified_metadata: Dict,
+        text_depth: "TextTypeEnum",
         extract_images: bool,
         extract_charts: bool,
         extract_tables: bool,
         para_idx: int,
-    ):
+    ) -> None:
         """
-        Process the text and images in a docx paragraph.
+        Process the text, images, and styles in a DOCX paragraph.
+
+        Parameters
+        ----------
+        child : element
+            The paragraph element to process.
+        base_unified_metadata : dict
+            The base metadata to associate with extracted data.
+        text_depth : TextTypeEnum
+            The depth of text extraction (e.g., block-level, document-level).
+        extract_images : bool
+            Whether to extract images from the paragraph.
+        extract_charts : bool
+            Whether to extract charts from the paragraph.
+        extract_tables : bool
+            Whether to extract tables from the paragraph.
+        para_idx : int
+            The index of the paragraph being processed.
+
+        Returns
+        -------
+        None
         """
+
         paragraph = Paragraph(child, self.document)
         paragraph_text, paragraph_images = self.format_paragraph(paragraph)
 
@@ -505,10 +665,110 @@ class DocxReader:
             self._extracted_data.append(text_extraction)
             self._accumulated_text = []
 
-    def _extract_table_data(self, child, base_unified_metadata, text_depth: TextTypeEnum, para_idx: int):
+    def _finalize_images(self, extract_tables: bool, extract_charts: bool, **kwargs) -> None:
         """
-        Process the text in a docx paragraph
+        Build and append final metadata for each pending image.
+
+        Parameters
+        ----------
+        extract_tables : bool
+            Whether to attempt table detection in images.
+        extract_charts : bool
+            Whether to attempt chart detection in images.
+        **kwargs
+            Additional configuration for image processing.
+
+        Returns
+        -------
+        None
         """
+
+        for docx_image, para_idx, caption, base_unified_metadata in self._pending_images:
+            # 1) Convert docx image blob -> base64 or NumPy
+            image_blob = docx_image.blob
+            base64_img = str(bytetools.base64frombytes(image_blob))
+            image_array = base64_to_numpy(base64_img)  # use your function from earlier
+
+            # 2) If user wants table/chart detection, attempt it
+            if extract_tables or extract_charts:
+                try:
+                    # e.g., YOLO-based detection
+                    tables_and_charts = extract_tables_and_charts_from_image(
+                        image_array,
+                        config=ImageConfigSchema(**self._extraction_config.model_dump()),
+                        trace_info=kwargs.get("trace_info"),
+                    )
+
+                    if tables_and_charts:
+                        # We found table(s)/chart(s). For each, build structured metadata
+                        for _, table_chart_data in tables_and_charts:
+                            structured_entry = construct_table_and_chart_metadata(
+                                structured_image=table_chart_data,  # a CroppedImageWithContent
+                                page_idx=0,  # docx => single page
+                                page_count=1,
+                                source_metadata=self.properties.source_metadata,
+                                base_unified_metadata=base_unified_metadata,
+                            )
+                            self._extracted_data.append(structured_entry)
+                    else:
+                        # No table/chart => treat as a normal image
+                        image_entry = self._construct_image_metadata(
+                            para_idx,
+                            caption,
+                            base_unified_metadata,
+                            base64_img,
+                        )
+                        self._extracted_data.append(image_entry)
+
+                except Exception as e:
+                    logger.error(f"Error extracting tables/charts from image: {e}")
+                    # On error, just treat it as a normal image
+                    image_entry = self._construct_image_metadata(
+                        para_idx,
+                        caption,
+                        base_unified_metadata,
+                        base64_img,
+                    )
+                    self._extracted_data.append(image_entry)
+            else:
+                # Table/chart detection not requested => always treat as normal image
+                image_entry = self._construct_image_metadata(
+                    para_idx,
+                    caption,
+                    base_unified_metadata,
+                    base64_img,
+                )
+                self._extracted_data.append(image_entry)
+
+        # Clear out the pending images after finalizing
+        self._pending_images = []
+
+    def _extract_table_data(
+        self,
+        child,
+        base_unified_metadata: Dict,
+        text_depth: "TextTypeEnum",
+        para_idx: int,
+    ) -> None:
+        """
+        Process the text and images in a DOCX table.
+
+        Parameters
+        ----------
+        child : element
+            The table element to process.
+        base_unified_metadata : dict
+            The base metadata to associate with extracted data.
+        text_depth : TextTypeEnum
+            The depth of text extraction (e.g., block-level, document-level).
+        para_idx : int
+            The index of the table being processed.
+
+        Returns
+        -------
+        None
+        """
+
         # Table
         table = Table(child, self.document)
         table_text, table_images, table_dataframe = self.format_table(table)
@@ -526,58 +786,94 @@ class DocxReader:
 
     def extract_data(
         self,
-        base_unified_metadata,
-        text_depth: TextTypeEnum,
+        base_unified_metadata: Dict,
+        text_depth: "TextTypeEnum",
         extract_text: bool,
         extract_charts: bool,
         extract_tables: bool,
         extract_images: bool,
     ) -> Dict:
         """
-        Iterate over paragraphs and tables
+        Iterate over paragraphs and tables in a DOCX document to extract data.
+
+        Parameters
+        ----------
+        base_unified_metadata : dict
+            The base metadata to associate with all extracted content.
+        text_depth : TextTypeEnum
+            The depth of text extraction (e.g., block-level, document-level).
+        extract_text : bool
+            Whether to extract text from the document.
+        extract_charts : bool
+            Whether to extract charts from the document.
+        extract_tables : bool
+            Whether to extract tables from the document.
+        extract_images : bool
+            Whether to extract images from the document.
+
+        Returns
+        -------
+        dict
+            A dictionary containing the extracted data from the document.
         """
+
         self._accumulated_text = []
         self._extracted_data = []
-
-        para_idx = 0
+        self._pending_images = []
         self._prev_para_images = []
         self._prev_para_image_idx = 0
 
+        para_idx = 0
+
         for child in self.document.element.body.iterchildren():
             if isinstance(child, CT_P):
-                if not extract_text:
-                    continue
-                self._extract_para_data(child, base_unified_metadata, text_depth, extract_images, para_idx)
-
-            if isinstance(child, CT_Tbl):
-                if not (extract_tables or extract_charts):
-                    continue
-                self._extract_table_data(child, base_unified_metadata, text_depth, para_idx)
-
+                if extract_text:
+                    self._extract_para_data(
+                        child,
+                        base_unified_metadata,
+                        text_depth,
+                        extract_images,
+                        extract_charts,
+                        extract_tables,
+                        para_idx,
+                    )
+            elif isinstance(child, CT_Tbl):
+                if extract_tables or extract_charts:
+                    self._extract_table_data(child, base_unified_metadata, text_depth, para_idx)
             para_idx += 1
 
-        # We treat the document as a single page
+        # If there's leftover text at the doc’s end
         if (
             extract_text
             and text_depth in (TextTypeEnum.DOCUMENT, TextTypeEnum.PAGE)
             and len(self._accumulated_text) > 0
         ):
             text_extraction = self._construct_text_metadata(
-                self._accumulated_text, -1, text_depth, base_unified_metadata
+                self._accumulated_text,
+                -1,
+                text_depth,
+                base_unified_metadata,
             )
-            if len(text_extraction) > 0:
+            if text_extraction:
                 self._extracted_data.append(text_extraction)
 
-        # TODO(Devin): Part 2 images need to be collected for processing before adding them to extracted data
+        # If there's an image in the final paragraph with no further caption paragraph
         if self._prev_para_images:
-            # if we got here it means that image was at the end of the document and there
-            # was no caption for the image
             self._extract_para_images(
                 self._prev_para_images,
                 self._prev_para_image_idx,
                 "",
                 base_unified_metadata,
-                self._extracted_data,
+            )
+
+        # Final pass: Decide if images are just images or contain tables/charts
+        if extract_images or extract_tables or extract_charts:
+            self._finalize_images(
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                # Optionally pass extra config for detection
+                image_extraction_config=None,
+                trace_info=None,
             )
 
         return self._extracted_data

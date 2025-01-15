@@ -31,7 +31,7 @@ from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
-from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
+from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
@@ -247,7 +247,7 @@ def extract_table_and_chart_images(
 
 def extract_tables_and_charts_from_image(
     image: np.ndarray,
-    config: ImageExtractorSchema,
+    config: ImageConfigSchema,
     num_classes: int = YOLOX_NUM_CLASSES,
     conf_thresh: float = YOLOX_CONF_THRESHOLD,
     iou_thresh: float = YOLOX_IOU_THRESHOLD,
@@ -290,7 +290,7 @@ def extract_tables_and_charts_from_image(
 
     yolox_client = None
     try:
-        model_interface = yolox_utils.YoloxModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
             config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
         )
@@ -354,6 +354,8 @@ def image_data_extractor(
         Specifies whether to extract tables.
     extract_charts : bool
         Specifies whether to extract charts.
+    trace_info : dict, optional
+        Tracing information for logging or debugging purposes.
     **kwargs
         Additional extraction parameters.
 

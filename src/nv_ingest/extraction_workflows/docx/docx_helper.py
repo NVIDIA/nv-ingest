@@ -82,9 +82,11 @@ def python_docx(
     source_id = row_data["source_id"]
     # get text_depth
     text_depth = kwargs.get("text_depth", "document")
-    text_depth = TextTypeEnum(text_depth.upper())
+    text_depth = TextTypeEnum(text_depth)
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
+
+    docx_extractor_config = kwargs.get("docx_extraction_config", {})
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
 
@@ -112,7 +114,7 @@ def python_docx(
     }
 
     # Extract data from the document using python-docx
-    doc = DocxReader(docx, source_metadata)
+    doc = DocxReader(docx, source_metadata, extraction_config=docx_extractor_config)
     extracted_data = doc.extract_data(
         base_unified_metadata, text_depth, extract_text, extract_charts, extract_tables, extract_images
     )

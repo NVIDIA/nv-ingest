@@ -29,7 +29,6 @@ from nv_ingest.util.detectors.language import detect_language
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 
 
-# TODO(Devin): Shift to this, since there is no difference between ImageTable and ImageChart
 @dataclass
 class CroppedImageWithContent:
     content: str
