@@ -16,7 +16,6 @@ import cv2
 import numpy as np
 import torch
 import torchvision
-from packaging import version as pkgversion
 from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
@@ -44,20 +43,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
     An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(
-        self,
-        yolox_version: Optional[str] = None,
-    ):
-        """
-        Initialize the YOLOX model interface.
-
-        Parameters
-        ----------
-        yolox_version : str, optional
-            The version of the YOLOX model (default: None).
-        """
-        self.yolox_version = yolox_version
-
     def name(
         self,
     ) -> str:
@@ -70,7 +55,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
             The name of the model interface.
         """
 
-        return f"yolox-page-elements (version {self.yolox_version})"
+        return "yolox-page-elements"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -86,16 +71,16 @@ class YoloxPageElementsModelInterface(ModelInterface):
         dict
             The updated data dictionary with resized images and original image shapes.
         """
+        if (not isinstance(data, dict)) or ("images" not in data):
+            raise KeyError("Input data must be a dictionary containing an 'images' key with a list of images.")
+
+        if not all(isinstance(x, np.ndarray) for x in data["images"]):
+            raise ValueError("All elements in the 'images' list must be numpy.ndarray objects.")
 
         original_images = data["images"]
-        # Our yolox model expects images to be resized to 1024x1024
-        resized_images = [
-            resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in original_images
-        ]
         data["original_image_shapes"] = [image.shape for image in original_images]
-        data["resized_images"] = resized_images
 
-        return data  # Return data with added 'resized_images' key
+        return data
 
     def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
         """
@@ -121,16 +106,18 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
+            # Our yolox-page-elements model (grPC) expects images to be resized to 1024x1024
+            resized_images = [
+                resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in data["images"]
+            ]
             # Reorder axes to match model input (batch, channels, height, width)
-            input_array = np.einsum("bijk->bkij", data["resized_images"]).astype(np.float32)
+            input_array = np.einsum("bijk->bkij", resized_images).astype(np.float32)
             return input_array
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
-            # Additional lists to keep track of scaling factors and new sizes
-            scaling_factors = []
             content_list = []
-            for image in data["resized_images"]:
+            for image in data["images"]:
                 # Convert numpy array to PIL Image
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
                 original_size = image_pil.size  # Should be (1024, 1024)
@@ -148,26 +135,12 @@ class YoloxPageElementsModelInterface(ModelInterface):
                 if new_size != original_size:
                     logger.warning(f"Image was scaled from {original_size} to {new_size} to meet size constraints.")
 
-                # Compute scaling factor
-                scaling_factor_x = new_size[0] / YOLOX_IMAGE_PREPROC_WIDTH
-                scaling_factor_y = new_size[1] / YOLOX_IMAGE_PREPROC_HEIGHT
-                scaling_factors.append((scaling_factor_x, scaling_factor_y))
-
                 # Add to content_list
-                if self._is_version_early_access_legacy_api():
-                    content = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{scaled_image_b64}"}}
-                else:
-                    content = {"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"}
+                content = {"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"}
 
                 content_list.append(content)
 
-            # Store scaling factors in data
-            data["scaling_factors"] = scaling_factors
-
-            if self._is_version_early_access_legacy_api():
-                payload = {"messages": [{"content": content_list}]}
-            else:
-                payload = {"input": content_list}
+            payload = {"input": content_list}
 
             return payload
         else:
@@ -203,108 +176,30 @@ class YoloxPageElementsModelInterface(ModelInterface):
         elif protocol == "http":
             logger.debug("Parsing output from HTTP Yolox model")
 
-            is_legacy_version = self._is_version_early_access_legacy_api()
-
-            # Convert JSON response to numpy array similar to gRPC response
-            if is_legacy_version:
-                # Convert response data to GA API format.
-                response_data = response.get("data", [])
-                batch_results = []
-                for idx, detections in enumerate(response_data):
-                    curr_batch = {"index": idx, "bounding_boxes": {}}
-                    for obj in detections:
-                        obj_type = obj.get("type", "")
-                        bboxes = obj.get("bboxes", [])
-                        if not obj_type:
-                            continue
-                        if obj_type not in curr_batch:
-                            curr_batch["bounding_boxes"][obj_type] = []
-                        curr_batch["bounding_boxes"][obj_type].extend(bboxes)
-                    batch_results.append(curr_batch)
-            else:
-                batch_results = response.get("data", [])
-
-            batch_size = len(batch_results)
             processed_outputs = []
 
-            scaling_factors = data.get("scaling_factors", [(1.0, 1.0)] * batch_size)
-
-            x_min_label = "xmin" if is_legacy_version else "x_min"
-            y_min_label = "ymin" if is_legacy_version else "y_min"
-            x_max_label = "xmax" if is_legacy_version else "x_max"
-            y_max_label = "ymax" if is_legacy_version else "y_max"
-            confidence_label = "confidence"
-
+            batch_results = response.get("data", [])
             for detections in batch_results:
-                idx = int(detections["index"])
-                scale_factor_x, scale_factor_y = scaling_factors[idx]
-                image_width = YOLOX_IMAGE_PREPROC_WIDTH
-                image_height = YOLOX_IMAGE_PREPROC_HEIGHT
+                new_bounding_boxes = {"table": [], "chart": [], "title": []}
 
-                # Initialize an empty tensor for detections
-                max_detections = 100
-                detection_tensor = np.zeros((max_detections, 85), dtype=np.float32)
-
-                index = 0
                 bounding_boxes = detections.get("bounding_boxes", [])
                 for obj_type, bboxes in bounding_boxes.items():
                     for bbox in bboxes:
-                        if index >= max_detections:
-                            break
-                        xmin_norm = bbox[x_min_label]
-                        ymin_norm = bbox[y_min_label]
-                        xmax_norm = bbox[x_max_label]
-                        ymax_norm = bbox[y_max_label]
-                        confidence = bbox[confidence_label]
+                        xmin = bbox["x_min"]
+                        ymin = bbox["y_min"]
+                        xmax = bbox["x_max"]
+                        ymax = bbox["y_max"]
+                        confidence = bbox["confidence"]
 
-                        # Convert normalized coordinates to absolute pixel values in scaled image
-                        xmin_scaled = xmin_norm * image_width * scale_factor_x
-                        ymin_scaled = ymin_norm * image_height * scale_factor_y
-                        xmax_scaled = xmax_norm * image_width * scale_factor_x
-                        ymax_scaled = ymax_norm * image_height * scale_factor_y
+                        new_bounding_boxes[obj_type].append([xmin, ymin, xmax, ymax, confidence])
 
-                        # Adjust coordinates back to 1024x1024 image space
-                        xmin = xmin_scaled / scale_factor_x
-                        ymin = ymin_scaled / scale_factor_y
-                        xmax = xmax_scaled / scale_factor_x
-                        ymax = ymax_scaled / scale_factor_y
+                processed_outputs.append(new_bounding_boxes)
 
-                        # YOLOX expects bbox format: center_x, center_y, width, height
-                        center_x = (xmin + xmax) / 2
-                        center_y = (ymin + ymax) / 2
-                        width = xmax - xmin
-                        height = ymax - ymin
-
-                        # Set the bbox coordinates
-                        detection_tensor[index, 0] = center_x
-                        detection_tensor[index, 1] = center_y
-                        detection_tensor[index, 2] = width
-                        detection_tensor[index, 3] = height
-
-                        # Objectness score
-                        detection_tensor[index, 4] = confidence
-
-                        class_index = {"table": 0, "chart": 1, "title": 2}.get(obj_type, -1)
-                        if class_index >= 0:
-                            detection_tensor[index, 5 + class_index] = 1.0
-
-                        index += 1
-
-                # Trim the detection tensor to the actual number of detections
-                detection_tensor = detection_tensor[:index, :]
-                processed_outputs.append(detection_tensor)
-
-            # Pad batch if necessary
-            max_detections_in_batch = max([output.shape[0] for output in processed_outputs]) if processed_outputs else 0
-            batch_output_array = np.zeros((batch_size, max_detections_in_batch, 85), dtype=np.float32)
-            for i, output in enumerate(processed_outputs):
-                batch_output_array[i, : output.shape[0], :] = output
-
-            return batch_output_array
+            return processed_outputs
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def process_inference_results(self, output_array: np.ndarray, **kwargs) -> List[Dict[str, Any]]:
+    def process_inference_results(self, output: Any, protocol: str, **kwargs) -> List[Dict[str, Any]]:
         """
         Process the results of the Yolox model inference and return the final annotations.
 
@@ -320,7 +215,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
         list[dict]
             A list of annotation dictionaries for each image in the batch.
         """
-
         original_image_shapes = kwargs.get("original_image_shapes", [])
         num_classes = kwargs.get("num_classes", YOLOX_NUM_CLASSES)
         conf_thresh = kwargs.get("conf_thresh", YOLOX_CONF_THRESHOLD)
@@ -328,14 +222,22 @@ class YoloxPageElementsModelInterface(ModelInterface):
         min_score = kwargs.get("min_score", YOLOX_MIN_SCORE)
         final_thresh = kwargs.get("final_thresh", YOLOX_FINAL_SCORE)
 
-        pred = postprocess_model_prediction(output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True)
+        if protocol == "http":
+            # For http, the output already has postprocessing applied. Skip to table/chart expansion.
+            results = output
 
-        results = postprocess_results(pred, original_image_shapes, min_score=min_score)
+        elif protocol == "grpc":
+            # For grpc, apply the same NIM postprocessing.
+            pred = postprocess_model_prediction(output, num_classes, conf_thresh, iou_thresh, class_agnostic=True)
+            results = postprocess_results(pred, original_image_shapes, min_score=min_score)
 
-        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in results]
+        # Table/chart expansion is "business logic" specific to nv-ingest
+        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in results]
+        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         inference_results = []
 
         # Filter out bounding boxes below the final threshold
+        # This final thresholding is "business logic" specific to nv-ingest
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
@@ -347,9 +249,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
             inference_results.append(new_dict)
 
         return inference_results
-
-    def _is_version_early_access_legacy_api(self):
-        return self.yolox_version and (pkgversion.parse(self.yolox_version) < pkgversion.parse("1.0.0-rc0"))
 
 
 def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
@@ -423,12 +322,14 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
     Keep only bboxes with high enough confidence.
     """
-    labels = ["table", "chart", "title"]
+    class_labels = ["table", "chart", "title"]
     out = []
 
     for original_image_shape, result in zip(original_image_shapes, results):
+        annotation_dict = {label: [] for label in class_labels}
+
         if result is None:
-            out.append({})
+            out.append(annotation_dict)
             continue
 
         try:
@@ -447,29 +348,17 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
             bboxes[:, [1, 3]] /= original_image_shape[0]
             bboxes = np.clip(bboxes, 0.0, 1.0)
 
-            label_idxs = result[:, 6]
+            labels = result[:, 6]
             scores = scores[scores > min_score]
         except Exception as e:
             raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
 
-        annotation_dict = {label: [] for label in labels}
-
-        # bboxes are in format [x_min, y_min, x_max, y_max]
-        for j in range(len(bboxes)):
-            label = labels[int(label_idxs[j])]
-            bbox = bboxes[j]
-            score = scores[j]
-
-            # additional preprocessing for tables: extend the upper bounds to capture titles if any.
-            if label == "table":
-                height = bbox[3] - bbox[1]
-                bbox[1] = (bbox[1] - height * 0.2).clip(0.0, 1.0)
-
-            annotation_dict[label].append([round(float(x), 4) for x in np.concatenate((bbox, [score]))])
+        for box, score, label in zip(bboxes, scores, labels):
+            class_name = class_labels[int(label)]
+            annotation_dict[class_name].append([round(float(x), 4) for x in np.concatenate((box, [score]))])
 
         out.append(annotation_dict)
 
-    # {label: [[x1, y1, x2, y2, confidence], ...], ...}
     return out
 
 
@@ -491,6 +380,37 @@ def resize_image(image, target_img_size):
         )
 
     return image
+
+
+def expand_table_bboxes(annotation_dict, labels=None):
+    """
+    Additional preprocessing for tables: extend the upper bounds to capture titles if any.
+    Args:
+        annotation_dict: output of postprocess_results, a dictionary with keys "table", "figure", "title"
+
+    Returns:
+        annotation_dict: same as input, with expanded bboxes for charts
+
+    """
+    if not labels:
+        labels = ["table", "chart", "title"]
+
+    if not annotation_dict or len(annotation_dict["table"]) == 0:
+        return annotation_dict
+
+    new_annotation_dict = {label: [] for label in labels}
+
+    for label, bboxes in annotation_dict.items():
+        for bbox_and_score in bboxes:
+            bbox, score = bbox_and_score[:4], bbox_and_score[4]
+
+            if label == "table":
+                height = bbox[3] - bbox[1]
+                bbox[1] = max(0.0, min(1.0, bbox[1] - height * 0.2))
+
+            new_annotation_dict[label].append([round(float(x), 4) for x in bbox + [score]])
+
+    return new_annotation_dict
 
 
 def expand_chart_bboxes(annotation_dict, labels=None):
