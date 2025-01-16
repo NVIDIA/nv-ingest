@@ -1,8 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
+import json
 from io import BytesIO
 from textwrap import dedent
 
@@ -220,6 +219,7 @@ def test_pptx(pptx_stream_with_text, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -267,6 +267,7 @@ def test_pptx_with_multiple_runs_in_title(pptx_stream_with_multiple_runs_in_titl
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -299,6 +300,7 @@ def test_pptx_text_depth_presentation(pptx_stream_with_text, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="document",
     )
@@ -343,6 +345,7 @@ def test_pptx_text_depth_shape(pptx_stream_with_text, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="block",
     )
@@ -397,6 +400,7 @@ def test_pptx_text_depth_para_run(pptx_stream_with_text, document_df, text_depth
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth=text_depth,
     )
@@ -441,6 +445,7 @@ def test_pptx_bullet(pptx_stream_with_bullet, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -473,6 +478,7 @@ def test_pptx_group(pptx_stream_with_group, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -502,6 +508,7 @@ def test_pptx_table(pptx_stream_with_table, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=True,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -524,7 +531,7 @@ def test_pptx_table(pptx_stream_with_table, document_df):
     | Baz   | Qux   |
         """
     )
-    assert extracted_data[0][1]["content"].rstrip() == expected_content.rstrip()
+    assert extracted_data[0][1]["table_metadata"]["table_content"].rstrip() == expected_content.rstrip()
 
 
 def test_pptx_image(pptx_stream_with_image, document_df):
@@ -533,14 +540,17 @@ def test_pptx_image(pptx_stream_with_image, document_df):
         extract_text=True,
         extract_images=True,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
     assert isinstance(extracted_data, list)
     assert len(extracted_data) == 2
     assert len(extracted_data[0]) == 3
-    assert extracted_data[0][0] == "image"
+
+    assert extracted_data[0][0] == "text"
     assert extracted_data[0][1]["source_metadata"]["source_id"] == "source1"
     assert isinstance(extracted_data[0][2], str)
 
-    assert extracted_data[0][1]["content"][:10] == "iVBORw0KGg"  # PNG format header
+    assert extracted_data[1][0] == "image"
+    assert extracted_data[1][1]["content"][:10] == "iVBORw0KGg"  # PNG format header
