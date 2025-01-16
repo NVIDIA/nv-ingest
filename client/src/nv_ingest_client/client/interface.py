@@ -74,6 +74,7 @@ class Ingestor:
         self._documents = documents or []
         self._client = client
         self._job_queue_id = job_queue_id
+        self._vdb_bulk_upload = None
 
         if self._client is None:
             client_kwargs = filter_function_kwargs(NvIngestClient, **kwargs)
