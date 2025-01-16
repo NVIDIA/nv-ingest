@@ -8,16 +8,16 @@ This page describes how to use Kubernetes generally, and how to deploy nv-ingest
 
 ## Kubernetes Cluster
 
-To start you need a Kubernetes cluster. We recommend using `kind` that creates a single Docker container with a Kubernetes cluster inside it.
+To start you need a Kubernetes cluster. We recommend that you use `kind`, which creates a single Docker container with a Kubernetes cluster inside it.
 
-Also, because this the `kind` cluster needs access to the GPUs on your system you need to install `kind-with-gpus`. The easiest way to do this is following the instructions laid out in this GitHub repo https://github.com/klueska/kind-with-gpus-examples/tree/master
+Because the `kind` cluster needs access to the GPUs on your system, you need to install `nvkind`.
+For details, see [Running kind clusters with GPUs using nvkind](https://github.com/NVIDIA/nvkind/tree/main).
+`nvkind` provides the following benefits:
 
-Benefits of this:
+- Multiple developers on the same system can have isolated Kubernetes clusters
+- Easy to create and delete clusters
 
-- Allows many developers on the same system to have isolated Kubernetes clusters
-- Enables easy creation and deletion of clusters
-
-Run the following **from the root of the repo** to create a configuration file for your cluster.
+From the root of the repo, run the following code to create a configuration file for your cluster.
 
 ```yaml
 mkdir -p ./.tmp
@@ -80,10 +80,10 @@ docker ps | grep kind
 # aaf5216a3cc8   kindest/node:v1.27.11  "/usr/local/bin/entr…"   44 seconds ago   Up 42 seconds 127.0.0.1:45099->6443/tcp jdyer-control-plane
 ```
 
-`kind create cluster` will do the following:
+`kind create cluster` does the following:
 
-- add a context for this cluster to `${HOME}/.kube/config`, the default config file used by tools like `kubectl`
-- change the default context to that one
+- Add a context for the cluster to `${HOME}/.kube/config`, the default config file used by tools like `kubectl`
+- Change the default context to `${HOME}/.kube/config`
 
 You should be able to use `kubectl` immediately, and it should be pointed at that cluster you just created.
 
@@ -100,22 +100,23 @@ NAME                  STATUS   ROLES           AGE   VERSION
 jdyer-control-plane   Ready    control-plane   63s   v1.27.11
 ```
 
-Note: All of the containers created inside your Kubernetes cluster will not show up when you run `docker ps` as they are nested within a separate containerd namespace.
+Note: Not all of the containers created inside your Kubernetes cluster appear when you run `docker ps`
+because some of them are are nested within a separate namespace.
 
-Refer to "debugging tools" in the "Troubleshooting" section.
+For help with issues that arise, see [Troubleshooting](#troubleshooting).
+
 
 ## Skaffold
 
-Now that you have a Kubernetes cluster, you can use `skaffold` to build and deploy your development environment.
+Now that you have a Kubernetes cluster, you can use [Skaffold](https://skaffold.dev/) to build and deploy your development environment.
 
-Skaffold does a few things for you in a single command:
+In a single command, Skaffold does the following:
 
-- Build containers from the current directory (via `docker build`).
-- Install the retriever-ingest helm charts (via `helm install`).
-- Apply additional Kubernetes manifests (via `kustomize`).
-- Hot reloading - skaffold watches your local directory for changes and syncs them into the Kubernetes container.
-  - _for details on this, see "Hot reloading" below ([link](#hot-reloading))_
-- Port forwards the -ingest service to the host.
+- Build containers from the current directory (via `docker build`)
+- Install the retriever-ingest helm charts (via `helm install`)
+- Apply additional Kubernetes manifests (via `kustomize`)
+- Hot reloading - Skaffold watches your local directory for changes and syncs them into the Kubernetes container
+- Port forwards the ingest service to the host
 
 ### Directory Structure
 
@@ -140,7 +141,9 @@ Skaffold does a few things for you in a single command:
 The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
 for example, Elasticsearch, OpenTelemetry, and Postgres.
 
-The first time you try to deploy this project to a local Kubernetes, you may need to tell your local version of `Helm` (a package manager for Kubernetes configurations) where to find those third-party things, by running something like the following.
+The first time you deploy this project to a local Kubernetes,
+you might need to tell your local version of `Helm` (a package manager for Kubernetes configurations)
+where to find third-party services by running code similar to the following.
 
 ```shell
 helm repo add \
@@ -164,11 +167,12 @@ helm repo add \
   https://charts.bitnami.com/bitnami
 ```
 
-For the full list of repositories, refer to the `dependencies` section in [this project's Chart.yaml](../../helm/Chart.yaml).
+For the full list of repositories, refer to the `dependencies` section in the [Chart.yaml](../../../../helm/Chart.yaml) file of this project.
 
 #### NVIDIA GPU Support
 
-In order for the deployed Kubernetes pods to access the NVIDIA GPU resources, the [Nvidia k8s-device-plugin](https://github.com/NVIDIA/k8s-device-plugin) must be installed. There are a multitude of configurations for this plugin but for a straight forward route to start development you can simply run.
+For the Kubernetes pods to access the NVIDIA GPU resources, you must install the [NVIDIA device plugin for Kubernetes](https://github.com/NVIDIA/k8s-device-plugin).
+There are many configurations for this plugin, but to start development simply run the following code.
 
 ```shell
 kubectl create -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.15.0/deployments/static/nvidia-device-plugin.yml
@@ -197,8 +201,9 @@ data:
 EOF
 ```
 
-An NGC personal API key is needed to access models and images hosted on NGC.
-Make sure that you have followed the steps of _[Ensure you have access to NGC](./index.md#ensure-you-have-access-to-ngc)_. Next, store the key in an environment variable:
+You need an NGC personal API key to access models and images that are hosted on NGC.
+First, [Generate an API key](ngc-api-key.md#generate-an-api-key).
+Next, store the key in an environment variable by running the following code.
 
 ```shell
 export NGC_API_KEY="<YOUR_KEY_HERE>"
@@ -253,9 +258,10 @@ Deployments stabilized in 23.08 seconds
 Watching for changes...
 ```
 
-When you run this command, `skaffold dev` finds a random open port on the system and exposes the retriever-ingest service on that port ([skaffold docs](https://skaffold.dev/docs/port-forwarding/)).
+When you run this command, `skaffold dev` finds a random open port on the system and exposes the retriever-ingest service on that port.
+For more information, see [Port Forwarding](https://skaffold.dev/docs/port-forwarding/).
 
-You can find that port in `skaffold`'s logs, in a statement like this:
+You can find that port in `skaffold`'s logs by running the following code.
 
 ```bash
 Port forwarding Service/nv-ingest in namespace , remote port http -> http://0.0.0.0:4503
@@ -283,7 +289,9 @@ curl \
   "${API_HOST}/health"
 ```
 
-Additionally, running `skaffold verify` in a new terminal will run verification tests against the service ([integration tests](https://skaffold.dev/docs/verify/)). These are very lightweight health checks, and should not be confused with actual integration tests.
+When you run `skaffold verify` in a new terminal, Skaffold runs verification tests against the service.
+These are very lightweight health checks, and should not be confused with integration tests.
+For more information, see [Verify](https://skaffold.dev/docs/verify/).
 
 ## Clean Up
 
@@ -320,28 +328,25 @@ kubectl exec \
     -- sh
 ```
 
-For an interactive, live-updating experience, try `k9s`.
+For an interactive, live-updating experience, try [k9s](https://k9scli.io/).
 To launch it, run `k9s`.
 
 ```shell
 k9s
 ```
 
-You should see something like the following.
-
-![k9s example](./media/k9s-example.png){width=80%}
-
-For details on how to use it, refer to https://k9scli.io/topics/commands/.
 
 ### Installing Helm Repositories
 
-You could encounter an error like this:
+You could encounter an error like the following.
+This indicates that your local installation of `Helm` (a package manager for Kubernetes configurations)
+doesn't know how to access a remote repository containing Kubernetes configurations.
 
-> _Error: no repository definition for https://helm.dask.org. Please add the missing repos via 'helm repo add'_
+```shell
+Error: no repository definition for https://helm.dask.org. Please add the missing repos via 'helm repo add'
+```
 
-This indicates that your local installation of `Helm` (sort of a package manager for Kubernetes configurations) doesn't know how to access a remote repository containing Kubernetes configurations.
-
-As that error message says, run `help repo add` with that URL and an informative name.
+To resolve this issue, run `help repo add` with the URL and an informative name.
 
 ```shell
 helm repo add \
@@ -363,12 +368,11 @@ Cleaning up...
 building helm dependencies: exit status 1
 ```
 
-Seeing only "building helm dependencies" likely means you ran `skaffold dev` or `skaffold run` in a fairly quiet mode.
-
-Rerun those commands with something like `-v info` or `-v debug` to get more information about what specifically failed.
+If you only see `building helm dependencies`, you probably ran `skaffold dev` or `skaffold run` in quiet mode.
+Rerun the commands with `-v info` or `-v debug` to get more information about what failed.
 
 ## References
 
-- Helm quickstart: https://helm.sh/docs/intro/quickstart/
-- `kind` docs: https://kind.sigs.k8s.io/
-- `skaffold` docs: https://skaffold.dev/docs/
+- [Helm Quickstart](https://helm.sh/docs/intro/quickstart/)
+- [Kind Quickstart](https://kind.sigs.k8s.io/)
+- [Skaffold Quickstart](https://skaffold.dev/docs/quickstart)

@@ -18,6 +18,87 @@ from scipy.sparse import csr_array
 from typing import List
 import time
 from urllib.parse import urlparse
+from typing import Union, Dict
+
+
+def _dict_to_params(collections_dict: dict, write_params: dict):
+    params_tuple_list = []
+    for coll_name, data_type in collections_dict.items():
+        cp_write_params = write_params.copy()
+        enabled_dtypes = {
+            "enable_text": False,
+            "enable_charts": False,
+            "enable_tables": False,
+        }
+        if not isinstance(data_type, list):
+            data_type = [data_type]
+        for d_type in data_type:
+            enabled_dtypes[f"enable_{d_type}"] = True
+        cp_write_params.update(enabled_dtypes)
+        params_tuple_list.append((coll_name, cp_write_params))
+    return params_tuple_list
+
+
+class MilvusOperator:
+    def __init__(
+        self,
+        collection_name: Union[str, Dict] = "nv_ingest_collection",
+        milvus_uri: str = "http://localhost:19530",
+        sparse: bool = True,
+        recreate: bool = True,
+        gpu_index: bool = True,
+        gpu_search: bool = False,
+        dense_dim: int = 1024,
+        minio_endpoint: str = "localhost:9000",
+        enable_text: bool = True,
+        enable_charts: bool = True,
+        enable_tables: bool = True,
+        bm25_save_path: str = "bm25_model.json",
+        compute_bm25_stats: bool = True,
+        access_key: str = "minioadmin",
+        secret_key: str = "minioadmin",
+        bucket_name: str = "a-bucket",
+        **kwargs,
+    ):
+        self.milvus_kwargs = locals()
+        self.milvus_kwargs.pop("self")
+        self.collection_name = self.milvus_kwargs.pop("collection_name")
+        self.milvus_kwargs.pop("kwargs", None)
+
+    def get_connection_params(self):
+        conn_dict = {
+            "milvus_uri": self.milvus_kwargs["milvus_uri"],
+            "sparse": self.milvus_kwargs["sparse"],
+            "recreate": self.milvus_kwargs["recreate"],
+            "gpu_index": self.milvus_kwargs["gpu_index"],
+            "gpu_search": self.milvus_kwargs["gpu_search"],
+            "dense_dim": self.milvus_kwargs["dense_dim"],
+        }
+        return (self.collection_name, conn_dict)
+
+    def get_write_params(self):
+        write_params = self.milvus_kwargs.copy()
+        del write_params["recreate"]
+        del write_params["gpu_index"]
+        del write_params["gpu_search"]
+        del write_params["dense_dim"]
+
+        return (self.collection_name, write_params)
+
+    def run(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            create_nvingest_collection(collection_name, **create_params)
+            write_to_nvingest_collection(records, collection_name, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                create_nvingest_collection(coll_name, **create_params)
+                write_to_nvingest_collection(records, coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
 
 
 def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False) -> CollectionSchema:
@@ -414,11 +495,12 @@ def write_to_nvingest_collection(
     collection_name: str,
     milvus_uri: str = "http://localhost:19530",
     minio_endpoint: str = "localhost:9000",
-    sparse: bool = False,
+    sparse: bool = True,
     enable_text: bool = True,
     enable_charts: bool = True,
     enable_tables: bool = True,
     bm25_save_path: str = "bm25_model.json",
+    compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
@@ -465,11 +547,14 @@ def write_to_nvingest_collection(
     else:
         stream = True
     bm25_ef = None
-    if sparse:
+    if sparse and compute_bm25_stats:
         bm25_ef = create_bm25_model(
             records, enable_text=enable_text, enable_charts=enable_charts, enable_tables=enable_tables
         )
         bm25_ef.save(bm25_save_path)
+    elif sparse and not compute_bm25_stats:
+        bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
+        bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
     if stream:
@@ -619,7 +704,7 @@ def hybrid_retrieval(
         "data": dense_embeddings,
         "anns_field": dense_field,
         "param": s_param_1,
-        "limit": top_k,
+        "limit": top_k * 2,
     }
 
     dense_req = AnnSearchRequest(**search_param_1)
@@ -628,7 +713,7 @@ def hybrid_retrieval(
         "data": sparse_embeddings,
         "anns_field": sparse_field,
         "param": {"metric_type": "IP", "params": {"drop_ratio_build": 0.2}},
-        "limit": top_k,
+        "limit": top_k * 2,
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
