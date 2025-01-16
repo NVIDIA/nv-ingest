@@ -4,6 +4,7 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import logging
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import MagicMock
@@ -72,13 +73,13 @@ def test_embed_task_no_args(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], EmbedTask)
 
 
-def test_embed_task_some_args(ingestor):
-    ingestor.embed(text=False, tables=False)
+def test_embed_task_some_args(ingestor, caplog):
+    # `text` and `table` arguments were deprecated before GA.
+    with caplog.at_level(logging.WARNING):
+        ingestor.embed(text=False, tables=False)
 
-    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
-    assert isinstance(task, EmbedTask)
-    assert task._text is False
-    assert task._tables is False
+    assert "'text' parameter is deprecated" in caplog.records[0].message
+    assert "'tables' parameter is deprecated" in caplog.records[1].message
 
 
 def test_extract_task_no_args(ingestor):
