@@ -27,7 +27,6 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.primitives.tasks import VdbUploadTask
 from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.milvus import MilvusOperator
 
@@ -463,7 +462,6 @@ class Ingestor:
 
         return self
 
-    @ensure_job_specs
     def vdb_upload(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a VdbUploadTask to the batch job specification.
@@ -478,8 +476,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        vdb_upload_task = VdbUploadTask(**kwargs)
-        self._job_specs.add_task(vdb_upload_task)
+        self._vdb_bulk_upload = MilvusOperator(**kwargs)
 
         return self
 
@@ -501,10 +498,6 @@ class Ingestor:
         caption_task = CaptionTask(**kwargs)
         self._job_specs.add_task(caption_task)
 
-        return self
-
-    def vdb_bulk_upload(self, **kwargs):
-        self._vdb_bulk_upload = MilvusOperator(**kwargs)
         return self
 
     def _count_job_states(self, job_states: set[JobStateEnum]) -> int:

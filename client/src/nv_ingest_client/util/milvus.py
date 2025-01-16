@@ -44,7 +44,7 @@ class MilvusOperator:
         self,
         collection_name: Union[str, Dict] = "nv_ingest_collection",
         milvus_uri: str = "http://localhost:19530",
-        sparse: bool = False,
+        sparse: bool = True,
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = False,
@@ -54,6 +54,7 @@ class MilvusOperator:
         enable_charts: bool = True,
         enable_tables: bool = True,
         bm25_save_path: str = "bm25_model.json",
+        compute_bm25_stats: bool = True,
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
         bucket_name: str = "a-bucket",
@@ -492,11 +493,12 @@ def write_to_nvingest_collection(
     collection_name: str,
     milvus_uri: str = "http://localhost:19530",
     minio_endpoint: str = "localhost:9000",
-    sparse: bool = False,
+    sparse: bool = True,
     enable_text: bool = True,
     enable_charts: bool = True,
     enable_tables: bool = True,
     bm25_save_path: str = "bm25_model.json",
+    compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
@@ -543,11 +545,14 @@ def write_to_nvingest_collection(
     else:
         stream = True
     bm25_ef = None
-    if sparse:
+    if sparse and compute_bm25_stats:
         bm25_ef = create_bm25_model(
             records, enable_text=enable_text, enable_charts=enable_charts, enable_tables=enable_tables
         )
         bm25_ef.save(bm25_save_path)
+    elif sparse and not compute_bm25_stats:
+        bm25_ef = BM25EmbeddingFunction(build_default_analyzer(language="en"))
+        bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
     if stream:
@@ -697,7 +702,7 @@ def hybrid_retrieval(
         "data": dense_embeddings,
         "anns_field": dense_field,
         "param": s_param_1,
-        "limit": top_k,
+        "limit": top_k * 2,
     }
 
     dense_req = AnnSearchRequest(**search_param_1)
@@ -706,7 +711,7 @@ def hybrid_retrieval(
         "data": sparse_embeddings,
         "anns_field": sparse_field,
         "param": {"metric_type": "IP", "params": {"drop_ratio_build": 0.2}},
-        "limit": top_k,
+        "limit": top_k * 2,
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
