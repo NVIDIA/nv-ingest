@@ -304,9 +304,21 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
 
 
 def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    pptx_extractor_config = ingest_config.get(
+        "pptx_extraction_module",
+        {
+            "pptx_extraction_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
+                "auth_token": yolox_auth,
+            }
+        },
+    )
     pptx_extractor_stage = pipe.add_stage(
         generate_pptx_extractor_stage(
             morpheus_pipeline_config,
+            extractor_config=pptx_extractor_config,
             pe_count=1,
             task="extract",
             task_desc="pptx_content_extractor",

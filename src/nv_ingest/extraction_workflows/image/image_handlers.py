@@ -156,6 +156,7 @@ def process_inference_results(
     >>> len(results)
     2
     """
+
     pred = yolox_utils.postprocess_model_prediction(
         output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True
     )
