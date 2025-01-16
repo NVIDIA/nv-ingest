@@ -130,8 +130,6 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
-    text: bool = True
-    tables: bool = True
     filter_errors: bool = False
 
 
