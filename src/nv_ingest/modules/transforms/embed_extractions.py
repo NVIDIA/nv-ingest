@@ -453,11 +453,6 @@ def _generate_embeddings(
 
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
 
-    logger.info(
-        "Generating text embeddings for supported content types: "
-        f"{[key.value for key, val in pandas_content_extractor.items() if val]}"
-    )
-
     embedding_dataframes = []
     content_masks = []
 
