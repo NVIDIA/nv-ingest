@@ -16,7 +16,7 @@ from morpheus.config import Config
 
 from nv_ingest.extraction_workflows import pptx
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.pptx_extractor_schema import PptxExtractorSchema
+from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest.util.exception_handlers.pdf import create_exception_tag
 
 logger = logging.getLogger(f"morpheus.{__name__}")
@@ -136,7 +136,7 @@ def generate_pptx_extractor_stage(
         A Morpheus stage with applied worker function.
     """
 
-    validated_config = PptxExtractorSchema(**extractor_config)
+    validated_config = PPTXExtractorSchema(**extractor_config)
     _wrapped_process_fn = functools.partial(_process_pptx_bytes, validated_config=validated_config)
 
     return MultiProcessingBaseStage(

@@ -66,6 +66,7 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
         (content_metadata.get("type") != "structured")
         or (content_metadata.get("subtype") != "chart")
         or (chart_metadata is None)
+        or (base64_image in [None, ""])
     ):
         return metadata
 

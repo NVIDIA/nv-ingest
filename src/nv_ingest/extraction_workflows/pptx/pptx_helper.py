@@ -48,7 +48,7 @@ from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
-from nv_ingest.schemas.pptx_extractor_schema import PptxConfigSchema
+from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
 from nv_ingest.util.converters import bytetools
 from nv_ingest.util.detectors.language import detect_language
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
@@ -59,7 +59,7 @@ logger = logging.getLogger(__name__)
 def _finalize_images(
     pending_images: List[Tuple[Shape, int, int, int, dict, dict, dict]],
     extracted_data: List,
-    pptx_extraction_config: PptxConfigSchema,
+    pptx_extraction_config: PPTXConfigSchema,
     extract_tables: bool = False,
     extract_charts: bool = False,
     trace_info: Optional[Dict] = None,
