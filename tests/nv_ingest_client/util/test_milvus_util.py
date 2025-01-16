@@ -10,6 +10,12 @@ def milvus_test_dict():
     return kwargs
 
 
+def test_extra_kwargs(milvus_test_dict):
+    mil_op = MilvusOperator(filter_errors=True)
+    milvus_test_dict.pop("collection_name")
+    assert mil_op.milvus_kwargs == milvus_test_dict
+
+
 @pytest.mark.parametrize("collection_name", [None, "name"])
 def test_op_collection_name(collection_name):
     if collection_name:
