@@ -282,7 +282,7 @@ def extract_tables_and_charts_from_images(
             config.yolox_infer_protocol,
         )
 
-        max_batch_size = YOLOX_MAX_BATCH_SIZE  # e.g. 4, 8, 16, etc.
+        max_batch_size = YOLOX_MAX_BATCH_SIZE
         batches = []
         i = 0
         while i < len(images):
@@ -292,7 +292,6 @@ def extract_tables_and_charts_from_images(
 
         img_index = 0
         for batch in batches:
-            # Prepare data for YOLOX
             data = {"images": batch}
 
             # NimClient inference
@@ -328,7 +327,6 @@ def extract_tables_and_charts_from_images(
         raise e
 
     finally:
-        # 6) Close the client
         if yolox_client:
             yolox_client.close()
 
