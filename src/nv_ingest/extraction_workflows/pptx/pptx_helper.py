@@ -254,7 +254,6 @@ def python_pptx(
                         text = escape_text(text)
 
                         if paragraph_format == "markdown":
-                            # If it's a title/subtitle shape, we only want to process them once
                             if is_title(shape):
                                 if not added_title:
                                     text = process_title(shape)  # format a heading or something
@@ -268,7 +267,6 @@ def python_pptx(
                                 else:
                                     continue
                             else:
-                                # Apply style transformations
                                 if run.hyperlink.address:
                                     text = get_hyperlink(text, run.hyperlink.address)
 
