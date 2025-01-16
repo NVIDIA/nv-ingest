@@ -63,7 +63,7 @@ class MilvusOperator:
         self.milvus_kwargs = locals()
         self.collection_name = self.milvus_kwargs.pop("collection_name")
         for k, v in kwargs.items():
-            self.milvus_kwargs.pop(k)
+            self.milvus_kwargs.pop(k, None)
         self.milvus_kwargs.pop("self")
 
     def get_connection_params(self):
