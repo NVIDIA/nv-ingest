@@ -10,27 +10,33 @@
 
 # pylint: skip-file
 
+from io import BytesIO
+from typing import Annotated, Dict, List
 import base64
 import json
 import logging
 import time
 import traceback
-from io import BytesIO
-from typing import Annotated
+import uuid
 
 from fastapi import APIRouter, Request, Response
 from fastapi import Depends
-from fastapi import File
+from fastapi import File, UploadFile, Form
 from fastapi import HTTPException
-from fastapi import UploadFile
+from fastapi.responses import JSONResponse
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
 from redis import RedisError
 
+from nv_ingest.util.converters.formats import ingest_json_results_to_blob
+
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
+from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob
 from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
+from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
+from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -184,3 +190,160 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         # Catch-all for other exceptions, returning a 500 Internal Server Error
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+
+
+@router.post("/convert")
+async def convert_pdf(
+    ingest_service: INGEST_SERVICE_T,
+    files: List[UploadFile] = File(...),
+    job_id: str = Form(...),
+    extract_text: bool = Form(True),
+    extract_images: bool = Form(True),
+    extract_tables: bool = Form(True),
+    extract_charts: bool = Form(False),
+) -> Dict[str, str]:
+    try:
+
+        if job_id is None:
+            job_id = str(uuid.uuid4())
+            logger.debug(f"JobId is None, Created JobId: {job_id}")
+
+        submitted_jobs: List[ProcessingJob] = []
+        for file in files:
+            file_stream = BytesIO(file.file.read())
+            doc_content = base64.b64encode(file_stream.read()).decode("utf-8")
+
+            try:
+                content_type = file.content_type.split("/")[1]
+            except Exception:
+                err_message = f"Unsupported content_type: {file.content_type}"
+                logger.error(err_message)
+                raise HTTPException(status_code=500, detail=err_message)
+
+            job_spec = JobSpec(
+                document_type=content_type,
+                payload=doc_content,
+                source_id=file.filename,
+                source_name=file.filename,
+                extended_options={
+                    "tracing_options": {
+                        "trace": True,
+                        "ts_send": time.time_ns(),
+                    }
+                },
+            )
+
+            extract_task = ExtractTask(
+                document_type=content_type,
+                extract_text=extract_text,
+                extract_images=extract_images,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+            )
+
+            job_spec.add_task(extract_task)
+
+            # Conditionally add tasks as needed.
+            if extract_tables:
+                table_data_extract = TableExtractionTask()
+                job_spec.add_task(table_data_extract)
+
+            if extract_charts:
+                chart_data_extract = ChartExtractionTask()
+                job_spec.add_task(chart_data_extract)
+
+            submitted_job_id = await ingest_service.submit_job(
+                MessageWrapper(payload=json.dumps(job_spec.to_dict())), job_id
+            )
+
+            processing_job = ProcessingJob(
+                submitted_job_id=submitted_job_id,
+                filename=file.filename,
+                status=ConversionStatus.IN_PROGRESS,
+            )
+
+            submitted_jobs.append(processing_job)
+
+        await ingest_service.set_processing_cache(job_id, submitted_jobs)
+
+        logger.debug(f"Submitted: {len(submitted_jobs)} documents of type: '{content_type}' for processing")
+
+        return {
+            "task_id": job_id,
+            "status": "processing",
+            "status_url": f"/status/{job_id}",
+        }
+
+    except Exception as e:
+        logger.error(f"Error starting conversion: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@router.get("/status/{job_id}")
+async def get_status(ingest_service: INGEST_SERVICE_T, job_id: str):
+    t_start = time.time()
+    try:
+        processing_jobs = await ingest_service.get_processing_cache(job_id)
+    except Exception as e:
+        logger.error(f"Error getting status: {str(e)}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+    updated_cache: List[ProcessingJob] = []
+    num_ready_docs = 0
+
+    for processing_job in processing_jobs:
+        logger.debug(f"submitted_job_id: {processing_job.submitted_job_id} - Status: {processing_job.status}")
+
+        if processing_job.status == ConversionStatus.IN_PROGRESS:
+            # Attempt to fetch the job from the ingest service
+            try:
+                job_response = await ingest_service.fetch_job(processing_job.submitted_job_id)
+
+                job_response = json.dumps(job_response)
+
+                # Convert JSON into pseudo markdown format
+                blob_response = ingest_json_results_to_blob(job_response)
+
+                processing_job.raw_result = job_response
+                processing_job.content = blob_response
+                processing_job.status = ConversionStatus.SUCCESS
+                num_ready_docs = num_ready_docs + 1
+                updated_cache.append(processing_job)
+
+            except TimeoutError:
+                logger.error(f"TimeoutError getting result for job_id: {processing_job.submitted_job_id}")
+                updated_cache.append(processing_job)
+                continue
+            except RedisError:
+                logger.error(f"RedisError getting result for job_id: {processing_job.submitted_job_id}")
+                updated_cache.append(processing_job)
+                continue
+        else:
+            logger.debug(f"{processing_job.submitted_job_id} has already finished successfully ....")
+            num_ready_docs = num_ready_docs + 1
+            updated_cache.append(processing_job)
+
+    await ingest_service.set_processing_cache(job_id, updated_cache)
+
+    logger.debug(f"{num_ready_docs}/{len(updated_cache)} complete")
+    if num_ready_docs == len(updated_cache):
+        results = []
+        raw_results = []
+        for result in updated_cache:
+            results.append(
+                {
+                    "filename": result.filename,
+                    "status": "success",
+                    "content": result.content,
+                }
+            )
+            raw_results.append(result.raw_result)
+
+        return JSONResponse(
+            content={"status": "completed", "result": results},
+            status_code=200,
+        )
+    else:
+        # Not yet ready ...
+        logger.debug(f"/status/{job_id} endpoint execution time: {time.time() - t_start}")
+        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")

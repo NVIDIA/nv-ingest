@@ -12,7 +12,7 @@ from pydantic import model_validator, ConfigDict, BaseModel
 logger = logging.getLogger(__name__)
 
 
-class PPTXConfigSchema(BaseModel):
+class DocxConfigSchema(BaseModel):
     """
     Configuration schema for docx extraction endpoints and options.
 
@@ -97,7 +97,7 @@ class PPTXConfigSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class PPTXExtractorSchema(BaseModel):
+class DocxExtractorSchema(BaseModel):
     """
     Configuration schema for the PDF extractor settings.
 
@@ -120,5 +120,5 @@ class PPTXExtractorSchema(BaseModel):
     n_workers: int = 16
     raise_on_failure: bool = False
 
-    pptx_extraction_config: Optional[PPTXConfigSchema] = None
+    docx_extraction_config: Optional[DocxConfigSchema] = None
     model_config = ConfigDict(extra="forbid")

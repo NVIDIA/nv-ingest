@@ -36,12 +36,14 @@ class AccessLevelEnum(int, Enum):
 
 
 class ContentTypeEnum(str, Enum):
-    TEXT = "text"
-    IMAGE = "image"
-    STRUCTURED = "structured"
-    UNSTRUCTURED = "unstructured"
-    INFO_MSG = "info_message"
+    AUDIO = "audio"
     EMBEDDING = "embedding"
+    IMAGE = "image"
+    INFO_MSG = "info_message"
+    STRUCTURED = "structured"
+    TEXT = "text"
+    UNSTRUCTURED = "unstructured"
+    VIDEO = "video"
 
 
 class StdContentDescEnum(str, Enum):

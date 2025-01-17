@@ -216,7 +216,7 @@ def test_process_inference_results(model_interface):
     """
     output = "Processed Output"
 
-    result = model_interface.process_inference_results(output)
+    result = model_interface.process_inference_results(output, "http")
 
     assert result == output
 
