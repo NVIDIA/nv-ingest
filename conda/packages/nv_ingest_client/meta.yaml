@@ -17,7 +17,8 @@ source:
   path: {{ git_root }}
 
 build:
-  number: 0
+  number: {{ GIT_DESCRIBE_NUMBER }}
+  string: cuda{{ cuda_major }}_py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
   script:
     - {{ PYTHON }} -m pip install ./ --no-deps -vv
 
