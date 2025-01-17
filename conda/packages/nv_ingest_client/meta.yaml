@@ -6,7 +6,6 @@
 {% set name = data.get('name', 'nv_ingest_client') | lower %}
 {% set version = data.get('version') %}
 {% set py_version = environ['CONDA_PY'] %}
-{% set date_string = environ['DATE_STRING'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
@@ -21,7 +20,7 @@ source:
 
 build:
   number: 0
-  string: py{{ py_version }}_{{ date_string }}_{{ GIT_SHA }}
+  string: py{{ py_version }}_{{ GIT_SHA }}
   script:
     - {{ PYTHON }} -m pip install ./ --no-deps -vv
 

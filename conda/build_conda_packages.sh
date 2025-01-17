@@ -40,7 +40,6 @@ NV_INGEST_CLIENT_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_client"
 echo "Using OUTPUT_DIR: $OUTPUT_DIR"
 mkdir -p "${OUTPUT_DIR}/linux-64"
 
-DATE_STRING="$(date +%y%m%d)"
 GIT_SHA=$(git rev-parse --short HEAD)
 
 ##############################
@@ -48,7 +47,7 @@ GIT_SHA=$(git rev-parse --short HEAD)
 ##############################
 if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
-    GIT_ROOT="${GIT_ROOT}" DATE_STRING="${DATE_STRING}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
+    GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
@@ -57,7 +56,7 @@ fi
 
 if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
     echo "Building nv_ingest_client..."
-    GIT_ROOT="${GIT_ROOT}/client" DATE_STRING="${DATE_STRING}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
+    GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
         -c conda-forge \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
