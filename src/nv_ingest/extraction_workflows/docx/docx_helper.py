@@ -36,7 +36,14 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 logger = logging.getLogger(__name__)
 
 
-def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+def python_docx(
+    docx: Union[str, Path, IO],
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    **kwargs
+):
     """
     Helper function that use python-docx to extract text from a bytestream document
 
@@ -57,6 +64,8 @@ def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: 
         Specifies whether to extract images.
     extract_tables : bool
         Specifies whether to extract tables.
+    extract_charts : bool
+        Specifies whether to extract charts.
     **kwargs
         The keyword arguments are used for additional extraction parameters.
 
@@ -73,9 +82,11 @@ def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: 
     source_id = row_data["source_id"]
     # get text_depth
     text_depth = kwargs.get("text_depth", "document")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    text_depth = TextTypeEnum(text_depth)
     # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
+
+    docx_extractor_config = kwargs.get("docx_extraction_config", {})
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
 
@@ -103,7 +114,9 @@ def python_docx(docx: Union[str, Path, IO], extract_text: bool, extract_images: 
     }
 
     # Extract data from the document using python-docx
-    doc = DocxReader(docx, source_metadata)
-    extracted_data = doc.extract_data(base_unified_metadata, text_depth, extract_text, extract_tables, extract_images)
+    doc = DocxReader(docx, source_metadata, extraction_config=docx_extractor_config)
+    extracted_data = doc.extract_data(
+        base_unified_metadata, text_depth, extract_text, extract_charts, extract_tables, extract_images
+    )
 
     return extracted_data

@@ -34,7 +34,6 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
@@ -64,22 +63,8 @@ def extract_tables_and_charts_using_image_ensemble(
 ) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
     tables_and_charts = []
 
-    # Obtain yolox_version
-    # Assuming that the grpc endpoint is at index 0
-    yolox_http_endpoint = config.yolox_endpoints[1]
     try:
-        yolox_version = get_version(yolox_http_endpoint)
-        if not yolox_version:
-            logger.warning(
-                "Failed to obtain yolox-page-elements version from the endpoint. Falling back to the latest version."
-            )
-            yolox_version = None  # Default to the latest version
-    except Exception:
-        logger.waring("Failed to get yolox-page-elements version after 30 seconds. Falling back to the latest version.")
-        yolox_version = None  # Default to the latest version
-
-    try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_version=yolox_version)
+        model_interface = yolox_utils.YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
             config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
         )
@@ -140,76 +125,6 @@ def extract_tables_and_charts_using_image_ensemble(
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
 
     return tables_and_charts
-
-
-def process_inference_results(
-    output_array: np.ndarray,
-    original_image_shapes: List[Tuple[int, int]],
-    num_classes: int,
-    conf_thresh: float,
-    iou_thresh: float,
-    min_score: float,
-    final_thresh: float,
-):
-    """
-    Process the model output to generate detection results and expand bounding boxes.
-
-    Parameters
-    ----------
-    output_array : np.ndarray
-        The raw output from the model inference.
-    original_image_shapes : List[Tuple[int, int]]
-        The shapes of the original images before resizing, used for scaling bounding boxes.
-    num_classes : int
-        The number of classes the model can detect.
-    conf_thresh : float
-        The confidence threshold for detecting objects.
-    iou_thresh : float
-        The Intersection Over Union (IoU) threshold for non-maximum suppression.
-    min_score : float
-        The minimum score for keeping a detection.
-    final_thresh: float
-        Threshold for keeping a bounding box applied after postprocessing.
-
-
-    Returns
-    -------
-    List[dict]
-        A list of dictionaries, each containing processed detection results including expanded bounding boxes.
-
-    Notes
-    -----
-    This function applies non-maximum suppression to the model's output and scales the bounding boxes back to the
-    original image size.
-
-    Examples
-    --------
-    >>> output_array = np.random.rand(2, 100, 85)
-    >>> original_image_shapes = [(1536, 1536), (1536, 1536)]
-    >>> results = process_inference_results(output_array, original_image_shapes, 80, 0.5, 0.5, 0.1)
-    >>> len(results)
-    2
-    """
-    pred = yolox_utils.postprocess_model_prediction(
-        output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True
-    )
-    results = yolox_utils.postprocess_results(pred, original_image_shapes, min_score=min_score)
-
-    annotation_dicts = [yolox_utils.expand_chart_bboxes(annotation_dict) for annotation_dict in results]
-    inference_results = []
-
-    # Filter out bounding boxes below the final threshold
-    for annotation_dict in annotation_dicts:
-        new_dict = {}
-        if "table" in annotation_dict:
-            new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
-        if "chart" in annotation_dict:
-            new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
-        if "title" in annotation_dict:
-            new_dict["title"] = annotation_dict["title"]
-        inference_results.append(new_dict)
-
-    return inference_results
 
 
 # Handle individual table/chart extraction and model inference

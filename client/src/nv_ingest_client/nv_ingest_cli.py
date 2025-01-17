@@ -120,7 +120,7 @@ Example:
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
-  --task 'embed:{"text":true, "tables":true}'
+  --task 'embed'
   --task 'vdb_upload'
   --task 'caption:{}'
 
@@ -143,8 +143,6 @@ Tasks and Options:
 - embed: Computes embeddings on multimodal extractions.
     Options:
     - filter_errors (bool): Flag to filter embedding errors. Optional.
-    - tables (bool): Flag to create embeddings for table extractions. Optional.
-    - text (bool): Flag to create embeddings for text extractions. Optional.
 \b
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.

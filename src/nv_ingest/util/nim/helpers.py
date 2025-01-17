@@ -75,7 +75,7 @@ class ModelInterface:
         """
         raise NotImplementedError("Subclasses should implement this method")
 
-    def process_inference_results(self, output_array, **kwargs):
+    def process_inference_results(self, output_array, protocol: str, **kwargs):
         """
         Process the inference results from the model.
 
@@ -206,7 +206,7 @@ class NimClient:
             response, protocol=self.protocol, data=prepared_data, **kwargs
         )
         results = self.model_interface.process_inference_results(
-            parsed_output, original_image_shapes=data.get("original_image_shapes"), **kwargs
+            parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
         )
         return results
 
@@ -624,8 +624,8 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
         headers = client["headers"]
 
         payload = {"audio_content": audio_content, "audio_id": audio_id}
-        response = requests.post(url, json=payload, headers=headers)            
-        
+        response = requests.post(url, json=payload, headers=headers)
+
         response.raise_for_status()  # Raise an exception for HTTP errors
 
         # Parse the JSON response
@@ -639,8 +639,3 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
         raise RuntimeError(f"An error occurred during inference: {e}")
 
     return json_response
-
-
-
-
-

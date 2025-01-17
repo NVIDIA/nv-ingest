@@ -36,6 +36,7 @@ class DocumentTypeEnum(str, Enum):
     mp3 = "mp3"
     wav = "wav"
 
+
 class TaskTypeEnum(str, Enum):
     caption = "caption"
     dedup = "dedup"
@@ -131,8 +132,6 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
-    text: bool = True
-    tables: bool = True
     filter_errors: bool = False
 
 

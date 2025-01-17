@@ -37,10 +37,7 @@ def valid_task_properties(task_type):
     elif task_type == TaskTypeEnum.store:
         return {"images": True, "structured": True, "method": "minio", "params": {"endpoint": "minio:9000"}}
     elif task_type == TaskTypeEnum.embed:
-        return {
-            "text": True,
-            "tables": True,
-        }
+        return {}
     elif task_type == TaskTypeEnum.filter:
         return {
             "content_type": "image",
@@ -179,10 +176,7 @@ def test_multiple_task_types():
             },
             {
                 "type": "embed",
-                "task_properties": {
-                    "text": True,
-                    "tables": True,
-                },
+                "task_properties": {},
             },
             {
                 "type": "filter",

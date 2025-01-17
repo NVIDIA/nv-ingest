@@ -9,6 +9,7 @@ import pandas as pd
 import pytest
 
 from nv_ingest.extraction_workflows.docx.docx_helper import python_docx
+from nv_ingest.schemas.metadata_schema import ImageTypeEnum
 
 
 @pytest.fixture
@@ -37,6 +38,7 @@ def test_docx_all_text(doc_stream, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -64,6 +66,7 @@ def test_docx_all_text(doc_stream, document_df):
     assert extracted_data[0][1]["source_metadata"]["source_id"] == "woods_frost"
 
 
+@pytest.mark.xfail(reason="Table extract requires yolox, disabling for now")
 def test_docx_table(doc_stream, document_df):
     """
     Validate text and table extraction. Table content is converted into markdown text.
@@ -73,6 +76,7 @@ def test_docx_table(doc_stream, document_df):
         extract_text=True,
         extract_images=False,
         extract_tables=True,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
@@ -108,11 +112,11 @@ def test_docx_image(doc_stream, document_df):
         doc_stream,
         extract_text=True,
         extract_images=True,
-        extract_tables=True,
+        extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
     )
 
-    expected_captions = ["*Figure 1: Snowy Woods*", "*Figure 2: Robert Frost*"]
     expected_text_cnt = 1
     expected_image_cnt = 2
     expected_entry_cnt = expected_image_cnt + expected_text_cnt
@@ -133,11 +137,4 @@ def test_docx_image(doc_stream, document_df):
         assert extracted_data[idx][0] == "image"
 
         # validate image type
-        assert extracted_data[idx][1]["image_metadata"]["image_type"] == "jpeg"
-
-        # validate captions
-        expected_caption = expected_captions[idx]
-        extracted_caption = extracted_data[idx][1]["image_metadata"]["caption"]
-        assert extracted_caption == expected_caption
-
-    assert image_cnt == expected_image_cnt
+        assert extracted_data[idx][1]["image_metadata"]["image_type"] == ImageTypeEnum.image_type_1

@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import io
 
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
@@ -21,8 +21,9 @@ import logging
 import operator
 import re
 import uuid
+from collections import defaultdict
 from datetime import datetime
-from typing import Dict
+from typing import Dict, List, Tuple
 from typing import Optional
 
 import pandas as pd
@@ -31,8 +32,14 @@ from pptx.enum.dml import MSO_COLOR_TYPE
 from pptx.enum.dml import MSO_THEME_COLOR
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 from pptx.enum.shapes import PP_PLACEHOLDER
+from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
 
+from nv_ingest.extraction_workflows.image.image_handlers import (
+    load_and_preprocess_image,
+    extract_tables_and_charts_from_images,
+)
+from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
@@ -41,70 +48,144 @@ from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
+from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
 from nv_ingest.util.converters import bytetools
 from nv_ingest.util.detectors.language import detect_language
+from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
 
 
-# Define a helper function to use python-pptx to extract text from a base64
-# encoded bytestram PPTX
-def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+def _finalize_images(
+    pending_images: List[Tuple[Shape, int, int, int, dict, dict, dict]],
+    extracted_data: List,
+    pptx_extraction_config: PPTXConfigSchema,
+    extract_tables: bool = False,
+    extract_charts: bool = False,
+    trace_info: Optional[Dict] = None,
+):
     """
-    Helper function to use python-pptx to extract text from a bytestream PPTX.
+    Post-process all pending images.
+      - Convert shape image -> NumPy or base64
+      - If `extract_tables` or `extract_charts`, do detection (table/chart)
+      - Build the appropriate metadata, either table/chart or image.
 
-    A document has five levels - presentation, slides, shapes, paragraphs, and runs.
-    To align with the pdf extraction, we map the levels as follows:
-    - Document -> Presention
-    - Pages -> Slides
-    - Blocks -> Shapes
-    - Lines -> Paragraphs
-    - Spans -> Runs
+    This mimics the docx approach, but adapted for python-pptx shapes.
+    """
+    if not pending_images:
+        return
 
-    Parameters
-    ----------
-    pptx_stream : io.BytesIO
-        A bytestream PPTX.
-    extract_text : bool
-        Specifies whether to extract text.
-    extract_images : bool
-        Specifies whether to extract images.
-    extract_tables : bool
-        Specifies whether to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+    # Convert each shape to image data (base64 or ndarray).
+    # We'll store them for a single call to your model if you'd like (batching).
+    image_arrays = []
+    image_contexts = []
+    for (
+        shape,
+        shape_idx,
+        slide_idx,
+        slide_count,
+        page_nearby_blocks,
+        source_metadata,
+        base_unified_metadata,
+    ) in pending_images:
+        try:
+            image_bytes = shape.image.blob
+            image_array = load_and_preprocess_image(io.BytesIO(image_bytes))
+            base64_img = bytetools.base64frombytes(image_bytes)
 
-    Returns
-    -------
-    str
-        A string of extracted text.
+            image_arrays.append(image_array)
+            image_contexts.append(
+                (
+                    shape_idx,
+                    slide_idx,
+                    slide_count,
+                    page_nearby_blocks,
+                    source_metadata,
+                    base_unified_metadata,
+                    base64_img,
+                )
+            )
+        except Exception as e:
+            logger.warning(f"Unable to process shape image: {e}")
+
+    # If you want table/chart detection for these images, do it now
+    # (similar to docx approach). This might use your YOLO or other method:
+    detection_map = defaultdict(list)  # image_idx -> list of CroppedImageWithContent
+    if extract_tables or extract_charts:
+        try:
+            # For example, a call to your function that checks for tables/charts
+            detection_results = extract_tables_and_charts_from_images(
+                images=image_arrays,
+                config=ImageConfigSchema(**(pptx_extraction_config.model_dump())),
+                trace_info=trace_info,
+            )
+            # detection_results is something like [(image_idx, CroppedImageWithContent), ...]
+            for img_idx, cropped_obj in detection_results:
+                detection_map[img_idx].append(cropped_obj)
+        except Exception as e:
+            logger.error(f"Error while running table/chart detection on PPTX images: {e}")
+            detection_map = {}
+
+    # Now build the final metadata objects
+    for i, context in enumerate(image_contexts):
+        (shape_idx, slide_idx, slide_count, page_nearby_blocks, source_metadata, base_unified_metadata, base64_img) = (
+            context
+        )
+
+        # If there's a detection result for this image, handle it
+        if i in detection_map and detection_map[i]:
+            # We found table(s)/chart(s) in the image
+            for cropped_item in detection_map[i]:
+                structured_entry = construct_table_and_chart_metadata(
+                    structured_image=cropped_item,
+                    page_idx=slide_idx,
+                    page_count=slide_count,
+                    source_metadata=source_metadata,
+                    base_unified_metadata=base_unified_metadata,
+                )
+                extracted_data.append(structured_entry)
+        else:
+            # No table detected => build normal image metadata
+            image_entry = _construct_image_metadata(
+                shape_idx=shape_idx,
+                slide_idx=slide_idx,
+                slide_count=slide_count,
+                page_nearby_blocks=page_nearby_blocks,
+                base64_img=base64_img,
+                source_metadata=source_metadata,
+                base_unified_metadata=base_unified_metadata,
+            )
+            extracted_data.append(image_entry)
+
+
+def python_pptx(
+    pptx_stream, extract_text: bool, extract_images: bool, extract_tables: bool, extract_charts: bool, **kwargs
+):
+    """
+    Helper function to use python-pptx to extract text from a bytestream PPTX,
+    while deferring image classification into tables/charts if requested.
     """
 
     logger.debug("Extracting PPTX with python-pptx backend.")
 
     row_data = kwargs.get("row_data")
-    # get source_id
     source_id = row_data["source_id"]
-    # get text_depth
+
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
-    # Not configurable anywhere at the moment
     paragraph_format = kwargs.get("paragraph_format", "markdown")
     identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
 
-    # get base metadata
     metadata_col = kwargs.get("metadata_column", "metadata")
+    pptx_extractor_config = kwargs.get("pptx_extraction_config", {})
+    trace_info = kwargs.get("trace_info", {})
+
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
-    # get base source_metadata
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
-    # get source_location
     source_location = base_source_metadata.get("source_location", "")
-    # get collection_id (assuming coming in from source_metadata...)
     collection_id = base_source_metadata.get("collection_id", "")
-    # get partition_id (assuming coming in from source_metadata...)
     partition_id = base_source_metadata.get("partition_id", -1)
-    # get access_level (assuming coming in from source_metadata...)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
 
     presentation = Presentation(pptx_stream)
@@ -140,6 +221,10 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
     accumulated_text = []
     extracted_data = []
 
+    # Hold images here for final classification
+    # Each item is (shape, shape_idx, slide_idx, page_nearby_blocks, base_unified_metadata)
+    pending_images = []
+
     for slide_idx, slide in enumerate(presentation.slides):
         shapes = sorted(ungroup_shapes(slide.shapes), key=operator.attrgetter("top", "left"))
 
@@ -153,6 +238,9 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
             block_text = []
             added_title = added_subtitle = False
 
+            # ---------------------------------------------
+            # 1) Text Extraction
+            # ---------------------------------------------
             if extract_text and shape.has_text_frame:
                 for paragraph_idx, paragraph in enumerate(shape.text_frame.paragraphs):
                     if not paragraph.text.strip():
@@ -162,21 +250,22 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                         text = run.text
                         if not text:
                             continue
+
                         text = escape_text(text)
 
                         if paragraph_format == "markdown":
-                            # For titles/subtitles, process them on the block/shape level, and
-                            # skip formatting.
                             if is_title(shape):
-                                if added_title:
+                                if not added_title:
+                                    text = process_title(shape)  # format a heading or something
+                                    added_title = True
+                                else:
                                     continue
-                                text = process_title(shape)
-                                added_title = True
                             elif is_subtitle(shape):
-                                if added_subtitle:
+                                if not added_subtitle:
+                                    text = process_subtitle(shape)
+                                    added_subtitle = True
+                                else:
                                     continue
-                                text = process_subtitle(shape)
-                                added_subtitle = True
                             else:
                                 if run.hyperlink.address:
                                     text = get_hyperlink(text, run.hyperlink.address)
@@ -193,9 +282,11 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
 
                         accumulated_text.append(text)
 
+                        # For "nearby objects", store block text
                         if extract_images and identify_nearby_objects:
                             block_text.append(text)
 
+                        # If we only want text at SPAN level, flush after each run
                         if text_depth == TextTypeEnum.SPAN:
                             text_extraction = _construct_text_metadata(
                                 presentation,
@@ -211,17 +302,15 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                                 source_metadata,
                                 base_unified_metadata,
                             )
-
                             if len(text_extraction) > 0:
                                 extracted_data.append(text_extraction)
-
                             accumulated_text = []
 
-                    # Avoid excessive newline characters and add them only at
-                    # the line/paragraph level or higher.
+                    # Add newlines for separation at line/paragraph level
                     if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
                         accumulated_text.append("\n\n")
 
+                    # If text_depth is LINE, flush after each paragraph
                     if text_depth == TextTypeEnum.LINE:
                         text_extraction = _construct_text_metadata(
                             presentation,
@@ -237,12 +326,11 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                             source_metadata,
                             base_unified_metadata,
                         )
-
                         if len(text_extraction) > 0:
                             extracted_data.append(text_extraction)
-
                         accumulated_text = []
 
+                # If text_depth is BLOCK, flush after we've read the entire shape
                 if text_depth == TextTypeEnum.BLOCK:
                     text_extraction = _construct_text_metadata(
                         presentation,
@@ -258,54 +346,60 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                         source_metadata,
                         base_unified_metadata,
                     )
-
                     if len(text_extraction) > 0:
                         extracted_data.append(text_extraction)
-
                     accumulated_text = []
 
-            if extract_images and identify_nearby_objects and (len(block_text) > 0):
+            # If we have text in this shape and the user wants "nearby objects" references:
+            if extract_images and identify_nearby_objects and block_text:
                 page_nearby_blocks["text"]["content"].append("".join(block_text))
                 page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
 
+            # ---------------------------------------------
+            # 2) Image Handling (DEFERRED)
+            # ---------------------------------------------
+            # If shape is a picture (or a placeholder that is an embedded image)
+            # Instead of building metadata now, we'll store it in pending_images.
             if extract_images and (
                 shape.shape_type == MSO_SHAPE_TYPE.PICTURE
                 or (
                     shape.is_placeholder
                     and shape.placeholder_format.type == PP_PLACEHOLDER.OBJECT
                     and hasattr(shape, "image")
-                    and getattr(shape, "image")
                 )
             ):
                 try:
-                    image_extraction = _construct_image_metadata(
-                        shape,
-                        shape_idx,
-                        slide_idx,
-                        slide_count,
-                        source_metadata,
-                        base_unified_metadata,
-                        page_nearby_blocks,
+                    # Just accumulate the shape + context; don't build the final item yet.
+                    pending_images.append(
+                        (
+                            shape,  # so we can later pull shape.image.blob
+                            shape_idx,
+                            slide_idx,
+                            slide_count,
+                            page_nearby_blocks,
+                            source_metadata,
+                            base_unified_metadata,
+                        )
                     )
-                    extracted_data.append(image_extraction)
                 except ValueError as e:
-                    # Handle the specific case where no embedded image is found
                     logger.warning(f"No embedded image found for shape {shape_idx} on slide {slide_idx}: {e}")
                 except Exception as e:
-                    # Handle any other exceptions that might occur
-                    logger.warning(f"An error occurred while processing shape {shape_idx} on slide {slide_idx}: {e}")
+                    logger.warning(f"Error processing shape {shape_idx} on slide {slide_idx}: {e}")
 
+            # ---------------------------------------------
+            # 3) Table Handling
+            # ---------------------------------------------
             if extract_tables and shape.has_table:
                 table_extraction = _construct_table_metadata(
                     shape, slide_idx, slide_count, source_metadata, base_unified_metadata
                 )
                 extracted_data.append(table_extraction)
 
-        # Extract text - slide (b)
+        # If text_depth is PAGE, flush once per slide
         if (extract_text) and (text_depth == TextTypeEnum.PAGE) and (len(accumulated_text) > 0):
             text_extraction = _construct_text_metadata(
                 presentation,
-                shape,
+                shape,  # might pass None if you prefer
                 accumulated_text,
                 keywords,
                 slide_idx,
@@ -317,17 +411,15 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
                 source_metadata,
                 base_unified_metadata,
             )
-
             if len(text_extraction) > 0:
                 extracted_data.append(text_extraction)
-
             accumulated_text = []
 
-    # Extract text - presentation (c)
+    # If text_depth is DOCUMENT, flush once at the end
     if (extract_text) and (text_depth == TextTypeEnum.DOCUMENT) and (len(accumulated_text) > 0):
         text_extraction = _construct_text_metadata(
             presentation,
-            shape,
+            shape,  # might pass None
             accumulated_text,
             keywords,
             -1,
@@ -339,11 +431,22 @@ def python_pptx(pptx_stream, extract_text: bool, extract_images: bool, extract_t
             source_metadata,
             base_unified_metadata,
         )
-
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
-
         accumulated_text = []
+
+    # ---------------------------------------------
+    # FINAL STEP: Finalize images
+    # ---------------------------------------------
+    if extract_images or extract_tables or extract_charts:
+        _finalize_images(
+            pending_images,
+            extracted_data,
+            pptx_extractor_config,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            trace_info=trace_info,
+        )
 
     return extracted_data
 
@@ -410,17 +513,19 @@ def _construct_text_metadata(
 
 # need to add block text to hierarchy/nearby_objects, including bbox
 def _construct_image_metadata(
-    shape, shape_idx, slide_idx, slide_count, source_metadata, base_unified_metadata, page_nearby_blocks
+    shape_idx: int,
+    slide_idx: int,
+    slide_count: int,
+    page_nearby_blocks: Dict,
+    base64_img: str,
+    source_metadata: Dict,
+    base_unified_metadata: Dict,
 ):
-    image_type = shape.image.ext
-    if ImageTypeEnum.has_value(image_type):
-        image_type = ImageTypeEnum[image_type.upper()]
-
-    base64_img = bytetools.base64frombytes(shape.image.blob)
-
-    bbox = get_bbox(shape_object=shape)
-    width = shape.width
-    height = shape.height
+    """
+    Build standard PPTX image metadata.
+    """
+    # Example bounding box
+    bbox = (0, 0, 0, 0)  # or extract from shape.left, shape.top, shape.width, shape.height if desired
 
     content_metadata = {
         "type": ContentTypeEnum.IMAGE,
@@ -437,17 +542,14 @@ def _construct_image_metadata(
     }
 
     image_metadata = {
-        "image_type": image_type,
+        "image_type": ImageTypeEnum.image_type_1,
         "structured_image_type": ImageTypeEnum.image_type_1,
-        "caption": "",
+        "caption": "",  # could attempt to guess a caption from nearby text
         "text": "",
         "image_location": bbox,
-        "width": width,
-        "height": height,
     }
 
-    unified_metadata = base_unified_metadata.copy()
-
+    unified_metadata = base_unified_metadata.copy() if base_unified_metadata else {}
     unified_metadata.update(
         {
             "content": base64_img,
@@ -459,7 +561,11 @@ def _construct_image_metadata(
 
     validated_unified_metadata = validate_metadata(unified_metadata)
 
-    return [ContentTypeEnum.IMAGE, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
+    return [
+        ContentTypeEnum.IMAGE.value,
+        validated_unified_metadata.model_dump(),
+        str(uuid.uuid4()),
+    ]
 
 
 def _construct_table_metadata(
@@ -492,12 +598,13 @@ def _construct_table_metadata(
         "caption": "",
         "table_format": TableFormatEnum.MARKDOWN,
         "table_location": bbox,
+        "table_content": df.to_markdown(index=False),
     }
     ext_unified_metadata = base_unified_metadata.copy()
 
     ext_unified_metadata.update(
         {
-            "content": df.to_markdown(index=False),
+            "content": "",
             "source_metadata": source_metadata,
             "content_metadata": content_metadata,
             "table_metadata": table_metadata,

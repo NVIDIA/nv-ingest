@@ -24,6 +24,7 @@ class CaptionTaskSchema(BaseModel):
     model_name: Optional[str] = None
 
     model_config = ConfigDict(extra="forbid")
+    model_config["protected_namespaces"] = ()
 
 
 class CaptionTask(Task):

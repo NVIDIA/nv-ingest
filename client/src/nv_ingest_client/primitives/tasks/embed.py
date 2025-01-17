@@ -9,7 +9,7 @@
 import logging
 from typing import Dict
 
-from pydantic import BaseModel
+from pydantic import BaseModel, root_validator
 
 from .task_base import Task
 
@@ -17,9 +17,21 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedTaskSchema(BaseModel):
-    text: bool = True
-    tables: bool = True
     filter_errors: bool = False
+
+    @root_validator(pre=True)
+    def handle_deprecated_fields(cls, values):
+        if "text" in values:
+            logger.warning(
+                "'text' parameter is deprecated and will be ignored. Future versions will remove this argument."
+            )
+            values.pop("text")
+        if "tables" in values:
+            logger.warning(
+                "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
+            )
+            values.pop("tables")
+        return values
 
     class Config:
         extra = "forbid"
@@ -30,13 +42,22 @@ class EmbedTask(Task):
     Object for document embedding task
     """
 
-    def __init__(self, text: bool = True, tables: bool = True, filter_errors: bool = False) -> None:
+    def __init__(self, text: bool = None, tables: bool = None, filter_errors: bool = False) -> None:
         """
         Setup Embed Task Config
         """
         super().__init__()
-        self._text = text
-        self._tables = tables
+
+        if text is not None:
+            logger.warning(
+                "'text' parameter is deprecated and will be ignored. Future versions will remove this argument."
+            )
+
+        if tables is not None:
+            logger.warning(
+                "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
+            )
+
         self._filter_errors = filter_errors
 
     def __str__(self) -> str:
@@ -45,8 +66,6 @@ class EmbedTask(Task):
         """
         info = ""
         info += "Embed Task:\n"
-        info += f"  text: {self._text}\n"
-        info += f"  tables: {self._tables}\n"
         info += f"  filter_errors: {self._filter_errors}\n"
         return info
 
@@ -56,8 +75,6 @@ class EmbedTask(Task):
         """
 
         task_properties = {
-            "text": self._text,
-            "tables": self._tables,
             "filter_errors": False,
         }
 
