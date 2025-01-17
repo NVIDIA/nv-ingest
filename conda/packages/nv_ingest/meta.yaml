@@ -5,6 +5,8 @@
 {% set data = load_setup_py_data() %}
 {% set name = data.get('name', 'nv_ingest') | lower %}
 {% set version = data.get('version') %}
+{% set py_version = environ['CONDA_PY'] %}
+{% set date_string = "$(date +%y%m%d)" %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
 {% set git_root = environ.get('GIT_ROOT', '../../..') %}
@@ -18,7 +20,7 @@ source:
 
 build:
   number: {{ GIT_DESCRIBE_NUMBER }}
-  string: cuda{{ cuda_major }}_py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
+  string: py{{ py_version }}_{{ date_string }}_{{ GIT_DESCRIBE_HASH }}_{{ GIT_DESCRIBE_NUMBER }}
   script:
     - {{ PYTHON }} -m pip install . --no-deps -vv
 
