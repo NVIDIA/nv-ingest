@@ -603,10 +603,14 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
 
     Parameters
     ----------
-    client : grpcclient.InferenceServerClient or dict
+    client :
         The inference client, which is an HTTP client.
-    audio_source : str
+    audio_content: str
         The audio source to transcribe.
+    audio_id: str
+        The unique identifier for the audio content.
+    trace_info: dict
+        Trace information for debugging or logging.
 
     Returns
     -------
@@ -620,16 +624,16 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
     """
 
     try:
-        url = client["endpoint_url"]
-        headers = client["headers"]
+        data = {"base64_audio": audio_content, "audio_id": audio_id}
 
-        payload = {"audio_content": audio_content, "audio_id": audio_id}
-        response = requests.post(url, json=payload, headers=headers)
+        parakeet_result = client.infer(
+            data,
+            model_name="parakeet",
+            trace_info=trace_info,  # traceable_func arg
+            stage_name="audio_extraction",
+        )
 
-        response.raise_for_status()  # Raise an exception for HTTP errors
-
-        # Parse the JSON response
-        json_response = response.json()
+        return parakeet_result
 
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"HTTP request failed: {e}")
@@ -637,5 +641,3 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
         raise RuntimeError(f"Missing expected key in response: {e}")
     except Exception as e:
         raise RuntimeError(f"An error occurred during inference: {e}")
-
-    return json_response
