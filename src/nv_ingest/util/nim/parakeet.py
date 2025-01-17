@@ -1,4 +1,6 @@
 import logging
+import uuid
+
 import requests
 from typing import Any, Dict, Optional
 
@@ -68,7 +70,8 @@ class ParakeetModelInterface(ModelInterface):
         if protocol == "http":
             logger.debug("Formatting input for HTTP Parakeet model")
             # For HTTP, we just build a simple JSON payload
-            payload = {"audio_content": data["base64_audio"], "audio_id": data["audio_id"]}
+            # audio_id just needs to be a unique identifier
+            payload = {"audio_content": data["base64_audio"], "audio_id": f"{str(uuid.uuid4())}.wav"}
             return payload
         else:
             raise ValueError("Invalid protocol specified. Must be 'http' for Parakeet.")
