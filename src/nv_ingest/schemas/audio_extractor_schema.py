@@ -73,12 +73,8 @@ class AudioConfigSchema(BaseModel):
                 return None
             return service
 
-
-        print ('===> audio extractor schema values:', values)
         endpoint_name = "audio_endpoints"
         grpc_service, http_service = values.get(endpoint_name)
-        print ("grpc_service:", grpc_service)
-        print ("http_service:", http_service)
         grpc_service = clean_service(grpc_service)
         http_service = clean_service(http_service)
 
@@ -90,9 +86,9 @@ class AudioConfigSchema(BaseModel):
         protocol_name = "audio_infer_protocol"
         protocol_value = values.get(protocol_name)
 
-        print("protocol_value:", protocol_value)
         if not protocol_value:
             protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+
         protocol_value = protocol_value.lower()
         values[protocol_name] = protocol_value
 
