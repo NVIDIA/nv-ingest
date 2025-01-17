@@ -20,6 +20,7 @@ For details, see [Running kind clusters with GPUs using nvkind](https://github.c
 From the root of the repo, run the following code to create a configuration file for your cluster.
 
 ```yaml
+{% raw %}
 mkdir -p ./.tmp
 
 cat <<EOF > ./.tmp/kind-config.yaml
@@ -29,16 +30,17 @@ name: nv-ingest-${USER}
 nodes:
   - role: control-plane
     image: kindest/node:v1.29.2
-  {{- range \$gpu := until numGPUs }}
+  {{- range $gpu := until numGPUs }}
   - role: worker
     extraMounts:
       # We inject all NVIDIA GPUs using the nvidia-container-runtime.
       # This requires 'accept-nvidia-visible-devices-as-volume-mounts = true' be set
       # in '/etc/nvidia-container-runtime/config.toml'
       - hostPath: /dev/null
-        containerPath: /var/run/nvidia-container-devices/{{ \$gpu }}
+        containerPath: /var/run/nvidia-container-devices/{{ $gpu }}
   {{- end }}
 EOF
+{% endraw %}
 ```
 
 Then, use the `nvkind` CLI to create your cluster.
