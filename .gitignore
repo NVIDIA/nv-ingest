@@ -222,3 +222,6 @@ processed_docs
 
 # Ignore conda build output
 conda/output_conda_channel
+
+# Ignore generate docs site
+docs/site
