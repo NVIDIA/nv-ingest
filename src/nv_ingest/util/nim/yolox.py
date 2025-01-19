@@ -14,6 +14,7 @@ from typing import Optional
 
 import cv2
 import numpy as np
+import pandas as pd
 import torch
 import torchvision
 from PIL import Image
@@ -23,9 +24,7 @@ from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
 
-YOLOX_PAGE_MAX_BATCH_SIZE = 8
-YOLOX_PAGE_MAX_WIDTH = 1536
-YOLOX_PAGE_MAX_HEIGHT = 1536
+# yolox-page-elements-v1 contants
 YOLOX_PAGE_NUM_CLASSES = 3
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
@@ -40,6 +39,30 @@ YOLOX_PAGE_CLASS_LABELS = [
     "table",
     "chart",
     "title",
+]
+
+# yolox-graphic-elements-v1 contants
+YOLOX_GRAPHIC_NUM_CLASSES = 10
+YOLOX_GRAPHIC_CONF_THRESHOLD = 0.01
+YOLOX_GRAPHIC_IOU_THRESHOLD = 0.25
+YOLOX_GRAPHIC_MIN_SCORE = 0.1
+YOLOX_GRAPHIC_FINAL_SCORE = 0.0
+YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 360_000
+
+YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 768
+YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 768
+
+YOLOX_GRAPHIC_CLASS_LABELS = [
+    "chart_title",
+    "x_title",
+    "y_title",
+    "xlabel",
+    "ylabel",
+    "other",
+    "legend_label",
+    "legend_title",
+    "mark_label",
+    "value_label",
 ]
 
 
@@ -255,17 +278,37 @@ class YoloxModelInterfaceBase(ModelInterface):
             )
 
         inference_results = self.postprocess_annotations(results, **kwargs)
+        inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
 
         return inference_results
 
-    def postprocess_annotations(self, annotation_dicts: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
         raise NotImplementedError()
 
+    def transform_normalized_coordinates_to_original(self, results, original_image_shapes):
+        """ """
+        transformed_results = []
 
-# Implementing YoloxPageElemenetsModelInterface with required methods
+        for annotation_dict, shape in zip(results, original_image_shapes):
+            new_dict = {}
+            for label, bboxes_and_scores in annotation_dict.items():
+                new_dict[label] = []
+                for *bbox, score in bboxes_and_scores:
+                    transformed_bbox = [
+                        bbox[0] * shape[1],
+                        bbox[1] * shape[0],
+                        bbox[2] * shape[1],
+                        bbox[3] * shape[0],
+                    ]
+                    new_dict[label].append(transformed_bbox + [score])
+            transformed_results.append(new_dict)
+
+        return transformed_results
+
+
 class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     """
-    An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
+    An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
     def __init__(self):
@@ -298,7 +341,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         return "yolox-page-elements"
 
-    def postprocess_annotations(self, annotation_dicts: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
         # Table/chart expansion is "business logic" specific to nv-ingest
         annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
@@ -315,6 +358,60 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
+
+        return inference_results
+
+
+class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-graphic-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
+            conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
+            iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
+            min_score=YOLOX_GRAPHIC_MIN_SCORE,
+            final_score=YOLOX_GRAPHIC_FINAL_SCORE,
+            class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-graphic-elements"
+
+    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+        original_image_shapes = kwargs.get("original_image_shapes", [])
+
+        inference_results = []
+
+        # bbox extraction: additional postprocessing speicifc to nv-ingest
+        for pred, shape in zip(annotation_dicts, original_image_shapes):
+            inference_results.append(
+                get_bbox_dict_yolox_graphic(
+                    pred,
+                    shape,
+                    self.class_labels,
+                    self.min_score,
+                )
+            )
 
         return inference_results
 
@@ -926,3 +1023,108 @@ def get_weighted_box(boxes, conf_type="avg"):
     box[3] = -1  # model index field is retained for consistency but is not used.
     box[4:] /= conf
     return box
+
+
+def batched_overlaps(A, B):
+    """
+    Calculate the Intersection over Union (IoU) between
+    two sets of bounding boxes in a batched manner.
+    Normalization is modified to only use the area of A boxes, hence computing the overlaps.
+    Args:
+        A (ndarray): Array of bounding boxes of shape (N, 4) in format [x1, y1, x2, y2].
+        B (ndarray): Array of bounding boxes of shape (M, 4) in format [x1, y1, x2, y2].
+    Returns:
+        ndarray: Array of IoU values of shape (N, M) representing the overlaps
+         between each pair of bounding boxes.
+    """
+    A = A.copy()
+    B = B.copy()
+
+    A = A[None].repeat(B.shape[0], 0)
+    B = B[:, None].repeat(A.shape[1], 1)
+
+    low = np.s_[..., :2]
+    high = np.s_[..., 2:]
+
+    A, B = A.copy(), B.copy()
+    A[high] += 1
+    B[high] += 1
+
+    intrs = (np.maximum(0, np.minimum(A[high], B[high]) - np.maximum(A[low], B[low]))).prod(-1)
+    ious = intrs / (A[high] - A[low]).prod(-1)
+
+    return ious
+
+
+def find_boxes_inside(boxes, boxes_to_check, threshold=0.9):
+    """
+    Find all boxes that are inside another box based on
+    the intersection area divided by the area of the smaller box,
+    and removes them.
+    """
+    overlaps = batched_overlaps(boxes_to_check, boxes)
+    to_keep = (overlaps >= threshold).sum(0) <= 1
+    return boxes_to_check[to_keep]
+
+
+def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> Dict[str, np.ndarray]:
+    """
+    Extracts bounding boxes from YOLOX model predictions:
+    - Applies thresholding
+    - Reformats boxes
+    - Cleans the `other` detections: removes the ones that are included  in other detections.
+    - If no title is found, the biggest `other` box is used if it is larger than 0.3*img_w.
+    Args:
+        preds (np.ndarray): YOLOX model predictions including bounding boxes, scores, and labels.
+        shape (tuple): Original image shape.
+        threshold_ (float): Score threshold to filter bounding boxes.
+    Returns:
+        Dict[str, np.ndarray]: Dictionary of bounding boxes, organized by class.
+    """
+    bbox_dict = {label: np.array([]) for label in class_labels}
+
+    for i, label in enumerate(class_labels):
+        bboxes_class = np.array(preds[label])
+
+        if bboxes_class.size == 0:
+            continue
+
+        # Try to find a chart_title box
+        threshold = threshold_ if label != "chart_title" else min(threshold_, bboxes_class[:, -1].max())
+        bboxes_class = bboxes_class[bboxes_class[:, -1] >= threshold][:, :4].astype(int)
+
+        sort = ["x0", "y0"] if label != "ylabel" else ["y0", "x0"]
+        idxs = (
+            pd.DataFrame(
+                {
+                    "y0": bboxes_class[:, 1],
+                    "x0": bboxes_class[:, 0],
+                }
+            )
+            .sort_values(sort, ascending=label != "ylabel")
+            .index
+        )
+        bboxes_class = bboxes_class[idxs]
+        bbox_dict[label] = bboxes_class
+
+    # Remove other included
+    if len(bbox_dict.get("other", [])):
+        other = find_boxes_inside(
+            np.concatenate(list([v for v in bbox_dict.values() if len(v)])), bbox_dict["other"], threshold=0.7
+        )
+        del bbox_dict["other"]
+        if len(other):
+            bbox_dict["other"] = other
+
+    # Biggest other is title if no title
+    if not len(bbox_dict.get("chart_title", [])) and len(bbox_dict.get("other", [])):
+        boxes = bbox_dict["other"]
+        ws = boxes[:, 2] - boxes[:, 0]
+        if np.max(ws) > shape[1] * 0.3:
+            bbox_dict["chart_title"] = boxes[np.argmax(ws)][None].copy()
+            bbox_dict["other"] = np.delete(boxes, (np.argmax(ws)), axis=0)
+
+    # Make sure other key not lost
+    bbox_dict["other"] = bbox_dict.get("other", [])
+
+    return bbox_dict
