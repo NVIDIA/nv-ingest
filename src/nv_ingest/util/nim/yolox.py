@@ -274,15 +274,15 @@ class YoloxModelInterfaceBase(ModelInterface):
                 original_image_shapes,
                 self.image_preproc_width,
                 self.image_preproc_height,
+                self.class_labels,
                 min_score=self.min_score,
             )
 
         inference_results = self.postprocess_annotations(results, **kwargs)
-        inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
 
         return inference_results
 
-    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
         raise NotImplementedError()
 
     def transform_normalized_coordinates_to_original(self, results, original_image_shapes):
@@ -293,14 +293,16 @@ class YoloxModelInterfaceBase(ModelInterface):
             new_dict = {}
             for label, bboxes_and_scores in annotation_dict.items():
                 new_dict[label] = []
-                for *bbox, score in bboxes_and_scores:
+                for bbox_and_score in bboxes_and_scores:
+                    bbox = bbox_and_score[:4]
                     transformed_bbox = [
                         bbox[0] * shape[1],
                         bbox[1] * shape[0],
                         bbox[2] * shape[1],
                         bbox[3] * shape[0],
                     ]
-                    new_dict[label].append(transformed_bbox + [score])
+                    transformed_bbox += bbox_and_score[4:]
+                    new_dict[label].append(transformed_bbox)
             transformed_results.append(new_dict)
 
         return transformed_results
@@ -341,7 +343,9 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
 
         return "yolox-page-elements"
 
-    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        original_image_shapes = kwargs.get("original_image_shapes", [])
+
         # Table/chart expansion is "business logic" specific to nv-ingest
         annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
@@ -358,6 +362,8 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
+
+        inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
 
         return inference_results
 
@@ -397,21 +403,26 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
 
         return "yolox-graphic-elements"
 
-    def postprocess_annotations(self, annotation_dicts: List[Dict[str, Any]], **kwargs) -> List[Dict[str, Any]]:
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
+
+        annotation_dicts = self.transform_normalized_coordinates_to_original(annotation_dicts, original_image_shapes)
 
         inference_results = []
 
         # bbox extraction: additional postprocessing speicifc to nv-ingest
         for pred, shape in zip(annotation_dicts, original_image_shapes):
-            inference_results.append(
-                get_bbox_dict_yolox_graphic(
-                    pred,
-                    shape,
-                    self.class_labels,
-                    self.min_score,
-                )
+            bbox_dict = get_bbox_dict_yolox_graphic(
+                pred,
+                shape,
+                self.class_labels,
+                self.min_score,
             )
+            # convert numpy arrays to list
+            bbox_dict = {
+                label: array.tolist() if isinstance(array, np.ndarray) else array for label, array in bbox_dict.items()
+            }
+            inference_results.append(bbox_dict)
 
         return inference_results
 
@@ -475,7 +486,9 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
     return output
 
 
-def postprocess_results(results, original_image_shapes, image_preproc_width, image_preproc_height, min_score=0.0):
+def postprocess_results(
+    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, min_score=0.0
+):
     """
     For each item (==image) in results, computes annotations in the form
 
@@ -487,7 +500,6 @@ def postprocess_results(results, original_image_shapes, image_preproc_width, ima
 
     Keep only bboxes with high enough confidence.
     """
-    class_labels = ["table", "chart", "title"]
     out = []
 
     for original_image_shape, result in zip(original_image_shapes, results):

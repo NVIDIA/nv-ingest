@@ -10,16 +10,16 @@ from typing import Optional
 from typing import Tuple
 
 import pandas as pd
-
 from morpheus.config import Config
 
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import NimClient
-from nv_ingest.util.nim.helpers import get_version
+from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 logger = logging.getLogger(f"morpheus.{__name__}")
@@ -71,6 +71,8 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
     ):
         return metadata
 
+    table_content_format = table_metadata.get("table_content_format")
+
     # Modify table metadata with the result from the inference model
     try:
         data = {"base64_image": base64_image}
@@ -83,12 +85,20 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
             paddle_result = paddle_client.infer(
                 data,
                 model_name="paddle",
-                table_content_format=table_metadata.get("table_content_format"),
+                table_content_format=table_content_format,
                 trace_info=trace_info,  # traceable_func arg
                 stage_name="table_data_extraction",  # traceable_func arg
             )
 
-        table_content, table_content_format = paddle_result
+        text_predictions, bounding_boxes = paddle_result
+
+        if table_content_format == TableFormatEnum.SIMPLE:
+            table_content = " ".join(text_predictions)
+        elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            table_content = convert_paddle_response_to_psuedo_markdown(text_predictions, bounding_boxes)
+        else:
+            raise ValueError(f"Unexpected table format: {table_content_format}")
+
         table_metadata["table_content"] = table_content
         table_metadata["table_content_format"] = table_content_format
     except Exception as e:
@@ -140,20 +150,8 @@ def _extract_table_data(
 
     stage_config = validated_config.stage_config
 
-    # Obtain paddle_version
-    # Assuming that the grpc endpoint is at index 0
-    paddle_endpoint = stage_config.paddle_endpoints[1]
-    try:
-        paddle_version = get_version(paddle_endpoint)
-        if not paddle_version:
-            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
-            paddle_version = None  # Default to the latest version
-    except Exception:
-        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
-        paddle_version = None  # Default to the latest version
-
-    # Create the PaddleOCRModelInterface with paddle_version
-    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
+    # Create the PaddleOCRModelInterface
+    paddle_model_interface = PaddleOCRModelInterface()
 
     # Create the NimClient for PaddleOCR
     paddle_client = create_inference_client(

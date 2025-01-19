@@ -20,12 +20,8 @@ class ChartExtractorConfigSchema(BaseModel):
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    cached_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the cached endpoint.
-        Either the gRPC or HTTP service can be empty, but not both.
-
-    deplot_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the deplot endpoint.
+    yolox_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
@@ -50,13 +46,9 @@ class ChartExtractorConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    cached_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    cached_infer_protocol: str = ""
+    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    yolox_infer_protocol: str = ""
 
-    deplot_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    deplot_infer_protocol: str = ""
-
-    ## NOTE: Paddle isn't currently called independently of the cached NIM, but will be in the future.
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     paddle_infer_protocol: str = ""
 
@@ -91,7 +83,7 @@ class ChartExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["cached_endpoints", "deplot_endpoints", "paddle_endpoints"]:
+        for endpoint_name in ["yolox_endpoints", "paddle_endpoints"]:
             grpc_service, http_service = values.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
@@ -122,7 +114,7 @@ class ChartExtractorSchema(BaseModel):
         A flag indicating whether to raise an exception if a failure occurs during chart extraction.
 
     stage_config : Optional[ChartExtractorConfigSchema], default=None
-        Configuration for the chart extraction stage, including cached, deplot, and paddle service endpoints.
+        Configuration for the chart extraction stage, including yolox and paddle service endpoints.
     """
 
     max_queue_size: int = 1

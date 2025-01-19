@@ -14,17 +14,19 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
-from nv_ingest.util.nim.cached import CachedModelInterface
-from nv_ingest.util.nim.deplot import DeplotModelInterface
-from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.image_processing.table_and_chart import join_yolox_and_paddle_output
+from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphic_elements
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
+from nv_ingest.util.nim.yolox import YoloxGraphicElementsModelInterface
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 # Modify the _update_metadata function
-def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: NimClient, trace_info: Dict) -> Dict:
+def _update_metadata(row: pd.Series, yolox_client: NimClient, paddle_client: NimClient, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for chart extraction are met.
 
@@ -33,11 +35,11 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
     row : pd.Series
         A row from the DataFrame containing metadata for the chart extraction.
 
-    cached_client : NimClient
-        The client used to call the cached inference model.
+    yolox_client : NimClient
+        The client used to call the yolox inference model.
 
-    deplot_client : NimClient
-        The client used to call the deplot inference model.
+    paddle_client : NimClient
+        The client used to call the paddle inference model.
 
     trace_info : Dict
         Trace information used for logging or debugging.
@@ -72,23 +74,47 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
 
     # Modify chart metadata with the result from the inference models
     try:
-        data = {"base64_image": base64_image}
+        base64_data = {"base64_image": base64_image}
+        array_data = {"images": [base64_to_numpy(base64_image)]}
 
         # Perform inference using the NimClients
-        deplot_result = deplot_client.infer(
-            data,
-            model_name="deplot",
-            trace_info=trace_info,  # traceable_func arg
+        yolox_result = yolox_client.infer(
+            array_data,
+            model_name="yolox",
             stage_name="chart_data_extraction",  # traceable_func arg
+            trace_info=trace_info,  # traceable_func arg
         )
-        cached_result = cached_client.infer(
-            data,
-            model_name="cached",
+        paddle_result = paddle_client.infer(
+            base64_data,
+            model_name="paddle",
             stage_name="chart_data_extraction",  # traceable_func arg
             trace_info=trace_info,  # traceable_func arg
         )
 
-        chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
+        ###
+        source_name = metadata.get("source_metadata", {}).get("source_name").split("/")[-1]
+        page_number = metadata.get("content_metadata", {}).get("page_number")
+
+        out_path = f"/workspace/data/tmp/{source_name}.{page_number}.yolox.pickle"
+
+        import os
+        import pickle
+
+        if os.path.exists(out_path):
+            with open(out_path, "rb") as f:
+                data = pickle.load(f)
+        else:
+            data = {"data": []}
+
+        data["data"].append({"base64_image": base64_image, "yolox": yolox_result[0], "paddle": paddle_result})
+
+        with open(out_path, "wb") as f:
+            pickle.dump(data, f)
+        ###
+
+        text_predictions, bounding_boxes = paddle_result
+        yolox_elements = join_yolox_and_paddle_output(yolox_result[0], text_predictions, bounding_boxes)
+        chart_content = process_yolox_graphic_elements(yolox_elements)
 
         chart_metadata["table_content"] = chart_content
     except Exception as e:
@@ -99,32 +125,32 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
 
 
 def _create_clients(
-    cached_endpoints: Tuple[str, str],
-    cached_protocol: str,
-    deplot_endpoints: Tuple[str, str],
-    deplot_protocol: str,
+    yolox_endpoints: Tuple[str, str],
+    yolox_protocol: str,
+    paddle_endpoints: Tuple[str, str],
+    paddle_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
-    cached_model_interface = CachedModelInterface()
-    deplot_model_interface = DeplotModelInterface()
+    yolox_model_interface = YoloxGraphicElementsModelInterface()
+    paddle_model_interface = PaddleOCRModelInterface()
 
-    logger.debug(f"Inference protocols: cached={cached_protocol}, deplot={deplot_protocol}")
+    logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")
 
-    cached_client = create_inference_client(
-        endpoints=cached_endpoints,
-        model_interface=cached_model_interface,
+    yolox_client = create_inference_client(
+        endpoints=yolox_endpoints,
+        model_interface=yolox_model_interface,
         auth_token=auth_token,
-        infer_protocol=cached_protocol,
+        infer_protocol=yolox_protocol,
     )
 
-    deplot_client = create_inference_client(
-        endpoints=deplot_endpoints,
-        model_interface=deplot_model_interface,
+    paddle_client = create_inference_client(
+        endpoints=paddle_endpoints,
+        model_interface=paddle_model_interface,
         auth_token=auth_token,
-        infer_protocol=deplot_protocol,
+        infer_protocol=paddle_protocol,
     )
 
-    return cached_client, deplot_client
+    return yolox_client, paddle_client
 
 
 def _extract_chart_data(
@@ -168,11 +194,11 @@ def _extract_chart_data(
         return df, trace_info
 
     stage_config = validated_config.stage_config
-    cached_client, deplot_client = _create_clients(
-        stage_config.cached_endpoints,
-        stage_config.cached_infer_protocol,
-        stage_config.deplot_endpoints,
-        stage_config.deplot_infer_protocol,
+    yolox_client, paddle_client = _create_clients(
+        stage_config.yolox_endpoints,
+        stage_config.yolox_infer_protocol,
+        stage_config.paddle_endpoints,
+        stage_config.paddle_infer_protocol,
         stage_config.auth_token,
     )
 
@@ -182,7 +208,7 @@ def _extract_chart_data(
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(cached_client, deplot_client, trace_info))
+        df["metadata"] = df.apply(_update_metadata, axis=1, args=(yolox_client, paddle_client, trace_info))
 
         return df, {"trace_info": trace_info}
 
@@ -190,8 +216,8 @@ def _extract_chart_data(
         logger.error("Error occurred while extracting chart data.", exc_info=True)
         raise
     finally:
-        cached_client.close()
-        deplot_client.close()
+        yolox_client.close()
+        paddle_client.close()
 
 
 def generate_chart_extractor_stage(
