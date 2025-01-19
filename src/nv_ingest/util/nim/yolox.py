@@ -23,39 +23,58 @@ from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
 
-YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1536
-YOLOX_MAX_HEIGHT = 1536
-YOLOX_NUM_CLASSES = 3
-YOLOX_CONF_THRESHOLD = 0.01
-YOLOX_IOU_THRESHOLD = 0.5
-YOLOX_MIN_SCORE = 0.1
-YOLOX_FINAL_SCORE = 0.48
-YOLOX_NIM_MAX_IMAGE_SIZE = 360_000
+YOLOX_PAGE_MAX_BATCH_SIZE = 8
+YOLOX_PAGE_MAX_WIDTH = 1536
+YOLOX_PAGE_MAX_HEIGHT = 1536
+YOLOX_PAGE_NUM_CLASSES = 3
+YOLOX_PAGE_CONF_THRESHOLD = 0.01
+YOLOX_PAGE_IOU_THRESHOLD = 0.5
+YOLOX_PAGE_MIN_SCORE = 0.1
+YOLOX_PAGE_FINAL_SCORE = 0.48
+YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 360_000
 
-YOLOX_IMAGE_PREPROC_HEIGHT = 1024
-YOLOX_IMAGE_PREPROC_WIDTH = 1024
+YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
+
+YOLOX_PAGE_CLASS_LABELS = [
+    "table",
+    "chart",
+    "title",
+]
 
 
-# Implementing YoloxPageElemenetsModelInterface with required methods
-class YoloxPageElementsModelInterface(ModelInterface):
+# YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
+class YoloxModelInterfaceBase(ModelInterface):
     """
     An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
     """
 
-    def name(
+    def __init__(
         self,
-    ) -> str:
+        image_preproc_width: Optional[int] = None,
+        image_preproc_height: Optional[int] = None,
+        nim_max_image_size: Optional[int] = None,
+        num_classes: Optional[int] = None,
+        conf_threshold: Optional[float] = None,
+        iou_threshold: Optional[float] = None,
+        min_score: Optional[float] = None,
+        final_score: Optional[float] = None,
+        class_labels: Optional[List[str]] = None,
+    ):
         """
-        Returns the name of the Yolox model interface.
-
-        Returns
-        -------
-        str
-            The name of the model interface.
+        Initialize the YOLOX model interface.
+        Parameters
+        ----------
         """
-
-        return "yolox-page-elements"
+        self.image_preproc_width = image_preproc_width
+        self.image_preproc_height = image_preproc_height
+        self.nim_max_image_size = nim_max_image_size
+        self.num_classes = num_classes
+        self.conf_threshold = conf_threshold
+        self.iou_threshold = iou_threshold
+        self.min_score = min_score
+        self.final_score = final_score
+        self.class_labels = class_labels
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -107,8 +126,9 @@ class YoloxPageElementsModelInterface(ModelInterface):
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
             # Our yolox-page-elements model (grPC) expects images to be resized to 1024x1024
+            # Our yolox-graphic-elements model (grPC) expects images to be resized to 768x768
             resized_images = [
-                resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in data["images"]
+                resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
             ]
             # Reorder axes to match model input (batch, channels, height, width)
             input_array = np.einsum("bijk->bkij", resized_images).astype(np.float32)
@@ -129,7 +149,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
                 # Now scale the image if necessary
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
-                    image_b64, max_base64_size=YOLOX_NIM_MAX_IMAGE_SIZE
+                    image_b64, max_base64_size=self.nim_max_image_size
                 )
 
                 if new_size != original_size:
@@ -216,11 +236,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
             A list of annotation dictionaries for each image in the batch.
         """
         original_image_shapes = kwargs.get("original_image_shapes", [])
-        num_classes = kwargs.get("num_classes", YOLOX_NUM_CLASSES)
-        conf_thresh = kwargs.get("conf_thresh", YOLOX_CONF_THRESHOLD)
-        iou_thresh = kwargs.get("iou_thresh", YOLOX_IOU_THRESHOLD)
-        min_score = kwargs.get("min_score", YOLOX_MIN_SCORE)
-        final_thresh = kwargs.get("final_thresh", YOLOX_FINAL_SCORE)
 
         if protocol == "http":
             # For http, the output already has postprocessing applied. Skip to table/chart expansion.
@@ -228,11 +243,64 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
         elif protocol == "grpc":
             # For grpc, apply the same NIM postprocessing.
-            pred = postprocess_model_prediction(output, num_classes, conf_thresh, iou_thresh, class_agnostic=True)
-            results = postprocess_results(pred, original_image_shapes, min_score=min_score)
+            pred = postprocess_model_prediction(
+                output, self.num_classes, self.conf_threshold, self.iou_threshold, class_agnostic=True
+            )
+            results = postprocess_results(
+                pred,
+                original_image_shapes,
+                self.image_preproc_width,
+                self.image_preproc_height,
+                min_score=self.min_score,
+            )
 
+        inference_results = self.postprocess_annotations(results, **kwargs)
+
+        return inference_results
+
+    def postprocess_annotations(self, annotation_dicts: Dict[str, Any], **kwargs) -> Dict[str, Any]:
+        raise NotImplementedError()
+
+
+# Implementing YoloxPageElemenetsModelInterface with required methods
+class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-page-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_PAGE_NUM_CLASSES,
+            conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
+            iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
+            min_score=YOLOX_PAGE_MIN_SCORE,
+            final_score=YOLOX_PAGE_FINAL_SCORE,
+            class_labels=YOLOX_PAGE_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-page-elements"
+
+    def postprocess_annotations(self, annotation_dicts: Dict[str, Any], **kwargs) -> Dict[str, Any]:
         # Table/chart expansion is "business logic" specific to nv-ingest
-        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in results]
+        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         inference_results = []
 
@@ -241,9 +309,9 @@ class YoloxPageElementsModelInterface(ModelInterface):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
             if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
@@ -310,7 +378,7 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
     return output
 
 
-def postprocess_results(results, original_image_shapes, min_score=0.0):
+def postprocess_results(results, original_image_shapes, image_preproc_width, image_preproc_height, min_score=0.0):
     """
     For each item (==image) in results, computes annotations in the form
 
@@ -339,8 +407,8 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
             # ratio is used when image was padded
             ratio = min(
-                YOLOX_IMAGE_PREPROC_WIDTH / original_image_shape[0],
-                YOLOX_IMAGE_PREPROC_HEIGHT / original_image_shape[1],
+                image_preproc_width / original_image_shape[0],
+                image_preproc_height / original_image_shape[1],
             )
             bboxes = result[:, :4] / ratio
 
