@@ -91,27 +91,6 @@ def _update_metadata(row: pd.Series, yolox_client: NimClient, paddle_client: Nim
             trace_info=trace_info,  # traceable_func arg
         )
 
-        ###
-        source_name = metadata.get("source_metadata", {}).get("source_name").split("/")[-1]
-        page_number = metadata.get("content_metadata", {}).get("page_number")
-
-        out_path = f"/workspace/data/tmp/{source_name}.{page_number}.yolox.pickle"
-
-        import os
-        import pickle
-
-        if os.path.exists(out_path):
-            with open(out_path, "rb") as f:
-                data = pickle.load(f)
-        else:
-            data = {"data": []}
-
-        data["data"].append({"base64_image": base64_image, "yolox": yolox_result[0], "paddle": paddle_result})
-
-        with open(out_path, "wb") as f:
-            pickle.dump(data, f)
-        ###
-
         text_predictions, bounding_boxes = paddle_result
         yolox_elements = join_yolox_and_paddle_output(yolox_result[0], text_predictions, bounding_boxes)
         chart_content = process_yolox_graphic_elements(yolox_elements)
