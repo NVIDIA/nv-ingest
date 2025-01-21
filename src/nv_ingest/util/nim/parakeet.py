@@ -1,7 +1,6 @@
 import logging
 import uuid
 
-import requests
 from typing import Any, Dict, Optional
 
 from nv_ingest.util.nim.helpers import ModelInterface
@@ -102,20 +101,7 @@ class ParakeetModelInterface(ModelInterface):
             For any HTTP-related or unexpected errors (e.g., missing keys).
         """
         if protocol == "http":
-            logger.debug("Parsing output from HTTP Parakeet model")
-            try:
-                response.raise_for_status()  # Raise an exception for HTTP errors
-                json_response = response.json()
-            except requests.exceptions.RequestException as e:
-                raise RuntimeError(f"HTTP request failed: {e}")
-            except KeyError as e:
-                raise RuntimeError(f"Missing expected key in response: {e}")
-            except Exception as e:
-                raise RuntimeError(f"An error occurred during inference: {e}")
-
-            return json_response
-        else:
-            raise ValueError("Invalid protocol specified. Must be 'http' for Parakeet.")
+            return response
 
     def process_inference_results(self, output: Any, protocol: str, **kwargs) -> Any:
         """
