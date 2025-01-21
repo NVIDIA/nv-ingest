@@ -460,7 +460,6 @@ def _generate_embeddings(
     embedding_dataframes = []
     content_masks = []
 
-    logger.info(f"Embedding with model: {embedding_model}")
     with ctrl_msg.payload().mutable_dataframe() as mdf:
         if mdf.empty:
             return ctrl_msg
