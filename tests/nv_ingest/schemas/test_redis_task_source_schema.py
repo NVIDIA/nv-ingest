@@ -33,7 +33,7 @@ def test_redis_task_source_schema_custom_values():
     assert schema.broker_client.host == "custom_host", "Custom host value for redis_client should be respected."
     assert schema.broker_client.port == 12345, "Custom port value for redis_client should be respected."
     assert (
-        schema.broker_client.broker_params["use_ssl"] == True
+        schema.broker_client.broker_params["use_ssl"] is True
     ), "Custom use_ssl value for redis_client should be True."
     assert schema.task_queue == "custom_queue", "Custom value for task_queue should be respected."
     assert schema.progress_engines == 10, "Custom value for progress_engines should be respected."
@@ -46,6 +46,6 @@ def test_redis_task_source_schema_invalid_progress_engines(progress_engines):
     """
     with pytest.raises(ValidationError) as excinfo:
         MessageBrokerTaskSourceSchema(progress_engines=progress_engines)
-    assert "ensure this value is greater than or equal to 1" in str(
+    assert "Input should be greater than or equal to 1" in str(
         excinfo.value
     ), "Schema should validate progress_engines to be >= 1."

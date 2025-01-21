@@ -14,6 +14,7 @@ from typing import List
 from typing import Optional
 
 import pandas as pd
+from pydantic import BaseModel
 from morpheus.config import Config
 
 import nv_ingest.extraction_workflows.image as image_helpers
@@ -45,7 +46,8 @@ def decode_and_extract(
     validated_config : Any
         Configuration object that contains `image_config`. Used if the `image` method is selected.
     default : str, optional
-        The default extraction method to use if the specified method in `task_props` is not available (default is "image").
+        The default extraction method to use if the specified method in `task_props` is not available
+        (default is "image").
 
     Returns
     -------
@@ -79,8 +81,6 @@ def decode_and_extract(
         source_id = base64_row["source_id"] if "source_id" in base64_row.index else None
         # Decode the base64 content
         image_bytes = base64.b64decode(base64_content)
-
-        # Load the PDF
         image_stream = io.BytesIO(image_bytes)
 
         # Type of extraction method to use
@@ -138,7 +138,8 @@ def process_image(
     -------
     Tuple[pd.DataFrame, Dict[str, Any]]
         A tuple containing:
-        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata', and 'uuid'.
+        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata',
+          and 'uuid'.
         - A dictionary with trace information collected during processing.
 
     Raises
@@ -149,6 +150,9 @@ def process_image(
     logger.debug("Processing image content")
     if trace_info is None:
         trace_info = {}
+
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
 
     try:
         # Apply the helper function to each row in the 'content' column

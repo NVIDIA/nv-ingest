@@ -2,9 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-
 import datetime
 import os
 import re
@@ -44,11 +41,7 @@ def read_requirements(file_name):
 
 
 # Specify your requirements files
-requirements_files = [
-    "requirements.txt",
-    "util-requirements.txt",
-    "test-requirements.txt",
-]
+requirements_files = []
 
 # Read and combine requirements from all specified files
 combined_requirements = []

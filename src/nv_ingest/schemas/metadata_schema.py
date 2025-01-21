@@ -12,8 +12,7 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pydantic import root_validator
-from pydantic import validator
+from pydantic import field_validator, model_validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.util.converters import datetools
@@ -37,12 +36,14 @@ class AccessLevelEnum(int, Enum):
 
 
 class ContentTypeEnum(str, Enum):
-    TEXT = "text"
-    IMAGE = "image"
-    STRUCTURED = "structured"
-    UNSTRUCTURED = "unstructured"
-    INFO_MSG = "info_message"
+    AUDIO = "audio"
     EMBEDDING = "embedding"
+    IMAGE = "image"
+    INFO_MSG = "info_message"
+    STRUCTURED = "structured"
+    TEXT = "text"
+    UNSTRUCTURED = "unstructured"
+    VIDEO = "video"
 
 
 class StdContentDescEnum(str, Enum):
@@ -194,7 +195,7 @@ class SourceMetadataSchema(BaseModelNoExt):
     partition_id: int = -1
     access_level: Union[AccessLevelEnum, int] = -1
 
-    @validator("date_created", "last_modified")
+    @field_validator("date_created", "last_modified")
     @classmethod
     def validate_fields(cls, field_value):
         datetools.validate_iso8601(field_value)
@@ -264,16 +265,16 @@ class ImageMetadataSchema(BaseModelNoExt):
     width: int = 0
     height: int = 0
 
-    @validator("image_type", pre=True, always=True)
+    @field_validator("image_type")
     def validate_image_type(cls, v):
         if not isinstance(v, (ImageTypeEnum, str)):
             raise ValueError("image_type must be a string or ImageTypeEnum")
         return v
 
-    @validator("width", "height", pre=True, always=True)
+    @field_validator("width", "height")
     def clamp_non_negative(cls, v, field):
         if v < 0:
-            logger.warning(f"{field.name} is negative; clamping to 0. Original value: {v}")
+            logger.warning(f"{field.field_name} is negative; clamping to 0. Original value: {v}")
             return 0
         return v
 
@@ -329,7 +330,8 @@ class MetadataSchema(BaseModelNoExt):
     debug_metadata: Optional[Dict[str, Any]] = None
     raise_on_failure: bool = False
 
-    @root_validator(pre=True)
+    @model_validator(mode="before")
+    @classmethod
     def check_metadata_type(cls, values):
         content_type = values.get("content_metadata", {}).get("type", None)
         if content_type != ContentTypeEnum.TEXT:

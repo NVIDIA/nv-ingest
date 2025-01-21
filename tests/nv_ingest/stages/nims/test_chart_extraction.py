@@ -1,12 +1,12 @@
-import pytest
 from unittest.mock import Mock
 from unittest.mock import patch
 
+import pytest
+import requests
 import pandas as pd
-from unittest.mock import Mock, patch
+
 from nv_ingest.stages.nim.chart_extraction import _update_metadata
 from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
-import requests
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 
@@ -211,7 +211,7 @@ def test_extract_chart_data_successful(sample_dataframe, mock_clients_and_reques
     # Expected content from the combined results
     expected_content = "Combined content: cached_result_content + deplot_result_content"
     assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
-    assert trace_info_out == trace_info
+    assert trace_info_out == {"trace_info": trace_info}
 
     # Verify that the mocked methods were called
     assert mock_create_client.call_count == 2  # deplot and cached clients created

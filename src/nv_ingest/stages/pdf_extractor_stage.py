@@ -13,6 +13,7 @@ from typing import List
 from typing import Optional
 
 import pandas as pd
+from pydantic import BaseModel
 from morpheus.config import Config
 
 from nv_ingest.extraction_workflows import pdf
@@ -44,7 +45,8 @@ def decode_and_extract(
     validated_config : Any
         Configuration object that contains `pdfium_config`. Used if the `pdfium` method is selected.
     default : str, optional
-        The default extraction method to use if the specified method in `task_props` is not available (default is "pdfium").
+        The default extraction method to use if the specified method in `task_props` is not available
+        (default is "pdfium").
 
     Returns
     -------
@@ -121,6 +123,9 @@ def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
     """
     if trace_info is None:
         trace_info = {}
+
+    if isinstance(task_props, BaseModel):
+        task_props = task_props.model_dump()
 
     try:
         # Apply the helper function to each row in the 'content' column

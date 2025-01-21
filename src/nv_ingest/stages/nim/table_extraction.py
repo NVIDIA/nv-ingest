@@ -67,6 +67,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
         (content_metadata.get("type") != "structured")
         or (content_metadata.get("subtype") != "table")
         or (table_metadata is None)
+        or (base64_image in [None, ""])
     ):
         return metadata
 
@@ -83,6 +84,8 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
                 data,
                 model_name="paddle",
                 table_content_format=table_metadata.get("table_content_format"),
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="table_data_extraction",  # traceable_func arg
             )
 
         table_content, table_content_format = paddle_result
@@ -137,18 +140,17 @@ def _extract_table_data(
 
     stage_config = validated_config.stage_config
 
-    paddle_infer_protocol = stage_config.paddle_infer_protocol.lower()
-
     # Obtain paddle_version
     # Assuming that the grpc endpoint is at index 0
     paddle_endpoint = stage_config.paddle_endpoints[1]
     try:
         paddle_version = get_version(paddle_endpoint)
         if not paddle_version:
-            raise Exception("Failed to obtain PaddleOCR version from the endpoint.")
-    except Exception as e:
-        logger.error("Failed to get PaddleOCR version after 30 seconds. Failing the job.", exc_info=True)
-        raise e
+            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
+            paddle_version = None  # Default to the latest version
+    except Exception:
+        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
+        paddle_version = None  # Default to the latest version
 
     # Create the PaddleOCRModelInterface with paddle_version
     paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
@@ -165,14 +167,13 @@ def _extract_table_data(
         # Apply the _update_metadata function to each row in the DataFrame
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
 
-        return df, trace_info
+        return df, {"trace_info": trace_info}
 
-    except Exception as e:
+    except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
-        if isinstance(paddle_client, NimClient):
-            paddle_client.close()
+        paddle_client.close()
 
 
 def generate_table_extractor_stage(
@@ -213,6 +214,7 @@ def generate_table_extractor_stage(
         from PDF content.
     """
 
+    print(f"TableExtractorSchema stage_config: {stage_config}")
     validated_config = TableExtractorSchema(**stage_config)
     _wrapped_process_fn = functools.partial(_extract_table_data, validated_config=validated_config)
 

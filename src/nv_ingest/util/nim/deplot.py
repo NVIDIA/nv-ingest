@@ -133,7 +133,7 @@ class DeplotModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def process_inference_results(self, output: Any, **kwargs) -> Any:
+    def process_inference_results(self, output: Any, protocol: str, **kwargs) -> Any:
         """
         Process inference results for the Deplot model.
 

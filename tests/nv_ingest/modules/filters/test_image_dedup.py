@@ -56,7 +56,7 @@ def valid_image_dedup_payload(content, width=1, height=1):
     metadata = valid_image_metadata(content, width, height)
 
     unified_metadata.update(metadata)
-    validated_unified_metadata = validate_metadata(unified_metadata).dict()
+    validated_unified_metadata = validate_metadata(unified_metadata).model_dump()
 
     return [ContentTypeEnum.IMAGE, validated_unified_metadata]
 
@@ -91,7 +91,7 @@ def test_apply_dedup(should_filter, expected0, expected1, expected2):
 
     payload_list = []
     for _ in range(3):
-        payload_list.append(valid_image_dedup_payload(f"test", 1, 1))
+        payload_list.append(valid_image_dedup_payload("test", 1, 1))
 
     extracted_df = pd.DataFrame(payload_list, columns=["document_type", "metadata"])
     extracted_gdf = cudf.from_pandas(extracted_df)

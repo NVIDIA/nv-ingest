@@ -5,7 +5,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 from nv_ingest.util.logging.configuration import LogLevel
 
@@ -13,15 +13,13 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedExtractionsSchema(BaseModel):
-    api_key: str
-    embedding_nim_endpoint: str
-    embedding_model: str = "nvidia/nv-embedqa-e5-v5"
-    encoding_format: str = "float"
-    input_type: str = "passage"
-    truncate: str = "END"
+    api_key: str = "api_key"
     batch_size: int = 100
+    embedding_model: str = "nvidia/nv-embedqa-e5-v5"
+    embedding_nim_endpoint: str = "http://embedding:8000/v1"
+    encoding_format: str = "float"
     httpx_log_level: LogLevel = LogLevel.WARNING
+    input_type: str = "passage"
     raise_on_failure: bool = False
-
-    class Config:
-        extra = "forbid"
+    truncate: str = "END"
+    model_config = ConfigDict(extra="forbid")

@@ -19,6 +19,7 @@ from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
+from pydantic import BaseModel
 
 import cudf
 
@@ -34,7 +35,8 @@ logger = logging.getLogger(__name__)
 MODULE_NAME = "image_storage"
 MODULE_NAMESPACE = "nv_ingest"
 
-# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema on startup.
+# TODO: Move these into microservice_entrypoint.py to populate the stage and validate them using the pydantic schema
+# on startup.
 _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_READ_ADDRESS = os.environ.get("MINIO_PUBLIC_ADDRESS", "http://minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
@@ -158,6 +160,9 @@ def _storage_images(builder: mrc.Builder):
     def on_data(ctrl_msg: ControlMessage):
         try:
             task_props = ctrl_msg.remove_task("store")
+            if isinstance(task_props, BaseModel):
+                task_props = task_props.model_dump()
+
             store_structured = task_props.get("structured", True)
             store_images = task_props.get("images", False)
 

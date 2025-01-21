@@ -69,8 +69,6 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
 
             # Validate and extract common fields
             queue_name = request_data.get("queue_name")
-            message = request_data.get("message")
-            timeout = request_data.get("timeout", 100)
 
             # Initialize the queue and its lock if necessary
             if queue_name:
@@ -350,7 +348,7 @@ class SimpleMessageBrokerHandler(socketserver.BaseRequestHandler):
         """
 
         try:
-            response_json = response.json().encode("utf-8")
+            response_json = response.model_dump_json().encode("utf-8")
             total_length = len(response_json)
             self.request.sendall(total_length.to_bytes(8, "big"))
             self.request.sendall(response_json)
