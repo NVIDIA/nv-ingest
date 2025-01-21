@@ -11,12 +11,14 @@ DOC_TO_CONTENT_MAP = {
     DocumentTypeEnum.docx: ContentTypeEnum.STRUCTURED,
     DocumentTypeEnum.html: ContentTypeEnum.STRUCTURED,
     DocumentTypeEnum.jpeg: ContentTypeEnum.IMAGE,
+    DocumentTypeEnum.mp3: ContentTypeEnum.AUDIO,
     DocumentTypeEnum.pdf: ContentTypeEnum.STRUCTURED,
     DocumentTypeEnum.png: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.pptx: ContentTypeEnum.STRUCTURED,
     DocumentTypeEnum.svg: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.tiff: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.txt: ContentTypeEnum.TEXT,
+    DocumentTypeEnum.wav: ContentTypeEnum.AUDIO,
 }
 
 

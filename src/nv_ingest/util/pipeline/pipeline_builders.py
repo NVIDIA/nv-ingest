@@ -30,9 +30,8 @@ def setup_ingestion_pipeline(
     ########################################################################################################
     pdf_extractor_stage = add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     image_extractor_stage = add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
-    docx_extractor_stage = add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count)
-    pptx_extractor_stage = add_pptx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count)
-    ## audio extraction
+    docx_extractor_stage = add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    pptx_extractor_stage = add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     audio_extractor_stage = add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     ########################################################################################################
 
@@ -80,7 +79,6 @@ def setup_ingestion_pipeline(
     pipe.add_edge(docx_extractor_stage, pptx_extractor_stage)
     pipe.add_edge(pptx_extractor_stage, audio_extractor_stage)
     pipe.add_edge(audio_extractor_stage, image_dedup_stage)
-
     pipe.add_edge(image_dedup_stage, image_filter_stage)
     pipe.add_edge(image_filter_stage, table_extraction_stage)
     pipe.add_edge(table_extraction_stage, chart_extraction_stage)

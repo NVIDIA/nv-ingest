@@ -75,7 +75,7 @@ class ModelInterface:
         """
         raise NotImplementedError("Subclasses should implement this method")
 
-    def process_inference_results(self, output_array, **kwargs):
+    def process_inference_results(self, output_array, protocol: str, **kwargs):
         """
         Process the inference results from the model.
 
@@ -206,7 +206,7 @@ class NimClient:
             response, protocol=self.protocol, data=prepared_data, **kwargs
         )
         results = self.model_interface.process_inference_results(
-            parsed_output, original_image_shapes=data.get("original_image_shapes"), **kwargs
+            parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
         )
         return results
 
@@ -603,10 +603,14 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
 
     Parameters
     ----------
-    client : grpcclient.InferenceServerClient or dict
+    client :
         The inference client, which is an HTTP client.
-    audio_source : str
+    audio_content: str
         The audio source to transcribe.
+    audio_id: str
+        The unique identifier for the audio content.
+    trace_info: dict
+        Trace information for debugging or logging.
 
     Returns
     -------
@@ -620,16 +624,16 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
     """
 
     try:
-        url = client["endpoint_url"]
-        headers = client["headers"]
+        data = {"base64_audio": audio_content, "audio_id": audio_id}
 
-        payload = {"audio_content": audio_content, "audio_id": audio_id}
-        response = requests.post(url, json=payload, headers=headers)            
-        
-        response.raise_for_status()  # Raise an exception for HTTP errors
+        parakeet_result = client.infer(
+            data,
+            model_name="parakeet",
+            trace_info=trace_info,  # traceable_func arg
+            stage_name="audio_extraction",
+        )
 
-        # Parse the JSON response
-        json_response = response.json()
+        return parakeet_result
 
     except requests.exceptions.RequestException as e:
         raise RuntimeError(f"HTTP request failed: {e}")
@@ -637,10 +641,3 @@ def call_audio_inference_model(client, audio_content: str, audio_id: str, trace_
         raise RuntimeError(f"Missing expected key in response: {e}")
     except Exception as e:
         raise RuntimeError(f"An error occurred during inference: {e}")
-
-    return json_response
-
-
-
-
-

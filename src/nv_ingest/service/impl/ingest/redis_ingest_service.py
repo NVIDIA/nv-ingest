@@ -14,10 +14,12 @@ import os
 from json import JSONDecodeError
 from typing import Any
 
+from typing import List
 from nv_ingest.schemas import validate_ingest_job
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+from nv_ingest.schemas.processing_job_schema import ProcessingJob
 
 logger = logging.getLogger("uvicorn")
 
@@ -46,6 +48,8 @@ class RedisIngestService(IngestServiceMeta):
         self._redis_hostname = redis_hostname
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
+        self._cache_prefix = "processing_cache:"
+        self._bulk_vdb_cache_prefix = "vdb_bulk_upload_cache:"
 
         self._ingest_client = RedisClient(
             host=self._redis_hostname, port=self._redis_port, max_pool_size=self._concurrency_level
@@ -89,3 +93,24 @@ class RedisIngestService(IngestServiceMeta):
             raise TimeoutError()
 
         return message
+
+    async def set_processing_cache(self, job_id: str, jobs_data: List[ProcessingJob]) -> None:
+        """Store processing jobs data using simple key-value"""
+        cache_key = f"{self._cache_prefix}{job_id}"
+        try:
+            self._ingest_client.get_client().set(cache_key, json.dumps([job.dict() for job in jobs_data]), ex=3600)
+        except Exception as err:
+            logger.error(f"Error setting cache for {cache_key}: {err}")
+            raise
+
+    async def get_processing_cache(self, job_id: str) -> List[ProcessingJob]:
+        """Retrieve processing jobs data using simple key-value"""
+        cache_key = f"{self._cache_prefix}{job_id}"
+        try:
+            data = self._ingest_client.get_client().get(cache_key)
+            if data is None:
+                return []
+            return [ProcessingJob(**job) for job in json.loads(data)]
+        except Exception as err:
+            logger.error(f"Error getting cache for {cache_key}: {err}")
+            raise

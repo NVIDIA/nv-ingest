@@ -7,23 +7,22 @@ import logging
 from typing import Optional
 from typing import Tuple
 
-from pydantic import BaseModel
-from pydantic import root_validator
+from pydantic import model_validator, ConfigDict, BaseModel
 
 logger = logging.getLogger(__name__)
 
 
-class AudioConfigSchema(BaseModel):
+class DocxConfigSchema(BaseModel):
     """
-    Configuration schema for audio extraction endpoints and options.
+    Configuration schema for docx extraction endpoints and options.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    audio_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the audio_retriever endpoint.
+    yolox_endpoints : Tuple[str, str]
+        A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -43,10 +42,12 @@ class AudioConfigSchema(BaseModel):
     """
 
     auth_token: Optional[str] = None
-    audio_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    audio_infer_protocol: Optional[str] = None
 
-    @root_validator(pre=True)
+    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    yolox_infer_protocol: str = ""
+
+    @model_validator(mode="before")
+    @classmethod
     def validate_endpoints(cls, values):
         """
         Validates the gRPC and HTTP services for all endpoints.
@@ -73,32 +74,30 @@ class AudioConfigSchema(BaseModel):
                 return None
             return service
 
-        endpoint_name = "audio_endpoints"
-        grpc_service, http_service = values.get(endpoint_name)
-        grpc_service = clean_service(grpc_service)
-        http_service = clean_service(http_service)
+        for model_name in ["yolox"]:
+            endpoint_name = f"{model_name}_endpoints"
+            grpc_service, http_service = values.get(endpoint_name)
+            grpc_service = clean_service(grpc_service)
+            http_service = clean_service(http_service)
 
-        if not grpc_service and not http_service:
-            raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
+            if not grpc_service and not http_service:
+                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
 
-        values[endpoint_name] = (grpc_service, http_service)
+            values[endpoint_name] = (grpc_service, http_service)
 
-        protocol_name = "audio_infer_protocol"
-        protocol_value = values.get(protocol_name)
-
-        if not protocol_value:
-            protocol_value = "http" if http_service else "grpc" if grpc_service else ""
-
-        protocol_value = protocol_value.lower()
-        values[protocol_name] = protocol_value
+            protocol_name = f"{model_name}_infer_protocol"
+            protocol_value = values.get(protocol_name)
+            if not protocol_value:
+                protocol_value = "http" if http_service else "grpc" if grpc_service else ""
+            protocol_value = protocol_value.lower()
+            values[protocol_name] = protocol_value
 
         return values
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
 
 
-class AudioExtractorSchema(BaseModel):
+class DocxExtractorSchema(BaseModel):
     """
     Configuration schema for the PDF extractor settings.
 
@@ -113,15 +112,13 @@ class AudioExtractorSchema(BaseModel):
     raise_on_failure : bool, default=False
         A flag indicating whether to raise an exception on processing failure.
 
-    audio_extraction_config: Optional[AudioConfigSchema], default=None
-        Configuration schema for the audio extraction stage.
+    image_extraction_config: Optional[ImageConfigSchema], default=None
+        Configuration schema for the image extraction stage.
     """
 
     max_queue_size: int = 1
     n_workers: int = 16
     raise_on_failure: bool = False
 
-    audio_extraction_config: Optional[AudioConfigSchema] = None
-
-    class Config:
-        extra = "forbid"
+    docx_extraction_config: Optional[DocxConfigSchema] = None
+    model_config = ConfigDict(extra="forbid")

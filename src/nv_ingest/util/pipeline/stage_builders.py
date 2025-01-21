@@ -274,16 +274,28 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
             extractor_config=image_extractor_config,
             pe_count=8,
             task="extract",
-            task_desc="docx_content_extractor",
+            task_desc="image_content_extractor",
         )
     )
     return image_extractor_stage
 
 
-def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
+def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    docx_extractor_config = ingest_config.get(
+        "docx_extraction_module",
+        {
+            "docx_extraction_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
+                "auth_token": yolox_auth,
+            }
+        },
+    )
     docx_extractor_stage = pipe.add_stage(
         generate_docx_extractor_stage(
             morpheus_pipeline_config,
+            extractor_config=docx_extractor_config,
             pe_count=1,
             task="extract",
             task_desc="docx_content_extractor",
@@ -292,10 +304,22 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
     return docx_extractor_stage
 
 
-def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, default_cpu_count):
+def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    pptx_extractor_config = ingest_config.get(
+        "pptx_extraction_module",
+        {
+            "pptx_extraction_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
+                "auth_token": yolox_auth,
+            }
+        },
+    )
     pptx_extractor_stage = pipe.add_stage(
         generate_pptx_extractor_stage(
             morpheus_pipeline_config,
+            extractor_config=pptx_extractor_config,
             pe_count=1,
             task="extract",
             task_desc="pptx_content_extractor",
@@ -332,17 +356,20 @@ def get_audio_retrieval_service(env_var_prefix):
 
     return grpc_endpoint, http_endpoint, auth_token, infer_protocol
 
+
 def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
-    audio_extractor_config = ingest_config.get("audio_extraction_module",
-                                               {
-                                                   "audio_extraction_config": {
-                                                       "audio_endpoints": (audio_grpc, audio_http),
-                                                       "audio_infer_protocol": audio_infer_protocol,
-                                                       "auth_token": audio_auth,
-                                                       # All auth tokens are the same for the moment
-                                                   }
-                                               })
+    audio_extractor_config = ingest_config.get(
+        "audio_extraction_module",
+        {
+            "audio_extraction_config": {
+                "audio_endpoints": (audio_grpc, audio_http),
+                "audio_infer_protocol": audio_infer_protocol,
+                "auth_token": audio_auth,
+                # All auth tokens are the same for the moment
+            }
+        },
+    )
     audio_extractor_stage = pipe.add_stage(
         generate_audio_extractor_stage(
             morpheus_pipeline_config,

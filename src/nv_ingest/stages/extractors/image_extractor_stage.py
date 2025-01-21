@@ -81,8 +81,6 @@ def decode_and_extract(
         source_id = base64_row["source_id"] if "source_id" in base64_row.index else None
         # Decode the base64 content
         image_bytes = base64.b64decode(base64_content)
-
-        # Load the PDF
         image_stream = io.BytesIO(image_bytes)
 
         # Type of extraction method to use
