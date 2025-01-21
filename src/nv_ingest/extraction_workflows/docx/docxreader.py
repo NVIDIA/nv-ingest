@@ -46,8 +46,8 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from build.lib.nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.extraction_workflows.image.image_handlers import extract_tables_and_charts_from_images
+from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
