@@ -104,18 +104,22 @@ async def _make_async_request(
         response["embedding"] = resp.data
         response["info_msg"] = None
 
-    except Exception as e:
+    except Exception as err:
         info_msg = {
             "task": TaskTypeEnum.EMBED.value,
             "status": StatusEnum.ERROR.value,
-            "message": f"Embedding error: {e}",
+            "message": f"Embedding error: {err}",
             "filter": filter_errors,
         }
 
         validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
+        # Populate the response with the error info for logging/inspection
         response["embedding"] = [None] * len(prompts)
         response["info_msg"] = validated_info_msg
+
+        # Raise an exception so that errors do not remain silent
+        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
 
     return response
 
@@ -456,6 +460,7 @@ def _generate_embeddings(
     embedding_dataframes = []
     content_masks = []
 
+    logger.info(f"Embedding with model: {embedding_model}")
     with ctrl_msg.payload().mutable_dataframe() as mdf:
         if mdf.empty:
             return ctrl_msg
