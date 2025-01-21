@@ -223,7 +223,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
             batch_results = response.get("data", [])
             for detections in batch_results:
-                new_bounding_boxes = {"table": [], "chart": [], "title": []}
+                new_bounding_boxes = {label: [] for label in self.class_labels}
 
                 bounding_boxes = detections.get("bounding_boxes", [])
                 for obj_type, bboxes in bounding_boxes.items():
