@@ -4,7 +4,7 @@
 
 import logging
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
@@ -22,7 +22,7 @@ from nv_ingest.schemas.nemo_doc_splitter_schema import DocumentSplitterSchema
 from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
 from nv_ingest.schemas.otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
-from nv_ingest.schemas.pptx_extractor_schema import PPTXExctractorSchema
+from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 
 logger = logging.getLogger(__name__)
@@ -42,11 +42,9 @@ class PipelineConfigSchema(BaseModel):
     otel_meter_module: OpenTelemetryMeterSchema = OpenTelemetryMeterSchema()
     otel_tracer_module: OpenTelemetryTracerSchema = OpenTelemetryTracerSchema()
     pdf_extractor_module: PDFExtractorSchema = PDFExtractorSchema()
-    pptx_extractor_module: PPTXExctractorSchema = PPTXExctractorSchema()
+    pptx_extractor_module: PPTXExtractorSchema = PPTXExtractorSchema()
     redis_task_sink: MessageBrokerTaskSinkSchema = MessageBrokerTaskSinkSchema()
     redis_task_source: MessageBrokerTaskSourceSchema = MessageBrokerTaskSourceSchema()
     table_extractor_module: TableExtractorSchema = TableExtractorSchema()
     vdb_task_sink: VdbTaskSinkSchema = VdbTaskSinkSchema()
-
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")

@@ -216,3 +216,12 @@ helm/charts/*
 
 # Ignore output from common examples
 processed_docs
+
+# Ignore devcontainer volumes
+.volumes
+
+# Ignore conda build output
+conda/output_conda_channel
+
+# Ignore generate docs site
+docs/site

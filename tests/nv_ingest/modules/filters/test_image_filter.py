@@ -71,7 +71,7 @@ def valid_image_filter_payload(content_type, width=1, height=1):
         metadata = valid_text_metadata()
 
     unified_metadata.update(metadata)
-    validated_unified_metadata = validate_metadata(unified_metadata).dict()
+    validated_unified_metadata = validate_metadata(unified_metadata).model_dump()
 
     return [content_type, validated_unified_metadata]
 

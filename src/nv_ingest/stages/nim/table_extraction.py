@@ -67,6 +67,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
         (content_metadata.get("type") != "structured")
         or (content_metadata.get("subtype") != "table")
         or (table_metadata is None)
+        or (base64_image in [None, ""])
     ):
         return metadata
 
@@ -172,8 +173,7 @@ def _extract_table_data(
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
-        if isinstance(paddle_client, NimClient):
-            paddle_client.close()
+        paddle_client.close()
 
 
 def generate_table_extractor_stage(
@@ -214,6 +214,7 @@ def generate_table_extractor_stage(
         from PDF content.
     """
 
+    print(f"TableExtractorSchema stage_config: {stage_config}")
     validated_config = TableExtractorSchema(**stage_config)
     _wrapped_process_fn = functools.partial(_extract_table_data, validated_config=validated_config)
 

@@ -10,7 +10,7 @@ import logging
 from typing import Dict
 from typing import Optional
 
-from pydantic import BaseModel
+from pydantic import ConfigDict, BaseModel
 
 from .task_base import Task
 
@@ -21,9 +21,10 @@ class CaptionTaskSchema(BaseModel):
     api_key: Optional[str] = None
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
+    model_name: Optional[str] = None
 
-    class Config:
-        extra = "forbid"
+    model_config = ConfigDict(extra="forbid")
+    model_config["protected_namespaces"] = ()
 
 
 class CaptionTask(Task):
@@ -32,12 +33,14 @@ class CaptionTask(Task):
         api_key: str = None,
         endpoint_url: str = None,
         prompt: str = None,
+        model_name: str = None,
     ) -> None:
         super().__init__()
 
         self._api_key = api_key
         self._endpoint_url = endpoint_url
         self._prompt = prompt
+        self._model_name = model_name
 
     def __str__(self) -> str:
         """
@@ -52,6 +55,8 @@ class CaptionTask(Task):
             info += f"  endpoint_url: {self._endpoint_url}\n"
         if self._prompt:
             info += f"  prompt: {self._prompt}\n"
+        if self._model_name:
+            info += f"  model_name: {self._model_name}\n"
 
         return info
 
@@ -69,5 +74,8 @@ class CaptionTask(Task):
 
         if self._prompt:
             task_properties["prompt"] = self._prompt
+
+        if self._model_name:
+            task_properties["model_name"] = self._model_name
 
         return {"type": "caption", "task_properties": task_properties}

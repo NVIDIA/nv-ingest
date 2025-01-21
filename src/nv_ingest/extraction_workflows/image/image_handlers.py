@@ -27,11 +27,12 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
+from math import log
 from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
-from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
+from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
@@ -107,79 +108,6 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     return image_array
 
 
-# TODO(Devin): Move to common file
-def process_inference_results(
-    output_array: np.ndarray,
-    original_image_shapes: List[Tuple[int, int]],
-    num_classes: int,
-    conf_thresh: float,
-    iou_thresh: float,
-    min_score: float,
-    final_thresh: float,
-):
-    """
-    Process the model output to generate detection results and expand bounding boxes.
-
-    Parameters
-    ----------
-    output_array : np.ndarray
-        The raw output from the model inference.
-    original_image_shapes : List[Tuple[int, int]]
-        The shapes of the original images before resizing, used for scaling bounding boxes.
-    num_classes : int
-        The number of classes the model can detect.
-    conf_thresh : float
-        The confidence threshold for detecting objects.
-    iou_thresh : float
-        The Intersection Over Union (IoU) threshold for non-maximum suppression.
-    min_score : float
-        The minimum score for keeping a detection.
-    final_thresh: float
-        Threshold for keeping a bounding box applied after postprocessing.
-
-
-    Returns
-    -------
-    List[dict]
-        A list of dictionaries, each containing processed detection results including expanded bounding boxes.
-
-    Notes
-    -----
-    This function applies non-maximum suppression to the model's output and scales the bounding boxes back to the
-    original image size.
-
-    Examples
-    --------
-    >>> output_array = np.random.rand(2, 100, 85)
-    >>> original_image_shapes = [(1536, 1536), (1536, 1536)]
-    >>> results = process_inference_results(output_array, original_image_shapes, 80, 0.5, 0.5, 0.1)
-    >>> len(results)
-    2
-    """
-    pred = yolox_utils.postprocess_model_prediction(
-        output_array, num_classes, conf_thresh, iou_thresh, class_agnostic=True
-    )
-    results = yolox_utils.postprocess_results(pred, original_image_shapes, min_score=min_score)
-    logger.debug(f"Number of results: {len(results)}")
-    logger.debug(f"Results: {results}")
-
-    annotation_dicts = [yolox_utils.expand_chart_bboxes(annotation_dict) for annotation_dict in results]
-    inference_results = []
-
-    # Filter out bounding boxes below the final threshold
-    for annotation_dict in annotation_dicts:
-        new_dict = {}
-        if "table" in annotation_dict:
-            new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
-        if "chart" in annotation_dict:
-            new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
-        if "title" in annotation_dict:
-            new_dict["title"] = annotation_dict["title"]
-        inference_results.append(new_dict)
-
-    return inference_results
-
-
 def extract_table_and_chart_images(
     annotation_dict: Dict[str, List[List[float]]],
     original_image: np.ndarray,
@@ -246,79 +174,85 @@ def extract_table_and_chart_images(
             tables_and_charts.append((page_idx, table_data))
 
 
-def extract_tables_and_charts_from_image(
-    image: np.ndarray,
-    config: ImageExtractorSchema,
-    num_classes: int = YOLOX_NUM_CLASSES,
-    conf_thresh: float = YOLOX_CONF_THRESHOLD,
-    iou_thresh: float = YOLOX_IOU_THRESHOLD,
-    min_score: float = YOLOX_MIN_SCORE,
-    final_thresh: float = YOLOX_FINAL_SCORE,
+def extract_tables_and_charts_from_images(
+    images: List[np.ndarray],
+    config: ImageConfigSchema,
     trace_info: Optional[List] = None,
-) -> List[CroppedImageWithContent]:
+) -> List[Tuple[int, object]]:
     """
-    Extract tables and charts from a single image using an ensemble of image-based models.
-
-    This function processes a single image to detect and extract tables and charts.
-    It uses a sequence of models hosted on different inference servers to achieve this.
+    Detect and extract tables/charts from a list of NumPy images using YOLOX.
 
     Parameters
     ----------
-    image : np.ndarray
-        A preprocessed image array for table and chart detection.
-    config : ImageExtractorSchema
-        Configuration for the inference client, including endpoint URLs and authentication.
-    num_classes : int, optional
-        The number of classes the model is trained to detect (default is 3).
-    conf_thresh : float, optional
-        The confidence threshold for detection (default is 0.01).
-    iou_thresh : float, optional
-        The Intersection Over Union (IoU) threshold for non-maximum suppression (default is 0.5).
-    min_score : float, optional
-        The minimum score threshold for considering a detection valid (default is 0.1).
-    final_thresh: float, optional
-        Threshold for keeping a bounding box applied after postprocessing (default is 0.48).
+    images : List[np.ndarray]
+        List of images in NumPy array format.
+    config : PDFiumConfigSchema
+        Configuration object containing YOLOX endpoints, auth token, etc.
     trace_info : Optional[List], optional
-        Tracing information for logging or debugging purposes.
+        Optional tracing data for debugging/performance profiling.
 
     Returns
     -------
-    List[CroppedImageWithContent]
-        A list of `CroppedImageWithContent` objects representing detected tables or charts,
-        each containing metadata about the detected region.
+    List[Tuple[int, object]]
+        A list of (image_index, CroppedImageWithContent)
+        representing extracted table/chart data from each image.
     """
     tables_and_charts = []
-
     yolox_client = None
+
     try:
-        model_interface = yolox_utils.YoloxModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
-            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+            config.yolox_endpoints,
+            model_interface,
+            config.auth_token,
+            config.yolox_infer_protocol,
         )
 
-        data = {"images": [image]}
+        max_batch_size = YOLOX_MAX_BATCH_SIZE
+        batches = []
+        i = 0
+        while i < len(images):
+            batch_size = min(2 ** int(log(len(images) - i, 2)), max_batch_size)
+            batches.append(images[i : i + batch_size])  # noqa: E203
+            i += batch_size
 
-        inference_results = yolox_client.infer(
-            data,
-            model_name="yolox",
-            num_classes=YOLOX_NUM_CLASSES,
-            conf_thresh=YOLOX_CONF_THRESHOLD,
-            iou_thresh=YOLOX_IOU_THRESHOLD,
-            min_score=YOLOX_MIN_SCORE,
-            final_thresh=YOLOX_FINAL_SCORE,
-        )
+        img_index = 0
+        for batch in batches:
+            data = {"images": batch}
 
-        extract_table_and_chart_images(
-            inference_results,
-            image,
-            page_idx=0,  # Single image treated as one page
-            tables_and_charts=tables_and_charts,
-        )
+            # NimClient inference
+            inference_results = yolox_client.infer(
+                data,
+                model_name="yolox",
+                num_classes=YOLOX_NUM_CLASSES,
+                conf_thresh=YOLOX_CONF_THRESHOLD,
+                iou_thresh=YOLOX_IOU_THRESHOLD,
+                min_score=YOLOX_MIN_SCORE,
+                final_thresh=YOLOX_FINAL_SCORE,
+                trace_info=trace_info,  # traceable_func arg
+                stage_name="pdf_content_extractor",  # traceable_func arg
+            )
+
+            # 5) Extract table/chart info from each image's annotations
+            for annotation_dict, original_image in zip(inference_results, batch):
+                extract_table_and_chart_images(
+                    annotation_dict,
+                    original_image,
+                    img_index,
+                    tables_and_charts,
+                )
+                img_index += 1
+
+    except TimeoutError:
+        logger.error("Timeout error during table/chart extraction.")
+        raise
 
     except Exception as e:
-        logger.error(f"Error during table/chart extraction from image: {str(e)}")
+        logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
         raise e
+
     finally:
         if yolox_client:
             yolox_client.close()
@@ -355,6 +289,8 @@ def image_data_extractor(
         Specifies whether to extract tables.
     extract_charts : bool
         Specifies whether to extract charts.
+    trace_info : dict, optional
+        Tracing information for logging or debugging purposes.
     **kwargs
         Additional extraction parameters.
 
@@ -425,13 +361,13 @@ def image_data_extractor(
     # Table and chart extraction
     if extract_tables or extract_charts:
         try:
-            tables_and_charts = extract_tables_and_charts_from_image(
-                image_array,
+            tables_and_charts = extract_tables_and_charts_from_images(
+                [image_array],
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
             logger.debug("Extracted table/chart data from image")
-            for _, table_chart_data in tables_and_charts:
+            for _, table_chart_data in tables_and_charts[0]:
                 extracted_data.append(
                     construct_table_and_chart_metadata(
                         table_chart_data,
@@ -443,6 +379,7 @@ def image_data_extractor(
                 )
         except Exception as e:
             logger.error(f"Error extracting tables/charts from image: {e}")
+            raise
 
     logger.debug(f"Extracted {len(extracted_data)} items from the image.")
 
