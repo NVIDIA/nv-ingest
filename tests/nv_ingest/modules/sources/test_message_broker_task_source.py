@@ -52,7 +52,7 @@ def job_payload():
                         "params": {},
                     },
                 },
-                {"type": "embed", "task_properties": {"text": True, "tables": True}},
+                {"type": "embed", "task_properties": {}},
             ],
         }
     )

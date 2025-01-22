@@ -4,6 +4,7 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import logging
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import MagicMock
@@ -24,7 +25,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
-from nv_ingest_client.primitives.tasks import VdbUploadTask
+from nv_ingest_client.util.milvus import MilvusOperator
 
 MODULE_UNDER_TEST = "nv_ingest_client.client.interface"
 
@@ -72,13 +73,13 @@ def test_embed_task_no_args(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], EmbedTask)
 
 
-def test_embed_task_some_args(ingestor):
-    ingestor.embed(text=False, tables=False)
+def test_embed_task_some_args(ingestor, caplog):
+    # `text` and `table` arguments were deprecated before GA.
+    with caplog.at_level(logging.WARNING):
+        ingestor.embed(text=False, tables=False)
 
-    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
-    assert isinstance(task, EmbedTask)
-    assert task._text is False
-    assert task._tables is False
+    assert "'text' parameter is deprecated" in caplog.records[0].message
+    assert "'tables' parameter is deprecated" in caplog.records[1].message
 
 
 def test_extract_task_no_args(ingestor):
@@ -193,15 +194,13 @@ def test_store_task_some_args_extra_param(ingestor):
 def test_vdb_upload_task_no_args(ingestor):
     ingestor.vdb_upload()
 
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], VdbUploadTask)
+    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
 
 
 def test_vdb_upload_task_some_args(ingestor):
     ingestor.vdb_upload(filter_errors=True)
 
-    task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
-    assert isinstance(task, VdbUploadTask)
-    assert task._filter_errors is True
+    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
 
 
 def test_caption_task_no_args(ingestor):
@@ -228,8 +227,8 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[8], VdbUploadTask)
-    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 9
+    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 8
 
 
 def test_ingest(ingestor, mock_client):
