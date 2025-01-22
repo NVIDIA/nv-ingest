@@ -45,6 +45,7 @@ class PDFiumConfigSchema(BaseModel):
 
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
+    page_batch_size: int = 1
 
     @model_validator(mode="before")
     @classmethod

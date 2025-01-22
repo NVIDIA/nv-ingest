@@ -186,8 +186,99 @@ def extract_table_and_chart_images(
             tables_and_charts.append((page_idx, table_data))
 
 
-# Define a helper function to use unstructured-io to extract text from a base64
-# encoded bytestream PDF
+def _extract_page_text(page) -> str:
+    """
+    Always extract text from the given page and return it as a raw string.
+    The caller decides whether to use per-page or doc-level logic.
+    """
+    textpage = page.get_textpage()
+    return textpage.get_text_bounded()
+
+
+def _extract_page_images(
+    page,
+    page_idx: int,
+    page_width: float,
+    page_height: float,
+    page_count: int,
+    source_metadata: dict,
+    base_unified_metadata: dict,
+) -> list:
+    """
+    Always extract images from the given page and return a list of image metadata items.
+    The caller decides whether to call this based on a flag.
+    """
+    extracted_images = []
+    for obj in page.get_objects():
+        obj_type = PDFIUM_PAGEOBJ_MAPPING.get(obj.type, "UNKNOWN")
+        if obj_type == "IMAGE":
+            try:
+                image_numpy = pdfium_try_get_bitmap_as_numpy(obj)
+                image_base64 = numpy_to_base64(image_numpy)
+                image_bbox = obj.get_pos()
+                image_size = obj.get_size()
+
+                image_data = Base64Image(
+                    image=image_base64,
+                    bbox=image_bbox,
+                    width=image_size[0],
+                    height=image_size[1],
+                    max_width=page_width,
+                    max_height=page_height,
+                )
+
+                image_meta = construct_image_metadata_from_pdf_image(
+                    image_data,
+                    page_idx,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                )
+                extracted_images.append(image_meta)
+            except Exception as e:
+                logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
+                # continue extracting other images
+
+    return extracted_images
+
+
+def _extract_tables_and_charts(
+    pages: list,
+    pdfium_config: dict,
+    page_count: int,
+    source_metadata: dict,
+    base_unified_metadata: dict,
+    paddle_output_format,
+    trace_info=None,
+) -> list:
+    """
+    Always extract tables and charts from the given pages using YOLOX-based logic.
+    The caller decides whether to call it.
+    """
+    extracted_table_chart = []
+
+    # Reuse your existing function
+    table_chart_results = extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+
+    # Build metadata for each
+    for page_idx, table_or_chart in table_chart_results:
+        # If we want all tables and charts, we assume the caller wouldn't call
+        # this function unless we truly want them.
+        if table_or_chart.type_string == "table":
+            table_or_chart.content_format = paddle_output_format
+
+        table_chart_meta = construct_table_and_chart_metadata(
+            table_or_chart,
+            page_idx,
+            page_count,
+            source_metadata,
+            base_unified_metadata,
+        )
+        extracted_table_chart.append(table_chart_meta)
+
+    return extracted_table_chart
+
+
 def pdfium_extractor(
     pdf_stream,
     extract_text: bool,
@@ -198,57 +289,41 @@ def pdfium_extractor(
     **kwargs,
 ):
     """
-    Helper function to use pdfium to extract text from a bytestream PDF.
-
-    Parameters
-    ----------
-    pdf_stream : io.BytesIO
-        A bytestream PDF.
-    extract_text : bool
-        Specifies whether to extract text.
-    extract_images : bool
-        Specifies whether to extract images.
-    extract_tables : bool
-        Specifies whether to extract tables.
-    extract_charts : bool
-        Specifies whether to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
-
-        kwargs.pdfium_config : dict, optional[PDFiumConfigSchema]
-
-    Returns
-    -------
-    str
-        A string of extracted text.
+    Main function that:
+      - Builds the doc from pdf_stream
+      - For each page:
+          - If extract_text, calls _extract_page_text
+          - If extract_images, calls _extract_page_images
+          - Collects those results
+      - If extract_tables or extract_charts, calls _extract_tables_and_charts
+      - Finally, if we have doc-level text, appends it at the very end
     """
     logger.debug("Extracting PDF with pdfium backend.")
 
     row_data = kwargs.get("row_data")
     source_id = row_data["source_id"]
+
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
+
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
-    # get base metadata
+    # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
-
-    pdfium_config = kwargs.get("pdfium_config", {})
-    pdfium_config = pdfium_config if pdfium_config is not None else {}
+    pdfium_config = kwargs.get("pdfium_config", {}) or {}
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
-
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
 
-    pages = []
-    extracted_data = []
+    # Create PdfDocument in the main process as before
     doc = libpdfium.PdfDocument(pdf_stream)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
+    page_count = pdf_metadata.page_count
 
     source_metadata = {
         "source_name": pdf_metadata.filename,
@@ -263,117 +338,93 @@ def pdfium_extractor(
         "access_level": access_level,
     }
 
-    logger.debug(f"Extracting text from PDF with {pdf_metadata.page_count} pages.")
-    logger.debug(f"Extract text: {extract_text}")
-    logger.debug(f"extract images: {extract_images}")
-    logger.debug(f"extract tables: {extract_tables}")
-    logger.debug(f"extract tables: {extract_charts}")
+    logger.debug(f"PDF has {page_count} pages.")
+    logger.debug(
+        f"extract_text={extract_text}, extract_images={extract_images}, "
+        f"extract_tables={extract_tables}, extract_charts={extract_charts}"
+    )
 
-    # Pdfium does not support text extraction at the document level
+    # Decide if text_depth is PAGE or DOCUMENT
+    if text_depth != TextTypeEnum.PAGE:
+        text_depth = TextTypeEnum.DOCUMENT
+
+    extracted_data = []
     accumulated_text = []
-    text_depth = text_depth if text_depth == TextTypeEnum.PAGE else TextTypeEnum.DOCUMENT
-    for page_idx in range(pdf_metadata.page_count):
+    pages_for_tables = []  # only needed if we do tables/charts
+
+    # PAGE LOOP
+    for page_idx in range(page_count):
         page = doc.get_page(page_idx)
-        page_width, page_height = doc.get_page_size(page_idx)
+        page_width, page_height = page.get_size()
 
-        # https://pypdfium2.readthedocs.io/en/stable/python_api.html#module-pypdfium2._helpers.textpage
+        # If we want text, extract text now.
         if extract_text:
-            textpage = page.get_textpage()
-            page_text = textpage.get_text_bounded()
-            accumulated_text.append(page_text)
-
-            if text_depth == TextTypeEnum.PAGE and len(accumulated_text) > 0:
-                text_extraction = construct_text_metadata(
-                    accumulated_text,
+            page_text = _extract_page_text(page)
+            if text_depth == TextTypeEnum.PAGE:
+                # Build a page-level text metadata item
+                text_meta = construct_text_metadata(
+                    [page_text],
                     pdf_metadata.keywords,
                     page_idx,
                     -1,
                     -1,
                     -1,
-                    pdf_metadata.page_count,
+                    page_count,
                     text_depth,
                     source_metadata,
                     base_unified_metadata,
                 )
+                extracted_data.append(text_meta)
+            else:
+                # doc-level => accumulate
+                accumulated_text.append(page_text)
 
-                extracted_data.append(text_extraction)
-                accumulated_text = []
-
-        # Image extraction
+        # If we want images, extract images now.
         if extract_images:
-            for obj in page.get_objects():
-                obj_type = PDFIUM_PAGEOBJ_MAPPING.get(obj.type, "UNKNOWN")
-                if obj_type == "IMAGE":
-                    try:
-                        # Attempt to retrieve the image bitmap
-                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
-                        image_base64: str = numpy_to_base64(image_numpy)
-                        image_bbox = obj.get_pos()
-                        image_size = obj.get_size()
-                        image_data = Base64Image(
-                            image=image_base64,
-                            bbox=image_bbox,
-                            width=image_size[0],
-                            height=image_size[1],
-                            max_width=page_width,
-                            max_height=page_height,
-                        )
+            image_data = _extract_page_images(
+                page,
+                page_idx,
+                page_width,
+                page_height,
+                page_count,
+                source_metadata,
+                base_unified_metadata,
+            )
+            extracted_data.extend(image_data)
 
-                        extracted_image_data = construct_image_metadata_from_pdf_image(
-                            image_data,
-                            page_idx,
-                            pdf_metadata.page_count,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
-
-                        extracted_data.append(extracted_image_data)
-                    except Exception as e:
-                        logger.error(f"Unhandled error extracting image: {e}")
-                        pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
-
-        # Table and chart collection
+        # If we want tables or charts, remember these pages
         if extract_tables or extract_charts:
-            pages.append(page)
+            pages_for_tables.append(page)
 
-    if extract_text and text_depth == TextTypeEnum.DOCUMENT and len(accumulated_text) > 0:
-        text_extraction = construct_text_metadata(
+    # TABLE/CHART extraction
+    if extract_tables or extract_charts:
+        # We assume if we call this, we want *all* tables/charts
+        table_chart_items = _extract_tables_and_charts(
+            pages_for_tables,
+            pdfium_config,
+            page_count,
+            source_metadata,
+            base_unified_metadata,
+            paddle_output_format,
+            trace_info=trace_info,
+        )
+        extracted_data.extend(table_chart_items)
+
+    # DOC-LEVEL TEXT added last
+    if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
+        doc_text_meta = construct_text_metadata(
             accumulated_text,
             pdf_metadata.keywords,
             -1,
             -1,
             -1,
             -1,
-            pdf_metadata.page_count,
+            page_count,
             text_depth,
             source_metadata,
             base_unified_metadata,
         )
-
-        extracted_data.append(text_extraction)
-
-    if extract_tables or extract_charts:
-        for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
-            pages,
-            pdfium_config,
-            trace_info=trace_info,
-        ):
-            if (extract_tables and (table_and_charts.type_string == "table")) or (
-                extract_charts and (table_and_charts.type_string == "chart")
-            ):
-                if table_and_charts.type_string == "table":
-                    table_and_charts.content_format = paddle_output_format
-
-                extracted_data.append(
-                    construct_table_and_chart_metadata(
-                        table_and_charts,
-                        page_idx,
-                        pdf_metadata.page_count,
-                        source_metadata,
-                        base_unified_metadata,
-                    )
-                )
+        extracted_data.append(doc_text_meta)
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
-
     return extracted_data
