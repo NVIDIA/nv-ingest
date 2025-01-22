@@ -183,7 +183,11 @@ class YoloxModelInterfaceBase(ModelInterface):
 
                 content_list.append(content)
 
-            payload = {"input": content_list}
+            payload = {
+                "input": content_list,
+                "confidence_threshold": self.conf_threshold,
+                "nms_threshold": self.iou_threshold,
+            }
 
             return payload
         else:
