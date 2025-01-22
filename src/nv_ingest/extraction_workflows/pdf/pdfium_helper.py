@@ -57,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-    pages: List,  # List[libpdfium.PdfPage]
+    pages: List[Tuple[int, np.ndarray]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
 ) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
@@ -79,9 +79,8 @@ def extract_tables_and_charts_using_image_ensemble(
 
         page_index = 0
         for batch in batches:
-            original_images, _ = pdfium_pages_to_numpy(
-                batch, scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
-            )
+            image_page_indices = [page[0] for page in batch]
+            original_images = [page[1] for page in batch]
 
             # Prepare data
             data = {"images": original_images}
@@ -100,14 +99,15 @@ def extract_tables_and_charts_using_image_ensemble(
             )
 
             # Process results
-            for annotation_dict, original_image in zip(inference_results, original_images):
+            for annotation_dict, page_index, original_image in zip(
+                inference_results, image_page_indices, original_images
+            ):
                 extract_table_and_chart_images(
                     annotation_dict,
                     original_image,
                     page_index,
                     tables_and_charts,
                 )
-                page_index += 1
 
     except TimeoutError:
         logger.error("Timeout error during table/chart extraction.")
@@ -394,7 +394,10 @@ def pdfium_extractor(
 
         # If we want tables or charts, remember these pages
         if extract_tables or extract_charts:
-            pages_for_tables.append(page)
+            image, _ = pdfium_pages_to_numpy(
+                [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
+            )
+            pages_for_tables.append((page_idx, image[0]))
 
     # TABLE/CHART extraction
     if extract_tables or extract_charts:
