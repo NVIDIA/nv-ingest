@@ -31,12 +31,33 @@ def load_images_from_json(json_file_path):
     with open(json_file_path, "r") as file:
         data = json.load(file)
 
+    def create_default_image():
+        """Create a solid black 300×300 image."""
+        width, height = 300, 300
+        default_img = Image.new("RGB", (width, height), color="black")
+        return default_img
+
     images = []
     for item in data:  # Assuming the JSON is a list of objects
         if item["document_type"] in ("image", "structured"):
-            image_data = base64.b64decode(item["metadata"]["content"])
-            image = Image.open(BytesIO(image_data))
-            images.append(image)
+            content = item.get("metadata", {}).get("content", "")
+            # Check if content is missing or empty
+            if not content:
+                images.append(create_default_image())
+                continue
+
+            # Attempt to decode and open the image
+            try:
+                image_data = base64.b64decode(content)
+                temp_image = Image.open(BytesIO(image_data))
+                # Verify & re-open to ensure no corruption or errors
+                temp_image.verify()
+                temp_image = Image.open(BytesIO(image_data))
+                images.append(temp_image)
+            except Exception:
+                # If there's any error decoding/reading the image, use the default
+                images.append(create_default_image())
+
     return images
 
 

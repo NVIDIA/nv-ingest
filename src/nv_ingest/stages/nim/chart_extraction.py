@@ -68,6 +68,7 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
         or (content_metadata.get("subtype") != "chart")
         or (chart_metadata is None)
         or (chart_metadata.get("table_format") != TableFormatEnum.IMAGE)
+        or (base64_image in [None, ""])
     ):
         return metadata
 

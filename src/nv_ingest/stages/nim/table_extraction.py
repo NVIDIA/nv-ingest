@@ -68,6 +68,7 @@ def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict)
         or (content_metadata.get("subtype") != "table")
         or (table_metadata is None)
         or (table_metadata.get("table_format") != TableFormatEnum.IMAGE)
+        or (base64_image in [None, ""])
     ):
         return metadata
 

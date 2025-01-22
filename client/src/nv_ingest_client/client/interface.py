@@ -27,8 +27,8 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.primitives.tasks import VdbUploadTask
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.milvus import MilvusOperator
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -74,6 +74,7 @@ class Ingestor:
         self._documents = documents or []
         self._client = client
         self._job_queue_id = job_queue_id
+        self._vdb_bulk_upload = None
 
         if self._client is None:
             client_kwargs = filter_function_kwargs(NvIngestClient, **kwargs)
@@ -223,7 +224,10 @@ class Ingestor:
 
         fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
         result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
-
+        if self._vdb_bulk_upload:
+            self._vdb_bulk_upload.run(result)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
         return result
 
     def ingest_async(self, **kwargs: Any) -> Future:
@@ -270,6 +274,11 @@ class Ingestor:
 
         for future in future_to_job_id:
             future.add_done_callback(_done_callback)
+
+        if self._vdb_bulk_upload:
+            self._vdb_bulk_upload.run(combined_future)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
 
         return combined_future
 
@@ -454,7 +463,6 @@ class Ingestor:
 
         return self
 
-    @ensure_job_specs
     def vdb_upload(self, **kwargs: Any) -> "Ingestor":
         """
         Adds a VdbUploadTask to the batch job specification.
@@ -469,8 +477,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        vdb_upload_task = VdbUploadTask(**kwargs)
-        self._job_specs.add_task(vdb_upload_task)
+        self._vdb_bulk_upload = MilvusOperator(**kwargs)
 
         return self
 

@@ -75,7 +75,7 @@ class ModelInterface:
         """
         raise NotImplementedError("Subclasses should implement this method")
 
-    def process_inference_results(self, output_array, **kwargs):
+    def process_inference_results(self, output_array, protocol: str, **kwargs):
         """
         Process the inference results from the model.
 
@@ -206,7 +206,7 @@ class NimClient:
             response, protocol=self.protocol, data=prepared_data, **kwargs
         )
         results = self.model_interface.process_inference_results(
-            parsed_output, original_image_shapes=data.get("original_image_shapes"), **kwargs
+            parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
         )
         return results
 
