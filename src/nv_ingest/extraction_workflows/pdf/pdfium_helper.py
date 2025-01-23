@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import concurrent.futures
 import logging
 import traceback
 from math import log
@@ -288,16 +289,6 @@ def pdfium_extractor(
     trace_info=None,
     **kwargs,
 ):
-    """
-    Main function that:
-      - Builds the doc from pdf_stream
-      - For each page:
-          - If extract_text, calls _extract_page_text
-          - If extract_images, calls _extract_page_images
-          - Collects those results
-      - If extract_tables or extract_charts, calls _extract_tables_and_charts
-      - Finally, if we have doc-level text, appends it at the very end
-    """
     logger.debug("Extracting PDF with pdfium backend.")
 
     row_data = kwargs.get("row_data")
@@ -350,68 +341,94 @@ def pdfium_extractor(
 
     extracted_data = []
     accumulated_text = []
-    pages_for_tables = []  # only needed if we do tables/charts
 
-    # PAGE LOOP
-    for page_idx in range(page_count):
-        page = doc.get_page(page_idx)
-        page_width, page_height = page.get_size()
+    # Prepare for table/chart extraction
+    pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
+    futures = []  # We'll keep track of all the Future objects for table/charts
 
-        # If we want text, extract text now.
-        if extract_text:
-            page_text = _extract_page_text(page)
-            if text_depth == TextTypeEnum.PAGE:
-                # Build a page-level text metadata item
-                text_meta = construct_text_metadata(
-                    [page_text],
-                    pdf_metadata.keywords,
+    # Create a single ThreadPoolExecutor (or set max_workers as you see fit)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+        # PAGE LOOP
+        for page_idx in range(page_count):
+            page = doc.get_page(page_idx)
+            page_width, page_height = page.get_size()
+
+            # If we want text, extract text now.
+            if extract_text:
+                page_text = _extract_page_text(page)
+                if text_depth == TextTypeEnum.PAGE:
+                    # Build a page-level text metadata item
+                    text_meta = construct_text_metadata(
+                        [page_text],
+                        pdf_metadata.keywords,
+                        page_idx,
+                        -1,
+                        -1,
+                        -1,
+                        page_count,
+                        text_depth,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
+                    extracted_data.append(text_meta)
+                else:
+                    # doc-level => accumulate
+                    accumulated_text.append(page_text)
+
+            # If we want images, extract images now.
+            if extract_images:
+                image_data = _extract_page_images(
+                    page,
                     page_idx,
-                    -1,
-                    -1,
-                    -1,
+                    page_width,
+                    page_height,
                     page_count,
-                    text_depth,
                     source_metadata,
                     base_unified_metadata,
                 )
-                extracted_data.append(text_meta)
-            else:
-                # doc-level => accumulate
-                accumulated_text.append(page_text)
+                extracted_data.extend(image_data)
 
-        # If we want images, extract images now.
-        if extract_images:
-            image_data = _extract_page_images(
-                page,
-                page_idx,
-                page_width,
-                page_height,
+            # If we want tables or charts, rasterize the page and store it
+            if extract_tables or extract_charts:
+                image, _ = pdfium_pages_to_numpy(
+                    [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
+                )
+                pages_for_tables.append((page_idx, image[0]))
+
+                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                    future = executor.submit(
+                        _extract_tables_and_charts,
+                        pages_for_tables[:],  # pass a copy
+                        pdfium_config,
+                        page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                        paddle_output_format,
+                        trace_info=trace_info,
+                    )
+                    futures.append(future)
+                    pages_for_tables.clear()
+
+        # After page loop, if we still have leftover pages_for_tables, submit one last job
+        if (extract_tables or extract_charts) and pages_for_tables:
+            future = executor.submit(
+                _extract_tables_and_charts,
+                pages_for_tables[:],
+                pdfium_config,
                 page_count,
                 source_metadata,
                 base_unified_metadata,
+                paddle_output_format,
+                trace_info=trace_info,
             )
-            extracted_data.extend(image_data)
+            futures.append(future)
+            pages_for_tables.clear()
 
-        # If we want tables or charts, remember these pages
-        if extract_tables or extract_charts:
-            image, _ = pdfium_pages_to_numpy(
-                [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
-            )
-            pages_for_tables.append((page_idx, image[0]))
-
-    # TABLE/CHART extraction
-    if extract_tables or extract_charts:
-        # We assume if we call this, we want *all* tables/charts
-        table_chart_items = _extract_tables_and_charts(
-            pages_for_tables,
-            pdfium_config,
-            page_count,
-            source_metadata,
-            base_unified_metadata,
-            paddle_output_format,
-            trace_info=trace_info,
-        )
-        extracted_data.extend(table_chart_items)
+        # Now wait for all futures to complete
+        for fut in concurrent.futures.as_completed(futures):
+            table_chart_items = fut.result()  # blocks until finished
+            extracted_data.extend(table_chart_items)
 
     # DOC-LEVEL TEXT added last
     if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
