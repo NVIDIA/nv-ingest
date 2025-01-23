@@ -1,4 +1,4 @@
-# NVIDIA-Ingest Release Notes 
+# NVIDIA-Ingest Release Notes
 
 ## Release 24.12
 
