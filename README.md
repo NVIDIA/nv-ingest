@@ -20,7 +20,7 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ## Introduction
 
-### What NVIDIA-Ingest is ✔️
+### What NVIDIA-Ingest Is ✔️
 
 A microservice that:
 
@@ -30,7 +30,7 @@ A microservice that:
 - Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
 - Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
 
-### What NVIDIA-Ingest is not ✖️
+### What NVIDIA-Ingest Is Not ✖️
 
 A service that:
 
@@ -65,7 +65,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 Optional:
-1. [Direct Library Deployment](docs/deployment.md) 📦
+1. [Direct Library Deployment](docs/docs/user-guide/developer-guide/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -74,14 +74,14 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
+If you prefer, you can also [start services one by one](docs/docs/user-guide/developer-guide/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/user-guide/developer-guide/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
 2. Change directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](docs/docs/user-guide/developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -112,7 +112,7 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 `docker compose up`
 
 > [!TIP]
-> By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
+> By default we have [configured log levels to be verbose](docker-compose.yaml).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 >
@@ -183,7 +183,7 @@ pip install .
 ```
 
 > [!NOTE]
-> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml).
 >
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
 >
@@ -211,7 +211,11 @@ In the below examples, we are doing text, chart, table, and image extraction:
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
-#### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
+#### In Python 
+
+> [!NOTE]
+> You can find more examples [here](./client/client_examples/examples).
+
 
 ```python
 import logging, time
@@ -326,7 +330,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
+You can view the full JSON extracts and the metadata definitions [here](/docs/docs/user-guide/developer-guide/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 First, install `tkinter` by running the following commands depending on your OS.

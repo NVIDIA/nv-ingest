@@ -47,7 +47,15 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | Axis | TODO | Extracted |  |
 |  | uploaded\_image\_uri | Mirrors source\_metadata.source\_location | Generated |  |
 
+
+<!-- 
+2025-01-23 NKM: Commenting out this section
+I can find only the first (text) file, and it is empty
+I can't find the other 2 files (images, charts and tables) at all
+If we get the files, we can add this back
+
 ## Example Text Extracts for multimodal_test.pdf:
 1. [text](example_processed_docs/text/multimodal_test.pdf.metadata.json)
 2. [images](example_processed_docs/image/multimodal_test.pdf.metadata.json)
 3. [charts and tables](example_processed_docs/structured/multimodal_test.pdf.metadata.json)
+-->
