@@ -169,7 +169,7 @@ helm repo add \
   https://charts.bitnami.com/bitnami
 ```
 
-For the full list of repositories, refer to the `dependencies` section in the [Chart.yaml](../../../../helm/Chart.yaml) file of this project.
+For the full list of repositories, refer to the `dependencies` section in the [Chart.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/helm/Chart.yaml) file.
 
 #### NVIDIA GPU Support
 
