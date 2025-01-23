@@ -211,10 +211,10 @@ In the below examples, we are doing text, chart, table, and image extraction:
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
-#### In Python 
+#### In Python
 
 > [!NOTE]
-> You can find more examples [here](./client/client_examples/examples).
+> You can find more examples [here](client/client_examples/examples/).
 
 
 ```python
@@ -269,7 +269,10 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
+#### Using the the `nv-ingest-cli`
+
+> [!NOTE]
+> You can find more examples [here](client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
