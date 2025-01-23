@@ -207,23 +207,38 @@ class RedisClient(MessageBrokerClientBase):
         while True:
             try:
                 # Attempt to fetch a message from the Redis queue
+                logger.info(
+                    f"!!!!! entering redis_client:fetch_message(channel_name: {channel_name}, timeout: {timeout})"
+                )
                 message, fragment, fragment_count = self._check_response(channel_name, timeout)
+                logger.info(
+                    f"!!!!! message len: {len(message)}, fragment: {fragment}, fragment_count: {fragment_count}"
+                )
 
                 if message is not None:
+                    logger.info(f"!!!!! Message is not None ...")
                     if fragment_count == 1:
                         # No fragmentation, return the message as is
                         return message
 
+                    logger.info(
+                        f"!!!!! collected fragments. Existing collected_fragments len: {len(collected_fragments)}"
+                    )
                     collected_fragments.append(message)
 
                     # If we have collected all fragments, combine and return
                     if len(collected_fragments) == fragment_count:
+                        logger.info(
+                            f"!!!! Collecting fragments .... len(collected_fragments) {len(collected_fragments)} - len(fragment_count): {len(fragment_count)}"
+                        )
                         # Sort fragments by the 'fragment' field to ensure correct order
                         collected_fragments.sort(key=lambda x: x["fragment"])
 
                         # Combine fragments (assuming they are part of a larger payload)
+                        logger.info(f"!!!!! combining_fragments to reconstruct message ....")
                         reconstructed_message = self._combine_fragments(collected_fragments)
 
+                        logger.info(f"!!!! Returning reconstructed_message")
                         return reconstructed_message
 
                 else:
@@ -240,6 +255,7 @@ class RedisClient(MessageBrokerClientBase):
                         logger.error(err_msg)
                         raise ValueError(err_msg)
                 else:
+                    logger.info(f"!!!! Hitting this case ...")
                     raise  # This is expected in many cases, so re-raise it
 
             except RedisError as err:
@@ -255,6 +271,7 @@ class RedisClient(MessageBrokerClientBase):
                     raise ValueError(f"Failed to fetch message from Redis queue after {retries} attempts: {err}")
 
                 # Invalidate client to force reconnection on the next try
+                logger.info(f"!!!! invalidating redis client")
                 self._client = None
 
             except Exception as e:
@@ -279,8 +296,10 @@ class RedisClient(MessageBrokerClientBase):
             The combined message as a JSON string, containing 'status', 'description', and combined 'data'.
         """
         if not fragments:
+            logger.info(f"!!!! Fragments list is empty")
             raise ValueError("Fragments list is empty")
 
+        logger.info(f"!!!! Fragments len: {len(fragments)}")
         # Use 'status' and 'description' from the first fragment
         combined_message = {
             "status": fragments[0]["status"],
@@ -293,6 +312,7 @@ class RedisClient(MessageBrokerClientBase):
         for fragment in fragments:
             combined_message["data"].extend(fragment["data"])
 
+        logger.info(f"!!!! Returning combined_message in _combine_fragments")
         return combined_message
 
     def submit_message(self, channel_name: str, message: str) -> None:
