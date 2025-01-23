@@ -48,7 +48,7 @@ class MilvusOperator:
         sparse: bool = True,
         recreate: bool = True,
         gpu_index: bool = True,
-        gpu_search: bool = False,
+        gpu_search: bool = True,
         dense_dim: int = 1024,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,
@@ -138,7 +138,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False) -> Colle
 
 
 def create_nvingest_index_params(
-    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = False, local_index: bool = True
+    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = True, local_index: bool = True
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -240,7 +240,7 @@ def create_nvingest_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = False,
+    gpu_search: bool = True,
     dense_dim: int = 2048,
 ) -> CollectionSchema:
     """
@@ -677,7 +677,7 @@ def hybrid_retrieval(
     dense_field: str = "vector",
     sparse_field: str = "sparse",
     output_fields: List[str] = ["text"],
-    gpu_search: bool = False,
+    gpu_search: bool = True,
     local_index: bool = False,
 ):
     """
@@ -760,7 +760,7 @@ def nvingest_retrieval(
     sparse_model_filepath: str = "bm25_model.json",
     model_name: str = "nvidia/nv-embedqa-e5-v5",
     output_fields: List[str] = ["text", "source", "content_metadata"],
-    gpu_search: bool = False,
+    gpu_search: bool = True,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
