@@ -48,7 +48,7 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | uploaded\_image\_uri | Mirrors source\_metadata.source\_location | Generated |  |
 
 
-<!-- 
+<!--
 2025-01-23 NKM: Commenting out this section
 I can find only the first (text) file, and it is empty
 I can't find the other 2 files (images, charts and tables) at all
