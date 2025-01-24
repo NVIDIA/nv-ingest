@@ -18,6 +18,7 @@
 # limitations under the License.
 
 import logging
+import math
 import uuid
 from typing import Dict
 from typing import List
@@ -151,17 +152,14 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
         model_interface,
         doughnut_config.auth_token,
         doughnut_config.doughnut_infer_protocol,
-        timeout=300,  # TODO: We shouldn't need this with an optimized endpoint.
     )
 
     for batch, batch_page_offset in zip(batches, batch_page_offsets):
         responses = preprocess_and_send_requests(doughnut_client, batch, batch_page_offset)
 
-        for page_idx, raw_text, bbox_offset in responses:
+        for page_idx, bboxes, bbox_offset in responses:
             page_image = None
             page_width, page_height = page_sizes[page_idx]
-
-            classes, bboxes, texts = doughnut_utils.extract_classes_bboxes(raw_text)
 
             page_nearby_blocks = {
                 "text": {"content": [], "bbox": [], "type": []},
@@ -169,14 +167,17 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                 "structured": {"content": [], "bbox": [], "type": []},
             }
 
-            for cls, bbox, txt in zip(classes, bboxes, texts):
+            for bbox_info in bboxes:
+                cls = bbox_info["type"]
+                bbox = bbox_info["bbox"]
+                txt = bbox_info["text"]
 
-                transformed_bbox = doughnut_utils.reverse_transform_bbox(
-                    bbox=bbox,
-                    bbox_offset=bbox_offset,
-                    original_width=DEFAULT_MAX_WIDTH,
-                    original_height=DEFAULT_MAX_HEIGHT,
-                )
+                transformed_bbox = [
+                    math.floor(bbox["xmin"] * DEFAULT_MAX_WIDTH),
+                    math.floor(bbox["ymin"] * DEFAULT_MAX_HEIGHT),
+                    math.ceil(bbox["xmax"] * DEFAULT_MAX_WIDTH),
+                    math.ceil(bbox["ymax"] * DEFAULT_MAX_HEIGHT),
+                ]
 
                 if cls in doughnut_utils.ACCEPTED_TEXT_CLASSES:
                     if identify_nearby_objects:
@@ -220,7 +221,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                             )
                             page_image = page_image[0]
 
-                        img_numpy = crop_image(page_image, bbox)
+                        img_numpy = crop_image(page_image, transformed_bbox)
 
                         if img_numpy is not None:
                             base64_img = numpy_to_base64(img_numpy)

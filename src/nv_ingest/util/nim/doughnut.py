@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import json
 import logging
 import re
 from typing import Any
@@ -170,13 +171,27 @@ class DoughnutModelInterface(ModelInterface):
         messages = [
             {
                 "role": "user",
-                "content": "<s><output_markdown><predict_bbox><predict_classes>"
-                f'<img src="data:image/png;base64,{base64_img}" />',
+                "content": [
+                    {
+                        "type": "image_url",
+                        "image_url": {
+                            "url": f"data:image/png;base64,{base64_img}",
+                        },
+                    }
+                ],
             }
         ]
         payload = {
             "model": "nvidia/eclair",
             "messages": messages,
+            "tools": [
+                {
+                    "type": "function",
+                    "function": {
+                        "name": "markdown_bbox",
+                    },
+                }
+            ],
         }
 
         return payload
@@ -204,7 +219,8 @@ class DoughnutModelInterface(ModelInterface):
         if "choices" not in json_response or not json_response["choices"]:
             raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
 
-        return json_response["choices"][0]["message"]["content"]
+        tool_call = json_response["choices"][0]["message"]["tool_calls"][0]
+        return json.loads(tool_call["function"]["arguments"])[0]
 
 
 def extract_classes_bboxes(text: str) -> Tuple[List[str], List[Tuple[int, int, int, int]], List[str]]:

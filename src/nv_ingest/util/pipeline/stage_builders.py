@@ -86,11 +86,6 @@ def get_nim_service(env_var_prefix):
         "",
     )
 
-    # TODO: This is a temporary workaround for the private endpoint on NVCF.
-    # It should be removed after the endpoint is moved to Preview API on Build.
-    if prefix == "DOUGHNUT":
-        auth_token = os.environ.get("DOUGHNUT_NVCF_API_KEY", "")
-
     infer_protocol = os.environ.get(
         f"{prefix}_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
@@ -291,7 +286,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     docx_extractor_config = ingest_config.get(
         "docx_extraction_module",
         {
@@ -315,7 +310,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
 
 
 def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     pptx_extractor_config = ingest_config.get(
         "pptx_extraction_module",
         {
