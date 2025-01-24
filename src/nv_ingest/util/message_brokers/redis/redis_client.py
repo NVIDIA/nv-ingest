@@ -229,7 +229,7 @@ class RedisClient(MessageBrokerClientBase):
                     # If we have collected all fragments, combine and return
                     if len(collected_fragments) == fragment_count:
                         logger.info(
-                            f"!!!! Collecting fragments .... len(collected_fragments) {len(collected_fragments)} - len(fragment_count): {len(fragment_count)}"
+                            f"!!!! Collecting fragments .... len(collected_fragments) {len(collected_fragments)} - fragment_count: {fragment_count}"
                         )
                         # Sort fragments by the 'fragment' field to ensure correct order
                         collected_fragments.sort(key=lambda x: x["fragment"])
