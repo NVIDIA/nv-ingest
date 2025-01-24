@@ -186,7 +186,6 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                         page_nearby_blocks["text"]["type"].append(cls)
 
                     if extract_text:
-                        txt = doughnut_utils.postprocess_text(txt, cls)
                         accumulated_text.append(txt)
 
                 if cls == "Table":
