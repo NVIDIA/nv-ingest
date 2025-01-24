@@ -187,7 +187,7 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         
         # Remember this is running in the nv_ingest_ms_runtime container ... so lets write the raw
         # data to /workspace/data/{JOB_ID}.raw.json
-        with open(f"{directory}/{job_id}.raw.json", "wb") as file:
+        with open(f"{directory}/{job_id}.raw.json", "") as file:
             if isinstance(job_response, dict):
                 json.dump(job_response, file, ensure_ascii=False, indent=4)
             elif isinstance(job_response, str):
