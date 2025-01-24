@@ -258,7 +258,6 @@ def _extract_tables_and_charts(
     """
     extracted_table_chart = []
 
-    # Reuse your existing function
     table_chart_results = extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
 
     # Build metadata for each
@@ -346,7 +345,6 @@ def pdfium_extractor(
     pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
-    # Create a single ThreadPoolExecutor (or set max_workers as you see fit)
     with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
         # PAGE LOOP
         for page_idx in range(page_count):
