@@ -90,7 +90,9 @@ class RedisIngestService(IngestServiceMeta):
         # Fetch message with a timeout
         logger.info(f"!!!! redis_ingest_service:fetch_job(job_id) job_id: {job_id}")
         message = self._ingest_client.fetch_message(f"{job_id}", timeout=5)
-        logger.info(f"!!!! redis_ingest_service:fetch_job(job_id) job_id: {job_id} message reponse: {message}")
+        logger.info(
+            f"!!!! redis_ingest_service:fetch_job(job_id) job_id: {job_id} message reponse - omitting printing full message reponse"
+        )
         if message is None:
             raise TimeoutError()
 

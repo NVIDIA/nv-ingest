@@ -212,7 +212,7 @@ class RedisClient(MessageBrokerClientBase):
                 )
                 message, fragment, fragment_count = self._check_response(channel_name, timeout)
                 logger.info(
-                    f"!!!!! message len: {len(message)}, fragment: {fragment}, fragment_count: {fragment_count}"
+                    f"!!!!! message len: {len(message)}, fragment: (Omitting), fragment_count: {fragment_count}"
                 )
 
                 if message is not None:

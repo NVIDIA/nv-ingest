@@ -177,7 +177,7 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         # Attempt to fetch the job from the ingest
         logger.info(f"!!!!! Attempting to fetch results for job_id: {job_id}")
         job_response = await ingest_service.fetch_job(job_id)
-        logger.info(f"!!!!! job_id: {job_id} ... job_response: {job_response}")
+        logger.info(f"!!!!! job_id: {job_id} ... job_response received. Omitting to print full object.")
         return job_response
     except TimeoutError:
         # Return a 202 Accepted if the job is not ready yet
