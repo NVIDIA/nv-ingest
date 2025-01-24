@@ -29,6 +29,7 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineConfigSchema(BaseModel):
+    # TODO(Devin): Audio
     chart_extractor_module: ChartExtractorSchema = ChartExtractorSchema()
     document_splitter_module: DocumentSplitterSchema = DocumentSplitterSchema()
     embedding_storage_module: EmbeddingStorageModuleSchema = EmbeddingStorageModuleSchema()
