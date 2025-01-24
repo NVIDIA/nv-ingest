@@ -39,7 +39,13 @@ def sample_pdf_stream():
 def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
-    mock_client_instance.infer.return_value = "<x_0><y_1>testing<x_10><y_20><class_Text>"
+    mock_client_instance.infer.return_value = [
+        {
+            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+            "text": "testing",
+            "type": "Text",
+        }
+    ]
 
     result = eclair(
         pdf_stream=sample_pdf_stream,
@@ -61,7 +67,13 @@ def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
 def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
-    mock_client_instance.infer.return_value = "<x_17><y_0>table text<x_1007><y_1280><class_Table>"
+    mock_client_instance.infer.return_value = [
+        {
+            "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
+            "text": "table text",
+            "type": "Table",
+        }
+    ]
 
     result = eclair(
         pdf_stream=sample_pdf_stream,
@@ -76,7 +88,7 @@ def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
     assert len(result) == 2
     assert result[0][0].value == "structured"
     assert result[0][1]["content"] == "table text"
-    assert result[0][1]["table_metadata"]["table_location"] == (0, 0, 1024, 1280)
+    assert result[0][1]["table_metadata"]["table_location"] == (1, 2, 101, 102)
     assert result[0][1]["table_metadata"]["table_location_max_dimensions"] == (1024, 1280)
     assert result[1][0].value == "text"
     assert result[1][1]["content"] == ""
@@ -86,7 +98,13 @@ def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
 def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
-    mock_client_instance.infer.return_value = "<x_17><y_0><x_1007><y_1280><class_Picture>"
+    mock_client_instance.infer.return_value = [
+        {
+            "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
+            "text": "",
+            "type": "Picture",
+        }
+    ]
 
     result = eclair(
         pdf_stream=sample_pdf_stream,
@@ -101,7 +119,7 @@ def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
     assert len(result) == 2
     assert result[0][0].value == "image"
     assert result[0][1]["content"][:10] == "iVBORw0KGg"  # PNG format header
-    assert result[0][1]["image_metadata"]["image_location"] == (0, 0, 1024, 1280)
+    assert result[0][1]["image_metadata"]["image_location"] == (1, 2, 101, 102)
     assert result[0][1]["image_metadata"]["image_location_max_dimensions"] == (1024, 1280)
     assert result[1][0].value == "text"
     assert result[1][1]["content"] == ""
@@ -127,9 +145,18 @@ def test_preprocess_and_send_requests(mock_pdfium_pages_to_numpy):
 def test_eclair_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
-    mock_client_instance.infer.return_value = (
-        "<x_0><y_1>testing0<x_10><y_20><class_Title><x_30><y_40>testing1<x_50><y_60><class_Text>"
-    )
+    mock_client_instance.infer.return_value = [
+        {
+            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+            "text": "testing0",
+            "type": "Title",
+        },
+        {
+            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+            "text": "testing1",
+            "type": "Text",
+        },
+    ]
 
     result = eclair(
         pdf_stream=sample_pdf_stream,
