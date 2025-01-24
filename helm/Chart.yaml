@@ -27,19 +27,19 @@ dependencies:
     version: 0.78.1
     condition: otelDeployed
   - name: yolox-nim
-    repository: "alias:ngc"
+    repository: "alias:nemo-microservice"
     version: 0.2.0
     condition: yoloxDeployed
   - name: cached-nim
-    repository: "alias:ngc"
+    repository: "alias:nemo-microservice"
     version: 0.2.0
     condition: cachedDeployed
   - name: paddleocr-nim
-    repository: "alias:ngc"
+    repository: "alias:nemo-microservice"
     version: 0.2.0
     condition: paddleocrDeployed
   - name: deplot-nim
-    repository: "alias:ngc"
+    repository: "alias:nemo-microservice"
     version: 0.1.6
     condition: deplotDeployed
   - name: text-embedding-nim
