@@ -19,6 +19,8 @@ import time
 import traceback
 import uuid
 
+import os
+
 from fastapi import APIRouter, Request, Response
 from fastapi import Depends
 from fastapi import File, UploadFile, Form
@@ -178,6 +180,21 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         logger.info(f"!!!!! Attempting to fetch results for job_id: {job_id}")
         job_response = await ingest_service.fetch_job(job_id)
         logger.info(f"!!!!! job_id: {job_id} ... job_response received. Omitting to print full object.")
+        logger.infof(f"!!!!! Type of job_response: {type(job_response)}")
+        
+        directory = "/workspace/data"
+        os.makedirs(directory, exist_ok=True)
+        
+        # Remember this is running in the nv_ingest_ms_runtime container ... so lets write the raw
+        # data to /workspace/data/{JOB_ID}.raw.json
+        with open(f"{directory}/{job_id}.raw.json", "wb") as file:
+            if isinstance(job_response, dict):
+                json.dump(job_response, file, ensure_ascii=False, indent=4)
+            elif isinstance(job_response, str):
+                file.write(job_response)
+            else:
+                raise ValueError("job_response must be either a string or a dictionary")
+        
         return job_response
     except TimeoutError:
         # Return a 202 Accepted if the job is not ready yet
