@@ -109,7 +109,7 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 5. Start all services:
-`docker compose up`
+`docker compose --profile retrieval up`
 
 > [!TIP]
 > By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
