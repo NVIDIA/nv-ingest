@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-page-elements-v1}:${YOLOX_TAG:-1.0.0}
+    image: ${YOLOX_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1}:${YOLOX_TAG:-1.0.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -60,7 +60,7 @@ services:
     runtime: nvidia
 
   cached:
-    image: ${CACHED_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/cached}:${CACHED_TAG:-0.2.1}
+    image: ${CACHED_IMAGE:-nvcr.io/nvidia/nemo-microservices/cached}:${CACHED_TAG:-0.2.1}
     shm_size: 2gb
     ports:
       - "8006:8000"
@@ -82,7 +82,7 @@ services:
     runtime: nvidia
 
   paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/paddleocr}:${PADDLE_TAG:-1.0.0}
+    image: ${PADDLE_IMAGE:-nvcr.io/nvidia/nemo-microservices/paddleocr}:${PADDLE_TAG:-1.0.0}
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -126,7 +126,7 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.12
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"

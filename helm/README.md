@@ -23,8 +23,8 @@ kubectl create namespace ${NAMESPACE}
 - Install the Helm repos
 
 ```bash
-# EA-Participants private NGC repository
-helm repo add ngc https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants --username='$oauthtoken' --password=<NGC_API_KEY>
+# Nvidia nemo-microservices NGC repository
+helm repo add ngc https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
 
 # Nvidia NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
@@ -36,7 +36,7 @@ helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oau
 helm upgrade \
     --install \
     nv-ingest \
-    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-0.3.8.tgz
     -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
@@ -44,7 +44,7 @@ helm upgrade \
     --set imagePullSecret.password="${NGC_API_KEY}" \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
-    --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
+    --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
     --set image.tag="24.12"
 ```
 

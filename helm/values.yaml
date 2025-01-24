@@ -26,7 +26,7 @@ nameOverride: ""
 ## @param image.pullPolicy [string] Image pull policy
 image:
   pullPolicy: IfNotPresent
-  repository: "nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest"
+  repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
   tag: "24.12"
 
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -100,7 +100,7 @@ yoloxDeployed: true
 yolox-nim:
   fullnameOverride: nv-ingest-yolox
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-page-elements-v1
+    repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1
     tag: "1.0.0"
   service:
     name: nv-ingest-yolox
@@ -120,7 +120,7 @@ cachedDeployed: true
 cached-nim:
   fullnameOverride: nv-ingest-cached
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/cached
+    repository: nvcr.io/nvidia/nemo-microservices/cached
     tag: "0.2.1"
   service:
     name: nv-ingest-cached
@@ -139,7 +139,7 @@ paddleocrDeployed: true
 paddleocr-nim:
   fullnameOverride: nv-ingest-paddle
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr
+    repository: nvcr.io/nvidia/nemo-microservices/paddleocr
     tag: "1.0.0"
   service:
     name: nv-ingest-paddle
@@ -158,7 +158,7 @@ deplotDeployed: true
 deplot-nim:
   fullnameOverride: nv-ingest-deplot
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/deplot
+    repository: nvcr.io/nvidia/nemo-microservices/deplot
     tag: "1.0.0"
   service:
     name: nv-ingest-deplot
