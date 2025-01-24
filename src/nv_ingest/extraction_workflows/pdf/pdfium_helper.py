@@ -245,7 +245,7 @@ def _extract_page_images(
 
 def _extract_tables_and_charts(
     pages: list,
-    pdfium_config: dict,
+    pdfium_config: PDFiumConfigSchema,
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
@@ -301,7 +301,9 @@ def pdfium_extractor(
 
     # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
-    pdfium_config = kwargs.get("pdfium_config", {}) or {}
+    pdfium_config = kwargs.get("pdfium_config", {})
+    if isinstance(pdfium_config, dict):
+        pdfium_config = PDFiumConfigSchema(**pdfium_config)
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
@@ -345,7 +347,7 @@ def pdfium_extractor(
     pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
-    with concurrent.futures.ThreadPoolExecutor(max_workers=5) as executor:
+    with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
         for page_idx in range(page_count):
             page = doc.get_page(page_idx)
