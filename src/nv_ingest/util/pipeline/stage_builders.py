@@ -181,7 +181,7 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
-    doughnut_grpc, doughnut_http, doughnut_auth, doughnut_protocol = get_nim_service("doughnut")
+    eclair_grpc, eclair_http, eclair_auth, eclair_protocol = get_nim_service("eclair")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -190,10 +190,10 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             },
-            "doughnut_config": {
-                "doughnut_endpoints": (doughnut_grpc, doughnut_http),
-                "doughnut_infer_protocol": doughnut_protocol,
-                "auth_token": doughnut_auth,  # All auth tokens are the same for the moment
+            "eclair_config": {
+                "eclair_endpoints": (eclair_grpc, eclair_http),
+                "eclair_infer_protocol": eclair_protocol,
+                "auth_token": eclair_auth,  # All auth tokens are the same for the moment
             },
         },
     )

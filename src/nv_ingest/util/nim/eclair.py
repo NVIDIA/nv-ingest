@@ -45,9 +45,9 @@ ACCEPTED_CLASSES = ACCEPTED_TEXT_CLASSES | ACCEPTED_TABLE_CLASSES | ACCEPTED_IMA
 logger = logging.getLogger(__name__)
 
 
-class DoughnutModelInterface(ModelInterface):
+class EclairModelInterface(ModelInterface):
     """
-    An interface for handling inference with a Doughnut model.
+    An interface for handling inference with a Eclair model.
     """
 
     def name(self) -> str:
@@ -59,7 +59,7 @@ class DoughnutModelInterface(ModelInterface):
         str
             The name of the model interface.
         """
-        return "doughnut"
+        return "eclair"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -103,12 +103,12 @@ class DoughnutModelInterface(ModelInterface):
         """
 
         if protocol == "grpc":
-            raise ValueError("gRPC protocol is not supported for Doughnut.")
+            raise ValueError("gRPC protocol is not supported for Eclair.")
         elif protocol == "http":
-            logger.debug("Formatting input for HTTP Doughnut model")
+            logger.debug("Formatting input for HTTP Eclair model")
             # Prepare payload for HTTP request
             base64_img = numpy_to_base64(data["image"])
-            payload = self._prepare_doughnut_payload(base64_img)
+            payload = self._prepare_eclair_payload(base64_img)
             return payload
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -138,16 +138,16 @@ class DoughnutModelInterface(ModelInterface):
         """
 
         if protocol == "grpc":
-            raise ValueError("gRPC protocol is not supported for Doughnut.")
+            raise ValueError("gRPC protocol is not supported for Eclair.")
         elif protocol == "http":
-            logger.debug("Parsing output from HTTP Doughnut model")
-            return self._extract_content_from_doughnut_response(response)
+            logger.debug("Parsing output from HTTP Eclair model")
+            return self._extract_content_from_eclair_response(response)
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
     def process_inference_results(self, output: Any, **kwargs) -> Any:
         """
-        Process inference results for the Doughnut model.
+        Process inference results for the Eclair model.
 
         Parameters
         ----------
@@ -162,7 +162,7 @@ class DoughnutModelInterface(ModelInterface):
 
         return output
 
-    def _prepare_doughnut_payload(self, base64_img: str) -> Dict[str, Any]:
+    def _prepare_eclair_payload(self, base64_img: str) -> Dict[str, Any]:
         messages = [
             {
                 "role": "user",
@@ -191,7 +191,7 @@ class DoughnutModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_doughnut_response(self, json_response: Dict[str, Any]) -> Any:
+    def _extract_content_from_eclair_response(self, json_response: Dict[str, Any]) -> Any:
         """
         Extract content from the JSON response of a Deplot HTTP API request.
 

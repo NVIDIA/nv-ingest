@@ -38,7 +38,7 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim import doughnut as doughnut_utils
+from nv_ingest.util.nim import eclair as eclair_utils
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
@@ -54,10 +54,10 @@ DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
 
-# Define a helper function to use doughnut to extract text from a base64 encoded bytestram PDF
-def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+# Define a helper function to use eclair to extract text from a base64 encoded bytestram PDF
+def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
     """
-    Helper function to use doughnut to extract text from a bytestream PDF.
+    Helper function to use eclair to extract text from a bytestream PDF.
 
     Parameters
     ----------
@@ -77,12 +77,12 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     str
         A string of extracted text.
     """
-    logger.debug("Extracting PDF with doughnut backend.")
+    logger.debug("Extracting PDF with eclair backend.")
 
-    doughnut_config = kwargs.get("doughnut_config", {})
-    doughnut_config = doughnut_config if doughnut_config is not None else {}
+    eclair_config = kwargs.get("eclair_config", {})
+    eclair_config = eclair_config if eclair_config is not None else {}
 
-    batch_size = doughnut_config.doughnut_batch_size
+    batch_size = eclair_config.eclair_batch_size
 
     row_data = kwargs.get("row_data")
     # get source_id
@@ -146,16 +146,16 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
     accumulated_tables = []
     accumulated_images = []
 
-    model_interface = doughnut_utils.DoughnutModelInterface()
-    doughnut_client = create_inference_client(
-        doughnut_config.doughnut_endpoints,
+    model_interface = eclair_utils.EclairModelInterface()
+    eclair_client = create_inference_client(
+        eclair_config.eclair_endpoints,
         model_interface,
-        doughnut_config.auth_token,
-        doughnut_config.doughnut_infer_protocol,
+        eclair_config.auth_token,
+        eclair_config.eclair_infer_protocol,
     )
 
     for batch, batch_page_offset in zip(batches, batch_page_offsets):
-        responses = preprocess_and_send_requests(doughnut_client, batch, batch_page_offset)
+        responses = preprocess_and_send_requests(eclair_client, batch, batch_page_offset)
 
         for page_idx, bboxes, bbox_offset in responses:
             page_image = None
@@ -179,7 +179,7 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
                     math.ceil(bbox["ymax"] * DEFAULT_MAX_HEIGHT),
                 ]
 
-                if cls in doughnut_utils.ACCEPTED_TEXT_CLASSES:
+                if cls in eclair_utils.ACCEPTED_TEXT_CLASSES:
                     if identify_nearby_objects:
                         page_nearby_blocks["text"]["content"].append(txt)
                         page_nearby_blocks["text"]["bbox"].append(transformed_bbox)
@@ -302,14 +302,14 @@ def doughnut(pdf_stream, extract_text: bool, extract_images: bool, extract_table
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
 
-    if isinstance(doughnut_client, grpcclient.InferenceServerClient):
-        doughnut_client.close()
+    if isinstance(eclair_client, grpcclient.InferenceServerClient):
+        eclair_client.close()
 
     return extracted_data
 
 
 def preprocess_and_send_requests(
-    doughnut_client,
+    eclair_client,
     batch: List[pdfium.PdfPage],
     batch_offset: int,
 ) -> List[Tuple[int, str]]:
@@ -331,7 +331,7 @@ def preprocess_and_send_requests(
     for page_image in page_images:
         # Currently, the model only supports processing one page at a time (batch size = 1).
         data = {"image": page_image}
-        response = doughnut_client.infer(data, model_name="doughnut")
+        response = eclair_client.infer(data, model_name="eclair")
         output.append(response)
 
     if len(output) != len(batch):
@@ -343,7 +343,7 @@ def preprocess_and_send_requests(
     return list(zip(page_numbers, output, bbox_offsets))
 
 
-@pdfium_exception_handler(descriptor="doughnut")
+@pdfium_exception_handler(descriptor="eclair")
 def _construct_table_metadata(
     table: LatexTable,
     page_idx: int,

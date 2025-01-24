@@ -6,16 +6,16 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.doughnut_helper import _construct_table_metadata
-from nv_ingest.extraction_workflows.pdf.doughnut_helper import doughnut
-from nv_ingest.extraction_workflows.pdf.doughnut_helper import preprocess_and_send_requests
+from nv_ingest.extraction_workflows.pdf.eclair_helper import _construct_table_metadata
+from nv_ingest.extraction_workflows.pdf.eclair_helper import eclair
+from nv_ingest.extraction_workflows.pdf.eclair_helper import preprocess_and_send_requests
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.util.nim import doughnut as doughnut_utils
+from nv_ingest.util.nim import eclair as eclair_utils
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
 
-_MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.doughnut_helper"
+_MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.eclair_helper"
 
 
 @pytest.fixture
@@ -36,19 +36,19 @@ def sample_pdf_stream():
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_doughnut_text_extraction(mock_client, sample_pdf_stream, document_df):
+def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = "<x_0><y_1>testing<x_10><y_20><class_Text>"
 
-    result = doughnut(
+    result = eclair(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        doughnut_config=MagicMock(doughnut_batch_size=1),
+        eclair_config=MagicMock(eclair_batch_size=1),
     )
 
     assert len(result) == 1
@@ -58,19 +58,19 @@ def test_doughnut_text_extraction(mock_client, sample_pdf_stream, document_df):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_doughnut_table_extraction(mock_client, sample_pdf_stream, document_df):
+def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = "<x_17><y_0>table text<x_1007><y_1280><class_Table>"
 
-    result = doughnut(
+    result = eclair(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=True,
         row_data=document_df.iloc[0],
         text_depth="page",
-        doughnut_config=MagicMock(doughnut_batch_size=1),
+        eclair_config=MagicMock(eclair_batch_size=1),
     )
 
     assert len(result) == 2
@@ -83,19 +83,19 @@ def test_doughnut_table_extraction(mock_client, sample_pdf_stream, document_df):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_doughnut_image_extraction(mock_client, sample_pdf_stream, document_df):
+def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = "<x_17><y_0><x_1007><y_1280><class_Picture>"
 
-    result = doughnut(
+    result = eclair(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=True,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        doughnut_config=MagicMock(doughnut_batch_size=1),
+        eclair_config=MagicMock(eclair_batch_size=1),
     )
 
     assert len(result) == 2
@@ -124,21 +124,21 @@ def test_preprocess_and_send_requests(mock_pdfium_pages_to_numpy):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_doughnut_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
+def test_eclair_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = (
         "<x_0><y_1>testing0<x_10><y_20><class_Title><x_30><y_40>testing1<x_50><y_60><class_Text>"
     )
 
-    result = doughnut(
+    result = eclair(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        doughnut_config=MagicMock(doughnut_batch_size=1),
+        eclair_config=MagicMock(eclair_batch_size=1),
     )
 
     assert len(result) == 1

@@ -4,10 +4,10 @@
 
 import pytest
 
-from nv_ingest.util.nim.doughnut import extract_classes_bboxes
-from nv_ingest.util.nim.doughnut import postprocess_text
-from nv_ingest.util.nim.doughnut import reverse_transform_bbox
-from nv_ingest.util.nim.doughnut import strip_markdown_formatting
+from nv_ingest.util.nim.eclair import extract_classes_bboxes
+from nv_ingest.util.nim.eclair import postprocess_text
+from nv_ingest.util.nim.eclair import reverse_transform_bbox
+from nv_ingest.util.nim.eclair import strip_markdown_formatting
 
 
 def test_reverse_transform_bbox_no_offset():

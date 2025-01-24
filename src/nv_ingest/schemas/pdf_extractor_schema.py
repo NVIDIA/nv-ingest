@@ -91,17 +91,17 @@ class PDFiumConfigSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class DoughnutConfigSchema(BaseModel):
+class EclairConfigSchema(BaseModel):
     """
-    Configuration schema for Doughnut endpoints and options.
+    Configuration schema for Eclair endpoints and options.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    doughnut_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the doughnut endpoint.
+    eclair_endpoints : Tuple[str, str]
+        A tuple containing the gRPC and HTTP services for the eclair endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -122,9 +122,9 @@ class DoughnutConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    doughnut_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    doughnut_infer_protocol: str = ""
-    doughnut_batch_size: int = 32
+    eclair_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    eclair_infer_protocol: str = ""
+    eclair_batch_size: int = 32
 
     @model_validator(mode="before")
     @classmethod
@@ -148,7 +148,7 @@ class DoughnutConfigSchema(BaseModel):
             If both gRPC and HTTP services are empty for any endpoint.
         """
 
-        for model_name in ["doughnut"]:
+        for model_name in ["eclair"]:
             endpoint_name = f"{model_name}_endpoints"
             grpc_service, http_service = values.get(endpoint_name)
             grpc_service = _clean_service(grpc_service)
@@ -167,8 +167,8 @@ class DoughnutConfigSchema(BaseModel):
             values[protocol_name] = protocol_value
 
         # Currently both build.nvidia.com and NIM do not support batch size > 1.
-        if values.get("doughnut_infer_protocol") == "http":
-            values["doughnut_batch_size"] = 1
+        if values.get("eclair_infer_protocol") == "http":
+            values["eclair_batch_size"] = 1
 
         return values
 
@@ -199,7 +199,7 @@ class PDFExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     pdfium_config: Optional[PDFiumConfigSchema] = None
-    doughnut_config: Optional[DoughnutConfigSchema] = None
+    eclair_config: Optional[EclairConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
 
