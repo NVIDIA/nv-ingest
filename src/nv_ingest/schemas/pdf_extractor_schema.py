@@ -124,7 +124,6 @@ class EclairConfigSchema(BaseModel):
 
     eclair_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     eclair_infer_protocol: str = ""
-    eclair_batch_size: int = 32
 
     @model_validator(mode="before")
     @classmethod
@@ -165,10 +164,6 @@ class EclairConfigSchema(BaseModel):
                 protocol_value = "http" if http_service else "grpc" if grpc_service else ""
             protocol_value = protocol_value.lower()
             values[protocol_name] = protocol_value
-
-        # Currently both build.nvidia.com and NIM do not support batch size > 1.
-        if values.get("eclair_infer_protocol") == "http":
-            values["eclair_batch_size"] = 1
 
         return values
 

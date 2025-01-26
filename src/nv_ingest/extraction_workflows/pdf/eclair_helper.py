@@ -19,14 +19,14 @@
 
 import logging
 import math
+import traceback
 import uuid
+from typing import Any
 from typing import Dict
-from typing import List
 from typing import Tuple
 
 import numpy as np
 import pypdfium2 as pdfium
-import tritonclient.grpc as grpcclient
 
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
@@ -82,8 +82,6 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     eclair_config = kwargs.get("eclair_config", {})
     eclair_config = eclair_config if eclair_config is not None else {}
 
-    batch_size = eclair_config.eclair_batch_size
-
     row_data = kwargs.get("row_data")
     # get source_id
     source_id = row_data["source_id"]
@@ -125,163 +123,121 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         "access_level": access_level,
     }
 
-    pages = []
-    page_sizes = []
-    for page_idx in range(pdf_metadata.page_count):
-        page = doc.get_page(page_idx)
-        pages.append(page)
-        page_width, page_height = doc.get_page_size(page_idx)
-        page_sizes.append((page_width, page_height))
-
-    # Split into batches.
-    i = 0
-    batches = []
-    batch_page_offsets = []
-    while i < len(pages):
-        batches.append(pages[i : i + batch_size])  # noqa: E203
-        batch_page_offsets.append(i)
-        i += batch_size
-
     accumulated_text = []
     accumulated_tables = []
     accumulated_images = []
 
-    model_interface = eclair_utils.EclairModelInterface()
-    eclair_client = create_inference_client(
-        eclair_config.eclair_endpoints,
-        model_interface,
-        eclair_config.auth_token,
-        eclair_config.eclair_infer_protocol,
-    )
+    eclair_client = _create_clients(eclair_config)
 
-    for batch, batch_page_offset in zip(batches, batch_page_offsets):
-        responses = preprocess_and_send_requests(eclair_client, batch, batch_page_offset)
+    for page_idx in range(pdf_metadata.page_count):
+        page = doc.get_page(page_idx)
+        page_width, page_height = doc.get_page_size(page_idx)
 
-        for page_idx, bboxes, bbox_offset in responses:
-            page_image = None
-            page_width, page_height = page_sizes[page_idx]
+        page_nearby_blocks = {
+            "text": {"content": [], "bbox": [], "type": []},
+            "images": {"content": [], "bbox": [], "type": []},
+            "structured": {"content": [], "bbox": [], "type": []},
+        }
 
-            page_nearby_blocks = {
-                "text": {"content": [], "bbox": [], "type": []},
-                "images": {"content": [], "bbox": [], "type": []},
-                "structured": {"content": [], "bbox": [], "type": []},
-            }
+        page_image = _convert_pdfium_page_to_numpy(page)
+        response = _send_inference_request(eclair_client, page_image)
 
-            for bbox_info in bboxes:
-                cls = bbox_info["type"]
-                bbox = bbox_info["bbox"]
-                txt = bbox_info["text"]
+        for bbox_dict in response:
+            cls = bbox_dict["type"]
+            bbox = bbox_dict["bbox"]
+            txt = bbox_dict["text"]
 
-                transformed_bbox = [
-                    math.floor(bbox["xmin"] * DEFAULT_MAX_WIDTH),
-                    math.floor(bbox["ymin"] * DEFAULT_MAX_HEIGHT),
-                    math.ceil(bbox["xmax"] * DEFAULT_MAX_WIDTH),
-                    math.ceil(bbox["ymax"] * DEFAULT_MAX_HEIGHT),
-                ]
+            transformed_bbox = [
+                math.floor(bbox["xmin"] * DEFAULT_MAX_WIDTH),
+                math.floor(bbox["ymin"] * DEFAULT_MAX_HEIGHT),
+                math.ceil(bbox["xmax"] * DEFAULT_MAX_WIDTH),
+                math.ceil(bbox["ymax"] * DEFAULT_MAX_HEIGHT),
+            ]
 
-                if cls in eclair_utils.ACCEPTED_TEXT_CLASSES:
-                    if identify_nearby_objects:
-                        page_nearby_blocks["text"]["content"].append(txt)
-                        page_nearby_blocks["text"]["bbox"].append(transformed_bbox)
-                        page_nearby_blocks["text"]["type"].append(cls)
+            if cls not in eclair_utils.ACCEPTED_CLASSES:
+                continue
 
-                    if extract_text:
-                        accumulated_text.append(txt)
+            if identify_nearby_objects:
+                _insert_page_nearby_blocks(page_nearby_blocks, cls, txt, transformed_bbox)
 
-                if cls == "Table":
-                    if identify_nearby_objects:
-                        page_nearby_blocks["structured"]["content"].append(txt)
-                        page_nearby_blocks["structured"]["bbox"].append(transformed_bbox)
-                        page_nearby_blocks["structured"]["type"].append(cls)
+            if extract_text:
+                accumulated_text.append(txt)
 
-                    if extract_tables:
-                        try:
-                            txt = txt.encode().decode("unicode_escape")  # remove double backlashes
-                        except UnicodeDecodeError:
-                            pass
+            if extract_tables and (cls == "Table"):
+                table = LatexTable(
+                    latex=txt, bbox=transformed_bbox, max_width=DEFAULT_MAX_WIDTH, max_height=DEFAULT_MAX_HEIGHT
+                )
+                accumulated_tables.append(table)
 
-                        table = LatexTable(
-                            latex=txt, bbox=transformed_bbox, max_width=DEFAULT_MAX_WIDTH, max_height=DEFAULT_MAX_HEIGHT
-                        )
-                        accumulated_tables.append(table)
+            if extract_images and (cls == "Picture"):
+                img_numpy = crop_image(page_image, transformed_bbox)
 
-                if cls == "Picture":
-                    if identify_nearby_objects:
-                        page_nearby_blocks["images"]["content"].append(txt)
-                        page_nearby_blocks["images"]["bbox"].append(transformed_bbox)
-                        page_nearby_blocks["images"]["type"].append(cls)
-
-                    if extract_images:
-                        if page_image is None:
-                            scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-                            padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-                            page_image, *_ = pdfium_pages_to_numpy(
-                                [pages[page_idx]], scale_tuple=scale_tuple, padding_tuple=padding_tuple
-                            )
-                            page_image = page_image[0]
-
-                        img_numpy = crop_image(page_image, transformed_bbox)
-
-                        if img_numpy is not None:
-                            base64_img = numpy_to_base64(img_numpy)
-                            image = Base64Image(
-                                image=base64_img,
-                                bbox=transformed_bbox,
-                                width=img_numpy.shape[1],
-                                height=img_numpy.shape[0],
-                                max_width=DEFAULT_MAX_WIDTH,
-                                max_height=DEFAULT_MAX_HEIGHT,
-                            )
-                            accumulated_images.append(image)
-
-            # Construct tables
-            if extract_tables:
-                for table in accumulated_tables:
-                    extracted_data.append(
-                        _construct_table_metadata(
-                            table,
-                            page_idx,
-                            pdf_metadata.page_count,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
+                if img_numpy is not None:
+                    base64_img = numpy_to_base64(img_numpy)
+                    image = Base64Image(
+                        image=base64_img,
+                        bbox=transformed_bbox,
+                        width=img_numpy.shape[1],
+                        height=img_numpy.shape[0],
+                        max_width=DEFAULT_MAX_WIDTH,
+                        max_height=DEFAULT_MAX_HEIGHT,
                     )
-                accumulated_tables = []
+                    accumulated_images.append(image)
 
-            # Construct images
-            if extract_images:
-                for image in accumulated_images:
-                    extracted_data.append(
-                        construct_image_metadata_from_pdf_image(
-                            image,
-                            page_idx,
-                            pdf_metadata.page_count,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
-                    )
-                accumulated_images = []
+        # If Eclair fails to extract anything, fall back to using pdfium.
+        if not "".join(accumulated_text).strip():
+            textpage = page.get_textpage()
+            page_text = textpage.get_text_bounded()
+            accumulated_text.append(page_text)
 
-            # Construct text - page
-            if (extract_text) and (text_depth == TextTypeEnum.PAGE):
+        # Construct tables
+        if extract_tables:
+            for table in accumulated_tables:
                 extracted_data.append(
-                    construct_text_metadata(
-                        accumulated_text,
-                        pdf_metadata.keywords,
+                    _construct_table_metadata(
+                        table,
                         page_idx,
-                        -1,
-                        -1,
-                        -1,
                         pdf_metadata.page_count,
-                        text_depth,
                         source_metadata,
                         base_unified_metadata,
-                        delimiter="\n\n",
-                        bbox_max_dimensions=(DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT),
-                        nearby_objects=page_nearby_blocks,
                     )
                 )
-                accumulated_text = []
+            accumulated_tables = []
+
+        # Construct images
+        if extract_images:
+            for image in accumulated_images:
+                extracted_data.append(
+                    construct_image_metadata_from_pdf_image(
+                        image,
+                        page_idx,
+                        pdf_metadata.page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
+                )
+            accumulated_images = []
+
+        # Construct text - page
+        if (extract_text) and (text_depth == TextTypeEnum.PAGE):
+            extracted_data.append(
+                construct_text_metadata(
+                    accumulated_text,
+                    pdf_metadata.keywords,
+                    page_idx,
+                    -1,
+                    -1,
+                    -1,
+                    pdf_metadata.page_count,
+                    text_depth,
+                    source_metadata,
+                    base_unified_metadata,
+                    delimiter="\n\n",
+                    bbox_max_dimensions=(DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT),
+                    nearby_objects=page_nearby_blocks,
+                )
+            )
+            accumulated_text = []
 
     # Construct text - document
     if (extract_text) and (text_depth == TextTypeEnum.DOCUMENT):
@@ -302,45 +258,72 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
 
-    if isinstance(eclair_client, grpcclient.InferenceServerClient):
-        eclair_client.close()
+    eclair_client.close()
 
     return extracted_data
 
 
-def preprocess_and_send_requests(
-    eclair_client,
-    batch: List[pdfium.PdfPage],
-    batch_offset: int,
-) -> List[Tuple[int, str]]:
-    if not batch:
-        return []
-
-    render_dpi = DEFAULT_RENDER_DPI
-    scale_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-    padding_tuple = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT)
-
-    page_images, bbox_offsets = pdfium_pages_to_numpy(
-        batch, render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
+def _create_clients(eclair_config):
+    model_interface = eclair_utils.EclairModelInterface()
+    eclair_client = create_inference_client(
+        eclair_config.eclair_endpoints,
+        model_interface,
+        eclair_config.auth_token,
+        eclair_config.eclair_infer_protocol,
     )
-    page_numbers = [page_idx for page_idx in range(batch_offset, batch_offset + len(page_images))]
 
-    batch = np.array(page_images)
+    return eclair_client
 
-    output = []
-    for page_image in page_images:
-        # Currently, the model only supports processing one page at a time (batch size = 1).
-        data = {"image": page_image}
-        response = eclair_client.infer(data, model_name="eclair")
-        output.append(response)
 
-    if len(output) != len(batch):
-        raise RuntimeError(
-            f"Dimensions mismatch: there are {len(batch)} pages in the input but there are "
-            f"{len(output)} pages in the response."
+def _send_inference_request(
+    eclair_client,
+    image_array: np.ndarray,
+) -> Dict[str, Any]:
+
+    try:
+        # NIM only supports processing one page at a time (batch size = 1).
+        data = {"image": image_array}
+        response = eclair_client.infer(
+            data=data,
+            model_name="eclair",
         )
+    except Exception as e:
+        logger.error(f"Unhandled error during Eclair inference: {e}")
+        traceback.print_exc()
+        raise e
 
-    return list(zip(page_numbers, output, bbox_offsets))
+    return response
+
+
+def _convert_pdfium_page_to_numpy(
+    page: pdfium.PdfPage,
+    render_dpi: int = DEFAULT_RENDER_DPI,
+    scale_tuple: Tuple[int, int] = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT),
+    padding_tuple: Tuple[int, int] = (DEFAULT_MAX_WIDTH, DEFAULT_MAX_HEIGHT),
+) -> np.ndarray:
+    page_images, _ = pdfium_pages_to_numpy(
+        [page], render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
+    )
+
+    return page_images[0]
+
+
+def _insert_page_nearby_blocks(
+    page_nearby_blocks: Dict[str, Any],
+    cls: str,
+    txt: str,
+    bbox: str,
+):
+    if cls in eclair_utils.ACCEPTED_TEXT_CLASSES:
+        nearby_blocks_key = "text"
+    elif cls in eclair_utils.ACCEPTED_TABLE_CLASSES:
+        nearby_blocks_key = "structured"
+    elif cls in eclair_utils.ACCEPTED_IMAGE_CLASSES:
+        nearby_blocks_key = "images"
+
+    page_nearby_blocks[nearby_blocks_key]["content"].append(txt)
+    page_nearby_blocks[nearby_blocks_key]["bbox"].append(bbox)
+    page_nearby_blocks[nearby_blocks_key]["type"].append(cls)
 
 
 @pdfium_exception_handler(descriptor="eclair")
@@ -379,7 +362,7 @@ def _construct_table_metadata(
 
     ext_unified_metadata.update(
         {
-            "content": content,
+            "content": "",
             "source_metadata": source_metadata,
             "content_metadata": content_metadata,
             "table_metadata": table_metadata,

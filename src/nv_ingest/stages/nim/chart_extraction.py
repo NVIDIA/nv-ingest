@@ -13,7 +13,6 @@ import pandas as pd
 from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.table_and_chart import join_cached_and_deplot_output
 from nv_ingest.util.nim.cached import CachedModelInterface
@@ -67,7 +66,6 @@ def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: Ni
         (content_metadata.get("type") != "structured")
         or (content_metadata.get("subtype") != "chart")
         or (chart_metadata is None)
-        or (chart_metadata.get("table_format") != TableFormatEnum.IMAGE)
         or (base64_image in [None, ""])
     ):
         return metadata
