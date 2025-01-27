@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 
 from io import BytesIO
+
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.cached import CachedModelInterface
 from PIL import Image
 
@@ -56,11 +58,12 @@ def test_prepare_data_for_inference_valid(model_interface):
     input_data = {"base64_image": base64_img}
 
     result = model_interface.prepare_data_for_inference(input_data)
+    print(result)
 
-    assert "image_array" in result
-    assert isinstance(result["image_array"], np.ndarray)
-    assert result["image_array"].shape == (64, 64, 3)  # Assuming RGB image
-    assert result["image_array"].dtype == np.uint8  # Assuming image is loaded as uint8
+    assert "image_arrays" in result
+    assert isinstance(result["image_arrays"][0], np.ndarray)
+    assert result["image_arrays"][0].shape == (64, 64, 3)  # Assuming RGB image
+    assert result["image_arrays"][0].dtype == np.uint8  # Assuming image is loaded as uint8
 
 
 def test_prepare_data_for_inference_invalid_base64(model_interface):
@@ -123,18 +126,45 @@ def test_format_input_grpc_with_ndim_other(model_interface):
 
 def test_format_input_http(model_interface):
     """
-    Test format_input for 'http' protocol.
-    Ensures that the HTTP payload is correctly formatted based on the base64_image.
+    Test format_input for 'http' protocol under the new approach:
+     - The code expects 'image_arrays' in data
+     - Each array is re-encoded as PNG
+     - A single Nim message is built with multiple images in the 'content' array
     """
+    # 1) Create a small in-memory base64 image
+    #    This is just a placeholder function to generate or load some base64 data
     base64_img = create_base64_image()
-    data = {"base64_image": base64_img}
-    expected_payload = {
-        "messages": [{"content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}]}]
-    }
 
+    # 2) Decode it into a NumPy array (mimicking prepare_data_for_inference)
+    arr = base64_to_numpy(base64_img)  # or however your code does this
+
+    # 3) Build the data dict with "image_arrays"
+    data = {"image_arrays": [arr]}  # single array for a single test image
+
+    # 4) Call format_input
     formatted_input = model_interface.format_input(data, "http")
 
-    assert formatted_input == expected_payload
+    # 5) Verify the structure of the HTTP payload
+
+    assert "messages" in formatted_input, "Expected 'messages' key in output"
+    assert len(formatted_input["messages"]) == 1, "Expected exactly 1 message"
+
+    message = formatted_input["messages"][0]
+    assert "content" in message, "Expected 'content' key in the message"
+    assert len(message["content"]) == 1, "Expected exactly 1 image in content for this test"
+
+    content_item = message["content"][0]
+    assert content_item["type"] == "image_url", "Expected 'type' == 'image_url'"
+    assert "image_url" in content_item, "Expected 'image_url' key in content item"
+    assert "url" in content_item["image_url"], "Expected 'url' key in 'image_url' dict"
+
+    # 6) Optionally, check the prefix of the base64 URL
+    url_value = content_item["image_url"]["url"]
+    assert url_value.startswith(
+        "data:image/png;base64,"
+    ), f"URL should start with data:image/png;base64, but got {url_value[:30]}..."
+    # And check that there's something after the prefix
+    assert len(url_value) > len("data:image/png;base64,"), "Base64 string seems empty"
 
 
 def test_format_input_invalid_protocol(model_interface):
@@ -153,25 +183,30 @@ def test_format_input_invalid_protocol(model_interface):
 def test_parse_output_grpc(model_interface):
     """
     Test parse_output for 'grpc' protocol.
-    Ensures that byte responses are correctly decoded and concatenated.
+    Ensures that byte responses are correctly decoded into a list of strings.
     """
-    response = [[b"Hello"], [b"World"]]  # Each output is a list containing a byte string
+    # Suppose the new parse_output returns ["Hello", "World"] for this input
+    response = [[b"Hello"], [b"World"]]  # Each output is a list of byte strings
 
     parsed_output = model_interface.parse_output(response, "grpc")
 
-    assert parsed_output == "Hello World"
+    # The updated code might now produce a list rather than a single concatenated string
+    assert parsed_output == ["Hello", "World"]
 
 
 def test_parse_output_http(model_interface):
     """
     Test parse_output for 'http' protocol.
-    Ensures that content is correctly extracted from a valid HTTP JSON response.
+    Ensures that content is correctly extracted from a valid HTTP JSON response
+    and returned as a list of strings.
     """
+    # Single "data" entry. The new code returns a list, even if there's only 1 item.
     json_response = {"data": [{"content": "Processed Content"}]}
 
     parsed_output = model_interface.parse_output(json_response, "http")
 
-    assert parsed_output == "Processed Content"
+    # Expect a list with exactly one string in it
+    assert parsed_output == ["Processed Content"]
 
 
 def test_parse_output_http_missing_data_key(model_interface):
@@ -181,7 +216,7 @@ def test_parse_output_http_missing_data_key(model_interface):
     """
     json_response = {}
 
-    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key is missing or empty."):
+    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key missing or empty."):
         model_interface.parse_output(json_response, "http")
 
 
@@ -190,11 +225,9 @@ def test_parse_output_http_empty_data(model_interface):
     Test parse_output for 'http' protocol with empty 'data' list.
     Expects a RuntimeError to be raised.
     """
-    # Arrange
     json_response = {"data": []}
 
-    # Act & Assert
-    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key is missing or empty."):
+    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key missing or empty."):
         model_interface.parse_output(json_response, "http")
 
 
