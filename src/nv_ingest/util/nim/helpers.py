@@ -238,7 +238,7 @@ class NimClient:
 
     def _http_infer(self, formatted_input: dict) -> dict:
         """
-        Perform inference using the HTTP protocol.
+        Perform inference using the HTTP protocol, retrying for timeouts or 5xx errors up to 5 times.
 
         Parameters
         ----------
@@ -253,63 +253,77 @@ class NimClient:
         Raises
         ------
         TimeoutError
-            If the HTTP request times out.
+            If the HTTP request times out repeatedly, up to the max retries.
         requests.RequestException
-            For other HTTP-related errors.
+            For other HTTP-related errors that persist after max retries.
         """
 
-        max_retries = 3
+        max_retries = 5
         base_delay = 2.0
         attempt = 0
 
-        while attempt <= max_retries:
+        while attempt < max_retries:
             try:
                 response = requests.post(
                     self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
                 )
                 status_code = response.status_code
 
-                if status_code in [429, 503]:
-                    # Warn and attempt to retry
+                # Check for server-side or rate-limit type errors
+                # e.g. 5xx => server error, 429 => too many requests
+                if status_code == 429 or status_code == 503 or (500 <= status_code < 600):
                     logger.warning(
                         f"Received HTTP {status_code} ({response.reason}) from "
-                        f"{self.model_interface.name()}. Retrying..."
+                        f"{self.model_interface.name()}. Attempt {attempt+1} of {max_retries}."
                     )
-                    if attempt == max_retries:
+                    if attempt == max_retries - 1:
                         # No more retries left
                         logger.error(f"Max retries exceeded after receiving HTTP {status_code}.")
-                        response.raise_for_status()  # This will raise the appropriate HTTPError
+                        response.raise_for_status()  # raise the appropriate HTTPError
                     else:
-                        # Exponential backoff before retrying
+                        # Exponential backoff
                         backoff_time = base_delay * (2**attempt)
                         time.sleep(backoff_time)
                         attempt += 1
                         continue
                 else:
-                    # Not a 429/503 - just raise_for_status or return the response
+                    # Not in our "retry" category => just raise_for_status or return
                     response.raise_for_status()
                     logger.debug(f"HTTP inference response: {response.json()}")
                     return response.json()
 
             except requests.Timeout:
-                err_msg = (
-                    f"HTTP request timed out during {self.model_interface.name()} "
-                    f"inference after {self.timeout} seconds"
+                # Treat timeouts similarly to 5xx => attempt a retry
+                logger.warning(
+                    f"HTTP request timed out after {self.timeout} seconds during {self.model_interface.name()} "
+                    f"inference. Attempt {attempt+1} of {max_retries}."
                 )
-                logger.error(err_msg)
-                raise TimeoutError(err_msg)
+                if attempt == max_retries - 1:
+                    logger.error("Max retries exceeded after repeated timeouts.")
+                    raise TimeoutError(
+                        f"Repeated timeouts for {self.model_interface.name()} after {attempt+1} attempts."
+                    )
+                # Exponential backoff
+                backoff_time = base_delay * (2**attempt)
+                time.sleep(backoff_time)
+                attempt += 1
 
             except requests.HTTPError as http_err:
-                # If we ended up here after a final raise_for_status, it's a non-429/503 error
+                # If we ended up here, it's a non-retryable 4xx or final 5xx after final attempt
                 logger.error(f"HTTP request failed with status code {response.status_code}: {http_err}")
                 raise
 
             except requests.RequestException as e:
-                # Non-HTTPError request exceptions (e.g., ConnectionError)
-                logger.error(f"HTTP request failed: {e}")
-                raise
+                # ConnectionError or other non-HTTPError
+                logger.error(f"HTTP request encountered a network issue: {e}")
+                if attempt == max_retries - 1:
+                    raise
+                # Else retry on next loop iteration
+                backoff_time = base_delay * (2**attempt)
+                time.sleep(backoff_time)
+                attempt += 1
 
-        # If we exit the loop without returning, raise a generic error
+        # If we exit the loop without returning, we've exhausted all attempts
         logger.error(f"Failed to get a successful response after {max_retries} retries.")
         raise Exception(f"Failed to get a successful response after {max_retries} retries.")
 

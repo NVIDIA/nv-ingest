@@ -25,65 +25,71 @@ logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def _update_metadata(
-    base64_images: List[str], cached_client: NimClient, deplot_client: NimClient, trace_info: Dict
+    base64_images: List[str],
+    cached_client: NimClient,
+    deplot_client: NimClient,
+    trace_info: Dict,
+    batch_size: int = 1,
+    worker_pool_size: int = 1,
 ) -> List[Tuple[str, Dict]]:
     """
-    Given a list of base64-encoded chart images, this function runs parallel inference
-    on batched images (grouped into batches of size 4) and returns a list of tuples:
-        (original_base64_image, joined_inference_result)
-
-    Parameters
-    ----------
-    base64_images : List[str]
-        List of base64-encoded images to process.
-    cached_client : NimClient
-        NimClient used for the cached inference model.
-    deplot_client : NimClient
-        NimClient used for the deplot inference model.
-    trace_info : Dict
-        Trace information used for logging or debugging.
+    Given a list of base64-encoded chart images, this function:
+      - Splits them into batches of size `batch_size`.
+      - Calls Cached with *all images* in each batch in a single request.
+      - Calls Deplot individually (one request per image) in parallel.
+      - Joins the results for each image into a final combined inference result.
 
     Returns
     -------
     List[Tuple[str, Dict]]
-        For each base64-encoded image passed, returns a tuple:
-            (base64_image, joined_chart_content_dict)
+      For each base64-encoded image, returns (original_image_str, joined_chart_content_dict).
     """
+    logger.debug(f"Running chart extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
 
     def chunk_list(lst, chunk_size):
-        """Helper to split a list into chunks of given size."""
         for i in range(0, len(lst), chunk_size):
             yield lst[i : i + chunk_size]
 
     results = []
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        for batch in chunk_list(base64_images, 1):  # Batch size of 1 for now
-            # Submit both inference tasks simultaneously for the batch
-            data = {"base64_images": batch}
-            future_deplot = executor.submit(
-                deplot_client.infer,
-                data=data,
-                model_name="deplot",
-                stage_name="chart_data_extraction",
-                trace_info=trace_info,
-            )
+    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
+        for batch in chunk_list(base64_images, batch_size):
+            # 1) Single call to CACHED for the entire batch
+            cached_data = {"base64_images": batch}
             future_cached = executor.submit(
                 cached_client.infer,
-                data=data,
+                data=cached_data,
                 model_name="cached",
                 stage_name="chart_data_extraction",
                 trace_info=trace_info,
             )
 
-            # Wait for both futures and process results
-            try:
-                deplot_results = future_deplot.result()
-                cached_results = future_cached.result()
+            # 2) Multiple calls to DEPLOT, one per image in the batch
+            #    We store all futures in a list, each item a single infer request.
+            deplot_futures = []
+            for image_str in batch:
+                # Deplot only supports single-image calls
+                deplot_data = {"base64_image": image_str}
+                fut = executor.submit(
+                    deplot_client.infer,
+                    data=deplot_data,
+                    model_name="deplot",
+                    stage_name="chart_data_extraction",
+                    trace_info=trace_info,
+                )
+                deplot_futures.append(fut)
 
-                for img, deplot_res, cached_res in zip(batch, deplot_results, cached_results):
+            try:
+                # 3) Retrieve results
+                cached_results = future_cached.result()
+                # This should be a list of inference results (same length as 'batch')
+                deplot_results = [f.result() for f in deplot_futures]
+                # Each item is presumably a single result (since each call was single-image)
+
+                # 4) Zip them together, one by one
+                for img_str, cached_res, deplot_res in zip(batch, cached_results, deplot_results):
                     chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
-                    results.append((img, chart_content))
+                    results.append((img_str, chart_content))
 
             except Exception as e:
                 logger.error(f"Error processing batch: {batch}, error: {e}", exc_info=True)
@@ -202,7 +208,12 @@ def _extract_chart_data(
 
         # 3) Call our bulk update_metadata to get all results
         bulk_results = _update_metadata(
-            base64_images=base64_images, cached_client=cached_client, deplot_client=deplot_client, trace_info=trace_info
+            base64_images=base64_images,
+            cached_client=cached_client,
+            deplot_client=deplot_client,
+            batch_size=stage_config.nim_batch_size,
+            worker_pool_size=stage_config.workers_per_progress_engine,
+            trace_info=trace_info,
         )
 
         # 4) Write the results back to each row’s table_metadata
