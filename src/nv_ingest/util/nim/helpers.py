@@ -112,6 +112,7 @@ class NimClient:
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
         timeout: float = 30.0,
+        max_retries: int = 5,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -139,6 +140,7 @@ class NimClient:
         self.protocol = protocol.lower()
         self.auth_token = auth_token
         self.timeout = timeout  # Timeout for HTTP requests
+        self.max_retries = max_retries
 
         grpc_endpoint, http_endpoint = endpoints
 
@@ -258,11 +260,10 @@ class NimClient:
             For other HTTP-related errors that persist after max retries.
         """
 
-        max_retries = 5
         base_delay = 2.0
         attempt = 0
 
-        while attempt < max_retries:
+        while attempt < self.max_retries:
             try:
                 response = requests.post(
                     self.endpoint_url, json=formatted_input, headers=self.headers, timeout=self.timeout
@@ -274,9 +275,9 @@ class NimClient:
                 if status_code == 429 or status_code == 503 or (500 <= status_code < 600):
                     logger.warning(
                         f"Received HTTP {status_code} ({response.reason}) from "
-                        f"{self.model_interface.name()}. Attempt {attempt+1} of {max_retries}."
+                        f"{self.model_interface.name()}. Attempt {attempt+1} of {self.max_retries}."
                     )
-                    if attempt == max_retries - 1:
+                    if attempt == self.max_retries - 1:
                         # No more retries left
                         logger.error(f"Max retries exceeded after receiving HTTP {status_code}.")
                         response.raise_for_status()  # raise the appropriate HTTPError
@@ -296,9 +297,9 @@ class NimClient:
                 # Treat timeouts similarly to 5xx => attempt a retry
                 logger.warning(
                     f"HTTP request timed out after {self.timeout} seconds during {self.model_interface.name()} "
-                    f"inference. Attempt {attempt+1} of {max_retries}."
+                    f"inference. Attempt {attempt+1} of {self.max_retries}."
                 )
-                if attempt == max_retries - 1:
+                if attempt == self.max_retries - 1:
                     logger.error("Max retries exceeded after repeated timeouts.")
                     raise TimeoutError(
                         f"Repeated timeouts for {self.model_interface.name()} after {attempt+1} attempts."
@@ -316,7 +317,7 @@ class NimClient:
             except requests.RequestException as e:
                 # ConnectionError or other non-HTTPError
                 logger.error(f"HTTP request encountered a network issue: {e}")
-                if attempt == max_retries - 1:
+                if attempt == self.max_retries - 1:
                     raise
                 # Else retry on next loop iteration
                 backoff_time = base_delay * (2**attempt)
@@ -324,8 +325,8 @@ class NimClient:
                 attempt += 1
 
         # If we exit the loop without returning, we've exhausted all attempts
-        logger.error(f"Failed to get a successful response after {max_retries} retries.")
-        raise Exception(f"Failed to get a successful response after {max_retries} retries.")
+        logger.error(f"Failed to get a successful response after {self.max_retries} retries.")
+        raise Exception(f"Failed to get a successful response after {self.max_retries} retries.")
 
     def close(self):
         if self.protocol == "grpc" and hasattr(self.client, "close"):
