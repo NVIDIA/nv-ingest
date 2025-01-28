@@ -892,7 +892,7 @@ def remove_records(source_name: str, collection_name: str, milvus_uri: str = "ht
 def nv_rerank(
     query,
     candidates,
-    reranker_endpoint: str = "http://localhost:8015",
+    reranker_endpoint: str = "http://localhost:8015/v1/ranking",
     model_name: str = "nvidia/llama-3.2-nv-rerankqa-1b-v2",
     nvidia_api_key: str = "",
     truncate: str = "END",
@@ -928,14 +928,15 @@ def nv_rerank(
     """
     # reranker = NVIDIARerank(base_url=reranker_endpoint, nvidia_api_key=nvidia_api_key, top_n=top_k)
     headers = {"accept": "application/json", "Content-Type": "application/json"}
+    if nvidia_api_key:
+        headers["Authorization"] = f"Bearer {nvidia_api_key}"
     texts = []
     map_candidates = {}
     for idx, candidate in enumerate(candidates):
         map_candidates[idx] = candidate
         texts.append({"text": candidate["entity"]["text"]})
     payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
-    response = requests.post(f"{reranker_endpoint}/v1/ranking", headers=headers, json=payload)
-
+    response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
     rank_results = []
     for rank_vals in response.json()["rankings"]:
         idx = rank_vals["index"]
