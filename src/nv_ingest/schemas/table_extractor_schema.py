@@ -47,7 +47,7 @@ class TableExtractorConfigSchema(BaseModel):
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     paddle_infer_protocol: str = ""
 
-    nim_batch_size: int = 4
+    nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
 
     @model_validator(mode="before")

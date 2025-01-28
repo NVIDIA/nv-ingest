@@ -212,28 +212,6 @@ class CachedModelInterface(ModelInterface):
         # For Cached model, the output is the chart content as a string
         return output
 
-    def _prepare_nim_payload(self, base64_img: str) -> Dict[str, Any]:
-        """
-        Prepare a payload for the NIM (HTTP) API using a base64-encoded image.
-
-        Parameters
-        ----------
-        base64_img : str
-            The base64-encoded image string.
-
-        Returns
-        -------
-        dict
-            The formatted payload for the NIM API.
-        """
-        image_url = f"data:image/png;base64,{base64_img}"
-        image = {"type": "image_url", "image_url": {"url": image_url}}
-
-        message = {"content": [image]}
-        payload = {"messages": [message]}
-
-        return payload
-
     def _extract_content_from_nim_response(self, json_response: Dict[str, Any]) -> Any:
         """
         Extract content from the JSON response of a NIM (HTTP) API request.

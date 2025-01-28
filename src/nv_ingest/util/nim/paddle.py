@@ -264,42 +264,47 @@ class PaddleOCRModelInterface(ModelInterface):
         self, response: np.ndarray, table_content_format: str
     ) -> List[Tuple[str, str]]:
         """
-        For multiple images, 'response' might contain multiple sets of bounding boxes / text predictions.
-        We always return a list of (content, format) tuples, one per row in the batch.
+        For a single image (batch_size=1), 'response' is assumed to have shape (3,), where:
+          - response[0]: byte string containing bounding box data
+          - response[1]: byte string containing text prediction data
+          - response[2]: (Optional) some additional data/metadata (ignored or logged here)
+
+        We return a single-element list of (content, format).
         """
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
+        if response.shape != (3,):
+            raise ValueError(f"Unexpected response shape: {response.shape}, expecting (3,).")
 
-        if response.ndim != 2 or response.shape[1] < 2:
-            raise ValueError("Unexpected response shape for batched gRPC data. Expecting (B, >=2).")
+        # 1) Parse bounding boxes
+        bboxes_bytestr = response[0]
+        bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))
 
-        contents = []
-        batch_size = response.shape[0]
-        for i in range(batch_size):
-            bboxes_bytestr = response[i, 0]
-            texts_bytestr = response[i, 1]
+        # 2) Parse text predictions
+        texts_bytestr = response[1]
+        text_predictions = json.loads(texts_bytestr.decode("utf8"))
 
-            # Convert from bytes to python strings
-            bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))
-            text_predictions = json.loads(texts_bytestr.decode("utf8"))
+        # 3) Optionally handle or log the third element
+        #    For example, if it's additional data we don't need:
+        extra_data = response[2]
+        logger.debug(f"Ignoring extra_data: {extra_data}")
 
-            # If your server sends [ [ bounding_boxes ], [ text_preds ] ] for each image, flatten them
-            if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
-                bounding_boxes = bounding_boxes[0]
-            if isinstance(text_predictions, list) and len(text_predictions) == 1:
-                text_predictions = text_predictions[0]
+        # If your server still sends nested lists like [[bboxes]], flatten them
+        if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
+            bounding_boxes = bounding_boxes[0]
+        if isinstance(text_predictions, list) and len(text_predictions) == 1:
+            text_predictions = text_predictions[0]
 
-            if table_content_format == TableFormatEnum.SIMPLE:
-                content = " ".join(text_predictions)
-            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions, i)
-            else:
-                raise ValueError(f"Unexpected table format: {table_content_format}")
+        # Construct the content string based on the desired table_content_format
+        if table_content_format == TableFormatEnum.SIMPLE:
+            content = " ".join(text_predictions)
+        elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+            content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions, img_index=0)
+        else:
+            raise ValueError(f"Unexpected table format: {table_content_format}")
 
-            contents.append(content)
-
-        # Return a list of (content, format) tuples, one for each batch entry
-        return [(c, table_content_format) for c in contents]
+        # Return a single-element list
+        return [(content, table_content_format)]
 
     def _convert_paddle_response_to_psuedo_markdown(
         self, bounding_boxes: List[Any], text_predictions: List[str], img_index: int = 0

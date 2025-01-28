@@ -31,19 +31,22 @@ def _update_metadata(
     trace_info: Dict = None,
 ) -> List[Tuple[str, Tuple[Any, Any]]]:
     """
-    Given a list of base64-encoded table images, this function processes them in batches
-    of arbitrary size and calls the PaddleOCR model to extract table data.
+    Given a list of base64-encoded images, this function processes them either individually
+    (if paddle_client.protocol == 'grpc') or in batches (if paddle_client.protocol == 'http'),
+    then calls the PaddleOCR model to extract data.
 
-    For each base64-encoded image passed, the return list has:
+    For each base64-encoded image, the result is:
         (base64_image, (table_content, table_content_format))
 
-    Images that do not meet the minimum size will get ("", "").
+    Images that do not meet the minimum size are skipped (("", "")).
     """
-
-    logger.debug(f"Running table extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
+    logger.debug(
+        f"Running table extraction: batch_size={batch_size}, "
+        f"worker_pool_size={worker_pool_size}, protocol={paddle_client.protocol}"
+    )
 
     # We'll build the final results in the same order as base64_images.
-    # results[i] will be (base64_images[i], (table_content, table_content_format)).
+    # results[i] = (base64_images[i], (table_content, table_content_format)).
     results: List[Optional[Tuple[str, Tuple[Any, Any]]]] = [None] * len(base64_images)
 
     # Pre-decode dimensions once (optional, but efficient if we want to skip small images).
@@ -52,63 +55,106 @@ def _update_metadata(
         array = base64_to_numpy(img)
         decoded_shapes.append(array.shape)  # e.g. (height, width, channels)
 
-    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
-        # Process images in chunks
-        for start_idx in range(0, len(base64_images), batch_size):
-            chunk_indices = range(start_idx, min(start_idx + batch_size, len(base64_images)))
-            valid_indices = []
-            valid_images = []
+    # ------------------------------------------------
+    # GRPC path: submit one request per valid image.
+    # ------------------------------------------------
+    if paddle_client.protocol == "grpc":
+        with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
+            future_to_index = {}
 
-            # Check dimensions & collect valid images
-            for i in chunk_indices:
-                # shape is (height, width, ...)
+            # Submit individual requests
+            for i, b64_image in enumerate(base64_images):
                 height, width = decoded_shapes[i][0], decoded_shapes[i][1]
-                if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
-                    valid_indices.append(i)
-                    valid_images.append(base64_images[i])
-                else:
+                if width < PADDLE_MIN_WIDTH or height < PADDLE_MIN_HEIGHT:
                     # Too small, skip inference
-                    results[i] = (base64_images[i], ("", ""))
+                    results[i] = (b64_image, ("", ""))
+                    continue
 
-            if not valid_images:
-                # All images in this chunk were too small
-                continue
+                # Enqueue a single-image inference
+                data = {"base64_images": [b64_image]}  # single item
+                future = executor.submit(
+                    paddle_client.infer,
+                    data=data,
+                    model_name="paddle",
+                    trace_info=trace_info,
+                    stage_name="table_data_extraction",
+                )
+                future_to_index[future] = i
 
-            # Now run inference on the valid images
-            data = {"base64_images": valid_images}
-            future = executor.submit(
-                paddle_client.infer,
-                data=data,
-                model_name="paddle",
-                trace_info=trace_info,
-                stage_name="table_data_extraction",
-            )
+            # Gather results
+            for future, i in future_to_index.items():
+                b64_image = base64_images[i]
+                try:
+                    paddle_result = future.result()
+                    # We expect exactly one result for one image
+                    if not isinstance(paddle_result, list) or len(paddle_result) != 1:
+                        raise ValueError(f"Expected 1 result list, got: {paddle_result}")
+                    table_content, table_format = paddle_result[0]
+                    results[i] = (b64_image, (table_content, table_format))
+                except Exception as e:
+                    logger.error(f"Error processing image {i}. Error: {e}", exc_info=True)
+                    results[i] = (b64_image, ("", ""))
 
-            try:
-                # This should be a list of (table_content, table_content_format),
-                # one for each valid image
-                paddle_result = future.result()
+    # ------------------------------------------------
+    # HTTP path: submit requests in batches.
+    # ------------------------------------------------
+    else:
+        with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
+            # Process images in chunks
+            for start_idx in range(0, len(base64_images), batch_size):
+                chunk_indices = range(start_idx, min(start_idx + batch_size, len(base64_images)))
+                valid_indices = []
+                valid_images = []
 
-                if not isinstance(paddle_result, list):
-                    raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
+                # Check dimensions & collect valid images
+                for i in chunk_indices:
+                    height, width = decoded_shapes[i][0], decoded_shapes[i][1]
+                    if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
+                        valid_indices.append(i)
+                        valid_images.append(base64_images[i])
+                    else:
+                        # Too small, skip inference
+                        results[i] = (base64_images[i], ("", ""))
 
-                if len(paddle_result) != len(valid_images):
-                    raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
+                if not valid_images:
+                    # All images in this chunk were too small
+                    continue
 
-                # Match each result back to its original index
-                for idx_in_batch, (tc, tf) in enumerate(paddle_result):
-                    i = valid_indices[idx_in_batch]
-                    results[i] = (base64_images[i], (tc, tf))
+                # Submit a single batch inference
+                data = {"base64_images": valid_images}
+                future = executor.submit(
+                    paddle_client.infer,
+                    data=data,
+                    model_name="paddle",
+                    trace_info=trace_info,
+                    stage_name="table_data_extraction",
+                )
 
-            except Exception as e:
-                logger.error(f"Error processing batch {valid_images}. Error: {e}", exc_info=True)
-                # If inference fails, we can fill them with empty or re-raise
-                for vi in valid_indices:
-                    results[vi] = (base64_images[vi], ("", ""))
-                raise
+                try:
+                    # This should be a list of (table_content, table_content_format)
+                    # in the same order as valid_images
+                    paddle_result = future.result()
+
+                    if not isinstance(paddle_result, list):
+                        raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
+
+                    if len(paddle_result) != len(valid_images):
+                        raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
+
+                    # Match each result back to its original index
+                    for idx_in_batch, (tc, tf) in enumerate(paddle_result):
+                        i = valid_indices[idx_in_batch]
+                        results[i] = (base64_images[i], (tc, tf))
+
+                except Exception as e:
+                    logger.error(f"Error processing batch {valid_images}. Error: {e}", exc_info=True)
+                    # If inference fails, we can fill them with empty or re-raise
+                    for vi in valid_indices:
+                        results[vi] = (base64_images[vi], ("", ""))
+                    raise
 
     # 'results' now has an entry for every image in base64_images
-    return results  # Each item is (base64_image, (content, format))
+    return results
 
 
 def _create_paddle_client(stage_config) -> NimClient:
