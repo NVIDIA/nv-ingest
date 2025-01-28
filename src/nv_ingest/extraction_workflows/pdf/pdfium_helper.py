@@ -25,8 +25,8 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-import nv_ingest.util.nim.yolox as yolox_utils
 
+import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
@@ -40,9 +40,8 @@ from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_fro
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
+from nv_ingest.util.pdf.pdfium import extract_image_bounding_boxes_from_pdfium_page
 
 YOLOX_MAX_BATCH_SIZE = 8
 YOLOX_MAX_WIDTH = 1536
@@ -173,6 +172,8 @@ def extract_table_and_chart_images(
             h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
 
             cropped = crop_image(original_image, (h1, w1, h2, w2))
+            if cropped is None:
+                continue
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
@@ -301,36 +302,44 @@ def pdfium_extractor(
 
         # Image extraction
         if extract_images:
-            for obj in page.get_objects():
-                obj_type = PDFIUM_PAGEOBJ_MAPPING.get(obj.type, "UNKNOWN")
-                if obj_type == "IMAGE":
-                    try:
-                        # Attempt to retrieve the image bitmap
-                        image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
-                        image_base64: str = numpy_to_base64(image_numpy)
-                        image_bbox = obj.get_pos()
-                        image_size = obj.get_size()
-                        image_data = Base64Image(
-                            image=image_base64,
-                            bbox=image_bbox,
-                            width=image_size[0],
-                            height=image_size[1],
-                            max_width=page_width,
-                            max_height=page_height,
-                        )
+            try:
+                fused_bboxes = extract_image_bounding_boxes_from_pdfium_page(page)
 
-                        extracted_image_data = construct_image_metadata_from_pdf_image(
-                            image_data,
-                            page_idx,
-                            pdf_metadata.page_count,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
+                original_images, _ = pdfium_pages_to_numpy(
+                    [page],  # A batch with a single image.
+                    render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
+                    rotation=page.get_rotation(),  # Without rotation, coordinates from page.get_pos() will not match.
+                )
 
-                        extracted_data.append(extracted_image_data)
-                    except Exception as e:
-                        logger.error(f"Unhandled error extracting image: {e}")
-                        pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
+                for bbox in fused_bboxes:
+                    cropped_image = crop_image(original_images[0], bbox, min_width=10, min_height=10)
+                    if cropped_image is None:  # Small images are filtered out.
+                        continue
+                    image_base64 = numpy_to_base64(cropped_image)
+
+                    image_data = Base64Image(
+                        image=image_base64,
+                        bbox=bbox,
+                        width=bbox[2] - bbox[0],
+                        height=bbox[3] - bbox[1],
+                        max_width=page_width,
+                        max_height=page_height,
+                    )
+
+                    extracted_image_data = construct_image_metadata_from_pdf_image(
+                        image_data,
+                        page_idx,
+                        pdf_metadata.page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
+
+                    extracted_data.append(extracted_image_data)
+
+            except Exception as e:
+                logger.error(f"Unhandled error extracting image: {e}")
+                traceback.print_exc()
+                pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
 
         # Table and chart collection
         if extract_tables or extract_charts:

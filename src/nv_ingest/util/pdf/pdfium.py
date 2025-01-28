@@ -10,6 +10,7 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from numpy import dtype
 from numpy import ndarray
 from PIL import Image
@@ -119,9 +120,10 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 @traceable_func(trace_name="pdf_content_extractor::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
-    render_dpi=300,
+    render_dpi: int = 300,
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
+    rotation: int = 0,
 ) -> tuple[list[ndarray | ndarray[Any, dtype[Any]]], list[tuple[int, int]]]:
     """
     Converts a list of PdfPage objects to a list of NumPy arrays, where each array
@@ -142,6 +144,7 @@ def pdfium_pages_to_numpy(
         Defaults to None.
     padding_tuple : Optional[Tuple[int, int]], optional
         A tuple (width, height) to pad the image to. Defaults to None.
+    rotation:
 
     Returns
     -------
@@ -164,9 +167,9 @@ def pdfium_pages_to_numpy(
     padding_offsets = []
     scale = render_dpi / 72  # 72 DPI is the base DPI in PDFium
 
-    for page in pages:
-        # Render the page as a bitmap with the specified scale
-        page_bitmap = page.render(scale=scale, rotation=0)
+    for idx, page in enumerate(pages):
+        # Render the page as a bitmap with the specified scale and rotation
+        page_bitmap = page.render(scale=scale, rotation=rotation)
 
         # Convert the bitmap to a PIL image
         pil_image = page_bitmap.to_pil()
@@ -188,3 +191,145 @@ def pdfium_pages_to_numpy(
         images.append(img_arr)
 
     return images, padding_offsets
+
+
+def convert_pdfium_position(pos, page_height):
+    left, bottom, right, top = pos
+    x0, x1 = left, right
+    y0, y1 = page_height - top, page_height - bottom
+
+    return [int(x0), int(y0), int(x1), int(y1)]
+
+
+def boxes_are_close_or_overlap(b1, b2, threshold=5.0):
+    """
+    Return True if bounding boxes b1 and b2 overlap or
+    are closer than 'threshold' in points/pixels.
+    b1, b2 = (xmin, ymin, xmax, ymax).
+    """
+    (xmin1, ymin1, xmax1, ymax1) = b1
+    (xmin2, ymin2, xmax2, ymax2) = b2
+
+    # Check if they overlap horizontally
+    overlap_x = not (xmax1 < xmin2 or xmax2 < xmin1)
+    # Check if they overlap vertically
+    overlap_y = not (ymax1 < ymin2 or ymax2 < ymin1)
+
+    # If there's an actual overlap area, that's enough
+    if overlap_x and overlap_y:
+        return True
+
+    # Otherwise, measure the gap. We can do a simple approach:
+    #   horizontal gap = distance between the rightmost left edge and the leftmost right edge
+    #   vertical gap   = ...
+    # But to keep it straightforward, let's do a quick bounding box expansions approach
+    # Expand each box by 'threshold' in all directions and see if they overlap now
+    expanded_b1 = (xmin1 - threshold, ymin1 - threshold, xmax1 + threshold, ymax1 + threshold)
+    expanded_b2 = (xmin2 - threshold, ymin2 - threshold, xmax2 + threshold, ymax2 + threshold)
+
+    # Check overlap on expanded boxes
+    (exmin1, eymin1, exmax1, eymax1) = expanded_b1
+    (exmin2, eymin2, exmax2, eymax2) = expanded_b2
+
+    overlap_x_expanded = not (exmax1 < exmin2 or exmax2 < exmin1)
+    overlap_y_expanded = not (eymax1 < eymin2 or eymax2 < eymin1)
+
+    return overlap_x_expanded and overlap_y_expanded
+
+
+def group_bounding_boxes(boxes, threshold=5.0, max_depth=None):
+    """
+    Given a list of bounding boxes,
+    returns a list of groups (lists) of bounding box indices.
+    """
+    n = len(boxes)
+    visited = [False] * n
+    adjacency_list = [[] for _ in range(n)]
+
+    # Build adjacency by checking closeness/overlap
+    for i in range(n):
+        for j in range(i + 1, n):
+            if boxes_are_close_or_overlap(boxes[i], boxes[j], threshold):
+                adjacency_list[i].append(j)
+                adjacency_list[j].append(i)
+
+    # DFS to get connected components
+    def dfs(start):
+        stack = [(start, 0)]  # (node, depth)
+        component = []
+        while stack:
+            node, depth = stack.pop()
+            if not visited[node]:
+                visited[node] = True
+                component.append(node)
+
+                # If we haven't reached max_depth (if max_depth is set)
+                if max_depth is None or depth < max_depth:
+                    for neighbor in adjacency_list[node]:
+                        if not visited[neighbor]:
+                            stack.append((neighbor, depth + 1))
+
+        return component
+
+    groups = []
+    for i in range(n):
+        if not visited[i]:
+            comp = dfs(i)
+            groups.append(comp)
+
+    return groups
+
+
+def combine_groups_into_bboxes(boxes, groups):
+    """
+    Given the original bounding boxes and a list of groups (each group is
+    a list of indices), return one bounding box per group.
+    """
+    combined = []
+    for group in groups:
+        # Initialize to something big/small
+        xmins = []
+        ymins = []
+        xmaxs = []
+        ymaxs = []
+        for idx in group:
+            (xmin, ymin, xmax, ymax) = boxes[idx]
+            xmins.append(xmin)
+            ymins.append(ymin)
+            xmaxs.append(xmax)
+            ymaxs.append(ymax)
+
+        # Compute combined bounding box
+        group_xmin = min(xmins)
+        group_ymin = min(ymins)
+        group_xmax = max(xmaxs)
+        group_ymax = max(ymaxs)
+
+        combined.append((group_xmin, group_ymin, group_xmax, group_ymax))
+
+    return combined
+
+
+def extract_image_bounding_boxes_from_pdfium_page(page):
+    results = []
+    page_height = page.get_height()
+    bboxes = []
+    for obj in page.get_objects(
+        filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE, pdfium_c.FPDF_PAGEOBJ_PATH),
+        max_depth=1,
+    ):
+        bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        bboxes.append(bbox)
+
+    if bboxes:
+        groups = group_bounding_boxes(bboxes)
+        results.extend(combine_groups_into_bboxes(bboxes, groups))
+
+    for obj in page.get_objects(
+        filter=(pdfium_c.FPDF_PAGEOBJ_FORM,),
+        max_depth=1,
+    ):
+        bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        results.append(bbox)
+
+    return results
