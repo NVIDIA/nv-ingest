@@ -254,25 +254,6 @@ def test_process_inference_results(model_interface):
     assert result == output
 
 
-# Note: The following tests for private methods are optional and can be omitted
-# in strict blackbox testing as they target internal implementations.
-
-
-def test_prepare_nim_payload(model_interface):
-    """
-    Test the _prepare_nim_payload private method.
-    Ensures that the NIM payload is correctly formatted.
-    """
-    base64_img = create_base64_image()
-    expected_payload = {
-        "messages": [{"content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}]}]
-    }
-
-    payload = model_interface._prepare_nim_payload(base64_img)
-
-    assert payload == expected_payload
-
-
 def test_extract_content_from_nim_response_valid(model_interface):
     """
     Test the _extract_content_from_nim_response private method with valid response.

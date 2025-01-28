@@ -8,9 +8,6 @@ import io
 import numpy as np
 from PIL import Image
 
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 _MODULE_UNDER_TEST = "nv_ingest.util.nim.paddle"
@@ -31,19 +28,30 @@ def create_valid_base64_image(width=32, height=32, color=(127, 127, 127)):
 
 def create_valid_grpc_response_batched(text="mock_text"):
     """
-    Create a gRPC response in shape (B,2), column0 => bounding boxes, column1 => text predictions
-    bounding_boxes is a list-of-lists-of-lists, text is a list-of-lists
-    """
-    # Example bounding boxes: 1 set with 4 corners
-    bounding_boxes = [[[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]]
-    text_predictions = [[text]]
+    Create a gRPC response in shape (3, n).
+      - row 0 => bounding boxes
+      - row 1 => text predictions
+      - row 2 => extra data / metadata
 
-    # Encode each column as JSON bytes
+    For a single item, we get (3,1).
+    """
+    # Example bounding boxes: one list with a single bounding box of 4 corners
+    bounding_boxes = [[[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]]
+    # Example text predictions
+    text_predictions = [[text]]
+    # Some arbitrary extra data
+    extra_data = "mock_extra_data"
+
+    # Encode each row as JSON bytes
     bb_json = json.dumps(bounding_boxes).encode("utf-8")
     txt_json = json.dumps(text_predictions).encode("utf-8")
+    extra_json = json.dumps(extra_data).encode("utf-8")
 
-    # Return shape => (1,2)
-    return np.array([[bb_json, txt_json]], dtype=object)
+    # Return shape => (3,1)
+    #   row 0 -> bounding_boxes
+    #   row 1 -> text_predictions
+    #   row 2 -> extra_data
+    return np.array([[bb_json], [txt_json], [extra_json]], dtype=object)
 
 
 @pytest.fixture
@@ -174,7 +182,7 @@ def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_re
     e.g. [("| mock_text |\n", "pseudo_markdown")]
     """
     with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
-        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
+        mock_base64_to_numpy.return_value = np.zeros((3, 100, 100))
 
         data = {"base64_image": "mock_base64_string"}
         _ = paddle_ocr_model.prepare_data_for_inference(data)
