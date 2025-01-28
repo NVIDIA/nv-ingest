@@ -178,8 +178,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | `affinity`                          | [default: {}] Affinity settings for deployment.                                                                  | `{}`    |
 | `nodeSelector`                      | Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`                                  | `{}`    |
 | `logLevel`                          | Log level of NV-Ingest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
-| `extraEnvVarsCM`                    | [default: ""] A Config map holding Enviroment variables to include in the NV-Ingest containerextraEnvVarsCM: ""   | `""`    |
-| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Enviroment variables to include in the NV-Ingest container                   | `""`    |
+| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NV-Ingest containerextraEnvVarsCM: ""   | `""`    |
+| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Environment variables to include in the NV-Ingest container                   | `""`    |
 | `fullnameOverride`                  | [default: ""] A name to force the fullname of the NV-Ingest container to have, defaults to the Helm Release Name  | `""`    |
 | `nameOverride`                      | [default: ""] A name to base the objects created by this helm chart                                              | `""`    |
 | `image.repository`                  | NIM Image Repository                                                                                             | `""`    |
