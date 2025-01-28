@@ -235,7 +235,7 @@ def main(
 
     try:
         configure_logging(logger, log_level)
-        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(ctx.params, indent=2, default=str)}")
+        logging.debug(f"nv-ingest-cli:params:\n{json.dumps(ctx.params, indent=2, default=repr)}")
 
         docs = list(doc)
         if dataset:
