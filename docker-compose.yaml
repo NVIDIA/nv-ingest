@@ -144,6 +144,8 @@ services:
               device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
+    profiles:
+      - retrieval
 
   nv-ingest-ms-runtime:
     image: nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10.1
