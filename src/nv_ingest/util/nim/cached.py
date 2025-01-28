@@ -50,7 +50,6 @@ class CachedModelInterface(ModelInterface):
         """
         # Handle single vs. multiple images.
         # For batch processing, prefer "base64_images".
-        # If you must remain backward-compatible, you can handle "base64_image" as a fallback.
         if "base64_images" in data:
             base64_list = data["base64_images"]
             if not isinstance(base64_list, list):
@@ -85,30 +84,37 @@ class CachedModelInterface(ModelInterface):
         Raises
         ------
         ValueError
-            If an invalid protocol is specified.
+            If an invalid protocol is specified or if the images do not share the same shape.
         """
         if "image_arrays" not in data:
             raise KeyError("Expected 'image_arrays' in data. Make sure prepare_data_for_inference was called.")
 
-        # The array(s) we got from prepare_data_for_inference
+        # The arrays we got from prepare_data_for_inference
         image_arrays = data["image_arrays"]
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Cached model (batched).")
-            # Stack all images into a batch: (batch_size, H, W, C) -> or the shape your model expects
+
             batched_images = []
             for arr in image_arrays:
                 # If shape is (H, W, C), expand to (1, H, W, C)
-                # or if already has batch dimension, keep it
+                # If already has a leading batch dimension, keep it
                 if arr.ndim == 3:
-                    arr = np.expand_dims(arr, axis=0)
+                    arr = np.expand_dims(arr, axis=0)  # -> (1, H, W, C)
+
                 batched_images.append(arr.astype(np.float32))
 
             if not batched_images:
                 raise ValueError("No valid images found for gRPC formatting.")
 
-            batched_input = np.concatenate(batched_images, axis=0)  # shape (B, H, W, C)
+            # Check that all images match in shape beyond the batch dimension
+            # e.g. every array should be (1, H, W, C) with the same (H, W, C)
+            shapes = [img.shape[1:] for img in batched_images]  # list of (H, W, C) shapes
+            if any(s != shapes[0] for s in shapes[1:]):
+                raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
 
+            # Concatenate along the batch dimension => shape (B, H, W, C)
+            batched_input = np.concatenate(batched_images, axis=0)
             return batched_input
 
         elif protocol == "http":

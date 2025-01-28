@@ -103,12 +103,18 @@ class PaddleOCRModelInterface(ModelInterface):
             # For each image in the batch:
             # 1) Preprocess (if needed)
             # 2) Cast to float32
-            # 3) Expand dims so shape => (1, H, W, Channels)
+            # 3) Expand dims so shape => (1, H, W, C)
             processed = []
             for img in images:
                 arr = preprocess_image_for_paddle(img, self.paddle_version).astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
                 processed.append(arr)
+
+            # Check that all images (beyond the batch dimension) have the same shape
+            # If not, raise an error
+            shapes = [p.shape[1:] for p in processed]  # List of (H, W, C) shapes
+            if not all(s == shapes[0] for s in shapes[1:]):
+                raise ValueError(f"All images must have the same dimensions for gRPC batching. " f"Found: {shapes}")
 
             # Concatenate along the batch dimension => shape (B, H, W, C)
             batched_input = np.concatenate(processed, axis=0)
@@ -264,47 +270,63 @@ class PaddleOCRModelInterface(ModelInterface):
         self, response: np.ndarray, table_content_format: str
     ) -> List[Tuple[str, str]]:
         """
-        For a single image (batch_size=1), 'response' is assumed to have shape (3,), where:
-          - response[0]: byte string containing bounding box data
-          - response[1]: byte string containing text prediction data
-          - response[2]: (Optional) some additional data/metadata (ignored or logged here)
+        Parses a gRPC response for one or more images.
 
-        We return a single-element list of (content, format).
+        The response can have two possible shapes:
+          - (3,) for batch_size=1
+          - (3, n) for batch_size=n
+
+        In either case:
+          response[0, i]: byte string containing bounding box data
+          response[1, i]: byte string containing text prediction data
+          response[2, i]: (Optional) additional data/metadata (ignored or logged here)
+
+        Returns a list of (content, table_content_format) of length n.
         """
         if not isinstance(response, np.ndarray):
             raise ValueError("Unexpected response format: response is not a NumPy array.")
-        if response.shape != (3,):
-            raise ValueError(f"Unexpected response shape: {response.shape}, expecting (3,).")
 
-        # 1) Parse bounding boxes
-        bboxes_bytestr = response[0]
-        bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))
+        # If we have shape (3,), convert to (3,1) so we can handle everything uniformly
+        if response.ndim == 1 and response.shape == (3,):
+            response = response.reshape(3, 1)
+        elif response.ndim != 2 or response.shape[0] != 3:
+            raise ValueError(f"Unexpected response shape: {response.shape}. " "Expecting (3,) or (3, n).")
 
-        # 2) Parse text predictions
-        texts_bytestr = response[1]
-        text_predictions = json.loads(texts_bytestr.decode("utf8"))
+        batch_size = response.shape[1]
+        results = []
 
-        # 3) Optionally handle or log the third element
-        #    For example, if it's additional data we don't need:
-        extra_data = response[2]
-        logger.debug(f"Ignoring extra_data: {extra_data}")
+        for i in range(batch_size):
+            # 1) Parse bounding boxes
+            bboxes_bytestr = response[0, i]
+            bounding_boxes = json.loads(bboxes_bytestr.decode("utf8"))
 
-        # If your server still sends nested lists like [[bboxes]], flatten them
-        if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
-            bounding_boxes = bounding_boxes[0]
-        if isinstance(text_predictions, list) and len(text_predictions) == 1:
-            text_predictions = text_predictions[0]
+            # 2) Parse text predictions
+            texts_bytestr = response[1, i]
+            text_predictions = json.loads(texts_bytestr.decode("utf8"))
 
-        # Construct the content string based on the desired table_content_format
-        if table_content_format == TableFormatEnum.SIMPLE:
-            content = " ".join(text_predictions)
-        elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-            content = self._convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions, img_index=0)
-        else:
-            raise ValueError(f"Unexpected table format: {table_content_format}")
+            # 3) Optionally handle or log the third element (extra data/metadata)
+            extra_data_bytestr = response[2, i]
+            logger.debug(f"Ignoring extra_data for image {i}: {extra_data_bytestr}")
 
-        # Return a single-element list
-        return [(content, table_content_format)]
+            # If your server still sends nested lists like [[bboxes]], flatten them
+            if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
+                bounding_boxes = bounding_boxes[0]
+            if isinstance(text_predictions, list) and len(text_predictions) == 1:
+                text_predictions = text_predictions[0]
+
+            # Construct the content string based on the desired format
+            if table_content_format == TableFormatEnum.SIMPLE:
+                content = " ".join(text_predictions)
+            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+                content = self._convert_paddle_response_to_psuedo_markdown(
+                    bounding_boxes, text_predictions, img_index=i
+                )
+            else:
+                raise ValueError(f"Unexpected table format: {table_content_format}")
+
+            results.append((content, table_content_format))
+
+        return results
 
     def _convert_paddle_response_to_psuedo_markdown(
         self, bounding_boxes: List[Any], text_predictions: List[str], img_index: int = 0
