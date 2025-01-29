@@ -209,7 +209,7 @@ class RestClient(MessageBrokerClientBase):
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
                     # Terminal response code; return error ResponseSchema
                     return ResponseSchema(
-                        response_code=1,
+                        response_code=response_code,
                         response_reason=(
                             f"Terminal response code {response_code} received when fetching JobSpec: {job_id}"
                         ),
