@@ -40,7 +40,7 @@ dependencies:
     condition: paddleocrDeployed
   - name: deplot-nim
     repository: "alias:nemo-microservices"
-    version: 0.1.6
+    version: 0.1.12
     condition: deplotDeployed
   - name: text-embedding-nim
     repository: "alias:nvidia-nim"
