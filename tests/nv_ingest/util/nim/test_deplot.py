@@ -29,13 +29,23 @@ def test_name_returns_deplot(model_interface):
 
 
 def test_prepare_data_for_inference_valid(model_interface):
+    """
+    Test prepare_data_for_inference with a single 'base64_image'.
+    We now expect the returned dict to contain 'image_arrays', a list with one item.
+    """
     base64_img = create_base64_image()
     data = {"base64_image": base64_img}
     result = model_interface.prepare_data_for_inference(data)
-    assert "image_array" in result
-    assert isinstance(result["image_array"], np.ndarray)
-    assert result["image_array"].shape == (256, 256, 3)
-    assert result["image_array"].dtype == np.uint8
+
+    # Check that we now have "image_arrays"
+    assert "image_arrays" in result, "Expected 'image_arrays' key after inference preparation"
+    assert len(result["image_arrays"]) == 1, "Expected exactly one image array"
+
+    # Extract the first array and verify shape/type
+    arr = result["image_arrays"][0]
+    assert isinstance(arr, np.ndarray), "Expected a NumPy array"
+    assert arr.shape == (256, 256, 3), "Expected a (256,256,3) shape"
+    assert arr.dtype == np.uint8, "Expected dtype of uint8"
 
 
 def test_prepare_data_for_inference_missing_base64_image(model_interface):
@@ -96,22 +106,37 @@ def test_format_input_invalid_protocol(model_interface):
 
 
 def test_parse_output_grpc_simple(model_interface):
+    """
+    Test parse_output for gRPC protocol with a simple 2-element response.
+    The new code returns a list of strings (one for each batch element).
+    """
+    # Each element is [b"Hello"] or [b"World"], so parse_output should decode and build a list.
     response = [[b"Hello"], [b"World"]]
     output = model_interface.parse_output(response, "grpc")
-    assert output == "Hello World"
+
+    # Now we expect ["Hello", "World"], not a single string.
+    assert output == ["Hello", "World"]
 
 
 def test_parse_output_grpc_multiple_bytes(model_interface):
+    """
+    Test parse_output for gRPC protocol with three elements.
+    The new code returns a list, each decoding/combining the bytes in that sublist.
+    """
+    # Here, the code sees [b"Hello"], [b"world"], [b"!"] -> becomes ["Hello", "world", "!"]
     response = [[b"Hello"], [b"world"], [b"!"]]
     output = model_interface.parse_output(response, "grpc")
-    assert output == "Hello world !"
+    assert output == ["Hello", "world", "!"]
 
 
 def test_parse_output_grpc_empty(model_interface):
+    """
+    Test parse_output for gRPC protocol with an empty response.
+    We now expect an empty list rather than an empty string.
+    """
     response = []
-    # With an empty response, the comprehension returns an empty list, join returns an empty string.
     output = model_interface.parse_output(response, "grpc")
-    assert output == ""
+    assert output == [], "Expected an empty list for an empty response"
 
 
 def test_parse_output_http_valid(model_interface):

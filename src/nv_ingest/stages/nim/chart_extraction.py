@@ -4,13 +4,14 @@
 
 import functools
 import logging
-from typing import Any
+from typing import Any, List
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
 import pandas as pd
 from morpheus.config import Config
+from concurrent.futures import ThreadPoolExecutor
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
@@ -23,79 +24,78 @@ from nv_ingest.util.nim.helpers import NimClient
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
-# Modify the _update_metadata function
-def _update_metadata(row: pd.Series, cached_client: NimClient, deplot_client: NimClient, trace_info: Dict) -> Dict:
+def _update_metadata(
+    base64_images: List[str],
+    cached_client: NimClient,
+    deplot_client: NimClient,
+    trace_info: Dict,
+    batch_size: int = 1,
+    worker_pool_size: int = 1,
+) -> List[Tuple[str, Dict]]:
     """
-    Modifies the metadata of a row if the conditions for chart extraction are met.
-
-    Parameters
-    ----------
-    row : pd.Series
-        A row from the DataFrame containing metadata for the chart extraction.
-
-    cached_client : NimClient
-        The client used to call the cached inference model.
-
-    deplot_client : NimClient
-        The client used to call the deplot inference model.
-
-    trace_info : Dict
-        Trace information used for logging or debugging.
+    Given a list of base64-encoded chart images, this function:
+      - Splits them into batches of size `batch_size`.
+      - Calls Cached with *all images* in each batch in a single request.
+      - Calls Deplot individually (one request per image) in parallel.
+      - Joins the results for each image into a final combined inference result.
 
     Returns
     -------
-    Dict
-        The modified metadata if conditions are met, otherwise the original metadata.
-
-    Raises
-    ------
-    ValueError
-        If critical information (such as metadata) is missing from the row.
+    List[Tuple[str, Dict]]
+      For each base64-encoded image, returns (original_image_str, joined_chart_content_dict).
     """
-    metadata = row.get("metadata")
-    if metadata is None:
-        logger.error("Row does not contain 'metadata'.")
-        raise ValueError("Row does not contain 'metadata'.")
+    logger.debug(f"Running chart extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
 
-    base64_image = metadata.get("content")
-    content_metadata = metadata.get("content_metadata", {})
-    chart_metadata = metadata.get("table_metadata")
+    def chunk_list(lst, chunk_size):
+        for i in range(0, len(lst), chunk_size):
+            yield lst[i : i + chunk_size]
 
-    # Only modify if content type is structured and subtype is 'chart' and chart_metadata exists
-    if (
-        (content_metadata.get("type") != "structured")
-        or (content_metadata.get("subtype") != "chart")
-        or (chart_metadata is None)
-        or (base64_image in [None, ""])
-    ):
-        return metadata
+    results = []
 
-    # Modify chart metadata with the result from the inference models
-    try:
-        data = {"base64_image": base64_image}
+    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
+        for batch in chunk_list(base64_images, batch_size):
+            # 1) Single call to CACHED for the entire batch
+            cached_data = {"base64_images": batch}
+            future_cached = executor.submit(
+                cached_client.infer,
+                data=cached_data,
+                model_name="cached",
+                stage_name="chart_data_extraction",
+                trace_info=trace_info,
+            )
 
-        # Perform inference using the NimClients
-        deplot_result = deplot_client.infer(
-            data,
-            model_name="deplot",
-            trace_info=trace_info,  # traceable_func arg
-            stage_name="chart_data_extraction",  # traceable_func arg
-        )
-        cached_result = cached_client.infer(
-            data,
-            model_name="cached",
-            stage_name="chart_data_extraction",  # traceable_func arg
-            trace_info=trace_info,  # traceable_func arg
-        )
+            # 2) Multiple calls to DEPLOT, one per image in the batch
+            #    We store all futures in a list, each item a single infer request.
+            deplot_futures = []
+            for image_str in batch:
+                # Deplot only supports single-image calls
+                deplot_data = {"base64_image": image_str}
+                fut = executor.submit(
+                    deplot_client.infer,
+                    data=deplot_data,
+                    model_name="deplot",
+                    stage_name="chart_data_extraction",
+                    trace_info=trace_info,
+                )
+                deplot_futures.append(fut)
 
-        chart_content = join_cached_and_deplot_output(cached_result, deplot_result)
+            try:
+                # 3) Retrieve results
+                cached_results = future_cached.result()
+                # This should be a list of inference results (same length as 'batch')
+                deplot_results = [f.result() for f in deplot_futures]
+                # Each item is presumably a single result (since each call was single-image)
 
-        chart_metadata["table_content"] = chart_content
-    except Exception as e:
-        logger.error(f"Unhandled error calling image inference model: {e}", exc_info=True)
-        raise
+                # 4) Zip them together, one by one
+                for img_str, cached_res, deplot_res in zip(batch, cached_results, deplot_results):
+                    chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
+                    results.append((img_str, chart_content))
 
-    return metadata
+            except Exception as e:
+                logger.error(f"Error processing batch: {batch}, error: {e}", exc_info=True)
+                raise
+
+    return results
 
 
 def _create_clients(
@@ -131,19 +131,16 @@ def _extract_chart_data(
     df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Extracts chart data from a DataFrame.
+    Extracts chart data from a DataFrame in a bulk fashion rather than row-by-row.
 
     Parameters
     ----------
     df : pd.DataFrame
         DataFrame containing the content from which chart data is to be extracted.
-
     task_props : Dict[str, Any]
         Dictionary containing task properties and configurations.
-
     validated_config : Any
         The validated configuration object for chart extraction.
-
     trace_info : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
@@ -157,7 +154,6 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
-
     _ = task_props  # unused
 
     if trace_info is None:
@@ -176,13 +172,56 @@ def _extract_chart_data(
         stage_config.auth_token,
     )
 
-    if trace_info is None:
-        trace_info = {}
-        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
-
     try:
-        # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(cached_client, deplot_client, trace_info))
+        # 1) Identify rows that meet criteria in a single pass
+        #    - metadata exists
+        #    - content_metadata.type == "structured"
+        #    - content_metadata.subtype == "chart"
+        #    - table_metadata not None
+        #    - base64_image not None or ""
+        def meets_criteria(row):
+            m = row.get("metadata", {})
+            if not m:
+                return False
+            content_md = m.get("content_metadata", {})
+            if (
+                content_md.get("type") == "structured"
+                and content_md.get("subtype") == "chart"
+                and m.get("table_metadata") is not None
+                and m.get("content") not in [None, ""]
+            ):
+                return True
+            return False
+
+        mask = df.apply(meets_criteria, axis=1)
+        valid_indices = df[mask].index.tolist()
+
+        # If no rows meet the criteria, just return
+        if not valid_indices:
+            return df, {"trace_info": trace_info}
+
+        # 2) Extract base64 images + keep track of row -> image mapping
+        base64_images = []
+        for idx in valid_indices:
+            meta = df.at[idx, "metadata"]
+            base64_images.append(meta["content"])  # guaranteed by meets_criteria
+
+        # 3) Call our bulk update_metadata to get all results
+        bulk_results = _update_metadata(
+            base64_images=base64_images,
+            cached_client=cached_client,
+            deplot_client=deplot_client,
+            batch_size=stage_config.nim_batch_size,
+            worker_pool_size=stage_config.workers_per_progress_engine,
+            trace_info=trace_info,
+        )
+
+        # 4) Write the results back to each row’s table_metadata
+        #    The order of base64_images in bulk_results should match their original
+        #    indices if we process them in the same order.
+        for row_id, idx in enumerate(valid_indices):
+            (_, chart_content) = bulk_results[row_id]
+            df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
 
         return df, {"trace_info": trace_info}
 
