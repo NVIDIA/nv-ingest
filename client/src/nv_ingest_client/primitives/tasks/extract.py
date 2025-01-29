@@ -180,9 +180,9 @@ class ExtractTask(Task):
         extract_method: _Type_Extract_Method_PDF = "pdfium",
         extract_text: bool = False,
         extract_images: bool = False,
-        extract_images_method: _Type_Extract_Images_Method = "merged",
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
+        extract_images_method: _Type_Extract_Images_Method = "merged",
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
@@ -194,9 +194,9 @@ class ExtractTask(Task):
 
         self._document_type = document_type
         self._extract_images = extract_images
-        self._extract_images_method = extract_images_method
         self._extract_method = extract_method
         self._extract_tables = extract_tables
+        self._extract_images_method = extract_images_method
         self._extract_tables_method = extract_tables_method
         # `extract_charts` is initially set to None for backward compatibility.
         # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
@@ -217,9 +217,9 @@ class ExtractTask(Task):
         info += f"  extract method: {self._extract_method}\n"
         info += f"  extract text: {self._extract_text}\n"
         info += f"  extract images: {self._extract_images}\n"
-        info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
+        info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
         info += f"  paddle_output_format: {self._paddle_output_format}\n"
@@ -232,8 +232,8 @@ class ExtractTask(Task):
         extract_params = {
             "extract_text": self._extract_text,
             "extract_images": self._extract_images,
-            "extract_images_method": self._extract_images_method,
             "extract_tables": self._extract_tables,
+            "extract_images_method": self._extract_images_method,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "text_depth": self._text_depth,
