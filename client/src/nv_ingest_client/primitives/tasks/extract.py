@@ -13,7 +13,10 @@ from typing import Literal
 from typing import Optional
 from typing import get_args
 
-from pydantic import BaseModel, field_validator, model_validator
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import field_validator
+from pydantic import model_validator
 
 from .task_base import Task
 
@@ -86,12 +89,15 @@ _Type_Extract_Tables_Method_Map = {
     "pptx": get_args(_Type_Extract_Tables_Method_PPTX),
 }
 
+_Type_Extract_Images_Method = Literal["simple", "merged"]
+
 
 class ExtractTaskSchema(BaseModel):
     document_type: str
     extract_method: str = None  # Initially allow None to set a smart default
     extract_text: bool = True
     extract_images: bool = True
+    extract_images_method: str = "merged"
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
@@ -152,8 +158,15 @@ class ExtractTaskSchema(BaseModel):
             raise ValueError(f"extract_method must be one of {valid_methods}")
         return v
 
-    class Config:
-        extra = "forbid"
+    @field_validator("extract_images_method")
+    def extract_images_method_must_be_valid(cls, v):
+        if v.lower() not in get_args(_Type_Extract_Images_Method):
+            raise ValueError(
+                f"Unsupported document type '{v}'. Supported types are: {', '.join(_Type_Extract_Images_Method)}"
+            )
+        return v.lower()
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class ExtractTask(Task):
@@ -167,6 +180,7 @@ class ExtractTask(Task):
         extract_method: _Type_Extract_Method_PDF = "pdfium",
         extract_text: bool = False,
         extract_images: bool = False,
+        extract_images_method: _Type_Extract_Images_Method = "merged",
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
@@ -180,6 +194,7 @@ class ExtractTask(Task):
 
         self._document_type = document_type
         self._extract_images = extract_images
+        self._extract_images_method = extract_images_method
         self._extract_method = extract_method
         self._extract_tables = extract_tables
         self._extract_tables_method = extract_tables_method
@@ -202,6 +217,7 @@ class ExtractTask(Task):
         info += f"  extract method: {self._extract_method}\n"
         info += f"  extract text: {self._extract_text}\n"
         info += f"  extract images: {self._extract_images}\n"
+        info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
@@ -216,6 +232,7 @@ class ExtractTask(Task):
         extract_params = {
             "extract_text": self._extract_text,
             "extract_images": self._extract_images,
+            "extract_images_method": self._extract_images_method,
             "extract_tables": self._extract_tables,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,

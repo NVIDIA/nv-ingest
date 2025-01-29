@@ -310,7 +310,14 @@ def combine_groups_into_bboxes(boxes, groups):
     return combined
 
 
-def extract_image_bounding_boxes_from_pdfium_page(page):
+def extract_nested_images_from_pdfium_page(page):
+    return page.get_objects(
+        filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
+        max_depth=2,
+    )
+
+
+def extract_top_level_image_like_objects_from_pdfium_page(page):
     results = []
     page_height = page.get_height()
     bboxes = []
