@@ -219,10 +219,7 @@ def _extract_chart_data(
         # 4) Write the results back to each row’s table_metadata
         #    The order of base64_images in bulk_results should match their original
         #    indices if we process them in the same order.
-        #    Alternatively, you can store a dictionary keyed by base64_image if needed.
-        #    For simplicity, we're just enumerating in the same sequence we built base64_images.
         for row_id, idx in enumerate(valid_indices):
-            # We get the (base64_image, chart_content) from the results
             (_, chart_content) = bulk_results[row_id]
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
 

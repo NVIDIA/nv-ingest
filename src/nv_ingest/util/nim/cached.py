@@ -122,15 +122,10 @@ class CachedModelInterface(ModelInterface):
             # Convert each image back to base64, building a single payload with multiple images
             # to mimic YOLOX or NIM's typical batch approach
 
-            # If your Nim endpoint expects: {"messages":[{"content": [ ... ]}]}
-            # we can build that structure.
             content_list = []
-            # If data also included the original base64 strings, we could just reuse them,
-            # but here let's do the full approach of re-encoding from "image_arrays".
             for arr in image_arrays:
                 # Convert from np.uint8 or float -> PIL -> base64
                 if arr.dtype != np.uint8:
-                    # If your pipeline expects [0,1] floats, you may need to scale 255
                     arr = (arr * 255).astype(np.uint8)
                 image_pil = Image.fromarray(arr)
                 buffered = io.BytesIO()
@@ -141,8 +136,6 @@ class CachedModelInterface(ModelInterface):
                 image_item = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}
                 content_list.append(image_item)
 
-            # Nim payload example (similar to your single-image approach, but batched)
-            # One message containing multiple images in the "content" array:
             message = {"content": content_list}
             payload = {"messages": [message]}
 
@@ -178,7 +171,6 @@ class CachedModelInterface(ModelInterface):
             logger.debug("Parsing output from gRPC Cached model (batched).")
             parsed = []
             for single_output in response:
-                # single_output might be [b'something']
                 joined_str = " ".join(o.decode("utf-8") for o in single_output)
                 parsed.append(joined_str)
             return parsed

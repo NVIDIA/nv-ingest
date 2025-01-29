@@ -163,8 +163,6 @@ class PaddleOCRModelInterface(ModelInterface):
     def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
         Parse the output from the model's inference response. For multi-image gRPC or HTTP,
-        you may need to handle multiple sets of bounding boxes/text. By default, we return
-        a single combined string or a list of strings, depending on your server's behavior.
         """
         default_table_content_format = (
             TableFormatEnum.SIMPLE if self._is_version_early_access_legacy_api() else TableFormatEnum.PSEUDO_MARKDOWN
@@ -308,7 +306,6 @@ class PaddleOCRModelInterface(ModelInterface):
             extra_data_bytestr = response[2, i]
             logger.debug(f"Ignoring extra_data for image {i}: {extra_data_bytestr}")
 
-            # If your server still sends nested lists like [[bboxes]], flatten them
             if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
                 bounding_boxes = bounding_boxes[0]
             if isinstance(text_predictions, list) and len(text_predictions) == 1:

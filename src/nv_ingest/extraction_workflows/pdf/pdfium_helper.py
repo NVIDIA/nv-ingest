@@ -312,7 +312,6 @@ def pdfium_extractor(
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
 
-    # Create PdfDocument in the main process as before
     doc = libpdfium.PdfDocument(pdf_stream)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
