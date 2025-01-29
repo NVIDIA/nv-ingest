@@ -8,14 +8,14 @@
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
-{% set git_root = environ.get('GIT_ROOT', '../../..') %}
+{% set git_root = environ.get('GIT_ROOT', '../../../api') %}
 
 package:
   name: nv_ingest_api
   version: {{ version }}
 
 source:
-  path: {{ git_root }}/api
+  path: {{ git_root }}
 
 build:
   number: 0

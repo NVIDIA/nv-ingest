@@ -16,7 +16,7 @@ package:
   version: {{ version }}
 
 source:
-  path: {{ git_root }}/client
+  path: {{ git_root }}
 
 build:
   number: 0
