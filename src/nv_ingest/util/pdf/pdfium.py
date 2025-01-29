@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import traceback
 from typing import Any
 from typing import List
 from typing import Optional
@@ -15,7 +16,10 @@ from numpy import dtype
 from numpy import ndarray
 from PIL import Image
 
+from nv_ingest.util.image_processing.transforms import crop_image
+from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.image_processing.transforms import pad_image
+from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
@@ -194,6 +198,10 @@ def pdfium_pages_to_numpy(
 
 
 def convert_pdfium_position(pos, page_height):
+    """
+    Convert a PDFium bounding box (which typically has an origin at the bottom-left)
+    to a more standard bounding-box format with y=0 at the top.
+    """
     left, bottom, right, top = pos
     x0, x1 = left, right
     y0, y1 = page_height - top, page_height - bottom
@@ -287,7 +295,6 @@ def combine_groups_into_bboxes(boxes, groups):
     """
     combined = []
     for group in groups:
-        # Initialize to something big/small
         xmins = []
         ymins = []
         xmaxs = []
@@ -299,7 +306,6 @@ def combine_groups_into_bboxes(boxes, groups):
             xmaxs.append(xmax)
             ymaxs.append(ymax)
 
-        # Compute combined bounding box
         group_xmin = min(xmins)
         group_ymin = min(ymins)
         group_xmax = max(xmaxs)
@@ -310,33 +316,214 @@ def combine_groups_into_bboxes(boxes, groups):
     return combined
 
 
-def extract_nested_images_from_pdfium_page(page):
-    return page.get_objects(
-        filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
-        max_depth=2,
-    )
-
-
-def extract_top_level_image_like_objects_from_pdfium_page(page):
-    results = []
+def extract_simple_images_from_pdfium_page(page, max_depth):
+    page_width = page.get_width()
     page_height = page.get_height()
-    bboxes = []
+
+    try:
+        image_objects = page.get_objects(
+            filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
+            max_depth=max_depth,
+        )
+    except Exception as e:
+        logger.error(f"Unhandled error extracting image: {e}")
+        traceback.print_exc()
+        return []
+
+    extracted_images = []
+    for obj in image_objects:
+        try:
+            # Attempt to retrieve the image bitmap
+            image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
+            image_base64: str = numpy_to_base64(image_numpy)
+            image_bbox = obj.get_pos()
+            image_size = obj.get_size()
+            if image_size[0] < 10 and image_size[1] < 10:
+                continue
+
+            image_data = Base64Image(
+                image=image_base64,
+                bbox=image_bbox,
+                width=image_size[0],
+                height=image_size[1],
+                max_width=page_width,
+                max_height=page_height,
+            )
+            extracted_images.append(image_data)
+        except Exception as e:
+            logger.error(f"Unhandled error extracting image: {e}")
+            traceback.print_exc()
+            pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
+
+    return extracted_images
+
+
+def extract_nested_simple_images_from_pdfium_page(page):
+    return extract_simple_images_from_pdfium_page(page, max_depth=2)
+
+
+def extract_top_level_simple_images_from_pdfium_page(page):
+    return extract_simple_images_from_pdfium_page(page, max_depth=1)
+
+
+def remove_superset_bboxes(bboxes):
+    """
+    Given a list of bounding boxes (x_min, y_min, x_max, y_max),
+    remove any bounding box that is a strict superset of another
+    (i.e., fully contains a smaller box).
+
+    Returns:
+        A new list of bounding boxes without the supersets.
+    """
+    results = []
+
+    for i, box_a in enumerate(bboxes):
+        xA_min, yA_min, xA_max, yA_max = box_a
+
+        # Flag to mark if we should exclude this box
+        exclude_a = False
+
+        for j, box_b in enumerate(bboxes):
+            if i == j:
+                continue
+
+            xB_min, yB_min, xB_max, yB_max = box_b
+
+            # Check if box_a strictly encloses box_b:
+            # 1) xA_min <= xB_min, yA_min <= yB_min, xA_max >= xB_max, yA_max >= yB_max
+            # 2) At least one of those inequalities is strict, meaning they're not equal on all edges
+            if xA_min <= xB_min and yA_min <= yB_min and xA_max >= xB_max and yA_max >= yB_max:
+                # box_a is a strict superset => remove it
+                exclude_a = True
+                break
+
+        if not exclude_a:
+            results.append(box_a)
+
+    return results
+
+
+def extract_merged_images_from_pdfium_page(page, merge=True):
+    """
+    Extract bounding boxes of image objects from a PDFium page, with optional merging
+    of bounding boxes that likely belong to the same compound image.
+    """
+    page_height = page.get_height()
+
+    image_bboxes = []
     for obj in page.get_objects(
-        filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE, pdfium_c.FPDF_PAGEOBJ_PATH),
+        filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
         max_depth=1,
     ):
-        bbox = convert_pdfium_position(obj.get_pos(), page_height)
-        bboxes.append(bbox)
+        image_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        image_bboxes.append(image_bbox)
 
-    if bboxes:
-        groups = group_bounding_boxes(bboxes)
-        results.extend(combine_groups_into_bboxes(bboxes, groups))
+    # If no merging is requested or no bounding boxes exist, return the list as is
+    if (not merge) or (not image_bboxes):
+        return image_bboxes
 
+    merged_groups = group_bounding_boxes(image_bboxes)
+    merged_bboxes = combine_groups_into_bboxes(image_bboxes, merged_groups)
+
+    return merged_bboxes
+
+
+def extract_merged_shapes_from_pdfium_page(page, merge=True):
+    """
+    Extract bounding boxes of path objects (shapes) from a PDFium page, and optionally merge
+    those bounding boxes if they appear to be part of the same shape group. Also filters out
+    shapes that occupy more than half the page area.
+    """
+    page_width = page.get_width()
+    page_height = page.get_height()
+    page_area = page_width * page_height
+
+    path_bboxes = []
+    for obj in page.get_objects(
+        filter=(pdfium_c.FPDF_PAGEOBJ_PATH,),
+        max_depth=1,
+    ):
+        path_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        path_bboxes.append(path_bbox)
+
+    # If merging is disabled or no bounding boxes were found, return them as-is
+    if (not merge) or (not path_bboxes):
+        return path_bboxes
+
+    merged_bboxes = []
+    path_groups = group_bounding_boxes(path_bboxes)
+    path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups)
+    for bbox in path_bboxes:
+        bbox_area = abs(bbox[0] - bbox[2]) * abs(bbox[1] - bbox[3])
+        # Exclude shapes that are too large (likely page backgrounds or false positives)
+        if bbox_area > 0.5 * page_area:
+            continue
+        merged_bboxes.append(bbox)
+
+    return merged_bboxes
+
+
+def extract_forms_from_pdfium_page(page):
+    """
+    Extract bounding boxes for PDF form objects from a PDFium page, removing any
+    bounding boxes that strictly enclose other boxes (i.e., are strict supersets).
+    """
+    results = []
+    page_height = page.get_height()
+
+    form_bboxes = []
     for obj in page.get_objects(
         filter=(pdfium_c.FPDF_PAGEOBJ_FORM,),
         max_depth=1,
     ):
-        bbox = convert_pdfium_position(obj.get_pos(), page_height)
-        results.append(bbox)
+        form_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        form_bboxes.append(form_bbox)
+
+    # Remove any bounding box that strictly encloses another.
+    # The larger form is likely a background.
+    results.extend(remove_superset_bboxes(form_bboxes))
 
     return results
+
+
+def extract_image_like_objects_from_pdfium_page(page, merge=True):
+    page_width = page.get_width()
+    page_height = page.get_height()
+    rotation = page.get_rotation()
+
+    try:
+        original_images, _ = pdfium_pages_to_numpy(
+            [page],  # A batch with a single image.
+            render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
+            rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
+        )
+        image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge)
+        shape_bboxes = extract_merged_shapes_from_pdfium_page(page, merge=merge)
+        form_bboxes = extract_forms_from_pdfium_page(page)
+    except Exception as e:
+        logger.error(f"Unhandled error extracting image: {e}")
+        traceback.print_exc()
+        return []
+
+    extracted_images = []
+    for bbox in image_bboxes + shape_bboxes + form_bboxes:
+        try:
+            cropped_image = crop_image(original_images[0], bbox, min_width=10, min_height=10)
+            if cropped_image is None:  # Small images are filtered out.
+                continue
+            image_base64 = numpy_to_base64(cropped_image)
+            image_data = Base64Image(
+                image=image_base64,
+                bbox=bbox,
+                width=bbox[2] - bbox[0],
+                height=bbox[3] - bbox[1],
+                max_width=page_width,
+                max_height=page_height,
+            )
+            extracted_images.append(image_data)
+        except Exception as e:
+            logger.error(f"Unhandled error extracting image: {e}")
+            traceback.print_exc()
+            pass  # Pdfium failed to extract the image associated with this object - corrupt or missing.
+
+    return extracted_images
