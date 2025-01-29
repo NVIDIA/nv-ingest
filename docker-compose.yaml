@@ -39,7 +39,7 @@ services:
     runtime: nvidia
 
   deplot:
-    image: ${DEPLOT_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/deplot}:${DEPLOT_TAG:-1.0.0}
+    image: ${DEPLOT_IMAGE:-nvcr.io/nvidia/nemo-microservices/deplot}:${DEPLOT_TAG:-1.0.0}
     ports:
       - "8003:8000"
       - "8004:8001"
