@@ -87,9 +87,9 @@ def _is_subset(superset, subset):
         # The subset is a regex pattern
         pattern = subset[len("regex:") :]
         if isinstance(superset, list):
-            return any(re.match(pattern, str(sup_item)) for sup_item in superset)
+            return any(re.match(pattern, sup_item) for sup_item in superset)
         else:
-            return re.match(pattern, str(superset)) is not None
+            return re.match(pattern, superset) is not None
     if isinstance(superset, list) and not isinstance(subset, list):
         # Check if the subset value matches any item in the superset
         return any(_is_subset(sup_item, subset) for sup_item in superset)
