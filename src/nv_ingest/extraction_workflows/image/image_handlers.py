@@ -345,19 +345,6 @@ def image_data_extractor(
         # Future function for text extraction based on document_type
         logger.warning("Text extraction is not supported for raw images.")
 
-    # Image extraction stub
-    if extract_images:
-        # Placeholder for image-specific extraction process
-        extracted_data.append(
-            construct_image_metadata_from_base64(
-                numpy_to_base64(image_array),
-                page_idx=0,  # Single image treated as one page
-                page_count=1,
-                source_metadata=source_metadata,
-                base_unified_metadata=base_unified_metadata,
-            )
-        )
-
     # Table and chart extraction
     if extract_tables or extract_charts:
         try:
@@ -366,8 +353,8 @@ def image_data_extractor(
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
-            logger.debug("Extracted table/chart data from image")
-            for _, table_chart_data in tables_and_charts[0]:
+            for item in tables_and_charts:
+                table_chart_data = item[1]
                 extracted_data.append(
                     construct_table_and_chart_metadata(
                         table_chart_data,
@@ -380,6 +367,19 @@ def image_data_extractor(
         except Exception as e:
             logger.error(f"Error extracting tables/charts from image: {e}")
             raise
+
+        # Image extraction stub
+    if extract_images and not extracted_data:  # It's not an unstructured image if we extracted a sturctured image
+        # Placeholder for image-specific extraction process
+        extracted_data.append(
+            construct_image_metadata_from_base64(
+                numpy_to_base64(image_array),
+                page_idx=0,  # Single image treated as one page
+                page_count=1,
+                source_metadata=source_metadata,
+                base_unified_metadata=base_unified_metadata,
+            )
+        )
 
     logger.debug(f"Extracted {len(extracted_data)} items from the image.")
 

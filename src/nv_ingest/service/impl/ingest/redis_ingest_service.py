@@ -68,7 +68,11 @@ class RedisIngestService(IngestServiceMeta):
 
             for task in tasks:
                 task_prop = task["task_properties"]
-                task_prop_dict = task_prop.dict()
+                if not isinstance(task_prop, dict):
+                    logger.debug(f"Task properties are not a dictionary: {tasks}")
+                    task_prop_dict = task_prop.model_dump()
+                else:
+                    task_prop_dict = task_prop
                 task["task_properties"] = task_prop_dict
                 updated_tasks.append(task)
 
