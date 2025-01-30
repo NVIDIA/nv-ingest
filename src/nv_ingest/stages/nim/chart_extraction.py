@@ -35,7 +35,8 @@ def _update_metadata(
     """
     Given a list of base64-encoded chart images, this function:
       - Splits them into batches of size `batch_size`.
-      - Calls Cached with *all images* in each batch in a single request.
+      - Calls Cached with *all images* in each batch in a single request if protocol != 'grpc'.
+        If protocol == 'grpc', calls Cached individually for each image in the batch.
       - Calls Deplot individually (one request per image) in parallel.
       - Joins the results for each image into a final combined inference result.
 
@@ -54,18 +55,32 @@ def _update_metadata(
 
     with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
         for batch in chunk_list(base64_images, batch_size):
-            # 1) Single call to CACHED for the entire batch
-            cached_data = {"base64_images": batch}
-            future_cached = executor.submit(
-                cached_client.infer,
-                data=cached_data,
-                model_name="cached",
-                stage_name="chart_data_extraction",
-                trace_info=trace_info,
-            )
+            # 1) Cached calls
+            if cached_client.protocol == "grpc":
+                # Submit each image in the batch separately
+                cached_futures = []
+                for image_str in batch:
+                    data = {"base64_images": [image_str]}
+                    fut = executor.submit(
+                        cached_client.infer,
+                        data=data,
+                        model_name="cached",
+                        stage_name="chart_data_extraction",
+                        trace_info=trace_info,
+                    )
+                    cached_futures.append(fut)
+            else:
+                # Single request for the entire batch
+                data = {"base64_images": batch}
+                future_cached = executor.submit(
+                    cached_client.infer,
+                    data=data,
+                    model_name="cached",
+                    stage_name="chart_data_extraction",
+                    trace_info=trace_info,
+                )
 
-            # 2) Multiple calls to DEPLOT, one per image in the batch
-            #    We store all futures in a list, each item a single infer request.
+            # 2) Multiple calls to Deplot, one per image in the batch
             deplot_futures = []
             for image_str in batch:
                 # Deplot only supports single-image calls
@@ -80,11 +95,25 @@ def _update_metadata(
                 deplot_futures.append(fut)
 
             try:
-                # 3) Retrieve results
-                cached_results = future_cached.result()
-                # This should be a list of inference results (same length as 'batch')
+                # 3) Retrieve results from Cached
+                if cached_client.protocol == "grpc":
+                    # Each future should return a single-element list
+                    # We take the 0th item to align with single-image results
+                    cached_results = []
+                    for fut in cached_futures:
+                        res = fut.result()
+                        if isinstance(res, list) and len(res) == 1:
+                            cached_results.append(res[0])
+                        else:
+                            # Fallback in case the service returns something unexpected
+                            logger.warning(f"Unexpected CACHED result format: {res}")
+                            cached_results.append(res)
+                else:
+                    # Single call returning a list of the same length as 'batch'
+                    cached_results = future_cached.result()
+
+                # Retrieve results from Deplot (each call returns a single inference result)
                 deplot_results = [f.result() for f in deplot_futures]
-                # Each item is presumably a single result (since each call was single-image)
 
                 # 4) Zip them together, one by one
                 for img_str, cached_res, deplot_res in zip(batch, cached_results, deplot_results):
