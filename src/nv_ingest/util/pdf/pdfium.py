@@ -197,7 +197,7 @@ def pdfium_pages_to_numpy(
     return images, padding_offsets
 
 
-def convert_pdfium_position(pos, page_height):
+def convert_pdfium_position(pos, page_width, page_height):
     """
     Convert a PDFium bounding box (which typically has an origin at the bottom-left)
     to a more standard bounding-box format with y=0 at the top.
@@ -206,10 +206,15 @@ def convert_pdfium_position(pos, page_height):
     x0, x1 = left, right
     y0, y1 = page_height - top, page_height - bottom
 
+    x0 = max(0, x0)
+    y0 = max(0, y0)
+    x1 = min(page_width, x1)
+    y1 = min(page_height, y1)
+
     return [int(x0), int(y0), int(x1), int(y1)]
 
 
-def boxes_are_close_or_overlap(b1, b2, threshold=5.0):
+def boxes_are_close_or_overlap(b1, b2, threshold=10.0):
     """
     Return True if bounding boxes b1 and b2 overlap or
     are closer than 'threshold' in points/pixels.
@@ -245,7 +250,7 @@ def boxes_are_close_or_overlap(b1, b2, threshold=5.0):
     return overlap_x_expanded and overlap_y_expanded
 
 
-def group_bounding_boxes(boxes, threshold=5.0, max_depth=None):
+def group_bounding_boxes(boxes, threshold=10.0, max_depth=None):
     """
     Given a list of bounding boxes,
     returns a list of groups (lists) of bounding box indices.
@@ -288,13 +293,15 @@ def group_bounding_boxes(boxes, threshold=5.0, max_depth=None):
     return groups
 
 
-def combine_groups_into_bboxes(boxes, groups):
+def combine_groups_into_bboxes(boxes, groups, min_num_components=1):
     """
     Given the original bounding boxes and a list of groups (each group is
     a list of indices), return one bounding box per group.
     """
     combined = []
     for group in groups:
+        if len(group) < min_num_components:
+            continue
         xmins = []
         ymins = []
         xmaxs = []
@@ -408,6 +415,7 @@ def extract_merged_images_from_pdfium_page(page, merge=True):
     Extract bounding boxes of image objects from a PDFium page, with optional merging
     of bounding boxes that likely belong to the same compound image.
     """
+    page_width = page.get_width()
     page_height = page.get_height()
 
     image_bboxes = []
@@ -415,7 +423,7 @@ def extract_merged_images_from_pdfium_page(page, merge=True):
         filter=(pdfium_c.FPDF_PAGEOBJ_IMAGE,),
         max_depth=1,
     ):
-        image_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        image_bbox = convert_pdfium_position(obj.get_pos(), page_width, page_height)
         image_bboxes.append(image_bbox)
 
     # If no merging is requested or no bounding boxes exist, return the list as is
@@ -443,7 +451,7 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True):
         filter=(pdfium_c.FPDF_PAGEOBJ_PATH,),
         max_depth=1,
     ):
-        path_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        path_bbox = convert_pdfium_position(obj.get_pos(), page_width, page_height)
         path_bboxes.append(path_bbox)
 
     # If merging is disabled or no bounding boxes were found, return them as-is
@@ -452,7 +460,7 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True):
 
     merged_bboxes = []
     path_groups = group_bounding_boxes(path_bboxes)
-    path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups)
+    path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups, min_num_components=3)
     for bbox in path_bboxes:
         bbox_area = abs(bbox[0] - bbox[2]) * abs(bbox[1] - bbox[3])
         # Exclude shapes that are too large (likely page backgrounds or false positives)
@@ -468,20 +476,31 @@ def extract_forms_from_pdfium_page(page):
     Extract bounding boxes for PDF form objects from a PDFium page, removing any
     bounding boxes that strictly enclose other boxes (i.e., are strict supersets).
     """
-    results = []
+    page_width = page.get_width()
     page_height = page.get_height()
+    page_area = page_width * page_height
 
     form_bboxes = []
     for obj in page.get_objects(
         filter=(pdfium_c.FPDF_PAGEOBJ_FORM,),
         max_depth=1,
     ):
-        form_bbox = convert_pdfium_position(obj.get_pos(), page_height)
+        form_bbox = convert_pdfium_position(obj.get_pos(), page_width, page_height)
         form_bboxes.append(form_bbox)
 
+    merged_bboxes = []
+    form_groups = group_bounding_boxes(form_bboxes)
+    form_bboxes = combine_groups_into_bboxes(form_bboxes, form_groups)
+    for bbox in form_bboxes:
+        bbox_area = abs(bbox[0] - bbox[2]) * abs(bbox[1] - bbox[3])
+        # Exclude shapes that are too large (likely page backgrounds or false positives)
+        if bbox_area > 0.5 * page_area:
+            continue
+        merged_bboxes.append(bbox)
+
     # Remove any bounding box that strictly encloses another.
-    # The larger form is likely a background.
-    results.extend(remove_superset_bboxes(form_bboxes))
+    # The larger one is likely a background.
+    results = remove_superset_bboxes(merged_bboxes)
 
     return results
 
