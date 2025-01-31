@@ -356,12 +356,16 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
             text = None
     elif element["document_type"] == "image" and enable_images:
         text = element["metadata"]["image_metadata"]["caption"]
-    if not text or not verify_embedding(element):
-        # if we do find text but no embedding remove anyway
-        text = None
+    verify_emb = verify_embedding(element)
+    if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
         pg_num = element["metadata"]["content_metadata"]["page_number"]
-        logger.warn(f"failed to find text/embedding for entity: {source_name}_{pg_num}")
+        if not verify_emb:
+            logger.error(f"failed to find embedding for entity: {source_name}_{pg_num}")
+        if not text:
+            logger.error(f"failed to find text for entity: {source_name}_{pg_num}")
+        # if we do find text but no embedding remove anyway
+        text = None
     return text
 
 
