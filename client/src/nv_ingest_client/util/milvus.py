@@ -21,6 +21,10 @@ from typing import List
 import time
 from urllib.parse import urlparse
 from typing import Union, Dict
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def _dict_to_params(collections_dict: dict, write_params: dict):
@@ -334,6 +338,12 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
     return record
 
 
+def verify_embedding(element):
+    if element["metadata"]["embedding"] is not None:
+        return True
+    return False
+
+
 def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: bool, enable_images: bool):
     text = None
     if element["document_type"] == "text" and enable_text:
@@ -346,6 +356,12 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
             text = None
     elif element["document_type"] == "image" and enable_images:
         text = element["metadata"]["image_metadata"]["caption"]
+    if not text or not verify_embedding(element):
+        # if we do find text but no embedding remove anyway
+        text = None
+        source_name = element["metadata"]["source_metadata"]["source_name"]
+        pg_num = element["metadata"]["content_metadata"]["page_number"]
+        logger.warn(f"failed to find text/embedding for entity: {source_name}_{pg_num}")
     return text
 
 
