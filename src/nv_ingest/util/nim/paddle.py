@@ -76,6 +76,8 @@ class PaddleOCRModelInterface(ModelInterface):
 
         images = data["image_arrays"]
 
+        data["_dimensions"] = []  # Cache image dimensions information for scale/shift.
+
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
 
@@ -86,8 +88,8 @@ class PaddleOCRModelInterface(ModelInterface):
             processed = []
             self._dims = []
             for img in images:
-                arr, metadata = preprocess_image_for_paddle(img)
-                self._dims.append(metadata)
+                arr, _dims = preprocess_image_for_paddle(img)
+                data["_dimensions"].append(_dims)
                 arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
                 processed.append(arr)
@@ -130,7 +132,7 @@ class PaddleOCRModelInterface(ModelInterface):
         """
         if protocol == "grpc":
             logger.debug("Parsing output from gRPC PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_grpc_response(response)
+            return self._extract_content_from_paddle_grpc_response(response, data["_dimensions"])
 
         elif protocol == "http":
             logger.debug("Parsing output from HTTP PaddleOCR model (batched).")
@@ -198,6 +200,7 @@ class PaddleOCRModelInterface(ModelInterface):
     def _extract_content_from_paddle_grpc_response(
         self,
         response: np.ndarray,
+        dimensions: List[Dict[str, Any]],
     ) -> List[Tuple[str, str]]:
         """
         Parses a gRPC response for one or more images.
@@ -246,6 +249,7 @@ class PaddleOCRModelInterface(ModelInterface):
             bounding_boxes, text_predictions = self._postprocess_paddle_response(
                 bounding_boxes,
                 text_predictions,
+                dimensions,
                 img_index=i,
             )
 
@@ -254,17 +258,21 @@ class PaddleOCRModelInterface(ModelInterface):
         return results
 
     def _postprocess_paddle_response(
-        self, bounding_boxes: List[Any], text_predictions: List[str], img_index: int = 0
+        self,
+        bounding_boxes: List[Any],
+        text_predictions: List[str],
+        dimensions: List[Dict[str, Any]],
+        img_index: int = 0,
     ) -> str:
         """
         Convert bounding boxes & text to pseudo-markdown. For multiple images,
         we use self._dims[img_index] to recover the correct height/width.
         """
-        max_width = self._dims[img_index]["new_width"]
-        max_height = self._dims[img_index]["new_height"]
-        pad_width = self._dims[img_index]["pad_width"]
-        pad_height = self._dims[img_index]["pad_height"]
-        scale_factor = self._dims[img_index]["scale_factor"]
+        max_width = dimensions[img_index]["new_width"]
+        max_height = dimensions[img_index]["new_height"]
+        pad_width = dimensions[img_index]["pad_width"]
+        pad_height = dimensions[img_index]["pad_height"]
+        scale_factor = dimensions[img_index]["scale_factor"]
 
         bboxes = []
         texts = []
