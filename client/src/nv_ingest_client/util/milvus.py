@@ -360,10 +360,11 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
     if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
         pg_num = element["metadata"]["content_metadata"]["page_number"]
+        doc_type = element["document_type"]
         if not verify_emb:
-            logger.error(f"failed to find embedding for entity: {source_name}_{pg_num}")
+            logger.error(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
         if not text:
-            logger.error(f"failed to find text for entity: {source_name}_{pg_num}")
+            logger.error(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
         # if we do find text but no embedding remove anyway
         text = None
     return text
