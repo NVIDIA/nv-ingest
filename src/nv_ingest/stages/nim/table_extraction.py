@@ -265,7 +265,7 @@ def _extract_table_data(
             if table_content_format == TableFormatEnum.SIMPLE:
                 table_content = " ".join(text_predictions)
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                table_content = convert_paddle_response_to_psuedo_markdown(text_predictions, bounding_boxes)
+                table_content = convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
             else:
                 raise ValueError(f"Unexpected table format: {table_content_format}")
 

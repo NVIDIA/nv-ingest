@@ -260,7 +260,7 @@ def _extract_chart_data(
         #    The order of base64_images in bulk_results should match their original
         #    indices if we process them in the same order.
         for row_id, idx in enumerate(valid_indices):
-            (_, chart_content) = bulk_results[row_id]
+            _, chart_content = bulk_results[row_id]
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
 
         return df, {"trace_info": trace_info}
