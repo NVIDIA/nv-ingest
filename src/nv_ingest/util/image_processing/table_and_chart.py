@@ -92,7 +92,7 @@ def match_bboxes(yolox_box, paddle_ocr_boxes, already_matched=None, delta=2.0):
     return matches
 
 
-def join_yolox_and_paddle_output(yolox_output, paddle_txts, paddle_boxes):
+def join_yolox_and_paddle_output(yolox_output, paddle_boxes, paddle_txts):
     """
     Matching boxes
     We need to associate a text to the paddle detections.
@@ -161,7 +161,7 @@ def join_yolox_and_paddle_output(yolox_output, paddle_txts, paddle_boxes):
     return results
 
 
-def convert_paddle_response_to_psuedo_markdown(texts, bboxes):
+def convert_paddle_response_to_psuedo_markdown(bboxes, texts):
     if (not bboxes) or (not texts):
         return ""
 

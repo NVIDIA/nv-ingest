@@ -1,0 +1,77 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+{% set data = load_setup_py_data() %}
+{% set version = data.get('version') %}
+{% set py_version = environ['CONDA_PY'] %}
+{% set GIT_SHA = environ['GIT_SHA'] %}
+
+# Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
+{% set git_root = environ.get('GIT_ROOT', '../../../api') %}
+
+package:
+  name: nv_ingest_api
+  version: {{ version }}
+
+source:
+  path: {{ git_root }}
+
+build:
+  number: 0
+  string: py{{ py_version }}_{{ GIT_SHA }}
+  script:
+    - {{ PYTHON }} -m pip install . --no-deps -vv
+
+requirements:
+  build:
+    - pip
+    - python==3.10
+    - setuptools>=58.2.0
+  run:
+    - azure-core>=1.32.0
+    - fastparquet>=2024.11.0
+    - fsspec>=2024.10.0
+    - httpx>=0.28.1
+    - isodate>=0.7.2
+    - langdetect>=1.0.9
+    - openai>=1.57.1
+    - pydantic>=2.0.0
+    - pypdfium2>=4.30.0
+    - pytest>=8.0.2
+    - pytest-mock>=3.14.0
+    - python>=3.10
+    - python-docx>=1.1.2
+    - python-dotenv>=1.0.1
+    - python-magic>=0.4.27
+    - python-pptx>=1.0.2
+    - pytorch
+    - requests>=2.32.3
+    - setuptools>=58.2.0
+    - tabulate>=0.9.0
+    - torchaudio
+    - torchvision
+    - transformers>=4.47.0
+    - unstructured-client>=0.25.9
+    - wand>=0.6.10
+
+  test:
+    commands:
+      - pytest ./tests
+
+about:
+  home: "https://github.com/NVIDIA/nv-ingest"
+  license: "Apache-2.0"
+  summary: "Python module with core document ingestion functions."
+  description: "Python module with core document ingestion functions."
+
+extra:
+  recipe-maintainers:
+    - jdyer@nvidia.com
+
+channels:
+  - nvidia/label/dev
+  - rapidsai
+  - nvidia
+  - conda-forge
+  - pytorch

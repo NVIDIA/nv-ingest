@@ -23,6 +23,9 @@ MODULE_UNDER_TEST = "nv_ingest.util.nim.helpers"
 
 
 class MockModelInterface:
+    def name(self):
+        return "MockModelInterface"
+
     def prepare_data_for_inference(self, data):
         # Simulate data preparation
         return data
@@ -163,11 +166,12 @@ def test_nimclient_infer_grpc(mock_model_interface, grpc_endpoints):
 # Test infer with HTTP protocol
 def test_nimclient_infer_http(mock_model_interface, http_endpoints):
     data = {"input_data": "test"}
-    client = NimClient(mock_model_interface, "http", http_endpoints)
+    client = NimClient(mock_model_interface, "http", http_endpoints, timeout=1)
 
     # Mock the HTTP request
     with patch(f"{MODULE_UNDER_TEST}.requests.post") as mock_post:
         mock_response = Mock()
+        mock_response.status_code = 200
         mock_response.json.return_value = {"output": "response_data"}
         mock_response.raise_for_status = Mock()
         mock_post.return_value = mock_response
@@ -182,8 +186,9 @@ def test_nimclient_infer_http_error(mock_model_interface, http_endpoints):
     data = {"input_data": "test"}
 
     with patch(f"{MODULE_UNDER_TEST}.requests.post") as mock_post:
-        client = NimClient(mock_model_interface, "http", http_endpoints)
+        client = NimClient(mock_model_interface, "http", http_endpoints, max_retries=1)
         mock_response = Mock()
+        mock_response.status_code = 505
         mock_response.raise_for_status.side_effect = Exception("HTTP Inference error")
         mock_post.return_value = mock_response
 

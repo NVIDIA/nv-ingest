@@ -4,8 +4,10 @@
 
 import functools
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -24,83 +26,116 @@ from nv_ingest.util.nim.yolox import YoloxGraphicElementsModelInterface
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
+PADDLE_MIN_WIDTH = 32
+PADDLE_MIN_HEIGHT = 32
 
-# Modify the _update_metadata function
-def _update_metadata(row: pd.Series, yolox_client: NimClient, paddle_client: NimClient, trace_info: Dict) -> Dict:
+
+def _update_metadata(
+    base64_images: List[str],
+    yolox_client: NimClient,
+    paddle_client: NimClient,
+    trace_info: Dict,
+    batch_size: int = 1,
+    worker_pool_size: int = 1,
+) -> List[Tuple[str, Dict]]:
     """
-    Modifies the metadata of a row if the conditions for chart extraction are met.
-
-    Parameters
-    ----------
-    row : pd.Series
-        A row from the DataFrame containing metadata for the chart extraction.
-
-    yolox_client : NimClient
-        The client used to call the yolox inference model.
-
-    paddle_client : NimClient
-        The client used to call the paddle inference model.
-
-    trace_info : Dict
-        Trace information used for logging or debugging.
+    Given a list of base64-encoded chart images, this function:
+      - Splits them into batches of size `batch_size`.
+      - Calls Yolox and Paddle with *all images* in each batch in a single request if protocol != 'grpc'.
+        If protocol == 'grpc', calls Yolox and Paddle individually for each image in the batch.
+      - Joins the results for each image into a final combined inference result.
 
     Returns
     -------
-    Dict
-        The modified metadata if conditions are met, otherwise the original metadata.
-
-    Raises
-    ------
-    ValueError
-        If critical information (such as metadata) is missing from the row.
+    List[Tuple[str, Dict]]
+      For each base64-encoded image, returns (original_image_str, joined_chart_content_dict).
     """
-    metadata = row.get("metadata")
-    if metadata is None:
-        logger.error("Row does not contain 'metadata'.")
-        raise ValueError("Row does not contain 'metadata'.")
+    logger.debug(f"Running chart extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
 
-    base64_image = metadata.get("content")
-    content_metadata = metadata.get("content_metadata", {})
-    chart_metadata = metadata.get("table_metadata")
+    def chunk_list(lst, chunk_size):
+        for i in range(0, len(lst), chunk_size):
+            yield lst[i : i + chunk_size]
 
-    # Only modify if content type is structured and subtype is 'chart' and chart_metadata exists
-    if (
-        (content_metadata.get("type") != "structured")
-        or (content_metadata.get("subtype") != "chart")
-        or (chart_metadata is None)
-        or (base64_image in [None, ""])
-    ):
-        return metadata
+    results = []
+    image_arrays = [base64_to_numpy(img) for img in base64_images]
 
-    # Modify chart metadata with the result from the inference models
-    try:
-        base64_data = {"base64_image": base64_image}
-        array_data = {"images": [base64_to_numpy(base64_image)]}
+    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
+        for batch, arrays in zip(chunk_list(base64_images, batch_size), chunk_list(image_arrays, batch_size)):
+            # 1) Yolox calls
+            # Single request for the entire batch
+            data = {"images": arrays}
+            yolox_futures = executor.submit(
+                yolox_client.infer,
+                data=data,
+                model_name="yolox",
+                stage_name="chart_data_extraction",
+                trace_info=trace_info,
+            )
 
-        # Perform inference using the NimClients
-        yolox_result = yolox_client.infer(
-            array_data,
-            model_name="yolox",
-            stage_name="chart_data_extraction",  # traceable_func arg
-            trace_info=trace_info,  # traceable_func arg
-        )
-        paddle_result = paddle_client.infer(
-            base64_data,
-            model_name="paddle",
-            stage_name="chart_data_extraction",  # traceable_func arg
-            trace_info=trace_info,  # traceable_func arg
-        )
+            # 2) Paddle calls
+            paddle_futures = []
+            if paddle_client.protocol == "grpc":
+                # Submit each image in the batch separately
+                paddle_futures = []
+                for image_str, image_arr in zip(batch, arrays):
+                    width, height = image_arr.shape[:2]
+                    if width < PADDLE_MIN_WIDTH or height < PADDLE_MIN_HEIGHT:
+                        # Too small, skip inference
+                        continue
 
-        text_predictions, bounding_boxes = paddle_result
-        yolox_elements = join_yolox_and_paddle_output(yolox_result[0], text_predictions, bounding_boxes)
-        chart_content = process_yolox_graphic_elements(yolox_elements)
+                    data = {"base64_images": [image_str]}
+                    fut = executor.submit(
+                        paddle_client.infer,
+                        data=data,
+                        model_name="paddle",
+                        stage_name="chart_data_extraction",
+                        trace_info=trace_info,
+                    )
+                    paddle_futures.append(fut)
+            else:
+                # Single request for the entire batch
+                data = {"base64_images": batch}
+                paddle_futures = executor.submit(
+                    paddle_client.infer,
+                    data=data,
+                    model_name="paddle",
+                    stage_name="chart_data_extraction",
+                    trace_info=trace_info,
+                )
 
-        chart_metadata["table_content"] = chart_content
-    except Exception as e:
-        logger.error(f"Unhandled error calling image inference model: {e}", exc_info=True)
-        raise
+            try:
+                # Retrieve results from Yolox
+                yolox_results = yolox_futures.result()
 
-    return metadata
+                # 3) Retrieve results from Yolox
+                if paddle_client.protocol == "grpc":
+                    # Each future should return a single-element list
+                    # We take the 0th item to align with single-image results
+                    paddle_results = []
+                    for fut in paddle_futures:
+                        res = fut.result()
+                        if isinstance(res, list) and len(res) == 1:
+                            paddle_results.append(res[0])
+                        else:
+                            # Fallback in case the service returns something unexpected
+                            logger.warning(f"Unexpected PaddleOCR result format: {res}")
+                            paddle_results.append(res)
+                else:
+                    # Single call returning a list of the same length as 'batch'
+                    paddle_results = paddle_futures.result()
+
+                # 4) Zip them together, one by one
+                for img_str, yolox_res, paddle_res in zip(batch, yolox_results, paddle_results):
+                    bounding_boxes, text_predictions = paddle_res
+                    yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+                    chart_content = process_yolox_graphic_elements(yolox_elements)
+                    results.append((img_str, chart_content))
+
+            except Exception as e:
+                logger.error(f"Error processing batch: {batch}, error: {e}", exc_info=True)
+                raise
+
+    return results
 
 
 def _create_clients(
@@ -136,19 +171,16 @@ def _extract_chart_data(
     df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Extracts chart data from a DataFrame.
+    Extracts chart data from a DataFrame in a bulk fashion rather than row-by-row.
 
     Parameters
     ----------
     df : pd.DataFrame
         DataFrame containing the content from which chart data is to be extracted.
-
     task_props : Dict[str, Any]
         Dictionary containing task properties and configurations.
-
     validated_config : Any
         The validated configuration object for chart extraction.
-
     trace_info : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
@@ -162,7 +194,6 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
-
     _ = task_props  # unused
 
     if trace_info is None:
@@ -181,13 +212,56 @@ def _extract_chart_data(
         stage_config.auth_token,
     )
 
-    if trace_info is None:
-        trace_info = {}
-        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
-
     try:
-        # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(yolox_client, paddle_client, trace_info))
+        # 1) Identify rows that meet criteria in a single pass
+        #    - metadata exists
+        #    - content_metadata.type == "structured"
+        #    - content_metadata.subtype == "chart"
+        #    - table_metadata not None
+        #    - base64_image not None or ""
+        def meets_criteria(row):
+            m = row.get("metadata", {})
+            if not m:
+                return False
+            content_md = m.get("content_metadata", {})
+            if (
+                content_md.get("type") == "structured"
+                and content_md.get("subtype") == "chart"
+                and m.get("table_metadata") is not None
+                and m.get("content") not in [None, ""]
+            ):
+                return True
+            return False
+
+        mask = df.apply(meets_criteria, axis=1)
+        valid_indices = df[mask].index.tolist()
+
+        # If no rows meet the criteria, just return
+        if not valid_indices:
+            return df, {"trace_info": trace_info}
+
+        # 2) Extract base64 images + keep track of row -> image mapping
+        base64_images = []
+        for idx in valid_indices:
+            meta = df.at[idx, "metadata"]
+            base64_images.append(meta["content"])  # guaranteed by meets_criteria
+
+        # 3) Call our bulk update_metadata to get all results
+        bulk_results = _update_metadata(
+            base64_images=base64_images,
+            yolox_client=yolox_client,
+            paddle_client=paddle_client,
+            batch_size=stage_config.nim_batch_size,
+            worker_pool_size=stage_config.workers_per_progress_engine,
+            trace_info=trace_info,
+        )
+
+        # 4) Write the results back to each row’s table_metadata
+        #    The order of base64_images in bulk_results should match their original
+        #    indices if we process them in the same order.
+        for row_id, idx in enumerate(valid_indices):
+            (_, chart_content) = bulk_results[row_id]
+            df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
 
         return df, {"trace_info": trace_info}
 
