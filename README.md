@@ -22,7 +22,7 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ### What NVIDIA-Ingest Is ✔️
 
-A library and microservice that:
+A library and microservice that does the following:
 
 - Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
 - Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, as well as processing annotations and timing/trace data.
