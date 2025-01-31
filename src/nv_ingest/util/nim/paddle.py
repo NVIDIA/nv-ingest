@@ -191,7 +191,7 @@ class PaddleOCRModelInterface(ModelInterface):
             bounding_boxes = []
             for td in text_detections:
                 text_predictions.append(td["text_prediction"]["text"])
-                bounding_boxes.append([(pt["x"], pt["y"]) for pt in td["bounding_box"]["points"]])
+                bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
 
             results.append([bounding_boxes, text_predictions])
 

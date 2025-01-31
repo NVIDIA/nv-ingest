@@ -43,7 +43,7 @@ def process_yolox_graphic_elements(yolox_text_dict):
     chart_content += " " + yolox_text_dict.get("value_label", "")
     chart_content += " " + yolox_text_dict.get("other", "")
 
-    return chart_content
+    return chart_content.strip()
 
 
 def match_bboxes(yolox_box, paddle_ocr_boxes, already_matched=None, delta=2.0):

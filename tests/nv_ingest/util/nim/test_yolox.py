@@ -182,11 +182,6 @@ def test_process_inference_results_grpc(model_interface):
         output_array,
         "grpc",
         original_image_shapes=original_image_shapes,
-        num_classes=3,
-        conf_thresh=0.5,
-        iou_thresh=0.4,
-        min_score=0.3,
-        final_thresh=0.6,
     )
     assert isinstance(inference_results, list)
     assert len(inference_results) == 2
@@ -194,10 +189,10 @@ def test_process_inference_results_grpc(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "title" in result:
             assert isinstance(result["title"], list)
 
@@ -211,14 +206,11 @@ def test_process_inference_results_http(model_interface):
         }
         for _ in range(10)
     ]
+    original_image_shapes = [[100, 100] for _ in range(10)]
     inference_results = model_interface.process_inference_results(
         output,
         "http",
-        num_classes=3,
-        conf_thresh=0.5,
-        iou_thresh=0.4,
-        min_score=0.3,
-        final_thresh=0.6,
+        original_image_shapes=original_image_shapes,
     )
     assert isinstance(inference_results, list)
     assert len(inference_results) == 10
@@ -226,9 +218,9 @@ def test_process_inference_results_http(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "title" in result:
             assert isinstance(result["title"], list)

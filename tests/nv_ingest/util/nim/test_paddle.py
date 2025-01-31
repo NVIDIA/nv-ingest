@@ -56,12 +56,7 @@ def create_valid_grpc_response_batched(text="mock_text"):
 
 @pytest.fixture
 def paddle_ocr_model():
-    return PaddleOCRModelInterface(paddle_version="0.2.1")
-
-
-@pytest.fixture
-def legacy_paddle_ocr_model():
-    return PaddleOCRModelInterface(paddle_version="0.2.0")
+    return PaddleOCRModelInterface()
 
 
 @pytest.fixture
@@ -113,16 +108,13 @@ def test_prepare_data_for_inference(paddle_ocr_model):
         assert len(result["image_arrays"]) == 1
         assert result["image_arrays"][0].shape == (100, 100, 3)
 
-        # We also store dimensions in self._dims
-        assert paddle_ocr_model._dims == [(100, 100)]
-
 
 def test_format_input_grpc(paddle_ocr_model):
     """
     Now we place the images under 'image_arrays' and return a batched input for gRPC.
     """
     with patch(f"{_MODULE_UNDER_TEST}.preprocess_image_for_paddle") as mock_preprocess:
-        mock_preprocess.return_value = np.zeros((32, 32, 3))
+        mock_preprocess.return_value = (np.zeros((32, 32, 3)), {})
 
         # For gRPC, we rely on 'image_arrays'
         data = {"image_arrays": [np.zeros((32, 32, 3))]}
@@ -134,8 +126,7 @@ def test_format_input_grpc(paddle_ocr_model):
 
 def test_format_input_http(paddle_ocr_model):
     """
-    For HTTP, if not legacy, we expect a payload with 'input': [...]
-    containing a valid base64 PNG.
+    For HTTP, we expect a payload with 'input': [...] containing a valid base64 PNG.
     """
     valid_b64 = create_valid_base64_image()
     data = {"base64_image": valid_b64}
@@ -145,7 +136,7 @@ def test_format_input_http(paddle_ocr_model):
 
     result = paddle_ocr_model.format_input(data, protocol="http")
 
-    # For non-legacy => {"input": [ {"type":"image_url","url": "..."} ]}
+    # {"input": [ {"type":"image_url","url": "..."} ]}
     assert "input" in result
     assert len(result["input"]) == 1
     first_item = result["input"][0]
@@ -153,45 +144,6 @@ def test_format_input_http(paddle_ocr_model):
     assert first_item["url"].startswith("data:image/png;base64,")
     # Optionally, check that it's non-empty after the prefix
     assert len(first_item["url"]) > len("data:image/png;base64,")
-
-
-def test_format_input_http_legacy(legacy_paddle_ocr_model):
-    """
-    For legacy version (<0.2.1-rc2), the code should produce the 'messages' structure.
-    """
-    valid_b64 = create_valid_base64_image()
-    data = {"base64_image": valid_b64}
-
-    data = legacy_paddle_ocr_model.prepare_data_for_inference(data)
-    result = legacy_paddle_ocr_model.format_input(data, protocol="http")
-
-    # Now we expect => {"messages":[{"content":[ { "type":"image_url",
-    # "image_url":{"url":"data:image/png;base64,..."}}, ... ]}]}
-    assert "messages" in result
-    assert len(result["messages"]) == 1
-    content_list = result["messages"][0]["content"]
-    assert len(content_list) == 1
-    item = content_list[0]
-    assert item["type"] == "image_url"
-    assert item["image_url"]["url"].startswith("data:image/png;base64,")
-
-
-def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_response):
-    """
-    parse_output should now return a list of (content, table_content_format) tuples.
-    e.g. [("| mock_text |\n", "pseudo_markdown")]
-    """
-    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
-        mock_base64_to_numpy.return_value = np.zeros((3, 100, 100))
-
-        data = {"base64_image": "mock_base64_string"}
-        _ = paddle_ocr_model.prepare_data_for_inference(data)
-
-    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http")
-    # It's a list with one tuple => (content, format).
-    assert len(result) == 1
-    assert result[0][0] == "| mock_text |\n"
-    assert result[0][1] == "pseudo_markdown"
 
 
 def test_parse_output_http_simple(paddle_ocr_model, mock_paddle_http_response):
@@ -205,55 +157,11 @@ def test_parse_output_http_simple(paddle_ocr_model, mock_paddle_http_response):
         data = {"base64_image": "mock_base64_string"}
         _ = paddle_ocr_model.prepare_data_for_inference(data)
 
-    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http", table_content_format="simple")
-    # Should be [("mock_text", "simple")]
+    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http")
+    # Should be (bounding_boxes, text_predictions)
     assert len(result) == 1
-    assert result[0][0] == "mock_text"
-    assert result[0][1] == "simple"
-
-
-def test_parse_output_http_simple_legacy(legacy_paddle_ocr_model):
-    """
-    For the legacy version, parse_output also returns a list of (content, format),
-    but it forces 'simple' format if the user requested something else.
-    """
-    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
-        mock_base64_to_numpy.return_value = np.zeros((100, 100, 3))
-
-        data = {"base64_image": "mock_base64_string"}
-        _ = legacy_paddle_ocr_model.prepare_data_for_inference(data)
-
-    mock_legacy_paddle_http_response = {"data": [{"content": "mock_text"}]}
-
-    result = legacy_paddle_ocr_model.parse_output(
-        mock_legacy_paddle_http_response, protocol="http", table_content_format="foo"
-    )
-    # Expect => [("mock_text", "simple")]
-    assert len(result) == 1
-    assert result[0][0] == "mock_text"
-    assert result[0][1] == "simple"
-
-
-def test_parse_output_grpc_pseudo_markdown(paddle_ocr_model):
-    """
-    Provide a valid (1,2) shape for bounding boxes & text.
-    The interface should parse them into [("| mock_text |\n", "pseudo_markdown")].
-    """
-    valid_b64 = create_valid_base64_image()
-    data = {"base64_image": valid_b64}
-    paddle_ocr_model.prepare_data_for_inference(data)
-
-    # Create a valid shape => (1,2), with bounding-box JSON, text JSON
-    grpc_response = create_valid_grpc_response_batched("mock_text")
-
-    # parse_output with default => pseudo_markdown for non-legacy
-    result = paddle_ocr_model.parse_output(grpc_response, protocol="grpc")
-
-    assert len(result) == 1
-    content, fmt = result[0]
-    # content might contain a markdown table row => "| mock_text |"
-    assert "mock_text" in content
-    assert fmt == "pseudo_markdown"
+    assert result[0][0] == [[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]
+    assert result[0][1] == ["mock_text"]
 
 
 def test_parse_output_grpc_simple(paddle_ocr_model):
@@ -264,28 +172,18 @@ def test_parse_output_grpc_simple(paddle_ocr_model):
     data = {"base64_image": valid_b64}
     paddle_ocr_model.prepare_data_for_inference(data)
 
+    data["_dimensions"] = [
+        {
+            "new_width": 1,
+            "new_height": 1,
+            "pad_width": 0,
+            "pad_height": 0,
+            "scale_factor": 1.0,
+        }
+    ]
     grpc_response = create_valid_grpc_response_batched("mock_text")
-    result = paddle_ocr_model.parse_output(grpc_response, protocol="grpc", table_content_format="simple")
+    result = paddle_ocr_model.parse_output(grpc_response, protocol="grpc", data=data)
 
     assert len(result) == 1
-    content, fmt = result[0]
-    assert content == "mock_text"
-    assert fmt == "simple"
-
-
-def test_parse_output_grpc_legacy(legacy_paddle_ocr_model):
-    """
-    For legacy gRPC, we also return a list of (content, format).
-    We force 'simple' if table_content_format was not 'simple'.
-    """
-    valid_b64 = create_valid_base64_image()
-    data = {"base64_image": valid_b64}
-    legacy_paddle_ocr_model.prepare_data_for_inference(data)
-
-    grpc_response = create_valid_grpc_response_batched("mock_text")
-
-    # Pass a non-"simple" format => should be forced to 'simple' in legacy
-    result = legacy_paddle_ocr_model.parse_output(grpc_response, protocol="grpc", table_content_format="foo")
-    assert len(result) == 1
-    assert result[0][0] == "mock_text"
-    assert result[0][1] == "simple"
+    assert result[0][0] == [[[0.1, 0.2], [0.2, 0.2], [0.2, 0.3], [0.1, 0.3]]]
+    assert result[0][1] == ["mock_text"]

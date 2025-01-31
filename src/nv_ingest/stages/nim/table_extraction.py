@@ -254,13 +254,14 @@ def _extract_table_data(
         )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
-        table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get("table_content_format")
+        table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
+            "table_content_format", TableFormatEnum.PSEUDO_MARKDOWN
+        )
 
         for row_id, idx in enumerate(valid_indices):
             # unpack (base64_image, (bounding boxes, text_predictions))
             _, (bounding_boxes, text_predictions) = bulk_results[row_id]
 
-            table_content_format = TableFormatEnum.SIMPLE
             if table_content_format == TableFormatEnum.SIMPLE:
                 table_content = " ".join(text_predictions)
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
