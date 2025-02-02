@@ -79,7 +79,7 @@ class RestClient(MessageBrokerClientBase):
     port : int
         The port number of the HTTP server.
     max_retries : int, optional
-        The maximum number of retry attempts for operations. Default is 0 (no retries).
+        The maximum number of retry attempts for operations. Default is 3 (no retries).
     max_backoff : int, optional
         The maximum backoff delay between retries in seconds. Default is 32 seconds.
     connection_timeout : int, optional
@@ -97,7 +97,7 @@ class RestClient(MessageBrokerClientBase):
         self,
         host: str,
         port: int,
-        max_retries: int = 0,
+        max_retries: int = 3,
         max_backoff: int = 32,
         connection_timeout: int = 300,
         http_allocator: Any = httpx.AsyncClient,
@@ -236,7 +236,7 @@ class RestClient(MessageBrokerClientBase):
                         except RuntimeError as rte:
                             raise rte
 
-            except requests.HTTPError as err:
+            except (ConnectionError, requests.exceptions.ConnectionError, requests.HTTPError) as err:
                 logger.error(f"Error during fetching, retrying... Error: {err}")
                 self._client = None  # Invalidate client to force reconnection
                 try:
