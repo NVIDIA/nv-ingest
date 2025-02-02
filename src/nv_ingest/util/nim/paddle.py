@@ -61,14 +61,11 @@ class PaddleOCRModelInterface(ModelInterface):
                 raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
 
             image_arrays: List[np.ndarray] = []
-            dims: List[Tuple[int, int]] = []
             for b64 in base64_list:
                 img = base64_to_numpy(b64)
                 image_arrays.append(img)
-                dims.append((img.shape[0], img.shape[1]))
 
             data["image_arrays"] = image_arrays
-            data["image_dims"] = dims
 
         elif "base64_image" in data:
             # Single-image fallback
@@ -112,7 +109,9 @@ class PaddleOCRModelInterface(ModelInterface):
             raise KeyError("Expected 'image_arrays' in data. Call prepare_data_for_inference first.")
 
         images = data["image_arrays"]
-        dims = data["image_dims"]
+
+        dims: List[Dict[str, Any]] = []
+        data["image_dims"] = dims
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
