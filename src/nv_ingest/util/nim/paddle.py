@@ -361,8 +361,8 @@ class PaddleOCRModelInterface(ModelInterface):
     def _postprocess_paddle_response(
         bounding_boxes: List[Any],
         text_predictions: List[str],
-        img_index: int = 0,
         dims: Optional[List[Dict[str, Any]]] = None,
+        img_index: int = 0,
     ) -> Tuple[List[Any], List[str]]:
         """
         Convert bounding boxes with normalized coordinates to pixel cooridnates by using
