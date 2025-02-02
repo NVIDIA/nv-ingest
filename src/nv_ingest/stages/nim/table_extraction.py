@@ -94,6 +94,7 @@ def _update_metadata(
                 except Exception as e:
                     logger.error(f"Error processing image {i}. Error: {e}", exc_info=True)
                     results[i] = (b64_image, ("", ""))
+                    raise
 
     # ------------------------------------------------
     # HTTP path: submit requests in batches.
