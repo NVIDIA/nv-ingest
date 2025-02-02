@@ -184,31 +184,38 @@ class NimClient:
             If an invalid protocol is specified.
         """
 
-        # Prepare data for inference
-        prepared_data = self.model_interface.prepare_data_for_inference(data)
+        try:
+            # Prepare data for inference
+            prepared_data = self.model_interface.prepare_data_for_inference(data)
 
-        # Format input based on protocol
-        formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
+            # Format input based on protocol
+            formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
 
-        # Perform inference
-        if self.protocol == "grpc":
-            logger.debug("Performing gRPC inference...")
-            response = self._grpc_infer(formatted_input, model_name)
-            logger.debug("gRPC inference received response")
-        elif self.protocol == "http":
-            logger.debug("Performing HTTP inference...")
-            response = self._http_infer(formatted_input)
-            logger.debug("HTTP inference received response")
-        else:
-            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+            # Perform inference
+            if self.protocol == "grpc":
+                logger.debug("Performing gRPC inference...")
+                response = self._grpc_infer(formatted_input, model_name)
+                logger.debug("gRPC inference received response")
+            elif self.protocol == "http":
+                logger.debug("Performing HTTP inference...")
+                response = self._http_infer(formatted_input)
+                logger.debug("HTTP inference received response")
+            else:
+                raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        # Parse and process output
-        parsed_output = self.model_interface.parse_output(
-            response, protocol=self.protocol, data=prepared_data, **kwargs
-        )
-        results = self.model_interface.process_inference_results(
-            parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
-        )
+            # Parse and process output
+            parsed_output = self.model_interface.parse_output(
+                response, protocol=self.protocol, data=prepared_data, **kwargs
+            )
+            results = self.model_interface.process_inference_results(
+                parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
+            )
+        except Exception as err:
+            error_str = f"Error during NimClient inference [{self.model_interface.name()}, {self.protocol}]: {err}"
+            logger.error(error_str)
+
+            raise RuntimeError(error_str)
+
         return results
 
     def _grpc_infer(self, formatted_input: np.ndarray, model_name: str) -> np.ndarray:
@@ -274,7 +281,7 @@ class NimClient:
                 if status_code == 429 or status_code == 503 or (500 <= status_code < 600):
                     logger.warning(
                         f"Received HTTP {status_code} ({response.reason}) from "
-                        f"{self.model_interface.name()}. Attempt {attempt+1} of {self.max_retries}."
+                        f"{self.model_interface.name()}. Attempt {attempt + 1} of {self.max_retries}."
                     )
                     if attempt == self.max_retries - 1:
                         # No more retries left
@@ -296,12 +303,12 @@ class NimClient:
                 # Treat timeouts similarly to 5xx => attempt a retry
                 logger.warning(
                     f"HTTP request timed out after {self.timeout} seconds during {self.model_interface.name()} "
-                    f"inference. Attempt {attempt+1} of {self.max_retries}."
+                    f"inference. Attempt {attempt + 1} of {self.max_retries}."
                 )
                 if attempt == self.max_retries - 1:
                     logger.error("Max retries exceeded after repeated timeouts.")
                     raise TimeoutError(
-                        f"Repeated timeouts for {self.model_interface.name()} after {attempt+1} attempts."
+                        f"Repeated timeouts for {self.model_interface.name()} after {attempt + 1} attempts."
                     )
                 # Exponential backoff
                 backoff_time = base_delay * (2**attempt)

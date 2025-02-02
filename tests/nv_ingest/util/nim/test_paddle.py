@@ -107,6 +107,7 @@ def test_prepare_data_for_inference(paddle_ocr_model):
         assert "image_arrays" in result
         assert len(result["image_arrays"]) == 1
         assert result["image_arrays"][0].shape == (100, 100, 3)
+        assert data["image_dims"][0] == (100, 100)
 
 
 def test_format_input_grpc(paddle_ocr_model):
@@ -144,6 +145,24 @@ def test_format_input_http(paddle_ocr_model):
     assert first_item["url"].startswith("data:image/png;base64,")
     # Optionally, check that it's non-empty after the prefix
     assert len(first_item["url"]) > len("data:image/png;base64,")
+
+
+def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_response):
+    """
+    parse_output should now return a list of (content, table_content_format) tuples.
+    e.g. [("| mock_text |\n", "pseudo_markdown")]
+    """
+    with patch(f"{_MODULE_UNDER_TEST}.base64_to_numpy") as mock_base64_to_numpy:
+        mock_base64_to_numpy.return_value = np.zeros((3, 100, 100))
+
+        data = {"base64_image": "mock_base64_string"}
+        _ = paddle_ocr_model.prepare_data_for_inference(data)
+
+    result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http")
+    # It's a list with one tuple => (content, format).
+    assert len(result) == 1
+    assert result[0][0] == "| mock_text |"
+    assert result[0][1] == "pseudo_markdown"
 
 
 def test_parse_output_http_simple(paddle_ocr_model, mock_paddle_http_response):

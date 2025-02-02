@@ -21,6 +21,10 @@ from typing import List
 import time
 from urllib.parse import urlparse
 from typing import Union, Dict
+import logging
+
+
+logger = logging.getLogger(__name__)
 
 
 def _dict_to_params(collections_dict: dict, write_params: dict):
@@ -334,6 +338,12 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
     return record
 
 
+def verify_embedding(element):
+    if element["metadata"]["embedding"] is not None:
+        return True
+    return False
+
+
 def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: bool, enable_images: bool):
     text = None
     if element["document_type"] == "text" and enable_text:
@@ -346,6 +356,17 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
             text = None
     elif element["document_type"] == "image" and enable_images:
         text = element["metadata"]["image_metadata"]["caption"]
+    verify_emb = verify_embedding(element)
+    if not text or not verify_emb:
+        source_name = element["metadata"]["source_metadata"]["source_name"]
+        pg_num = element["metadata"]["content_metadata"]["page_number"]
+        doc_type = element["document_type"]
+        if not verify_emb:
+            logger.error(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
+        if not text:
+            logger.error(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
+        # if we do find text but no embedding remove anyway
+        text = None
     return text
 
 
