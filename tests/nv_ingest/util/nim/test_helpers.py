@@ -213,7 +213,7 @@ def test_nimclient_infer_invalid_protocol(mock_model_interface, both_endpoints):
     client = NimClient(mock_model_interface, "grpc", both_endpoints)
     client.protocol = "invalid_protocol"
 
-    with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
+    with pytest.raises(RuntimeError, match=".*Invalid protocol specified. Must be 'grpc' or 'http'\\..*"):
         client.infer({}, model_name="test_model")
 
 
