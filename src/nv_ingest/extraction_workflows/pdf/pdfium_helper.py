@@ -214,7 +214,7 @@ def _extract_page_images(
     if extract_images_method == "simple":
         extracted_image_data = extract_nested_simple_images_from_pdfium_page(page)
 
-    elif extract_images_method == "merged":
+    elif extract_images_method == "group":
         extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True)
 
     extracted_images = []
@@ -290,7 +290,7 @@ def pdfium_extractor(
 
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
-    extract_images_method = kwargs.get("extract_images_method", "merged")
+    extract_images_method = kwargs.get("extract_images_method", "group")
 
     # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")

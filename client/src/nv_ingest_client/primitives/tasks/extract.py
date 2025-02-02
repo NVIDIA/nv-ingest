@@ -89,7 +89,7 @@ _Type_Extract_Tables_Method_Map = {
     "pptx": get_args(_Type_Extract_Tables_Method_PPTX),
 }
 
-_Type_Extract_Images_Method = Literal["simple", "merged"]
+_Type_Extract_Images_Method = Literal["simple", "group"]
 
 
 class ExtractTaskSchema(BaseModel):
@@ -97,7 +97,7 @@ class ExtractTaskSchema(BaseModel):
     extract_method: str = None  # Initially allow None to set a smart default
     extract_text: bool = True
     extract_images: bool = True
-    extract_images_method: str = "merged"
+    extract_images_method: str = "group"
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
@@ -182,7 +182,7 @@ class ExtractTask(Task):
         extract_images: bool = False,
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
-        extract_images_method: _Type_Extract_Images_Method = "merged",
+        extract_images_method: _Type_Extract_Images_Method = "group",
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
