@@ -489,6 +489,8 @@ class MultiProcessingBaseStage(SinglePortStage):
                 # This is the first location where we have access to both the control message and the work package,
                 # if we had any errors in the processing, raise them here.
                 if work_package.get("error", False):
+                    logger.error(f"Error in processing: {work_package['error_message']}")
+
                     raise RuntimeError(work_package["error_message"])
 
                 gdf = cudf.from_pandas(work_package["payload"])
