@@ -26,12 +26,14 @@ GIT_ROOT=$(determine_git_root)
 OUTPUT_DIR=${1:-"${BUILD_SCRIPT_BASE}/output_conda_channel"}
 CONDA_CHANNEL=${2:-""}
 BUILD_NV_INGEST=${BUILD_NV_INGEST:-1} # 1 = build by default, 0 = skip
+BUILD_NV_INGEST_API=${BUILD_NV_INGEST_API:-1} # 1 = build by default, 0 = skip
 BUILD_NV_INGEST_CLIENT=${BUILD_NV_INGEST_CLIENT:-1} # 1 = build by default, 0 = skip
 
 ##############################
 # Package Directories
 ##############################
 NV_INGEST_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest"
+NV_INGEST_API_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_api"
 NV_INGEST_CLIENT_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_client"
 
 ##############################
@@ -45,6 +47,15 @@ GIT_SHA=$(git rev-parse --short HEAD)
 ##############################
 # Build Packages
 ##############################
+if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
+    echo "Building nv_ingest_api..."
+    GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
+        --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
+else
+    echo "Skipping nv_ingest_api build."
+fi
+
 if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
     GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \

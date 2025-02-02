@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import concurrent.futures
 import logging
 import traceback
 from math import log
@@ -56,7 +57,7 @@ logger = logging.getLogger(__name__)
 
 
 def extract_tables_and_charts_using_image_ensemble(
-    pages: List,  # List[libpdfium.PdfPage]
+    pages: List[Tuple[int, np.ndarray]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
 ) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
@@ -78,9 +79,8 @@ def extract_tables_and_charts_using_image_ensemble(
 
         page_index = 0
         for batch in batches:
-            original_images, _ = pdfium_pages_to_numpy(
-                batch, scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
-            )
+            image_page_indices = [page[0] for page in batch]
+            original_images = [page[1] for page in batch]
 
             # Prepare data
             data = {"images": original_images}
@@ -99,14 +99,15 @@ def extract_tables_and_charts_using_image_ensemble(
             )
 
             # Process results
-            for annotation_dict, original_image in zip(inference_results, original_images):
+            for annotation_dict, page_index, original_image in zip(
+                inference_results, image_page_indices, original_images
+            ):
                 extract_table_and_chart_images(
                     annotation_dict,
                     original_image,
                     page_index,
                     tables_and_charts,
                 )
-                page_index += 1
 
     except TimeoutError:
         logger.error("Timeout error during table/chart extraction.")
@@ -187,18 +188,89 @@ def extract_table_and_chart_images(
             tables_and_charts.append((page_idx, table_data))
 
 
-def extract_pdfium_images(page, extract_images_method):
+def _extract_page_text(page) -> str:
+    """
+    Always extract text from the given page and return it as a raw string.
+    The caller decides whether to use per-page or doc-level logic.
+    """
+    textpage = page.get_textpage()
+    return textpage.get_text_bounded()
+
+
+def _extract_page_images(
+    extract_images_method: str,
+    page,
+    page_idx: int,
+    page_width: float,
+    page_height: float,
+    page_count: int,
+    source_metadata: dict,
+    base_unified_metadata: dict,
+) -> list:
+    """
+    Always extract images from the given page and return a list of image metadata items.
+    The caller decides whether to call this based on a flag.
+    """
     if extract_images_method == "simple":
-        extracted_images = extract_nested_simple_images_from_pdfium_page(page)
+        extracted_image_data = extract_nested_simple_images_from_pdfium_page(page)
 
     elif extract_images_method == "merged":
-        extracted_images = extract_image_like_objects_from_pdfium_page(page, merge=True)
+        extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True)
+
+    extracted_images = []
+    for image_data in extracted_image_data:
+        try:
+            image_meta = construct_image_metadata_from_pdf_image(
+                image_data,
+                page_idx,
+                page_count,
+                source_metadata,
+                base_unified_metadata,
+            )
+            extracted_images.append(image_meta)
+        except Exception as e:
+            logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
+            # continue extracting other images
 
     return extracted_images
 
 
-# Define a helper function to use unstructured-io to extract text from a base64
-# encoded bytestream PDF
+def _extract_tables_and_charts(
+    pages: list,
+    pdfium_config: PDFiumConfigSchema,
+    page_count: int,
+    source_metadata: dict,
+    base_unified_metadata: dict,
+    paddle_output_format,
+    trace_info=None,
+) -> list:
+    """
+    Always extract tables and charts from the given pages using YOLOX-based logic.
+    The caller decides whether to call it.
+    """
+    extracted_table_chart = []
+
+    table_chart_results = extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+
+    # Build metadata for each
+    for page_idx, table_or_chart in table_chart_results:
+        # If we want all tables and charts, we assume the caller wouldn't call
+        # this function unless we truly want them.
+        if table_or_chart.type_string == "table":
+            table_or_chart.content_format = paddle_output_format
+
+        table_chart_meta = construct_table_and_chart_metadata(
+            table_or_chart,
+            page_idx,
+            page_count,
+            source_metadata,
+            base_unified_metadata,
+        )
+        extracted_table_chart.append(table_chart_meta)
+
+    return extracted_table_chart
+
+
 def pdfium_extractor(
     pdf_stream,
     extract_text: bool,
@@ -208,59 +280,34 @@ def pdfium_extractor(
     trace_info=None,
     **kwargs,
 ):
-    """
-    Helper function to use pdfium to extract text from a bytestream PDF.
-
-    Parameters
-    ----------
-    pdf_stream : io.BytesIO
-        A bytestream PDF.
-    extract_text : bool
-        Specifies whether to extract text.
-    extract_images : bool
-        Specifies whether to extract images.
-    extract_tables : bool
-        Specifies whether to extract tables.
-    extract_charts : bool
-        Specifies whether to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
-
-        kwargs.pdfium_config : dict, optional[PDFiumConfigSchema]
-
-    Returns
-    -------
-    str
-        A string of extracted text.
-    """
     logger.debug("Extracting PDF with pdfium backend.")
 
     row_data = kwargs.get("row_data")
     source_id = row_data["source_id"]
+
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
+
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
     extract_images_method = kwargs.get("extract_images_method", "merged")
 
-    # get base metadata
+    # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
-
     pdfium_config = kwargs.get("pdfium_config", {})
-    pdfium_config = pdfium_config if pdfium_config is not None else {}
+    if isinstance(pdfium_config, dict):
+        pdfium_config = PDFiumConfigSchema(**pdfium_config)
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
-
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
 
-    pages = []
-    extracted_data = []
     doc = libpdfium.PdfDocument(pdf_stream)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
+    page_count = pdf_metadata.page_count
 
     source_metadata = {
         "source_name": pdf_metadata.filename,
@@ -275,98 +322,124 @@ def pdfium_extractor(
         "access_level": access_level,
     }
 
-    logger.debug(f"Extracting text from PDF with {pdf_metadata.page_count} pages.")
-    logger.debug(f"Extract text: {extract_text}")
-    logger.debug(f"extract images: {extract_images}")
-    logger.debug(f"extract tables: {extract_tables}")
-    logger.debug(f"extract tables: {extract_charts}")
+    logger.debug(f"PDF has {page_count} pages.")
+    logger.debug(
+        f"extract_text={extract_text}, extract_images={extract_images}, "
+        f"extract_tables={extract_tables}, extract_charts={extract_charts}"
+    )
 
-    # Pdfium does not support text extraction at the document level
+    # Decide if text_depth is PAGE or DOCUMENT
+    if text_depth != TextTypeEnum.PAGE:
+        text_depth = TextTypeEnum.DOCUMENT
+
+    extracted_data = []
     accumulated_text = []
-    text_depth = text_depth if text_depth == TextTypeEnum.PAGE else TextTypeEnum.DOCUMENT
-    for page_idx in range(pdf_metadata.page_count):
-        page = doc.get_page(page_idx)
 
-        # https://pypdfium2.readthedocs.io/en/stable/python_api.html#module-pypdfium2._helpers.textpage
-        if extract_text:
-            textpage = page.get_textpage()
-            page_text = textpage.get_text_bounded()
-            accumulated_text.append(page_text)
+    # Prepare for table/chart extraction
+    pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
+    futures = []  # We'll keep track of all the Future objects for table/charts
 
-            if text_depth == TextTypeEnum.PAGE and len(accumulated_text) > 0:
-                text_extraction = construct_text_metadata(
-                    accumulated_text,
-                    pdf_metadata.keywords,
+    with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
+        # PAGE LOOP
+        for page_idx in range(page_count):
+            page = doc.get_page(page_idx)
+            page_width, page_height = page.get_size()
+
+            # If we want text, extract text now.
+            if extract_text:
+                page_text = _extract_page_text(page)
+                if text_depth == TextTypeEnum.PAGE:
+                    # Build a page-level text metadata item
+                    text_meta = construct_text_metadata(
+                        [page_text],
+                        pdf_metadata.keywords,
+                        page_idx,
+                        -1,
+                        -1,
+                        -1,
+                        page_count,
+                        text_depth,
+                        source_metadata,
+                        base_unified_metadata,
+                    )
+                    extracted_data.append(text_meta)
+                else:
+                    # doc-level => accumulate
+                    accumulated_text.append(page_text)
+
+            # If we want images, extract images now.
+            if extract_images:
+                image_data = _extract_page_images(
+                    extract_images_method,
+                    page,
                     page_idx,
-                    -1,
-                    -1,
-                    -1,
-                    pdf_metadata.page_count,
-                    text_depth,
+                    page_width,
+                    page_height,
+                    page_count,
                     source_metadata,
                     base_unified_metadata,
                 )
+                extracted_data.extend(image_data)
 
-                extracted_data.append(text_extraction)
-                accumulated_text = []
-
-        # Image extraction
-        if extract_images:
-            for image_data in extract_pdfium_images(page, extract_images_method):
-                extracted_image_data = construct_image_metadata_from_pdf_image(
-                    image_data,
-                    page_idx,
-                    pdf_metadata.page_count,
-                    source_metadata,
-                    base_unified_metadata,
+            # If we want tables or charts, rasterize the page and store it
+            if extract_tables or extract_charts:
+                image, _ = pdfium_pages_to_numpy(
+                    [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
                 )
+                pages_for_tables.append((page_idx, image[0]))
 
-                extracted_data.append(extracted_image_data)
+                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                    future = executor.submit(
+                        _extract_tables_and_charts,
+                        pages_for_tables[:],  # pass a copy
+                        pdfium_config,
+                        page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                        paddle_output_format,
+                        trace_info=trace_info,
+                    )
+                    futures.append(future)
+                    pages_for_tables.clear()
 
-        # Table and chart collection
-        if extract_tables or extract_charts:
-            pages.append(page)
+        # After page loop, if we still have leftover pages_for_tables, submit one last job
+        if (extract_tables or extract_charts) and pages_for_tables:
+            future = executor.submit(
+                _extract_tables_and_charts,
+                pages_for_tables[:],
+                pdfium_config,
+                page_count,
+                source_metadata,
+                base_unified_metadata,
+                paddle_output_format,
+                trace_info=trace_info,
+            )
+            futures.append(future)
+            pages_for_tables.clear()
 
-    if extract_text and text_depth == TextTypeEnum.DOCUMENT and len(accumulated_text) > 0:
-        text_extraction = construct_text_metadata(
+        # Now wait for all futures to complete
+        for fut in concurrent.futures.as_completed(futures):
+            table_chart_items = fut.result()  # blocks until finished
+            extracted_data.extend(table_chart_items)
+
+    # DOC-LEVEL TEXT added last
+    if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
+        doc_text_meta = construct_text_metadata(
             accumulated_text,
             pdf_metadata.keywords,
             -1,
             -1,
             -1,
             -1,
-            pdf_metadata.page_count,
+            page_count,
             text_depth,
             source_metadata,
             base_unified_metadata,
         )
-
-        extracted_data.append(text_extraction)
-
-    if extract_tables or extract_charts:
-        for page_idx, table_and_charts in extract_tables_and_charts_using_image_ensemble(
-            pages,
-            pdfium_config,
-            trace_info=trace_info,
-        ):
-            if (extract_tables and (table_and_charts.type_string == "table")) or (
-                extract_charts and (table_and_charts.type_string == "chart")
-            ):
-                if table_and_charts.type_string == "table":
-                    table_and_charts.content_format = paddle_output_format
-
-                extracted_data.append(
-                    construct_table_and_chart_metadata(
-                        table_and_charts,
-                        page_idx,
-                        pdf_metadata.page_count,
-                        source_metadata,
-                        base_unified_metadata,
-                    )
-                )
+        extracted_data.append(doc_text_meta)
 
     doc.close()
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
-
     return extracted_data
