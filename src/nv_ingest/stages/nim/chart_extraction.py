@@ -66,6 +66,7 @@ def _update_metadata(
                         data=data,
                         model_name="cached",
                         stage_name="chart_data_extraction",
+                        max_batch_size=1,
                         trace_info=trace_info,
                     )
                     cached_futures.append(fut)
@@ -77,6 +78,7 @@ def _update_metadata(
                     data=data,
                     model_name="cached",
                     stage_name="chart_data_extraction",
+                    max_batch_size=batch_size,
                     trace_info=trace_info,
                 )
 
@@ -90,6 +92,7 @@ def _update_metadata(
                     data=deplot_data,
                     model_name="deplot",
                     stage_name="chart_data_extraction",
+                    max_batch_size=1,
                     trace_info=trace_info,
                 )
                 deplot_futures.append(fut)

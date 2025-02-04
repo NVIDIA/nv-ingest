@@ -96,7 +96,7 @@ class PaddleOCRModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, **kwargs: Any) -> Any:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
         Format input data for the specified protocol ("grpc" or "http"), supporting batched data.
 
@@ -106,28 +106,31 @@ class PaddleOCRModelInterface(ModelInterface):
             The input data dictionary, expected to contain "image_arrays" (list of np.ndarray).
         protocol : str
             The inference protocol, either "grpc" or "http".
-        **kwargs : Any
-            Additional keyword arguments for future use.
+        max_batch_size : int
+            The maximum batch size batching.
 
         Returns
         -------
         Any
-            The formatted data ready to be sent via the specified protocol. For gRPC,
-            a batched NumPy array of shape (B, H, W, C). For HTTP, a JSON-serializable
-            payload containing the base64 images in the format required by the PaddleOCR endpoint.
+            A list of formatted batches. For gRPC, each item is a batched NumPy array of shape (B, H, W, C)
+            where B <= max_batch_size. For HTTP, each item is a JSON-serializable payload containing the
+            base64 images in the format required by the PaddleOCR endpoint.
 
         Raises
         ------
         KeyError
             If "image_arrays" is not found in `data`.
         ValueError
-            If an invalid protocol is specified, or if the image shapes are inconsistent
-            for gRPC batching.
+            If an invalid protocol is specified, or if the image shapes are inconsistent for gRPC batching.
         """
         if "image_arrays" not in data:
             raise KeyError("Expected 'image_arrays' in data. Call prepare_data_for_inference first.")
 
         images = data["image_arrays"]
+
+        # Helper function to split a list into chunks of size up to chunk_size.
+        def chunk_list(lst, chunk_size):
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
@@ -143,15 +146,19 @@ class PaddleOCRModelInterface(ModelInterface):
             if not all(s == shapes[0] for s in shapes[1:]):
                 raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
 
-            # Concatenate along the batch dimension => shape (B, H, W, C)
-            batched_input = np.concatenate(processed, axis=0)
-            return batched_input
+            batches = []
+            for chunk in chunk_list(processed, max_batch_size):
+                # Concatenate arrays in the chunk along the batch dimension => shape (B, H, W, C)
+                batched_input = np.concatenate(chunk, axis=0)
+                batches.append(batched_input)
+
+            return batches
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP PaddleOCR model (batched).")
 
+            # Use legacy or new API based on the PaddleOCR version
             if self._is_version_early_access_legacy_api():
-                # Legacy => {"messages":[{"content":[imageObj, imageObj, ...]}]}
                 content_list: List[Dict[str, Any]] = []
                 base64_list = data.get("base64_images")
                 if base64_list is None and "base64_image" in data:
@@ -163,11 +170,14 @@ class PaddleOCRModelInterface(ModelInterface):
                     image_obj = {"type": "image_url", "image_url": {"url": image_url}}
                     content_list.append(image_obj)
 
-                message = {"content": content_list}
-                payload = {"messages": [message]}
+                batches = []
+                for chunk in chunk_list(content_list, max_batch_size):
+                    message = {"content": chunk}
+                    payload = {"messages": [message]}
+                    batches.append(payload)
+                return batches
 
             else:
-                # New => {"input":[ {"type":"image_url","url":...}, ... ]}
                 input_list: List[Dict[str, Any]] = []
                 base64_list = data.get("base64_images")
                 if base64_list is None and "base64_image" in data:
@@ -179,9 +189,11 @@ class PaddleOCRModelInterface(ModelInterface):
                     image_obj = {"type": "image_url", "url": image_url}
                     input_list.append(image_obj)
 
-                payload = {"input": input_list}
-
-            return payload
+                batches = []
+                for chunk in chunk_list(input_list, max_batch_size):
+                    payload = {"input": chunk}
+                    batches.append(payload)
+                return batches
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")

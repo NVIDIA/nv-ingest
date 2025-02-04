@@ -90,6 +90,7 @@ def extract_tables_and_charts_using_image_ensemble(
             inference_results = yolox_client.infer(
                 data,
                 model_name="yolox",
+                max_batch_size=YOLOX_MAX_BATCH_SIZE,
                 num_classes=YOLOX_NUM_CLASSES,
                 conf_thresh=YOLOX_CONF_THRESHOLD,
                 iou_thresh=YOLOX_IOU_THRESHOLD,

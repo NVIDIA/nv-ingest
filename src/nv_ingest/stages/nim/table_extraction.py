@@ -76,8 +76,9 @@ def _update_metadata(
                     paddle_client.infer,
                     data=data,
                     model_name="paddle",
-                    trace_info=trace_info,
                     stage_name="table_data_extraction",
+                    max_batch_size=1,
+                    trace_info=trace_info,
                 )
                 future_to_index[future] = i
 
@@ -127,8 +128,9 @@ def _update_metadata(
                     paddle_client.infer,
                     data=data,
                     model_name="paddle",
-                    trace_info=trace_info,
                     stage_name="table_data_extraction",
+                    max_batch_size=batch_size,
+                    trace_info=trace_info,
                 )
 
                 try:
