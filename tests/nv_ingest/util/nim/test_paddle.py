@@ -125,7 +125,7 @@ def test_format_input_grpc(paddle_ocr_model):
 
         # For gRPC, we rely on 'image_arrays'
         data = {"image_arrays": [np.zeros((32, 32, 3))]}
-        result = paddle_ocr_model.format_input(data, protocol="grpc")
+        result = paddle_ocr_model.format_input(data, protocol="grpc", max_batch_size=1)[0]
 
         # shape => (batch_size, 32, 32, 3). We have batch_size=1.
         assert result.shape == (1, 32, 32, 3)
@@ -142,7 +142,7 @@ def test_format_input_http(paddle_ocr_model):
     # MUST call prepare_data_for_inference first, so data has "image_arrays"
     data = paddle_ocr_model.prepare_data_for_inference(data)
 
-    result = paddle_ocr_model.format_input(data, protocol="http")
+    result = paddle_ocr_model.format_input(data, protocol="http", max_batch_size=1)[0]
 
     # For non-legacy => {"input": [ {"type":"image_url","url": "..."} ]}
     assert "input" in result
@@ -162,7 +162,7 @@ def test_format_input_http_legacy(legacy_paddle_ocr_model):
     data = {"base64_image": valid_b64}
 
     data = legacy_paddle_ocr_model.prepare_data_for_inference(data)
-    result = legacy_paddle_ocr_model.format_input(data, protocol="http")
+    result = legacy_paddle_ocr_model.format_input(data, protocol="http", max_batch_size=1)[0]
 
     # Now we expect => {"messages":[{"content":[ { "type":"image_url",
     # "image_url":{"url":"data:image/png;base64,..."}}, ... ]}]}

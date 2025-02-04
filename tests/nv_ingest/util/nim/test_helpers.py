@@ -30,12 +30,12 @@ class MockModelInterface:
         # Simulate data preparation
         return data
 
-    def format_input(self, data, protocol: str, **kwargs):
+    def format_input(self, data, protocol: str, max_batch_size: int, **kwargs):
         # Return different data based on the protocol
         if protocol == "grpc":
-            return np.array([1, 2, 3], dtype=np.float32)
+            return [np.array([1, 2, 3], dtype=np.float32)]
         elif protocol == "http":
-            return {"input": "formatted_data"}
+            return [{"input": "formatted_data"}]
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -158,9 +158,13 @@ def test_nimclient_infer_grpc(mock_model_interface, grpc_endpoints):
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
 
+        fake_config = Mock()
+        fake_config.config = Mock(max_batch_size=1)
+        mock_grpc_client.return_value.get_model_config.return_value = fake_config
+
         result = client.infer(data, model_name="test_model")
 
-    assert result == "processed_parsed_output_grpc"
+    assert result == ["processed_parsed_output_grpc"]
 
 
 # Test infer with HTTP protocol
@@ -178,7 +182,7 @@ def test_nimclient_infer_http(mock_model_interface, http_endpoints):
 
         result = client.infer(data, model_name="test_model")
 
-    assert result == "processed_parsed_output_http"
+    assert result == ["processed_parsed_output_http"]
 
 
 # Test infer raises exception on HTTP error
@@ -203,6 +207,10 @@ def test_nimclient_infer_grpc_error(mock_model_interface, grpc_endpoints):
     with patch(f"{MODULE_UNDER_TEST}.grpcclient.InferenceServerClient") as mock_grpc_client:
         client = NimClient(mock_model_interface, "grpc", grpc_endpoints)
         mock_grpc_client.return_value.infer.side_effect = Exception("gRPC Inference error")
+
+        fake_config = Mock()
+        fake_config.config = Mock(max_batch_size=1)
+        mock_grpc_client.return_value.get_model_config.return_value = fake_config
 
         with pytest.raises(Exception, match="gRPC Inference error"):
             client.infer(data, model_name="test_model")
@@ -255,6 +263,10 @@ def test_nimclient_infer_parse_output_exception(mock_model_interface, grpc_endpo
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
 
+        fake_config = Mock()
+        fake_config.config = Mock(max_batch_size=1)
+        mock_grpc_client.return_value.get_model_config.return_value = fake_config
+
         # Simulate exception in parse_output
         mock_model_interface.parse_output = Mock(side_effect=Exception("Parsing error"))
 
@@ -272,6 +284,10 @@ def test_nimclient_infer_process_results_exception(mock_model_interface, grpc_en
         mock_response = Mock()
         mock_response.as_numpy.return_value = np.array([1, 2, 3])
         mock_grpc_client.return_value.infer.return_value = mock_response
+
+        fake_config = Mock()
+        fake_config.config = Mock(max_batch_size=1)
+        mock_grpc_client.return_value.get_model_config.return_value = fake_config
 
         # Simulate exception in process_inference_results
         mock_model_interface.process_inference_results = Mock(side_effect=Exception("Processing error"))

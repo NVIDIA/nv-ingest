@@ -4,6 +4,7 @@
 
 import logging
 import re
+import threading
 import time
 from typing import Any
 from typing import Optional
@@ -34,7 +35,7 @@ class ModelInterface:
     inference, parsing output, and processing inference results.
     """
 
-    def format_input(self, data: dict, protocol: str):
+    def format_input(self, data: dict, protocol: str, max_batch_size: int):
         """
         Format the input data for the specified protocol.
 
@@ -107,7 +108,7 @@ class NimClient:
 
     def __init__(
         self,
-        model_interface: ModelInterface,
+        model_interface,
         protocol: str,
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
@@ -136,29 +137,60 @@ class NimClient:
             If an invalid protocol is specified or if required endpoints are missing.
         """
 
+        self.client = None
         self.model_interface = model_interface
         self.protocol = protocol.lower()
         self.auth_token = auth_token
         self.timeout = timeout  # Timeout for HTTP requests
         self.max_retries = max_retries
-
-        grpc_endpoint, http_endpoint = endpoints
+        self._grpc_endpoint, self._http_endpoint = endpoints
+        self._max_batch_sizes = {}
+        self._lock = threading.Lock()
 
         if self.protocol == "grpc":
-            if not grpc_endpoint:
+            if not self._grpc_endpoint:
                 raise ValueError("gRPC endpoint must be provided for gRPC protocol")
-            logger.debug(f"Creating gRPC client with {grpc_endpoint}")
-            self.client = grpcclient.InferenceServerClient(url=grpc_endpoint)
+            logger.debug(f"Creating gRPC client with {self._grpc_endpoint}")
+            self.client = grpcclient.InferenceServerClient(url=self._grpc_endpoint)
         elif self.protocol == "http":
-            if not http_endpoint:
+            if not self._http_endpoint:
                 raise ValueError("HTTP endpoint must be provided for HTTP protocol")
-            logger.debug(f"Creating HTTP client with {http_endpoint}")
-            self.endpoint_url = generate_url(http_endpoint)
+            logger.debug(f"Creating HTTP client with {self._http_endpoint}")
+            self.endpoint_url = generate_url(self._http_endpoint)
             self.headers = {"accept": "application/json", "content-type": "application/json"}
             if self.auth_token:
                 self.headers["Authorization"] = f"Bearer {self.auth_token}"
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+    def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
+        """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
+        if model_name in self._max_batch_sizes:
+            return self._max_batch_sizes[model_name]
+
+        with self._lock:
+            # Double check, just in case another thread set the value while we were waiting
+            if model_name in self._max_batch_sizes:
+                return self._max_batch_sizes[model_name]
+
+            if not self._grpc_endpoint:
+                self._max_batch_sizes[model_name] = 1
+                return 1
+
+            try:
+                client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
+                model_config = client.get_model_config(model_name=model_name, model_version=model_version)
+                self._max_batch_sizes[model_name] = model_config.config.max_batch_size
+                logger.info(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
+            except Exception as e:
+                self._max_batch_sizes[model_name] = 1
+                logger.warning(f"Failed to retrieve max batch size: {e}, defaulting to 1")
+
+            return self._max_batch_sizes[model_name]
+
+    def try_set_max_batch_size(self, model_name, model_version: str = ""):
+        """Attempt to set the max batch size for the model if it is not already set, ensuring thread safety."""
+        self._fetch_max_batch_size(model_name, model_version)
 
     @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
@@ -186,38 +218,74 @@ class NimClient:
         """
 
         try:
-            # Prepare data for inference
+            # 1. Retrieve or default to the model's maximum batch size
+            batch_size = self._fetch_max_batch_size(model_name)
+            max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
+            force_requested_batch_size = kwargs.get("force_max_batch_size", False)
+
+            # 1a. In some cases we can't use the absolute max batch size (or don't want to) so we allow override
+            # 1b. In some cases we can't reliably retrieve the max batch size so we default to 1 and allow forced
+            #   override
+            if not force_requested_batch_size:
+                max_batch_size = min(batch_size, max_requested_batch_size)
+            else:
+                max_batch_size = max_requested_batch_size
+
+            # 2. Prepare data for inference
             prepared_data = self.model_interface.prepare_data_for_inference(data)
 
-            # Format input based on protocol
-            formatted_input = self.model_interface.format_input(prepared_data, protocol=self.protocol)
-
-            # Perform inference
-            if self.protocol == "grpc":
-                logger.debug("Performing gRPC inference...")
-                response = self._grpc_infer(formatted_input, model_name)
-                logger.debug("gRPC inference received response")
-            elif self.protocol == "http":
-                logger.debug("Performing HTTP inference...")
-                response = self._http_infer(formatted_input)
-                logger.debug("HTTP inference received response")
-            else:
-                raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
-
-            # Parse and process output
-            parsed_output = self.model_interface.parse_output(
-                response, protocol=self.protocol, data=prepared_data, **kwargs
+            # 3. Format the input based on protocol
+            #    NOTE: This now returns a list of batches.
+            formatted_batches = self.model_interface.format_input(
+                prepared_data, protocol=self.protocol, max_batch_size=max_batch_size
             )
-            results = self.model_interface.process_inference_results(
-                parsed_output, original_image_shapes=data.get("original_image_shapes"), protocol=self.protocol, **kwargs
-            )
+
+            # Container for all parsed outputs
+            all_parsed_outputs = []
+
+            # 4. Loop over each batch
+            for batch_input in formatted_batches:
+                if self.protocol == "grpc":
+                    logger.debug("Performing gRPC inference for a batch...")
+                    response = self._grpc_infer(batch_input, model_name)
+                    logger.debug("gRPC inference received response for a batch")
+                elif self.protocol == "http":
+                    logger.debug("Performing HTTP inference for a batch...")
+                    response = self._http_infer(batch_input)
+                    logger.debug("HTTP inference received response for a batch")
+                else:
+                    raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+                # Parse the output of this batch
+                parsed_output = self.model_interface.parse_output(
+                    response, protocol=self.protocol, data=prepared_data, **kwargs
+                )
+                # Accumulate parsed outputs
+                all_parsed_outputs.append(parsed_output)
+
+            # 5. Process the parsed outputs for each batch
+            all_results = []
+            for parsed_output in all_parsed_outputs:
+                batch_results = self.model_interface.process_inference_results(
+                    parsed_output,
+                    original_image_shapes=data.get("original_image_shapes"),
+                    protocol=self.protocol,
+                    **kwargs,
+                )
+                # Extend or append based on how `batch_results` is structured
+                # (assuming it's a list of result items):
+                if isinstance(batch_results, list):
+                    all_results.extend(batch_results)
+                else:
+                    all_results.append(batch_results)
+
         except Exception as err:
             error_str = f"Error during NimClient inference [{self.model_interface.name()}, {self.protocol}]: {err}"
             logger.error(error_str)
-
             raise RuntimeError(error_str)
 
-        return results
+        # 6. Return final accumulated results
+        return all_results
 
     def _grpc_infer(self, formatted_input: np.ndarray, model_name: str) -> np.ndarray:
         """
