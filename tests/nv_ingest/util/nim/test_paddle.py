@@ -113,8 +113,7 @@ def test_prepare_data_for_inference(paddle_ocr_model):
         assert len(result["image_arrays"]) == 1
         assert result["image_arrays"][0].shape == (100, 100, 3)
 
-        # We also store dimensions in self._dims
-        assert paddle_ocr_model._dims == [(100, 100)]
+        assert data["image_dims"][0] == (100, 100)
 
 
 def test_format_input_grpc(paddle_ocr_model):
@@ -190,7 +189,7 @@ def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_re
     result = paddle_ocr_model.parse_output(mock_paddle_http_response, protocol="http")
     # It's a list with one tuple => (content, format).
     assert len(result) == 1
-    assert result[0][0] == "| mock_text |\n"
+    assert result[0][0] == "| mock_text |"
     assert result[0][1] == "pseudo_markdown"
 
 
