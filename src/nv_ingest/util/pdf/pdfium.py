@@ -21,6 +21,9 @@ from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.image_processing.transforms import pad_image
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.tracing.tagging import traceable_func
+from nv_ingest.util.image_processing.clustering import combine_groups_into_bboxes
+from nv_ingest.util.image_processing.clustering import group_bounding_boxes
+from nv_ingest.util.image_processing.clustering import remove_superset_bboxes
 
 logger = logging.getLogger(__name__)
 
@@ -214,124 +217,6 @@ def convert_pdfium_position(pos, page_width, page_height):
     return [int(x0), int(y0), int(x1), int(y1)]
 
 
-def boxes_are_close_or_overlap(b1, b2, threshold=10.0):
-    """
-    Return True if bounding boxes b1 and b2 overlap or
-    are closer than 'threshold' in points/pixels.
-    b1, b2 = (xmin, ymin, xmax, ymax).
-    """
-    (xmin1, ymin1, xmax1, ymax1) = b1
-    (xmin2, ymin2, xmax2, ymax2) = b2
-
-    # Check if they overlap horizontally
-    overlap_x = not (xmax1 < xmin2 or xmax2 < xmin1)
-    # Check if they overlap vertically
-    overlap_y = not (ymax1 < ymin2 or ymax2 < ymin1)
-
-    # If there's an actual overlap area, that's enough
-    if overlap_x and overlap_y:
-        return True
-
-    # Otherwise, measure the gap. We can do a simple approach:
-    #   horizontal gap = distance between the rightmost left edge and the leftmost right edge
-    #   vertical gap   = ...
-    # But to keep it straightforward, let's do a quick bounding box expansions approach
-    # Expand each box by 'threshold' in all directions and see if they overlap now
-    expanded_b1 = (xmin1 - threshold, ymin1 - threshold, xmax1 + threshold, ymax1 + threshold)
-    expanded_b2 = (xmin2 - threshold, ymin2 - threshold, xmax2 + threshold, ymax2 + threshold)
-
-    # Check overlap on expanded boxes
-    (exmin1, eymin1, exmax1, eymax1) = expanded_b1
-    (exmin2, eymin2, exmax2, eymax2) = expanded_b2
-
-    overlap_x_expanded = not (exmax1 < exmin2 or exmax2 < exmin1)
-    overlap_y_expanded = not (eymax1 < eymin2 or eymax2 < eymin1)
-
-    return overlap_x_expanded and overlap_y_expanded
-
-
-def group_bounding_boxes(boxes, threshold=10.0, max_num_boxes=1_000, max_depth=None):
-    """
-    Given a list of bounding boxes,
-    returns a list of groups (lists) of bounding box indices.
-    """
-    n = len(boxes)
-    if n > max_num_boxes:
-        logger.warning(
-            "Number of bounding boxes (%d) exceeds the maximum allowed (%d). "
-            "Skipping grouping to avoid high computational overhead.",
-            n,
-            max_num_boxes,
-        )
-        return []
-
-    visited = [False] * n
-    adjacency_list = [[] for _ in range(n)]
-
-    # Build adjacency by checking closeness/overlap
-    for i in range(n):
-        for j in range(i + 1, n):
-            if boxes_are_close_or_overlap(boxes[i], boxes[j], threshold):
-                adjacency_list[i].append(j)
-                adjacency_list[j].append(i)
-
-    # DFS to get connected components
-    def dfs(start):
-        stack = [(start, 0)]  # (node, depth)
-        component = []
-        while stack:
-            node, depth = stack.pop()
-            if not visited[node]:
-                visited[node] = True
-                component.append(node)
-
-                # If we haven't reached max_depth (if max_depth is set)
-                if max_depth is None or depth < max_depth:
-                    for neighbor in adjacency_list[node]:
-                        if not visited[neighbor]:
-                            stack.append((neighbor, depth + 1))
-
-        return component
-
-    groups = []
-    for i in range(n):
-        if not visited[i]:
-            comp = dfs(i)
-            groups.append(comp)
-
-    return groups
-
-
-def combine_groups_into_bboxes(boxes, groups, min_num_components=1):
-    """
-    Given the original bounding boxes and a list of groups (each group is
-    a list of indices), return one bounding box per group.
-    """
-    combined = []
-    for group in groups:
-        if len(group) < min_num_components:
-            continue
-        xmins = []
-        ymins = []
-        xmaxs = []
-        ymaxs = []
-        for idx in group:
-            (xmin, ymin, xmax, ymax) = boxes[idx]
-            xmins.append(xmin)
-            ymins.append(ymin)
-            xmaxs.append(xmax)
-            ymaxs.append(ymax)
-
-        group_xmin = min(xmins)
-        group_ymin = min(ymins)
-        group_xmax = max(xmaxs)
-        group_ymax = max(ymaxs)
-
-        combined.append((group_xmin, group_ymin, group_xmax, group_ymax))
-
-    return combined
-
-
 def extract_simple_images_from_pdfium_page(page, max_depth):
     page_width = page.get_width()
     page_height = page.get_height()
@@ -380,43 +265,6 @@ def extract_nested_simple_images_from_pdfium_page(page):
 
 def extract_top_level_simple_images_from_pdfium_page(page):
     return extract_simple_images_from_pdfium_page(page, max_depth=1)
-
-
-def remove_superset_bboxes(bboxes):
-    """
-    Given a list of bounding boxes (x_min, y_min, x_max, y_max),
-    remove any bounding box that is a strict superset of another
-    (i.e., fully contains a smaller box).
-
-    Returns:
-        A new list of bounding boxes without the supersets.
-    """
-    results = []
-
-    for i, box_a in enumerate(bboxes):
-        xA_min, yA_min, xA_max, yA_max = box_a
-
-        # Flag to mark if we should exclude this box
-        exclude_a = False
-
-        for j, box_b in enumerate(bboxes):
-            if i == j:
-                continue
-
-            xB_min, yB_min, xB_max, yB_max = box_b
-
-            # Check if box_a strictly encloses box_b:
-            # 1) xA_min <= xB_min, yA_min <= yB_min, xA_max >= xB_max, yA_max >= yB_max
-            # 2) At least one of those inequalities is strict, meaning they're not equal on all edges
-            if xA_min <= xB_min and yA_min <= yB_min and xA_max >= xB_max and yA_max >= yB_max:
-                # box_a is a strict superset => remove it
-                exclude_a = True
-                break
-
-        if not exclude_a:
-            results.append(box_a)
-
-    return results
 
 
 def extract_merged_images_from_pdfium_page(page, merge=True):
