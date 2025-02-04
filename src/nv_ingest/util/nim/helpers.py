@@ -100,17 +100,6 @@ class ModelInterface:
         """
         raise NotImplementedError("Subclasses should implement this method")
 
-    def model_name(self):
-        """
-        Get the model name for the interface.
-
-        Returns
-        -------
-        str
-            The name of the model.
-        """
-        raise NotImplementedError("Subclasses should implement this method")
-
 
 class NimClient:
     """
