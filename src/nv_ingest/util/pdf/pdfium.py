@@ -250,12 +250,21 @@ def boxes_are_close_or_overlap(b1, b2, threshold=10.0):
     return overlap_x_expanded and overlap_y_expanded
 
 
-def group_bounding_boxes(boxes, threshold=10.0, max_depth=None):
+def group_bounding_boxes(boxes, threshold=10.0, max_num_boxes=1_000, max_depth=None):
     """
     Given a list of bounding boxes,
     returns a list of groups (lists) of bounding box indices.
     """
     n = len(boxes)
+    if n > max_num_boxes:
+        logger.warning(
+            "Number of bounding boxes (%d) exceeds the maximum allowed (%d). "
+            "Skipping grouping to avoid high computational overhead.",
+            n,
+            max_num_boxes,
+        )
+        return []
+
     visited = [False] * n
     adjacency_list = [[] for _ in range(n)]
 
@@ -459,6 +468,7 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True):
         return path_bboxes
 
     merged_bboxes = []
+
     path_groups = group_bounding_boxes(path_bboxes)
     path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups, min_num_components=3)
     for bbox in path_bboxes:
