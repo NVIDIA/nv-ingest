@@ -229,7 +229,7 @@ class Ingestor:
 
         # If progress display is enabled, create a tqdm progress bar and set a callback to update it.
         if show_progress:
-            pbar = tqdm(total=len(self._job_ids), desc="Fetching results")
+            pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
 
             def progress_callback(result: Dict, job_id: str) -> None:
                 pbar.update(1)

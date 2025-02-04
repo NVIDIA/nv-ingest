@@ -93,7 +93,6 @@ async def _make_async_request(
             api_key=api_key,
             base_url=embedding_nim_endpoint,
         )
-        logger.info(f"Sending request to NIM embedding service: {embedding_nim_endpoint}, model: {embedding_model}")
 
         resp = await async_client.embeddings.create(
             input=prompts,
