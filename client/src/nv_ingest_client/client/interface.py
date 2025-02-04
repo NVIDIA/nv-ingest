@@ -204,41 +204,56 @@ class Ingestor:
 
     def ingest(self, show_progress: bool = False, **kwargs: Any) -> List[Dict[str, Any]]:
         """
-        Synchronously submits jobs to the NvIngestClient and fetches the results,
-        optionally displaying a progress bar as each file/job finishes.
-
-        Rather than its own direct submission logic, this method delegates to `ingest_async`,
-        blocking on the returned Future until all tasks complete.
+        Synchronously submits jobs to the NvIngestClient and fetches the results.
 
         Parameters
         ----------
-        show_progress : bool
-            If True, display a tqdm progress bar that updates as each job finishes.
-            This flag is passed directly to `ingest_async`.
         kwargs : dict
-            Additional parameters that are passed to `ingest_async`.
+            Additional parameters for `submit_job` and `fetch_job_result` methods of NvIngestClient.
+            Optionally, include 'show_progress' (bool) to display a progress bar while fetching results.
 
         Returns
         -------
-        List[Dict[str, Any]]
+        List[Dict]
             Result of each job after execution.
         """
-        # Simply delegate to ingest_async, passing the parameters
-        future = self.ingest_async(show_progress=show_progress, **kwargs)
+        self._prepare_ingest_run()
 
-        # Block until all async ingestion tasks are finished
-        results = future.result()
-        return results
+        self._job_ids = self._client.add_job(self._job_specs)
 
-    def ingest_async(self, show_progress: bool = False, **kwargs: Any) -> Future:
+        submit_kwargs = filter_function_kwargs(self._client.submit_job, **kwargs)
+        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_kwargs)
+
+        # Pop the show_progress flag from kwargs; default to False if not provided.
+        fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
+
+        # If progress display is enabled, create a tqdm progress bar and set a callback to update it.
+        if show_progress:
+            pbar = tqdm(total=len(self._job_ids), desc="Fetching results")
+
+            def progress_callback(result: Dict, job_id: str) -> None:
+                pbar.update(1)
+
+            fetch_kwargs["completion_callback"] = progress_callback
+
+        result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
+
+        if show_progress and pbar:
+            pbar.close()
+
+        if self._vdb_bulk_upload:
+            self._vdb_bulk_upload.run(result)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
+
+        return result
+
+    def ingest_async(self, **kwargs: Any) -> Future:
         """
-        Asynchronously submits jobs and returns a single future that completes when
-        all jobs have finished, optionally showing a progress bar as each file/job finishes.
+        Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
 
         Parameters
         ----------
-        show_progress : bool
-            If True, display a tqdm progress bar that updates as each job finishes.
         kwargs : dict
             Additional parameters for the `submit_job_async` method.
 
@@ -248,26 +263,21 @@ class Ingestor:
             A future that completes when all submitted jobs have reached a terminal state.
         """
         self._prepare_ingest_run()
+
         self._job_ids = self._client.add_job(self._job_specs)
 
-        # Submit jobs asynchronously
         future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
         self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
 
-        # Create a single future that completes when all individual job futures are done
         combined_future = Future()
         submitted_futures = set(future_to_job_id.keys())
         completed_futures = set()
         future_results = []
 
-        # Optional: If showing progress, create a tqdm bar
-        pbar = tqdm(total=len(submitted_futures), desc="Ingesting Files", unit="job") if show_progress else None
-
-        def _done_callback(f: Future):
-            job_id = future_to_job_id[f]
+        def _done_callback(future):
+            job_id = future_to_job_id[future]
             job_state = self._job_states[job_id]
             try:
-                # Attempt to fetch the result for this single job
                 result = self._client.fetch_job_result(job_id)
                 if job_state.state != JobStateEnum.COMPLETED:
                     job_state.state = JobStateEnum.COMPLETED
@@ -275,33 +285,18 @@ class Ingestor:
                 result = None
                 if job_state.state != JobStateEnum.FAILED:
                     job_state.state = JobStateEnum.FAILED
-
-            completed_futures.add(f)
+            completed_futures.add(future)
             future_results.append(result)
-
-            # Update progress bar if requested
-            if pbar is not None:
-                pbar.update(1)
-
-            # If all the job futures are done, mark the combined future as done
             if completed_futures == submitted_futures:
-                if pbar is not None:
-                    pbar.close()
                 combined_future.set_result(future_results)
 
-        # Add the callback to each future
-        for f in future_to_job_id:
-            f.add_done_callback(_done_callback)
+        for future in future_to_job_id:
+            future.add_done_callback(_done_callback)
 
-        # If we have a VDB bulk upload, attach it to run after combined_future finishes
         if self._vdb_bulk_upload:
-
-            def _vdb_upload_cb(cf: Future):
-                # Once all results are in, run the upload
-                self._vdb_bulk_upload.run(cf.result())
-                self._vdb_bulk_upload = None
-
-            combined_future.add_done_callback(_vdb_upload_cb)
+            self._vdb_bulk_upload.run(combined_future)
+            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload = None
 
         return combined_future
 
