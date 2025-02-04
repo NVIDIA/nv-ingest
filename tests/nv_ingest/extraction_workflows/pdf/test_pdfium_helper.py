@@ -240,6 +240,7 @@ def test_pdfium_extractor_page_form(pdf_stream_test_page_form_pdf, document_df):
         extract_charts=False,
         extract_images_method="simple",
         row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
     )
 
     assert isinstance(extracted_data, list)
@@ -253,6 +254,7 @@ def test_pdfium_extractor_page_form(pdf_stream_test_page_form_pdf, document_df):
         extract_charts=False,
         extract_images_method="merged",
         row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
     )
 
     assert isinstance(extracted_data, list)
@@ -270,6 +272,7 @@ def test_pdfium_extractor_shapes(pdf_stream_test_shapes_pdf, document_df):
         extract_charts=False,
         extract_images_method="simple",
         row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
     )
 
     assert isinstance(extracted_data, list)
@@ -284,6 +287,7 @@ def test_pdfium_extractor_shapes(pdf_stream_test_shapes_pdf, document_df):
         extract_charts=False,
         extract_images_method="merged",
         row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
     )
 
     assert isinstance(extracted_data, list)

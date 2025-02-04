@@ -273,7 +273,7 @@ def extract_merged_images_from_pdfium_page(page, merge=True, **kwargs):
     of bounding boxes that likely belong to the same compound image.
     """
     threshold = kwargs.get("images_threshold", 10.0)
-    max_num_boxes = kwargs.get("images_max_num_boxes", 1_000)
+    max_num_boxes = kwargs.get("images_max_num_boxes", 1_024)
 
     page_width = page.get_width()
     page_height = page.get_height()
@@ -303,7 +303,7 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True, **kwargs):
     shapes that occupy more than half the page area.
     """
     threshold = kwargs.get("shapes_threshold", 10.0)
-    max_num_boxes = kwargs.get("shapes_max_num_boxes", 1_000)
+    max_num_boxes = kwargs.get("shapes_max_num_boxes", 2_048)
     min_num_components = kwargs.get("shapes_min_num_components", 3)
 
     page_width = page.get_width()
@@ -342,7 +342,7 @@ def extract_forms_from_pdfium_page(page, **kwargs):
     bounding boxes that strictly enclose other boxes (i.e., are strict supersets).
     """
     threshold = kwargs.get("forms_threshold", 10.0)
-    max_num_boxes = kwargs.get("forms_max_num_boxes", 1_000)
+    max_num_boxes = kwargs.get("forms_max_num_boxes", 1_024)
 
     page_width = page.get_width()
     page_height = page.get_height()

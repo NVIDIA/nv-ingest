@@ -224,10 +224,12 @@ class ExtractTask(Task):
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract images method: {self._extract_images_method}\n"
-        info += f"  extract images params: {self._extract_images_params}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
         info += f"  paddle_output_format: {self._paddle_output_format}\n"
+
+        if self._extract_images_params:
+            info += f"  extract images params: {self._extract_images_params}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -239,12 +241,17 @@ class ExtractTask(Task):
             "extract_images": self._extract_images,
             "extract_tables": self._extract_tables,
             "extract_images_method": self._extract_images_method,
-            "extract_images_params": self._extract_images_params,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "text_depth": self._text_depth,
             "paddle_output_format": self._paddle_output_format,
         }
+        if self._extract_images_params:
+            extract_params.update(
+                {
+                    "extract_images_params": self._extract_images_params,
+                }
+            )
 
         task_properties = {
             "method": self._extract_method,

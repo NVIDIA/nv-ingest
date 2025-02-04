@@ -214,8 +214,7 @@ def _extract_page_images(
     """
     if extract_images_method == "simple":
         extracted_image_data = extract_nested_simple_images_from_pdfium_page(page)
-
-    elif extract_images_method == "group":
+    else:  # if extract_images_method == "group"
         extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True, **extract_images_params)
 
     extracted_images = []
