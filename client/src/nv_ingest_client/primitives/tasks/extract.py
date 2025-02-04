@@ -8,6 +8,7 @@
 
 import logging
 import os
+from typing import Any
 from typing import Dict
 from typing import Literal
 from typing import Optional
@@ -98,6 +99,7 @@ class ExtractTaskSchema(BaseModel):
     extract_text: bool = True
     extract_images: bool = True
     extract_images_method: str = "group"
+    extract_images_params: Optional[Dict[str, Any]] = None
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
@@ -183,6 +185,7 @@ class ExtractTask(Task):
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
         extract_images_method: _Type_Extract_Images_Method = "group",
+        extract_images_params: Optional[Dict[str, Any]] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
@@ -197,6 +200,7 @@ class ExtractTask(Task):
         self._extract_method = extract_method
         self._extract_tables = extract_tables
         self._extract_images_method = extract_images_method
+        self._extract_images_params = extract_images_params
         self._extract_tables_method = extract_tables_method
         # `extract_charts` is initially set to None for backward compatibility.
         # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
@@ -220,6 +224,7 @@ class ExtractTask(Task):
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract images method: {self._extract_images_method}\n"
+        info += f"  extract images params: {self._extract_images_params}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
         info += f"  paddle_output_format: {self._paddle_output_format}\n"
@@ -234,6 +239,7 @@ class ExtractTask(Task):
             "extract_images": self._extract_images,
             "extract_tables": self._extract_tables,
             "extract_images_method": self._extract_images_method,
+            "extract_images_params": self._extract_images_params,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "text_depth": self._text_depth,

@@ -206,6 +206,7 @@ def _extract_page_images(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
+    **extract_images_params,
 ) -> list:
     """
     Always extract images from the given page and return a list of image metadata items.
@@ -215,7 +216,7 @@ def _extract_page_images(
         extracted_image_data = extract_nested_simple_images_from_pdfium_page(page)
 
     elif extract_images_method == "group":
-        extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True)
+        extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True, **extract_images_params)
 
     extracted_images = []
     for image_data in extracted_image_data:
@@ -291,6 +292,7 @@ def pdfium_extractor(
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
     extract_images_method = kwargs.get("extract_images_method", "group")
+    extract_images_params = kwargs.get("extract_images_params") or {}
 
     # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -378,6 +380,7 @@ def pdfium_extractor(
                     page_count,
                     source_metadata,
                     base_unified_metadata,
+                    **extract_images_params,
                 )
                 extracted_data.extend(image_data)
 

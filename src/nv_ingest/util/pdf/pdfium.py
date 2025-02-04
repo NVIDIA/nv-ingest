@@ -267,11 +267,14 @@ def extract_top_level_simple_images_from_pdfium_page(page):
     return extract_simple_images_from_pdfium_page(page, max_depth=1)
 
 
-def extract_merged_images_from_pdfium_page(page, merge=True):
+def extract_merged_images_from_pdfium_page(page, merge=True, **kwargs):
     """
     Extract bounding boxes of image objects from a PDFium page, with optional merging
     of bounding boxes that likely belong to the same compound image.
     """
+    threshold = kwargs.get("images_threshold", 10.0)
+    max_num_boxes = kwargs.get("images_max_num_boxes", 1_000)
+
     page_width = page.get_width()
     page_height = page.get_height()
 
@@ -287,18 +290,22 @@ def extract_merged_images_from_pdfium_page(page, merge=True):
     if (not merge) or (not image_bboxes):
         return image_bboxes
 
-    merged_groups = group_bounding_boxes(image_bboxes)
+    merged_groups = group_bounding_boxes(image_bboxes, threshold=threshold, max_num_boxes=max_num_boxes)
     merged_bboxes = combine_groups_into_bboxes(image_bboxes, merged_groups)
 
     return merged_bboxes
 
 
-def extract_merged_shapes_from_pdfium_page(page, merge=True):
+def extract_merged_shapes_from_pdfium_page(page, merge=True, **kwargs):
     """
     Extract bounding boxes of path objects (shapes) from a PDFium page, and optionally merge
     those bounding boxes if they appear to be part of the same shape group. Also filters out
     shapes that occupy more than half the page area.
     """
+    threshold = kwargs.get("shapes_threshold", 10.0)
+    max_num_boxes = kwargs.get("shapes_max_num_boxes", 1_000)
+    min_num_components = kwargs.get("shapes_min_num_components", 3)
+
     page_width = page.get_width()
     page_height = page.get_height()
     page_area = page_width * page_height
@@ -317,8 +324,8 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True):
 
     merged_bboxes = []
 
-    path_groups = group_bounding_boxes(path_bboxes)
-    path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups, min_num_components=3)
+    path_groups = group_bounding_boxes(path_bboxes, threshold=threshold, max_num_boxes=max_num_boxes)
+    path_bboxes = combine_groups_into_bboxes(path_bboxes, path_groups, min_num_components=min_num_components)
     for bbox in path_bboxes:
         bbox_area = abs(bbox[0] - bbox[2]) * abs(bbox[1] - bbox[3])
         # Exclude shapes that are too large (likely page backgrounds or false positives)
@@ -329,11 +336,14 @@ def extract_merged_shapes_from_pdfium_page(page, merge=True):
     return merged_bboxes
 
 
-def extract_forms_from_pdfium_page(page):
+def extract_forms_from_pdfium_page(page, **kwargs):
     """
     Extract bounding boxes for PDF form objects from a PDFium page, removing any
     bounding boxes that strictly enclose other boxes (i.e., are strict supersets).
     """
+    threshold = kwargs.get("forms_threshold", 10.0)
+    max_num_boxes = kwargs.get("forms_max_num_boxes", 1_000)
+
     page_width = page.get_width()
     page_height = page.get_height()
     page_area = page_width * page_height
@@ -347,7 +357,7 @@ def extract_forms_from_pdfium_page(page):
         form_bboxes.append(form_bbox)
 
     merged_bboxes = []
-    form_groups = group_bounding_boxes(form_bboxes)
+    form_groups = group_bounding_boxes(form_bboxes, threshold=threshold, max_num_boxes=max_num_boxes)
     form_bboxes = combine_groups_into_bboxes(form_bboxes, form_groups)
     for bbox in form_bboxes:
         bbox_area = abs(bbox[0] - bbox[2]) * abs(bbox[1] - bbox[3])
@@ -363,7 +373,7 @@ def extract_forms_from_pdfium_page(page):
     return results
 
 
-def extract_image_like_objects_from_pdfium_page(page, merge=True):
+def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
     page_width = page.get_width()
     page_height = page.get_height()
     rotation = page.get_rotation()
@@ -374,9 +384,9 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True):
             render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
             rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
         )
-        image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge)
-        shape_bboxes = extract_merged_shapes_from_pdfium_page(page, merge=merge)
-        form_bboxes = extract_forms_from_pdfium_page(page)
+        image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge, **kwargs)
+        shape_bboxes = extract_merged_shapes_from_pdfium_page(page, merge=merge, **kwargs)
+        form_bboxes = extract_forms_from_pdfium_page(page, **kwargs)
     except Exception as e:
         logger.error(f"Unhandled error extracting image: {e}")
         traceback.print_exc()
