@@ -148,6 +148,7 @@ class NimClient:
             If an invalid protocol is specified or if required endpoints are missing.
         """
 
+        self.client = None
         self.model_interface = model_interface
         self.protocol = protocol.lower()
         self.auth_token = auth_token
@@ -188,7 +189,8 @@ class NimClient:
                 return 1
 
             try:
-                model_config = self.client.get_model_config(model_name=model_name, model_version=model_version)
+                client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
+                model_config = client.get_model_config(model_name=model_name, model_version=model_version)
                 self._max_batch_sizes[model_name] = model_config.config.max_batch_size
                 logger.info(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
             except Exception as e:

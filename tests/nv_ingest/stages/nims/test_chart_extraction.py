@@ -99,16 +99,25 @@ def test_update_metadata_single_batch_single_worker(mocker):
         data={"base64_images": ["img1", "img2"]},
         model_name="cached",
         stage_name="chart_data_extraction",
+        max_batch_size=2,
         trace_info=trace_info,
     )
 
     # deplot.infer called once per image
     assert deplot_mock.infer.call_count == 2
     deplot_mock.infer.assert_any_call(
-        data={"base64_image": "img1"}, model_name="deplot", stage_name="chart_data_extraction", trace_info=trace_info
+        data={"base64_image": "img1"},
+        model_name="deplot",
+        stage_name="chart_data_extraction",
+        max_batch_size=1,
+        trace_info=trace_info,
     )
     deplot_mock.infer.assert_any_call(
-        data={"base64_image": "img2"}, model_name="deplot", stage_name="chart_data_extraction", trace_info=trace_info
+        data={"base64_image": "img2"},
+        model_name="deplot",
+        stage_name="chart_data_extraction",
+        max_batch_size=1,
+        trace_info=trace_info,
     )
 
     # join_cached_and_deplot_output called twice
