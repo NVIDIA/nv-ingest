@@ -427,6 +427,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
         ),
     )
+
     embed_extractions_stage = pipe.add_stage(
         LinearModulesStage(
             morpheus_pipeline_config,
@@ -437,6 +438,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             output_port_name="output",
         )
     )
+
     return embed_extractions_stage
 
 
