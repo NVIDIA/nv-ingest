@@ -55,7 +55,7 @@ A service that:
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
-> [!Note] 
+> [!Note]
 > You should not need to install Python separately, but if you do, NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
 
 
@@ -99,6 +99,8 @@ Password: <Your Key>
 4. Create a .env file containing your NGC API key, and the following paths:
 ```
 # Container images must access resources from NGC.
+
+
 NGC_API_KEY=... # Optional, set this if you are deploying NIMs locally from NGC
 NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com NIMs
 ```
