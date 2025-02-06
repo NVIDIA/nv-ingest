@@ -176,7 +176,6 @@ services:
       # build.nvidia.com hosted deplot
       #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
       - DEPLOT_INFER_PROTOCOL=http
-      - ECLAIR_GRPC_ENDPOINT=
       - ECLAIR_HTTP_ENDPOINT=http://eclair:8000/v1/chat/completions
       - ECLAIR_INFER_PROTOCOL=http
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}

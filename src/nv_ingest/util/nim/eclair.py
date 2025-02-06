@@ -106,7 +106,7 @@ class EclairModelInterface(ModelInterface):
             # Prepare payload for HTTP request
             base64_img = numpy_to_base64(data["image"])
             payload = self._prepare_eclair_payload(base64_img)
-            return payload
+            return [payload]
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -174,16 +174,8 @@ class EclairModelInterface(ModelInterface):
             }
         ]
         payload = {
-            "model": "nvidia/eclair",
+            "model": "nvidia/nemoretriever-parse",
             "messages": messages,
-            "tools": [
-                {
-                    "type": "function",
-                    "function": {
-                        "name": "markdown_bbox",
-                    },
-                }
-            ],
         }
 
         return payload

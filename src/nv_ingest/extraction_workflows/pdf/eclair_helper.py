@@ -259,6 +259,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
             extracted_data.append(text_extraction)
 
     eclair_client.close()
+    doc.close()
 
     return extracted_data
 
