@@ -382,16 +382,11 @@ def _insert_location_into_content_metadata(element, enable_charts: bool, enable_
     elif element["document_type"] == "image" and enable_images:
         location = element["metadata"]["image_metadata"]["image_location"]
         max_dimensions = element["metadata"]["image_metadata"]["image_location_max_dimensions"]
-    verify_emb = verify_embedding(element)
-    if (not location) or (not verify_emb):
+    if (not location) and (element["document_type"] != "text"):
         source_name = element["metadata"]["source_metadata"]["source_name"]
         pg_num = element["metadata"]["content_metadata"]["page_number"]
         doc_type = element["document_type"]
-        if not verify_emb:
-            logger.error(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
-        if not location:
-            logger.error(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
-        # if we do find location but no embedding remove anyway
+        logger.error(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
         location = max_dimensions = None
     element["metadata"]["content_metadata"]["location"] = location
     element["metadata"]["content_metadata"]["max_dimensions"] = max_dimensions
