@@ -10,6 +10,7 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as pdfium
+import pypdfium2.raw as pdfium_c
 from numpy import dtype
 from numpy import ndarray
 from PIL import Image
@@ -19,13 +20,12 @@ from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
-# Mapping based on the FPDF_PAGEOBJ_* constants
 PDFIUM_PAGEOBJ_MAPPING = {
-    1: "TEXT",  # FPDF_PAGEOBJ_TEXT
-    2: "PATH",  # FPDF_PAGEOBJ_PATH
-    3: "IMAGE",  # FPDF_PAGEOBJ_IMAGE
-    4: "SHADING",  # FPDF_PAGEOBJ_SHADING
-    5: "FORM",  # FPDF_PAGEOBJ_FORM
+    pdfium_c.FPDF_PAGEOBJ_TEXT:    "TEXT",
+    pdfium_c.FPDF_PAGEOBJ_PATH:    "PATH",
+    pdfium_c.FPDF_PAGEOBJ_IMAGE:   "IMAGE",
+    pdfium_c.FPDF_PAGEOBJ_SHADING: "SHADING",
+    pdfium_c.FPDF_PAGEOBJ_FORM:    "FORM",
 }
 
 
@@ -45,8 +45,7 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
         A NumPy array representing the correctly formatted image data.
     """
     # Get the bitmap format information
-    bitmap_info = bitmap.get_info()
-    mode = bitmap_info.mode  # Use the mode to identify the correct format
+    mode = bitmap.mode  # Use the mode to identify the correct format
 
     # Convert to a NumPy array using the built-in method
     img_arr = bitmap.to_numpy()
