@@ -418,7 +418,7 @@ class NvIngestClient:
                 try:
                     result, _ = handle_future_result(future, timeout=timeout)
                     # Append a tuple of (result data, job_id). (Using result.get("data") if result is valid.)
-                    results.append((result.get("data") if result else None, job_id))
+                    results.append(result.get("data"))
                     # Run the callback if provided and the result is valid
                     if completion_callback and result:
                         completion_callback(result, job_id)
