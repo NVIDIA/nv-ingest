@@ -90,7 +90,7 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. 
+> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
 4. Create a .env file containing your NGC API key, and the following paths:
