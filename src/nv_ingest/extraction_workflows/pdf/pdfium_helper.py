@@ -446,5 +446,4 @@ def pdfium_extractor(
         )
         extracted_data.append(doc_text_meta)
 
-    logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
     return extracted_data

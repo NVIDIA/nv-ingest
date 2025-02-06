@@ -181,7 +181,7 @@ class NimClient:
                 client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
                 model_config = client.get_model_config(model_name=model_name, model_version=model_version)
                 self._max_batch_sizes[model_name] = model_config.config.max_batch_size
-                logger.info(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
+                logger.debug(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
             except Exception as e:
                 self._max_batch_sizes[model_name] = 1
                 logger.warning(f"Failed to retrieve max batch size: {e}, defaulting to 1")

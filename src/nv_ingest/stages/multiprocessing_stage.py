@@ -348,7 +348,7 @@ class MultiProcessingBaseStage(SinglePortStage):
 
             if event["type"] == "on_completed":
                 sub.on_completed()
-                logger.info("parent_receive sent on_completed")
+                logger.debug("parent_receive sent on_completed")
                 break
 
         sub.on_completed()
