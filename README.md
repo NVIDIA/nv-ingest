@@ -96,13 +96,14 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file containing your NGC API key, and the following paths:
+4. Create a .env file that contains your NGC API keys. For more information, refer to [](docs/docs/user-guide/developer-guide/environment-config.md).
+
 ```
 # Container images must access resources from NGC.
 
-
-NGC_API_KEY=... # Optional, set this if you are deploying NIMs locally from NGC
-NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com NIMs
+NGC_API_KEY=<key to download containers from NGC>
+NIM_NGC_API_KEY=<key to download model files after containers start>
+NVIDIA_BUILD_API_KEY=<key to download NIMs from build.nvidia.com>
 ```
 
 > [!NOTE]

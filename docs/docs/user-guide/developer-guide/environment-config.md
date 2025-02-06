@@ -61,8 +61,8 @@
 
 - **`NVIDIA_BUILD_API_KEY`**:
   - **Description**: This key is for when you are using the build.nvidia.com endpoint instead of a self hosted Deplot NIM.
-    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used for bulid.nvidia.com.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` is used for build.nvidia.com.
 
 - **`NIM_NGC_API_KEY`**:
   - **Description**: This key is by NIM microservices inside docker containers to access NGC resources.
-    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` will be used to access NGC resources.
+    This is necessary only in some cases when it is different from `NGC_API_KEY`. If this is not specified, `NGC_API_KEY` is used to access NGC resources.
