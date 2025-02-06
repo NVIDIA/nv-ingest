@@ -413,7 +413,7 @@ def write_records_minio(
         Returns the writer supplied, with information related to minio records upload.
     """
     for result in records:
-        for element in result:
+        for element in result[0]:
             text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
             if text:
                 if sparse_model is not None:
