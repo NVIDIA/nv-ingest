@@ -370,6 +370,28 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
     return text
 
 
+def _insert_location_into_content_metadata(element, enable_charts: bool, enable_tables: bool, enable_images: bool):
+    location = max_dimensions = None
+    if element["document_type"] == "structured":
+        location = element["metadata"]["table_metadata"]["table_location"]
+        max_dimensions = element["metadata"]["table_metadata"]["table_location_max_dimensions"]
+        if element["metadata"]["content_metadata"]["subtype"] == "chart" and not enable_charts:
+            location = max_dimensions = None
+        elif element["metadata"]["content_metadata"]["subtype"] == "table" and not enable_tables:
+            location = max_dimensions = None
+    elif element["document_type"] == "image" and enable_images:
+        location = element["metadata"]["image_metadata"]["image_location"]
+        max_dimensions = element["metadata"]["image_metadata"]["image_location_max_dimensions"]
+    if (not location) and (element["document_type"] != "text"):
+        source_name = element["metadata"]["source_metadata"]["source_name"]
+        pg_num = element["metadata"]["content_metadata"]["page_number"]
+        doc_type = element["document_type"]
+        logger.error(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
+        location = max_dimensions = None
+    element["metadata"]["content_metadata"]["location"] = location
+    element["metadata"]["content_metadata"]["max_dimensions"] = max_dimensions
+
+
 def write_records_minio(
     records,
     writer: RemoteBulkWriter,
@@ -415,6 +437,7 @@ def write_records_minio(
     for result in records:
         for element in result:
             text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
+            _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
             if text:
                 if sparse_model is not None:
                     writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
