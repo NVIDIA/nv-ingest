@@ -474,7 +474,9 @@ def _generate_embeddings(
                 continue
 
             cudf_content_getter = cudf_content_extractor[content_type]
-            content_mask = (content_mask & (cudf_content_getter(mdf["metadata"]) != "")).fillna(False)
+            # Embedding NIMs will complain if text has only whitespaces.
+            content_text_mask = cudf_content_getter(mdf["metadata"]).str.strip() != ""
+            content_mask = (content_mask & content_text_mask).fillna(False)
             if not content_mask.any():
                 continue
 

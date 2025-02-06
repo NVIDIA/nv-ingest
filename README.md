@@ -20,7 +20,7 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ## Introduction
 
-### What NVIDIA-Ingest is ✔️
+### What NVIDIA-Ingest Is ✔️
 
 A microservice that:
 
@@ -30,7 +30,7 @@ A microservice that:
 - Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
 - Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
 
-### What NVIDIA-Ingest is not ✖️
+### What NVIDIA-Ingest Is Not ✖️
 
 A service that:
 
@@ -65,7 +65,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 Optional:
-1. [Direct Library Deployment](docs/deployment.md) 📦
+1. [Direct Library Deployment](docs/docs/user-guide/developer-guide/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -74,14 +74,14 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If preferred, you can also [start services one by one](docs/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/environment-config.md) you may wish to configure.
+If you prefer, you can also [start services one by one](docs/docs/user-guide/developer-guide/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/user-guide/developer-guide/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
 2. Change directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](docs/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](docs/docs/user-guide/developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -109,10 +109,10 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 5. Start all services:
-`docker compose up`
+`docker compose --profile retrieval up`
 
 > [!TIP]
-> By default we have [configured log levels to be verbose](docker-compose.yaml#L27).
+> By default we have [configured log levels to be verbose](docker-compose.yaml).
 >
 > It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 >
@@ -141,13 +141,13 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 Observe the started containers with `docker ps`:
 ```
 CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
-0f2f86615ea5   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
+0f2f86615ea5   nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
 de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-02c9ab8c6901   nvcr.io/ohlfw0olaadg/ea-participants/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
+02c9ab8c6901   nvcr.io/nvidia/nemo-microservices/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
 d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
-508715a24998   nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
-5b7a174a0a85   nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
-430045f98c02   nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
+508715a24998   nvcr.io/nvidia/nemo-microservices/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
+5b7a174a0a85   nvcr.io/nvidia/nemo-microservices/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
+430045f98c02   nvcr.io/nvidia/nemo-microservices/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
 8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
 aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
 bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
@@ -183,7 +183,7 @@ pip install .
 ```
 
 > [!NOTE]
-> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml#L141).
+> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml).
 >
 > If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
 >
@@ -211,7 +211,11 @@ In the below examples, we are doing text, chart, table, and image extraction:
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
 
-#### In Python (you can find more documentation and examples [here](./client/client_examples/examples/python_client_usage.ipynb)):
+#### In Python
+
+> [!NOTE]
+> You can find more examples [here](client/client_examples/examples/).
+
 
 ```python
 import logging, time
@@ -265,7 +269,10 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli` (you can find more nv-ingest-cli examples [here](./client/client_examples/examples/cli_client_usage.ipynb)):
+#### Using the the `nv-ingest-cli`
+
+> [!NOTE]
+> You can find more examples [here](client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
@@ -326,7 +333,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](docs/content-metadata.md).
+You can view the full JSON extracts and the metadata definitions [here](/docs/docs/user-guide/developer-guide/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 First, install `tkinter` by running the following commands depending on your OS.
