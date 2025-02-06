@@ -46,6 +46,9 @@ class PDFiumConfigSchema(BaseModel):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
+    nim_batch_size: int = 4
+    workers_per_progress_engine: int = 5
+
     @model_validator(mode="before")
     @classmethod
     def validate_endpoints(cls, values):

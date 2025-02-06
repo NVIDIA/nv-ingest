@@ -7,6 +7,7 @@ import base64
 import functools
 import io
 import logging
+import traceback
 from typing import Any
 from typing import Dict
 from typing import List
@@ -104,6 +105,7 @@ def decode_and_extract(
     except Exception as e:
         err_msg = f"Unhandled exception in decode_and_extract for '{source_id}':\n{e}"
         logger.error(err_msg)
+        traceback.print_exc()
 
         raise
 
@@ -148,6 +150,7 @@ def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
     except Exception as e:
         err_msg = f"Unhandled exception in process_pdf_bytes: {e}"
         logger.error(err_msg)
+        traceback.print_exc()
 
         raise
 

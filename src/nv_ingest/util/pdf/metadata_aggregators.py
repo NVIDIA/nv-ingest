@@ -344,6 +344,7 @@ def construct_image_metadata_from_pdf_image(
         "image_location": pdf_image.bbox,
         "image_location_max_dimensions": (max(pdf_image.max_width, 0), max(pdf_image.max_height, 0)),
         "height": pdf_image.height,
+        "width": pdf_image.width,
     }
 
     # Update the unified metadata with the extracted image information

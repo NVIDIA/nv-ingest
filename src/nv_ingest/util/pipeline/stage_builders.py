@@ -390,12 +390,14 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         },
     )
@@ -431,6 +433,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
         ),
     )
+
     embed_extractions_stage = pipe.add_stage(
         LinearModulesStage(
             morpheus_pipeline_config,
@@ -441,6 +444,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             output_port_name="output",
         )
     )
+
     return embed_extractions_stage
 
 
