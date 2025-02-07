@@ -10,11 +10,20 @@ import re
 from setuptools import find_packages
 from setuptools import setup
 
+import subprocess
+
+
+def git_revision():
+    try:
+        return subprocess.check_output(["git", "rev-parse", "HEAD"]).decode("utf-8").strip()
+    except Exception:
+        return "unknown"
+
 
 def get_version():
     release_type = os.getenv("NV_INGEST_RELEASE_TYPE", "dev")
     version = os.getenv("NV_INGEST_CLIENT_VERSION")
-    rev = os.getenv("NV_INGEST_REV", "0")
+    rev = git_revision()[:7]  # Use short in favor of full sha
 
     if not version:
         version = f"{datetime.datetime.now().strftime('%Y.%m.%d')}"
