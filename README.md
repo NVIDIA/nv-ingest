@@ -55,6 +55,8 @@ A service that:
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
+> [!Note]
+> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
 
 ## Quickstart
 
@@ -90,13 +92,17 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> during the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
+> When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file containing your NGC API key, and the following paths:
+4. Create a .env file that contains your NGC API keys. For more information, refer to [](docs/docs/user-guide/developer-guide/environment-config.md).
+
 ```
 # Container images must access resources from NGC.
-NGC_API_KEY=... # Optional, set this if you are deploying NIMs locally from NGC
-NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com NIMs
+
+NGC_API_KEY=<key to download containers from NGC>
+NIM_NGC_API_KEY=<key to download model files after containers start>
+NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 ```
 
 > [!NOTE]
