@@ -316,6 +316,7 @@ def pdfium_extractor(
     doc = libpdfium.PdfDocument(pdf_stream)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
+    doc.close()
 
     source_metadata = {
         "source_name": pdf_metadata.filename,
@@ -350,6 +351,7 @@ def pdfium_extractor(
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
         for page_idx in range(page_count):
+            doc = libpdfium.PdfDocument(pdf_stream)
             page = doc.get_page(page_idx)
             page_width, page_height = page.get_size()
 
@@ -395,6 +397,9 @@ def pdfium_extractor(
                 )
                 pages_for_tables.append((page_idx, image[0]))
 
+            doc.close()
+
+            if extract_tables or extract_charts:
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
