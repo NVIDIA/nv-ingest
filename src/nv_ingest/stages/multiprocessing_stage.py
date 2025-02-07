@@ -44,18 +44,20 @@ def trace_message(ctrl_msg, task_desc):
     task_desc : str
         Description of the task for tracing purposes.
     """
-    ts_fetched = datetime.now()
-    do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-        ctrl_msg.get_metadata("config::add_trace_tagging") is True
-    )
-
-    if do_trace_tagging:
-        ts_send = ctrl_msg.get_timestamp("latency::ts_send")
-        ts_entry = datetime.now()
-        ctrl_msg.set_timestamp(f"trace::entry::{task_desc}", ts_entry)
-        if ts_send:
-            ctrl_msg.set_timestamp(f"trace::entry::{task_desc}_channel_in", ts_send)
-            ctrl_msg.set_timestamp(f"trace::exit::{task_desc}_channel_in", ts_fetched)
+    try:
+        ts_fetched = datetime.now()
+        do_trace_tagging = ctrl_msg.get_metadata("config::add_trace_tagging") is True
+        if do_trace_tagging:
+            ts_send = ctrl_msg.get_timestamp("latency::ts_send")
+            ts_entry = datetime.now()
+            ctrl_msg.set_timestamp(f"trace::entry::{task_desc}", ts_entry)
+            if ts_send:
+                ctrl_msg.set_timestamp(f"trace::entry::{task_desc}_channel_in", ts_send)
+                ctrl_msg.set_timestamp(f"trace::exit::{task_desc}_channel_in", ts_fetched)
+    except Exception as e:
+        err_msg = f"trace_message: Error processing control message for task '{task_desc}'. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def put_in_queue(ctrl_msg, pass_thru_recv_queue):
@@ -69,12 +71,17 @@ def put_in_queue(ctrl_msg, pass_thru_recv_queue):
     pass_thru_recv_queue : queue.Queue
         The queue to put the control message into.
     """
-    while True:
-        try:
-            pass_thru_recv_queue.put(ctrl_msg, timeout=0.1)
-            break
-        except queue.Full:
-            continue
+    try:
+        while True:
+            try:
+                pass_thru_recv_queue.put(ctrl_msg, timeout=0.1)
+                break
+            except queue.Full:
+                continue
+    except Exception as e:
+        err_msg = f"put_in_queue: Error putting control message into queue. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_queue):
@@ -95,14 +102,38 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
     send_queue : Queue
         Queue to send the work package to the child process.
     """
-    with ctrl_msg.payload().mutable_dataframe() as mdf:
-        df = mdf.to_pandas()  # noqa
+    try:
+        with ctrl_msg.payload().mutable_dataframe() as mdf:
+            df = mdf.to_pandas()
+    except Exception as e:
+        err_msg = (
+            f"process_control_message: Error extracting DataFrame payload for task "
+            f"'{task_desc}'. Original error: {e}"
+        )
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
-    task_props = ctrl_msg.get_tasks().get(task).pop()
-    cm_id = uuid.uuid4()
-    ctrl_msg_ledger[cm_id] = ctrl_msg
-    work_package = {"payload": df, "task_props": task_props, "cm_id": cm_id}
-    send_queue.put({"type": "on_next", "value": work_package})
+    try:
+        task_props = ctrl_msg.get_tasks().get(task).pop()
+    except Exception as e:
+        err_msg = (
+            f"process_control_message: Error retrieving task properties for task '{task}' "
+            f"from control message. Original error: {e}"
+        )
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
+
+    try:
+        cm_id = uuid.uuid4()
+        ctrl_msg_ledger[cm_id] = ctrl_msg
+        work_package = {"payload": df, "task_props": task_props, "cm_id": cm_id}
+        send_queue.put({"type": "on_next", "value": work_package})
+    except Exception as e:
+        err_msg = (
+            f"process_control_message: Error enqueuing work package for task '{task_desc}'. " f"Original error: {e}"
+        )
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 class MultiProcessingBaseStage(SinglePortStage):

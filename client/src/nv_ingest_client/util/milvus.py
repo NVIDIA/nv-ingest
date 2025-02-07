@@ -435,7 +435,7 @@ def write_records_minio(
         Returns the writer supplied, with information related to minio records upload.
     """
     for result in records:
-        for element in result[0]:
+        for element in result:
             text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
             _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
             if text:
