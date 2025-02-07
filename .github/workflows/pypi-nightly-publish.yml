@@ -1,0 +1,35 @@
+name: Nv-Ingest Nightly PyPi Wheel Publish
+
+# Trigger for pull requests and pushing to main
+on:
+  schedule:
+    # Runs every day at 11:30PM (UTC)
+    - cron: "30 23 * * *"
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: linux-large-disk
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Install build dependencies
+        run: |
+          pip install build twine
+
+      - name: Build wheel
+        run: |
+          cd client && python -m build
+
+      - name: Publish to Artifactory
+        env:
+          ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
+          ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
+          ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
+        run: |
+          twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD dist/*
