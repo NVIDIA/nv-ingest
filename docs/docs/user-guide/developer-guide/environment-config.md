@@ -3,8 +3,8 @@
 The following are the environment configuration variables that you can specify in your .env file.
 
 
-| Name                             | Example                   | Description                                                             |
-|----------------------------------|---------------------------|-------------------------------------------------------------------------|
+| Name                             | Example                        | Description                                                           |
+|----------------------------------|--------------------------------|-----------------------------------------------------------------------|
 | `CAPTION_CLASSIFIER_GRPC_TRITON` | - `triton:8001` <br/>                                      | The endpoint where the caption classifier model is hosted using gRPC for communication. This is used to send requests for caption classification. You must specify only ONE of an http or gRPC endpoint. If both are specified gRPC will take precedence. |
 | `CAPTION_CLASSIFIER_MODEL_NAME`  | - `deberta_large` <br/>                                    | The name of the caption classifier model. |
 | `DOUGHNUT_TRITON_HOST`           | - `triton-doughnut` <br/>                                  | The hostname or IP address of the DOUGHNUT model service. |
