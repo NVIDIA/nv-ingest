@@ -40,7 +40,7 @@ Password: <Your Key>
 
 NGC_API_KEY=<key to download containers from NGC>
 NIM_NGC_API_KEY=<key to download model files after containers start>
-NVIDIA_BUILD_API_KEY=<key to download NIMs from build.nvidia.com>
+NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 
 DATASET_ROOT=<PATH_TO_THIS_REPO>/data
 NV_INGEST_ROOT=<PATH_TO_THIS_REPO>

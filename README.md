@@ -56,8 +56,7 @@ A service that:
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 > [!Note]
-> You should not need to install Python separately, but if you do, NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
-
+> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
 
 ## Quickstart
 
@@ -103,7 +102,7 @@ Password: <Your Key>
 
 NGC_API_KEY=<key to download containers from NGC>
 NIM_NGC_API_KEY=<key to download model files after containers start>
-NVIDIA_BUILD_API_KEY=<key to download NIMs from build.nvidia.com>
+NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 ```
 
 > [!NOTE]
