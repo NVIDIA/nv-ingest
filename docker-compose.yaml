@@ -39,7 +39,7 @@ services:
     runtime: nvidia
 
   yolox-graphic-elements:
-    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.1.0}
+    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.1.0}
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -48,7 +48,7 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
