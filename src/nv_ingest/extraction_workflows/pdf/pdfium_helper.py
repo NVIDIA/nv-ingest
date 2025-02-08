@@ -19,7 +19,6 @@
 import concurrent.futures
 import logging
 import traceback
-from math import log
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -61,55 +60,61 @@ def extract_tables_and_charts_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
-) -> List[Tuple[int, object]]:  # List[Tuple[int, CroppedImageWithContent]]
+) -> List[Tuple[int, object]]:
+    """
+    Given a list of (page_index, image) tuples, this function calls the YOLOX-based
+    inference service to extract table and chart annotations from all pages.
+
+    The NimClient is now responsible for handling batching and concurrency internally.
+    For each page, the output is processed and the result is added to tables_and_charts.
+
+    Returns
+    -------
+    List[Tuple[int, object]]
+        For each page, returns (page_index, joined_content) where joined_content
+        is the result of combining annotations from the inference.
+    """
     tables_and_charts = []
+    yolox_client = None
 
     try:
         model_interface = yolox_utils.YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
-            config.yolox_endpoints, model_interface, config.auth_token, config.yolox_infer_protocol
+            config.yolox_endpoints,
+            model_interface,
+            config.auth_token,
+            config.yolox_infer_protocol,
         )
 
-        batches = []
-        i = 0
-        max_batch_size = YOLOX_MAX_BATCH_SIZE
-        while i < len(pages):
-            batch_size = min(2 ** int(log(len(pages) - i, 2)), max_batch_size)
-            batches.append(pages[i : i + batch_size])  # noqa: E203
-            i += batch_size
+        # Collect all page indices and images in order.
+        image_page_indices = [page[0] for page in pages]
+        original_images = [page[1] for page in pages]
 
-        page_index = 0
-        for batch in batches:
-            image_page_indices = [page[0] for page in batch]
-            original_images = [page[1] for page in batch]
+        # Prepare the data payload with all images.
+        data = {"images": original_images}
 
-            # Prepare data
-            data = {"images": original_images}
+        # Perform inference using the NimClient.
+        inference_results = yolox_client.infer(
+            data,
+            model_name="yolox",
+            max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            num_classes=YOLOX_NUM_CLASSES,
+            conf_thresh=YOLOX_CONF_THRESHOLD,
+            iou_thresh=YOLOX_IOU_THRESHOLD,
+            min_score=YOLOX_MIN_SCORE,
+            final_thresh=YOLOX_FINAL_SCORE,
+            trace_info=trace_info,
+            stage_name="pdf_content_extractor",
+        )
 
-            # Perform inference using NimClient
-            inference_results = yolox_client.infer(
-                data,
-                model_name="yolox",
-                max_batch_size=YOLOX_MAX_BATCH_SIZE,
-                num_classes=YOLOX_NUM_CLASSES,
-                conf_thresh=YOLOX_CONF_THRESHOLD,
-                iou_thresh=YOLOX_IOU_THRESHOLD,
-                min_score=YOLOX_MIN_SCORE,
-                final_thresh=YOLOX_FINAL_SCORE,
-                trace_info=trace_info,  # traceable_func arg
-                stage_name="pdf_content_extractor",  # traceable_func arg
+        # Process results: iterate over each image's inference output.
+        for annotation_dict, page_index, original_image in zip(inference_results, image_page_indices, original_images):
+            extract_table_and_chart_images(
+                annotation_dict,
+                original_image,
+                page_index,
+                tables_and_charts,
             )
-
-            # Process results
-            for annotation_dict, page_index, original_image in zip(
-                inference_results, image_page_indices, original_images
-            ):
-                extract_table_and_chart_images(
-                    annotation_dict,
-                    original_image,
-                    page_index,
-                    tables_and_charts,
-                )
 
     except TimeoutError:
         logger.error("Timeout error during table/chart extraction.")
@@ -118,14 +123,13 @@ def extract_tables_and_charts_using_image_ensemble(
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
-        raise e
+        raise
 
     finally:
         if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
-
     return tables_and_charts
 
 
