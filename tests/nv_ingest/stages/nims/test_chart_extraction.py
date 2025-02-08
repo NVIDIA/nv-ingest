@@ -118,6 +118,7 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
         data={"base64_images": [base64_image, base64_image]},
         model_name="paddle",
         stage_name="chart_data_extraction",
+        max_batch_size=2,
         trace_info=trace_info,
     )
 

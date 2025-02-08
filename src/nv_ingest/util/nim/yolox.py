@@ -66,6 +66,11 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 ]
 
 
+def chunkify(lst, chunk_size):
+    for i in range(0, len(lst), chunk_size):
+        yield lst[i : i + chunk_size]
+
+
 # YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
 class YoloxModelInterfaceBase(ModelInterface):
     """
@@ -124,9 +129,10 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> List[Any]:
         """
-        Format input data for the specified protocol.
+        Format input data for the specified protocol, returning a list of batches
+        each up to 'max_batch_size' in length.
 
         Parameters
         ----------
@@ -134,18 +140,14 @@ class YoloxModelInterfaceBase(ModelInterface):
             The input data to format.
         protocol : str
             The protocol to use ("grpc" or "http").
+        max_batch_size : int
+            The maximum batch size to respect.
 
         Returns
         -------
-        Any
-            The formatted input data.
-
-        Raises
-        ------
-        ValueError
-            If an invalid protocol is specified.
+        List[Any]
+            A list of batches, each formatted according to the protocol.
         """
-
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
             # Our yolox-page-elements model (grPC) expects images to be resized to 1024x1024
@@ -153,9 +155,15 @@ class YoloxModelInterfaceBase(ModelInterface):
             resized_images = [
                 resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
             ]
-            # Reorder axes to match model input (batch, channels, height, width)
-            input_array = np.einsum("bijk->bkij", resized_images).astype(np.float32)
-            return input_array
+
+            # Create a list of smaller batches (chunkify)
+            batches = []
+            for chunk in chunkify(resized_images, max_batch_size):
+                # Reorder axes to match model input (batch, channels, height, width)
+                input_array = np.einsum("bijk->bkij", chunk).astype(np.float32)
+                batches.append(input_array)
+
+            return batches
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
@@ -163,33 +171,36 @@ class YoloxModelInterfaceBase(ModelInterface):
             for image in data["images"]:
                 # Convert numpy array to PIL Image
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
-                original_size = image_pil.size  # Should be (1024, 1024)
+                original_size = image_pil.size  # e.g., (1024, 1024)
 
                 # Save image to buffer
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
                 image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                # Now scale the image if necessary
+                # Scale the image if necessary
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
                     image_b64, max_base64_size=self.nim_max_image_size
                 )
 
                 if new_size != original_size:
-                    logger.warning(f"Image was scaled from {original_size} to {new_size} to meet size constraints.")
+                    logger.warning(f"Image was scaled from {original_size} to {new_size}.")
 
                 # Add to content_list
-                content = {"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"}
+                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
 
-                content_list.append(content)
+            # Now split content_list into batches of up to max_batch_size
+            batches = []
+            for chunk in chunkify(content_list, max_batch_size):
+                payload = {
+                    "input": content_list,
+                    "confidence_threshold": self.conf_threshold,
+                    "nms_threshold": self.iou_threshold,
+                }
+                batches.append(payload)
 
-            payload = {
-                "input": content_list,
-                "confidence_threshold": self.conf_threshold,
-                "nms_threshold": self.iou_threshold,
-            }
+            return batches
 
-            return payload
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 

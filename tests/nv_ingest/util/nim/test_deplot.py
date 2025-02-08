@@ -63,7 +63,7 @@ def test_prepare_data_for_inference_invalid_base64_image(model_interface):
 def test_format_input_grpc(model_interface):
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(prepared, "grpc")
+    formatted = model_interface.format_input(prepared, "grpc", max_batch_size=1)[0]
     assert isinstance(formatted, np.ndarray)
     assert formatted.dtype == np.float32
     assert formatted.ndim == 4
@@ -74,7 +74,9 @@ def test_format_input_grpc(model_interface):
 def test_format_input_http(model_interface):
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(prepared, "http", max_tokens=600, temperature=0.7, top_p=0.95)
+    formatted = model_interface.format_input(
+        prepared, "http", max_batch_size=1, max_tokens=600, temperature=0.7, top_p=0.95
+    )[0]
     assert isinstance(formatted, dict)
     assert formatted["model"] == "google/deplot"
     assert isinstance(formatted["messages"], list)
@@ -91,7 +93,7 @@ def test_format_input_http(model_interface):
 def test_format_input_http_defaults(model_interface):
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(prepared, "http")
+    formatted = model_interface.format_input(prepared, "http", max_batch_size=1)[0]
     assert formatted["max_tokens"] == 500
     assert formatted["temperature"] == 0.5
     assert formatted["top_p"] == 0.9
@@ -102,7 +104,7 @@ def test_format_input_invalid_protocol(model_interface):
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        model_interface.format_input(prepared, "invalid")
+        model_interface.format_input(prepared, "invalid", max_batch_size=1)
 
 
 def test_parse_output_grpc_simple(model_interface):

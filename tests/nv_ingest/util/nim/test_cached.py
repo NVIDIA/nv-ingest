@@ -97,7 +97,7 @@ def test_format_input_grpc_with_ndim_3(model_interface):
     base64_img = create_base64_image()
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
 
-    formatted_input = model_interface.format_input(data, "grpc")
+    formatted_input = model_interface.format_input(data, "grpc", max_batch_size=1)[0]
 
     assert isinstance(formatted_input, np.ndarray)
     assert formatted_input.dtype == np.float32
@@ -117,7 +117,7 @@ def test_format_input_grpc_with_ndim_other(model_interface):
 
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
 
-    formatted_input = model_interface.format_input(data, "grpc")
+    formatted_input = model_interface.format_input(data, "grpc", max_batch_size=1)[0]
 
     assert isinstance(formatted_input, np.ndarray)
     assert formatted_input.dtype == np.float32
@@ -142,7 +142,7 @@ def test_format_input_http(model_interface):
     data = {"image_arrays": [arr]}  # single array for a single test image
 
     # 4) Call format_input
-    formatted_input = model_interface.format_input(data, "http")
+    formatted_input = model_interface.format_input(data, "http", max_batch_size=1)[0]
 
     # 5) Verify the structure of the HTTP payload
 
@@ -177,7 +177,7 @@ def test_format_input_invalid_protocol(model_interface):
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
 
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        model_interface.format_input(data, "invalid_protocol")
+        model_interface.format_input(data, "invalid_protocol", max_batch_size=1)
 
 
 def test_parse_output_grpc(model_interface):

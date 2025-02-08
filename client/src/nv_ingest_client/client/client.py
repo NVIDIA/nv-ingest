@@ -14,7 +14,7 @@ import traceback
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
-from typing import Any, Type
+from typing import Any, Type, Callable
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -362,19 +362,23 @@ class NvIngestClient:
         max_retries: Optional[int] = None,
         retry_delay: float = 1,
         verbose: bool = False,
+        completion_callback: Optional[Callable[[Dict, str], None]] = None,
     ) -> List[Tuple[Optional[Dict], str]]:
         """
         Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
 
         Args:
-            job_ids (List[str]): A list of job IDs to fetch results for.
+            job_ids (Union[str, List[str]]): A job ID or list of job IDs to fetch results for.
             timeout (float): Timeout for each fetch operation, in seconds.
-            max_retries (int): Maximum number of retries for jobs that are not ready yet.
+            max_retries (Optional[int]): Maximum number of retries for jobs that are not ready yet.
             retry_delay (float): Delay between retry attempts, in seconds.
+            verbose (bool): If True, logs additional information.
+            completion_callback (Optional[Callable[[Dict, str], None]]): A callback function that is executed each time
+             a job result is successfully fetched. It receives two arguments: the job result (a dict) and the job ID.
 
         Returns:
-            List[Tuple[Optional[Dict], str]]: A list of tuples containing the job results and job IDs.
-                                              If a timeout or error occurs, the result will be None for that job.
+            List[Tuple[Optional[Dict], str]]: A list of tuples, each containing the job result (or None on failure) and
+            the job ID.
 
         Raises:
             ValueError: If there is an error in decoding the job result.
@@ -396,14 +400,12 @@ class NvIngestClient:
                 except TimeoutError:
                     if verbose:
                         logger.info(
-                            f"Job {job_id} is not ready. "
-                            f"Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
+                            f"Job {job_id} is not ready. Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
                             f"after {retry_delay} seconds."
                         )
                     retries += 1
                     time.sleep(retry_delay)  # Wait before retrying
                 except (RuntimeError, Exception) as err:
-                    # For any other error, log and break out of the retry loop
                     logger.error(f"Error while fetching result for job ID {job_id}: {err}")
                     return None, job_id
             logger.error(f"Max retries exceeded for job {job_id}.")
@@ -418,7 +420,12 @@ class NvIngestClient:
                 job_id = futures[future]
                 try:
                     result, _ = handle_future_result(future, timeout=timeout)
+                    # Append a tuple of (result data, job_id). (Using result.get("data") if result is valid.)
                     results.append(result.get("data"))
+                    # Run the callback if provided and the result is valid
+                    if completion_callback and result:
+                        completion_callback(result, job_id)
+                    # Clean up the job spec mapping
                     del self._job_index_to_job_spec[job_id]
                 except concurrent.futures.TimeoutError:
                     logger.error(
@@ -427,7 +434,7 @@ class NvIngestClient:
                     )
                 except json.JSONDecodeError as e:
                     logger.error(
-                        f"Decoding while processing job ID {job_id}: "
+                        f"Decoding error while processing job ID {job_id}: "
                         f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
                 except RuntimeError as e:

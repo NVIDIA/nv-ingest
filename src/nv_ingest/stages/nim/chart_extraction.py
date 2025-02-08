@@ -89,6 +89,7 @@ def _update_metadata(
                         data=data,
                         model_name="paddle",
                         stage_name="chart_data_extraction",
+                        max_batch_size=1,
                         trace_info=trace_info,
                     )
                     paddle_futures.append(fut)
@@ -100,6 +101,7 @@ def _update_metadata(
                     data=data,
                     model_name="paddle",
                     stage_name="chart_data_extraction",
+                    max_batch_size=batch_size,
                     trace_info=trace_info,
                 )
 

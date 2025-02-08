@@ -96,18 +96,22 @@ def test_format_input_grpc(model_interface):
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "grpc")
-    assert isinstance(formatted_input, np.ndarray)
-    assert formatted_input.dtype == np.float32
-    assert formatted_input.shape[0] == len(images)
-    assert formatted_input.shape[1:] == (3, 1024, 1024)
+    formatted_input = model_interface.format_input(prepared_data, "grpc", max_batch_size=2)
+
+    assert isinstance(formatted_input, list)
+    assert isinstance(formatted_input[0], np.ndarray)
+    nparray = formatted_input[0]
+    assert nparray.dtype == np.float32
+    assert nparray.shape[0] == len(images)
+    assert nparray.shape[1:] == (3, 1024, 1024)
 
 
 def test_format_input_http(model_interface):
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "http")
+    formatted_input = model_interface.format_input(prepared_data, "http", max_batch_size=2)[0]
+
     assert "input" in formatted_input
     assert isinstance(formatted_input["input"], list)
     for content in formatted_input["input"]:
@@ -122,7 +126,7 @@ def test_format_input_invalid_protocol(model_interface):
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        model_interface.format_input(prepared_data, "invalid_protocol")
+        model_interface.format_input(prepared_data, "invalid_protocol", max_batch_size=1)
 
 
 def test_parse_output_grpc(model_interface):

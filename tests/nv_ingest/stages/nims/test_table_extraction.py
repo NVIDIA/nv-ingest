@@ -288,6 +288,7 @@ def test_update_metadata_all_valid(mocker, paddle_mock):
         data={"base64_images": ["b64imgA", "b64imgB"]},
         model_name="paddle",
         stage_name="table_data_extraction",
+        max_batch_size=2,
         trace_info=None,
     )
 
@@ -316,7 +317,11 @@ def test_update_metadata_skip_small(mocker, paddle_mock):
     assert res[1] == ("imgBig", ("valid_table", "valid_fmt"))
 
     paddle_mock.infer.assert_called_once_with(
-        data={"base64_images": ["imgBig"]}, model_name="paddle", stage_name="table_data_extraction", trace_info=None
+        data={"base64_images": ["imgBig"]},
+        model_name="paddle",
+        stage_name="table_data_extraction",
+        max_batch_size=2,
+        trace_info=None,
     )
 
 
