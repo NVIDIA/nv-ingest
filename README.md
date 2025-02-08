@@ -184,7 +184,6 @@ pip install .
 # When not using Conda, pip dependencies for the client can be installed directly via pip. Pip based installation of
 # the ingest service is not supported.
 cd client
-pip install -r requirements.txt
 pip install .
 ```
 

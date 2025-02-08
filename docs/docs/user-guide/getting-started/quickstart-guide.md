@@ -112,7 +112,6 @@ To interact from the host, you'll need a Python environment and install the clie
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
-pip install -r ./requirements.txt
 pip install .
 ```
 
