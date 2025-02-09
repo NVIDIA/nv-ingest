@@ -410,6 +410,8 @@ def pdfium_extractor(
                     futures.append(future)
                     pages_for_tables.clear()
 
+            page.close()
+
         # After page loop, if we still have leftover pages_for_tables, submit one last job
         if (extract_tables or extract_charts) and pages_for_tables:
             future = executor.submit(
