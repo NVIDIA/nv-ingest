@@ -36,7 +36,6 @@ def validated_config():
 
     class FakeStageConfig:
         # Values that _extract_table_data expects
-        nim_batch_size = 4
         workers_per_progress_engine = 5
         auth_token = "fake-token"
         # For _create_paddle_client
@@ -143,7 +142,6 @@ def test_extract_table_data_all_valid(mocker, validated_config):
     mock_update_metadata.assert_called_once_with(
         base64_images=["imgA", "imgB"],
         paddle_client=mock_client,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=trace_info.get("trace_info"),
     )
@@ -202,7 +200,6 @@ def test_extract_table_data_mixed_rows(mocker, validated_config):
     mock_update_metadata.assert_called_once_with(
         base64_images=["good1", "good2"],
         paddle_client=mock_client,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=trace_info.get("trace_info"),
     )
@@ -258,32 +255,30 @@ def test_update_metadata_empty_list(paddle_mock):
 
 
 def test_update_metadata_all_valid(mocker, paddle_mock):
-    """
-    If all images meet the minimum size, we pass them all to paddle.infer
-    in a single batch (batch_size=2), then use the returned results.
-    """
     imgs = ["b64imgA", "b64imgB"]
+    # Patch base64_to_numpy so that both images are valid.
     mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
-    # Return actual NumPy arrays
     mock_dim.side_effect = [
-        np.zeros((100, 120, 3), dtype=np.uint8),
-        np.zeros((80, 80, 3), dtype=np.uint8),
+        np.zeros((100, 120, 3), dtype=np.uint8),  # b64imgA is valid
+        np.zeros((80, 80, 3), dtype=np.uint8),  # b64imgB is valid
     ]
 
+    # Set minimum dimensions so that both images pass.
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 50)
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 50)
 
-    # Suppose inference returns a list of (table_content, table_content_format)
+    # The paddle client returns a result for each valid image.
     paddle_mock.infer.return_value = [
         ("tableA", "fmtA"),
         ("tableB", "fmtB"),
     ]
 
-    res = _update_metadata(imgs, paddle_mock, batch_size=2, worker_pool_size=1)
+    res = _update_metadata(imgs, paddle_mock, worker_pool_size=1)
     assert len(res) == 2
     assert res[0] == ("b64imgA", ("tableA", "fmtA"))
     assert res[1] == ("b64imgB", ("tableB", "fmtB"))
 
+    # Expect one call to infer with all valid images.
     paddle_mock.infer.assert_called_once_with(
         data={"base64_images": ["b64imgA", "b64imgB"]},
         model_name="paddle",
@@ -300,7 +295,7 @@ def test_update_metadata_skip_small(mocker, paddle_mock):
     """
     imgs = ["imgSmall", "imgBig"]
     mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
-    # Return NumPy arrays of certain shape to emulate dimension checks
+    # Return NumPy arrays of certain shape to emulate dimension checks.
     mock_dim.side_effect = [
         np.zeros((40, 40, 3), dtype=np.uint8),  # too small
         np.zeros((60, 70, 3), dtype=np.uint8),  # big enough
@@ -310,10 +305,11 @@ def test_update_metadata_skip_small(mocker, paddle_mock):
 
     paddle_mock.infer.return_value = [("valid_table", "valid_fmt")]
 
-    res = _update_metadata(imgs, paddle_mock, batch_size=2)
+    res = _update_metadata(imgs, paddle_mock)
     assert len(res) == 2
-    # First was too small => ("", "")
+    # The first image is too small and is skipped.
     assert res[0] == ("imgSmall", ("", ""))
+    # The second image is valid and processed.
     assert res[1] == ("imgBig", ("valid_table", "valid_fmt"))
 
     paddle_mock.infer.assert_called_once_with(
@@ -326,36 +322,39 @@ def test_update_metadata_skip_small(mocker, paddle_mock):
 
 
 def test_update_metadata_multiple_batches(mocker, paddle_mock):
-    """
-    If batch_size=1 but we have 3 images => we chunk them => 3 calls to paddle.infer,
-    ignoring any that are too small.
-    """
     imgs = ["img1", "img2", "img3"]
+    # Patch base64_to_numpy so that all images are valid.
     mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
-    # All valid => each call returns a 3D array big enough
     mock_dim.side_effect = [
-        np.zeros((80, 80, 3), dtype=np.uint8),
-        np.zeros((100, 50, 3), dtype=np.uint8),
-        np.zeros((64, 64, 3), dtype=np.uint8),
+        np.zeros((80, 80, 3), dtype=np.uint8),  # img1
+        np.zeros((100, 50, 3), dtype=np.uint8),  # img2
+        np.zeros((64, 64, 3), dtype=np.uint8),  # img3
     ]
+    # Set minimum dimensions such that all images are considered valid.
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 40)
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 40)
 
-    # We'll side_effect 3 calls => each returns a single pair
-    paddle_mock.infer.side_effect = [
-        [("table1", "fmt1")],
-        [("table2", "fmt2")],
-        [("table3", "fmt3")],
+    # Since all images are valid, infer is called once with the full list.
+    paddle_mock.infer.return_value = [
+        ("table1", "fmt1"),
+        ("table2", "fmt2"),
+        ("table3", "fmt3"),
     ]
 
-    res = _update_metadata(imgs, paddle_mock, batch_size=1, worker_pool_size=2)
+    res = _update_metadata(imgs, paddle_mock, worker_pool_size=2)
     assert len(res) == 3
     assert res[0] == ("img1", ("table1", "fmt1"))
     assert res[1] == ("img2", ("table2", "fmt2"))
     assert res[2] == ("img3", ("table3", "fmt3"))
 
-    # 3 calls to infer, each with a single base64_images list
-    assert paddle_mock.infer.call_count == 3
+    # Verify that infer is called only once with all valid images.
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": ["img1", "img2", "img3"]},
+        model_name="paddle",
+        stage_name="table_data_extraction",
+        max_batch_size=2,
+        trace_info=None,
+    )
 
 
 def test_update_metadata_inference_error(mocker, paddle_mock):
@@ -372,7 +371,7 @@ def test_update_metadata_inference_error(mocker, paddle_mock):
     paddle_mock.infer.side_effect = RuntimeError("paddle error")
 
     with pytest.raises(RuntimeError, match="paddle error"):
-        _update_metadata(imgs, paddle_mock, batch_size=2)
+        _update_metadata(imgs, paddle_mock)
 
     # The code sets them to ("", "") before re-raising
     # We can’t see final 'res', but that’s the logic.
@@ -391,7 +390,7 @@ def test_update_metadata_mismatch_length(mocker, paddle_mock):
     paddle_mock.infer.return_value = [("tableOnly", "fmtOnly")]
 
     with pytest.raises(ValueError, match="Expected 2 results"):
-        _update_metadata(imgs, paddle_mock, batch_size=2)
+        _update_metadata(imgs, paddle_mock)
 
 
 def test_update_metadata_non_list_return(mocker, paddle_mock):
@@ -419,7 +418,7 @@ def test_update_metadata_all_small(mocker, paddle_mock):
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 30)
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 30)
 
-    res = _update_metadata(imgs, paddle_mock, batch_size=2)
+    res = _update_metadata(imgs, paddle_mock)
     assert res[0] == ("imgA", ("", ""))
     assert res[1] == ("imgB", ("", ""))
 
