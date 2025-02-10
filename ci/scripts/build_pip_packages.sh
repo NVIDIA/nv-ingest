@@ -41,15 +41,14 @@ fi
 if [[ "$LIBRARY" == "client" ]]; then
     NV_INGEST_CLIENT_VERSION_OVERRIDE="${VERSION_SUFFIX}"
     export NV_INGEST_CLIENT_VERSION_OVERRIDE
-    SETUP_PATH="$SCRIPT_DIR/../../client/setup.py"
+    SETUP_PATH="$SCRIPT_DIR/../../client"
+    (cd "$(dirname "$SETUP_PATH")/client" && python -m build)
 elif [[ "$LIBRARY" == "service" ]]; then
     NV_INGEST_SERVICE_VERSION_OVERRIDE="${VERSION_SUFFIX}"
     export NV_INGEST_SERVICE_VERSION_OVERRIDE
     SETUP_PATH="$SCRIPT_DIR/../../setup.py"
+    (cd "$(dirname "$SETUP_PATH")" && python setup.py sdist bdist_wheel)
 else
     echo "Invalid library: $LIBRARY"
     usage
 fi
-
-# Build the wheel
-(cd "$(dirname "$SETUP_PATH")" && python setup.py sdist bdist_wheel)
