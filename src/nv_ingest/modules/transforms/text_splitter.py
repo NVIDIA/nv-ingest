@@ -51,7 +51,7 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
     return documents
 
 
-def _split_into_chunks(text, tokenizer, chunk_size=300, chunk_overlap=0):
+def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=0):
     # Tokenize the text into token IDs
     encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
 

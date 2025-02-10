@@ -11,11 +11,11 @@ from nv_ingest_client.primitives.tasks.split import SplitTask
 def test_split_task_initialization():
     task = SplitTask(
         tokenizer="intfloat/e5-large-unsupervised",
-        chunk_size=300,
+        chunk_size=1024,
         chunk_overlap=0,
     )
     assert task._tokenizer == "intfloat/e5-large-unsupervised"
-    assert task._chunk_size == 300
+    assert task._chunk_size == 1024
     assert task._chunk_overlap == 0
 
 
@@ -38,7 +38,7 @@ def test_split_task_str_representation():
     [
         ("intfloat/e5-large-unsupervised", 100, 10),
         ("microsoft/deberta-large", 50, 5),
-        ("meta-llama/Llama-3.2-1B", 300, 0),
+        ("meta-llama/Llama-3.2-1B", 1024, 0),
     ],
 )
 def test_split_task_to_dict(
@@ -72,7 +72,7 @@ def test_split_task_default_params():
     task = SplitTask()
     expected_str_contains = [
         "tokenizer: intfloat/e5-large-unsupervised",
-        "chunk_size: 300",
+        "chunk_size: 1024",
         "chunk_overlap: 0",
     ]
     for expected_part in expected_str_contains:
@@ -80,6 +80,6 @@ def test_split_task_default_params():
 
     expected_dict = {
         "type": "split",
-        "task_properties": {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 300, "chunk_overlap": 0},
+        "task_properties": {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 1024, "chunk_overlap": 0},
     }
     assert task.to_dict() == expected_dict

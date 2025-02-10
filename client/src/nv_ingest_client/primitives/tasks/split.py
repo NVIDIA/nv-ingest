@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 class SplitTaskSchema(BaseModel):
     tokenizer: str = "intfloat/e5-large-unsupervised"
-    chunk_size: int = 300
+    chunk_size: int = 1024
     chunk_overlap: int = 0
 
     class Config:
@@ -33,7 +33,7 @@ class SplitTask(Task):
     def __init__(
         self,
         tokenizer: str = "intfloat/e5-large-unsupervised",
-        chunk_size: int = 300,
+        chunk_size: int = 1024,
         chunk_overlap: int = 0,
     ) -> None:
         """

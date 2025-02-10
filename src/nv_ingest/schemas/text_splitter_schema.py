@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 
 class TextSplitterSchema(BaseModel):
     tokenizer: str = "intfloat/e5-large-unsupervised"
-    chunk_size: Annotated[int, Field(gt=0)] = 300
+    chunk_size: Annotated[int, Field(gt=0)] = 1024
     chunk_overlap: Annotated[int, Field(ge=0)] = 0
     raise_on_failure: bool = False
 
