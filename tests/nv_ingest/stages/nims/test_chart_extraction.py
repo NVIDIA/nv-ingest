@@ -24,7 +24,6 @@ def valid_chart_extractor_config():
         deplot_infer_protocol="http",
         paddle_endpoints=("paddle_grpc_url", "paddle_http_url"),
         paddle_infer_protocol="grpc",
-        nim_batch_size=2,
         workers_per_progress_engine=5,
     )
 
@@ -45,56 +44,76 @@ def validated_config(valid_chart_extractor_config):
 
 def test_update_metadata_empty_list():
     """
-    If the base64_images list is empty, _update_metadata should
-    skip all logic and return an empty list.
+    If the base64_images list is empty, _update_metadata should return an empty list.
+    With the updated implementation, both clients are still invoked (with an empty list)
+    so we set their return values to [] and then verify the calls.
     """
     cached_mock = MagicMock()
     deplot_mock = MagicMock()
     trace_info = {}
+
+    # When given an empty list, both clients return an empty list.
+    cached_mock.infer.return_value = []
+    deplot_mock.infer.return_value = []
 
     result = _update_metadata(
         base64_images=[],
         cached_client=cached_mock,
         deplot_client=deplot_mock,
         trace_info=trace_info,
-        batch_size=1,
         worker_pool_size=1,
     )
 
     assert result == []
-    cached_mock.infer.assert_not_called()
-    deplot_mock.infer.assert_not_called()
+
+    # Each client's infer should be called once with an empty list.
+    cached_mock.infer.assert_called_once_with(
+        data={"base64_images": []},
+        model_name="cached",
+        stage_name="chart_data_extraction",
+        max_batch_size=2,
+        trace_info=trace_info,
+    )
+    deplot_mock.infer.assert_called_once_with(
+        data={"base64_images": []},
+        model_name="deplot",
+        stage_name="chart_data_extraction",
+        max_batch_size=1,
+        trace_info=trace_info,
+    )
 
 
 def test_update_metadata_single_batch_single_worker(mocker):
     """
-    Test a simple scenario with a small list of base64_images, batch_size=2,
-    worker_pool_size=1. We verify that cached is called once per batch,
-    and deplot is called once per image in that batch.
+    Test a simple scenario with a small list of base64_images using worker_pool_size=1.
+    In the updated _update_metadata implementation, both the cached and deplot clients are
+    called once with the full list of images. The join function is applied per image.
     """
     # Mock out the clients
     cached_mock = MagicMock()
     deplot_mock = MagicMock()
 
-    # Suppose cached returns ["cached_res1", "cached_res2"] for 2 images
+    # For 2 images, cached.infer should return a list with 2 results.
     cached_mock.infer.return_value = ["cached_res1", "cached_res2"]
 
-    # Suppose deplot is called for each image, returning single string
-    deplot_mock.infer.side_effect = [["deplot_res1"], ["deplot_res2"]]
+    # deplot.infer should also return a list with 2 results.
+    deplot_mock.infer.return_value = ["deplot_res1", "deplot_res2"]
 
-    mock_join = mocker.patch(f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output", side_effect=["joined_1", "joined_2"])
+    # Patch the join function to return expected joined outputs.
+    mock_join = mocker.patch(
+        f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output",
+        side_effect=["joined_1", "joined_2"],
+    )
 
     base64_images = ["img1", "img2"]
     trace_info = {}
 
-    result = _update_metadata(base64_images, cached_mock, deplot_mock, trace_info, batch_size=2, worker_pool_size=1)
+    result = _update_metadata(base64_images, cached_mock, deplot_mock, trace_info, worker_pool_size=1)
 
-    # We expect result => [("img1", "joined_1"), ("img2", "joined_2")]
-    assert len(result) == 2
-    assert result[0] == ("img1", "joined_1")
-    assert result[1] == ("img2", "joined_2")
+    # Expect the result to combine each original image with its corresponding joined output.
+    assert result == [("img1", "joined_1"), ("img2", "joined_2")]
 
-    # Check calls
+    # cached.infer should be called once with the full list of images.
     cached_mock.infer.assert_called_once_with(
         data={"base64_images": ["img1", "img2"]},
         model_name="cached",
@@ -103,49 +122,42 @@ def test_update_metadata_single_batch_single_worker(mocker):
         trace_info=trace_info,
     )
 
-    # deplot.infer called once per image
-    assert deplot_mock.infer.call_count == 2
-    deplot_mock.infer.assert_any_call(
-        data={"base64_image": "img1"},
-        model_name="deplot",
-        stage_name="chart_data_extraction",
-        max_batch_size=1,
-        trace_info=trace_info,
-    )
-    deplot_mock.infer.assert_any_call(
-        data={"base64_image": "img2"},
+    # deplot.infer should be called once with the full list of images.
+    deplot_mock.infer.assert_called_once_with(
+        data={"base64_images": ["img1", "img2"]},
         model_name="deplot",
         stage_name="chart_data_extraction",
         max_batch_size=1,
         trace_info=trace_info,
     )
 
-    # join_cached_and_deplot_output called twice
+    # The join function should be invoked once per image.
     assert mock_join.call_count == 2
 
 
 def test_update_metadata_multiple_batches_multi_worker(mocker):
     """
-    If batch_size=1 but we have multiple images, each image forms its own batch.
-    We also can use worker_pool_size=2 for parallel calls.
+    With the new _update_metadata implementation, both cached_client.infer and deplot_client.infer
+    are called once with the full list of images. Their results are expected to be lists with one
+    item per image. The join function is still invoked for each image.
     """
     cached_mock = MagicMock()
     deplot_mock = MagicMock()
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output", side_effect=["joined_1", "joined_2", "joined_3"]
+        f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output",
+        side_effect=["joined_1", "joined_2", "joined_3"],
     )
 
-    # Suppose every cached.infer call returns a 1-element list
+    # Each client should return a list with an entry per input image.
     def cached_side_effect(**kwargs):
         images = kwargs["data"]["base64_images"]
-        return [f"cached_{images[0]}"]
+        return [f"cached_{img}" for img in images]
 
     cached_mock.infer.side_effect = cached_side_effect
 
-    # Suppose deplot.infer returns e.g. ["deplot_img1"], etc.
     def deplot_side_effect(**kwargs):
-        img = kwargs["data"]["base64_image"]
-        return [f"deplot_{img}"]
+        images = kwargs["data"]["base64_images"]
+        return [f"deplot_{img}" for img in images]
 
     deplot_mock.infer.side_effect = deplot_side_effect
 
@@ -157,51 +169,48 @@ def test_update_metadata_multiple_batches_multi_worker(mocker):
         cached_mock,
         deplot_mock,
         trace_info,
-        batch_size=1,  # each image in its own batch
         worker_pool_size=2,
     )
 
-    # Expect 3 results: [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
+    # Expect 3 results corresponding to the input images and the joined outputs.
     assert result == [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
 
-    # We should have 3 calls to cached.infer, each with one image
-    assert cached_mock.infer.call_count == 3
-    # Also 3 calls to deplot.infer
-    assert deplot_mock.infer.call_count == 3
-    # 3 calls to join
+    # Now, with the new implementation, each infer method is called only once.
+    assert cached_mock.infer.call_count == 1
+    assert deplot_mock.infer.call_count == 1
+    # The join function is still called once per image.
     assert mock_join.call_count == 3
 
 
 def test_update_metadata_exception_in_cached_call(caplog):
     """
-    If the cached call fails for a batch, we expect an exception to bubble up
-    and the error logged.
+    If the cached call fails, we expect an exception to bubble up and the error to be logged.
     """
     cached_mock = MagicMock()
     deplot_mock = MagicMock()
     cached_mock.infer.side_effect = Exception("Cached call error")
 
     with pytest.raises(Exception, match="Cached call error"):
-        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, batch_size=1, worker_pool_size=1)
+        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, worker_pool_size=1)
 
-    # Check log
-    assert "Error processing batch: ['some_img']" in caplog.text
+    # Verify that the error message from the cached client is logged.
+    assert "Error calling cached_client.infer: Cached call error" in caplog.text
 
 
 def test_update_metadata_exception_in_deplot_call(caplog):
     """
-    If any deplot call fails for one of the images, the entire process fails
-    and logs the error.
+    If the deplot call fails, we expect an exception to bubble up and the error to be logged.
     """
     cached_mock = MagicMock()
-    cached_mock.infer.return_value = ["cached_result"]  # 1-element list
+    cached_mock.infer.return_value = ["cached_result"]  # Single-element list for one image
     deplot_mock = MagicMock()
     deplot_mock.infer.side_effect = Exception("Deplot error")
 
     with pytest.raises(Exception, match="Deplot error"):
-        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, batch_size=1, worker_pool_size=2)
+        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, worker_pool_size=2)
 
-    assert "Error processing batch: ['some_img']" in caplog.text
+    # Verify that the error message from the deplot client is logged.
+    assert "Error calling deplot_client.infer: Deplot error" in caplog.text
 
 
 def test_create_clients(mocker):
@@ -336,7 +345,6 @@ def test_extract_chart_data_all_valid(validated_config, mocker):
         base64_images=["imgA", "imgB"],
         cached_client=cached_mock,
         deplot_client=deplot_mock,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=ti.get("trace_info"),
     )
@@ -395,7 +403,6 @@ def test_extract_chart_data_mixed_rows(validated_config, mocker):
         base64_images=["base64img1", "base64img2"],
         cached_client=cached_mock,
         deplot_client=deplot_mock,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=trace.get("trace_info"),
     )
