@@ -23,6 +23,10 @@ def get_version():
 
     # Construct the final version string
     if release_type == "dev":
+        # If rev is not specified and defaults to 0 lets create a more meaningful development
+        # identifier that is pep440 compliant
+        if int(rev) == 0:
+            rev = datetime.datetime.now().strftime("%Y%m%d%H%M%S")
         final_version = f"{version}.dev{rev}"
     elif release_type == "release":
         final_version = f"{version}.post{rev}" if int(rev) > 0 else version
