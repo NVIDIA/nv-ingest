@@ -114,7 +114,7 @@ class NimClient:
         protocol: str,
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: float = 120.0,
         max_retries: int = 5,
     ):
         """
@@ -273,7 +273,7 @@ class NimClient:
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
-            max_pool_workers = kwargs.pop("max_pool_workers", len(formatted_batches))
+            max_pool_workers = kwargs.pop("max_pool_workers", 16)
 
             # 4. Process each batch concurrently using a thread pool.
             process_batch_partial = partial(

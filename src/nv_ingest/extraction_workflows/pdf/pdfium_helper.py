@@ -65,9 +65,6 @@ def extract_tables_and_charts_using_image_ensemble(
     Given a list of (page_index, image) tuples, this function calls the YOLOX-based
     inference service to extract table and chart annotations from all pages.
 
-    The NimClient is now responsible for handling batching and concurrency internally.
-    For each page, the output is processed and the result is added to tables_and_charts.
-
     Returns
     -------
     List[Tuple[int, object]]

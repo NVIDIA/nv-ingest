@@ -4,6 +4,7 @@
 
 import functools
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, List
 from typing import Dict
 from typing import Optional
@@ -28,47 +29,51 @@ def _update_metadata(
     cached_client: NimClient,
     deplot_client: NimClient,
     trace_info: Dict,
-    batch_size: int = 1,  # No longer used
-    worker_pool_size: int = 1,  # No longer used
+    worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Dict]]:
     """
     Given a list of base64-encoded chart images, this function calls both the Cached and Deplot
-    inference services to extract chart data for all images. The NimClient implementations are
-    responsible for handling batching and concurrency internally.
+    inference services concurrently to extract chart data for all images.
 
     For each base64-encoded image, returns:
       (original_image_str, joined_chart_content_dict)
     """
     logger.debug("Running chart extraction using updated concurrency handling.")
 
-    # Prepare data payloads for both clients. We assume that both clients now support receiving
-    # a list of images via the "base64_images" key.
+    # Prepare data payloads for both clients.
     data_cached = {"base64_images": base64_images}
     data_deplot = {"base64_images": base64_images}
 
-    try:
-        cached_results = cached_client.infer(
+    _ = worker_pool_size
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_cached = executor.submit(
+            cached_client.infer,
             data=data_cached,
             model_name="cached",
             stage_name="chart_data_extraction",
-            max_batch_size=len(base64_images),
+            max_batch_size=2,
             trace_info=trace_info,
         )
-    except Exception as e:
-        logger.error(f"Error calling cached_client.infer: {e}", exc_info=True)
-        raise
-
-    try:
-        deplot_results = deplot_client.infer(
+        future_deplot = executor.submit(
+            deplot_client.infer,
             data=data_deplot,
             model_name="deplot",
             stage_name="chart_data_extraction",
-            max_batch_size=len(base64_images),
+            max_batch_size=1,
             trace_info=trace_info,
         )
-    except Exception as e:
-        logger.error(f"Error calling deplot_client.infer: {e}", exc_info=True)
-        raise
+
+        try:
+            cached_results = future_cached.result()
+        except Exception as e:
+            logger.error(f"Error calling cached_client.infer: {e}", exc_info=True)
+            raise
+
+        try:
+            deplot_results = future_deplot.result()
+        except Exception as e:
+            logger.error(f"Error calling deplot_client.infer: {e}", exc_info=True)
+            raise
 
     # Ensure both clients returned lists of results matching the number of input images.
     if not (isinstance(cached_results, list) and isinstance(deplot_results, list)):

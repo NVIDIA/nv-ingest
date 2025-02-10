@@ -25,8 +25,7 @@ PADDLE_MIN_HEIGHT = 32
 def _update_metadata(
     base64_images: List[str],
     paddle_client: NimClient,
-    batch_size: int = 1,  # No longer used
-    worker_pool_size: int = 1,  # No longer used
+    worker_pool_size: int = 8,  # Not currently used
     trace_info: Dict = None,
 ) -> List[Tuple[str, Tuple[Any, Any]]]:
     """
@@ -47,6 +46,7 @@ def _update_metadata(
     valid_images: List[str] = []
     valid_indices: List[int] = []
 
+    _ = worker_pool_size
     # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
         array = base64_to_numpy(img)
@@ -66,7 +66,7 @@ def _update_metadata(
                 data=data,
                 model_name="paddle",
                 stage_name="table_data_extraction",
-                max_batch_size=len(valid_images),
+                max_batch_size=2,
                 trace_info=trace_info,
             )
 
@@ -81,7 +81,7 @@ def _update_metadata(
                 results[original_index] = (base64_images[original_index], result)
 
         except Exception as e:
-            logger.error(f"Error processing images {valid_images}. Error: {e}", exc_info=True)
+            logger.error(f"Error processing images. Error: {e}", exc_info=True)
             for i in valid_indices:
                 results[i] = (base64_images[i], ("", ""))
             raise
