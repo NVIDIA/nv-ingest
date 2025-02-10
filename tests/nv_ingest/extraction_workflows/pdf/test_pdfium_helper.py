@@ -37,6 +37,20 @@ def pdf_stream_embedded_tables_pdf():
     return pdf_stream
 
 
+@pytest.fixture
+def pdf_stream_test_page_form_pdf():
+    with open("data/test-page-form.pdf", "rb") as f:
+        pdf_stream = BytesIO(f.read())
+    return pdf_stream
+
+
+@pytest.fixture
+def pdf_stream_test_shapes_pdf():
+    with open("data/test-shapes.pdf", "rb") as f:
+        pdf_stream = BytesIO(f.read())
+    return pdf_stream
+
+
 @pytest.mark.xfail(reason="PDFium conversion required")
 def test_pdfium_extractor_basic(pdf_stream_test_pdf, document_df):
     extracted_data = pdfium_extractor(
@@ -215,3 +229,70 @@ def test_pdfium_extractor_table_extraction_on_pdf_with_tables(pdf_stream_embedde
     # Access data in the cloud table
     assert list(dfs[7].columns) == ["Dependency", "Minimum Version", "Notes"]
     assert dfs[7]["Dependency"].to_list() == ["fsspec", "gcsfs", "pandas-gbq", "s3fs"]
+
+
+def test_pdfium_extractor_page_form(pdf_stream_test_page_form_pdf, document_df):
+    extracted_data = pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=True,
+        extract_images=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images_method="simple",
+        row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 19
+
+    extracted_data = pdfium_extractor(
+        pdf_stream_test_page_form_pdf,
+        extract_text=True,
+        extract_images=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images_method="merged",
+        row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 2
+    assert extracted_data[0][0].value == "text"
+    assert extracted_data[1][0].value == "image"
+
+
+def test_pdfium_extractor_shapes(pdf_stream_test_shapes_pdf, document_df):
+    extracted_data = pdfium_extractor(
+        pdf_stream_test_shapes_pdf,
+        extract_text=True,
+        extract_images=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images_method="simple",
+        row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 1
+    assert extracted_data[0][0].value == "text"
+
+    extracted_data = pdfium_extractor(
+        pdf_stream_test_shapes_pdf,
+        extract_text=True,
+        extract_images=True,
+        extract_tables=False,
+        extract_charts=False,
+        extract_images_method="merged",
+        row_data=document_df.iloc[0],
+        pdfium_config={"yolox_endpoints": ("grpc://mock", "http://mock")},
+    )
+
+    assert isinstance(extracted_data, list)
+    assert len(extracted_data) == 4
+    assert extracted_data[0][0].value == "text"
+    assert extracted_data[1][0].value == "image"
+    assert extracted_data[2][0].value == "image"
+    assert extracted_data[3][0].value == "image"
