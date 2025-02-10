@@ -109,7 +109,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./dist/*.whl \
     && pip install ./client/dist/*.whl
 
-# RUN rm -rf src
+RUN rm -rf src
 
 FROM nv_ingest_install AS runtime
 
