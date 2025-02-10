@@ -17,6 +17,6 @@ requests
 setuptools
 tqdm
 langchain-milvus
-langchain-nvidia-ai-endpoints
+langchain-nvidia-ai-endpoints>=0.3.7
 minio
 pyarrow
