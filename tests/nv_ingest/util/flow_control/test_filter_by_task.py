@@ -6,13 +6,11 @@ from unittest.mock import Mock
 
 import pytest
 
-from nv_ingest.util.flow_control.filter_by_task import filter_by_task
-from nv_ingest.util.flow_control.filter_by_task import remove_task_subset
-
-from ....import_checks import CUDA_DRIVER_OK
 from ....import_checks import MORPHEUS_IMPORT_OK
 
-if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
+if MORPHEUS_IMPORT_OK:
+    from nv_ingest.util.flow_control.filter_by_task import remove_task_subset
+    from nv_ingest.util.flow_control.filter_by_task import filter_by_task
     from morpheus.messages import ControlMessage
 
 
@@ -125,10 +123,6 @@ def create_ctrl_msg(task, task_props_list):
 
 
 @pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
 def test_remove_task_subset():
     task_props_list = [
         {"prop0": "foo0", "prop1": "bar1"},
