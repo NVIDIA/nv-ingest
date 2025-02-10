@@ -206,7 +206,6 @@ def _extract_chart_data(
             base64_images=base64_images,
             cached_client=cached_client,
             deplot_client=deplot_client,
-            batch_size=stage_config.nim_batch_size,
             worker_pool_size=stage_config.workers_per_progress_engine,
             trace_info=trace_info,
         )

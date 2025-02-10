@@ -185,7 +185,6 @@ def _extract_table_data(
         bulk_results = _update_metadata(
             base64_images=base64_images,
             paddle_client=paddle_client,
-            batch_size=stage_config.nim_batch_size,
             worker_pool_size=stage_config.workers_per_progress_engine,
             trace_info=trace_info,
         )
