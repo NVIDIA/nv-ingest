@@ -283,8 +283,6 @@ def generate_chart_extractor_stage(
         from PDF content.
     """
     try:
-        print(f"TableExtractorSchema stage_config: {stage_config}")
-
         validated_config = ChartExtractorSchema(**stage_config)
 
         _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
