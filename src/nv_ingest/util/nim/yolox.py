@@ -142,7 +142,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
                 )
 
                 if new_size != original_size:
-                    logger.warning(f"Image was scaled from {original_size} to {new_size}.")
+                    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
                 # Add to content_list
                 content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})

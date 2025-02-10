@@ -27,7 +27,6 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
-from math import log
 from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
@@ -187,7 +186,7 @@ def extract_tables_and_charts_from_images(
     ----------
     images : List[np.ndarray]
         List of images in NumPy array format.
-    config : PDFiumConfigSchema
+    config : ImageConfigSchema
         Configuration object containing YOLOX endpoints, auth token, etc.
     trace_info : Optional[List], optional
         Optional tracing data for debugging/performance profiling.
@@ -195,8 +194,8 @@ def extract_tables_and_charts_from_images(
     Returns
     -------
     List[Tuple[int, object]]
-        A list of (image_index, CroppedImageWithContent)
-        representing extracted table/chart data from each image.
+        A list of (image_index, CroppedImageWithContent) representing extracted
+        table/chart data from each image.
     """
     tables_and_charts = []
     yolox_client = None
@@ -210,41 +209,31 @@ def extract_tables_and_charts_from_images(
             config.yolox_infer_protocol,
         )
 
-        max_batch_size = YOLOX_MAX_BATCH_SIZE
-        batches = []
-        i = 0
-        while i < len(images):
-            batch_size = min(2 ** int(log(len(images) - i, 2)), max_batch_size)
-            batches.append(images[i : i + batch_size])  # noqa: E203
-            i += batch_size
+        # Prepare the payload with all images.
+        data = {"images": images}
 
-        img_index = 0
-        for batch in batches:
-            data = {"images": batch}
+        # Perform inference in a single call. The NimClient handles batching internally.
+        inference_results = yolox_client.infer(
+            data,
+            model_name="yolox",
+            max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            num_classes=YOLOX_NUM_CLASSES,
+            conf_thresh=YOLOX_CONF_THRESHOLD,
+            iou_thresh=YOLOX_IOU_THRESHOLD,
+            min_score=YOLOX_MIN_SCORE,
+            final_thresh=YOLOX_FINAL_SCORE,
+            trace_info=trace_info,
+            stage_name="pdf_content_extractor",
+        )
 
-            # NimClient inference
-            inference_results = yolox_client.infer(
-                data,
-                model_name="yolox",
-                max_batch_size=YOLOX_MAX_BATCH_SIZE,
-                num_classes=YOLOX_NUM_CLASSES,
-                conf_thresh=YOLOX_CONF_THRESHOLD,
-                iou_thresh=YOLOX_IOU_THRESHOLD,
-                min_score=YOLOX_MIN_SCORE,
-                final_thresh=YOLOX_FINAL_SCORE,
-                trace_info=trace_info,  # traceable_func arg
-                stage_name="pdf_content_extractor",  # traceable_func arg
+        # Process each result along with its corresponding image.
+        for i, (annotation_dict, original_image) in enumerate(zip(inference_results, images)):
+            extract_table_and_chart_images(
+                annotation_dict,
+                original_image,
+                i,
+                tables_and_charts,
             )
-
-            # 5) Extract table/chart info from each image's annotations
-            for annotation_dict, original_image in zip(inference_results, batch):
-                extract_table_and_chart_images(
-                    annotation_dict,
-                    original_image,
-                    img_index,
-                    tables_and_charts,
-                )
-                img_index += 1
 
     except TimeoutError:
         logger.error("Timeout error during table/chart extraction.")
@@ -253,14 +242,13 @@ def extract_tables_and_charts_from_images(
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
-        raise e
+        raise
 
     finally:
         if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
-
     return tables_and_charts
 
 

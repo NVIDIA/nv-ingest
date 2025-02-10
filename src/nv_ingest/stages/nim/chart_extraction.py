@@ -4,6 +4,7 @@
 
 import functools
 import logging
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, List
 from typing import Dict
 from typing import Optional
@@ -11,7 +12,6 @@ from typing import Tuple
 
 import pandas as pd
 from morpheus.config import Config
-from concurrent.futures import ThreadPoolExecutor
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
@@ -29,103 +29,66 @@ def _update_metadata(
     cached_client: NimClient,
     deplot_client: NimClient,
     trace_info: Dict,
-    batch_size: int = 1,
-    worker_pool_size: int = 1,
+    worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Dict]]:
     """
-    Given a list of base64-encoded chart images, this function:
-      - Splits them into batches of size `batch_size`.
-      - Calls Cached with *all images* in each batch in a single request if protocol != 'grpc'.
-        If protocol == 'grpc', calls Cached individually for each image in the batch.
-      - Calls Deplot individually (one request per image) in parallel.
-      - Joins the results for each image into a final combined inference result.
+    Given a list of base64-encoded chart images, this function calls both the Cached and Deplot
+    inference services concurrently to extract chart data for all images.
 
-    Returns
-    -------
-    List[Tuple[str, Dict]]
-      For each base64-encoded image, returns (original_image_str, joined_chart_content_dict).
+    For each base64-encoded image, returns:
+      (original_image_str, joined_chart_content_dict)
     """
-    logger.debug(f"Running chart extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
+    logger.debug("Running chart extraction using updated concurrency handling.")
 
-    def chunk_list(lst, chunk_size):
-        for i in range(0, len(lst), chunk_size):
-            yield lst[i : i + chunk_size]
+    # Prepare data payloads for both clients.
+    data_cached = {"base64_images": base64_images}
+    data_deplot = {"base64_images": base64_images}
 
+    _ = worker_pool_size
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_cached = executor.submit(
+            cached_client.infer,
+            data=data_cached,
+            model_name="cached",
+            stage_name="chart_data_extraction",
+            max_batch_size=2,
+            trace_info=trace_info,
+        )
+        future_deplot = executor.submit(
+            deplot_client.infer,
+            data=data_deplot,
+            model_name="deplot",
+            stage_name="chart_data_extraction",
+            max_batch_size=1,
+            trace_info=trace_info,
+        )
+
+        try:
+            cached_results = future_cached.result()
+        except Exception as e:
+            logger.error(f"Error calling cached_client.infer: {e}", exc_info=True)
+            raise
+
+        try:
+            deplot_results = future_deplot.result()
+        except Exception as e:
+            logger.error(f"Error calling deplot_client.infer: {e}", exc_info=True)
+            raise
+
+    # Ensure both clients returned lists of results matching the number of input images.
+    if not (isinstance(cached_results, list) and isinstance(deplot_results, list)):
+        raise ValueError("Expected list results from both cached_client and deplot_client infer calls.")
+
+    if len(cached_results) != len(base64_images):
+        raise ValueError(f"Expected {len(base64_images)} cached results, got {len(cached_results)}")
+    if len(deplot_results) != len(base64_images):
+        raise ValueError(f"Expected {len(base64_images)} deplot results, got {len(deplot_results)}")
+
+    # Join the corresponding results from both services for each image.
     results = []
-
-    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
-        for batch in chunk_list(base64_images, batch_size):
-            # 1) Cached calls
-            if cached_client.protocol == "grpc":
-                # Submit each image in the batch separately
-                cached_futures = []
-                for image_str in batch:
-                    data = {"base64_images": [image_str]}
-                    fut = executor.submit(
-                        cached_client.infer,
-                        data=data,
-                        model_name="cached",
-                        stage_name="chart_data_extraction",
-                        max_batch_size=1,
-                        trace_info=trace_info,
-                    )
-                    cached_futures.append(fut)
-            else:
-                # Single request for the entire batch
-                data = {"base64_images": batch}
-                future_cached = executor.submit(
-                    cached_client.infer,
-                    data=data,
-                    model_name="cached",
-                    stage_name="chart_data_extraction",
-                    max_batch_size=batch_size,
-                    trace_info=trace_info,
-                )
-
-            # 2) Multiple calls to Deplot, one per image in the batch
-            deplot_futures = []
-            for image_str in batch:
-                # Deplot only supports single-image calls
-                deplot_data = {"base64_image": image_str}
-                fut = executor.submit(
-                    deplot_client.infer,
-                    data=deplot_data,
-                    model_name="deplot",
-                    stage_name="chart_data_extraction",
-                    max_batch_size=1,
-                    trace_info=trace_info,
-                )
-                deplot_futures.append(fut)
-
-            try:
-                # 3) Retrieve results from Cached
-                if cached_client.protocol == "grpc":
-                    # Each future should return a single-element list
-                    # We take the 0th item to align with single-image results
-                    cached_results = []
-                    for fut in cached_futures:
-                        res = fut.result()
-                        if isinstance(res, list) and len(res) == 1:
-                            cached_results.append(res[0])
-                        else:
-                            # Fallback in case the service returns something unexpected
-                            logger.warning(f"Unexpected CACHED result format: {res}")
-                            cached_results.append(res)
-                else:
-                    # Single call returning a list of the same length as 'batch'
-                    cached_results = future_cached.result()
-
-                # Retrieve results from Deplot (each call returns a single inference result)
-                deplot_results = [f.result() for f in deplot_futures]
-
-                # 4) Zip them together, one by one
-                for img_str, cached_res, deplot_res in zip(batch, cached_results, deplot_results):
-                    chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
-                    results.append((img_str, chart_content))
-
-            except Exception as e:
-                logger.error(f"Error processing batch: {batch}, error: {e}", exc_info=True)
-                raise
+    for img_str, cached_res, deplot_res in zip(base64_images, cached_results, deplot_results):
+        joined_chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
+        results.append((img_str, joined_chart_content))
 
     return results
 
@@ -243,7 +206,6 @@ def _extract_chart_data(
             base64_images=base64_images,
             cached_client=cached_client,
             deplot_client=deplot_client,
-            batch_size=stage_config.nim_batch_size,
             worker_pool_size=stage_config.workers_per_progress_engine,
             trace_info=trace_info,
         )
