@@ -38,86 +38,112 @@ def _update_metadata(
     Images that do not meet the minimum size are skipped (resulting in ("", "") for that image).
     The paddle_client is expected to handle any necessary batching and concurrency.
     """
-    logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
+    try:
+        logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
 
-    # Initialize the results list in the same order as base64_images.
-    results: List[Optional[Tuple[str, Tuple[Any, Any]]]] = [None] * len(base64_images)
+        # Initialize the results list in the same order as base64_images.
+        results: List[Optional[Tuple[str, Tuple[Any, Any]]]] = [None] * len(base64_images)
 
-    valid_images: List[str] = []
-    valid_indices: List[int] = []
+        valid_images: List[str] = []
+        valid_indices: List[int] = []
 
-    _ = worker_pool_size
-    # Pre-decode image dimensions and filter valid images.
-    for i, img in enumerate(base64_images):
-        array = base64_to_numpy(img)
-        height, width = array.shape[0], array.shape[1]
-        if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
-            valid_images.append(img)
-            valid_indices.append(i)
-        else:
-            # Image is too small; mark as skipped.
-            results[i] = (img, ("", ""))
+        _ = worker_pool_size
 
-    if valid_images:
-        data = {"base64_images": valid_images}
-        try:
-            # Call infer once for all valid images. The NimClient will handle batching internally.
-            paddle_result = paddle_client.infer(
-                data=data,
-                model_name="paddle",
-                stage_name="table_data_extraction",
-                max_batch_size=2,
-                trace_info=trace_info,
-            )
+        # Pre-decode image dimensions and filter valid images.
+        for i, img in enumerate(base64_images):
+            array = base64_to_numpy(img)
+            height, width = array.shape[0], array.shape[1]
 
-            if not isinstance(paddle_result, list):
-                raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
-            if len(paddle_result) != len(valid_images):
-                raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
+            if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
+                valid_images.append(img)
+                valid_indices.append(i)
+            else:
+                # Image is too small; mark as skipped.
+                results[i] = (img, ("", ""))
 
-            # Assign each result back to its original position.
-            for idx, result in enumerate(paddle_result):
-                original_index = valid_indices[idx]
-                results[original_index] = (base64_images[original_index], result)
+        if valid_images:
+            data = {"base64_images": valid_images}
 
-        except Exception as e:
-            logger.error(f"Error processing images. Error: {e}", exc_info=True)
-            for i in valid_indices:
-                results[i] = (base64_images[i], ("", ""))
-            raise
+            try:
+                # Call infer once for all valid images. The NimClient will handle batching internally.
+                paddle_result = paddle_client.infer(
+                    data=data,
+                    model_name="paddle",
+                    stage_name="table_data_extraction",
+                    max_batch_size=2,
+                    trace_info=trace_info,
+                )
 
-    return results
+                if not isinstance(paddle_result, list):
+                    raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
+
+                if len(paddle_result) != len(valid_images):
+                    raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
+
+                # Assign each result back to its original position.
+                for idx, result in enumerate(paddle_result):
+                    original_index = valid_indices[idx]
+                    results[original_index] = (base64_images[original_index], result)
+
+            except Exception as e:
+                logger.error(f"Error processing images. Error: {e}", exc_info=True)
+
+                for i in valid_indices:
+                    results[i] = (base64_images[i], ("", ""))
+
+                raise
+
+        return results
+
+    except Exception as e:
+        err_msg = f"_update_metadata: Error during metadata extraction. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def _create_paddle_client(stage_config) -> NimClient:
     """
     Helper to create a NimClient for PaddleOCR, retrieving the paddle version from the endpoint.
     """
-    # Attempt to obtain PaddleOCR version from the second endpoint
-    paddle_endpoint = stage_config.paddle_endpoints[1]
     try:
-        paddle_version = get_version(paddle_endpoint)
-        if not paddle_version:
-            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
+        # Attempt to obtain PaddleOCR version from the second endpoint.
+        paddle_endpoint = stage_config.paddle_endpoints[1]
+
+        try:
+            paddle_version = get_version(paddle_endpoint)
+
+            if not paddle_version:
+                logger.warning(
+                    "Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version."
+                )
+                paddle_version = None
+
+        except Exception:
+            logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest version.")
             paddle_version = None
-    except Exception:
-        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest version.")
-        paddle_version = None
 
-    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
+        paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
 
-    paddle_client = create_inference_client(
-        endpoints=stage_config.paddle_endpoints,
-        model_interface=paddle_model_interface,
-        auth_token=stage_config.auth_token,
-        infer_protocol=stage_config.paddle_infer_protocol,
-    )
+        paddle_client = create_inference_client(
+            endpoints=stage_config.paddle_endpoints,
+            model_interface=paddle_model_interface,
+            auth_token=stage_config.auth_token,
+            infer_protocol=stage_config.paddle_infer_protocol,
+        )
 
-    return paddle_client
+        return paddle_client
+
+    except Exception as e:
+        err_msg = f"_create_paddle_client: Error creating Paddle client. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def _extract_table_data(
-    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+    df: pd.DataFrame,
+    task_props: Dict[str, Any],
+    validated_config: Any,
+    trace_info: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts table data from a DataFrame in a bulk fashion rather than row-by-row,
@@ -139,9 +165,6 @@ def _extract_table_data(
     Tuple[pd.DataFrame, Dict]
         A tuple containing the updated DataFrame and the trace information.
     """
-
-    _ = task_props  # unused
-
     if trace_info is None:
         trace_info = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
@@ -153,12 +176,14 @@ def _extract_table_data(
     paddle_client = _create_paddle_client(stage_config)
 
     try:
-        # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
+        # 1) Identify rows that meet criteria.
         def meets_criteria(row):
             m = row.get("metadata", {})
             if not m:
                 return False
+
             content_md = m.get("content_metadata", {})
+
             if (
                 content_md.get("type") == "structured"
                 and content_md.get("subtype") == "table"
@@ -166,22 +191,23 @@ def _extract_table_data(
                 and m.get("content") not in [None, ""]
             ):
                 return True
+
             return False
 
         mask = df.apply(meets_criteria, axis=1)
         valid_indices = df[mask].index.tolist()
 
-        # If no rows meet the criteria, just return
+        # If no rows meet the criteria, just return.
         if not valid_indices:
             return df, {"trace_info": trace_info}
 
-        # 2) Extract base64 images in the same order
+        # 2) Extract base64 images in the same order.
         base64_images = []
         for idx in valid_indices:
             meta = df.at[idx, "metadata"]
             base64_images.append(meta["content"])
 
-        # 3) Call our bulk _update_metadata to get all results
+        # 3) Call our bulk _update_metadata to get all results.
         bulk_results = _update_metadata(
             base64_images=base64_images,
             paddle_client=paddle_client,
@@ -189,11 +215,9 @@ def _extract_table_data(
             trace_info=trace_info,
         )
 
-        # 4) Write the results (table_content, table_content_format) back
+        # 4) Write the results back.
         for row_id, idx in enumerate(valid_indices):
-            # unpack (base64_image, (content, format))
             _, (table_content, table_content_format) = bulk_results[row_id]
-
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
             df.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
 
@@ -202,6 +226,7 @@ def _extract_table_data(
     except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)
         raise
+
     finally:
         paddle_client.close()
 
@@ -220,22 +245,17 @@ def generate_table_extractor_stage(
     ----------
     c : Config
         Morpheus global configuration object.
-
     stage_config : Dict[str, Any]
         Configuration parameters for the table content extractor, passed as a dictionary
         validated against the `TableExtractorSchema`.
-
     task : str, optional
         The task name for the stage worker function, defining the specific table extraction process.
         Default is "table_data_extract".
-
     task_desc : str, optional
         A descriptor used for latency tracing and logging during table extraction.
         Default is "table_data_extraction".
-
     pe_count : int, optional
-        The number of process engines to use for table data extraction. This value controls
-        how many worker processes will run concurrently. Default is 1.
+        The number of process engines to use for table data extraction. Default is 1.
 
     Returns
     -------
@@ -243,11 +263,22 @@ def generate_table_extractor_stage(
         A configured Morpheus stage with an applied worker function that handles table data extraction
         from PDF content.
     """
+    try:
+        print(f"TableExtractorSchema stage_config: {stage_config}")
 
-    print(f"TableExtractorSchema stage_config: {stage_config}")
-    validated_config = TableExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(_extract_table_data, validated_config=validated_config)
+        validated_config = TableExtractorSchema(**stage_config)
 
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
-    )
+        _wrapped_process_fn = functools.partial(_extract_table_data, validated_config=validated_config)
+
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+        )
+
+    except Exception as e:
+        err_msg = f"generate_table_extractor_stage: Error generating table extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

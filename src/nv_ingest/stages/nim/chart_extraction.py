@@ -38,59 +38,68 @@ def _update_metadata(
     For each base64-encoded image, returns:
       (original_image_str, joined_chart_content_dict)
     """
-    logger.debug("Running chart extraction using updated concurrency handling.")
+    try:
+        logger.debug("Running chart extraction using updated concurrency handling.")
 
-    # Prepare data payloads for both clients.
-    data_cached = {"base64_images": base64_images}
-    data_deplot = {"base64_images": base64_images}
+        # Prepare data payloads for both clients.
+        data_cached = {"base64_images": base64_images}
+        data_deplot = {"base64_images": base64_images}
 
-    _ = worker_pool_size
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_cached = executor.submit(
-            cached_client.infer,
-            data=data_cached,
-            model_name="cached",
-            stage_name="chart_data_extraction",
-            max_batch_size=2,
-            trace_info=trace_info,
-        )
-        future_deplot = executor.submit(
-            deplot_client.infer,
-            data=data_deplot,
-            model_name="deplot",
-            stage_name="chart_data_extraction",
-            max_batch_size=1,
-            trace_info=trace_info,
-        )
+        _ = worker_pool_size
 
-        try:
-            cached_results = future_cached.result()
-        except Exception as e:
-            logger.error(f"Error calling cached_client.infer: {e}", exc_info=True)
-            raise
+        with ThreadPoolExecutor(max_workers=2) as executor:
+            future_cached = executor.submit(
+                cached_client.infer,
+                data=data_cached,
+                model_name="cached",
+                stage_name="chart_data_extraction",
+                max_batch_size=2,
+                trace_info=trace_info,
+            )
 
-        try:
-            deplot_results = future_deplot.result()
-        except Exception as e:
-            logger.error(f"Error calling deplot_client.infer: {e}", exc_info=True)
-            raise
+            future_deplot = executor.submit(
+                deplot_client.infer,
+                data=data_deplot,
+                model_name="deplot",
+                stage_name="chart_data_extraction",
+                max_batch_size=1,
+                trace_info=trace_info,
+            )
 
-    # Ensure both clients returned lists of results matching the number of input images.
-    if not (isinstance(cached_results, list) and isinstance(deplot_results, list)):
-        raise ValueError("Expected list results from both cached_client and deplot_client infer calls.")
+            try:
+                cached_results = future_cached.result()
+            except Exception as e:
+                logger.error(f"Error calling cached_client.infer: {e}", exc_info=True)
+                raise
 
-    if len(cached_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} cached results, got {len(cached_results)}")
-    if len(deplot_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} deplot results, got {len(deplot_results)}")
+            try:
+                deplot_results = future_deplot.result()
+            except Exception as e:
+                logger.error(f"Error calling deplot_client.infer: {e}", exc_info=True)
+                raise
 
-    # Join the corresponding results from both services for each image.
-    results = []
-    for img_str, cached_res, deplot_res in zip(base64_images, cached_results, deplot_results):
-        joined_chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
-        results.append((img_str, joined_chart_content))
+        # Ensure both clients returned lists of results matching the number of input images.
+        if not (isinstance(cached_results, list) and isinstance(deplot_results, list)):
+            raise ValueError("Expected list results from both cached_client and deplot_client infer calls.")
 
-    return results
+        if len(cached_results) != len(base64_images):
+            raise ValueError(f"Expected {len(base64_images)} cached results, got {len(cached_results)}")
+
+        if len(deplot_results) != len(base64_images):
+            raise ValueError(f"Expected {len(base64_images)} deplot results, got {len(deplot_results)}")
+
+        # Join the corresponding results from both services for each image.
+        results = []
+        for img_str, cached_res, deplot_res in zip(base64_images, cached_results, deplot_results):
+            joined_chart_content = join_cached_and_deplot_output(cached_res, deplot_res)
+            results.append((img_str, joined_chart_content))
+
+        return results
+
+    except Exception as e:
+        err_msg = f"_update_metadata: Error during metadata extraction. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def _create_clients(
@@ -100,26 +109,32 @@ def _create_clients(
     deplot_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
-    cached_model_interface = CachedModelInterface()
-    deplot_model_interface = DeplotModelInterface()
+    try:
+        cached_model_interface = CachedModelInterface()
+        deplot_model_interface = DeplotModelInterface()
 
-    logger.debug(f"Inference protocols: cached={cached_protocol}, deplot={deplot_protocol}")
+        logger.debug(f"Inference protocols: cached={cached_protocol}, deplot={deplot_protocol}")
 
-    cached_client = create_inference_client(
-        endpoints=cached_endpoints,
-        model_interface=cached_model_interface,
-        auth_token=auth_token,
-        infer_protocol=cached_protocol,
-    )
+        cached_client = create_inference_client(
+            endpoints=cached_endpoints,
+            model_interface=cached_model_interface,
+            auth_token=auth_token,
+            infer_protocol=cached_protocol,
+        )
 
-    deplot_client = create_inference_client(
-        endpoints=deplot_endpoints,
-        model_interface=deplot_model_interface,
-        auth_token=auth_token,
-        infer_protocol=deplot_protocol,
-    )
+        deplot_client = create_inference_client(
+            endpoints=deplot_endpoints,
+            model_interface=deplot_model_interface,
+            auth_token=auth_token,
+            infer_protocol=deplot_protocol,
+        )
 
-    return cached_client, deplot_client
+        return cached_client, deplot_client
+
+    except Exception as e:
+        err_msg = f"_create_clients: Error creating clients. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def _extract_chart_data(
@@ -149,36 +164,34 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
-    _ = task_props  # unused
-
-    if trace_info is None:
-        trace_info = {}
-        logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
-
-    if df.empty:
-        return df, trace_info
-
-    stage_config = validated_config.stage_config
-    cached_client, deplot_client = _create_clients(
-        stage_config.cached_endpoints,
-        stage_config.cached_infer_protocol,
-        stage_config.deplot_endpoints,
-        stage_config.deplot_infer_protocol,
-        stage_config.auth_token,
-    )
-
     try:
-        # 1) Identify rows that meet criteria in a single pass
-        #    - metadata exists
-        #    - content_metadata.type == "structured"
-        #    - content_metadata.subtype == "chart"
-        #    - table_metadata not None
-        #    - base64_image not None or ""
+        _ = task_props  # Unused
+
+        if trace_info is None:
+            trace_info = {}
+            logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
+
+        if df.empty:
+            return df, trace_info
+
+        stage_config = validated_config.stage_config
+
+        cached_client, deplot_client = _create_clients(
+            stage_config.cached_endpoints,
+            stage_config.cached_infer_protocol,
+            stage_config.deplot_endpoints,
+            stage_config.deplot_infer_protocol,
+            stage_config.auth_token,
+        )
+
+        # 1) Identify rows that meet criteria in a single pass.
         def meets_criteria(row):
             m = row.get("metadata", {})
             if not m:
                 return False
+
             content_md = m.get("content_metadata", {})
+
             if (
                 content_md.get("type") == "structured"
                 and content_md.get("subtype") == "chart"
@@ -186,22 +199,23 @@ def _extract_chart_data(
                 and m.get("content") not in [None, ""]
             ):
                 return True
+
             return False
 
         mask = df.apply(meets_criteria, axis=1)
         valid_indices = df[mask].index.tolist()
 
-        # If no rows meet the criteria, just return
+        # If no rows meet the criteria, just return.
         if not valid_indices:
             return df, {"trace_info": trace_info}
 
-        # 2) Extract base64 images + keep track of row -> image mapping
+        # 2) Extract base64 images + keep track of row -> image mapping.
         base64_images = []
         for idx in valid_indices:
             meta = df.at[idx, "metadata"]
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
-        # 3) Call our bulk update_metadata to get all results
+        # 3) Call our bulk _update_metadata to get all results.
         bulk_results = _update_metadata(
             base64_images=base64_images,
             cached_client=cached_client,
@@ -210,9 +224,7 @@ def _extract_chart_data(
             trace_info=trace_info,
         )
 
-        # 4) Write the results back to each row’s table_metadata
-        #    The order of base64_images in bulk_results should match their original
-        #    indices if we process them in the same order.
+        # 4) Write the results back to each row’s table_metadata.
         for row_id, idx in enumerate(valid_indices):
             (_, chart_content) = bulk_results[row_id]
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
@@ -221,10 +233,16 @@ def _extract_chart_data(
 
     except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
+
         raise
+
     finally:
-        cached_client.close()
-        deplot_client.close()
+        try:
+            cached_client.close()
+            deplot_client.close()
+
+        except Exception as close_err:
+            logger.error(f"Error closing clients: {close_err}", exc_info=True)
 
 
 def generate_chart_extractor_stage(
@@ -264,10 +282,22 @@ def generate_chart_extractor_stage(
         A configured Morpheus stage with an applied worker function that handles chart data extraction
         from PDF content.
     """
+    try:
+        print(f"TableExtractorSchema stage_config: {stage_config}")
 
-    validated_config = ChartExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
+        validated_config = ChartExtractorSchema(**stage_config)
 
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
-    )
+        _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
+
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+        )
+
+    except Exception as e:
+        err_msg = f"generate_chart_extractor_stage: Error generating table extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
