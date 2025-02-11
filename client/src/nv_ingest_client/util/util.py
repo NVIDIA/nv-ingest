@@ -32,13 +32,15 @@ logger = logging.getLogger(__name__)
 
 
 class ClientConfigSchema:
-    embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
-    nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
-    nv_ranker_nim_endpoint: str = os.getenv(
-        "RERANKER_NIM_ENDPOINT", "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking"
-    )
-    nv_ranker_nim_model_name: str = os.getenv("RERANKER_NUM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
+    def __init__(self):
+        self.embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
+        self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+        self.nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
+        self.nv_ranker_nim_endpoint: str = os.getenv(
+            "RERANKER_NIM_ENDPOINT",
+            "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking",
+        )
+        self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NUM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
 
 
 def estimate_page_count(file_path: str) -> int:
