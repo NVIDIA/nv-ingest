@@ -11,6 +11,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import numpy as np
 import pandas as pd
 from morpheus.config import Config
 
@@ -35,107 +36,79 @@ def _update_metadata(
     yolox_client: NimClient,
     paddle_client: NimClient,
     trace_info: Dict,
-    batch_size: int = 1,
-    worker_pool_size: int = 1,
+    worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Dict]]:
     """
-    Given a list of base64-encoded chart images, this function:
-      - Splits them into batches of size `batch_size`.
-      - Calls Yolox and Paddle with *all images* in each batch in a single request if protocol != 'grpc'.
-        If protocol == 'grpc', calls Yolox and Paddle individually for each image in the batch.
-      - Joins the results for each image into a final combined inference result.
+    Given a list of base64-encoded chart images, this function calls both the Yolox and Paddle
+    inference services concurrently to extract chart data for all images.
 
-    Returns
-    -------
-    List[Tuple[str, Dict]]
-      For each base64-encoded image, returns (original_image_str, joined_chart_content_dict).
+    For each base64-encoded image, returns:
+      (original_image_str, joined_chart_content_dict)
     """
-    logger.debug(f"Running chart extraction: batch_size={batch_size}, worker_pool_size={worker_pool_size}")
+    logger.debug("Running chart extraction using updated concurrency handling.")
 
-    def chunk_list(lst, chunk_size):
-        for i in range(0, len(lst), chunk_size):
-            yield lst[i : i + chunk_size]
+    valid_images: List[str] = []
+    valid_arrays: List[np.ndarray] = []
 
+    # Pre-decode image dimensions and filter valid images.
+    for i, img in enumerate(base64_images):
+        array = base64_to_numpy(img)
+        height, width = array.shape[0], array.shape[1]
+        if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
+            valid_images.append(img)
+            valid_arrays.append(array)
+
+    # Prepare data payloads for both clients.
+    data_yolox = {"images": valid_arrays}
+    data_paddle = {"base64_images": valid_images}
+
+    _ = worker_pool_size
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_yolox = executor.submit(
+            yolox_client.infer,
+            data=data_yolox,
+            model_name="yolox",
+            stage_name="chart_data_extraction",
+            max_batch_size=8,
+            trace_info=trace_info,
+        )
+        future_paddle = executor.submit(
+            paddle_client.infer,
+            data=data_paddle,
+            model_name="paddle",
+            stage_name="chart_data_extraction",
+            max_batch_size=1,
+            trace_info=trace_info,
+        )
+
+        try:
+            yolox_results = future_yolox.result()
+        except Exception as e:
+            logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+            raise
+
+        try:
+            paddle_results = future_paddle.result()
+        except Exception as e:
+            logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+            raise
+
+    # Ensure both clients returned lists of results matching the number of input images.
+    if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
+        raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
+
+    if len(yolox_results) != len(base64_images):
+        raise ValueError(f"Expected {len(base64_images)} yolox results, got {len(yolox_results)}")
+    if len(paddle_results) != len(base64_images):
+        raise ValueError(f"Expected {len(base64_images)} paddle results, got {len(paddle_results)}")
+
+    # Join the corresponding results from both services for each image.
     results = []
-    image_arrays = [base64_to_numpy(img) for img in base64_images]
-
-    with ThreadPoolExecutor(max_workers=worker_pool_size) as executor:
-        for batch, arrays in zip(chunk_list(base64_images, batch_size), chunk_list(image_arrays, batch_size)):
-            # 1) Yolox calls
-            # Single request for the entire batch
-            data = {"images": arrays}
-            yolox_futures = executor.submit(
-                yolox_client.infer,
-                data=data,
-                model_name="yolox",
-                stage_name="chart_data_extraction",
-                trace_info=trace_info,
-            )
-
-            # 2) Paddle calls
-            paddle_futures = []
-            if paddle_client.protocol == "grpc":
-                # Submit each image in the batch separately
-                paddle_futures = []
-                for image_str, image_arr in zip(batch, arrays):
-                    width, height = image_arr.shape[:2]
-                    if width < PADDLE_MIN_WIDTH or height < PADDLE_MIN_HEIGHT:
-                        # Too small, skip inference
-                        continue
-
-                    data = {"base64_images": [image_str]}
-                    fut = executor.submit(
-                        paddle_client.infer,
-                        data=data,
-                        model_name="paddle",
-                        stage_name="chart_data_extraction",
-                        max_batch_size=1,
-                        trace_info=trace_info,
-                    )
-                    paddle_futures.append(fut)
-            else:
-                # Single request for the entire batch
-                data = {"base64_images": batch}
-                paddle_futures = executor.submit(
-                    paddle_client.infer,
-                    data=data,
-                    model_name="paddle",
-                    stage_name="chart_data_extraction",
-                    max_batch_size=batch_size,
-                    trace_info=trace_info,
-                )
-
-            try:
-                # Retrieve results from Yolox
-                yolox_results = yolox_futures.result()
-
-                # 3) Retrieve results from Yolox
-                if paddle_client.protocol == "grpc":
-                    # Each future should return a single-element list
-                    # We take the 0th item to align with single-image results
-                    paddle_results = []
-                    for fut in paddle_futures:
-                        res = fut.result()
-                        if isinstance(res, list) and len(res) == 1:
-                            paddle_results.append(res[0])
-                        else:
-                            # Fallback in case the service returns something unexpected
-                            logger.warning(f"Unexpected PaddleOCR result format: {res}")
-                            paddle_results.append(res)
-                else:
-                    # Single call returning a list of the same length as 'batch'
-                    paddle_results = paddle_futures.result()
-
-                # 4) Zip them together, one by one
-                for img_str, yolox_res, paddle_res in zip(batch, yolox_results, paddle_results):
-                    bounding_boxes, text_predictions = paddle_res
-                    yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
-                    chart_content = process_yolox_graphic_elements(yolox_elements)
-                    results.append((img_str, chart_content))
-
-            except Exception as e:
-                logger.error(f"Error processing batch: {batch}, error: {e}", exc_info=True)
-                raise
+    for img_str, yolox_res, paddle_res in zip(base64_images, yolox_results, paddle_results):
+        bounding_boxes, text_predictions = paddle_res
+        yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+        chart_content = process_yolox_graphic_elements(yolox_elements)
+        results.append((img_str, chart_content))
 
     return results
 
@@ -253,7 +226,6 @@ def _extract_chart_data(
             base64_images=base64_images,
             yolox_client=yolox_client,
             paddle_client=paddle_client,
-            batch_size=stage_config.nim_batch_size,
             worker_pool_size=stage_config.workers_per_progress_engine,
             trace_info=trace_info,
         )

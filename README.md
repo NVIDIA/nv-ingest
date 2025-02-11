@@ -95,7 +95,7 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file that contains your NGC API keys. For more information, refer to [](docs/docs/user-guide/developer-guide/environment-config.md).
+4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/user-guide/developer-guide/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
@@ -184,7 +184,6 @@ pip install .
 # When not using Conda, pip dependencies for the client can be installed directly via pip. Pip based installation of
 # the ingest service is not supported.
 cd client
-pip install -r requirements.txt
 pip install .
 ```
 

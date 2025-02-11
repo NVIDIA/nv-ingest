@@ -6,6 +6,8 @@ import logging
 import re
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from functools import partial
 from typing import Any
 from typing import Optional
 from typing import Tuple
@@ -111,7 +113,7 @@ class NimClient:
         protocol: str,
         endpoints: Tuple[str, str],
         auth_token: Optional[str] = None,
-        timeout: float = 30.0,
+        timeout: float = 120.0,
         max_retries: int = 5,
     ):
         """
@@ -187,6 +189,39 @@ class NimClient:
 
             return self._max_batch_sizes[model_name]
 
+    def _process_batch(self, batch_input, *, prepared_data, model_name, **kwargs):
+        """
+        Process a single batch input for inference.
+
+        Parameters
+        ----------
+        batch_input : Any
+            The batch input data to process.
+        prepared_data : Any
+            The prepared data used for inference.
+        model_name : str
+            The model name to use for inference.
+        kwargs : dict
+            Additional parameters for inference.
+
+        Returns
+        -------
+        Any
+            The parsed output from the inference request.
+        """
+        if self.protocol == "grpc":
+            logger.debug("Performing gRPC inference for a batch...")
+            response = self._grpc_infer(batch_input, model_name)
+            logger.debug("gRPC inference received response for a batch")
+        elif self.protocol == "http":
+            logger.debug("Performing HTTP inference for a batch...")
+            response = self._http_infer(batch_input)
+            logger.debug("HTTP inference received response for a batch")
+        else:
+            raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+
+        return self.model_interface.parse_output(response, protocol=self.protocol, data=prepared_data, **kwargs)
+
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
         """Attempt to set the max batch size for the model if it is not already set, ensuring thread safety."""
         self._fetch_max_batch_size(model_name, model_version)
@@ -203,7 +238,8 @@ class NimClient:
         model_name : str
             The name of the model to use for inference.
         kwargs : dict
-            Additional parameters for inference.
+            Additional parameters for inference. Optionally supports "max_pool_workers" to set
+            the number of worker threads in the thread pool.
 
         Returns
         -------
@@ -215,54 +251,38 @@ class NimClient:
         ValueError
             If an invalid protocol is specified.
         """
-
         try:
-            # 1. Retrieve or default to the model's maximum batch size
+            # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
             max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
             force_requested_batch_size = kwargs.get("force_max_batch_size", False)
 
-            # 1a. In some cases we can't use the absolute max batch size (or don't want to) so we allow override
-            # 1b. In some cases we can't reliably retrieve the max batch size so we default to 1 and allow forced
-            #   override
             if not force_requested_batch_size:
                 max_batch_size = min(batch_size, max_requested_batch_size)
             else:
                 max_batch_size = max_requested_batch_size
 
-            # 2. Prepare data for inference
+            # 2. Prepare data for inference.
             prepared_data = self.model_interface.prepare_data_for_inference(data)
 
-            # 3. Format the input based on protocol
+            # 3. Format the input based on protocol.
             #    NOTE: This now returns a list of batches.
             formatted_batches = self.model_interface.format_input(
                 prepared_data, protocol=self.protocol, max_batch_size=max_batch_size
             )
 
-            # Container for all parsed outputs
-            all_parsed_outputs = []
+            # Check for a custom maximum pool worker count, and remove it from kwargs.
+            max_pool_workers = kwargs.pop("max_pool_workers", 16)
 
-            # 4. Loop over each batch
-            for batch_input in formatted_batches:
-                if self.protocol == "grpc":
-                    logger.debug("Performing gRPC inference for a batch...")
-                    response = self._grpc_infer(batch_input, model_name)
-                    logger.debug("gRPC inference received response for a batch")
-                elif self.protocol == "http":
-                    logger.debug("Performing HTTP inference for a batch...")
-                    response = self._http_infer(batch_input)
-                    logger.debug("HTTP inference received response for a batch")
-                else:
-                    raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
+            # 4. Process each batch concurrently using a thread pool.
+            process_batch_partial = partial(
+                self._process_batch, prepared_data=prepared_data, model_name=model_name, **kwargs
+            )
 
-                # Parse the output of this batch
-                parsed_output = self.model_interface.parse_output(
-                    response, protocol=self.protocol, data=prepared_data, **kwargs
-                )
-                # Accumulate parsed outputs
-                all_parsed_outputs.append(parsed_output)
+            with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
+                all_parsed_outputs = list(executor.map(process_batch_partial, formatted_batches))
 
-            # 5. Process the parsed outputs for each batch
+            # 5. Process the parsed outputs for each batch.
             all_results = []
             for parsed_output in all_parsed_outputs:
                 batch_results = self.model_interface.process_inference_results(
@@ -271,8 +291,6 @@ class NimClient:
                     protocol=self.protocol,
                     **kwargs,
                 )
-                # Extend or append based on how `batch_results` is structured
-                # (assuming it's a list of result items):
                 if isinstance(batch_results, list):
                     all_results.extend(batch_results)
                 else:
@@ -283,7 +301,6 @@ class NimClient:
             logger.error(error_str)
             raise RuntimeError(error_str)
 
-        # 6. Return final accumulated results
         return all_results
 
     def _grpc_infer(self, formatted_input: np.ndarray, model_name: str) -> np.ndarray:

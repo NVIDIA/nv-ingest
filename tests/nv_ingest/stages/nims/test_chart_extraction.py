@@ -24,7 +24,6 @@ def valid_chart_extractor_config():
         yolox_infer_protocol="grpc",
         paddle_endpoints=("paddle_grpc_url", "paddle_http_url"),
         paddle_infer_protocol="grpc",
-        nim_batch_size=2,
         workers_per_progress_engine=5,
     )
 
@@ -50,31 +49,50 @@ def validated_config(valid_chart_extractor_config):
 
 def test_update_metadata_empty_list():
     """
-    If the base64_images list is empty, _update_metadata should
-    skip all logic and return an empty list.
+    If the base64_images list is empty, _update_metadata should return an empty list.
+    With the updated implementation, both clients are still invoked (with an empty list)
+    so we set their return values to [] and then verify the calls.
     """
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
     trace_info = {}
+
+    # When given an empty list, both clients return an empty list.
+    yolox_mock.infer.return_value = []
+    paddle_mock.infer.return_value = []
 
     result = _update_metadata(
         base64_images=[],
         yolox_client=yolox_mock,
         paddle_client=paddle_mock,
         trace_info=trace_info,
-        batch_size=1,
         worker_pool_size=1,
     )
 
     assert result == []
-    yolox_mock.infer.assert_not_called()
+
+    # Each client's infer should be called once with an empty list.
+    yolox_mock.infer.assert_called_once_with(
+        data={"images": []},
+        model_name="yolox",
+        stage_name="chart_data_extraction",
+        max_batch_size=8,
+        trace_info=trace_info,
+    )
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": []},
+        model_name="paddle",
+        stage_name="chart_data_extraction",
+        max_batch_size=2,
+        trace_info=trace_info,
+    )
 
 
 def test_update_metadata_single_batch_single_worker(mocker, base64_image):
     """
-    Test a simple scenario with a small list of base64_images, batch_size=2,
-    worker_pool_size=1. We verify that yolox is called once per batch,
-    and paddle is called once per image in that batch.
+    Test a simple scenario with a small list of base64_images using worker_pool_size=1.
+    In the updated _update_metadata implementation, both the yolox and paddle clients are
+    called once with the full list of images. The join function is applied per image.
     """
     # Mock out the clients
     yolox_mock = MagicMock()
@@ -99,12 +117,12 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
 
     result = _update_metadata(base64_images, yolox_mock, paddle_mock, trace_info, batch_size=2, worker_pool_size=1)
 
-    # We expect result => [("img1", "joined_1"), ("img2", "joined_2")]
+    # Expect the result to combine each original image with its corresponding joined output.
     assert len(result) == 2
     assert result[0] == (base64_image, "joined_1")
     assert result[1] == (base64_image, "joined_2")
 
-    # Check calls
+    # yolox.infer should be called once with the full list of arrays.
     assert yolox_mock.infer.call_count == 1
     assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][0] == base64_to_numpy(base64_image))
     assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][1] == base64_to_numpy(base64_image))
@@ -112,9 +130,8 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
     assert yolox_mock.infer.call_args.kwargs["stage_name"] == "chart_data_extraction"
     assert yolox_mock.infer.call_args.kwargs["trace_info"] == trace_info
 
-    # paddle.infer called once per image
-    assert paddle_mock.infer.call_count == 1
-    paddle_mock.infer.assert_any_call(
+    # paddle.infer should be called once with the full list of images.
+    paddle_mock.infer.assert_called_once_with(
         data={"base64_images": [base64_image, base64_image]},
         model_name="paddle",
         stage_name="chart_data_extraction",
@@ -122,14 +139,15 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
         trace_info=trace_info,
     )
 
-    # join_yolox_and_paddle_output called twice
+    # The join function should be invoked once per image.
     assert mock_join.call_count == 2
 
 
 def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
     """
-    If batch_size=1 but we have multiple images, each image forms its own batch.
-    We also can use worker_pool_size=2 for parallel calls.
+    With the new _update_metadata implementation, both cached_client.infer and deplot_client.infer
+    are called once with the full list of images. Their results are expected to be lists with one
+    item per image. The join function is still invoked for each image.
     """
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
@@ -160,7 +178,6 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
         yolox_mock,
         paddle_mock,
         trace_info,
-        batch_size=1,  # each image in its own batch
         worker_pool_size=2,
     )
 
@@ -177,8 +194,7 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
 
 def test_update_metadata_exception_in_yolox_call(base64_image, caplog):
     """
-    If the yolox call fails for a batch, we expect an exception to bubble up
-    and the error logged.
+    If the yolox call fails, we expect an exception to bubble up and the error to be logged.
     """
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
@@ -187,24 +203,24 @@ def test_update_metadata_exception_in_yolox_call(base64_image, caplog):
     with pytest.raises(Exception, match="Yolox call error"):
         _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=1)
 
-    # Check log
-    assert f"Error processing batch: ['{base64_image}']" in caplog.text
+    # Verify that the error message from the cached client is logged.
+    assert "Error calling yolox_client.infer: Cached call error" in caplog.text
 
 
 def test_update_metadata_exception_in_paddle_call(base64_image, caplog):
     """
-    If any paddle call fails for one of the images, the entire process fails
-    and logs the error.
+    If the paddle call fails, we expect an exception to bubble up and the error to be logged.
     """
     yolox_mock = MagicMock()
-    yolox_mock.infer.return_value = ["yolox_result"]  # 1-element list
+    yolox_mock.infer.return_value = ["yolox_result"]  # Single-element list for one image
     paddle_mock = MagicMock()
     paddle_mock.infer.side_effect = Exception("Paddle error")
 
     with pytest.raises(Exception, match="Paddle error"):
         _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=2)
 
-    assert f"Error processing batch: ['{base64_image}']" in caplog.text
+    # Verify that the error message from the deplot client is logged.
+    assert "Error calling paddle_client.infer: Deplot error" in caplog.text
 
 
 def test_create_clients(mocker):
@@ -339,7 +355,6 @@ def test_extract_chart_data_all_valid(validated_config, mocker):
         base64_images=["imgA", "imgB"],
         yolox_client=yolox_mock,
         paddle_client=paddle_mock,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=ti.get("trace_info"),
     )
@@ -398,7 +413,6 @@ def test_extract_chart_data_mixed_rows(validated_config, mocker):
         base64_images=["base64img1", "base64img2"],
         yolox_client=yolox_mock,
         paddle_client=paddle_mock,
-        batch_size=validated_config.stage_config.nim_batch_size,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=trace.get("trace_info"),
     )

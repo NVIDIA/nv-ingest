@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "nv-ingest-client"
+description = "Python client for the nv-ingest service"
+dynamic = ["version"]  # Declare attrs that will be generated at build time
+readme = "README.md"
+authors = [
+    {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
+]
+license = {file = "LICENSE"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
+dependencies = [
+    "azure-storage-blob==12.24.0",
+    "build>=1.2.2",
+    "charset-normalizer>=3.4.1",
+    "click>=8.1.8",
+    "fsspec>=2025.2.0",
+    "httpx==0.27.2",
+    "langchain-milvus==0.1.7",
+    "langchain-nvidia-ai-endpoints>=0.3.7",
+    "llama-index-embeddings-nvidia==0.1.5",
+    "minio>=7.2.15",
+    "openai==1.40.6",
+    "pyarrow>=19.0.0",
+    "pydantic>2.0.0",
+    "pydantic-settings>2.0.0",
+    "pymilvus==2.5.4",
+    "pymilvus[bulk_writer,model]",
+    "pypdfium2>=4.30.1",
+    "python-docx>=1.1.2",
+    "python-magic>=0.4.27",
+    "python-pptx==0.6.23",
+    "redis==5.0.8",
+    "requests>=2.32.3",
+    "setuptools>=75.8.0",
+    "tqdm>=4.67.1",
+]
+
+[project.urls]
+homepage = "https://github.com/NVIDIA/nv-ingest"
+repository = "https://github.com/NVIDIA/nv-ingest"
+documentation = "https://docs.nvidia.com/nv-ingest"
+
+[project.scripts]
+nv-ingest-cli = "nv_ingest_client.nv_ingest_cli:main"
+process-json-files = "nv_ingest_client.util.process_json_files:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "version.get_version"}

@@ -33,7 +33,7 @@ Password: <Your Key>
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
 
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [](../developer-guide/environment-config.md).
+4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](../developer-guide/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
@@ -112,7 +112,6 @@ To interact from the host, you'll need a Python environment and install the clie
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
-pip install -r ./requirements.txt
 pip install .
 ```
 
