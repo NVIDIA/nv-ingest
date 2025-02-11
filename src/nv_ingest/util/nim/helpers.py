@@ -430,7 +430,6 @@ def create_inference_client(
     model_interface: ModelInterface,
     auth_token: Optional[str] = None,
     infer_protocol: Optional[str] = None,
-    timeout: float = 30.0,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -467,7 +466,7 @@ def create_inference_client(
     if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout=timeout)
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token)
 
 
 def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
