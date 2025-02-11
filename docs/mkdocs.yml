@@ -1,6 +1,6 @@
-site_name: MyLibrary Documentation
+site_name: NV-Ingest Documentation
 # site_url:
-# repo_url:
+repo_url: https://github.com/NVIDIA/nv-ingest
 # repo_name:
 
 theme:
@@ -57,8 +57,12 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_if_no_docstring: true
           paths:
-            - ../sub-packages/*/src
+            - ../api/*/src/nv_ingest_api
   - mkdocs-jupyter:
       theme: auto
       highlight_extra_classes: "jupyter-notebook"
@@ -87,6 +91,9 @@ markdown_extensions:
   - admonition
   - footnotes
 
+extra:
+  python_path: "../../api/src"  # Relative path from 'docs/' to 'api/src'
+
 # extra:
 #   social:
 #     - icon: fontawesome/brands/github
@@ -98,6 +105,11 @@ markdown_extensions:
 #   docker_url: nvcr.io/nvidia/clara/bionemo-framework
 #   docker_tag: main--nightly
 #   github_url:
+
+# nav:
+#   - Home: index.md
+#   - API Reference:
+#       - NV Ingest API: reference/nv_ingest_api.md  # This will contain the API docs
 
 copyright: |
   &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
