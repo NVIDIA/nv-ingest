@@ -66,7 +66,7 @@ def _update_metadata(
                 data=data,
                 model_name="paddle",
                 stage_name="table_data_extraction",
-                max_batch_size=2,
+                max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
                 trace_info=trace_info,
             )
 
