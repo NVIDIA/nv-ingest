@@ -39,11 +39,15 @@ def _update_metadata(
     worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Dict]]:
     """
-    Given a list of base64-encoded chart images, this function calls both the Yolox and Paddle
-    inference services concurrently to extract chart data for all images.
+    <<<<<<< HEAD
+        Given a list of base64-encoded chart images, this function calls both the Yolox and Paddle
+    =======
+        Given a list of base64-encoded chart images, this function calls both the Cached and Deplot
+    >>>>>>> main
+        inference services concurrently to extract chart data for all images.
 
-    For each base64-encoded image, returns:
-      (original_image_str, joined_chart_content_dict)
+        For each base64-encoded image, returns:
+          (original_image_str, joined_chart_content_dict)
     """
     logger.debug("Running chart extraction using updated concurrency handling.")
 
@@ -77,7 +81,7 @@ def _update_metadata(
             data=data_paddle,
             model_name="paddle",
             stage_name="chart_data_extraction",
-            max_batch_size=1,
+            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
 
