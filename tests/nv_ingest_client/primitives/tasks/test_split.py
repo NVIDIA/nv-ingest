@@ -73,13 +73,13 @@ def test_split_task_default_params():
     expected_str_contains = [
         "tokenizer: intfloat/e5-large-unsupervised",
         "chunk_size: 1024",
-        "chunk_overlap: 0",
+        "chunk_overlap: 20",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
 
     expected_dict = {
         "type": "split",
-        "task_properties": {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 1024, "chunk_overlap": 0},
+        "task_properties": {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 1024, "chunk_overlap": 20},
     }
     assert task.to_dict() == expected_dict

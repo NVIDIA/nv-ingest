@@ -15,7 +15,7 @@ def test_text_splitter_schema_defaults():
     schema = TextSplitterSchema()
     assert schema.tokenizer == "intfloat/e5-large-unsupervised"
     assert schema.chunk_size == 1024
-    assert schema.chunk_overlap == 0
+    assert schema.chunk_overlap == 20
     assert schema.raise_on_failure is False
 
 
