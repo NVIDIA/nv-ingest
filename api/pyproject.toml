@@ -1,11 +1,11 @@
 [build-system]
-requires = ["setuptools", "wheel"]  # Tools needed to build the project
+requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "nv-ingest-api"
-version = "24.12.dev0"
 description = "Python module with core document ingestion functions."
+dynamic = ["version"]  # Declare attrs that will be generated at build time
 readme = "README.md"
 authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
@@ -29,3 +29,6 @@ documentation = "https://docs.nvidia.com/nv-ingest"
 
 [tool.setuptools.packages.find]
 where = ["src"]
+
+[tool.setuptools.dynamic]
+version = {attr = "version.get_version"}
