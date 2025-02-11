@@ -27,7 +27,7 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | Hierarchy | Location/order of content within the source document  | Extracted |
 |  | Subtype | For structured data subtypes \- table, chart, etc.. |  |  |
 | Text Metadata | Text Type | Header, body, etc | Extracted |
-|  | Summary | Abbreviated Summary of content | Generated | Pending Research |
+|  | Summary | Abbreviated Summary of content (Not Yet Implemented) | Generated | Pending Research |
 |  | Keywords | Keywords, Named Entities, or other phrases  | Extracted | N |
 |  | Language |  | Generated | N |
 | Image Metadata | Image Type | Structured, Natural,Hybrid,  etc | Generated (Classifier) | Y(needs to be developed) |
