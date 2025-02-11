@@ -136,7 +136,7 @@ class ParakeetModelInterface(ModelInterface):
 
 
     def create_args(self, audio_file: str) -> argparse.Namespace:
-        NVIDIA_API_KEY='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'
+        NVIDIA_API_KEY='nvapi-xxx'
         #NVIDIA_API_KEY = os.getenv("NVIDIA_API_KEY") 
         config_dict = {
                 "input_file": PosixPath(audio_file),
@@ -284,19 +284,19 @@ if __name__ == "__main__":
     #     python transcribe_file_offline.py \
     #        --server grpc.nvcf.nvidia.com:443 --use-ssl \
     #        --metadata function-id "1598d209-5e27-4d3c-8079-4751568b1081" \
-    #        --metadata "authorization" "Bearer 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" \
+    #        --metadata "authorization" "Bearer nvapi-xxx" \
     #        --language-code en-US \
-    #        --input-file /ads_ds3/users/fayw/riva/data/mono_harvard.wav
+    #        --input-file /riva/data/mono_harvard.wav
 
     
     # (1) Method 1: Modify transcribe_file_offline to take non-command-line args.
     # CON: need to modify the file, and don't know how to capture the printline 
     parakeet = ParakeetModelInterface()
-    audio_file = "/ads_ds3/users/fayw/riva/data/mono_harvard.wav"
+    audio_file = "/riva/data/mono_harvard.wav"
     #parakeet.call_riva(audio_file) 
 
     # (2) Method 2: directly call transcribe_file_offline.py
-    NVIDIA_API_KEY='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'    
+    NVIDIA_API_KEY='nvapi-xxx'    
     out_file = "./out.text"
     cmd = f"""
         python python-clients/scripts/asr/transcribe_file_offline.py \
