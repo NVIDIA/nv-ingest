@@ -321,7 +321,19 @@ class NvIngestClient:
                     # Only pop once we know we've successfully decoded the response or errored out
                     _ = self._pop_job_state(job_index)
             else:
-                raise TimeoutError(f"Timeout: No response within {timeout} seconds for job ID {job_index}")
+                # There are a plethora of codes that can be thrown. Some offer specific insights while
+                # others can be grouped into a general failure category. We check for specific codes here
+                # and then generally error on the others.
+                if response.response_code == 404:
+                    # job_id not found on serverside. This condition will not alleviate itself with a retry
+                    raise RuntimeError(f"JobId: {job_state.job_id} not found - Reason: {response.response_reason}")
+                elif response.response_code == 500:
+                    # properly propagated server side error
+                    raise RuntimeError(f"Response: {response.response} - Reason: {response.response_reason}")
+                else:
+                    # Generalized errors group. These errors are ones that could potentially be resolved and
+                    # therefore should be retried. Existing logic works based on TimeoutErrors so we raise here.
+                    raise TimeoutError(f"Response: {response.response} - Reason: {response.response_reason}")
 
         except TimeoutError:
             raise
