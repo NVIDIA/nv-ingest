@@ -38,7 +38,7 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim import eclair as eclair_utils
+from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
@@ -54,10 +54,10 @@ DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
 
-# Define a helper function to use eclair to extract text from a base64 encoded bytestram PDF
-def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
+# Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
+def nemoretriever_parse(pdf_stream, extract_text: bool, extract_images: bool, extract_tables: bool, **kwargs):
     """
-    Helper function to use eclair to extract text from a bytestream PDF.
+    Helper function to use nemoretriever_parse to extract text from a bytestream PDF.
 
     Parameters
     ----------
@@ -77,10 +77,10 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     str
         A string of extracted text.
     """
-    logger.debug("Extracting PDF with eclair backend.")
+    logger.debug("Extracting PDF with nemoretriever_parse backend.")
 
-    eclair_config = kwargs.get("eclair_config", {})
-    eclair_config = eclair_config if eclair_config is not None else {}
+    nemoretriever_parse_config = kwargs.get("nemoretriever_parse_config", {})
+    nemoretriever_parse_config = nemoretriever_parse_config if nemoretriever_parse_config is not None else {}
 
     row_data = kwargs.get("row_data")
     # get source_id
@@ -127,7 +127,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
     accumulated_tables = []
     accumulated_images = []
 
-    eclair_client = _create_clients(eclair_config)
+    nemoretriever_parse_client = _create_clients(nemoretriever_parse_config)
 
     for page_idx in range(pdf_metadata.page_count):
         page = doc.get_page(page_idx)
@@ -140,7 +140,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         }
 
         page_image = _convert_pdfium_page_to_numpy(page)
-        response = _send_inference_request(eclair_client, page_image)
+        response = _send_inference_request(nemoretriever_parse_client, page_image)
 
         for bbox_dict in response:
             cls = bbox_dict["type"]
@@ -154,7 +154,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
                 math.ceil(bbox["ymax"] * DEFAULT_MAX_HEIGHT),
             ]
 
-            if cls not in eclair_utils.ACCEPTED_CLASSES:
+            if cls not in nemoretriever_parse_utils.ACCEPTED_CLASSES:
                 continue
 
             if identify_nearby_objects:
@@ -184,7 +184,7 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
                     )
                     accumulated_images.append(image)
 
-        # If Eclair fails to extract anything, fall back to using pdfium.
+        # If NemoRetrieverParse fails to extract anything, fall back to using pdfium.
         if not "".join(accumulated_text).strip():
             textpage = page.get_textpage()
             page_text = textpage.get_text_bounded()
@@ -258,38 +258,38 @@ def eclair(pdf_stream, extract_text: bool, extract_images: bool, extract_tables:
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
 
-    eclair_client.close()
+    nemoretriever_parse_client.close()
     doc.close()
 
     return extracted_data
 
 
-def _create_clients(eclair_config):
-    model_interface = eclair_utils.EclairModelInterface()
-    eclair_client = create_inference_client(
-        eclair_config.eclair_endpoints,
+def _create_clients(nemoretriever_parse_config):
+    model_interface = nemoretriever_parse_utils.NemoRetrieverParseModelInterface()
+    nemoretriever_parse_client = create_inference_client(
+        nemoretriever_parse_config.nemoretriever_parse_endpoints,
         model_interface,
-        eclair_config.auth_token,
-        eclair_config.eclair_infer_protocol,
+        nemoretriever_parse_config.auth_token,
+        nemoretriever_parse_config.nemoretriever_parse_infer_protocol,
     )
 
-    return eclair_client
+    return nemoretriever_parse_client
 
 
 def _send_inference_request(
-    eclair_client,
+    nemoretriever_parse_client,
     image_array: np.ndarray,
 ) -> Dict[str, Any]:
 
     try:
         # NIM only supports processing one page at a time (batch size = 1).
         data = {"image": image_array}
-        response = eclair_client.infer(
+        response = nemoretriever_parse_client.infer(
             data=data,
-            model_name="eclair",
+            model_name="nemoretriever_parse",
         )
     except Exception as e:
-        logger.error(f"Unhandled error during Eclair inference: {e}")
+        logger.error(f"Unhandled error during NemoRetrieverParse inference: {e}")
         traceback.print_exc()
         raise e
 
@@ -315,11 +315,11 @@ def _insert_page_nearby_blocks(
     txt: str,
     bbox: str,
 ):
-    if cls in eclair_utils.ACCEPTED_TEXT_CLASSES:
+    if cls in nemoretriever_parse_utils.ACCEPTED_TEXT_CLASSES:
         nearby_blocks_key = "text"
-    elif cls in eclair_utils.ACCEPTED_TABLE_CLASSES:
+    elif cls in nemoretriever_parse_utils.ACCEPTED_TABLE_CLASSES:
         nearby_blocks_key = "structured"
-    elif cls in eclair_utils.ACCEPTED_IMAGE_CLASSES:
+    elif cls in nemoretriever_parse_utils.ACCEPTED_IMAGE_CLASSES:
         nearby_blocks_key = "images"
 
     page_nearby_blocks[nearby_blocks_key]["content"].append(txt)
@@ -327,7 +327,7 @@ def _insert_page_nearby_blocks(
     page_nearby_blocks[nearby_blocks_key]["type"].append(cls)
 
 
-@pdfium_exception_handler(descriptor="eclair")
+@pdfium_exception_handler(descriptor="nemoretriever_parse")
 def _construct_table_metadata(
     table: LatexTable,
     page_idx: int,

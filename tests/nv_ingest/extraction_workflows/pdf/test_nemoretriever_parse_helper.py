@@ -6,15 +6,15 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.eclair_helper import _construct_table_metadata
-from nv_ingest.extraction_workflows.pdf.eclair_helper import eclair
+from nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper import _construct_table_metadata
+from nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper import nemoretriever_parse
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.util.nim import eclair as eclair_utils
+from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
 
-_MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.eclair_helper"
+_MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper"
 
 
 @pytest.fixture
@@ -35,7 +35,7 @@ def sample_pdf_stream():
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
@@ -46,14 +46,14 @@ def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
         }
     ]
 
-    result = eclair(
+    result = nemoretriever_parse(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        eclair_config=MagicMock(),
+        nemoretriever_parse_config=MagicMock(),
     )
 
     assert len(result) == 1
@@ -63,7 +63,7 @@ def test_eclair_text_extraction(mock_client, sample_pdf_stream, document_df):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
@@ -74,14 +74,14 @@ def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
         }
     ]
 
-    result = eclair(
+    result = nemoretriever_parse(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=True,
         row_data=document_df.iloc[0],
         text_depth="page",
-        eclair_config=MagicMock(),
+        nemoretriever_parse_config=MagicMock(),
     )
 
     assert len(result) == 2
@@ -93,7 +93,7 @@ def test_eclair_table_extraction(mock_client, sample_pdf_stream, document_df):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
@@ -104,14 +104,14 @@ def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
         }
     ]
 
-    result = eclair(
+    result = nemoretriever_parse(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=True,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        eclair_config=MagicMock(),
+        nemoretriever_parse_config=MagicMock(),
     )
 
     assert len(result) == 2
@@ -123,7 +123,7 @@ def test_eclair_image_extraction(mock_client, sample_pdf_stream, document_df):
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_eclair_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
@@ -139,14 +139,14 @@ def test_eclair_text_extraction_bboxes(mock_client, sample_pdf_stream, document_
         },
     ]
 
-    result = eclair(
+    result = nemoretriever_parse(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
         extract_tables=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        eclair_config=MagicMock(),
+        nemoretriever_parse_config=MagicMock(),
     )
 
     assert len(result) == 1

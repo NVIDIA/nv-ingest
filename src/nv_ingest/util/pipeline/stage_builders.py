@@ -181,7 +181,9 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
-    eclair_grpc, eclair_http, eclair_auth, eclair_protocol = get_nim_service("eclair")
+    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
+        get_nim_service("nemoretriever_parse")
+    )
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -190,10 +192,10 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             },
-            "eclair_config": {
-                "eclair_endpoints": (eclair_grpc, eclair_http),
-                "eclair_infer_protocol": eclair_protocol,
-                "auth_token": eclair_auth,  # All auth tokens are the same for the moment
+            "nemoretriever_parse_config": {
+                "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
+                "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
+                "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
             },
         },
     )

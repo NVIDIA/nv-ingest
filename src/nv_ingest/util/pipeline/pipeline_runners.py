@@ -38,8 +38,10 @@ class PipelineCreationSchema(BaseModel):
     cached_infer_protocol: str = "http"
     deplot_http_endpoint: str = os.getenv("DEPLOT_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/google/deplot")
     deplot_infer_protocol: str = "http"
-    eclair_http_endpoint: str = os.getenv("ECLAIR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/eclair")
-    eclair_infer_protocol: str = "http"
+    nemoretriever_parse_http_endpoint: str = os.getenv(
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever_parse"
+    )
+    nemoretriever_parse_infer_protocol: str = "http"
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
     embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
     ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")

@@ -32,7 +32,7 @@ Options:
                                   Example:
                                     --task 'split:{"split_by":"page", "split_length":10}'
                                     --task 'extract:{"document_type":"pdf", "extract_text":true}'
-                                    --task 'extract:{"document_type":"pdf", "extract_method":"eclair"}'
+                                    --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
                                     --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
                                     --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
                                     --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
@@ -120,7 +120,7 @@ nv-ingest-cli \
 
 Submit a PDF file with splitting and extraction tasks.
 
-**Note: (TODO)** This currently only works for pdfium, eclair, and Unstructured.io; haystack, Adobe, and LlamaParse
+**Note: (TODO)** This currently only works for pdfium, nemoretriever_parse, and Unstructured.io; haystack, Adobe, and LlamaParse
 have existing workflows but have not been fully converted to use our unified metadata schema.
 
 ```bash

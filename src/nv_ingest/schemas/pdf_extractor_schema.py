@@ -94,17 +94,17 @@ class PDFiumConfigSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-class EclairConfigSchema(BaseModel):
+class NemoRetrieverParseConfigSchema(BaseModel):
     """
-    Configuration schema for Eclair endpoints and options.
+    Configuration schema for NemoRetrieverParse endpoints and options.
 
     Parameters
     ----------
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    eclair_endpoints : Tuple[str, str]
-        A tuple containing the gRPC and HTTP services for the eclair endpoint.
+    nemoretriever_parse_endpoints : Tuple[str, str]
+        A tuple containing the gRPC and HTTP services for the nemoretriever_parse endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -125,8 +125,8 @@ class EclairConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    eclair_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    eclair_infer_protocol: str = ""
+    nemoretriever_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    nemoretriever_parse_infer_protocol: str = ""
 
     @model_validator(mode="before")
     @classmethod
@@ -150,7 +150,7 @@ class EclairConfigSchema(BaseModel):
             If both gRPC and HTTP services are empty for any endpoint.
         """
 
-        for model_name in ["eclair"]:
+        for model_name in ["nemoretriever_parse"]:
             endpoint_name = f"{model_name}_endpoints"
             grpc_service, http_service = values.get(endpoint_name)
             grpc_service = _clean_service(grpc_service)
@@ -197,7 +197,7 @@ class PDFExtractorSchema(BaseModel):
     raise_on_failure: bool = False
 
     pdfium_config: Optional[PDFiumConfigSchema] = None
-    eclair_config: Optional[EclairConfigSchema] = None
+    nemoretriever_parse_config: Optional[NemoRetrieverParseConfigSchema] = None
 
     model_config = ConfigDict(extra="forbid")
 

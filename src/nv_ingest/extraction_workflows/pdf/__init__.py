@@ -4,7 +4,7 @@
 
 
 from nv_ingest.extraction_workflows.pdf.adobe_helper import adobe
-from nv_ingest.extraction_workflows.pdf.eclair_helper import eclair
+from nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper import nemoretriever_parse
 from nv_ingest.extraction_workflows.pdf.llama_parse_helper import llama_parse
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import pdfium_extractor as pdfium
 from nv_ingest.extraction_workflows.pdf.tika_helper import tika
@@ -15,6 +15,6 @@ __all__ = [
     "pdfium",
     "tika",
     "unstructured_io",
-    "eclair",
+    "nemoretriever_parse",
     "adobe",
 ]

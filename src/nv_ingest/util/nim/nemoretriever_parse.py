@@ -42,9 +42,9 @@ ACCEPTED_CLASSES = ACCEPTED_TEXT_CLASSES | ACCEPTED_TABLE_CLASSES | ACCEPTED_IMA
 logger = logging.getLogger(__name__)
 
 
-class EclairModelInterface(ModelInterface):
+class NemoRetrieverParseModelInterface(ModelInterface):
     """
-    An interface for handling inference with a Eclair model.
+    An interface for handling inference with a NemoRetrieverParse model.
     """
 
     def name(self) -> str:
@@ -56,7 +56,7 @@ class EclairModelInterface(ModelInterface):
         str
             The name of the model interface.
         """
-        return "eclair"
+        return "nemoretriever_parse"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -100,12 +100,12 @@ class EclairModelInterface(ModelInterface):
         """
 
         if protocol == "grpc":
-            raise ValueError("gRPC protocol is not supported for Eclair.")
+            raise ValueError("gRPC protocol is not supported for NemoRetrieverParse.")
         elif protocol == "http":
-            logger.debug("Formatting input for HTTP Eclair model")
+            logger.debug("Formatting input for HTTP NemoRetrieverParse model")
             # Prepare payload for HTTP request
             base64_img = numpy_to_base64(data["image"])
-            payload = self._prepare_eclair_payload(base64_img)
+            payload = self._prepare_nemoretriever_parse_payload(base64_img)
             return [payload]
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -135,16 +135,16 @@ class EclairModelInterface(ModelInterface):
         """
 
         if protocol == "grpc":
-            raise ValueError("gRPC protocol is not supported for Eclair.")
+            raise ValueError("gRPC protocol is not supported for NemoRetrieverParse.")
         elif protocol == "http":
-            logger.debug("Parsing output from HTTP Eclair model")
-            return self._extract_content_from_eclair_response(response)
+            logger.debug("Parsing output from HTTP NemoRetrieverParse model")
+            return self._extract_content_from_nemoretriever_parse_response(response)
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
     def process_inference_results(self, output: Any, **kwargs) -> Any:
         """
-        Process inference results for the Eclair model.
+        Process inference results for the NemoRetrieverParse model.
 
         Parameters
         ----------
@@ -159,7 +159,7 @@ class EclairModelInterface(ModelInterface):
 
         return output
 
-    def _prepare_eclair_payload(self, base64_img: str) -> Dict[str, Any]:
+    def _prepare_nemoretriever_parse_payload(self, base64_img: str) -> Dict[str, Any]:
         messages = [
             {
                 "role": "user",
@@ -180,7 +180,7 @@ class EclairModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_eclair_response(self, json_response: Dict[str, Any]) -> Any:
+    def _extract_content_from_nemoretriever_parse_response(self, json_response: Dict[str, Any]) -> Any:
         """
         Extract content from the JSON response of a Deplot HTTP API request.
 
