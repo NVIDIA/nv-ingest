@@ -4,13 +4,15 @@
 
 
 import asyncio
+import functools
 import logging
 import traceback
-from typing import Iterable
+from typing import Iterable, Dict, Any
 from typing import List
 
 import mrc
 import pandas as pd
+from morpheus.config import Config
 from morpheus.messages import ControlMessage
 from morpheus.messages import MessageMeta
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
@@ -21,6 +23,7 @@ from openai import AsyncOpenAI
 
 import cudf
 
+from build.lib.nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import InfoMessageMetadataSchema
@@ -600,3 +603,55 @@ def _embed_extractions(builder: mrc.Builder):
     # Register the input and output of the module
     builder.register_module_input("input", embedding_node)
     builder.register_module_output("output", embedding_node)
+
+
+def _embedding_generation_entrypoint(validated_config: EmbedExtractionsSchema):
+    pass
+
+
+def generate_embedding_generation_stage(
+    c: Config,
+    stage_config: Dict[str, Any],
+    task: str = "embed",
+    task_desc: str = "Embedding generation",
+    pe_count: int = 1,
+):
+    """
+    A function to generate a stage for embedding generation.
+
+    Parameters
+    ----------
+    c : Config
+        The Morpheus configuration object.
+    stage_config : Dict[str, Any]
+        The configuration for the stage.
+    task : str
+        The task to be added to the stage.
+    task_desc : str
+        The description of the task.
+    pe_count : int
+        The number of processing elements to be used in the stage.
+
+    Returns
+    -------
+    Stage
+        A stage for embedding generation.
+    """
+
+    try:
+        validated_config = EmbedExtractionsSchema(**stage_config)
+
+        _wrapped_process_fn = functools.partial(_embedding_generation_entrypoint, validated_config=validated_config)
+
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+        )
+
+    except Exception as e:
+        err_msg = f"generate_chart_extractor_stage: Error generating table extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
