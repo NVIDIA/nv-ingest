@@ -18,7 +18,7 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 |  | Collection ID | Collection in which the source is contained | N/A |
 |  | Date Created | Date source was created | Extracted |   |
 |  | Last Modified | Date source was last modified | Extracted |   |
-|  | Summary | Summarization of Source Doc | Generated | Pending Research |
+|  | Summary | Summarization of Source Doc (Not Yet Implemented) | Generated | Pending Research |
 |  | Partition ID | Offset of this data fragment within a larger set of fragments | Generated |
 |  | Access Level | Dictates RBAC | N/A |
 | Content Metadata (applicable to all content types) | Type | Text, Image, Structured, Table, Chart | Generated |
