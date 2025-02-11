@@ -39,7 +39,7 @@ services:
     runtime: nvidia
 
   yolox-graphic-elements:
-    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.1.0}
+    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.1}
     ports:
       - "8003:8000"
       - "8004:8001"
