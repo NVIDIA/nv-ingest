@@ -51,7 +51,7 @@ def _update_metadata(
             data=data_cached,
             model_name="cached",
             stage_name="chart_data_extraction",
-            max_batch_size=2,
+            max_batch_size=1 if cached_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
         future_deplot = executor.submit(
