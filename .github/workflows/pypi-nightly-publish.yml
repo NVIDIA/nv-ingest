@@ -22,14 +22,19 @@ jobs:
         run: |
           pip install build twine
 
-      - name: Build wheel
+      - name: Build nv-ingest-api wheel
+        run: |
+          cd api && python -m build
+
+      - name: Build nv-ingest-client wheel
         run: |
           cd client && python -m build
 
-      - name: Publish to Artifactory
+      - name: Publish wheels to Artifactory
         env:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
           ARTIFACTORY_USERNAME: ${{ secrets.ARTIFACTORY_USERNAME }}
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
         run: |
-          twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/*
+          twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/*
