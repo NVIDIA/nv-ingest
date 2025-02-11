@@ -29,7 +29,7 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. 
+> During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). 
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
 
@@ -57,7 +57,7 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 5. Start all services:
 `docker compose up`
 
-> **TIP:** By default, we have [configured log levels to be verbose]([docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L27).
+> **TIP:** By default, we have [configured log levels to be verbose](docker-compose.yaml).
 >
 > It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
