@@ -13,14 +13,14 @@ This example demonstrates how to use the provided [docker-compose.yaml](https://
 
 **IMPORTANT:** NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If preferred, you can also [start services one by one](../../user-guide/developer-guide/deployment.md) or run on Kubernetes via [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](../../user-guide/developer-guide/environment-config.md) you want to configure.
+If preferred, you can also [start services one by one](developer-guide/deployment.md) or run on Kubernetes via [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](developer-guide/environment-config.md) you want to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
 2. Change the directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](../../user-guide/developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -29,11 +29,11 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. 
+> During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). 
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
 
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](../developer-guide/environment-config.md).
+4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
@@ -57,7 +57,7 @@ NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
 5. Start all services:
 `docker compose up`
 
-> **TIP:** By default, we have [configured log levels to be verbose]([docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L27).
+> **TIP:** By default, we have [configured log levels to be verbose](docker-compose.yaml).
 >
 > It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
@@ -261,7 +261,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](../../user-guide/developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
+You can view the full JSON extracts and the metadata definitions [here](developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 
 First, install `tkinter` by running the following commands depending on your OS.
 - For Ubuntu/Debian Linux:

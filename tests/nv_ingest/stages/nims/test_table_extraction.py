@@ -1,19 +1,21 @@
-import base64
-from io import BytesIO
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import cv2
 import numpy as np
 import pandas as pd
 import pytest
-from PIL import Image
 
-from nv_ingest.stages.nim.table_extraction import _extract_table_data
-from nv_ingest.stages.nim.table_extraction import _update_metadata
-from nv_ingest.stages.nim.table_extraction import PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT
-from nv_ingest.util.nim.helpers import NimClient
-from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.stages.nim.table_extraction import _extract_table_data
+    from nv_ingest.stages.nim.table_extraction import _update_metadata
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
