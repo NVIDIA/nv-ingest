@@ -593,6 +593,7 @@ def write_to_nvingest_collection(
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
+    threshold: int = 10,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -655,6 +656,8 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
+    if len(records) < threshold:
+        stream = True
     if stream:
         stream_insert_milvus(
             records,
