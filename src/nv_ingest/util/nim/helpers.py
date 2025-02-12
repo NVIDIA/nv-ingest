@@ -258,7 +258,6 @@ class NimClient:
             )
 
             # 2. Prepare data for inference.
-            #    NOTE: We assume the model interface mutates this scratch pad.
             data = self.model_interface.prepare_data_for_inference(data)
 
             # 3. Format the input based on protocol.
