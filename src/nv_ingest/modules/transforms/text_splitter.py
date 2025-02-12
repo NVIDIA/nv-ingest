@@ -56,26 +56,16 @@ def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=20):
     encoding = tokenizer.encode_plus(text, add_special_tokens=False, return_offsets_mapping=True)
 
     # Get the token IDs and offsets for splitting
-    tokens = encoding["input_ids"]
     offsets = encoding["offset_mapping"]
 
     # Split the tokens into chunks of the desired size with the desired overlap
-    chunks = [tokens[i : i + chunk_size] for i in range(0, len(tokens), chunk_size - chunk_overlap)]
+    chunks = [offsets[i : i + chunk_size] for i in range(0, len(offsets), chunk_size - chunk_overlap)]
 
     # Convert token chunks back to text while preserving original spacing and case
     text_chunks = []
     for chunk in chunks:
-        # Find the start and end offsets for the current chunk
-        chunk_offsets = offsets[: len(chunk)]
-        start_offset = chunk_offsets[0][0]
-        end_offset = chunk_offsets[-1][1]
-
-        # Extract the original text for this chunk based on offsets
-        text_chunk = text[start_offset:end_offset]
+        text_chunk = text[chunk[0][0] : chunk[-1][0]]
         text_chunks.append(text_chunk)
-
-        # Remove processed offsets for the next iteration
-        offsets = offsets[len(chunk) :]
 
     return text_chunks
 
