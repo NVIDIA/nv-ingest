@@ -6,6 +6,7 @@ import json
 import logging
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
@@ -75,7 +76,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
         Format input data for the specified protocol.
 
@@ -99,14 +100,26 @@ class NemoRetrieverParseModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
+        # Helper function: chunk a list into sublists of length <= chunk_size.
+        def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
         if protocol == "grpc":
             raise ValueError("gRPC protocol is not supported for NemoRetrieverParse.")
         elif protocol == "http":
             logger.debug("Formatting input for HTTP NemoRetrieverParse model")
             # Prepare payload for HTTP request
-            base64_img = numpy_to_base64(data["image"])
-            payload = self._prepare_nemoretriever_parse_payload(base64_img)
-            return [payload]
+
+            if "images" in data:
+                base64_list = [numpy_to_base64(img) for img in data["images"]]
+            else:
+                base64_list = [numpy_to_base64(data["image"])]
+
+            payloads = []
+            for chunk in chunk_list(base64_list, max_batch_size):
+                payload = self._prepare_nemoretriever_parse_payload(chunk)
+                payloads.append(payload)
+            return payloads
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
@@ -159,20 +172,23 @@ class NemoRetrieverParseModelInterface(ModelInterface):
 
         return output
 
-    def _prepare_nemoretriever_parse_payload(self, base64_img: str) -> Dict[str, Any]:
-        messages = [
-            {
-                "role": "user",
-                "content": [
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": f"data:image/png;base64,{base64_img}",
-                        },
-                    }
-                ],
-            }
-        ]
+    def _prepare_nemoretriever_parse_payload(self, base64_list: List[str]) -> Dict[str, Any]:
+        messages = []
+
+        for b64_img in base64_list:
+            messages.append(
+                {
+                    "role": "user",
+                    "content": [
+                        {
+                            "type": "image_url",
+                            "image_url": {
+                                "url": f"data:image/png;base64,{b64_img}",
+                            },
+                        }
+                    ],
+                }
+            )
         payload = {
             "model": "nvidia/nemoretriever-parse",
             "messages": messages,
