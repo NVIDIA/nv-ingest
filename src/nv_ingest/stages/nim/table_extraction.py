@@ -63,14 +63,13 @@ def _update_metadata(
 
         if valid_images:
             data = {"base64_images": valid_images}
-
             try:
                 # Call infer once for all valid images. The NimClient will handle batching internally.
                 paddle_result = paddle_client.infer(
                     data=data,
                     model_name="paddle",
                     stage_name="table_data_extraction",
-                    max_batch_size=2,
+                    max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
                     trace_info=trace_info,
                 )
 

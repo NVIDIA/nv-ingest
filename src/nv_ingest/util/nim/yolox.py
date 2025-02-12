@@ -7,6 +7,7 @@ import base64
 import io
 import logging
 import warnings
+from math import log
 from typing import Any
 from typing import Dict
 from typing import List
@@ -37,9 +38,18 @@ YOLOX_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_IMAGE_PREPROC_WIDTH = 1024
 
 
-def chunkify(lst, chunk_size):
+def chunkify_linearly(lst, chunk_size):
     for i in range(0, len(lst), chunk_size):
         yield lst[i : i + chunk_size]
+
+
+def chunkify_geometrically(lst, max_size):
+    # TRT engine in Yolox NIM (gRPC) only allows a batch size in multiples of 2.
+    i = 0
+    while i < len(lst):
+        chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+        yield lst[i : i + chunk_size]
+        i += chunk_size
 
 
 # Implementing YoloxPageElemenetsModelInterface with required methods
@@ -116,7 +126,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
             # Create a list of smaller batches (chunkify)
             batches = []
-            for chunk in chunkify(resized_images, max_batch_size):
+            for chunk in chunkify_geometrically(resized_images, max_batch_size):
                 # Reorder axes to match model input (batch, channels, height, width)
                 input_array = np.einsum("bijk->bkij", chunk).astype(np.float32)
                 batches.append(input_array)
@@ -149,7 +159,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
             # Now split content_list into batches of up to max_batch_size
             batches = []
-            for chunk in chunkify(content_list, max_batch_size):
+            for chunk in chunkify_linearly(content_list, max_batch_size):
                 payload = {"input": chunk}
                 batches.append(payload)
 

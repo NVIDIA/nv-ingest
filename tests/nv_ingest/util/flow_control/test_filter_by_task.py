@@ -7,8 +7,9 @@ from unittest.mock import Mock
 import pytest
 
 from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
 
-if MORPHEUS_IMPORT_OK:
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
     from nv_ingest.util.flow_control.filter_by_task import remove_task_subset
     from nv_ingest.util.flow_control.filter_by_task import filter_by_task
     from morpheus.messages import ControlMessage
@@ -38,7 +39,7 @@ def process_message(message):
     return message
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_with_required_task(mock_control_message):
     decorated_func = filter_by_task(["task1"])(process_message)
     assert (
@@ -46,7 +47,7 @@ def test_filter_by_task_with_required_task(mock_control_message):
     ), "Should process the message when required task is present."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_with_required_task_properties(mock_control_message):
     decorated_func = filter_by_task([("task1", {"prop1": "foo"})])(process_message)
     assert (
@@ -54,7 +55,7 @@ def test_filter_by_task_with_required_task_properties(mock_control_message):
     ), "Should process the message when both required task and required property are present."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_without_required_task_no_forward_func(mock_control_message):
     decorated_func = filter_by_task(["task3"])(process_message)
     assert (
@@ -62,7 +63,7 @@ def test_filter_by_task_without_required_task_no_forward_func(mock_control_messa
     ), "Should return the original message when required task is not present and no forward_func is provided."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_without_required_task_properteies_no_forward_func(mock_control_message):
     decorated_func = filter_by_task([("task1", {"prop1": "bar"})])(process_message)
     assert (
@@ -70,7 +71,7 @@ def test_filter_by_task_without_required_task_properteies_no_forward_func(mock_c
     ), "Should return the original message when required task is present but required task property is not present."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_without_required_task_with_forward_func(mock_control_message):
     # Create a simple mock function to be decorated
     mock_function = Mock(return_value="some_value")
@@ -92,7 +93,7 @@ def test_filter_by_task_without_required_task_with_forward_func(mock_control_mes
     assert result == mock_control_message, "Should return the mock_control_message from the forward function."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_without_required_task_properties_with_forward_func(mock_control_message):
     # Create a simple mock function to be decorated
     mock_function = Mock(return_value="some_value")
@@ -114,7 +115,7 @@ def test_filter_by_task_without_required_task_properties_with_forward_func(mock_
     assert result == mock_control_message, "Should return the mock_control_message from the forward function."
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_filter_by_task_with_invalid_argument():
     decorated_func = filter_by_task(["task1"])(process_message)
     with pytest.raises(ValueError):
@@ -131,7 +132,7 @@ def create_ctrl_msg(task, task_props_list):
     return ctrl_msg
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
 def test_remove_task_subset():
     task_props_list = [
         {"prop0": "foo0", "prop1": "bar1"},

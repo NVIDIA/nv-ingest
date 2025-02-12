@@ -46,17 +46,15 @@ def _update_metadata(
         data_deplot = {"base64_images": base64_images}
 
         _ = worker_pool_size
-
         with ThreadPoolExecutor(max_workers=2) as executor:
             future_cached = executor.submit(
                 cached_client.infer,
                 data=data_cached,
                 model_name="cached",
                 stage_name="chart_data_extraction",
-                max_batch_size=2,
+                max_batch_size=1 if cached_client.protocol == "grpc" else 2,
                 trace_info=trace_info,
             )
-
             future_deplot = executor.submit(
                 deplot_client.infer,
                 data=data_deplot,

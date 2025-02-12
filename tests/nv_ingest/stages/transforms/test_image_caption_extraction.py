@@ -86,7 +86,7 @@ class TestImageCaptionExtraction(unittest.TestCase):
             "base64_images": ["image1_scaled", "image2_scaled"],
             "prompt": prompt,
         }
-        fake_client.infer.assert_called_once_with(expected_data, model_name=model_name, max_batch_size=1)
+        fake_client.infer.assert_called_once_with(expected_data, model_name=model_name)
         # Check that the returned captions match the fake infer result.
         self.assertEqual(captions, ["caption1", "caption2"])
 

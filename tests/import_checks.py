@@ -10,7 +10,8 @@ def check_morpheus_import():
         _ = morpheus._version
 
         return True
-    except ImportError:
+    except Exception as e:
+        print(f"\nError: {e}\n", flush=True)
         return False
 
 
