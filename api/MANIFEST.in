@@ -1,0 +1,7 @@
+exclude *.egg-info
+
+include README.md
+include LICENSE
+recursive-include src *
+global-exclude __pycache__
+global-exclude *.pyc
