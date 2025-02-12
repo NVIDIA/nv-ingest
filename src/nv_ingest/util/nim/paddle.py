@@ -146,7 +146,10 @@ class PaddleOCRModelInterface(ModelInterface):
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP PaddleOCR model (batched).")
-            base64_list = [self.image_array_to_base64(img) for img in images]
+            if "base64_images" in data:
+                base64_list = data["base64_images"]
+            else:
+                base64_list = [data["base64_image"]]
 
             input_list: List[Dict[str, Any]] = []
             for b64 in base64_list:

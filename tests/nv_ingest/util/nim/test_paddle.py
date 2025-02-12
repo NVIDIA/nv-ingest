@@ -1,5 +1,4 @@
 import json
-from unittest.mock import MagicMock
 from unittest.mock import patch
 
 import pytest
@@ -112,39 +111,57 @@ def test_prepare_data_for_inference(paddle_ocr_model):
 
 def test_format_input_grpc(paddle_ocr_model):
     """
-    Now we place the images under 'image_arrays' and return a batched input for gRPC.
+    For gRPC, the images are processed with preprocess_image_for_paddle and batched.
+    The test verifies that:
+      - The returned batched input has the correct shape: (batch_size, H, W, C).
+      - The accompanying batch data correctly includes the original image_arrays and image_dims.
     """
     with patch(f"{_MODULE_UNDER_TEST}.preprocess_image_for_paddle") as mock_preprocess:
-        mock_preprocess.return_value = (np.zeros((32, 32, 3)), {})
-
-        # For gRPC, we rely on 'image_arrays'
-        data = {"image_arrays": [np.zeros((32, 32, 3))]}
-        result = paddle_ocr_model.format_input(data, protocol="grpc", max_batch_size=1)[0]
-
-        # shape => (batch_size, 32, 32, 3). We have batch_size=1.
+        # Force the preprocessing to return an array with shape (32, 32, 3)
+        mock_preprocess.return_value = np.zeros((32, 32, 3))
+        # Supply both "image_arrays" and "image_dims" as required by the implementation.
+        img = np.zeros((32, 32, 3))
+        data = {"image_arrays": [img], "image_dims": [(32, 32)]}
+        batches, batch_data = paddle_ocr_model.format_input(data, protocol="grpc", max_batch_size=1)
+        # Verify batched input shape; preprocessing adds a batch dimension via np.expand_dims.
+        result = batches[0]
+        assert isinstance(result, np.ndarray)
         assert result.shape == (1, 32, 32, 3)
+        # Verify that the batch_data correctly reflects the original image and dimensions.
+        assert isinstance(batch_data, list)
+        assert len(batch_data) == 1
+        bd = batch_data[0]
+        assert "image_arrays" in bd and "image_dims" in bd
+        assert bd["image_arrays"] == [img]
+        assert bd["image_dims"] == [(32, 32)]
 
 
 def test_format_input_http(paddle_ocr_model):
     """
-    For HTTP, we expect a payload with 'input': [...] containing a valid base64 PNG.
+    For HTTP in non-legacy mode, after prepare_data_for_inference (which populates both
+    "image_arrays" and "image_dims"), the formatted payload should use the new structure:
+       {"input": [ {"type": "image_url", "url": "data:image/png;base64,..."}, ... ]}
+    In addition, the accompanying batch data should contain the original images and dimensions.
     """
     valid_b64 = create_valid_base64_image()
     data = {"base64_image": valid_b64}
-
-    # MUST call prepare_data_for_inference first, so data has "image_arrays"
+    # prepare_data_for_inference adds "image_arrays" and "image_dims"
     data = paddle_ocr_model.prepare_data_for_inference(data)
-
-    result = paddle_ocr_model.format_input(data, protocol="http", max_batch_size=1)[0]
-
-    # {"input": [ {"type":"image_url","url": "..."} ]}
+    batches, batch_data = paddle_ocr_model.format_input(data, protocol="http", max_batch_size=1)
+    result = batches[0]
+    # Check that the new (non-legacy) branch is used.
     assert "input" in result
+    assert isinstance(result["input"], list)
     assert len(result["input"]) == 1
     first_item = result["input"][0]
     assert first_item["type"] == "image_url"
     assert first_item["url"].startswith("data:image/png;base64,")
-    # Optionally, check that it's non-empty after the prefix
     assert len(first_item["url"]) > len("data:image/png;base64,")
+    # Also verify the returned batch data.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
 
 
 def test_parse_output_http_pseudo_markdown(paddle_ocr_model, mock_paddle_http_response):

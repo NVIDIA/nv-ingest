@@ -93,32 +93,75 @@ def test_prepare_data_for_inference_invalid_image_format(model_interface):
 
 
 def test_format_input_grpc(model_interface):
+    """
+    Test that for the gRPC protocol:
+      - The input images are resized and reordered to have shape (B, 3, 1024, 1024).
+      - The returned batch data includes the original images and their original shapes.
+    """
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "grpc", max_batch_size=2)
 
-    assert isinstance(formatted_input, list)
-    assert isinstance(formatted_input[0], np.ndarray)
-    nparray = formatted_input[0]
-    assert nparray.dtype == np.float32
-    assert nparray.shape[0] == len(images)
-    assert nparray.shape[1:] == (3, 1024, 1024)
+    # format_input returns a tuple: (batched_inputs, formatted_batch_data)
+    batched_inputs, batch_data = model_interface.format_input(prepared_data, "grpc", max_batch_size=2)
+
+    # Check batched_inputs is a list of NumPy arrays
+    assert isinstance(batched_inputs, list)
+    # Since max_batch_size=2 and we provided 2 images, there should be one chunk
+    assert len(batched_inputs) == 1
+    batched_array = batched_inputs[0]
+
+    # Verify dtype and shape: expected shape (number_of_images, 3, 1024, 1024)
+    assert batched_array.dtype == np.float32
+    assert batched_array.shape[0] == len(images)
+    assert batched_array.shape[1:] == (3, 1024, 1024)
+
+    # Verify that the batch_data correctly includes the original images and their shapes.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1  # one chunk since all images were batched together
+    bd = batch_data[0]
+    assert "images" in bd and "original_image_shapes" in bd
+    # The original images should match the ones provided in input_data.
+    assert bd["images"] == images
+    # The original shapes stored during prepare_data_for_inference should be returned.
+    assert bd["original_image_shapes"] == prepared_data["original_image_shapes"]
 
 
 def test_format_input_http(model_interface):
+    """
+    Test that for the HTTP protocol:
+      - The formatted payload is a JSON-serializable dict with an "input" key containing a list
+        of image dictionaries. Each image dictionary must have a "type" key with value "image_url"
+        and a "url" starting with "data:image/png;base64,".
+      - The accompanying batch data correctly contains the original images and their original shapes.
+    """
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "http", max_batch_size=2)[0]
 
-    assert "input" in formatted_input
-    assert isinstance(formatted_input["input"], list)
-    for content in formatted_input["input"]:
-        assert "type" in content
-        assert content["type"] == "image_url"
-        assert "url" in content
-        assert content["url"].startswith("data:image/png;base64,")
+    # format_input returns a tuple: (payload_batches, formatted_batch_data)
+    payload_batches, batch_data = model_interface.format_input(prepared_data, "http", max_batch_size=2)
+
+    # Verify payload structure.
+    assert isinstance(payload_batches, list)
+    # Since max_batch_size=2 and we have 2 images, we expect one payload chunk.
+    assert len(payload_batches) == 1
+    payload = payload_batches[0]
+    assert "input" in payload
+    assert isinstance(payload["input"], list)
+    for item in payload["input"]:
+        assert "type" in item
+        assert item["type"] == "image_url"
+        assert "url" in item
+        assert item["url"].startswith("data:image/png;base64,")
+
+    # Verify that batch_data is returned correctly.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1  # one batch chunk
+    bd = batch_data[0]
+    assert "images" in bd and "original_image_shapes" in bd
+    assert bd["images"] == images
+    assert bd["original_image_shapes"] == prepared_data["original_image_shapes"]
 
 
 def test_format_input_invalid_protocol(model_interface):
