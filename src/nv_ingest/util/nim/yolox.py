@@ -203,7 +203,7 @@ class YoloxModelInterfaceBase(ModelInterface):
             batches = []
             for chunk in chunkify_linearly(content_list, max_batch_size):
                 payload = {
-                    "input": content_list,
+                    "input": chunk,
                     "confidence_threshold": self.conf_threshold,
                     "nms_threshold": self.iou_threshold,
                 }
