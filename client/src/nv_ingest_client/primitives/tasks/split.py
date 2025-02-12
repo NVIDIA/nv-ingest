@@ -6,8 +6,6 @@
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
 
-import os
-
 import logging
 from typing import Dict
 
