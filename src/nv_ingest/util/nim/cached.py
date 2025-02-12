@@ -123,13 +123,15 @@ class CachedModelInterface(ModelInterface):
             if not batched_images:
                 raise ValueError("No valid images found for gRPC formatting.")
 
+            batched_image_chunks = chunk_list(batched_images, max_batch_size)
+
             # Ensure all images have the same shape (excluding batch dimension)
-            shapes = [img.shape[1:] for img in batched_images]  # each is (H, W, C)
-            if any(s != shapes[0] for s in shapes[1:]):
-                raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
+            for chunk in batched_image_chunks:
+                shapes = [img.shape[1:] for img in chunk]  # each is (H, W, C)
+                if any(s != shapes[0] for s in shapes[1:]):
+                    raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
 
             # Chunk the images into groups of size up to max_batch_size
-            batched_image_chunks = chunk_list(batched_images, max_batch_size)
             batched_inputs = []
             for chunk in batched_image_chunks:
                 # Concatenate along the batch dimension => shape (B, H, W, C) where B <= max_batch_size
