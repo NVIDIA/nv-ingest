@@ -8,7 +8,7 @@ import io
 import logging
 import warnings
 from math import log
-from typing import Any
+from typing import Any, Tuple
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -97,73 +97,100 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> List[Any]:
+    def format_input(
+        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
         """
-        Format input data for the specified protocol, returning a list of batches
-        each up to 'max_batch_size' in length.
+        Format input data for the specified protocol, returning a tuple of:
+          (formatted_batches, formatted_batch_data)
+        where:
+          - For gRPC: formatted_batches is a list of NumPy arrays, each of shape (B, H, W, C)
+            with B <= max_batch_size.
+          - For HTTP: formatted_batches is a list of JSON-serializable dict payloads.
+          - In both cases, formatted_batch_data is a list of dicts that coalesce the original
+            images and their original shapes in the same order as provided.
 
         Parameters
         ----------
         data : dict
-            The input data to format.
+            The input data to format. Must include:
+              - "images": a list of numpy.ndarray images.
+              - "original_image_shapes": a list of tuples with each image's (height, width),
+                as set by prepare_data_for_inference.
         protocol : str
             The protocol to use ("grpc" or "http").
         max_batch_size : int
-            The maximum batch size to respect.
+            The maximum number of images per batch.
 
         Returns
         -------
-        List[Any]
-            A list of batches, each formatted according to the protocol.
+        tuple
+            A tuple (formatted_batches, formatted_batch_data).
+
+        Raises
+        ------
+        ValueError
+            If the protocol is invalid.
         """
+
+        # Helper to chunk a list into sublists of length up to chunk_size.
+        def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
-
-            # Our yolox-page-elements model (gRPC) expects images to be resized to 1024x1024
+            # Resize images for model input (Yolox expects 1024x1024).
             resized_images = [
                 resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in data["images"]
             ]
+            # Chunk the resized images, the original images, and their shapes.
+            resized_chunks = chunk_list(resized_images, max_batch_size)
+            original_chunks = chunk_list(data["images"], max_batch_size)
+            shape_chunks = chunk_list(data["original_image_shapes"], max_batch_size)
 
-            # Create a list of smaller batches (chunkify)
-            batches = []
-            for chunk in chunkify_geometrically(resized_images, max_batch_size):
-                # Reorder axes to match model input (batch, channels, height, width)
-                input_array = np.einsum("bijk->bkij", chunk).astype(np.float32)
-                batches.append(input_array)
-
-            return batches
+            batched_inputs = []
+            formatted_batch_data = []
+            for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
+                # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
+                input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
+                batched_inputs.append(input_array)
+                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+            return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
-            content_list = []
+            content_list: List[Dict[str, Any]] = []
             for image in data["images"]:
-                # Convert numpy array to PIL Image
+                # Convert the numpy array to a PIL Image. Assume images are in [0,1].
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
-                original_size = image_pil.size  # e.g., (1024, 1024)
+                original_size = image_pil.size
 
-                # Save image to buffer
+                # Save the image to a buffer and encode to base64.
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
                 image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                # Scale the image if necessary
+                # Scale the image if necessary.
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
                     image_b64, max_base64_size=YOLOX_NIM_MAX_IMAGE_SIZE
                 )
-
                 if new_size != original_size:
                     logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                # Add to content_list
                 content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
 
-            # Now split content_list into batches of up to max_batch_size
-            batches = []
-            for chunk in chunkify_linearly(content_list, max_batch_size):
-                payload = {"input": chunk}
-                batches.append(payload)
+            # Chunk the payload content, the original images, and their shapes.
+            content_chunks = chunk_list(content_list, max_batch_size)
+            original_chunks = chunk_list(data["images"], max_batch_size)
+            shape_chunks = chunk_list(data["original_image_shapes"], max_batch_size)
 
-            return batches
+            payload_batches = []
+            formatted_batch_data = []
+            for chunk, orig_chunk, shapes in zip(content_chunks, original_chunks, shape_chunks):
+                payload = {"input": chunk}
+                payload_batches.append(payload)
+                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+            return payload_batches, formatted_batch_data
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
