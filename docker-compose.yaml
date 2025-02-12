@@ -126,7 +126,7 @@ services:
     runtime: nvidia
 
   nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.0.0}
+    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0ea}
     ports:
       - "8015:8000"
       - "8016:8001"
