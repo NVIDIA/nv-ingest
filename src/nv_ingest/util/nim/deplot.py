@@ -115,11 +115,6 @@ class DeplotModelInterface(ModelInterface):
             if not processed:
                 raise ValueError("No valid images found for gRPC formatting.")
 
-            # Ensure all images have the same dimensions (excluding the batch dimension)
-            shapes = [p.shape[1:] for p in processed]
-            if any(s != shapes[0] for s in shapes[1:]):
-                raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
-
             # Split processed images into chunks of size at most max_batch_size
             batched_inputs = []
             for chunk in chunk_list(processed, max_batch_size):
