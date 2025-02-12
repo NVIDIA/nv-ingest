@@ -3,9 +3,18 @@ from unittest.mock import MagicMock
 import pytest
 import pandas as pd
 
-from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
-from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
+    from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
+    from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 
