@@ -220,4 +220,4 @@ class NemoRetrieverParseModelInterface(ModelInterface):
             raise RuntimeError("Unexpected response format: 'choices' key is missing or empty.")
 
         tool_call = json_response["choices"][0]["message"]["tool_calls"][0]
-        return json.loads(tool_call["function"]["arguments"])[0]
+        return json.loads(tool_call["function"]["arguments"])

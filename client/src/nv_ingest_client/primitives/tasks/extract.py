@@ -70,7 +70,7 @@ _Type_Extract_Method_Map = {
     "tiff": get_args(_Type_Extract_Method_Image),
 }
 
-_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]
+_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium", "nemoretriever_parse"]
 
 _Type_Extract_Tables_Method_DOCX = Literal["python_docx",]
 
