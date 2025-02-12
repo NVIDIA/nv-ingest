@@ -141,11 +141,6 @@ class PaddleOCRModelInterface(ModelInterface):
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
                 processed.append(arr)
 
-            # Check that all images have the same shape (excluding batch dimension)
-            shapes = [p.shape[1:] for p in processed]  # List of (H, W, C) shapes
-            if not all(s == shapes[0] for s in shapes[1:]):
-                raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
-
             batches = []
             for chunk in chunk_list(processed, max_batch_size):
                 # Concatenate arrays in the chunk along the batch dimension => shape (B, H, W, C)
