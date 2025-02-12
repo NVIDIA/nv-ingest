@@ -237,74 +237,74 @@ def nemoretriever_parse(
             elif model_name == "parser":
                 parser_results.extend(extracted_items)
 
+    for page_idx, parser_output in parser_results:
+        page = None
+        page_image = None
+        page_text = []
+
         page_nearby_blocks = {
             "text": {"content": [], "bbox": [], "type": []},
             "images": {"content": [], "bbox": [], "type": []},
             "structured": {"content": [], "bbox": [], "type": []},
         }
 
-        for page_idx, parser_output in parser_results:
-            page = None
-            page_image = None
-            page_text = []
+        for bbox_dict in parser_output:
+            cls = bbox_dict["type"]
+            bbox = bbox_dict["bbox"]
+            txt = bbox_dict["text"]
 
-            for bbox_dict in parser_output:
-                cls = bbox_dict["type"]
-                bbox = bbox_dict["bbox"]
-                txt = bbox_dict["text"]
+            transformed_bbox = [
+                math.floor(bbox["xmin"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
+                math.floor(bbox["ymin"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
+                math.ceil(bbox["xmax"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
+                math.ceil(bbox["ymax"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
+            ]
 
-                transformed_bbox = [
-                    math.floor(bbox["xmin"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
-                    math.floor(bbox["ymin"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
-                    math.ceil(bbox["xmax"] * NEMORETRIEVER_PARSE_MAX_WIDTH),
-                    math.ceil(bbox["ymax"] * NEMORETRIEVER_PARSE_MAX_HEIGHT),
-                ]
+            if cls not in nemoretriever_parse_utils.ACCEPTED_CLASSES:
+                continue
 
-                if cls not in nemoretriever_parse_utils.ACCEPTED_CLASSES:
-                    continue
+            if identify_nearby_objects:
+                _insert_page_nearby_blocks(page_nearby_blocks, cls, txt, transformed_bbox)
 
-                if identify_nearby_objects:
-                    _insert_page_nearby_blocks(page_nearby_blocks, cls, txt, transformed_bbox)
+            if extract_text:
+                page_text.append(txt)
 
-                if extract_text:
-                    page_text.append(txt)
+            if (extract_tables_method == "nemoretriever_parse") and (extract_tables) and (cls == "Table"):
+                table = LatexTable(
+                    latex=txt,
+                    bbox=transformed_bbox,
+                    max_width=NEMORETRIEVER_PARSE_MAX_WIDTH,
+                    max_height=NEMORETRIEVER_PARSE_MAX_HEIGHT,
+                )
+                accumulated_tables.append(table)
 
-                if (extract_tables_method == "nemoretriever_parse") and (extract_tables) and (cls == "Table"):
-                    table = LatexTable(
-                        latex=txt,
+            if extract_images and (cls == "Picture"):
+                if page is None:
+                    page = doc.get_page(page_idx)
+                if page_image is None:
+                    page_image = _convert_pdfium_page_to_numpy(page)
+
+                img_numpy = crop_image(page_image, transformed_bbox)
+
+                if img_numpy is not None:
+                    base64_img = numpy_to_base64(img_numpy)
+                    image = Base64Image(
+                        image=base64_img,
                         bbox=transformed_bbox,
+                        width=img_numpy.shape[1],
+                        height=img_numpy.shape[0],
                         max_width=NEMORETRIEVER_PARSE_MAX_WIDTH,
                         max_height=NEMORETRIEVER_PARSE_MAX_HEIGHT,
                     )
-                    accumulated_tables.append(table)
+                    accumulated_images.append(image)
 
-                if extract_images and (cls == "Picture"):
-                    if page is None:
-                        page = doc.get_page(page_idx)
-                    if page_image is None:
-                        page_image = _convert_pdfium_page_to_numpy(page)
+        # If NemoRetrieverParse fails to extract anything, fall back to using pdfium.
+        if not "".join(page_text).strip():
+            if page is None:
+                page = doc.get_page(page_idx)
+            page_text = [page.get_textpage().get_text_bounded()]
 
-                    img_numpy = crop_image(page_image, transformed_bbox)
-
-                    if img_numpy is not None:
-                        base64_img = numpy_to_base64(img_numpy)
-                        image = Base64Image(
-                            image=base64_img,
-                            bbox=transformed_bbox,
-                            width=img_numpy.shape[1],
-                            height=img_numpy.shape[0],
-                            max_width=NEMORETRIEVER_PARSE_MAX_WIDTH,
-                            max_height=NEMORETRIEVER_PARSE_MAX_HEIGHT,
-                        )
-                        accumulated_images.append(image)
-
-            # If NemoRetrieverParse fails to extract anything, fall back to using pdfium.
-            if not "".join(page_text).strip():
-                if page is None:
-                    page = doc.get_page(page_idx)
-                page_text = [page.get_textpage().get_text_bounded()]
-
-            accumulated_text.extend(page_text)
+        accumulated_text.extend(page_text)
 
         # Construct tables
         if extract_tables:

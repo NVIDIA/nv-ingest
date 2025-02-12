@@ -128,7 +128,7 @@ class NemoRetrieverParseConfigSchema(BaseModel):
     nemoretriever_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     nemoretriever_parse_infer_protocol: str = ""
 
-    workers_per_progress_engine: int = 5
+    workers_per_progress_engine: int = 2
 
     @model_validator(mode="before")
     @classmethod
