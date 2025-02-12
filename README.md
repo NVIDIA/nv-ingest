@@ -274,7 +274,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli`
+#### Using the `nv-ingest-cli`
 
 > [!NOTE]
 > You can find more examples [here](client/client_examples/examples/).

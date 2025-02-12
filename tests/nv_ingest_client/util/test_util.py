@@ -5,8 +5,10 @@
 from unittest.mock import patch
 
 import pytest
+import os
 from nv_ingest_client.cli.util.click import generate_matching_files
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.util import ClientConfigSchema
 
 _MODULE_UNDER_TEST = "nv_ingest_client.util.util"
 
@@ -71,6 +73,21 @@ _MODULE_UNDER_TEST = "nv_ingest_client.util.util"
 #     with patch(f"{_MODULE_UNDER_TEST}.os.path.splitext", return_value=("", ".pdf")):
 #         with patch(f"{_MODULE_UNDER_TEST}.fitz.open", side_effect=Exception("Some error")):
 #             assert estimate_page_count(file_path) == 0
+
+
+def test_cient_config_schema():
+    os.environ["EMBEDDING_NIM_ENDPOINT"] = "test"
+    os.environ["EMBEDDING_NIM_MODEL_NAME"] = "test"
+    os.environ["NVIDIA_BUILD_API_KEY"] = "test"
+    os.environ["RERANKER_NIM_ENDPOINT"] = "test"
+    os.environ["RERANKER_NUM_MODEL_NAME"] = "test"
+
+    client_schema = ClientConfigSchema()
+    assert client_schema.embedding_nim_endpoint == "test"
+    assert client_schema.embedding_nim_model_name == "test"
+    assert client_schema.nvidia_build_api_key == "test"
+    assert client_schema.nv_ranker_nim_endpoint == "test"
+    assert client_schema.nv_ranker_nim_model_name == "test"
 
 
 @pytest.mark.parametrize(

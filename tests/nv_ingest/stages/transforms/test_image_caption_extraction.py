@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import base64
 import io
 from unittest.mock import MagicMock
@@ -13,9 +14,19 @@ from PIL import Image
 import pandas as pd
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.stages.transforms.image_caption_extraction import _generate_captions
-from nv_ingest.stages.transforms.image_caption_extraction import _prepare_dataframes_mod
-from nv_ingest.stages.transforms.image_caption_extraction import caption_extract_stage
+
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.stages.transforms.image_caption_extraction import _generate_captions
+    from nv_ingest.stages.transforms.image_caption_extraction import _prepare_dataframes_mod
+    from nv_ingest.stages.transforms.image_caption_extraction import caption_extract_stage
 
 MODULE_UNDER_TEST = "nv_ingest.stages.transforms.image_caption_extraction"
 

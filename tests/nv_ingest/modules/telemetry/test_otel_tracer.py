@@ -1,11 +1,17 @@
+import pytest
 from datetime import datetime
 
-from morpheus.messages import ControlMessage
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
 
-from nv_ingest.modules.telemetry.otel_tracer import extract_annotated_task_results
-from nv_ingest.modules.telemetry.otel_tracer import extract_timestamps_from_message
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from morpheus.messages import ControlMessage
+
+    from nv_ingest.modules.telemetry.otel_tracer import extract_annotated_task_results
+    from nv_ingest.modules.telemetry.otel_tracer import extract_timestamps_from_message
 
 
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus dependencies are not available")
 def test_extract_timestamps_single_task():
     msg = ControlMessage()
     msg.set_timestamp("trace::entry::foo", datetime.fromtimestamp(1))
@@ -18,6 +24,7 @@ def test_extract_timestamps_single_task():
     assert result == expected_output
 
 
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus dependencies are not available")
 def test_extract_timestamps_no_tasks():
     msg = ControlMessage()
 
@@ -28,6 +35,7 @@ def test_extract_timestamps_no_tasks():
     assert result == expected_output
 
 
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus dependencies are not available")
 def test_extract_annotated_task_results_invalid_metadata():
     msg = ControlMessage()
 
@@ -42,6 +50,7 @@ def test_extract_annotated_task_results_invalid_metadata():
     assert result == expected_output
 
 
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus dependencies are not available")
 def test_extract_annotated_task_results_missing_fields():
     msg = ControlMessage()
 
@@ -56,6 +65,7 @@ def test_extract_annotated_task_results_missing_fields():
     assert result == expected_output
 
 
+@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus dependencies are not available")
 def test_extract_annotated_task_results_no_annotation_keys():
     msg = ControlMessage()
 

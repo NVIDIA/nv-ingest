@@ -21,6 +21,7 @@ from typing import List
 import time
 from urllib.parse import urlparse
 from typing import Union, Dict
+from nv_ingest_client.util.util import ClientConfigSchema
 import logging
 
 
@@ -592,6 +593,7 @@ def write_to_nvingest_collection(
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
+    threshold: int = 10,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -654,6 +656,8 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
+    if len(records) < threshold:
+        stream = True
     if stream:
         stream_insert_milvus(
             records,
@@ -836,9 +840,9 @@ def nvingest_retrieval(
     hybrid: bool = False,
     dense_field: str = "vector",
     sparse_field: str = "sparse",
-    embedding_endpoint="http://localhost:8000/v1",
+    embedding_endpoint=None,
     sparse_model_filepath: str = "bm25_model.json",
-    model_name: str = "nvidia/nv-embedqa-e5-v5",
+    model_name: str = None,
     output_fields: List[str] = ["text", "source", "content_metadata"],
     gpu_search: bool = True,
 ):
@@ -878,8 +882,12 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
+    nvidia_api_key = ClientConfigSchema.nvidia_build_api_key
+    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
+    embedding_endpoint = embedding_endpoint if embedding_endpoint else ClientConfigSchema.embedding_nim_endpoint
+    model_name = model_name if model_name else ClientConfigSchema.embedding_nim_model_name
     local_index = False
-    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name)
+    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
     if milvus_uri.endswith(".db"):
         local_index = True
