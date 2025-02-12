@@ -7,8 +7,17 @@ from unittest.mock import MagicMock
 
 import pytest
 
-# Assuming the decorator and all necessary components are defined in decorator_module.py
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    # Assuming the decorator and all necessary components are defined in decorator_module.py
+    from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 
 
 # Mock the ControlMessage class and related functions
