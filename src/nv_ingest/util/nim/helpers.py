@@ -7,7 +7,6 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from typing import Any
 from typing import Optional
 from typing import Tuple
@@ -190,25 +189,25 @@ class NimClient:
 
             return self._max_batch_sizes[model_name]
 
-    def _process_batch(self, batch_input, *, prepared_data, model_name, **kwargs):
+    def _process_batch(self, batch_input, *, batch_data, model_name, **kwargs):
         """
-        Process a single batch input for inference.
+        Process a single batch input for inference using its corresponding batch_data.
 
         Parameters
         ----------
         batch_input : Any
-            The batch input data to process.
-        prepared_data : Any
-            The prepared data used for inference.
+            The input data for this batch.
+        batch_data : Any
+            The corresponding scratch-pad data for this batch as returned by format_input.
         model_name : str
-            The model name to use for inference.
+            The model name for inference.
         kwargs : dict
-            Additional parameters for inference.
+            Additional parameters.
 
         Returns
         -------
-        Any
-            The parsed output from the inference request.
+        tuple
+            A tuple (parsed_output, batch_data) for subsequent post-processing.
         """
         if self.protocol == "grpc":
             logger.debug("Performing gRPC inference for a batch...")
@@ -221,7 +220,8 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        return self.model_interface.parse_output(response, protocol=self.protocol, data=prepared_data, **kwargs)
+        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=batch_data, **kwargs)
+        return parsed_output, batch_data
 
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
         """Attempt to set the max batch size for the model if it is not already set, ensuring thread safety."""
@@ -237,58 +237,57 @@ class NimClient:
         data : dict
             The input data for inference.
         model_name : str
-            The name of the model to use for inference.
+            The model name.
         kwargs : dict
-            Additional parameters for inference. Optionally supports "max_pool_workers" to set
-            the number of worker threads in the thread pool.
+            Additional parameters for inference.
 
         Returns
         -------
         Any
-            The processed inference results.
-
-        Raises
-        ------
-        ValueError
-            If an invalid protocol is specified.
+            The processed inference results, coalesced in the same order as the input images.
         """
         try:
             # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
             max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
             force_requested_batch_size = kwargs.get("force_max_batch_size", False)
-
-            if not force_requested_batch_size:
-                max_batch_size = min(batch_size, max_requested_batch_size)
-            else:
-                max_batch_size = max_requested_batch_size
+            max_batch_size = (
+                min(batch_size, max_requested_batch_size)
+                if not force_requested_batch_size
+                else max_requested_batch_size
+            )
 
             # 2. Prepare data for inference.
-            prepared_data = self.model_interface.prepare_data_for_inference(data)
+            data = self.model_interface.prepare_data_for_inference(data)
 
             # 3. Format the input based on protocol.
-            #    NOTE: This now returns a list of batches.
-            formatted_batches = self.model_interface.format_input(
-                prepared_data, protocol=self.protocol, max_batch_size=max_batch_size
+            formatted_batches, formatted_batch_data = self.model_interface.format_input(
+                data, protocol=self.protocol, max_batch_size=max_batch_size
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
             max_pool_workers = kwargs.pop("max_pool_workers", 16)
 
             # 4. Process each batch concurrently using a thread pool.
-            process_batch_partial = partial(
-                self._process_batch, prepared_data=prepared_data, model_name=model_name, **kwargs
-            )
-
+            #    We enumerate the batches so that we can later reassemble results in order.
+            results = [None] * len(formatted_batches)
             with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                all_parsed_outputs = list(executor.map(process_batch_partial, formatted_batches))
+                futures = []
+                for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
+                    future = executor.submit(
+                        self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
+                    )
+                    futures.append((idx, future))
+                for idx, future in futures:
+                    results[idx] = future.result()
 
-            # 5. Process the parsed outputs for each batch.
+            # 5. Process the parsed outputs for each batch using its corresponding batch_data.
+            #    As the batches are in order, we coalesce their outputs accordingly.
             all_results = []
-            for parsed_output in all_parsed_outputs:
+            for parsed_output, batch_data in results:
                 batch_results = self.model_interface.process_inference_results(
                     parsed_output,
-                    original_image_shapes=data.get("original_image_shapes"),
+                    original_image_shapes=batch_data.get("original_image_shapes"),
                     protocol=self.protocol,
                     **kwargs,
                 )
