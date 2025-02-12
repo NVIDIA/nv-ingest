@@ -67,20 +67,6 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 ]
 
 
-def chunkify_linearly(lst, chunk_size):
-    for i in range(0, len(lst), chunk_size):
-        yield lst[i : i + chunk_size]
-
-
-def chunkify_geometrically(lst, max_size):
-    # TRT engine in Yolox NIM (gRPC) only allows a batch size in multiples of 2.
-    i = 0
-    while i < len(lst):
-        chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
-        yield lst[i : i + chunk_size]
-        i += chunk_size
-
-
 # YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
 class YoloxModelInterfaceBase(ModelInterface):
     """
@@ -175,9 +161,19 @@ class YoloxModelInterfaceBase(ModelInterface):
             If the protocol is invalid.
         """
 
-        # Helper to chunk a list into sublists of length up to chunk_size.
+        # Helper functions to chunk a list into sublists of length up to chunk_size.
         def chunk_list(lst: list, chunk_size: int) -> List[list]:
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+        def chunk_list_geometrically(lst: list, max_size: int) -> List[list]:
+            # TRT engine in Yolox NIM (gRPC) only allows a batch size in powers of 2.
+            chunks = []
+            i = 0
+            while i < len(lst):
+                chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+                chunks.append(lst[i : i + chunk_size])
+                i += chunk_size
+            return chunks
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
@@ -186,9 +182,9 @@ class YoloxModelInterfaceBase(ModelInterface):
                 resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
             ]
             # Chunk the resized images, the original images, and their shapes.
-            resized_chunks = chunk_list(resized_images, max_batch_size)
-            original_chunks = chunk_list(data["images"], max_batch_size)
-            shape_chunks = chunk_list(data["original_image_shapes"], max_batch_size)
+            resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
+            original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+            shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
             batched_inputs = []
             formatted_batch_data = []
