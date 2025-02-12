@@ -10,13 +10,15 @@ from nv_ingest_client.primitives.tasks.split import SplitTask
 
 def test_split_task_initialization():
     task = SplitTask(
-        tokenizer="intfloat/e5-large-unsupervised",
+        tokenizer="meta-llama/Llama-3.2-1B",
         chunk_size=1024,
         chunk_overlap=0,
+        params={},
     )
-    assert task._tokenizer == "intfloat/e5-large-unsupervised"
+    assert task._tokenizer == "meta-llama/Llama-3.2-1B"
     assert task._chunk_size == 1024
     assert task._chunk_overlap == 0
+    assert task._params == {}
 
 
 # String Representation Tests
@@ -34,22 +36,24 @@ def test_split_task_str_representation():
 
 
 @pytest.mark.parametrize(
-    "tokenizer, chunk_size, chunk_overlap",
+    "tokenizer, chunk_size, chunk_overlap, params",
     [
-        ("intfloat/e5-large-unsupervised", 100, 10),
-        ("microsoft/deberta-large", 50, 5),
-        ("meta-llama/Llama-3.2-1B", 1024, 0),
+        ("intfloat/e5-large-unsupervised", 100, 10, {}),
+        ("microsoft/deberta-large", 50, 5, None),
+        ("meta-llama/Llama-3.2-1B", 1024, 0, {"hf_access_token": "TOKEN"}),
     ],
 )
 def test_split_task_to_dict(
     tokenizer,
     chunk_size,
     chunk_overlap,
+    params,
 ):
     task = SplitTask(
         tokenizer=tokenizer,
         chunk_size=chunk_size,
         chunk_overlap=chunk_overlap,
+        params=params,
     )
 
     expected_dict = {"type": "split", "task_properties": {}}
@@ -61,6 +65,8 @@ def test_split_task_to_dict(
         expected_dict["task_properties"]["chunk_size"] = chunk_size
     if chunk_overlap is not None:
         expected_dict["task_properties"]["chunk_overlap"] = chunk_overlap
+    if params is not None:
+        expected_dict["task_properties"]["params"] = params
 
     assert task.to_dict() == expected_dict, "The to_dict method did not return the expected dictionary representation"
 
@@ -71,7 +77,7 @@ def test_split_task_to_dict(
 def test_split_task_default_params():
     task = SplitTask()
     expected_str_contains = [
-        "tokenizer: intfloat/e5-large-unsupervised",
+        "tokenizer: meta-llama/Llama-3.2-1B",
         "chunk_size: 1024",
         "chunk_overlap: 20",
     ]
@@ -80,6 +86,6 @@ def test_split_task_default_params():
 
     expected_dict = {
         "type": "split",
-        "task_properties": {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 1024, "chunk_overlap": 20},
+        "task_properties": {"tokenizer": "meta-llama/Llama-3.2-1B", "chunk_size": 1024, "chunk_overlap": 20, "params": {}},
     }
     assert task.to_dict() == expected_dict

@@ -62,6 +62,7 @@ class IngestTaskSplitSchema(BaseModelNoExt):
     tokenizer: str
     chunk_size: Annotated[int, Field(gt=0)]
     chunk_overlap: Annotated[int, Field(ge=0)]
+    params: dict
 
     @field_validator("chunk_overlap")
     def check_chunk_overlap(cls, v, values, **kwargs):

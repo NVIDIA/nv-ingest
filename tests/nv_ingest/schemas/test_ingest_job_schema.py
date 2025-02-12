@@ -29,6 +29,7 @@ def valid_task_properties(task_type):
             "tokenizer": "intfloat/e5-large-unsupervised",
             "chunk_size": 300,
             "chunk_overlap": 0,
+            "params": {},
         }
     elif task_type == TaskTypeEnum.extract:
         return {"document_type": "pdf", "method": "OCR", "params": {"language": "en"}}
@@ -122,6 +123,7 @@ def test_custom_validator_logic_for_sentence_window_size():
             "tokanizer": "intfloat/e5-large-unsupervised",
             "chunk_size": 200,
             "chunk_overlap": 250,  # chunk_overlap should always be less than chunk_size
+            "params": {},
         },
     }
     job_data = {
@@ -150,6 +152,7 @@ def test_multiple_task_types():
                     "tokenizer": "intfloat/e5-large-unsupervised",
                     "chunk_size": 100,
                     "chunk_overlap": 0,
+                    "params": {},
                 },
             },
             {
@@ -244,6 +247,7 @@ def test_incorrect_property_types():
                     "tokenizer": "intfloat/e5-large-unsupervised",
                     "chunk_size": {"not an int": 123},  # Incorrect type (should be int)
                     "chunk_overlap": 0,
+                    "params": {},
                 },
             }
         ],
@@ -262,6 +266,7 @@ def test_missing_required_fields():
                 "task_properties": {
                     "tokenizer": "intfloat/e5-large-unsupervised",  # Missing chunk_size
                     "chunk_overlap": 0,
+                    "params": {},
                 },
             }
         ],

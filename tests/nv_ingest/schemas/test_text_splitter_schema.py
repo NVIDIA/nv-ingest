@@ -13,7 +13,7 @@ def test_text_splitter_schema_defaults():
     Test the TextSplitterSchema with default values.
     """
     schema = TextSplitterSchema()
-    assert schema.tokenizer == "intfloat/e5-large-unsupervised"
+    assert schema.tokenizer == "meta-llama/Llama-3.2-1B"
     assert schema.chunk_size == 1024
     assert schema.chunk_overlap == 20
     assert schema.raise_on_failure is False

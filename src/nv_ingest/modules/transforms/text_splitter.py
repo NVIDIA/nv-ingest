@@ -59,7 +59,7 @@ def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=20):
     tokens = encoding["input_ids"]
     offsets = encoding["offset_mapping"]
 
-    # Split the tokens into chunks of the desired size
+    # Split the tokens into chunks of the desired size with the desired overlap
     chunks = [tokens[i : i + chunk_size] for i in range(0, len(tokens), chunk_size - chunk_overlap)]
 
     # Convert token chunks back to text while preserving original spacing and case
@@ -113,7 +113,12 @@ def _text_splitter(builder: mrc.Builder):
             with message.payload().mutable_dataframe() as mdf:
                 df = mdf.to_pandas()
 
-            # Filter to text only
+            # Filter to txt files only
+            # bool_index = df["document_type"] == ContentTypeEnum.TEXT
+            # df_filtered = df.loc[bool_index]
+            logger.info(df.columns)
+
+            # Filter to document type
             bool_index = df["document_type"] == ContentTypeEnum.TEXT
             df_filtered = df.loc[bool_index]
 
@@ -124,14 +129,17 @@ def _text_splitter(builder: mrc.Builder):
             tokenizer = task_props.get("tokenizer", validated_config.tokenizer)
             chunk_size = task_props.get("chunk_size", validated_config.chunk_size)
             chunk_overlap = task_props.get("chunk_overlap", validated_config.chunk_overlap)
+            params = task_props.get("params", {})
 
-            logger.info(
+            hf_access_token = params.get("hf_access_token", None)
+
+            logger.debug(
                 f"Splitting text with tokenizer: {tokenizer}, "
                 f"chunk_size: {chunk_size} tokens, "
                 f"chunk_overlap: {chunk_overlap}"
             )
 
-            tokenizer_model = AutoTokenizer.from_pretrained(tokenizer)
+            tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token=hf_access_token)
 
             split_docs = []
             for _, row in df_filtered.iterrows():

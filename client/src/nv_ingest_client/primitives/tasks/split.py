@@ -6,6 +6,8 @@
 # pylint: disable=too-few-public-methods
 # pylint: disable=too-many-arguments
 
+import os
+
 import logging
 from typing import Dict
 
@@ -17,9 +19,10 @@ logger = logging.getLogger(__name__)
 
 
 class SplitTaskSchema(BaseModel):
-    tokenizer: str = "intfloat/e5-large-unsupervised"
+    tokenizer: str = "meta-llama/Llama-3.2-1B"
     chunk_size: int = 1024
     chunk_overlap: int = 20
+    params: dict = {}
 
     class Config:
         extra = "forbid"
@@ -32,9 +35,10 @@ class SplitTask(Task):
 
     def __init__(
         self,
-        tokenizer: str = "intfloat/e5-large-unsupervised",
+        tokenizer: str = "meta-llama/Llama-3.2-1B",
         chunk_size: int = 1024,
         chunk_overlap: int = 20,
+        params: dict = {},
     ) -> None:
         """
         Setup Split Task Config
@@ -43,6 +47,7 @@ class SplitTask(Task):
         self._tokenizer = tokenizer
         self._chunk_size = chunk_size
         self._chunk_overlap = chunk_overlap
+        self._params = params
 
     def __str__(self) -> str:
         """
@@ -53,6 +58,8 @@ class SplitTask(Task):
         info += f"  tokenizer: {self._tokenizer}\n"
         info += f"  chunk_size: {self._chunk_size}\n"
         info += f"  chunk_overlap: {self._chunk_overlap}\n"
+        for key, value in self._params.items():
+            info += f"  {key}: {value}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -67,5 +74,7 @@ class SplitTask(Task):
             split_params["chunk_size"] = self._chunk_size
         if self._chunk_overlap is not None:
             split_params["chunk_overlap"] = self._chunk_overlap
+        if self._params is not None:
+            split_params["params"] = self._params
 
         return {"type": "split", "task_properties": split_params}

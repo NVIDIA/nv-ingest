@@ -42,6 +42,7 @@ def job_payload():
                         "tokenizer": "intfloat/e5-large-unsupervised",
                         "chunk_size": 100,
                         "chunk_overlap": 0,
+                        "params": {},
                     },
                 },
                 {
