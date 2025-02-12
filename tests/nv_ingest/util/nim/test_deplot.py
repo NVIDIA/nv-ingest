@@ -61,43 +61,108 @@ def test_prepare_data_for_inference_invalid_base64_image(model_interface):
 
 
 def test_format_input_grpc(model_interface):
+    """
+    Test that for the gRPC protocol:
+      - The image (decoded from a base64 string) is normalized and batched.
+      - The returned formatted batch is a NumPy array of shape (B, H, W, C) with dtype float32.
+      - The accompanying batch data contains the original image and its dimensions.
+    """
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(prepared, "grpc", max_batch_size=1)[0]
+    # format_input returns a tuple: (formatted_batches, formatted_batch_data)
+    batches, batch_data = model_interface.format_input(prepared, "grpc", max_batch_size=1)
+
+    formatted = batches[0]
+    # Check the formatted batch
     assert isinstance(formatted, np.ndarray)
     assert formatted.dtype == np.float32
+    # Since prepare_data_for_inference decodes to (256,256,3), the grpc branch expands it to (1,256,256,3)
     assert formatted.ndim == 4
     assert formatted.shape == (1, 256, 256, 3)
+    # Ensure normalization to [0, 1]
     assert 0.0 <= formatted.min() and formatted.max() <= 1.0
+
+    # Verify accompanying batch data
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    assert isinstance(bd["image_arrays"], list)
+    assert len(bd["image_arrays"]) == 1
+    # The original image should have shape (256,256,3)
+    assert bd["image_arrays"][0].shape == (256, 256, 3)
+    # Dimensions should be recorded as (height, width)
+    assert bd["image_dims"] == [(256, 256)]
 
 
 def test_format_input_http(model_interface):
+    """
+    Test that for the HTTP protocol:
+      - The formatted payload is a JSON-serializable dict built via _prepare_deplot_payload.
+      - The payload includes the expected keys (model, messages, max_tokens, stream, temperature, top_p)
+      - And the accompanying batch data reflects the original image and its dimensions.
+    """
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(
+    batches, batch_data = model_interface.format_input(
         prepared, "http", max_batch_size=1, max_tokens=600, temperature=0.7, top_p=0.95
-    )[0]
+    )
+    formatted = batches[0]
+
+    # Check the payload structure from _prepare_deplot_payload
     assert isinstance(formatted, dict)
     assert formatted["model"] == "google/deplot"
+    assert "messages" in formatted
     assert isinstance(formatted["messages"], list)
     assert len(formatted["messages"]) == 1
     message = formatted["messages"][0]
     assert message["role"] == "user"
+    # The content should start with the fixed prompt text
     assert message["content"].startswith("Generate the underlying data table")
+    # Check that the payload parameters match the supplied arguments
     assert formatted["max_tokens"] == 600
     assert formatted["temperature"] == 0.7
     assert formatted["top_p"] == 0.95
     assert formatted["stream"] is False
 
+    # Verify accompanying batch data
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    assert isinstance(bd["image_arrays"], list)
+    assert len(bd["image_arrays"]) == 1
+    assert bd["image_arrays"][0].shape == (256, 256, 3)
+    assert bd["image_dims"] == [(256, 256)]
+
 
 def test_format_input_http_defaults(model_interface):
+    """
+    Test the HTTP branch when default parameters are used.
+      - The default max_tokens, temperature, and top_p values should be applied.
+      - The stream flag should be False.
+      - Also verify that batch data is correctly returned.
+    """
     base64_img = create_base64_image()
     prepared = model_interface.prepare_data_for_inference({"base64_image": base64_img})
-    formatted = model_interface.format_input(prepared, "http", max_batch_size=1)[0]
+    batches, batch_data = model_interface.format_input(prepared, "http", max_batch_size=1)
+    formatted = batches[0]
+
+    # Check that default values are set
     assert formatted["max_tokens"] == 500
     assert formatted["temperature"] == 0.5
     assert formatted["top_p"] == 0.9
     assert formatted["stream"] is False
+
+    # Verify accompanying batch data
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    assert isinstance(bd["image_arrays"], list)
+    assert len(bd["image_arrays"]) == 1
+    assert bd["image_arrays"][0].shape == (256, 256, 3)
+    assert bd["image_dims"] == [(256, 256)]
 
 
 def test_format_input_invalid_protocol(model_interface):
