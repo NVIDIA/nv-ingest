@@ -126,7 +126,7 @@ services:
     runtime: nvidia
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12.1
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
