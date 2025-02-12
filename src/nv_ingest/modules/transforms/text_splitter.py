@@ -113,11 +113,6 @@ def _text_splitter(builder: mrc.Builder):
             with message.payload().mutable_dataframe() as mdf:
                 df = mdf.to_pandas()
 
-            # Filter to txt files only
-            # bool_index = df["document_type"] == ContentTypeEnum.TEXT
-            # df_filtered = df.loc[bool_index]
-            logger.info(df.columns)
-
             # Filter to document type
             bool_index = df["document_type"] == ContentTypeEnum.TEXT
             df_filtered = df.loc[bool_index]
@@ -132,12 +127,22 @@ def _text_splitter(builder: mrc.Builder):
             params = task_props.get("params", {})
 
             hf_access_token = params.get("hf_access_token", None)
+            split_source_types = params.get("split_source_types", ["TEXT"])
 
             logger.debug(
                 f"Splitting text with tokenizer: {tokenizer}, "
                 f"chunk_size: {chunk_size} tokens, "
                 f"chunk_overlap: {chunk_overlap}"
             )
+
+            # Filter to file type
+            bool_index = pd.json_normalize(df_filtered["metadata"])["source_metadata.source_type"].isin(
+                split_source_types
+            )
+            df_filtered = df_filtered.loc[bool_index]
+
+            if df_filtered.empty:
+                return message
 
             tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token=hf_access_token)
 
