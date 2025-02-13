@@ -162,6 +162,7 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
+    cached_client = deplot_client = None
     try:
         _ = task_props  # Unused
 
@@ -236,8 +237,10 @@ def _extract_chart_data(
 
     finally:
         try:
-            cached_client.close()
-            deplot_client.close()
+            if cached_client is not None:
+                cached_client.close()
+            if deplot_client is not None:
+                deplot_client.close()
 
         except Exception as close_err:
             logger.error(f"Error closing clients: {close_err}", exc_info=True)
