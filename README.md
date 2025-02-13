@@ -214,10 +214,11 @@ pip install .
 You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
 
 In the below examples, we are doing text, chart, table, and image extraction:
-- `extract_text`, - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages
-- `extract_images` - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images
-- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
-- `extract_charts` - (optional) enables or disables the use of Deplot and CACHED for chart extraction.
+
+- **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
+- **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
+- **extract_tables** — Uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
+- **extract_charts** — (Optional) Enables or disables Deplot and CACHED for chart extraction.
 
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
