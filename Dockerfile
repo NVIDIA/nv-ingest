@@ -13,6 +13,12 @@ ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
 
+# Embed the `git rev-parse HEAD` as a Docker metadata label
+# Allows for linking container builds to git commits
+# docker inspect nv-ingest:latest | jq '.[0].Config.Labels.git_commit' -> GIT_SHA
+ARG GIT_COMMIT
+LABEL git_commit=$GIT_COMMIT
+
 # Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
       wget \
