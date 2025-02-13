@@ -93,10 +93,13 @@ class NvIngestClient:
         self._message_client_hostname = message_client_hostname or "localhost"
         self._message_client_port = message_client_port or 7670
         self._message_counter_id = msg_counter_id or "nv-ingest-message-id"
+        self._message_client_kwargs = message_client_kwargs or {}
 
         logger.debug("Instantiate NvIngestClient:\n%s", str(self))
         self._message_client = message_client_allocator(
-            host=self._message_client_hostname, port=self._message_client_port
+            host=self._message_client_hostname,
+            port=self._message_client_port,
+            **self._message_client_kwargs,
         )
 
         # Initialize the worker pool with the specified size
