@@ -882,10 +882,11 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
-    nvidia_api_key = ClientConfigSchema.nvidia_build_api_key
+    client_config = ClientConfigSchema()
+    nvidia_api_key = client_config.nvidia_build_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
-    embedding_endpoint = embedding_endpoint if embedding_endpoint else ClientConfigSchema.embedding_nim_endpoint
-    model_name = model_name if model_name else ClientConfigSchema.embedding_nim_model_name
+    embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
+    model_name = model_name if model_name else client_config.embedding_nim_model_name
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)

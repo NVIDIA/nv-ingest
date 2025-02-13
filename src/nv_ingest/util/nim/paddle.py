@@ -103,38 +103,40 @@ class PaddleOCRModelInterface(ModelInterface):
         Parameters
         ----------
         data : dict of str -> Any
-            The input data dictionary, expected to contain "image_arrays" (list of np.ndarray).
+            The input data dictionary, expected to contain "image_arrays" (list of np.ndarray)
+            and "image_dims" (list of (height, width) tuples), as produced by prepare_data_for_inference.
         protocol : str
             The inference protocol, either "grpc" or "http".
         max_batch_size : int
-            The maximum batch size batching.
+            The maximum batch size for batching.
 
         Returns
         -------
-        Any
-            A list of formatted batches. For gRPC, each item is a batched NumPy array of shape (B, H, W, C)
-            where B <= max_batch_size. For HTTP, each item is a JSON-serializable payload containing the
-            base64 images in the format required by the PaddleOCR endpoint.
+        tuple
+            A tuple (formatted_batches, formatted_batch_data) where:
+              - formatted_batches is a list of batches ready for inference.
+              - formatted_batch_data is a list of scratch-pad dictionaries corresponding to each batch,
+                containing the keys "image_arrays" and "image_dims" for later post-processing.
 
         Raises
         ------
         KeyError
-            If "image_arrays" is not found in `data`.
+            If either "image_arrays" or "image_dims" is not found in `data`.
         ValueError
-            If an invalid protocol is specified, or if the image shapes are inconsistent for gRPC batching.
+            If an invalid protocol is specified.
         """
-        if "image_arrays" not in data:
-            raise KeyError("Expected 'image_arrays' in data. Call prepare_data_for_inference first.")
 
-        images = data["image_arrays"]
-
-        # Helper function to split a list into chunks of size up to chunk_size.
         def chunk_list(lst, chunk_size):
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
+        if "image_arrays" not in data or "image_dims" not in data:
+            raise KeyError("Expected 'image_arrays' and 'image_dims' in data. Call prepare_data_for_inference first.")
+
+        images = data["image_arrays"]
+        dims = data["image_dims"]
+
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
-
             processed: List[np.ndarray] = []
             for img in images:
                 arr = preprocess_image_for_paddle(img, self.paddle_version).astype(np.float32)
@@ -142,53 +144,62 @@ class PaddleOCRModelInterface(ModelInterface):
                 processed.append(arr)
 
             batches = []
-            for chunk in chunk_list(processed, max_batch_size):
-                # Concatenate arrays in the chunk along the batch dimension => shape (B, H, W, C)
-                batched_input = np.concatenate(chunk, axis=0)
+            batch_data_list = []
+            for proc_chunk, orig_chunk, dims_chunk in zip(
+                chunk_list(processed, max_batch_size),
+                chunk_list(images, max_batch_size),
+                chunk_list(dims, max_batch_size),
+            ):
+                batched_input = np.concatenate(proc_chunk, axis=0)
                 batches.append(batched_input)
-
-            return batches
+                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return batches, batch_data_list
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP PaddleOCR model (batched).")
+            if "base64_images" in data:
+                base64_list = data["base64_images"]
+            else:
+                base64_list = [data["base64_image"]]
 
-            # Use legacy or new API based on the PaddleOCR version
             if self._is_version_early_access_legacy_api():
                 content_list: List[Dict[str, Any]] = []
-                base64_list = data.get("base64_images")
-                if base64_list is None and "base64_image" in data:
-                    # fallback to single image
-                    base64_list = [data["base64_image"]]
-
                 for b64 in base64_list:
                     image_url = f"data:image/png;base64,{b64}"
                     image_obj = {"type": "image_url", "image_url": {"url": image_url}}
                     content_list.append(image_obj)
 
                 batches = []
-                for chunk in chunk_list(content_list, max_batch_size):
-                    message = {"content": chunk}
+                batch_data_list = []
+                for content_chunk, orig_chunk, dims_chunk in zip(
+                    chunk_list(content_list, max_batch_size),
+                    chunk_list(images, max_batch_size),
+                    chunk_list(dims, max_batch_size),
+                ):
+                    message = {"content": content_chunk}
                     payload = {"messages": [message]}
                     batches.append(payload)
-                return batches
+                    batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+                return batches, batch_data_list
 
             else:
                 input_list: List[Dict[str, Any]] = []
-                base64_list = data.get("base64_images")
-                if base64_list is None and "base64_image" in data:
-                    # fallback to single image
-                    base64_list = [data["base64_image"]]
-
                 for b64 in base64_list:
                     image_url = f"data:image/png;base64,{b64}"
                     image_obj = {"type": "image_url", "url": image_url}
                     input_list.append(image_obj)
 
                 batches = []
-                for chunk in chunk_list(input_list, max_batch_size):
-                    payload = {"input": chunk}
+                batch_data_list = []
+                for input_chunk, orig_chunk, dims_chunk in zip(
+                    chunk_list(input_list, max_batch_size),
+                    chunk_list(images, max_batch_size),
+                    chunk_list(dims, max_batch_size),
+                ):
+                    payload = {"input": input_chunk}
                     batches.append(payload)
-                return batches
+                    batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+                return batches, batch_data_list
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
