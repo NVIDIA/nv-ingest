@@ -5,11 +5,7 @@ from typing import Dict
 from typing import Optional
 
 import numpy as np
-import pandas as pd
-from packaging import version as pkgversion
-from sklearn.cluster import DBSCAN
 
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import ModelInterface
 from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
@@ -22,17 +18,6 @@ class PaddleOCRModelInterface(ModelInterface):
     An interface for handling inference with a PaddleOCR model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, paddle_version: Optional[str] = None) -> None:
-        """
-        Initialize the PaddleOCR model interface.
-
-        Parameters
-        ----------
-        paddle_version : str, optional
-            The version of the PaddleOCR model (default is None).
-        """
-        self.paddle_version: Optional[str] = paddle_version
-
     def name(self) -> str:
         """
         Get the name of the model interface.
@@ -40,9 +25,9 @@ class PaddleOCRModelInterface(ModelInterface):
         Returns
         -------
         str
-            The name of the model interface, including the PaddleOCR version.
+            The name of the model interface.
         """
-        return f"PaddleOCR - {self.paddle_version}"
+        return "PaddleOCR"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -76,20 +61,16 @@ class PaddleOCRModelInterface(ModelInterface):
                 raise ValueError("The 'base64_images' key must contain a list of base64-encoded strings.")
 
             image_arrays: List[np.ndarray] = []
-            dims: List[Tuple[int, int]] = []
             for b64 in base64_list:
                 img = base64_to_numpy(b64)
                 image_arrays.append(img)
-                dims.append((img.shape[0], img.shape[1]))
 
             data["image_arrays"] = image_arrays
-            data["image_dims"] = dims
 
         elif "base64_image" in data:
             # Single-image fallback
             img = base64_to_numpy(data["base64_image"])
             data["image_arrays"] = [img]
-            data["image_dims"] = [(img.shape[0], img.shape[1])]
 
         else:
             raise KeyError("Input data must include 'base64_image' or 'base64_images'.")
@@ -126,6 +107,12 @@ class PaddleOCRModelInterface(ModelInterface):
             If an invalid protocol is specified.
         """
 
+        images = data["image_arrays"]
+
+        dims: List[Dict[str, Any]] = []
+        data["image_dims"] = dims
+
+        # Helper function to split a list into chunks of size up to chunk_size.
         def chunk_list(lst, chunk_size):
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
@@ -139,7 +126,9 @@ class PaddleOCRModelInterface(ModelInterface):
             logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
             processed: List[np.ndarray] = []
             for img in images:
-                arr = preprocess_image_for_paddle(img, self.paddle_version).astype(np.float32)
+                arr, _dims = preprocess_image_for_paddle(img)
+                dims.append(_dims)
+                arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
                 processed.append(arr)
 
@@ -162,44 +151,23 @@ class PaddleOCRModelInterface(ModelInterface):
             else:
                 base64_list = [data["base64_image"]]
 
-            if self._is_version_early_access_legacy_api():
-                content_list: List[Dict[str, Any]] = []
-                for b64 in base64_list:
-                    image_url = f"data:image/png;base64,{b64}"
-                    image_obj = {"type": "image_url", "image_url": {"url": image_url}}
-                    content_list.append(image_obj)
+            input_list: List[Dict[str, Any]] = []
+            for b64 in base64_list:
+                image_url = f"data:image/png;base64,{b64}"
+                image_obj = {"type": "image_url", "url": image_url}
+                input_list.append(image_obj)
 
-                batches = []
-                batch_data_list = []
-                for content_chunk, orig_chunk, dims_chunk in zip(
-                    chunk_list(content_list, max_batch_size),
-                    chunk_list(images, max_batch_size),
-                    chunk_list(dims, max_batch_size),
-                ):
-                    message = {"content": content_chunk}
-                    payload = {"messages": [message]}
-                    batches.append(payload)
-                    batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
-                return batches, batch_data_list
-
-            else:
-                input_list: List[Dict[str, Any]] = []
-                for b64 in base64_list:
-                    image_url = f"data:image/png;base64,{b64}"
-                    image_obj = {"type": "image_url", "url": image_url}
-                    input_list.append(image_obj)
-
-                batches = []
-                batch_data_list = []
-                for input_chunk, orig_chunk, dims_chunk in zip(
-                    chunk_list(input_list, max_batch_size),
-                    chunk_list(images, max_batch_size),
-                    chunk_list(dims, max_batch_size),
-                ):
-                    payload = {"input": input_chunk}
-                    batches.append(payload)
-                    batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
-                return batches, batch_data_list
+            batches = []
+            batch_data_list = []
+            for input_chunk, orig_chunk, dims_chunk in zip(
+                chunk_list(input_list, max_batch_size),
+                chunk_list(images, max_batch_size),
+                chunk_list(dims, max_batch_size),
+            ):
+                payload = {"input": input_chunk}
+                batches.append(payload)
+                batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return batches, batch_data_list
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -230,29 +198,16 @@ class PaddleOCRModelInterface(ModelInterface):
         ValueError
             If an invalid protocol is specified.
         """
-        default_table_content_format = (
-            TableFormatEnum.SIMPLE if self._is_version_early_access_legacy_api() else TableFormatEnum.PSEUDO_MARKDOWN
-        )
-        table_content_format = kwargs.get("table_content_format", default_table_content_format)
-
-        # Enforce legacy constraints
-        if self._is_version_early_access_legacy_api() and table_content_format != TableFormatEnum.SIMPLE:
-            logger.warning(
-                f"Paddle version {self.paddle_version} does not support {table_content_format} format. "
-                "The table content will be in `simple` format."
-            )
-            table_content_format = TableFormatEnum.SIMPLE
-
         # Retrieve image dimensions if available
         dims: Optional[List[Tuple[int, int]]] = data.get("image_dims") if data else None
 
         if protocol == "grpc":
             logger.debug("Parsing output from gRPC PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_grpc_response(response, table_content_format, dims)
+            return self._extract_content_from_paddle_grpc_response(response, dims)
 
         elif protocol == "http":
             logger.debug("Parsing output from HTTP PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_http_response(response, table_content_format, dims)
+            return self._extract_content_from_paddle_http_response(response)
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -276,18 +231,6 @@ class PaddleOCRModelInterface(ModelInterface):
         """
         return output
 
-    def _is_version_early_access_legacy_api(self) -> bool:
-        """
-        Determine if the current PaddleOCR version is considered "early access" and thus uses
-        the legacy API format.
-
-        Returns
-        -------
-        bool
-            True if the version is < 0.2.1-rc2; False otherwise.
-        """
-        return self.paddle_version is not None and pkgversion.parse(self.paddle_version) < pkgversion.parse("0.2.1-rc2")
-
     def _prepare_paddle_payload(self, base64_img: str) -> Dict[str, Any]:
         """
         DEPRECATED by batch logic in format_input. Kept here if you need single-image direct calls.
@@ -304,18 +247,15 @@ class PaddleOCRModelInterface(ModelInterface):
         """
         image_url = f"data:image/png;base64,{base64_img}"
 
-        if self._is_version_early_access_legacy_api():
-            image = {"type": "image_url", "image_url": {"url": image_url}}
-            message = {"content": [image]}
-            payload = {"messages": [message]}
-        else:
-            image = {"type": "image_url", "url": image_url}
-            payload = {"input": [image]}
+        image = {"type": "image_url", "url": image_url}
+        payload = {"input": [image]}
 
         return payload
 
     def _extract_content_from_paddle_http_response(
-        self, json_response: Dict[str, Any], table_content_format: Optional[str], dims: Optional[List[Tuple[int, int]]]
+        self,
+        json_response: Dict[str, Any],
+        table_content_format: Optional[str],
     ) -> List[Tuple[str, str]]:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.
@@ -326,9 +266,6 @@ class PaddleOCRModelInterface(ModelInterface):
             The JSON response returned by the PaddleOCR endpoint.
         table_content_format : str or None
             The specified format for table content (e.g., 'simple' or 'pseudo_markdown').
-        dims : list of (int, int), optional
-            A list of (height, width) for each corresponding image, used for bounding box
-            scaling if not None.
 
         Returns
         -------
@@ -347,33 +284,21 @@ class PaddleOCRModelInterface(ModelInterface):
 
         results: List[str] = []
         for item_idx, item in enumerate(json_response["data"]):
-            if self._is_version_early_access_legacy_api():
-                content = item.get("content", "")
-            else:
-                text_detections = item.get("text_detections", [])
-                text_predictions: List[str] = []
-                bounding_boxes: List[List[Tuple[float, float]]] = []
+            text_detections = item.get("text_detections", [])
+            text_predictions = []
+            bounding_boxes = []
+            for td in text_detections:
+                text_predictions.append(td["text_prediction"]["text"])
+                bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
 
-                for td in text_detections:
-                    text_predictions.append(td["text_prediction"]["text"])
-                    bounding_boxes.append([(pt["x"], pt["y"]) for pt in td["bounding_box"]["points"]])
+            results.append([bounding_boxes, text_predictions])
 
-                if table_content_format == TableFormatEnum.SIMPLE:
-                    content = " ".join(text_predictions)
-                elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                    content = self._convert_paddle_response_to_psuedo_markdown(
-                        bounding_boxes, text_predictions, img_index=item_idx, dims=dims
-                    )
-                else:
-                    raise ValueError(f"Unexpected table format: {table_content_format}")
-
-            results.append(content)
-
-        # Convert each content into a tuple (content, format).
-        return [(content, table_content_format) for content in results]
+        return results
 
     def _extract_content_from_paddle_grpc_response(
-        self, response: np.ndarray, table_content_format: str, dims: Optional[List[Tuple[int, int]]]
+        self,
+        response: np.ndarray,
+        dimensions: List[Dict[str, Any]],
     ) -> List[Tuple[str, str]]:
         """
         Parse a gRPC response for one or more images. The response can have two possible shapes:
@@ -391,8 +316,8 @@ class PaddleOCRModelInterface(ModelInterface):
             The raw NumPy array from gRPC. Expected shape: (3,) or (3, n).
         table_content_format : str
             The format of the output text content, e.g. 'simple' or 'pseudo_markdown'.
-        dims : list of (int, int), optional
-            A list of (height, width) for each corresponding image, used for bounding box scaling.
+        dims : list of dict, optional
+            A list of dict for each corresponding image, used for bounding box scaling.
 
         Returns
         -------
@@ -436,29 +361,27 @@ class PaddleOCRModelInterface(ModelInterface):
             if isinstance(text_predictions, list) and len(text_predictions) == 1:
                 text_predictions = text_predictions[0]
 
-            # Construct the content string
-            if table_content_format == TableFormatEnum.SIMPLE:
-                content = " ".join(text_predictions)
-            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                content = self._convert_paddle_response_to_psuedo_markdown(
-                    bounding_boxes, text_predictions, img_index=i, dims=dims
-                )
-            else:
-                raise ValueError(f"Unexpected table format: {table_content_format}")
+            bounding_boxes, text_predictions = self._postprocess_paddle_response(
+                bounding_boxes,
+                text_predictions,
+                dimensions,
+                img_index=i,
+            )
 
-            results.append((content, table_content_format))
+            results.append([bounding_boxes, text_predictions])
 
         return results
 
     @staticmethod
-    def _convert_paddle_response_to_psuedo_markdown(
+    def _postprocess_paddle_response(
         bounding_boxes: List[Any],
         text_predictions: List[str],
+        dims: Optional[List[Dict[str, Any]]] = None,
         img_index: int = 0,
-        dims: Optional[List[Tuple[int, int]]] = None,
-    ) -> str:
+    ) -> Tuple[List[Any], List[str]]:
         """
-        Convert bounding boxes & text to pseudo-markdown format. For multiple images,
+        Convert bounding boxes with normalized coordinates to pixel cooridnates by using
+        the dimensions. Also shift the coorindates if the inputs were padded. For multiple images,
         the correct image dimensions (height, width) are retrieved from `dims[img_index]`.
 
         Parameters
@@ -469,14 +392,19 @@ class PaddleOCRModelInterface(ModelInterface):
             A list of text predictions, one for each bounding box.
         img_index : int, optional
             The index of the image for which bounding boxes are being converted. Default is 0.
-        dims : list of (int, int), optional
-            A list of (height, width) for each corresponding image.
+        dims : list of dict, optional
+            A list of dictionaries, where each dictionary contains image-specific dimensions
+            and scaling information:
+                - "new_width" (int): The width of the image after processing.
+                - "new_height" (int): The height of the image after processing.
+                - "pad_width" (int, optional): The width of padding added to the image.
+                - "pad_height" (int, optional): The height of padding added to the image.
+                - "scale_factor" (float, optional): The scaling factor applied to the image.
 
         Returns
         -------
-        str
-            The pseudo-markdown representation of detected text lines and bounding boxes.
-            Each cluster of text is placed on its own line, with text columns separated by '|'.
+        Tuple[List[Any], List[str]]
+            Bounding boxes scaled backed to the original dimensions and detected text lines.
 
         Notes
         -----
@@ -484,16 +412,19 @@ class PaddleOCRModelInterface(ModelInterface):
         """
         # Default to no scaling if dims are missing or out of range
         if not dims:
-            logger.warning("No image_dims provided; bounding boxes will not be scaled.")
-            target_h, target_w = 1, 1
+            raise ValueError("No image_dims provided.")
         else:
             if img_index >= len(dims):
                 logger.warning("Image index out of range for stored dimensions. Using first image dims by default.")
-                target_h, target_w = dims[0]
-            else:
-                target_h, target_w = dims[img_index]
+                img_index = 0
 
-        scaled_boxes: List[List[float]] = []
+        max_width = dims[img_index]["new_width"]
+        max_height = dims[img_index]["new_height"]
+        pad_width = dims[img_index].get("pad_width", 0)
+        pad_height = dims[img_index].get("pad_height", 0)
+        scale_factor = dims[img_index].get("scale_factor", 1.0)
+
+        bboxes: List[List[float]] = []
         texts: List[str] = []
 
         # Convert normalized coords back to actual pixel coords
@@ -502,43 +433,14 @@ class PaddleOCRModelInterface(ModelInterface):
                 continue
             points: List[List[float]] = []
             for point in box:
-                x = float(point[0]) * target_w
-                y = float(point[1]) * target_h
-                points.append([x, y])
-            scaled_boxes.append(points)
+                # Convert normalized coords back to actual pixel coords,
+                # and shift them back to their original positions if padded.
+                x_pixels = float(point[0]) * max_width - pad_width
+                y_pixels = float(point[1]) * max_height - pad_height
+                x_original = x_pixels / scale_factor
+                y_original = y_pixels / scale_factor
+                points.append([x_original, y_original])
+            bboxes.append(points)
             texts.append(txt)
 
-        if not scaled_boxes or not texts:
-            return ""
-
-        # Convert bounding boxes to a simplified (x0, y0, x1, y1) representation
-        # by taking only the top-left and bottom-right corners
-        bboxes_array = np.array(scaled_boxes).astype(int)
-        # Reshape => (N, 4) by taking [0,1, 2,3] from the original (N, 4, 2)
-        # but we have 4 corners => 8 values. So shape => (N, 8). Then keep indices [0, 1, 2, 7].
-        bboxes_array = bboxes_array.reshape(-1, 8)[:, [0, 1, 2, -1]]
-
-        preds_df = pd.DataFrame(
-            {
-                "x0": bboxes_array[:, 0],
-                "y0": bboxes_array[:, 1],
-                "x1": bboxes_array[:, 2],
-                "y1": bboxes_array[:, 3],
-                "text": texts,
-            }
-        )
-        # Sort by top position
-        preds_df = preds_df.sort_values("y0")
-
-        dbscan = DBSCAN(eps=10, min_samples=1)
-        dbscan.fit(preds_df["y0"].values[:, None])
-
-        preds_df["cluster"] = dbscan.labels_
-        # Sort by cluster and then by x0 to group text lines from left to right
-        preds_df = preds_df.sort_values(["cluster", "x0"])
-
-        lines = []
-        for _, dfg in preds_df.groupby("cluster"):
-            lines.append("| " + " | ".join(dfg["text"].values.tolist()) + " |")
-
-        return "\n".join(lines)
+        return bboxes, texts

@@ -158,7 +158,7 @@ def extract_table_and_chart_images(
         objects = annotation_dict[label]
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = np.array(bbox) * np.array([height, width, height, width])
+            h1, w1, h2, w2 = bbox
 
             cropped_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
             base64_img = numpy_to_base64(cropped_img) if cropped_img is not None else None
