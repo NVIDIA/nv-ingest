@@ -225,21 +225,15 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
-
-    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
-    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
-    # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_graphic_elements")
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
-                "cached_endpoints": (cached_grpc, cached_http),
-                "cached_infer_protocol": cached_protocol,
-                "deplot_endpoints": (deplot_grpc, deplot_http),
-                "deplot_infer_protocol": deplot_protocol,
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
@@ -384,12 +378,14 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         },
     )
@@ -425,6 +421,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
         ),
     )
+
     embed_extractions_stage = pipe.add_stage(
         LinearModulesStage(
             morpheus_pipeline_config,
@@ -435,6 +432,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
             output_port_name="output",
         )
     )
+
     return embed_extractions_stage
 
 

@@ -2,7 +2,7 @@
 
 # Function to display usage
 usage() {
-    echo "Usage: $0 --type <dev|release> --lib <client|service>"
+    echo "Usage: $0 --type <dev|release> --lib <api|client|service>"
     exit 1
 }
 
@@ -38,18 +38,22 @@ else
 fi
 
 # Set library-specific variables and paths
-if [[ "$LIBRARY" == "client" ]]; then
-    NV_INGEST_CLIENT_VERSION_OVERRIDE="${VERSION_SUFFIX}"
-    export NV_INGEST_CLIENT_VERSION_OVERRIDE
-    SETUP_PATH="$SCRIPT_DIR/../../client/setup.py"
+if [[ "$LIBRARY" == "api" ]]; then
+    NV_INGEST_VERSION_OVERRIDE="${VERSION_SUFFIX}"
+    export NV_INGEST_VERSION_OVERRIDE
+    SETUP_PATH="$SCRIPT_DIR/../../api/pyproject.toml"
+    (cd "$(dirname "$SETUP_PATH")" && python -m build)
+elif [[ "$LIBRARY" == "client" ]]; then
+    NV_INGEST_VERSION_OVERRIDE="${VERSION_SUFFIX}"
+    export NV_INGEST_VERSION_OVERRIDE
+    SETUP_PATH="$SCRIPT_DIR/../../client/pyproject.toml"
+    (cd "$(dirname "$SETUP_PATH")" && python -m build)
 elif [[ "$LIBRARY" == "service" ]]; then
     NV_INGEST_SERVICE_VERSION_OVERRIDE="${VERSION_SUFFIX}"
     export NV_INGEST_SERVICE_VERSION_OVERRIDE
     SETUP_PATH="$SCRIPT_DIR/../../setup.py"
+    (cd "$(dirname "$SETUP_PATH")" && python setup.py sdist bdist_wheel)
 else
     echo "Invalid library: $LIBRARY"
     usage
 fi
-
-# Build the wheel
-(cd "$(dirname "$SETUP_PATH")" && python setup.py sdist bdist_wheel)

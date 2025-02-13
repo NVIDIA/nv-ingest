@@ -4,6 +4,10 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
+> [!Note]
+> Cached and Deplot are deprecated, docker-compose now points to a beta version of the yolox-graphic-elements container instead. That model and container is slated for full release in March.
+> With this change, you should now be able to run on a single 80GB A100 or H100 GPU.
+> If you want to continue using the old pipeline with Cached and Deplot, please use the [24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 ## NVIDIA-Ingest: Multi-modal data extraction
 
@@ -44,8 +48,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM or PCIe | 80GB | 2 |
-| A100 | SXM or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 1 |
+| A100 | SXM or PCIe | 80GB | 1 |
 
 ### Software
 
@@ -55,6 +59,8 @@ A service that:
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
+> [!Note]
+> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
 
 ## Quickstart
 
@@ -90,13 +96,17 @@ Password: <Your Key>
 ```
 
 > [!NOTE]
-> during the early access (EA) phase, your API key must be created as a member of `nemo-microservice / ea-participants` which you may join by applying for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join. When approved, switch your profile to this org / team, then the key you generate will have access to the resources outlined below.
+> During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
+> When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file containing your NGC API key, and the following paths:
+4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/user-guide/developer-guide/environment-config.md).
+
 ```
 # Container images must access resources from NGC.
-NGC_API_KEY=... # Optional, set this if you are deploying NIMs locally from NGC
-NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com NIMs
+
+NGC_API_KEY=<key to download containers from NGC>
+NIM_NGC_API_KEY=<key to download model files after containers start>
+NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 ```
 
 > [!NOTE]
@@ -109,7 +119,7 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 5. Start all services:
-`docker compose up`
+`docker compose --profile retrieval up`
 
 > [!TIP]
 > By default we have [configured log levels to be verbose](docker-compose.yaml).
@@ -141,13 +151,13 @@ NVIDIA_BUILD_API_KEY=... # Optional, set this is you are using build.nvidia.com 
 Observe the started containers with `docker ps`:
 ```
 CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
-0f2f86615ea5   nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest:24.10                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
+0f2f86615ea5   nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
 de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-02c9ab8c6901   nvcr.io/ohlfw0olaadg/ea-participants/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
+02c9ab8c6901   nvcr.io/nvidia/nemo-microservices/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
 d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
-508715a24998   nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
-5b7a174a0a85   nvcr.io/ohlfw0olaadg/ea-participants/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
-430045f98c02   nvcr.io/ohlfw0olaadg/ea-participants/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
+508715a24998   nvcr.io/nvidia/nemo-microservices/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
+5b7a174a0a85   nvcr.io/nvidia/nemo-microservices/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
+430045f98c02   nvcr.io/nvidia/nemo-microservices/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
 8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
 aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
 bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
@@ -178,7 +188,6 @@ pip install .
 # When not using Conda, pip dependencies for the client can be installed directly via pip. Pip based installation of
 # the ingest service is not supported.
 cd client
-pip install -r requirements.txt
 pip install .
 ```
 
@@ -269,7 +278,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli`
+#### Using the `nv-ingest-cli`
 
 > [!NOTE]
 > You can find more examples [here](client/client_examples/examples/).

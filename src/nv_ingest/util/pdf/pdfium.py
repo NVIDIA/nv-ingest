@@ -176,7 +176,7 @@ def pdfium_pages_to_numpy(
             pil_image.thumbnail(scale_tuple, Image.LANCZOS)
 
         # Convert the PIL image to a NumPy array
-        img_arr = np.array(pil_image)
+        img_arr = np.array(pil_image).copy()
 
         # Apply padding if specified
         if padding_tuple:

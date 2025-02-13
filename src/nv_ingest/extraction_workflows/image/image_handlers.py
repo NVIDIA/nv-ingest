@@ -27,7 +27,6 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
-from math import log
 from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
@@ -159,7 +158,7 @@ def extract_table_and_chart_images(
         objects = annotation_dict[label]
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = np.array(bbox) * np.array([height, width, height, width])
+            h1, w1, h2, w2 = bbox
 
             base64_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
 
@@ -186,7 +185,7 @@ def extract_tables_and_charts_from_images(
     ----------
     images : List[np.ndarray]
         List of images in NumPy array format.
-    config : PDFiumConfigSchema
+    config : ImageConfigSchema
         Configuration object containing YOLOX endpoints, auth token, etc.
     trace_info : Optional[List], optional
         Optional tracing data for debugging/performance profiling.
@@ -194,8 +193,8 @@ def extract_tables_and_charts_from_images(
     Returns
     -------
     List[Tuple[int, object]]
-        A list of (image_index, CroppedImageWithContent)
-        representing extracted table/chart data from each image.
+        A list of (image_index, CroppedImageWithContent) representing extracted
+        table/chart data from each image.
     """
     tables_and_charts = []
     yolox_client = None
@@ -209,40 +208,31 @@ def extract_tables_and_charts_from_images(
             config.yolox_infer_protocol,
         )
 
-        max_batch_size = YOLOX_MAX_BATCH_SIZE
-        batches = []
-        i = 0
-        while i < len(images):
-            batch_size = min(2 ** int(log(len(images) - i, 2)), max_batch_size)
-            batches.append(images[i : i + batch_size])  # noqa: E203
-            i += batch_size
+        # Prepare the payload with all images.
+        data = {"images": images}
 
-        img_index = 0
-        for batch in batches:
-            data = {"images": batch}
+        # Perform inference in a single call. The NimClient handles batching internally.
+        inference_results = yolox_client.infer(
+            data,
+            model_name="yolox",
+            max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            num_classes=YOLOX_NUM_CLASSES,
+            conf_thresh=YOLOX_CONF_THRESHOLD,
+            iou_thresh=YOLOX_IOU_THRESHOLD,
+            min_score=YOLOX_MIN_SCORE,
+            final_thresh=YOLOX_FINAL_SCORE,
+            trace_info=trace_info,
+            stage_name="pdf_content_extractor",
+        )
 
-            # NimClient inference
-            inference_results = yolox_client.infer(
-                data,
-                model_name="yolox",
-                num_classes=YOLOX_NUM_CLASSES,
-                conf_thresh=YOLOX_CONF_THRESHOLD,
-                iou_thresh=YOLOX_IOU_THRESHOLD,
-                min_score=YOLOX_MIN_SCORE,
-                final_thresh=YOLOX_FINAL_SCORE,
-                trace_info=trace_info,  # traceable_func arg
-                stage_name="pdf_content_extractor",  # traceable_func arg
+        # Process each result along with its corresponding image.
+        for i, (annotation_dict, original_image) in enumerate(zip(inference_results, images)):
+            extract_table_and_chart_images(
+                annotation_dict,
+                original_image,
+                i,
+                tables_and_charts,
             )
-
-            # 5) Extract table/chart info from each image's annotations
-            for annotation_dict, original_image in zip(inference_results, batch):
-                extract_table_and_chart_images(
-                    annotation_dict,
-                    original_image,
-                    img_index,
-                    tables_and_charts,
-                )
-                img_index += 1
 
     except TimeoutError:
         logger.error("Timeout error during table/chart extraction.")
@@ -251,14 +241,13 @@ def extract_tables_and_charts_from_images(
     except Exception as e:
         logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
         traceback.print_exc()
-        raise e
+        raise
 
     finally:
         if yolox_client:
             yolox_client.close()
 
     logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
-
     return tables_and_charts
 
 
@@ -345,19 +334,6 @@ def image_data_extractor(
         # Future function for text extraction based on document_type
         logger.warning("Text extraction is not supported for raw images.")
 
-    # Image extraction stub
-    if extract_images:
-        # Placeholder for image-specific extraction process
-        extracted_data.append(
-            construct_image_metadata_from_base64(
-                numpy_to_base64(image_array),
-                page_idx=0,  # Single image treated as one page
-                page_count=1,
-                source_metadata=source_metadata,
-                base_unified_metadata=base_unified_metadata,
-            )
-        )
-
     # Table and chart extraction
     if extract_tables or extract_charts:
         try:
@@ -366,8 +342,8 @@ def image_data_extractor(
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
-            logger.debug("Extracted table/chart data from image")
-            for _, table_chart_data in tables_and_charts[0]:
+            for item in tables_and_charts:
+                table_chart_data = item[1]
                 extracted_data.append(
                     construct_table_and_chart_metadata(
                         table_chart_data,
@@ -380,6 +356,19 @@ def image_data_extractor(
         except Exception as e:
             logger.error(f"Error extracting tables/charts from image: {e}")
             raise
+
+        # Image extraction stub
+    if extract_images and not extracted_data:  # It's not an unstructured image if we extracted a sturctured image
+        # Placeholder for image-specific extraction process
+        extracted_data.append(
+            construct_image_metadata_from_base64(
+                numpy_to_base64(image_array),
+                page_idx=0,  # Single image treated as one page
+                page_count=1,
+                source_metadata=source_metadata,
+                base_unified_metadata=base_unified_metadata,
+            )
+        )
 
     logger.debug(f"Extracted {len(extracted_data)} items from the image.")
 

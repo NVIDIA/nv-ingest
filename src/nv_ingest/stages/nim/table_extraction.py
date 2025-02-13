@@ -6,115 +6,138 @@ import functools
 import logging
 from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
 from typing import Tuple
 
 import pandas as pd
-
 from morpheus.config import Config
 
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
-logger = logging.getLogger(f"morpheus.{__name__}")
+logger = logging.getLogger(__name__)
 
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _update_metadata(row: pd.Series, paddle_client: NimClient, trace_info: Dict) -> Dict:
+def _update_metadata(
+    base64_images: List[str],
+    paddle_client: NimClient,
+    worker_pool_size: int = 8,  # Not currently used
+    trace_info: Dict = None,
+) -> List[Tuple[str, Tuple[Any, Any]]]:
     """
-    Modifies the metadata of a row if the conditions for table extraction are met.
+    Given a list of base64-encoded images, this function filters out images that do not meet the minimum
+    size requirements and then calls the PaddleOCR model via paddle_client.infer to extract table data.
 
-    Parameters
-    ----------
-    row : pd.Series
-        A row from the DataFrame containing metadata for the table extraction.
+    For each base64-encoded image, the result is:
+        (base64_image, (text_predictions, bounding_boxes))
 
-    paddle_client : NimClient
-        The client used to call the PaddleOCR inference model.
-
-    trace_info : Dict
-        Trace information used for logging or debugging.
-
-    Returns
-    -------
-    Dict
-        The modified metadata if conditions are met, otherwise the original metadata.
-
-    Raises
-    ------
-    ValueError
-        If critical information (such as metadata) is missing from the row.
+    Images that do not meet the minimum size are skipped (resulting in ("", "") for that image).
+    The paddle_client is expected to handle any necessary batching and concurrency.
     """
-    metadata = row.get("metadata")
-    if metadata is None:
-        logger.error("Row does not contain 'metadata'.")
-        raise ValueError("Row does not contain 'metadata'.")
+    logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
 
-    base64_image = metadata.get("content")
-    content_metadata = metadata.get("content_metadata", {})
-    table_metadata = metadata.get("table_metadata")
+    # Initialize the results list in the same order as base64_images.
+    results: List[Optional[Tuple[str, Tuple[Any, Any]]]] = [None] * len(base64_images)
 
-    # Only modify if content type is structured and subtype is 'table' and table_metadata exists
-    if (
-        (content_metadata.get("type") != "structured")
-        or (content_metadata.get("subtype") != "table")
-        or (table_metadata is None)
-        or (base64_image in [None, ""])
-    ):
-        return metadata
+    valid_images: List[str] = []
+    valid_indices: List[int] = []
 
-    # Modify table metadata with the result from the inference model
-    try:
-        data = {"base64_image": base64_image}
+    _ = worker_pool_size
+    # Pre-decode image dimensions and filter valid images.
+    for i, img in enumerate(base64_images):
+        array = base64_to_numpy(img)
+        height, width = array.shape[0], array.shape[1]
+        if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
+            valid_images.append(img)
+            valid_indices.append(i)
+        else:
+            # Image is too small; mark as skipped.
+            results[i] = (img, (None, None))
 
-        image_array = base64_to_numpy(base64_image)
-
-        paddle_result = "", ""
-        if check_numpy_image_size(image_array, PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT):
-            # Perform inference using the NimClient
+    if valid_images:
+        data = {"base64_images": valid_images}
+        try:
+            # Call infer once for all valid images. The NimClient will handle batching internally.
             paddle_result = paddle_client.infer(
-                data,
+                data=data,
                 model_name="paddle",
-                table_content_format=table_metadata.get("table_content_format"),
-                trace_info=trace_info,  # traceable_func arg
-                stage_name="table_data_extraction",  # traceable_func arg
+                stage_name="table_data_extraction",
+                max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
+                trace_info=trace_info,
             )
 
-        table_content, table_content_format = paddle_result
-        table_metadata["table_content"] = table_content
-        table_metadata["table_content_format"] = table_content_format
-    except Exception as e:
-        logger.error(f"Unhandled error calling PaddleOCR inference model: {e}", exc_info=True)
-        raise
+            if not isinstance(paddle_result, list):
+                raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
+            if len(paddle_result) != len(valid_images):
+                raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
 
-    return metadata
+            # Assign each result back to its original position.
+            for idx, result in enumerate(paddle_result):
+                original_index = valid_indices[idx]
+                results[original_index] = (base64_images[original_index], result)
+
+        except Exception as e:
+            logger.error(f"Error processing images. Error: {e}", exc_info=True)
+            for i in valid_indices:
+                results[i] = (base64_images[i], (None, None))
+            raise
+
+    return results
+
+
+def _create_paddle_client(stage_config) -> NimClient:
+    """
+    Helper to create a NimClient for PaddleOCR, retrieving the paddle version from the endpoint.
+    """
+    # Attempt to obtain PaddleOCR version from the second endpoint
+    paddle_endpoint = stage_config.paddle_endpoints[1]
+    try:
+        paddle_version = get_version(paddle_endpoint)
+        if not paddle_version:
+            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
+            paddle_version = None
+    except Exception:
+        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest version.")
+        paddle_version = None
+
+    paddle_model_interface = PaddleOCRModelInterface()
+
+    paddle_client = create_inference_client(
+        endpoints=stage_config.paddle_endpoints,
+        model_interface=paddle_model_interface,
+        auth_token=stage_config.auth_token,
+        infer_protocol=stage_config.paddle_infer_protocol,
+    )
+
+    return paddle_client
 
 
 def _extract_table_data(
     df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Extracts table data from a DataFrame.
+    Extracts table data from a DataFrame in a bulk fashion rather than row-by-row,
+    following the chart extraction pattern.
 
     Parameters
     ----------
     df : pd.DataFrame
         DataFrame containing the content from which table data is to be extracted.
-
     task_props : Dict[str, Any]
         Dictionary containing task properties and configurations.
-
     validated_config : Any
         The validated configuration object for table extraction.
-
     trace_info : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
@@ -122,11 +145,6 @@ def _extract_table_data(
     -------
     Tuple[pd.DataFrame, Dict]
         A tuple containing the updated DataFrame and the trace information.
-
-    Raises
-    ------
-    Exception
-        If any error occurs during the table data extraction process.
     """
 
     _ = task_props  # unused
@@ -139,33 +157,63 @@ def _extract_table_data(
         return df, trace_info
 
     stage_config = validated_config.stage_config
-
-    # Obtain paddle_version
-    # Assuming that the grpc endpoint is at index 0
-    paddle_endpoint = stage_config.paddle_endpoints[1]
-    try:
-        paddle_version = get_version(paddle_endpoint)
-        if not paddle_version:
-            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
-            paddle_version = None  # Default to the latest version
-    except Exception:
-        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest verrsion.")
-        paddle_version = None  # Default to the latest version
-
-    # Create the PaddleOCRModelInterface with paddle_version
-    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
-
-    # Create the NimClient for PaddleOCR
-    paddle_client = create_inference_client(
-        endpoints=stage_config.paddle_endpoints,
-        model_interface=paddle_model_interface,
-        auth_token=stage_config.auth_token,
-        infer_protocol=stage_config.paddle_infer_protocol,
-    )
+    paddle_client = _create_paddle_client(stage_config)
 
     try:
-        # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_metadata, axis=1, args=(paddle_client, trace_info))
+        # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
+        def meets_criteria(row):
+            m = row.get("metadata", {})
+            if not m:
+                return False
+            content_md = m.get("content_metadata", {})
+            if (
+                content_md.get("type") == "structured"
+                and content_md.get("subtype") == "table"
+                and m.get("table_metadata") is not None
+                and m.get("content") not in [None, ""]
+            ):
+                return True
+            return False
+
+        mask = df.apply(meets_criteria, axis=1)
+        valid_indices = df[mask].index.tolist()
+
+        # If no rows meet the criteria, just return
+        if not valid_indices:
+            return df, {"trace_info": trace_info}
+
+        # 2) Extract base64 images in the same order
+        base64_images = []
+        for idx in valid_indices:
+            meta = df.at[idx, "metadata"]
+            base64_images.append(meta["content"])
+
+        # 3) Call our bulk _update_metadata to get all results
+        bulk_results = _update_metadata(
+            base64_images=base64_images,
+            paddle_client=paddle_client,
+            worker_pool_size=stage_config.workers_per_progress_engine,
+            trace_info=trace_info,
+        )
+
+        # 4) Write the results (bounding_boxes, text_predictions) back
+        table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
+            "table_content_format", TableFormatEnum.PSEUDO_MARKDOWN
+        )
+
+        for row_id, idx in enumerate(valid_indices):
+            # unpack (base64_image, (bounding boxes, text_predictions))
+            _, (bounding_boxes, text_predictions) = bulk_results[row_id]
+
+            if table_content_format == TableFormatEnum.SIMPLE:
+                table_content = " ".join(text_predictions)
+            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+                table_content = convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+            else:
+                raise ValueError(f"Unexpected table format: {table_content_format}")
+
+            df.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
+            df.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
 
         return df, {"trace_info": trace_info}
 

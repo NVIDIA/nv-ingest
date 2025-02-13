@@ -20,7 +20,6 @@ RUN apt update && apt install -y python3-pip git tree \
 RUN cd /workspace \
     && git clone https://github.com/NVIDIA/nv-ingest.git \
     && cd /workspace/nv-ingest/client \
-    && pip install -r ./requirements.txt \
     && pip install .
 COPY examples /workspace/client_examples/examples
 

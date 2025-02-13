@@ -93,28 +93,75 @@ def test_prepare_data_for_inference_invalid_image_format(model_interface):
 
 
 def test_format_input_grpc(model_interface):
+    """
+    Test that for the gRPC protocol:
+      - The input images are resized and reordered to have shape (B, 3, 1024, 1024).
+      - The returned batch data includes the original images and their original shapes.
+    """
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "grpc")
-    assert isinstance(formatted_input, np.ndarray)
-    assert formatted_input.dtype == np.float32
-    assert formatted_input.shape[0] == len(images)
-    assert formatted_input.shape[1:] == (3, 1024, 1024)
+
+    # format_input returns a tuple: (batched_inputs, formatted_batch_data)
+    batched_inputs, batch_data = model_interface.format_input(prepared_data, "grpc", max_batch_size=2)
+
+    # Check batched_inputs is a list of NumPy arrays
+    assert isinstance(batched_inputs, list)
+    # Since max_batch_size=2 and we provided 2 images, there should be one chunk
+    assert len(batched_inputs) == 1
+    batched_array = batched_inputs[0]
+
+    # Verify dtype and shape: expected shape (number_of_images, 3, 1024, 1024)
+    assert batched_array.dtype == np.float32
+    assert batched_array.shape[0] == len(images)
+    assert batched_array.shape[1:] == (3, 1024, 1024)
+
+    # Verify that the batch_data correctly includes the original images and their shapes.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1  # one chunk since all images were batched together
+    bd = batch_data[0]
+    assert "images" in bd and "original_image_shapes" in bd
+    # The original images should match the ones provided in input_data.
+    assert bd["images"] == images
+    # The original shapes stored during prepare_data_for_inference should be returned.
+    assert bd["original_image_shapes"] == prepared_data["original_image_shapes"]
 
 
 def test_format_input_http(model_interface):
+    """
+    Test that for the HTTP protocol:
+      - The formatted payload is a JSON-serializable dict with an "input" key containing a list
+        of image dictionaries. Each image dictionary must have a "type" key with value "image_url"
+        and a "url" starting with "data:image/png;base64,".
+      - The accompanying batch data correctly contains the original images and their original shapes.
+    """
     images = [create_test_image(), create_test_image()]
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
-    formatted_input = model_interface.format_input(prepared_data, "http")
-    assert "input" in formatted_input
-    assert isinstance(formatted_input["input"], list)
-    for content in formatted_input["input"]:
-        assert "type" in content
-        assert content["type"] == "image_url"
-        assert "url" in content
-        assert content["url"].startswith("data:image/png;base64,")
+
+    # format_input returns a tuple: (payload_batches, formatted_batch_data)
+    payload_batches, batch_data = model_interface.format_input(prepared_data, "http", max_batch_size=2)
+
+    # Verify payload structure.
+    assert isinstance(payload_batches, list)
+    # Since max_batch_size=2 and we have 2 images, we expect one payload chunk.
+    assert len(payload_batches) == 1
+    payload = payload_batches[0]
+    assert "input" in payload
+    assert isinstance(payload["input"], list)
+    for item in payload["input"]:
+        assert "type" in item
+        assert item["type"] == "image_url"
+        assert "url" in item
+        assert item["url"].startswith("data:image/png;base64,")
+
+    # Verify that batch_data is returned correctly.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1  # one batch chunk
+    bd = batch_data[0]
+    assert "images" in bd and "original_image_shapes" in bd
+    assert bd["images"] == images
+    assert bd["original_image_shapes"] == prepared_data["original_image_shapes"]
 
 
 def test_format_input_invalid_protocol(model_interface):
@@ -122,7 +169,7 @@ def test_format_input_invalid_protocol(model_interface):
     input_data = {"images": images}
     prepared_data = model_interface.prepare_data_for_inference(input_data)
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        model_interface.format_input(prepared_data, "invalid_protocol")
+        model_interface.format_input(prepared_data, "invalid_protocol", max_batch_size=1)
 
 
 def test_parse_output_grpc(model_interface):
@@ -182,11 +229,6 @@ def test_process_inference_results_grpc(model_interface):
         output_array,
         "grpc",
         original_image_shapes=original_image_shapes,
-        num_classes=3,
-        conf_thresh=0.5,
-        iou_thresh=0.4,
-        min_score=0.3,
-        final_thresh=0.6,
     )
     assert isinstance(inference_results, list)
     assert len(inference_results) == 2
@@ -194,10 +236,10 @@ def test_process_inference_results_grpc(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "title" in result:
             assert isinstance(result["title"], list)
 
@@ -211,14 +253,11 @@ def test_process_inference_results_http(model_interface):
         }
         for _ in range(10)
     ]
+    original_image_shapes = [[100, 100] for _ in range(10)]
     inference_results = model_interface.process_inference_results(
         output,
         "http",
-        num_classes=3,
-        conf_thresh=0.5,
-        iou_thresh=0.4,
-        min_score=0.3,
-        final_thresh=0.6,
+        original_image_shapes=original_image_shapes,
     )
     assert isinstance(inference_results, list)
     assert len(inference_results) == 10
@@ -226,9 +265,9 @@ def test_process_inference_results_http(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.6
+                assert bbox[4] >= 0.48
         if "title" in result:
             assert isinstance(result["title"], list)

@@ -1,256 +1,456 @@
-from unittest.mock import Mock
-from unittest.mock import patch
+from unittest.mock import MagicMock
 
 import pytest
-import requests
 import pandas as pd
+import numpy as np
 
-from nv_ingest.stages.nim.chart_extraction import _update_metadata
-from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
+    from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
+    from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
+    from nv_ingest.util.image_processing.transforms import base64_to_numpy
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 
 
 @pytest.fixture
-def base64_encoded_image():
-    # Create a simple image and encode it to base64
-    import base64
-    from io import BytesIO
-
-    from PIL import Image
-
-    img = Image.new("RGB", (64, 64), color="white")
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
-    base64_str = base64.b64encode(img_bytes).decode("utf-8")
-    return base64_str
+def valid_chart_extractor_config():
+    """
+    Returns a ChartExtractorConfigSchema object with valid endpoints/protocols.
+    This fixture can be adapted to your environment.
+    """
+    return ChartExtractorConfigSchema(
+        auth_token="fake_token",
+        yolox_endpoints=("yolox_grpc_url", "yolox_http_url"),
+        yolox_infer_protocol="grpc",
+        paddle_endpoints=("paddle_grpc_url", "paddle_http_url"),
+        paddle_infer_protocol="grpc",
+        workers_per_progress_engine=5,
+    )
 
 
 @pytest.fixture
-def sample_dataframe(base64_encoded_image):
-    data = {
-        "metadata": [
+def base64_image():
+    return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
+
+
+@pytest.fixture
+def validated_config(valid_chart_extractor_config):
+    """
+    If your code references validated_config.stage_config,
+    we can make a simple object that has an attribute 'stage_config'
+    pointing to our chart config.
+    """
+
+    class FakeValidated:
+        stage_config = valid_chart_extractor_config
+
+    return FakeValidated()
+
+
+def test_update_metadata_empty_list():
+    """
+    If the base64_images list is empty, _update_metadata should return an empty list.
+    With the updated implementation, both clients are still invoked (with an empty list)
+    so we set their return values to [] and then verify the calls.
+    """
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    trace_info = {}
+
+    # When given an empty list, both clients return an empty list.
+    yolox_mock.infer.return_value = []
+    paddle_mock.infer.return_value = []
+
+    result = _update_metadata(
+        base64_images=[],
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
+        trace_info=trace_info,
+        worker_pool_size=1,
+    )
+
+    assert result == []
+
+    # Each client's infer should be called once with an empty list.
+    yolox_mock.infer.assert_called_once_with(
+        data={"images": []},
+        model_name="yolox",
+        stage_name="chart_data_extraction",
+        max_batch_size=8,
+        trace_info=trace_info,
+    )
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": []},
+        model_name="paddle",
+        stage_name="chart_data_extraction",
+        max_batch_size=2,
+        trace_info=trace_info,
+    )
+
+
+def test_update_metadata_single_batch_single_worker(mocker, base64_image):
+    """
+    Test a simple scenario with a small list of base64_images using worker_pool_size=1.
+    In the updated _update_metadata implementation, both the yolox and paddle clients are
+    called once with the full list of images. The join function is applied per image.
+    """
+    # Mock out the clients
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+
+    # Suppose yolox returns ["yolox_res1", "yolox_res2"] for 2 images
+    yolox_mock.infer.return_value = ["yolox_res1", "yolox_res2"]
+
+    # Suppose paddle returns ["paddle_res1", "paddle_res2"] for 2 images
+    paddle_mock.infer.return_value = [[(), "paddle_res1"], [(), "paddle_res2"]]
+
+    mock_join = mocker.patch(
+        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}],
+    )
+
+    base64_images = [
+        base64_image,
+        base64_image,
+    ]
+    trace_info = {}
+
+    result = _update_metadata(base64_images, yolox_mock, paddle_mock, trace_info, batch_size=2, worker_pool_size=1)
+
+    # Expect the result to combine each original image with its corresponding joined output.
+    assert len(result) == 2
+    assert result[0] == (base64_image, "joined_1")
+    assert result[1] == (base64_image, "joined_2")
+
+    # yolox.infer should be called once with the full list of arrays.
+    assert yolox_mock.infer.call_count == 1
+    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][0] == base64_to_numpy(base64_image))
+    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][1] == base64_to_numpy(base64_image))
+    assert yolox_mock.infer.call_args.kwargs["model_name"] == "yolox"
+    assert yolox_mock.infer.call_args.kwargs["stage_name"] == "chart_data_extraction"
+    assert yolox_mock.infer.call_args.kwargs["trace_info"] == trace_info
+
+    # paddle.infer should be called once with the full list of images.
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": [base64_image, base64_image]},
+        model_name="paddle",
+        stage_name="chart_data_extraction",
+        max_batch_size=2,
+        trace_info=trace_info,
+    )
+
+    # The join function should be invoked once per image.
+    assert mock_join.call_count == 2
+
+
+def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
+    """
+    With the new _update_metadata implementation, both cached_client.infer and deplot_client.infer
+    are called once with the full list of images. Their results are expected to be lists with one
+    item per image. The join function is still invoked for each image.
+    """
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    mock_join = mocker.patch(
+        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}, {"chart_title": "joined_3"}],
+    )
+
+    # Suppose every yolox.infer call returns a 1-element list
+    def yolox_side_effect(**kwargs):
+        images = kwargs["data"]["images"]
+        return [f"yolox_{images[0]}"]
+
+    yolox_mock.infer.side_effect = yolox_side_effect
+
+    # Suppose paddle.infer returns e.g. ["paddle_img1"], etc.
+    def paddle_side_effect(**kwargs):
+        img = kwargs["data"]["base64_images"]
+        return [([], f"paddle_{img}")]
+
+    paddle_mock.infer.side_effect = paddle_side_effect
+
+    base64_images = [base64_image, base64_image, base64_image]
+    trace_info = {}
+
+    result = _update_metadata(
+        base64_images,
+        yolox_mock,
+        paddle_mock,
+        trace_info,
+        worker_pool_size=2,
+    )
+
+    # Expect 3 results: [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
+    assert result == [(base64_image, "joined_1"), (base64_image, "joined_2"), (base64_image, "joined_3")]
+
+    # We should have 3 calls to yolox.infer, each with one image
+    assert yolox_mock.infer.call_count == 3
+    # Also 3 calls to paddle.infer
+    assert paddle_mock.infer.call_count == 3
+    # 3 calls to join
+    assert mock_join.call_count == 3
+
+
+def test_update_metadata_exception_in_yolox_call(base64_image, caplog):
+    """
+    If the yolox call fails, we expect an exception to bubble up and the error to be logged.
+    """
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    yolox_mock.infer.side_effect = Exception("Yolox call error")
+
+    with pytest.raises(Exception, match="Yolox call error"):
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=1)
+
+    # Verify that the error message from the cached client is logged.
+    assert "Error calling yolox_client.infer: Cached call error" in caplog.text
+
+
+def test_update_metadata_exception_in_paddle_call(base64_image, caplog):
+    """
+    If the paddle call fails, we expect an exception to bubble up and the error to be logged.
+    """
+    yolox_mock = MagicMock()
+    yolox_mock.infer.return_value = ["yolox_result"]  # Single-element list for one image
+    paddle_mock = MagicMock()
+    paddle_mock.infer.side_effect = Exception("Paddle error")
+
+    with pytest.raises(Exception, match="Paddle error"):
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=2)
+
+    # Verify that the error message from the deplot client is logged.
+    assert "Error calling paddle_client.infer: Deplot error" in caplog.text
+
+
+def test_create_clients(mocker):
+    """
+    Verify that _create_clients calls create_inference_client for
+    both yolox and paddle endpoints, returning the pair of NimClient mocks.
+    """
+    mock_create_inference_client = mocker.patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+
+    # Suppose it returns different mocks each time
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    mock_create_inference_client.side_effect = [yolox_mock, paddle_mock]
+
+    result = _create_clients(
+        yolox_endpoints=("yolox_grpc", "yolox_http"),
+        yolox_protocol="grpc",
+        paddle_endpoints=("paddle_grpc", "paddle_http"),
+        paddle_protocol="http",
+        auth_token="xyz",
+    )
+
+    # result => (yolox_mock, paddle_mock)
+    assert result == (yolox_mock, paddle_mock)
+
+    # Check calls
+    assert mock_create_inference_client.call_count == 2
+
+    mock_create_inference_client.assert_any_call(
+        endpoints=("yolox_grpc", "yolox_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="grpc"
+    )
+    mock_create_inference_client.assert_any_call(
+        endpoints=("paddle_grpc", "paddle_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="http"
+    )
+
+
+def test_extract_chart_data_empty_df(validated_config, mocker):
+    """
+    If df is empty, we just return df + trace_info as is; no calls to clients.
+    """
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients")
+    mock_update_metadata = mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata")
+
+    empty_df = pd.DataFrame()
+
+    df_out, ti = _extract_chart_data(empty_df, {}, validated_config)
+    assert df_out.empty
+    assert ti == {}
+
+    mock_create_clients.assert_not_called()
+    mock_update_metadata.assert_not_called()
+
+
+def test_extract_chart_data_no_valid_rows(validated_config, mocker):
+    """
+    A DataFrame with rows that do not meet the 'structured/chart' criteria
+    => skip everything, return df unchanged, no calls to _update_metadata.
+    """
+    mock_create = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(MagicMock(), MagicMock()))
+    mock_update = mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata")
+
+    df_in = pd.DataFrame(
+        [
             {
-                "content": base64_encoded_image,
-                "content_metadata": {"type": "structured", "subtype": "chart"},
-                "table_metadata": {"table_content": "original_content"},
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {},
+                    "content": "some_img",
+                }
+            },
+            {"metadata": None},
+        ]
+    )
+    df_out, trace_info = _extract_chart_data(df_in, {}, validated_config)
+
+    assert df_out.equals(df_in), "No changes should be made"
+    assert "trace_info" in trace_info
+
+    mock_create.assert_called_once()  # We still create clients
+    mock_update.assert_not_called()
+
+
+def test_extract_chart_data_all_valid(validated_config, mocker):
+    """
+    All rows meet criteria => pass them all to _update_metadata in order.
+    """
+    # Mock out clients
+    yolox_mock, paddle_mock = MagicMock(), MagicMock()
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(yolox_mock, paddle_mock))
+
+    # Suppose _update_metadata returns chart content for each image
+    mock_update_metadata = mocker.patch(
+        f"{MODULE_UNDER_TEST}._update_metadata",
+        return_value=[("imgA", {"joined": "contentA"}), ("imgB", {"joined": "contentB"})],
+    )
+
+    # Build a DataFrame with 2 valid rows
+    df_in = pd.DataFrame(
+        [
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "imgA",
+                }
+            },
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "imgB",
+                }
+            },
+        ]
+    )
+
+    # Extract
+    df_out, ti = _extract_chart_data(df_in, {}, validated_config)
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == {"joined": "contentA"}
+    assert df_out.at[1, "metadata"]["table_metadata"]["table_content"] == {"joined": "contentB"}
+
+    mock_create_clients.assert_called_once_with(
+        validated_config.stage_config.yolox_endpoints,
+        validated_config.stage_config.yolox_infer_protocol,
+        validated_config.stage_config.paddle_endpoints,
+        validated_config.stage_config.paddle_infer_protocol,
+        validated_config.stage_config.auth_token,
+    )
+
+    # Check _update_metadata call
+    mock_update_metadata.assert_called_once_with(
+        base64_images=["imgA", "imgB"],
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
+        worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
+        trace_info=ti.get("trace_info"),
+    )
+
+
+def test_extract_chart_data_mixed_rows(validated_config, mocker):
+    """
+    Some rows are valid, some not. We only pass valid images to _update_metadata,
+    and only those rows get updated.
+    """
+    yolox_mock, paddle_mock = MagicMock(), MagicMock()
+    mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(yolox_mock, paddle_mock))
+
+    mock_update = mocker.patch(
+        f"{MODULE_UNDER_TEST}._update_metadata",
+        return_value=[
+            ("base64img1", {"chart": "stuff1"}),
+            ("base64img2", {"chart": "stuff2"}),
+        ],
+    )
+
+    df_in = pd.DataFrame(
+        [
+            {  # valid row
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "base64img1",
+                }
+            },
+            {  # invalid row
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {},
+                    "content": "whatever",
+                }
+            },
+            {  # valid row
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "base64img2",
+                }
+            },
+        ]
+    )
+
+    df_out, trace = _extract_chart_data(df_in, {}, validated_config)
+
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == {"chart": "stuff1"}
+    # row1 => no update
+    assert "table_content" not in df_out.at[1, "metadata"]["table_metadata"]
+    assert df_out.at[2, "metadata"]["table_metadata"]["table_content"] == {"chart": "stuff2"}
+
+    mock_update.assert_called_once_with(
+        base64_images=["base64img1", "base64img2"],
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
+        worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
+        trace_info=trace.get("trace_info"),
+    )
+
+
+def test_extract_chart_data_exception_raised(validated_config, mocker):
+    """
+    If something goes wrong, we still close the clients and re-raise the exception.
+    """
+    c_mock, d_mock = MagicMock(), MagicMock()
+    mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(c_mock, d_mock))
+
+    # Suppose _update_metadata raises an exception
+    mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata", side_effect=RuntimeError("Test error"))
+
+    df_in = pd.DataFrame(
+        [
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "imgZ",
+                }
             }
         ]
-    }
-    df = pd.DataFrame(data)
-    return df
+    )
 
+    with pytest.raises(RuntimeError, match="Test error"):
+        _extract_chart_data(df_in, {}, validated_config)
 
-@pytest.fixture
-def dataframe_missing_metadata():
-    data = {"other_data": ["no metadata here"]}
-    df = pd.DataFrame(data)
-    return df
-
-
-@pytest.fixture
-def dataframe_non_chart(base64_encoded_image):
-    data = {
-        "metadata": [
-            {
-                "content": base64_encoded_image,
-                "content_metadata": {"type": "text", "subtype": "paragraph"},  # Not "structured"  # Not "chart"
-                "table_metadata": {"table_content": "original_content"},
-            }
-        ]
-    }
-    df = pd.DataFrame(data)
-    return df
-
-
-# Common mock fixtures
-@pytest.fixture
-def mock_clients_and_requests():
-    # Dummy clients as dictionaries with 'endpoint_url' and 'headers'
-    deplot_client = {"endpoint_url": "http://deplot_endpoint_url", "headers": {"Authorization": "Bearer mock_token"}}
-    cached_client = {"endpoint_url": "http://cached_endpoint_url", "headers": {"Authorization": "Bearer mock_token"}}
-
-    # Mock response for requests.post (successful inference)
-    mock_response_deplot = Mock()
-    mock_response_deplot.raise_for_status = Mock()  # Does nothing
-    mock_response_deplot.json.return_value = {
-        "object": "list",
-        "data": [{"index": 0, "content": "deplot_result_content", "object": "string"}],
-        "model": "deplot",
-        "usage": None,
-    }
-
-    mock_response_cached = Mock()
-    mock_response_cached.raise_for_status = Mock()  # Does nothing
-    mock_response_cached.json.return_value = {
-        "object": "list",
-        "data": [{"index": 0, "content": "cached_result_content", "object": "string"}],
-        "model": "cached",
-        "usage": None,
-    }
-
-    # Patching create_inference_client and requests.post
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client") as mock_create_client, patch(
-        "requests.post"
-    ) as mock_requests_post:
-        # Mock create_inference_client to return dummy clients
-        def side_effect_create_inference_client(endpoints, auth_token, protocol):
-            if "deplot" in endpoints[0]:
-                return deplot_client
-            elif "cached" in endpoints[0]:
-                return cached_client
-            else:
-                return None
-
-        mock_create_client.side_effect = side_effect_create_inference_client
-
-        # Mock requests.post to return different responses based on URL
-        def side_effect_requests_post(url, *args, **kwargs):
-            if "deplot" in url:
-                return mock_response_deplot
-            elif "cached" in url:
-                return mock_response_cached
-            else:
-                return Mock()
-
-        mock_requests_post.side_effect = side_effect_requests_post
-
-        yield deplot_client, cached_client, mock_create_client, mock_requests_post
-
-
-@pytest.fixture
-def mock_clients_and_requests_failure():
-    # Dummy clients as dictionaries with 'endpoint_url' and 'headers'
-    deplot_client = {"endpoint_url": "http://deplot_endpoint_url", "headers": {"Authorization": "Bearer mock_token"}}
-    cached_client = {"endpoint_url": "http://cached_endpoint_url", "headers": {"Authorization": "Bearer mock_token"}}
-
-    # Mock response for requests.post to raise an HTTPError
-    mock_response_failure = Mock()
-    mock_response_failure.raise_for_status.side_effect = requests.exceptions.HTTPError("Inference error")
-    mock_response_failure.json.return_value = {}
-
-    # Patching create_inference_client and requests.post
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client") as mock_create_client, patch(
-        "requests.post", return_value=mock_response_failure
-    ) as mock_requests_post:
-        # Mock create_inference_client to return dummy clients
-        def side_effect_create_inference_client(endpoints, auth_token, protocol):
-            if "deplot" in endpoints[0]:
-                return deplot_client
-            elif "cached" in endpoints[0]:
-                return cached_client
-            else:
-                return None
-
-        mock_create_client.side_effect = side_effect_create_inference_client
-
-        yield deplot_client, cached_client, mock_create_client, mock_requests_post
-
-
-def test_update_metadata_missing_metadata(dataframe_missing_metadata, mock_clients_and_requests):
-    deplot_client, cached_client, _, _ = mock_clients_and_requests
-
-    row = dataframe_missing_metadata.iloc[0]
-    trace_info = {}
-    with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _update_metadata(row, cached_client, deplot_client, trace_info)
-
-
-def test_update_metadata_non_chart_content(dataframe_non_chart, mock_clients_and_requests):
-    deplot_client, cached_client, _, _ = mock_clients_and_requests
-
-    row = dataframe_non_chart.iloc[0]
-    trace_info = {}
-    result = _update_metadata(row, cached_client, deplot_client, trace_info)
-    # The metadata should remain unchanged
-    assert result == row["metadata"]
-
-
-@pytest.mark.xfail
-def test_update_metadata_successful_update(sample_dataframe, mock_clients_and_requests):
-    deplot_client, cached_client, _, _ = mock_clients_and_requests
-
-    row = sample_dataframe.iloc[0]
-    trace_info = {}
-    result = _update_metadata(row, cached_client, deplot_client, trace_info)
-    # The table_content should be updated with combined result
-    expected_content = "Combined content: cached_result_content + deplot_result_content"
-    assert result["table_metadata"]["table_content"] == expected_content
-
-
-@pytest.mark.xfail
-def test_update_metadata_inference_failure(sample_dataframe, mock_clients_and_requests_failure):
-    deplot_client, cached_client, _, mock_requests_post = mock_clients_and_requests_failure
-
-    row = sample_dataframe.iloc[0]
-    trace_info = {}
-
-    with pytest.raises(RuntimeError, match="An error occurred during inference: Inference error"):
-        _update_metadata(row, cached_client, deplot_client, trace_info)
-
-    # Verify that requests.post was called and raised an exception
-    assert mock_requests_post.call_count >= 1  # At least one call failed
-
-
-@pytest.mark.xfail
-def test_extract_chart_data_successful(sample_dataframe, mock_clients_and_requests):
-    deplot_client, cached_client, mock_create_client, mock_requests_post = mock_clients_and_requests
-
-    validated_config = Mock()
-    validated_config.stage_config.deplot_endpoints = ("http://deplot_endpoint", None)
-    validated_config.stage_config.cached_endpoints = ("http://cached_endpoint", None)
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.deplot_infer_protocol = "mock_protocol"
-    validated_config.stage_config.cached_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    updated_df, trace_info_out = _extract_chart_data(sample_dataframe, {}, validated_config, trace_info)
-
-    # Expected content from the combined results
-    expected_content = "Combined content: cached_result_content + deplot_result_content"
-    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
-    assert trace_info_out == {"trace_info": trace_info}
-
-    # Verify that the mocked methods were called
-    assert mock_create_client.call_count == 2  # deplot and cached clients created
-    assert mock_requests_post.call_count == 2  # deplot and cached inference called
-
-
-@pytest.mark.xfail
-def test_extract_chart_data_missing_metadata(dataframe_missing_metadata, mock_clients_and_requests):
-    deplot_client, cached_client, _, _ = mock_clients_and_requests
-
-    validated_config = Mock()
-    validated_config.stage_config.deplot_endpoints = ("http://deplot_endpoint", None)
-    validated_config.stage_config.cached_endpoints = ("http://cached_endpoint", None)
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.deplot_infer_protocol = "mock_protocol"
-    validated_config.stage_config.cached_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _extract_chart_data(dataframe_missing_metadata, {}, validated_config, trace_info)
-
-
-@pytest.mark.xfail
-def test_extract_chart_data_inference_failure(sample_dataframe, mock_clients_and_requests_failure):
-    deplot_client, cached_client, mock_create_client, mock_requests_post = mock_clients_and_requests_failure
-
-    validated_config = Mock()
-    validated_config.stage_config.deplot_endpoints = ("http://deplot_endpoint", None)
-    validated_config.stage_config.cached_endpoints = ("http://cached_endpoint", None)
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.deplot_infer_protocol = "mock_protocol"
-    validated_config.stage_config.cached_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    with pytest.raises(RuntimeError, match="An error occurred during inference: Inference error"):
-        _extract_chart_data(sample_dataframe, {}, validated_config, trace_info)
-
-    # Verify that the mocked methods were called
-    assert mock_create_client.call_count == 2
-    assert mock_requests_post.call_count >= 1  # At least one call failed
+    c_mock.close.assert_called_once()
+    d_mock.close.assert_called_once()

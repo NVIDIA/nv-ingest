@@ -3,7 +3,7 @@
 > [!WARNING]
 > NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
 >
-> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.10`+ when available.
+> If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.12`+ when available.
 
 
 ## Prerequisites
@@ -23,8 +23,8 @@ kubectl create namespace ${NAMESPACE}
 - Install the Helm repos
 
 ```bash
-# EA-Participants private NGC repository
-helm repo add ngc https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants --username='$oauthtoken' --password=<NGC_API_KEY>
+# Nvidia nemo-microservices NGC repository
+helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
 
 # Nvidia NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
@@ -35,18 +35,17 @@ helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oau
 ```bash
 helm upgrade \
     --install \
+    nv-ingest \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-0.4.0.tgz \
+    -n ${NAMESPACE} \
     --username '$oauthtoken' \
     --password "${NGC_API_KEY}" \
-    -n ${NAMESPACE} \
-    nv-ingest \
     --set imagePullSecret.create=true \
     --set imagePullSecret.password="${NGC_API_KEY}" \
     --set ngcSecret.create=true \
     --set ngcSecret.password="${NGC_API_KEY}" \
-    --set image.repository="nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest" \
-    --set image.tag="24.10" \
-    https://helm.ngc.nvidia.com/ohlfw0olaadg/ea-participants/charts/nv-ingest-0.3.8.tgz
-
+    --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
+    --set image.tag="24.12"
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
