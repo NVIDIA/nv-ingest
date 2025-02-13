@@ -83,7 +83,7 @@ services:
 
   embedding:
     # NIM ON
-    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/nv-embedqa-e5-v5}:${EMBEDDING_TAG:-1.1.0}
+    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-1.3.0}
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -121,7 +121,7 @@ services:
     environment:
       - CUDA_VISIBLE_DEVICES=0
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
