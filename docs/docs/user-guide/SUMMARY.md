@@ -2,5 +2,4 @@
 - [Getting Started](getting-started/)
 - [Developer Guide](developer-guide/)
 - [Contributing](contributing/)
-- [API Reference](api/)
 - [Appendix](appendix/)

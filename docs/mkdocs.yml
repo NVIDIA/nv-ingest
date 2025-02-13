@@ -91,9 +91,6 @@ markdown_extensions:
   - admonition
   - footnotes
 
-extra:
-  python_path: "../../api/src"  # Relative path from 'docs/' to 'api/src'
-
 # extra:
 #   social:
 #     - icon: fontawesome/brands/github
@@ -105,11 +102,6 @@ extra:
 #   docker_url: nvcr.io/nvidia/clara/bionemo-framework
 #   docker_tag: main--nightly
 #   github_url:
-
-# nav:
-#   - Home: index.md
-#   - API Reference:
-#       - NV Ingest API: reference/nv_ingest_api.md  # This will contain the API docs
 
 copyright: |
   &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
