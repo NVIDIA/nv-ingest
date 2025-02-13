@@ -4,16 +4,18 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-> [!Note]
-> Cached and Deplot are deprecated, docker-compose now points to a beta version of the yolox-graphic-elements container instead. That model and container is slated for full release in March.
-> With this change, you should now be able to run on a single 80GB A100 or H100 GPU.
-> If you want to continue using the old pipeline with Cached and Deplot, please use the [24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
-
 ## NVIDIA-Ingest: Multi-modal data extraction
 
 NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+
+> [!Note]
+> Cached and Deplot are deprecated. 
+> Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. 
+> With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU.
+> If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
 
 ### Table of Contents
 1. [Introduction](#introduction)
@@ -345,20 +347,28 @@ multimodal_test.pdf.metadata.json
 You can view the full JSON extracts and the metadata definitions [here](/docs/docs/user-guide/developer-guide/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
-First, install `tkinter` by running the following commands depending on your OS.
+
+First, install `tkinter` by running the following code. Choose the code for your OS.
+
 - For Ubuntu/Debian Linux:
-```shell
-sudo apt-get update
-sudo apt-get install python3-tk
-```
+
+  ```shell
+  sudo apt-get update
+  sudo apt-get install python3-tk
+  ```
+
 - For Fedora/RHEL Linux:
-```shell
-sudo dnf install python3-tkinter
-```
+
+  ```shell
+  sudo dnf install python3-tkinter
+  ```
+
 - For macOS using Homebrew:
-```shell
-brew install python-tk
-```
+
+  ```shell
+  brew install python-tk
+  ```
+
 Then run the following command to execute the script for inspecting the extracted image:
 ```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json

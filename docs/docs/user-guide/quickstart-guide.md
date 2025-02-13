@@ -109,7 +109,7 @@ You can interact with the NV-Ingest service from the host or by `docker exec`-in
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required but makes it easy to create a fresh Python environment
-conda create --name nv-ingest-dev python=3.10
+conda env create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
 pip install .
@@ -263,20 +263,27 @@ multimodal_test.pdf.metadata.json
 ```
 You can view the full JSON extracts and the metadata definitions [here](developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 
-First, install `tkinter` by running the following commands depending on your OS.
+First, install `tkinter` by running the following code. Choose the code for your OS.
+
 - For Ubuntu/Debian Linux:
-```shell
-sudo apt-get update
-sudo apt-get install python3-tk
-```
+
+  ```shell
+  sudo apt-get update
+  sudo apt-get install python3-tk
+  ```
+
 - For Fedora/RHEL Linux:
-```shell
-sudo dnf install python3-tkinter
-```
+
+  ```shell
+  sudo dnf install python3-tkinter
+  ```
+
 - For macOS using Homebrew:
-```shell
-brew install python-tk
-```
+
+  ```shell
+  brew install python-tk
+  ```
+
 Then, run the following command to execute the script for inspecting the extracted image:
 ```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
