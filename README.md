@@ -7,6 +7,7 @@ SPDX-License-Identifier: Apache-2.0
 > [!Note]
 > Cached and Deplot are deprecated, docker-compose now points to a beta version of the yolox-graphic-elements container instead. That model and container is slated for full release in March.
 > With this change, you should now be able to run on a single 80GB A100 or H100 GPU.
+> If you want to continue using the old pipeline with Cached and Deplot, please use the [24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 ## NVIDIA-Ingest: Multi-modal data extraction
 
