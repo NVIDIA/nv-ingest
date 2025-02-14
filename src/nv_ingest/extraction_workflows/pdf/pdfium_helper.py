@@ -251,7 +251,7 @@ def _extract_tables_and_charts(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
-    paddle_output_format,
+    table_content_format,
     trace_info=None,
 ) -> list:
     """
@@ -267,7 +267,7 @@ def _extract_tables_and_charts(
         # If we want all tables and charts, we assume the caller wouldn't call
         # this function unless we truly want them.
         if table_or_chart.type_string == "table":
-            table_or_chart.content_format = paddle_output_format
+            table_or_chart.content_format = table_content_format
 
         table_chart_meta = construct_table_and_chart_metadata(
             table_or_chart,
@@ -298,8 +298,8 @@ def pdfium_extractor(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
-    paddle_output_format = kwargs.get("paddle_output_format", "markdown")
-    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
+    table_content_format = kwargs.get("table_content_format", "markdown")
+    table_content_format = TableFormatEnum[table_content_format.upper()]
 
     # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -405,7 +405,7 @@ def pdfium_extractor(
                         page_count,
                         source_metadata,
                         base_unified_metadata,
-                        paddle_output_format,
+                        table_content_format,
                         trace_info=trace_info,
                     )
                     futures.append(future)
@@ -422,7 +422,7 @@ def pdfium_extractor(
                 page_count,
                 source_metadata,
                 base_unified_metadata,
-                paddle_output_format,
+                table_content_format,
                 trace_info=trace_info,
             )
             futures.append(future)
