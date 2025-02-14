@@ -298,7 +298,7 @@ def pdfium_extractor(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
-    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
+    paddle_output_format = kwargs.get("paddle_output_format", "markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
     # Basic config

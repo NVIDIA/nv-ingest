@@ -67,6 +67,26 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 ]
 
 
+# yolox-table-structure-v1 contants
+YOLOX_TABLE_NUM_CLASSES = 5
+YOLOX_TABLE_CONF_THRESHOLD = 0.01
+YOLOX_TABLE_IOU_THRESHOLD = 0.25
+YOLOX_TABLE_MIN_SCORE = 0.1
+YOLOX_TABLE_FINAL_SCORE = 0.0
+YOLOX_TABLE_NIM_MAX_IMAGE_SIZE = 512_000
+
+YOLOX_TABLE_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_TABLE_IMAGE_PREPROC_WIDTH = 1024
+
+YOLOX_TABLE_CLASS_LABELS = [
+    "border",
+    "cell",
+    "row",
+    "column",
+    "header",
+]
+
+
 # YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
 class YoloxModelInterfaceBase(ModelInterface):
     """
@@ -446,6 +466,65 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
         """
 
         return "yolox-graphic-elements"
+
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        original_image_shapes = kwargs.get("original_image_shapes", [])
+
+        annotation_dicts = self.transform_normalized_coordinates_to_original(annotation_dicts, original_image_shapes)
+
+        inference_results = []
+
+        # bbox extraction: additional postprocessing speicifc to nv-ingest
+        for pred, shape in zip(annotation_dicts, original_image_shapes):
+            bbox_dict = get_bbox_dict_yolox_graphic(
+                pred,
+                shape,
+                self.class_labels,
+                self.min_score,
+            )
+            # convert numpy arrays to list
+            bbox_dict = {
+                label: array.tolist() if isinstance(array, np.ndarray) else array for label, array in bbox_dict.items()
+            }
+            inference_results.append(bbox_dict)
+
+        return inference_results
+
+
+class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-graphic-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_TABLE_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_TABLE_NUM_CLASSES,
+            conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
+            iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
+            min_score=YOLOX_TABLE_MIN_SCORE,
+            final_score=YOLOX_TABLE_FINAL_SCORE,
+            class_labels=YOLOX_TABLE_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-table-structure"
 
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])

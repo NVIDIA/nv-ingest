@@ -17,7 +17,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import join_yolox_and_paddle_output
+from nv_ingest.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
@@ -106,7 +106,7 @@ def _update_metadata(
     results = []
     for img_str, yolox_res, paddle_res in zip(base64_images, yolox_results, paddle_results):
         bounding_boxes, text_predictions = paddle_res
-        yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+        yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
         results.append((img_str, chart_content))
 

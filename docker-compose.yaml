@@ -59,6 +59,27 @@ services:
               capabilities: [gpu]
     runtime: nvidia
 
+  yolox-table-structure:
+    image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.1}
+    ports:
+      - "8006:8000"
+      - "8007:8001"
+      - "8008:8002"
+    user: root
+    environment:
+      - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_LOG_VERBOSE=1
+      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+
   paddle:
     image: ${PADDLE_IMAGE:-nvcr.io/nvidia/nemo-microservices/paddleocr}:${PADDLE_TAG:-1.0.0}
     shm_size: 2gb
@@ -155,6 +176,9 @@ services:
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=yolox-graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://yolox-graphic-elements:8000/v1/infer
       - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
+      - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=yolox-table-structure:8001
+      - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://yolox-table-structure:8000/v1/infer
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-90b-vision-instruct
     healthcheck:
