@@ -113,10 +113,10 @@ def _update_metadata(
     if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
         raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
 
-    if len(yolox_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} yolox results, got {len(yolox_results)}")
-    if len(paddle_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} paddle results, got {len(paddle_results)}")
+    if len(yolox_results) != len(valid_arrays):
+        raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
 
     for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
         original_index = valid_indices[idx]
