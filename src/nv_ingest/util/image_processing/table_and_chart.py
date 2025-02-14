@@ -187,6 +187,8 @@ def convert_paddle_response_to_psuedo_markdown(bboxes, texts):
 
 
 def join_yolox_table_structure_and_paddle_output(yolox_cell_preds, paddle_ocr_boxes, paddle_ocr_txts):
+    if (not paddle_ocr_boxes) or (not paddle_ocr_txts):
+        return ""
 
     paddle_ocr_boxes = np.array(paddle_ocr_boxes)
     paddle_ocr_boxes_ = np.array(

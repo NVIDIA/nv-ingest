@@ -235,9 +235,9 @@ def _extract_table_data(
         )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
-        #table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
-        #    "table_content_format", TableFormatEnum.MARKDOWN
-        #)
+        # table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
+        #     "table_content_format", TableFormatEnum.MARKDOWN
+        # )
         table_content_format = TableFormatEnum.MARKDOWN
 
         for row_id, idx in enumerate(valid_indices):
