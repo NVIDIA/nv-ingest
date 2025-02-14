@@ -172,7 +172,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 > docker compose build
 > ```
 >
-> After the image is built, run `docker compose up` per item 5 above.
+> After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 
 ### Step 2: Installing Python dependencies
 

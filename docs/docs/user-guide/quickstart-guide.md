@@ -61,7 +61,7 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
 
 1. Start all services:
 
-   `docker compose up`
+   `docker compose --profile retrieval up`
 
    ```{tip}
    By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
@@ -105,7 +105,7 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
    ```
 
 ```{tip}
-NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose up`.
+NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 ```
 
 
