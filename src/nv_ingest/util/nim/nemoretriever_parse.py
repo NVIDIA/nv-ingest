@@ -115,11 +115,16 @@ class NemoRetrieverParseModelInterface(ModelInterface):
             else:
                 base64_list = [numpy_to_base64(data["image"])]
 
-            payloads = []
-            for chunk in chunk_list(base64_list, max_batch_size):
-                payload = self._prepare_nemoretriever_parse_payload(chunk)
-                payloads.append(payload)
-            return payloads
+            formatted_batches = []
+            formatted_batch_data = []
+            b64_chunks = chunk_list(base64_list, max_batch_size)
+
+            for b64_chunk in b64_chunks:
+                payload = self._prepare_nemoretriever_parse_payload(b64_chunk)
+                formatted_batches.append(payload)
+                formatted_batch_data.append({})
+            return formatted_batches, formatted_batch_data
+
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 

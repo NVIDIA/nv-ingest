@@ -234,8 +234,8 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_graphic_elements")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox_graphic_elements")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",

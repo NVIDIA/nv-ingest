@@ -60,7 +60,7 @@ logger = logging.getLogger(__name__)
 NEMORETRIEVER_PARSE_RENDER_DPI = 300
 NEMORETRIEVER_PARSE_MAX_WIDTH = 1024
 NEMORETRIEVER_PARSE_MAX_HEIGHT = 1280
-NEMORETRIEVER_PARSE_MAX_BATCH_SIZE = 2
+NEMORETRIEVER_PARSE_MAX_BATCH_SIZE = 1
 
 
 # Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
