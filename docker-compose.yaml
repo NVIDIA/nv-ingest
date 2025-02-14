@@ -34,12 +34,12 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
 
-  deplot:
-    image: ${DEPLOT_IMAGE:-nvcr.io/nvidia/nemo-microservices/deplot}:${DEPLOT_TAG:-1.0.0}
+  yolox-graphic-elements:
+    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.1}
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -56,28 +56,6 @@ services:
           devices:
             - driver: nvidia
               device_ids: ["0"]
-              capabilities: [gpu]
-    runtime: nvidia
-
-  cached:
-    image: ${CACHED_IMAGE:-nvcr.io/nvidia/nemo-microservices/cached}:${CACHED_TAG:-0.2.1}
-    shm_size: 2gb
-    ports:
-      - "8006:8000"
-      - "8007:8001"
-      - "8008:8002"
-    user: root
-    environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - CUDA_VISIBLE_DEVICES=0
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -99,13 +77,13 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
 
   embedding:
     # NIM ON
-    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/nv-embedqa-e5-v5}:${EMBEDDING_TAG:-1.1.0}
+    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-1.3.0}
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -121,7 +99,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -141,22 +119,9 @@ services:
     cap_add:
       - sys_nice
     environment:
-      # Self-hosted cached endpoints.
-      - CACHED_GRPC_ENDPOINT=cached:8001
-      - CACHED_HTTP_ENDPOINT=http://cached:8000/v1/infer
-      - CACHED_INFER_PROTOCOL=grpc
-      # build.nvidia.com hosted cached endpoints.
-      #- CACHED_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached
-      #- CACHED_INFER_PROTOCOL=http
       - CUDA_VISIBLE_DEVICES=0
-      #- DEPLOT_GRPC_ENDPOINT=""
-      # Self-hosted deplot endpoints.
-      - DEPLOT_HTTP_ENDPOINT=http://deplot:8000/v1/chat/completions
-      # build.nvidia.com hosted deplot
-      #- DEPLOT_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/google/deplot
-      - DEPLOT_INFER_PROTOCOL=http
       - DOUGHNUT_GRPC_TRITON=triton-doughnut:8001
-      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/nv-embedqa-e5-v5}
+      - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
@@ -185,10 +150,13 @@ services:
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
-      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/nvdev/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
-      - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions
-      - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-90b-vision-instruct
+      - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=yolox-graphic-elements:8001
+      - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://yolox-graphic-elements:8000/v1/infer
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
+      - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/nvdev/meta/llama-3.2-11b-vision-instruct/chat/completions
+      - VLM_CAPTION_MODEL_NAME=
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
@@ -199,7 +167,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
 
   otel-collector:
@@ -321,7 +289,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
     depends_on:
       - "etcd"
