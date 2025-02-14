@@ -535,7 +535,7 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
 
         # bbox extraction: additional postprocessing speicifc to nv-ingest
         for pred, shape in zip(annotation_dicts, original_image_shapes):
-            bbox_dict = get_bbox_dict_yolox_graphic(
+            bbox_dict = get_bbox_dict_yolox_table(
                 pred,
                 shape,
                 self.class_labels,
@@ -1261,5 +1261,67 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
 
     # Make sure other key not lost
     bbox_dict["other"] = bbox_dict.get("other", [])
+
+    return bbox_dict
+
+
+def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0.0):
+    """
+    Extracts bounding boxes from YOLOX model predictions:
+    - Applies thresholding
+    - Reformats boxes
+    - Reorders predictions
+
+    Args:
+        preds (np.ndarray): YOLOX model predictions including bounding boxes, scores, and labels.
+        shape (tuple): Original image shape.
+        config: Model configuration, including size for bounding box adjustment.
+        threshold (float): Score threshold to filter bounding boxes.
+        delta (float): How much the table was cropped upwards.
+
+    Returns:
+        dict[str, np.ndarray]: Dictionary of bounding boxes, organized by class.
+    """
+    bbox_dict = {label: np.array([]) for label in class_labels}
+
+    for i, label in enumerate(class_labels):
+        if label not in ["cell", "row", "column"]:
+            continue  # Ignore useless classes
+
+        bboxes_class = np.array(preds[label])
+
+        if bboxes_class.size == 0:
+            continue
+
+        # Threshold and clip
+        bboxes_class = bboxes_class[bboxes_class[:, -1] >= threshold][:, :4].astype(int)
+        bboxes_class[:, [0, 2]] = np.clip(bboxes_class[:, [0, 2]], 0, shape[1])
+        bboxes_class[:, [1, 3]] = np.clip(bboxes_class[:, [1, 3]], 0, shape[0])
+
+        # Reorder
+        sort = ["x0", "y0"] if label != "row" else ["y0", "x0"]
+        df = pd.DataFrame(
+            {
+                "y0": (bboxes_class[:, 1] + bboxes_class[:, 3]) / 2,
+                "x0": (bboxes_class[:, 0] + bboxes_class[:, 2]) / 2,
+            }
+        )
+        idxs = df.sort_values(sort).index
+        bboxes_class = bboxes_class[idxs]
+
+        bbox_dict[label] = bboxes_class
+
+    # Enforce spanning the entire table
+    if len(bbox_dict["row"]):
+        bbox_dict["row"][:, 0] = 0
+        bbox_dict["row"][:, 2] = shape[1]
+    if len(bbox_dict["column"]):
+        bbox_dict["column"][:, 1] = 0
+        bbox_dict["column"][:, 3] = shape[0]
+
+    # Shift back if cropped
+    for k in bbox_dict:
+        if len(bbox_dict[k]):
+            bbox_dict[k][:, [1, 3]] = np.add(bbox_dict[k][:, [1, 3]], delta, casting="unsafe")
 
     return bbox_dict
