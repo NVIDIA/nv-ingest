@@ -1,7 +1,7 @@
 # Documentation and examples
-docs/                    @nv-ingest-docs
-README.md                @nv-ingest-docs
-examples/                @nv-ingest-docs
+docs/                    @NVIDIA/nv-ingest-docs
+README.md                @NVIDIA/nv-ingest-docs
+examples/                @NVIDIA/nv-ingest-docs
 
 # Devops
 .devcontainer/           @NVIDIA-nv-ingest-ops
