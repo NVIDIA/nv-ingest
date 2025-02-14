@@ -578,8 +578,8 @@ def _embed_extractions(builder: mrc.Builder):
             model_dump = task_props.model_dump()
             filter_errors = model_dump.get("filter_errors", False)
 
-            embedding_model = task_props.get("model", validated_config.embedding_model)
-            embedding_nim_endpoint = task_props.get("nim_endpoint_url", validated_config.embedding_nim_endpoint)
+            embedding_model = task_props.get("model_name", validated_config.embedding_model)
+            embedding_nim_endpoint = task_props.get("endpoint_url", validated_config.embedding_nim_endpoint)
 
             return _generate_embeddings(
                 message,
