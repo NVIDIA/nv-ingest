@@ -24,7 +24,12 @@ def test_embed_task_initialization():
 
 
 def test_embed_task_str_representation():
-    task = EmbedTask(model_name="nvidia/nv-embedqa-e5-v5", endpoint_url="http://localhost:8024/v1", api_key="API_KEY", filter_errors=True)
+    task = EmbedTask(
+        model_name="nvidia/nv-embedqa-e5-v5",
+        endpoint_url="http://localhost:8024/v1",
+        api_key="API_KEY",
+        filter_errors=True,
+    )
     expected_str = (
         "Embed Task:\n"
         "  model_name: nvidia/nv-embedqa-e5-v5\n"

@@ -91,7 +91,6 @@ class EmbedTask(Task):
         info += f"  filter_errors: {self._filter_errors}\n"
 
         return info
-        
 
     def to_dict(self) -> Dict:
         """
@@ -108,7 +107,7 @@ class EmbedTask(Task):
 
         if self._api_key:
             task_properties["api_key"] = self._api_key
-        
+
         task_properties["filter_errors"] = self._filter_errors
 
         return {"type": "embed", "task_properties": task_properties}
