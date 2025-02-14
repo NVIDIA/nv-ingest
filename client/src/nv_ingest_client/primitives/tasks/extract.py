@@ -96,7 +96,7 @@ class ExtractTaskSchema(BaseModel):
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
     text_depth: str = "document"
-    paddle_output_format: str = "pseudo_markdown"
+    table_content_format: str = "markdown"
 
     @model_validator(mode="after")
     @classmethod
@@ -171,7 +171,7 @@ class ExtractTask(Task):
         extract_charts: Optional[bool] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         text_depth: str = "document",
-        paddle_output_format: str = "pseudo_markdown",
+        table_content_format: str = "markdown",
     ) -> None:
         """
         Setup Extract Task Config
@@ -190,7 +190,7 @@ class ExtractTask(Task):
         self._extract_charts = extract_charts if extract_charts is not None else extract_tables
         self._extract_text = extract_text
         self._text_depth = text_depth
-        self._paddle_output_format = paddle_output_format
+        self._table_content_format = table_content_format
 
     def __str__(self) -> str:
         """
@@ -206,7 +206,7 @@ class ExtractTask(Task):
         info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
-        info += f"  paddle_output_format: {self._paddle_output_format}\n"
+        info += f"  table_content_format: {self._table_content_format}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -220,7 +220,7 @@ class ExtractTask(Task):
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "text_depth": self._text_depth,
-            "paddle_output_format": self._paddle_output_format,
+            "table_content_format": self._table_content_format,
         }
 
         task_properties = {
