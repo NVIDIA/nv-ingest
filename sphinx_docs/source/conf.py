@@ -5,7 +5,8 @@
 import os
 import sys
 
-sys.path.insert(0, os.path.abspath("../../api/src"))  # nv-ingest-api src
+sys.path.insert(0, os.path.abspath("../../api/src/nv-ingest-api"))  # nv-ingest-api src
+print(f"!!!!!!!!sys.path: {sys.path}")
 
 project = "nv-ingest"
 copyright = "2025, Nvidia"
@@ -17,6 +18,7 @@ release = "24.12"
 
 extensions = [
     "sphinx.ext.autodoc",
+    "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
 ]
