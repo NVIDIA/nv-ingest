@@ -18,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedTaskSchema(BaseModel):
-    model: Optional[str] = None
-    nim_endpoint_url: Optional[str] = None
+    model_name: Optional[str] = None
+    endpoint_url: Optional[str] = None
     filter_errors: bool = False
 
     @root_validator(pre=True)
@@ -47,8 +47,8 @@ class EmbedTask(Task):
 
     def __init__(
         self,
-        model: str = None,
-        nim_endpoint_url: str = None,
+        model_name: str = None,
+        endpoint_url: str = None,
         text: bool = None,
         tables: bool = None,
         filter_errors: bool = False,
@@ -68,8 +68,8 @@ class EmbedTask(Task):
                 "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
             )
 
-        self._model = model
-        self._nim_endpoint_url = nim_endpoint_url
+        self._model_name = model_name
+        self._endpoint_url = endpoint_url
         self._filter_errors = filter_errors
 
     def __str__(self) -> str:
@@ -78,8 +78,8 @@ class EmbedTask(Task):
         """
         info = ""
         info += "Embed Task:\n"
-        info += f"  model: {self._model}\n"
-        info += f"  nim_endpoint_url: {self._nim_endpoint_url}\n"
+        info += f"  model_name: {self._model_name}\n"
+        info += f"  endpoint_url: {self._endpoint_url}\n"
         info += f"  filter_errors: {self._filter_errors}\n"
         return info
 
@@ -89,9 +89,9 @@ class EmbedTask(Task):
         """
 
         task_properties = {
-            "model": self._model,
-            "nim_endpoint_url": self._nim_endpoint_url,
-            "filter_errors": False,
+            "model_name": self._model_name,
+            "endpoint_url": self._endpoint_url,
+            "filter_errors": self._filter_errors,
         }
 
         return {"type": "embed", "task_properties": task_properties}
