@@ -17,7 +17,7 @@ from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtrac
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
-from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.vlm import VLMModelInterface
 
 logger = logging.getLogger(__name__)
@@ -85,12 +85,11 @@ def _generate_captions(
         }
 
         # Instantiate the NimClient with our VLMModelInterface.
-        # For HTTP, we supply a tuple with a None placeholder for the gRPC endpoint.
-        nim_client = NimClient(
+        nim_client = create_inference_client(
             model_interface=VLMModelInterface(),
-            protocol="http",
             endpoints=(None, endpoint_url),
             auth_token=api_key,
+            infer_protocol="http",
         )
 
         logger.info(f"Calling: {endpoint_url} with model: {model_name}")

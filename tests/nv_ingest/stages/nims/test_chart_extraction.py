@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 import pandas as pd
+import numpy as np
 
 from ....import_checks import MORPHEUS_IMPORT_OK
 from ....import_checks import CUDA_DRIVER_OK
@@ -15,6 +16,7 @@ if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
     from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
     from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
     from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
+    from nv_ingest.util.image_processing.transforms import base64_to_numpy
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 
@@ -27,14 +29,17 @@ def valid_chart_extractor_config():
     """
     return ChartExtractorConfigSchema(
         auth_token="fake_token",
-        cached_endpoints=("cached_grpc_url", "cached_http_url"),
-        cached_infer_protocol="grpc",
-        deplot_endpoints=("deplot_grpc_url", "deplot_http_url"),
-        deplot_infer_protocol="http",
+        yolox_endpoints=("yolox_grpc_url", "yolox_http_url"),
+        yolox_infer_protocol="grpc",
         paddle_endpoints=("paddle_grpc_url", "paddle_http_url"),
         paddle_infer_protocol="grpc",
         workers_per_progress_engine=5,
     )
+
+
+@pytest.fixture
+def base64_image():
+    return "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII="
 
 
 @pytest.fixture
@@ -57,18 +62,18 @@ def test_update_metadata_empty_list():
     With the updated implementation, both clients are still invoked (with an empty list)
     so we set their return values to [] and then verify the calls.
     """
-    cached_mock = MagicMock()
-    deplot_mock = MagicMock()
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
     trace_info = {}
 
     # When given an empty list, both clients return an empty list.
-    cached_mock.infer.return_value = []
-    deplot_mock.infer.return_value = []
+    yolox_mock.infer.return_value = []
+    paddle_mock.infer.return_value = []
 
     result = _update_metadata(
         base64_images=[],
-        cached_client=cached_mock,
-        deplot_client=deplot_mock,
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
         trace_info=trace_info,
         worker_pool_size=1,
     )
@@ -76,67 +81,70 @@ def test_update_metadata_empty_list():
     assert result == []
 
     # Each client's infer should be called once with an empty list.
-    cached_mock.infer.assert_called_once_with(
+    yolox_mock.infer.assert_called_once_with(
+        data={"images": []},
+        model_name="yolox",
+        stage_name="chart_data_extraction",
+        max_batch_size=8,
+        trace_info=trace_info,
+    )
+    paddle_mock.infer.assert_called_once_with(
         data={"base64_images": []},
-        model_name="cached",
+        model_name="paddle",
         stage_name="chart_data_extraction",
         max_batch_size=2,
         trace_info=trace_info,
     )
-    deplot_mock.infer.assert_called_once_with(
-        data={"base64_images": []},
-        model_name="deplot",
-        stage_name="chart_data_extraction",
-        max_batch_size=1,
-        trace_info=trace_info,
-    )
 
 
-def test_update_metadata_single_batch_single_worker(mocker):
+def test_update_metadata_single_batch_single_worker(mocker, base64_image):
     """
     Test a simple scenario with a small list of base64_images using worker_pool_size=1.
-    In the updated _update_metadata implementation, both the cached and deplot clients are
+    In the updated _update_metadata implementation, both the yolox and paddle clients are
     called once with the full list of images. The join function is applied per image.
     """
     # Mock out the clients
-    cached_mock = MagicMock()
-    deplot_mock = MagicMock()
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
 
-    # For 2 images, cached.infer should return a list with 2 results.
-    cached_mock.infer.return_value = ["cached_res1", "cached_res2"]
+    # Suppose yolox returns ["yolox_res1", "yolox_res2"] for 2 images
+    yolox_mock.infer.return_value = ["yolox_res1", "yolox_res2"]
 
-    # deplot.infer should also return a list with 2 results.
-    deplot_mock.infer.return_value = ["deplot_res1", "deplot_res2"]
+    # Suppose paddle returns ["paddle_res1", "paddle_res2"] for 2 images
+    paddle_mock.infer.return_value = [[(), "paddle_res1"], [(), "paddle_res2"]]
 
-    # Patch the join function to return expected joined outputs.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output",
-        side_effect=["joined_1", "joined_2"],
+        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}],
     )
 
-    base64_images = ["img1", "img2"]
+    base64_images = [
+        base64_image,
+        base64_image,
+    ]
     trace_info = {}
 
-    result = _update_metadata(base64_images, cached_mock, deplot_mock, trace_info, worker_pool_size=1)
+    result = _update_metadata(base64_images, yolox_mock, paddle_mock, trace_info, batch_size=2, worker_pool_size=1)
 
     # Expect the result to combine each original image with its corresponding joined output.
-    assert result == [("img1", "joined_1"), ("img2", "joined_2")]
+    assert len(result) == 2
+    assert result[0] == (base64_image, "joined_1")
+    assert result[1] == (base64_image, "joined_2")
 
-    # cached.infer should be called once with the full list of images.
-    cached_mock.infer.assert_called_once_with(
-        data={"base64_images": ["img1", "img2"]},
-        model_name="cached",
+    # yolox.infer should be called once with the full list of arrays.
+    assert yolox_mock.infer.call_count == 1
+    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][0] == base64_to_numpy(base64_image))
+    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][1] == base64_to_numpy(base64_image))
+    assert yolox_mock.infer.call_args.kwargs["model_name"] == "yolox"
+    assert yolox_mock.infer.call_args.kwargs["stage_name"] == "chart_data_extraction"
+    assert yolox_mock.infer.call_args.kwargs["trace_info"] == trace_info
+
+    # paddle.infer should be called once with the full list of images.
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": [base64_image, base64_image]},
+        model_name="paddle",
         stage_name="chart_data_extraction",
         max_batch_size=2,
-        trace_info=trace_info,
-    )
-
-    # deplot.infer should be called once with the full list of images.
-    deplot_mock.infer.assert_called_once_with(
-        data={"base64_images": ["img1", "img2"]},
-        model_name="deplot",
-        stage_name="chart_data_extraction",
-        max_batch_size=1,
         trace_info=trace_info,
     )
 
@@ -144,115 +152,117 @@ def test_update_metadata_single_batch_single_worker(mocker):
     assert mock_join.call_count == 2
 
 
-def test_update_metadata_multiple_batches_multi_worker(mocker):
+def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
     """
     With the new _update_metadata implementation, both cached_client.infer and deplot_client.infer
     are called once with the full list of images. Their results are expected to be lists with one
     item per image. The join function is still invoked for each image.
     """
-    cached_mock = MagicMock()
-    deplot_mock = MagicMock()
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_cached_and_deplot_output",
-        side_effect=["joined_1", "joined_2", "joined_3"],
+        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}, {"chart_title": "joined_3"}],
     )
 
-    # Each client should return a list with an entry per input image.
-    def cached_side_effect(**kwargs):
-        images = kwargs["data"]["base64_images"]
-        return [f"cached_{img}" for img in images]
+    # Suppose every yolox.infer call returns a 1-element list
+    def yolox_side_effect(**kwargs):
+        images = kwargs["data"]["images"]
+        return [f"yolox_{images[0]}"]
 
-    cached_mock.infer.side_effect = cached_side_effect
+    yolox_mock.infer.side_effect = yolox_side_effect
 
-    def deplot_side_effect(**kwargs):
-        images = kwargs["data"]["base64_images"]
-        return [f"deplot_{img}" for img in images]
+    # Suppose paddle.infer returns e.g. ["paddle_img1"], etc.
+    def paddle_side_effect(**kwargs):
+        img = kwargs["data"]["base64_images"]
+        return [([], f"paddle_{img}")]
 
-    deplot_mock.infer.side_effect = deplot_side_effect
+    paddle_mock.infer.side_effect = paddle_side_effect
 
-    base64_images = ["imgA", "imgB", "imgC"]
+    base64_images = [base64_image, base64_image, base64_image]
     trace_info = {}
 
     result = _update_metadata(
         base64_images,
-        cached_mock,
-        deplot_mock,
+        yolox_mock,
+        paddle_mock,
         trace_info,
         worker_pool_size=2,
     )
 
-    # Expect 3 results corresponding to the input images and the joined outputs.
-    assert result == [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
+    # Expect 3 results: [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
+    assert result == [(base64_image, "joined_1"), (base64_image, "joined_2"), (base64_image, "joined_3")]
 
-    # Now, with the new implementation, each infer method is called only once.
-    assert cached_mock.infer.call_count == 1
-    assert deplot_mock.infer.call_count == 1
-    # The join function is still called once per image.
+    # We should have 3 calls to yolox.infer, each with one image
+    assert yolox_mock.infer.call_count == 3
+    # Also 3 calls to paddle.infer
+    assert paddle_mock.infer.call_count == 3
+    # 3 calls to join
     assert mock_join.call_count == 3
 
 
-def test_update_metadata_exception_in_cached_call(caplog):
+def test_update_metadata_exception_in_yolox_call(base64_image, caplog):
     """
-    If the cached call fails, we expect an exception to bubble up and the error to be logged.
+    If the yolox call fails, we expect an exception to bubble up and the error to be logged.
     """
-    cached_mock = MagicMock()
-    deplot_mock = MagicMock()
-    cached_mock.infer.side_effect = Exception("Cached call error")
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    yolox_mock.infer.side_effect = Exception("Yolox call error")
 
-    with pytest.raises(Exception, match="Cached call error"):
-        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, worker_pool_size=1)
+    with pytest.raises(Exception, match="Yolox call error"):
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=1)
 
     # Verify that the error message from the cached client is logged.
-    assert "Error calling cached_client.infer: Cached call error" in caplog.text
+    assert "Error calling yolox_client.infer: Cached call error" in caplog.text
 
 
-def test_update_metadata_exception_in_deplot_call(caplog):
+def test_update_metadata_exception_in_paddle_call(base64_image, caplog):
     """
-    If the deplot call fails, we expect an exception to bubble up and the error to be logged.
+    If the paddle call fails, we expect an exception to bubble up and the error to be logged.
     """
-    cached_mock = MagicMock()
-    cached_mock.infer.return_value = ["cached_result"]  # Single-element list for one image
-    deplot_mock = MagicMock()
-    deplot_mock.infer.side_effect = Exception("Deplot error")
+    yolox_mock = MagicMock()
+    yolox_mock.infer.return_value = ["yolox_result"]  # Single-element list for one image
+    paddle_mock = MagicMock()
+    paddle_mock.infer.side_effect = Exception("Paddle error")
 
-    with pytest.raises(Exception, match="Deplot error"):
-        _update_metadata(["some_img"], cached_mock, deplot_mock, trace_info={}, worker_pool_size=2)
+    with pytest.raises(Exception, match="Paddle error"):
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=2)
 
     # Verify that the error message from the deplot client is logged.
-    assert "Error calling deplot_client.infer: Deplot error" in caplog.text
+    assert "Error calling paddle_client.infer: Deplot error" in caplog.text
 
 
 def test_create_clients(mocker):
     """
     Verify that _create_clients calls create_inference_client for
-    both cached and deplot endpoints, returning the pair of NimClient mocks.
+    both yolox and paddle endpoints, returning the pair of NimClient mocks.
     """
     mock_create_inference_client = mocker.patch(f"{MODULE_UNDER_TEST}.create_inference_client")
 
     # Suppose it returns different mocks each time
-    cached_mock = MagicMock()
-    deplot_mock = MagicMock()
-    mock_create_inference_client.side_effect = [cached_mock, deplot_mock]
+    yolox_mock = MagicMock()
+    paddle_mock = MagicMock()
+    mock_create_inference_client.side_effect = [yolox_mock, paddle_mock]
 
     result = _create_clients(
-        cached_endpoints=("cached_grpc", "cached_http"),
-        cached_protocol="grpc",
-        deplot_endpoints=("deplot_grpc", "deplot_http"),
-        deplot_protocol="http",
+        yolox_endpoints=("yolox_grpc", "yolox_http"),
+        yolox_protocol="grpc",
+        paddle_endpoints=("paddle_grpc", "paddle_http"),
+        paddle_protocol="http",
         auth_token="xyz",
     )
 
-    # result => (cached_mock, deplot_mock)
-    assert result == (cached_mock, deplot_mock)
+    # result => (yolox_mock, paddle_mock)
+    assert result == (yolox_mock, paddle_mock)
 
     # Check calls
     assert mock_create_inference_client.call_count == 2
 
     mock_create_inference_client.assert_any_call(
-        endpoints=("cached_grpc", "cached_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="grpc"
+        endpoints=("yolox_grpc", "yolox_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="grpc"
     )
     mock_create_inference_client.assert_any_call(
-        endpoints=("deplot_grpc", "deplot_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="http"
+        endpoints=("paddle_grpc", "paddle_http"), model_interface=mocker.ANY, auth_token="xyz", infer_protocol="http"
     )
 
 
@@ -307,8 +317,8 @@ def test_extract_chart_data_all_valid(validated_config, mocker):
     All rows meet criteria => pass them all to _update_metadata in order.
     """
     # Mock out clients
-    cached_mock, deplot_mock = MagicMock(), MagicMock()
-    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(cached_mock, deplot_mock))
+    yolox_mock, paddle_mock = MagicMock(), MagicMock()
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(yolox_mock, paddle_mock))
 
     # Suppose _update_metadata returns chart content for each image
     mock_update_metadata = mocker.patch(
@@ -342,18 +352,18 @@ def test_extract_chart_data_all_valid(validated_config, mocker):
     assert df_out.at[1, "metadata"]["table_metadata"]["table_content"] == {"joined": "contentB"}
 
     mock_create_clients.assert_called_once_with(
-        validated_config.stage_config.cached_endpoints,
-        validated_config.stage_config.cached_infer_protocol,
-        validated_config.stage_config.deplot_endpoints,
-        validated_config.stage_config.deplot_infer_protocol,
+        validated_config.stage_config.yolox_endpoints,
+        validated_config.stage_config.yolox_infer_protocol,
+        validated_config.stage_config.paddle_endpoints,
+        validated_config.stage_config.paddle_infer_protocol,
         validated_config.stage_config.auth_token,
     )
 
     # Check _update_metadata call
     mock_update_metadata.assert_called_once_with(
         base64_images=["imgA", "imgB"],
-        cached_client=cached_mock,
-        deplot_client=deplot_mock,
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=ti.get("trace_info"),
     )
@@ -364,8 +374,8 @@ def test_extract_chart_data_mixed_rows(validated_config, mocker):
     Some rows are valid, some not. We only pass valid images to _update_metadata,
     and only those rows get updated.
     """
-    cached_mock, deplot_mock = MagicMock(), MagicMock()
-    mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(cached_mock, deplot_mock))
+    yolox_mock, paddle_mock = MagicMock(), MagicMock()
+    mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=(yolox_mock, paddle_mock))
 
     mock_update = mocker.patch(
         f"{MODULE_UNDER_TEST}._update_metadata",
@@ -410,8 +420,8 @@ def test_extract_chart_data_mixed_rows(validated_config, mocker):
 
     mock_update.assert_called_once_with(
         base64_images=["base64img1", "base64img2"],
-        cached_client=cached_mock,
-        deplot_client=deplot_mock,
+        yolox_client=yolox_mock,
+        paddle_client=paddle_mock,
         worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
         trace_info=trace.get("trace_info"),
     )

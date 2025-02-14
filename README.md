@@ -4,6 +4,10 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
+> [!Note]
+> Cached and Deplot are deprecated, docker-compose now points to a beta version of the yolox-graphic-elements container instead. That model and container is slated for full release in March.
+> With this change, you should now be able to run on a single 80GB A100 or H100 GPU.
+> If you want to continue using the old pipeline with Cached and Deplot, please use the [24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 ## NVIDIA-Ingest: Multi-modal data extraction
 
@@ -44,8 +48,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM or PCIe | 80GB | 2 |
-| A100 | SXM or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 1 |
+| A100 | SXM or PCIe | 80GB | 1 |
 
 ### Software
 
@@ -175,7 +179,7 @@ To interact with the nv-ingest service, you can do so from the host, or by `dock
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```bash
 # conda not required, but makes it easy to create a fresh python environment
-conda create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
+conda env create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
 conda activate nv-ingest-dev
 
 cd client

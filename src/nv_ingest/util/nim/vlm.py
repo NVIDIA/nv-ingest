@@ -1,4 +1,4 @@
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, Tuple, List
 
 import logging
 
@@ -45,15 +45,19 @@ class VLMModelInterface(ModelInterface):
             raise KeyError("Input data must include 'prompt'.")
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
+    def format_input(
+        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
         """
         Format the input payload for the VLM endpoint. This method constructs one payload per batch,
         where each payload includes one message per image in the batch.
+        Additionally, it returns batch data that preserves the original order of images by including
+        the list of base64 images and the prompt for each batch.
 
         Parameters
         ----------
         data : dict
-            The input data containing "base64_images" (a list of images) and "prompt".
+            The input data containing "base64_images" (a list of base64-encoded images) and "prompt".
         protocol : str
             Only "http" is supported.
         max_batch_size : int
@@ -63,8 +67,11 @@ class VLMModelInterface(ModelInterface):
 
         Returns
         -------
-        list
-            A list of JSON-serializable payload dictionaries.
+        tuple
+            A tuple (payloads, batch_data_list) where:
+              - payloads is a list of JSON-serializable payload dictionaries.
+              - batch_data_list is a list of dictionaries containing the keys "base64_images" and "prompt"
+                corresponding to each batch.
         """
         if protocol != "http":
             raise ValueError("VLMModelInterface only supports HTTP protocol.")
@@ -78,13 +85,14 @@ class VLMModelInterface(ModelInterface):
 
         batches = chunk_list(images, max_batch_size)
         payloads = []
+        batch_data_list = []
         for batch in batches:
             # Create one message per image in the batch.
             messages = [
                 {"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{img}" />'} for img in batch
             ]
             payload = {
-                "model": kwargs.get("model_name", "vlm"),
+                "model": kwargs.get("model_name"),
                 "messages": messages,
                 "max_tokens": kwargs.get("max_tokens", 512),
                 "temperature": kwargs.get("temperature", 1.0),
@@ -92,7 +100,8 @@ class VLMModelInterface(ModelInterface):
                 "stream": kwargs.get("stream", False),
             }
             payloads.append(payload)
-        return payloads
+            batch_data_list.append({"base64_images": batch, "prompt": prompt})
+        return payloads, batch_data_list
 
     def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
         """
