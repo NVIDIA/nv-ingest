@@ -17,6 +17,7 @@ def test_embed_task_initialization():
     assert task._model_name == "nvidia/llama-3.2-nv-embedqa-1b-v2"
     assert task._endpoint_url == "http://embedding:8000/v1"
 
+
 # String Representation Tests
 
 
@@ -54,7 +55,10 @@ def test_embed_task_to_dict(
         filter_errors=filter_errors,
     )
 
-    expected_dict = {"type": "embed", "task_properties": {"model_name": model_name, "endpoint_url": endpoint_url, "filter_errors": filter_errors}}
+    expected_dict = {
+        "type": "embed",
+        "task_properties": {"model_name": model_name, "endpoint_url": endpoint_url, "filter_errors": filter_errors},
+    }
     print(expected_dict)
     print(task.to_dict())
 
@@ -66,13 +70,12 @@ def test_embed_task_to_dict(
 
 def test_embed_task_default_params():
     task = EmbedTask()
-    expected_str_contains = [
-        "model_name: None",
-        "endpoint_url: None",
-        "filter_errors: False"
-    ]
+    expected_str_contains = ["model_name: None", "endpoint_url: None", "filter_errors: False"]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
 
-    expected_dict = {"type": "embed", "task_properties": {"model_name": None, "endpoint_url": None, "filter_errors": False}}
+    expected_dict = {
+        "type": "embed",
+        "task_properties": {"model_name": None, "endpoint_url": None, "filter_errors": False},
+    }
     assert task.to_dict() == expected_dict
