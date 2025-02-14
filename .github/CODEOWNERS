@@ -4,7 +4,7 @@ README.md                @NVIDIA/nv-ingest-docs
 examples/                @NVIDIA/nv-ingest-docs
 
 # Devops
-.devcontainer/           @NVIDIA-nv-ingest-ops
+.devcontainer/           @NVIDIA/nv-ingest-ops
 .github/                 @NVIDIA/nv-ingest-ops
 .ci/                     @NVIDIA/nv-ingest-ops
 
