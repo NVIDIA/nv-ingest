@@ -577,9 +577,9 @@ def _embed_extractions(builder: mrc.Builder):
             task_props = message.remove_task("embed")
             model_dump = task_props.model_dump()
 
-            model_name = task_props.get("model_name", validated_config.model_name)
-            endpoint_url = task_props.get("endpoint_url", validated_config.endpoint_url)
-            api_key = task_props.get("api_key", validated_config.api_key)
+            model_name = model_dump.get("model_name") or validated_config.model_name
+            endpoint_url = model_dump.get("endpoint_url") or validated_config.endpoint_url
+            api_key = model_dump.get("api_key") or validated_config.api_key
             filter_errors = model_dump.get("filter_errors", False)
 
             return _generate_embeddings(
@@ -587,8 +587,8 @@ def _embed_extractions(builder: mrc.Builder):
                 event_loop,
                 validated_config.batch_size,
                 api_key,
-                model_name,
                 endpoint_url,
+                model_name,
                 validated_config.encoding_format,
                 validated_config.input_type,
                 validated_config.truncate,
