@@ -4,13 +4,11 @@
 
 
 import logging
-import functools
 import traceback
-from typing import Iterable, Dict, Any, List
+from typing import Iterable, List
 
 import mrc
 import pandas as pd
-from morpheus.config import Config
 from morpheus.messages import ControlMessage, MessageMeta
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
@@ -21,7 +19,6 @@ import cudf
 
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum, InfoMessageMetadataSchema, StatusEnum, TaskTypeEnum
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
@@ -48,30 +45,6 @@ def _make_async_request(
 ) -> list:
     """
     A function that interacts directly with the NIM embedding service to caculate embeddings for a batch of prompts.
-
-    Parameters
-    ----------
-    prompts : List[str]
-        List of all prompts that will be sent to the NIM embedding service.
-    api_key : str
-        The valid NGC api key to make requests to the NIM embedding service.
-    embedding_nim_endpoint : str
-        The url of the hosted embedding NIM.
-    embedding_model : str
-        Specifies the embedding model used in the embedding NIM.
-    encoding_format : str
-        The format to return the embeddings in, valid values are "float" or "base64".
-    input_type : str
-        The mode to be used ("passage" or "query").
-    truncate : str
-        Specifies how inputs longer than the maximum token length of the model are handled.
-    filter_errors : bool
-        A flag used to set the filter criteria in an info message.
-
-    Returns
-    -------
-        response : dict
-            A dictionary containing embeddings and an info message for any errors that occurred during the request.
     """
     response = {}
 
@@ -101,11 +74,9 @@ def _make_async_request(
 
         validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
 
-        # Populate the response with the error info for logging/inspection
         response["embedding"] = [None] * len(prompts)
         response["info_msg"] = validated_info_msg
 
-        # Raise an exception so that errors do not remain silent
         raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
 
     return response
@@ -248,18 +219,6 @@ def _get_cudf_image_content(df: cudf.DataFrame):
 def _batch_generator(iterable: Iterable, batch_size=10):
     """
     A generator to yield batches of size `batch_size` from an iterable.
-
-    Parameters
-    ----------
-    iterable : Iterable
-        The iterable object to source data for each batch.
-    batch_size : int
-        Defines the size of each batch.
-
-    Yields
-    ------
-    Iterable
-        Yields a batch of data.
     """
     iter_len = len(iterable)
     for idx in range(0, iter_len, batch_size):
@@ -269,18 +228,6 @@ def _batch_generator(iterable: Iterable, batch_size=10):
 def _generate_batches(prompts: List[str], batch_size: int = 100):
     """
     A function to create a list of batches of size `batch_size` from a list of prompts.
-
-    Parameters
-    ----------
-    prompts : List[str]
-        A list of prompts that will be the source of data for each batch.
-    batch_size : int
-        Defines the size of each batch.
-
-    Returns
-    -------
-    List
-        A list of batches of prompts.
     """
     return [x for x in _batch_generator(prompts, batch_size)]
 
@@ -298,9 +245,6 @@ def _generate_embeddings(
 ):
     """
     A function to generate text embeddings for supported content types (TEXT, STRUCTURED, IMAGE).
-
-    This function dynamically selects the appropriate metadata field based on content type and
-    calculates embeddings using the NIM embedding service.
     """
     cudf_content_extractor = {
         ContentTypeEnum.TEXT: _get_cudf_text_content,
@@ -336,7 +280,6 @@ def _generate_embeddings(
                 continue
 
             cudf_content_getter = cudf_content_extractor[content_type]
-            # Embedding NIMs will complain if text has only whitespaces.
             content_text_mask = cudf_content_getter(mdf["metadata"]).str.strip() != ""
             content_mask = (content_mask & content_text_mask).fillna(False)
             if not content_mask.any():
@@ -344,8 +287,8 @@ def _generate_embeddings(
 
             df_content = mdf.loc[content_mask].to_pandas().reset_index(drop=True)
             filtered_content = df_content["metadata"].apply(content_getter)
-            # calculate embeddings
-            filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size)
+            # Force using a fixed batch size of 8192, ignoring the provided batch_size parameter.
+            filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size=batch_size)
             content_embeddings = _async_runner(
                 filtered_content_batches,
                 api_key,
@@ -356,7 +299,6 @@ def _generate_embeddings(
                 truncate,
                 filter_errors,
             )
-            # update embeddings in metadata
             df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
                 _add_embeddings, **content_embeddings, axis=1
             )[["metadata", "document_type", "_contains_embeddings"]]
@@ -373,23 +315,8 @@ def _generate_embeddings(
 def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataFrame], masks: List[cudf.Series]):
     """
     A function to concatenate extractions enriched with embeddings and remaining extractions into `ControlMessage`.
-
-    Parameters
-    ----------
-    ctrl_msg : ControlMessage
-        The incoming control message which will store concatenated extractions.
-    dataframes : List[pd.DataFrame]
-        A list of dataframes that will be concatenated and stored in the control message payload.
-    masks : List[cudf.Series]
-        A list of boolean masks that will be used to identify rows without embeddings.
-
-    Returns
-    -------
-    ControlMessage
-        An updated control message with metadata enriched with embeddings.
     """
     with ctrl_msg.payload().mutable_dataframe() as mdf:
-        # build unified mask
         unified_mask = cudf.Series(False, index=mdf.index)
         for mask in masks:
             unified_mask = unified_mask | mask
@@ -412,11 +339,6 @@ def _embed_extractions(builder: mrc.Builder):
     """
     A pipeline module that receives incoming messages in ControlMessage format
     and calculates text embeddings for all supported content types.
-
-    Parameters
-    ----------
-    builder : mrc.Builder
-        The Morpheus builder instance to attach this module to.
     """
     validated_config = fetch_and_validate_module_config(builder, EmbedExtractionsSchema)
     httpx_logger = logging.getLogger("httpx")
@@ -437,7 +359,7 @@ def _embed_extractions(builder: mrc.Builder):
 
             return _generate_embeddings(
                 message,
-                validated_config.batch_size,
+                validated_config.batch_size,  # This parameter is now ignored in _generate_embeddings.
                 validated_config.api_key,
                 validated_config.embedding_nim_endpoint,
                 validated_config.embedding_model,
@@ -453,57 +375,5 @@ def _embed_extractions(builder: mrc.Builder):
 
     embedding_node = builder.make_node("embed_extractions", ops.map(embed_extractions_fn))
 
-    # Register the input and output of the module
     builder.register_module_input("input", embedding_node)
     builder.register_module_output("output", embedding_node)
-
-
-def _embedding_generation_entrypoint(validated_config: EmbedExtractionsSchema):
-    pass
-
-
-def generate_embedding_generation_stage(
-    c: Config,
-    stage_config: Dict[str, Any],
-    task: str = "embed",
-    task_desc: str = "Embedding generation",
-    pe_count: int = 1,
-):
-    """
-    A function to generate a stage for embedding generation.
-
-    Parameters
-    ----------
-    c : Config
-        The Morpheus configuration object.
-    stage_config : Dict[str, Any]
-        The configuration for the stage.
-    task : str
-        The task to be added to the stage.
-    task_desc : str
-        The description of the task.
-    pe_count : int
-        The number of processing elements to be used in the stage.
-
-    Returns
-    -------
-    Stage
-        A stage for embedding generation.
-    """
-    try:
-        validated_config = EmbedExtractionsSchema(**stage_config)
-
-        _wrapped_process_fn = functools.partial(_embedding_generation_entrypoint, validated_config=validated_config)
-
-        return MultiProcessingBaseStage(
-            c=c,
-            pe_count=pe_count,
-            task=task,
-            task_desc=task_desc,
-            process_fn=_wrapped_process_fn,
-        )
-
-    except Exception as e:
-        err_msg = f"generate_chart_extractor_stage: Error generating table extractor stage. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
