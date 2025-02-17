@@ -56,7 +56,7 @@ class MilvusOperator:
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = True,
-        dense_dim: int = 1024,
+        dense_dim: int = 2048,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,
         enable_charts: bool = True,
