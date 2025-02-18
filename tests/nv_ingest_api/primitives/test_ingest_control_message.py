@@ -1,19 +1,15 @@
+import re
+
 from nv_ingest_api.primitives.control_message_task import ControlMessageTask
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
-
 
 import pytest
 import pandas as pd
 from datetime import datetime
 from pydantic import ValidationError
 
-# Assuming the classes ControlMessageTask and IngestControlMessage have been imported.
-
 
 def test_valid_task():
-    """
-    Validate that a ControlMessageTask can be successfully created with valid input data.
-    """
     data = {
         "name": "Example Task",
         "id": "task-123",
@@ -26,13 +22,7 @@ def test_valid_task():
 
 
 def test_valid_task_without_properties():
-    """
-    Validate that a ControlMessageTask defaults properties to an empty dictionary when not provided.
-    """
-    data = {
-        "name": "Minimal Task",
-        "id": "task-456",
-    }
+    data = {"name": "Minimal Task", "id": "task-456"}
     task = ControlMessageTask(**data)
     assert task.name == "Minimal Task"
     assert task.id == "task-456"
@@ -40,9 +30,6 @@ def test_valid_task_without_properties():
 
 
 def test_missing_required_field_name():
-    """
-    Validate that creating a ControlMessageTask without the 'name' field raises a ValidationError.
-    """
     data = {"id": "task-no-name", "properties": {"some_property": "some_value"}}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
@@ -53,9 +40,6 @@ def test_missing_required_field_name():
 
 
 def test_missing_required_field_id():
-    """
-    Validate that creating a ControlMessageTask without the 'id' field raises a ValidationError.
-    """
     data = {"name": "Task With No ID", "properties": {"some_property": "some_value"}}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
@@ -66,9 +50,6 @@ def test_missing_required_field_id():
 
 
 def test_extra_fields_forbidden():
-    """
-    Validate that providing extra fields to ControlMessageTask raises a ValidationError.
-    """
     data = {"name": "Task With Extras", "id": "task-extra", "properties": {}, "unexpected_field": "foo"}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
@@ -79,9 +60,6 @@ def test_extra_fields_forbidden():
 
 
 def test_properties_accepts_various_types():
-    """
-    Validate that the 'properties' field accepts various types of values.
-    """
     data = {
         "name": "Complex Properties Task",
         "id": "task-complex",
@@ -100,9 +78,6 @@ def test_properties_accepts_various_types():
 
 
 def test_properties_with_invalid_type():
-    """
-    Validate that providing an invalid type for 'properties' (e.g., a list) raises a ValidationError.
-    """
     data = {"name": "Invalid Properties Task", "id": "task-invalid-props", "properties": ["this", "should", "fail"]}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
@@ -112,42 +87,33 @@ def test_properties_with_invalid_type():
 
 
 def test_set_and_get_metadata():
-    """
-    Validate that set_metadata correctly stores metadata and get_metadata returns the correct value.
-    """
     cm = IngestControlMessage()
     cm.set_metadata("key1", "value1")
+    # Test string lookup remains unchanged.
     assert cm.get_metadata("key1") == "value1"
 
 
 def test_get_all_metadata():
-    """
-    Validate that get_metadata returns a copy of all metadata when no key is provided.
-    """
     cm = IngestControlMessage()
     cm.set_metadata("key1", "value1")
     cm.set_metadata("key2", "value2")
     all_metadata = cm.get_metadata()
     assert isinstance(all_metadata, dict)
     assert all_metadata == {"key1": "value1", "key2": "value2"}
+    # Ensure a copy is returned.
     all_metadata["key1"] = "modified"
     assert cm.get_metadata("key1") == "value1"
 
 
 def test_has_metadata():
-    """
-    Validate that has_metadata returns True if the metadata key exists and False otherwise.
-    """
     cm = IngestControlMessage()
     cm.set_metadata("present", 123)
+    # Test string lookup remains unchanged.
     assert cm.has_metadata("present")
     assert not cm.has_metadata("absent")
 
 
 def test_list_metadata():
-    """
-    Validate that list_metadata returns all metadata keys as a list.
-    """
     cm = IngestControlMessage()
     keys = ["alpha", "beta", "gamma"]
     for key in keys:
@@ -156,10 +122,46 @@ def test_list_metadata():
     assert sorted(metadata_keys) == sorted(keys)
 
 
+def test_get_metadata_regex_match():
+    """
+    Validate that get_metadata returns a dict of all matching metadata entries when a regex is provided.
+    """
+    cm = IngestControlMessage()
+    cm.set_metadata("alpha", 1)
+    cm.set_metadata("beta", 2)
+    cm.set_metadata("gamma", 3)
+    # Use a regex to match keys that start with "a" or "g".
+    pattern = re.compile("^(a|g)")
+    result = cm.get_metadata(pattern)
+    expected = {"alpha": 1, "gamma": 3}
+    assert result == expected
+
+
+def test_get_metadata_regex_no_match():
+    """
+    Validate that get_metadata returns the default value when a regex is provided but no keys match.
+    """
+    cm = IngestControlMessage()
+    cm.set_metadata("alpha", 1)
+    cm.set_metadata("beta", 2)
+    pattern = re.compile("z")
+    # Return default as an empty dict when no match is found.
+    result = cm.get_metadata(pattern, default_value={})
+    assert result == {}
+
+
+def test_has_metadata_regex_match():
+    """
+    Validate that has_metadata returns True if any metadata key matches the regex.
+    """
+    cm = IngestControlMessage()
+    cm.set_metadata("key1", "value1")
+    cm.set_metadata("other", "value2")
+    assert cm.has_metadata(re.compile("^key"))
+    assert not cm.has_metadata(re.compile("nonexistent"))
+
+
 def test_set_timestamp_with_datetime():
-    """
-    Validate that set_timestamp accepts a datetime object and get_timestamp returns the correct value.
-    """
     cm = IngestControlMessage()
     dt = datetime(2025, 1, 1, 12, 0, 0)
     cm.set_timestamp("start", dt)
@@ -168,9 +170,6 @@ def test_set_timestamp_with_datetime():
 
 
 def test_set_timestamp_with_string():
-    """
-    Validate that set_timestamp accepts an ISO format string and get_timestamp returns the correct datetime object.
-    """
     cm = IngestControlMessage()
     iso_str = "2025-01-01T12:00:00"
     dt = datetime.fromisoformat(iso_str)
@@ -180,9 +179,6 @@ def test_set_timestamp_with_string():
 
 
 def test_set_timestamp_invalid_input():
-    """
-    Validate that set_timestamp raises a ValueError when provided with an invalid timestamp format or type.
-    """
     cm = IngestControlMessage()
     with pytest.raises(ValueError):
         cm.set_timestamp("bad", 123)
@@ -191,26 +187,17 @@ def test_set_timestamp_invalid_input():
 
 
 def test_get_timestamp_nonexistent():
-    """
-    Validate that get_timestamp returns None for a non-existent key when fail_if_nonexist is False.
-    """
     cm = IngestControlMessage()
     assert cm.get_timestamp("missing") is None
 
 
 def test_get_timestamp_nonexistent_fail():
-    """
-    Validate that get_timestamp raises a KeyError for a non-existent key when fail_if_nonexist is True.
-    """
     cm = IngestControlMessage()
     with pytest.raises(KeyError):
         cm.get_timestamp("missing", fail_if_nonexist=True)
 
 
 def test_get_timestamps():
-    """
-    Validate that get_timestamps returns a dictionary of all set timestamps.
-    """
     cm = IngestControlMessage()
     dt1 = datetime(2025, 1, 1, 12, 0, 0)
     dt2 = datetime(2025, 1, 2, 12, 0, 0)
@@ -223,9 +210,6 @@ def test_get_timestamps():
 
 
 def test_filter_timestamp():
-    """
-    Validate that filter_timestamp returns only those timestamps whose keys match the given regex pattern.
-    """
     cm = IngestControlMessage()
     dt1 = datetime(2025, 1, 1, 12, 0, 0)
     dt2 = datetime(2025, 1, 2, 12, 0, 0)
@@ -243,9 +227,6 @@ def test_filter_timestamp():
 
 
 def test_remove_existing_task():
-    """
-    Validate that remove_task successfully removes an existing task.
-    """
     cm = IngestControlMessage()
     task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
@@ -257,10 +238,6 @@ def test_remove_existing_task():
 
 
 def test_remove_nonexistent_task():
-    """
-    Validate that calling remove_task on a non-existent task id does not raise an error and does not affect
-    existing tasks.
-    """
     cm = IngestControlMessage()
     task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
@@ -271,9 +248,6 @@ def test_remove_nonexistent_task():
 
 
 def test_payload_get_default():
-    """
-    Validate that the payload getter returns an empty DataFrame by default.
-    """
     cm = IngestControlMessage()
     payload = cm.payload()
     assert isinstance(payload, pd.DataFrame)
@@ -281,9 +255,6 @@ def test_payload_get_default():
 
 
 def test_payload_set_valid():
-    """
-    Validate that setting a valid pandas DataFrame as payload updates the payload correctly.
-    """
     cm = IngestControlMessage()
     df = pd.DataFrame({"col1": [1, 2], "col2": ["a", "b"]})
     returned_payload = cm.payload(df)
@@ -292,21 +263,12 @@ def test_payload_set_valid():
 
 
 def test_payload_set_invalid():
-    """
-    Validate that setting an invalid payload (non-DataFrame) raises a ValueError.
-    """
     cm = IngestControlMessage()
     with pytest.raises(ValueError):
         cm.payload("not a dataframe")
 
 
-# New tests for the added functionality:
-
-
 def test_config_get_default():
-    """
-    Validate that the default configuration is an empty dictionary.
-    """
     cm = IngestControlMessage()
     default_config = cm.config()
     assert isinstance(default_config, dict)
@@ -314,34 +276,23 @@ def test_config_get_default():
 
 
 def test_config_update_valid():
-    """
-    Validate that providing a valid configuration dictionary updates the config.
-    """
     cm = IngestControlMessage()
     new_config = {"setting": True, "threshold": 10}
     updated_config = cm.config(new_config)
     assert updated_config == new_config
-    # Update config with additional values.
     additional_config = {"another_setting": "value"}
     updated_config = cm.config(additional_config)
     assert updated_config == {"setting": True, "threshold": 10, "another_setting": "value"}
 
 
 def test_config_update_invalid():
-    """
-    Validate that providing a non-dictionary to the config method raises a ValueError.
-    """
     cm = IngestControlMessage()
     with pytest.raises(ValueError):
         cm.config("not a dict")
 
 
 def test_copy_creates_deep_copy():
-    """
-    Validate that the copy method returns a deep copy of the control message.
-    """
     cm = IngestControlMessage()
-    # Set up initial state.
     task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
     cm.set_metadata("meta", "data")
@@ -351,25 +302,20 @@ def test_copy_creates_deep_copy():
     cm.payload(df)
     cm.config({"config_key": "config_value"})
 
-    # Create a deep copy.
     copy_cm = cm.copy()
-    # Ensure they are not the same object.
     assert copy_cm is not cm
-    # Check that the state is equivalent.
     assert list(copy_cm.get_tasks()) == list(cm.get_tasks())
     assert copy_cm.get_metadata() == cm.get_metadata()
     assert copy_cm.get_timestamps() == cm.get_timestamps()
     pd.testing.assert_frame_equal(copy_cm.payload(), cm.payload())
     assert copy_cm.config() == cm.config()
 
-    # Modify the copy.
     copy_cm.remove_task("task1")
     copy_cm.set_metadata("meta", "new_data")
     copy_cm.set_timestamp("start", "2025-01-02T12:00:00")
     copy_cm.payload(pd.DataFrame({"col": [3, 4]}))
     copy_cm.config({"config_key": "new_config"})
 
-    # Verify the original remains unchanged.
     assert cm.has_task("task1")
     assert cm.get_metadata("meta") == "data"
     assert cm.get_timestamp("start") == dt
@@ -378,9 +324,6 @@ def test_copy_creates_deep_copy():
 
 
 def test_remove_nonexistent_task_logs_warning(caplog):
-    """
-    Validate that removing a non-existent task logs a warning.
-    """
     cm = IngestControlMessage()
     with caplog.at_level("WARNING"):
         cm.remove_task("nonexistent")

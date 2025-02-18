@@ -4,7 +4,7 @@ from datetime import datetime
 
 import logging
 import pandas as pd
-from typing import Any, Dict, Generator
+from typing import Any, Dict, Generator, Union
 
 from nv_ingest_api.primitives.control_message_task import ControlMessageTask
 
@@ -89,18 +89,52 @@ class IngestControlMessage:
         """
         return copy.deepcopy(self)
 
-    def get_metadata(self, key: str = None, default_value: Any = None) -> Any:
+    def get_metadata(self, key: Union[str, re.Pattern] = None, default_value: Any = None) -> Any:
         """
         Retrieve metadata. If 'key' is None, returns a copy of all metadata.
+
+        Parameters
+        ----------
+        key : str or re.Pattern, optional
+            If a string is provided, returns the value for that exact key.
+            If a regex pattern is provided, returns a dictionary of all metadata key-value pairs
+            where the key matches the regex. If no matches are found, returns default_value.
+        default_value : Any, optional
+            The value to return if the key is not found or no regex matches.
+
+        Returns
+        -------
+        Any
+            The metadata value for an exact string key, or a dict of matching metadata if a regex is provided.
         """
         if key is None:
             return self._metadata.copy()
+
+        # If key is a regex pattern (i.e. has a search method), perform pattern matching.
+        if hasattr(key, "search"):
+            matches = {k: v for k, v in self._metadata.items() if key.search(k)}
+            return matches if matches else default_value
+
+        # Otherwise, perform an exact lookup.
         return self._metadata.get(key, default_value)
 
-    def has_metadata(self, key: str) -> bool:
+    def has_metadata(self, key: Union[str, re.Pattern]) -> bool:
         """
         Check if a metadata key exists.
+
+        Parameters
+        ----------
+        key : str or re.Pattern
+            If a string is provided, checks for the exact key.
+            If a regex pattern is provided, returns True if any metadata key matches the regex.
+
+        Returns
+        -------
+        bool
+            True if the key (or any matching key, in case of a regex) exists, False otherwise.
         """
+        if hasattr(key, "search"):
+            return any(key.search(k) for k in self._metadata)
         return key in self._metadata
 
     def list_metadata(self) -> list:
