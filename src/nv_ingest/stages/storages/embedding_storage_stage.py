@@ -5,7 +5,6 @@
 import functools
 import logging
 import os
-import traceback
 from typing import Any
 from typing import Dict
 
@@ -33,65 +32,74 @@ def upload_embeddings(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     Identify contents (e.g., images) within a dataframe and uploads the data to MinIO.
     The image metadata in the metadata column is updated with the URL of the uploaded data.
     """
-    access_key = params.get("access_key", None)
-    secret_key = params.get("secret_key", None)
+    try:
+        access_key = params.get("access_key", None)
+        secret_key = params.get("secret_key", None)
 
-    endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
-    bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
-    bucket_path = params.get("bucket_path", "embeddings")
-    collection_name = params.get("collection_name", "nv_ingest_collection")
+        endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
+        bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
+        bucket_path = params.get("bucket_path", "embeddings")
+        collection_name = params.get("collection_name", "nv_ingest_collection")
 
-    client = Minio(
-        endpoint,
-        access_key=access_key,
-        secret_key=secret_key,
-        session_token=params.get("session_token", None),
-        secure=params.get("secure", False),
-        region=params.get("region", None),
-    )
+        client = Minio(
+            endpoint,
+            access_key=access_key,
+            secret_key=secret_key,
+            session_token=params.get("session_token", None),
+            secure=params.get("secure", False),
+            region=params.get("region", None),
+        )
 
-    connections.connect(address="milvus:19530", uri="http://milvus:19530", host="milvus", port="19530")
-    schema = Collection(collection_name).schema
+        connections.connect(address="milvus:19530", uri="http://milvus:19530", host="milvus", port="19530")
+        schema = Collection(collection_name).schema
 
-    bucket_found = client.bucket_exists(bucket_name)
-    if not bucket_found:
-        client.make_bucket(bucket_name)
-        logger.debug("Created bucket %s", bucket_name)
-    else:
-        logger.debug("Bucket %s already exists", bucket_name)
+        bucket_found = client.bucket_exists(bucket_name)
+        if not bucket_found:
+            client.make_bucket(bucket_name)
+            logger.debug("Created bucket %s", bucket_name)
+        else:
+            logger.debug("Bucket %s already exists", bucket_name)
 
-    conn = RemoteBulkWriter.ConnectParam(
-        endpoint=endpoint, access_key=access_key, secret_key=secret_key, bucket_name=bucket_name, secure=False
-    )
+        conn = RemoteBulkWriter.ConnectParam(
+            endpoint=endpoint, access_key=access_key, secret_key=secret_key, bucket_name=bucket_name, secure=False
+        )
 
-    writer = RemoteBulkWriter(
-        schema=schema, remote_path=bucket_path, connect_param=conn, file_type=BulkFileType.PARQUET
-    )
+        writer = RemoteBulkWriter(
+            schema=schema, remote_path=bucket_path, connect_param=conn, file_type=BulkFileType.PARQUET
+        )
 
-    for idx, row in df.iterrows():
-        metadata = row["metadata"].copy()
-        metadata["embedding_metadata"] = {}
-        metadata["embedding_metadata"]["uploaded_embedding_url"] = bucket_path
-        doc_type = row["document_type"]
-        content_replace = doc_type in [ContentTypeEnum.IMAGE, ContentTypeEnum.STRUCTURED]
-        location = metadata["source_metadata"]["source_location"]
-        content = metadata["content"]
-        # TODO: validate metadata before putting it back in.
-        if metadata["embedding"] is not None:
-            logger.error(f"row type: {doc_type} -  {location} -  {len(content)}")
-            df.at[idx, "metadata"] = metadata
-            writer.append_row(
-                {
-                    "text": location if content_replace else content,
-                    "source": metadata["source_metadata"],
-                    "content_metadata": metadata["content_metadata"],
-                    "vector": metadata["embedding"],
-                }
-            )
+        for idx, row in df.iterrows():
+            metadata = row["metadata"].copy()
+            metadata["embedding_metadata"] = {}
+            metadata["embedding_metadata"]["uploaded_embedding_url"] = bucket_path
 
-    writer.commit()
+            doc_type = row["document_type"]
+            content_replace = doc_type in [ContentTypeEnum.IMAGE, ContentTypeEnum.STRUCTURED]
+            location = metadata["source_metadata"]["source_location"]
+            content = metadata["content"]
 
-    return df
+            # TODO: validate metadata before putting it back in.
+            if metadata["embedding"] is not None:
+                logger.error(f"row type: {doc_type} -  {location} -  {len(content)}")
+                df.at[idx, "metadata"] = metadata
+
+                writer.append_row(
+                    {
+                        "text": location if content_replace else content,
+                        "source": metadata["source_metadata"],
+                        "content_metadata": metadata["content_metadata"],
+                        "vector": metadata["embedding"],
+                    }
+                )
+
+        writer.commit()
+
+        return df
+
+    except Exception as e:
+        err_msg = f"upload_embeddings: Error uploading embeddings. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def _store_embeddings(df, task_props, validated_config, trace_info=None):
@@ -99,8 +107,7 @@ def _store_embeddings(df, task_props, validated_config, trace_info=None):
         if isinstance(task_props, BaseModel):
             task_props = task_props.model_dump()
 
-        content_types = {}
-        content_types[ContentTypeEnum.EMBEDDING] = True
+        content_types = {ContentTypeEnum.EMBEDDING: True}
 
         params = task_props.get("params", {})
         params["content_types"] = content_types
@@ -108,11 +115,11 @@ def _store_embeddings(df, task_props, validated_config, trace_info=None):
         df = upload_embeddings(df, params)
 
         return df
+
     except Exception as e:
-        traceback.print_exc()
-        err_msg = f"Failed to store embeddings: {e}"
-        logger.error(err_msg)
-        raise
+        err_msg = f"_store_embeddings: Failed to store embeddings: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def generate_embedding_storage_stage(
@@ -142,9 +149,17 @@ def generate_embedding_storage_stage(
     MultiProcessingBaseStage
         A Morpheus stage with applied worker function.
     """
-    validated_config = EmbeddingStorageModuleSchema()
-    _wrapped_process_fn = functools.partial(_store_embeddings, validated_config=validated_config)
+    try:
+        # Note: No embedding storage config is provided here; using default schema.
+        validated_config = EmbeddingStorageModuleSchema()
 
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
-    )
+        _wrapped_process_fn = functools.partial(_store_embeddings, validated_config=validated_config)
+
+        return MultiProcessingBaseStage(
+            c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
+        )
+
+    except Exception as e:
+        err_msg = f"generate_embedding_storage_stage: Error generating embedding storage stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

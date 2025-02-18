@@ -206,4 +206,6 @@ def test_decode_and_extract_handles_exception_in_extraction(mock_image_helpers):
         decode_and_extract(base64_row, task_props, validated_config, trace_info=trace_info)
 
     # Verify the exception message
-    assert str(excinfo.value) == "Extraction error"
+    assert (
+        str(excinfo.value) == "decode_and_extract: Unhandled exception for source '1'. Original error: Extraction error"
+    )
