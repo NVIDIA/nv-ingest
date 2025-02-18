@@ -2,10 +2,12 @@ from datetime import datetime
 
 import pandas as pd
 
-from nv_ingest.primitives.ingest_control_message import ControlMessageTask, IngestControlMessage
 
 import pytest
 from pydantic import ValidationError
+
+from nv_ingest_api.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 
 def test_valid_task():

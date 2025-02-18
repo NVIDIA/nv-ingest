@@ -6,7 +6,7 @@ import logging
 import pandas as pd
 from typing import Any, Dict, Generator
 
-from nv_ingest.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.primitives.control_message_task import ControlMessageTask
 
 
 logger = logging.getLogger(__name__)
