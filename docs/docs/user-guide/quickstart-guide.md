@@ -145,7 +145,8 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 ### In Python
 
-You can find more documentation and examples [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb):
+You can find more documentation and examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+
 
 ```python
 import logging, time
@@ -201,7 +202,7 @@ print(f"Got {len(result)} results")
 
 ### Using the `nv-ingest-cli`
 
-You can find more nv-ingest-cli examples [here](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb):
+You can find more nv-ingest-cli examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
@@ -262,7 +263,10 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
+
+For the full metadata definitions, refer to [Content Metadata](developer-guide/content-metadata.md). 
+
+We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 
 First, install `tkinter` by running the following code. Choose the code for your OS.
 

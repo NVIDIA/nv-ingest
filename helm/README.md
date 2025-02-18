@@ -73,7 +73,7 @@ kubectl create -n ${NAMESPACE} secret generic ngc-api --from-literal=NGC_API_KEY
 
 Alternatively, you can also use an External Secret Store like Vault, the name of the secret name expected for the NGC API is `ngc-api` and the secret name expected for NVCR is `nvcrimagepullsecret`.
 
-In this case, make sure to remove the following from your helm commmand:
+In this case, make sure to remove the following from your helm command:
 
 ```bash
     --set imagePullSecret.create=true \
@@ -84,7 +84,7 @@ In this case, make sure to remove the following from your helm commmand:
 
 ### Minikube Setup
 
-The PVC setup for minikube requires a little bit more configuraiton. Please follow the steps below if you are using minikube.
+The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
 
 ```bash
 minikube start --driver docker --container-runtime docker --gpus all --nodes 3
@@ -103,7 +103,8 @@ NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service 
 > [!TIP]
 > This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.
 
-First, build `nv-ingest-cli` from the source to ensure you have the latest code. More information is provided [here](https://github.com/NVIDIA/nv-ingest/tree/main/client).
+First, build `nv-ingest-cli` from the source to ensure you have the latest code. 
+For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-ingest/tree/main/client).
 
 ```bash
 # Just to be cautious we remove any existing installation
@@ -119,7 +120,7 @@ pip install that wheel made above
 #### Rest Endpoint Ingress
 
 It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the NV-Ingest pod.
-You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NV-Ingest pod to your local environment.
+You can test outside of your Kubernetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NV-Ingest pod to your local environment.
 
 Example:
 
@@ -177,7 +178,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | `affinity`                          | [default: {}] Affinity settings for deployment.                                                                  | `{}`    |
 | `nodeSelector`                      | Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`                                  | `{}`    |
 | `logLevel`                          | Log level of NV-Ingest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
-| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NV-Ingest containerextraEnvVarsCM: ""   | `""`    |
+| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NV-Ingest container                     | `""`    |
 | `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Environment variables to include in the NV-Ingest container                   | `""`    |
 | `fullnameOverride`                  | [default: ""] A name to force the fullname of the NV-Ingest container to have, defaults to the Helm Release Name  | `""`    |
 | `nameOverride`                      | [default: ""] A name to base the objects created by this helm chart                                              | `""`    |
