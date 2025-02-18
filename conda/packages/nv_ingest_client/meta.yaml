@@ -28,7 +28,7 @@ requirements:
   build:
     - pip
     - python==3.10
-    - setuptools>=58.2.0
+    - setuptools>=75.8.0
   run:
     - click>=8.1.7
     - fsspec>=2024.10.0
