@@ -112,12 +112,23 @@ def _update_metadata(
         try:
             paddle_results = future_paddle.result()
         except Exception as e:
-            logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
             raise
 
     # Ensure both clients returned lists of results matching the number of input images.
-    if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
-        raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
+    if not isinstance(yolox_results, list) or not isinstance(paddle_results, list):
+        logger.warning(
+            "Unexpected result types from inference clients: yolox_results=%s, paddle_results=%s. "
+            "Proceeding with available results.",
+            type(yolox_results).__name__,
+            type(paddle_results).__name__,
+        )
+
+        # Assign default values for missing results
+        if not isinstance(yolox_results, list):
+            yolox_results = [None] * len(valid_arrays)
+        if not isinstance(paddle_results, list):
+            paddle_results = [(None, None)] * len(valid_images)  # Default for paddle output
 
     if len(yolox_results) != len(valid_arrays):
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
