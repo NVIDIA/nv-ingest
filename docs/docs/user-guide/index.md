@@ -9,11 +9,9 @@ extracted into discrete content, and further contextualized through optical char
 From there, NVIDIA-Ingest can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
-> [!Note]
-> Cached and Deplot are deprecated. 
-> Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. 
-> With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU.
-> If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+!!! note
+
+    Cached and Deplot are deprecated. Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 ## What NVIDIA-Ingest Is ✔️
