@@ -11,96 +11,103 @@ To get started using NVIDIA-Ingest, you need to do a few things:
 
 This example demonstrates how to use the provided [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml) to start all needed services with a few commands.
 
-**IMPORTANT:** NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
+```{important}
+NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
+```
 
 If preferred, you can also [start services one by one](developer-guide/deployment.md) or run on Kubernetes via [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](developer-guide/environment-config.md) you want to configure.
 
 1. Git clone the repo:
-`git clone https://github.com/nvidia/nv-ingest`
-2. Change the directory to the cloned repo
-`cd nv-ingest`.
 
-3. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
-```shell
-# This is required to access pre-built containers and NIM microservices
-$ docker login nvcr.io
-Username: $oauthtoken
-Password: <Your Key>
+   `git clone https://github.com/nvidia/nv-ingest`
+
+1. Change the directory to the cloned repo
+   
+   `cd nv-ingest`.
+
+1. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+
+   ```shell
+   # This is required to access pre-built containers and NIM microservices
+   $ docker login nvcr.io
+   Username: $oauthtoken
+   Password: <Your Key>
+   ```
+
+   ```{note}
+   During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
+   ```
+
+1. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
+
+   ```
+   # Container images must access resources from NGC.
+
+   NGC_API_KEY=<key to download containers from NGC>
+   NIM_NGC_API_KEY=<key to download model files after containers start>
+   NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
+
+   DATASET_ROOT=<PATH_TO_THIS_REPO>/data
+   NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
+   ```
+
+   ```{note}
+   As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device. Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+   ```
+
+1. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+
+   `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
+
+1. Start all services:
+
+   `docker compose --profile retrieval up`
+
+   ```{tip}
+   By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+   ```
+
+1. When all services have fully started, `nvidia-smi` should show processes like the following:
+
+   ```
+   # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
+   +---------------------------------------------------------------------------------------+
+   | Processes:                                                                            |
+   |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
+   |        ID   ID                                                             Usage      |
+   |=======================================================================================|
+   |    0   N/A  N/A   1352957      C   tritonserver                                762MiB |
+   |    1   N/A  N/A   1322081      C   /opt/nim/llm/.venv/bin/python3            63916MiB |
+   |    2   N/A  N/A   1355175      C   tritonserver                                478MiB |
+   |    2   N/A  N/A   1367569      C   ...s/python/triton_python_backend_stub       12MiB |
+   |    3   N/A  N/A   1321841      C   python                                      414MiB |
+   |    3   N/A  N/A   1352331      C   tritonserver                                478MiB |
+   |    3   N/A  N/A   1355929      C   ...s/python/triton_python_backend_stub      424MiB |
+   |    3   N/A  N/A   1373202      C   tritonserver                                414MiB |
+   +---------------------------------------------------------------------------------------+
+   ```
+
+1. Observe the started containers with `docker ps`:
+
+   ```
+   CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
+   0f2f86615ea5   nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
+   de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
+   02c9ab8c6901   nvcr.io/nvidia/nemo-microservices/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
+   d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
+   508715a24998   nvcr.io/nvidia/nemo-microservices/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
+   5b7a174a0a85   nvcr.io/nvidia/nemo-microservices/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
+   430045f98c02   nvcr.io/nvidia/nemo-microservices/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
+   8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
+   aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
+   bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
+   ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
+   ```
+
+```{tip}
+NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 ```
 
-> [!NOTE]
-> During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). 
-> When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
-
-
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
-
-```
-# Container images must access resources from NGC.
-
-NGC_API_KEY=<key to download containers from NGC>
-NIM_NGC_API_KEY=<key to download model files after containers start>
-NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
-
-DATASET_ROOT=<PATH_TO_THIS_REPO>/data
-NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
-```
-
-> **NOTE:** As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device.
-
-> Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
-
-> **IMPORTANT:** Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
-
-> `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
-
-5. Start all services:
-`docker compose up`
-
-> **TIP:** By default, we have [configured log levels to be verbose](docker-compose.yaml).
->
-> It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
-
-6. When all services have fully started, `nvidia-smi` should show processes like the following:
-```
-# If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
-+---------------------------------------------------------------------------------------+
-| Processes:                                                                            |
-|  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
-|        ID   ID                                                             Usage      |
-|=======================================================================================|
-|    0   N/A  N/A   1352957      C   tritonserver                                762MiB |
-|    1   N/A  N/A   1322081      C   /opt/nim/llm/.venv/bin/python3            63916MiB |
-|    2   N/A  N/A   1355175      C   tritonserver                                478MiB |
-|    2   N/A  N/A   1367569      C   ...s/python/triton_python_backend_stub       12MiB |
-|    3   N/A  N/A   1321841      C   python                                      414MiB |
-|    3   N/A  N/A   1352331      C   tritonserver                                478MiB |
-|    3   N/A  N/A   1355929      C   ...s/python/triton_python_backend_stub      424MiB |
-|    3   N/A  N/A   1373202      C   tritonserver                                414MiB |
-+---------------------------------------------------------------------------------------+
-```
-
-Observe the started containers with `docker ps`:
-```
-CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
-0f2f86615ea5   nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
-de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-02c9ab8c6901   nvcr.io/nvidia/nemo-microservices/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
-d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
-508715a24998   nvcr.io/nvidia/nemo-microservices/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
-5b7a174a0a85   nvcr.io/nvidia/nemo-microservices/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
-430045f98c02   nvcr.io/nvidia/nemo-microservices/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
-8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
-aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
-bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
-ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
-```
-
-> **TIP:** NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can:
-> ```
-> docker compose build
-> ```
-> After the image is built, run `docker compose up` per item 5 above.
 
 ## Step 2: Installing Python Dependencies
 
@@ -109,38 +116,32 @@ You can interact with the NV-Ingest service from the host or by `docker exec`-in
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required but makes it easy to create a fresh Python environment
-conda create --name nv-ingest-dev python=3.10
+conda env create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 cd client
 pip install .
 ```
 
-> **NOTE:** Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141).
->
-> If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container.
->
-> To interact within the container:
-> ```
-> docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash
-> ```
-> You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed:
-> ```
-> (morpheus) root@aba77e2a4bde:/workspace#
-> ```
->
-> From the bash prompt above, you can run the nv-ingest-cli and Python examples described below.
+```{note}
+Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+```
+
 
 ## Step 3: Ingesting Documents
 
 You can submit jobs programmatically in Python or using the nv-ingest-cli tool.
 
 In the below examples, we are doing text, chart, table, and image extraction:
-- `extract_text`, - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages
-- `extract_images` - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images
-- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
-- `extract_charts` - (optional) enables or disables the use of Deplot and CACHED for chart extraction.
 
-> **IMPORTANT:** `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
+- **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
+- **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
+- **extract_tables** — Uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction.
+- **extract_charts** — (Optional) Enables or disables Deplot and CACHED for chart extraction.
+
+```{important}
+`extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
+```
+
 
 ### In Python
 
@@ -263,28 +264,36 @@ multimodal_test.pdf.metadata.json
 ```
 You can view the full JSON extracts and the metadata definitions [here](developer-guide/content-metadata.md). We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 
-First, install `tkinter` by running the following commands depending on your OS.
+First, install `tkinter` by running the following code. Choose the code for your OS.
+
 - For Ubuntu/Debian Linux:
-```shell
-sudo apt-get update
-sudo apt-get install python3-tk
-```
+
+  ```shell
+  sudo apt-get update
+  sudo apt-get install python3-tk
+  ```
+
 - For Fedora/RHEL Linux:
-```shell
-sudo dnf install python3-tkinter
-```
+
+  ```shell
+  sudo dnf install python3-tkinter
+  ```
+
 - For macOS using Homebrew:
-```shell
-brew install python-tk
-```
+
+  ```shell
+  brew install python-tk
+  ```
+
 Then, run the following command to execute the script for inspecting the extracted image:
 ```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
 ```
 
-> **TIP:** Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
->
-> Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+```{tip}
+Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+```
+
 
 ## Repo Structure
 

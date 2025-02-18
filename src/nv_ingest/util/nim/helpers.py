@@ -261,7 +261,7 @@ class NimClient:
 
             # 3. Format the input based on protocol.
             formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size
+                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
@@ -565,7 +565,7 @@ def generate_url(url) -> str:
         str: Fully validated URL
     """
     if not re.match(r"^https?://", url):
-        # Add the default `http://` if its not already present in the URL
+        # Add the default `http://` if it's not already present in the URL
         url = f"http://{url}"
 
     return url

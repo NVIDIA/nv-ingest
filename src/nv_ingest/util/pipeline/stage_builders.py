@@ -20,7 +20,6 @@ from nv_ingest.modules.sources.message_broker_task_source import MessageBrokerTa
 from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
-from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
@@ -31,6 +30,7 @@ from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
+from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 
@@ -422,22 +422,19 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
     embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
 
-    embed_extractions_loader = EmbedExtractionsLoaderFactory.get_instance(
-        module_name="embed_extractions",
-        module_config=ingest_config.get(
-            "embed_extractions_module",
-            {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
-        ),
-    )
+    text_embed_extraction_config = {
+        "api_key": api_key,
+        "embedding_nim_endpoint": embedding_nim_endpoint,
+        "embedding_model": embedding_model,
+    }
 
     embed_extractions_stage = pipe.add_stage(
-        LinearModulesStage(
+        generate_text_embed_extractor_stage(
             morpheus_pipeline_config,
-            embed_extractions_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
-            input_port_name="input",
-            output_port_name="output",
+            text_embed_extraction_config,
+            pe_count=2,
+            task="embed",
+            task_desc="embed_text",
         )
     )
 

@@ -177,7 +177,7 @@ def _nemo_document_splitter(builder: mrc.Builder):
             max_character_length = task_props.get("max_character_length", validated_config.max_character_length)
             sentence_window_size = task_props.get("sentence_window_size", validated_config.sentence_window_size)
 
-            logger.info(
+            logger.debug(
                 f"Splitting documents with split_by: {split_by}, split_length: {split_length}, "
                 f"split_overlap: {split_overlap}, max_character_length: {max_character_length}, "
                 f"sentence_window_size: {sentence_window_size}"

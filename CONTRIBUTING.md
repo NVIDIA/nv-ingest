@@ -48,7 +48,7 @@ External contributions will be welcome soon, and they are greatly appreciated! E
    an [issue](https://github.com/NVIDIA/nv-ingest/issues) with a detailed
    description of
    the problem, feature request, or documentation issue. The NV-Ingest team will review and triage these issues,
-   scheduling them for a future release.
+   and if appropriate, schedule them for a future release.
 
 ## Cloning the repository
 

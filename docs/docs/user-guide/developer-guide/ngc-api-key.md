@@ -5,7 +5,7 @@
 NGC contains many public images, models, and datasets that can be pulled immediately without authentication.
 To push and pull custom images to and from the private registry, you must authenticate with NGC and generate a private key.
 
-To create a private key, go to https://org.ngc.nvidia.com/setup/personal-keys.
+To create a private key, go to [https://org.ngc.nvidia.com/setup/personal-keys](https://org.ngc.nvidia.com/setup/personal-keys).
 
 When creating an NGC API key, ensure that all of the following are selected from the "Services Included" drop-down.
 - AI Foundation Models and Endpoints
