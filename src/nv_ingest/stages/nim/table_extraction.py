@@ -38,6 +38,7 @@ def _update_metadata(
     yolox_client: NimClient,
     paddle_client: NimClient,
     worker_pool_size: int = 8,  # Not currently used
+    enable_yolox: bool = False,
     trace_info: Dict = None,
 ) -> List[Tuple[str, Tuple[Any, Any]]]:
     """
@@ -75,19 +76,21 @@ def _update_metadata(
         return results
 
     # Prepare data payloads for both clients.
-    data_yolox = {"images": valid_arrays}
+    if enable_yolox:
+        data_yolox = {"images": valid_arrays}
     data_paddle = {"base64_images": valid_images}
 
     _ = worker_pool_size
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_yolox = executor.submit(
-            yolox_client.infer,
-            data=data_yolox,
-            model_name="yolox",
-            stage_name="table_data_extraction",
-            max_batch_size=8,
-            trace_info=trace_info,
-        )
+        if enable_yolox:
+            future_yolox = executor.submit(
+                yolox_client.infer,
+                data=data_yolox,
+                model_name="yolox",
+                stage_name="table_data_extraction",
+                max_batch_size=8,
+                trace_info=trace_info,
+            )
         future_paddle = executor.submit(
             paddle_client.infer,
             data=data_paddle,
@@ -97,11 +100,14 @@ def _update_metadata(
             trace_info=trace_info,
         )
 
-        try:
-            yolox_results = future_yolox.result()
-        except Exception as e:
-            logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
-            raise
+        if enable_yolox:
+            try:
+                yolox_results = future_yolox.result()
+            except Exception as e:
+                logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+                raise
+        else:
+            yolox_results = [None] * len(valid_images)
 
         try:
             paddle_results = future_paddle.result()
@@ -226,20 +232,22 @@ def _extract_table_data(
             base64_images.append(meta["content"])
 
         # 3) Call our bulk _update_metadata to get all results
+        table_content_format = (
+            df.at[valid_indices[0], "metadata"]["table_metadata"].get("table_content_format")
+            or TableFormatEnum.PSEUDO_MARKDOWN
+        )
+        enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
+
         bulk_results = _update_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
             paddle_client=paddle_client,
             worker_pool_size=stage_config.workers_per_progress_engine,
+            enable_yolox=enable_yolox,
             trace_info=trace_info,
         )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
-        # table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
-        #     "table_content_format", TableFormatEnum.MARKDOWN
-        # )
-        table_content_format = TableFormatEnum.MARKDOWN
-
         for row_id, idx in enumerate(valid_indices):
             # unpack (base64_image, (yolox_predictions, paddle_bounding boxes, paddle_text_predictions))
             _, cell_predictions, bounding_boxes, text_predictions = bulk_results[row_id]
