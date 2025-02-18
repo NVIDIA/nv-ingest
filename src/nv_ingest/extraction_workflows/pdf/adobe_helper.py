@@ -99,7 +99,7 @@ def adobe(
 
     """
 
-    logger.info("Extracting PDF with Adobe backend.")
+    logger.debug("Extracting PDF with Adobe backend.")
     if not ADOBE_INSTALLED:
         err_msg = (
             "Adobe SDK not installed -- cannot extract PDF.\r\nTo install the adobe SDK please review the "

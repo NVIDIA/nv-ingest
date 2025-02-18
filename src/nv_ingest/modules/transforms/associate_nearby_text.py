@@ -146,8 +146,6 @@ def _associate_nearby_text(builder: mrc.Builder):
 
             n_neighbors = task_props.get("n_neighbors", validated_config.n_neighbors)
 
-            logger.info(f"Associating text blocks with images with neighbors: {n_neighbors}")
-
             result_df = _associate_nearby_text_blocks(df, n_neighbors)
 
             # Work around until https://github.com/apache/arrow/pull/40412 is resolved
