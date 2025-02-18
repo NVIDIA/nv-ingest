@@ -21,11 +21,11 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
 
    `git clone https://github.com/nvidia/nv-ingest`
 
-1. Change the directory to the cloned repo
+2. Change the directory to the cloned repo
    
    `cd nv-ingest`.
 
-1. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 
    ```shell
    # This is required to access pre-built containers and NIM microservices
@@ -38,7 +38,7 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
    During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
    ```
 
-1. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
+4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
 
    ```
    # Container images must access resources from NGC.
@@ -55,11 +55,11 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
    As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device. Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
    ```
 
-1. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
+5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
    `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-1. Start all services:
+6. Start all services:
 
    `docker compose --profile retrieval up`
 
@@ -67,7 +67,7 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
    By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
    ```
 
-1. When all services have fully started, `nvidia-smi` should show processes like the following:
+7. When all services have fully started, `nvidia-smi` should show processes like the following:
 
    ```
    # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -87,7 +87,7 @@ If preferred, you can also [start services one by one](developer-guide/deploymen
    +---------------------------------------------------------------------------------------+
    ```
 
-1. Observe the started containers with `docker ps`:
+8. Observe the started containers with `docker ps`:
 
    ```
    CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
