@@ -1,13 +1,13 @@
-from datetime import datetime
-
-import pandas as pd
+from nv_ingest_api.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 
 import pytest
+import pandas as pd
+from datetime import datetime
 from pydantic import ValidationError
 
-from nv_ingest_api.primitives.control_message_task import ControlMessageTask
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+# Assuming the classes ControlMessageTask and IngestControlMessage have been imported.
 
 
 def test_valid_task():
@@ -298,3 +298,90 @@ def test_payload_set_invalid():
     cm = IngestControlMessage()
     with pytest.raises(ValueError):
         cm.payload("not a dataframe")
+
+
+# New tests for the added functionality:
+
+
+def test_config_get_default():
+    """
+    Validate that the default configuration is an empty dictionary.
+    """
+    cm = IngestControlMessage()
+    default_config = cm.config()
+    assert isinstance(default_config, dict)
+    assert default_config == {}
+
+
+def test_config_update_valid():
+    """
+    Validate that providing a valid configuration dictionary updates the config.
+    """
+    cm = IngestControlMessage()
+    new_config = {"setting": True, "threshold": 10}
+    updated_config = cm.config(new_config)
+    assert updated_config == new_config
+    # Update config with additional values.
+    additional_config = {"another_setting": "value"}
+    updated_config = cm.config(additional_config)
+    assert updated_config == {"setting": True, "threshold": 10, "another_setting": "value"}
+
+
+def test_config_update_invalid():
+    """
+    Validate that providing a non-dictionary to the config method raises a ValueError.
+    """
+    cm = IngestControlMessage()
+    with pytest.raises(ValueError):
+        cm.config("not a dict")
+
+
+def test_copy_creates_deep_copy():
+    """
+    Validate that the copy method returns a deep copy of the control message.
+    """
+    cm = IngestControlMessage()
+    # Set up initial state.
+    task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
+    cm.add_task(task)
+    cm.set_metadata("meta", "data")
+    dt = datetime(2025, 1, 1, 12, 0, 0)
+    cm.set_timestamp("start", dt)
+    df = pd.DataFrame({"col": [1, 2]})
+    cm.payload(df)
+    cm.config({"config_key": "config_value"})
+
+    # Create a deep copy.
+    copy_cm = cm.copy()
+    # Ensure they are not the same object.
+    assert copy_cm is not cm
+    # Check that the state is equivalent.
+    assert list(copy_cm.get_tasks()) == list(cm.get_tasks())
+    assert copy_cm.get_metadata() == cm.get_metadata()
+    assert copy_cm.get_timestamps() == cm.get_timestamps()
+    pd.testing.assert_frame_equal(copy_cm.payload(), cm.payload())
+    assert copy_cm.config() == cm.config()
+
+    # Modify the copy.
+    copy_cm.remove_task("task1")
+    copy_cm.set_metadata("meta", "new_data")
+    copy_cm.set_timestamp("start", "2025-01-02T12:00:00")
+    copy_cm.payload(pd.DataFrame({"col": [3, 4]}))
+    copy_cm.config({"config_key": "new_config"})
+
+    # Verify the original remains unchanged.
+    assert cm.has_task("task1")
+    assert cm.get_metadata("meta") == "data"
+    assert cm.get_timestamp("start") == dt
+    pd.testing.assert_frame_equal(cm.payload(), df)
+    assert cm.config()["config_key"] == "config_value"
+
+
+def test_remove_nonexistent_task_logs_warning(caplog):
+    """
+    Validate that removing a non-existent task logs a warning.
+    """
+    cm = IngestControlMessage()
+    with caplog.at_level("WARNING"):
+        cm.remove_task("nonexistent")
+        assert "Attempted to remove non-existent task" in caplog.text
