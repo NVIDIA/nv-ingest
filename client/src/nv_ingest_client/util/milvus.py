@@ -1037,6 +1037,8 @@ def nv_rerank(
         texts.append({"text": candidate["entity"]["text"]})
     payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
     response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
+    if response.status_code != 200:
+        raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []
     for rank_vals in response.json()["rankings"]:
         idx = rank_vals["index"]
