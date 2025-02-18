@@ -62,14 +62,15 @@ class TestImageCaptionExtraction(unittest.TestCase):
     # Tests for _generate_captions
     # ------------------------------
     @patch(f"{MODULE_UNDER_TEST}.scale_image_to_encoding_size")
-    @patch(f"{MODULE_UNDER_TEST}.NimClient")
-    def test_generate_captions_success(self, mock_NimClient, mock_scale):
+    @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+    def test_generate_captions_success(self, mock_create_inference_client, mock_scale):
         # For each call, just append "_scaled" to the input image.
         mock_scale.side_effect = lambda b64: (b64 + "_scaled", None)
-        # Create a fake NimClient instance whose infer() returns a list of captions.
+
+        # Create a fake client instance whose infer() returns a list of captions.
         fake_client = MagicMock()
         fake_client.infer.return_value = ["caption1", "caption2"]
-        mock_NimClient.return_value = fake_client
+        mock_create_inference_client.return_value = fake_client
 
         base64_images = ["image1", "image2"]
         prompt = "Test prompt"
@@ -81,12 +82,14 @@ class TestImageCaptionExtraction(unittest.TestCase):
 
         # Check that scale_image_to_encoding_size was called once per image.
         self.assertEqual(mock_scale.call_count, len(base64_images))
-        # Verify that the scaled images are passed to NimClient.infer.
+
+        # Verify that the scaled images are passed to the fake client's infer() method.
         expected_data = {
             "base64_images": ["image1_scaled", "image2_scaled"],
             "prompt": prompt,
         }
         fake_client.infer.assert_called_once_with(expected_data, model_name=model_name)
+
         # Check that the returned captions match the fake infer result.
         self.assertEqual(captions, ["caption1", "caption2"])
 
