@@ -180,6 +180,7 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
+
     _ = task_props  # unused
 
     if trace_info is None:
@@ -209,6 +210,7 @@ def _extract_chart_data(
             m = row.get("metadata", {})
             if not m:
                 return False
+
             content_md = m.get("content_metadata", {})
             if (
                 content_md.get("type") == "structured"
@@ -217,22 +219,23 @@ def _extract_chart_data(
                 and m.get("content") not in [None, ""]
             ):
                 return True
+
             return False
 
         mask = df.apply(meets_criteria, axis=1)
         valid_indices = df[mask].index.tolist()
 
-        # If no rows meet the criteria, just return
+        # If no rows meet the criteria, just return.
         if not valid_indices:
             return df, {"trace_info": trace_info}
 
-        # 2) Extract base64 images + keep track of row -> image mapping
+        # 2) Extract base64 images + keep track of row -> image mapping.
         base64_images = []
         for idx in valid_indices:
             meta = df.at[idx, "metadata"]
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
-        # 3) Call our bulk update_metadata to get all results
+        # 3) Call our bulk _update_metadata to get all results.
         bulk_results = _update_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
@@ -252,10 +255,18 @@ def _extract_chart_data(
 
     except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
+
         raise
+
     finally:
-        yolox_client.close()
-        paddle_client.close()
+        try:
+            if paddle_client is not None:
+                paddle_client.close()
+            if yolox_client is not None:
+                yolox_client.close()
+
+        except Exception as close_err:
+            logger.error(f"Error closing clients: {close_err}", exc_info=True)
 
 
 def generate_chart_extractor_stage(
@@ -295,10 +306,20 @@ def generate_chart_extractor_stage(
         A configured Morpheus stage with an applied worker function that handles chart data extraction
         from PDF content.
     """
+    try:
+        validated_config = ChartExtractorSchema(**stage_config)
 
-    validated_config = ChartExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
+        _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
 
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
-    )
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+        )
+
+    except Exception as e:
+        err_msg = f"generate_chart_extractor_stage: Error generating table extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

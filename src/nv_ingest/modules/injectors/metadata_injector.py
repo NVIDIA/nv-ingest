@@ -31,41 +31,46 @@ MetadataInjectorLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPAC
 
 
 def on_data(message: ControlMessage):
-    with message.payload().mutable_dataframe() as mdf:
-        df = mdf.to_pandas()
+    try:
+        with message.payload().mutable_dataframe() as mdf:
+            df = mdf.to_pandas()
 
-    update_required = False
-    rows = []
-    for _, row in df.iterrows():
-        content_type = doc_type_to_content_type(DocumentTypeEnum(row["document_type"]))
-        if "metadata" not in row or "content" not in row["metadata"]:
-            update_required = True
-            row["metadata"] = {
-                "content": row["content"],
-                "content_metadata": {
-                    "type": content_type.name.lower(),
-                },
-                "error_metadata": None,
-                "image_metadata": (
-                    None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
-                ),
-                "source_metadata": {
-                    "source_id": row["source_id"],
-                    "source_name": row["source_name"],
-                    "source_type": row["document_type"],
-                },
-                "text_metadata": (None if (content_type != ContentTypeEnum.TEXT) else {"text_type": "document"}),
-            }
+        update_required = False
+        rows = []
+        for _, row in df.iterrows():
+            content_type = doc_type_to_content_type(DocumentTypeEnum(row["document_type"]))
+            if "metadata" not in row or "content" not in row["metadata"]:
+                update_required = True
+                row["metadata"] = {
+                    "content": row["content"],
+                    "content_metadata": {
+                        "type": content_type.name.lower(),
+                    },
+                    "error_metadata": None,
+                    "image_metadata": (
+                        None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
+                    ),
+                    "source_metadata": {
+                        "source_id": row["source_id"],
+                        "source_name": row["source_name"],
+                        "source_type": row["document_type"],
+                    },
+                    "text_metadata": (None if (content_type != ContentTypeEnum.TEXT) else {"text_type": "document"}),
+                }
 
-        rows.append(row)
+            rows.append(row)
 
-    if update_required:
-        docs = pd.DataFrame(rows)
-        gdf = cudf.from_pandas(docs)
-        message_meta = MessageMeta(df=gdf)
-        message.payload(message_meta)
+        if update_required:
+            docs = pd.DataFrame(rows)
+            gdf = cudf.from_pandas(docs)
+            message_meta = MessageMeta(df=gdf)
+            message.payload(message_meta)
 
-    return message
+        return message
+
+    except Exception as e:
+        new_message = f"on_data: Failed to process ControlMessage. Original error: {str(e)}"
+        raise type(e)(new_message) from e
 
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)

@@ -46,8 +46,9 @@ def decode_and_extract(
     validated_config : Any
         Configuration object that contains `pdfium_config`. Used if the `pdfium` method is selected.
     default : str, optional
-        The default extraction method to use if the specified method in `task_props` is not available
-        (default is "pdfium").
+        The default extraction method to use if the specified method in `task_props` is not available.
+    trace_info : Optional[List], optional
+        An optional list for trace information to pass to the extraction function.
 
     Returns
     -------
@@ -61,28 +62,27 @@ def decode_and_extract(
     Exception
         For any other unhandled exceptions during extraction, an error is logged, and the exception is re-raised.
     """
-
     try:
         base64_content = base64_row["content"]
-    except KeyError:
-        log_error_message = f"Unhandled error processing row, no content was found:\n{base64_row}"
-        logger.error(log_error_message)
-        raise
+    except KeyError as e:
+        err_msg = f"decode_and_extract: Missing 'content' key in row: {base64_row}"
+        logger.error(err_msg, exc_info=True)
+        raise KeyError(err_msg) from e
 
     try:
-        # Row data to include in extraction
+        # Extract row data excluding the "content" column.
         bool_index = base64_row.index.isin(("content",))
         row_data = base64_row[~bool_index]
         task_props["params"]["row_data"] = row_data
-        # Get source_id
-        source_id = base64_row["source_id"] if "source_id" in base64_row.index else None
-        # Decode the base64 content
-        pdf_bytes = base64.b64decode(base64_content)
 
-        # Load the PDF
+        # Get source_id if available.
+        source_id = base64_row["source_id"] if "source_id" in base64_row.index else None
+
+        # Decode the base64 content.
+        pdf_bytes = base64.b64decode(base64_content)
         pdf_stream = io.BytesIO(pdf_bytes)
 
-        # Type of extraction method to use
+        # Determine the extraction method and parameters.
         extract_method = task_props.get("method", "pdfium")
         extract_params = task_props.get("params", {})
 
@@ -95,33 +95,34 @@ def decode_and_extract(
             extract_method = default
 
         func = getattr(pdf, extract_method, default)
-        logger.debug("Running extraction method: %s", extract_method)
+        logger.debug("decode_and_extract: Running extraction method: %s", extract_method)
         extracted_data = func(pdf_stream, **extract_params)
 
         return extracted_data
 
     except Exception as e:
-        err_msg = f"Unhandled exception in decode_and_extract for '{source_id}':\n{e}"
-        logger.error(err_msg)
+        err_msg = f"decode_and_extract: Error processing PDF for source '{source_id}'. " f"Original error: {e}"
+        logger.error(err_msg, exc_info=True)
         traceback.print_exc()
 
-        raise
-
-    # Propagate error back and tag message as failed.
-    # exception_tag = create_exception_tag(error_message=log_error_message, source_id=source_id)
+        raise type(e)(err_msg) from e
 
 
 def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
     """
-    Processes a cuDF DataFrame containing PDF files in base64 encoding.
-    Each PDF's content is replaced with its extracted text.
+    Processes a pandas DataFrame containing PDF files in base64 encoding.
+    Each PDF's content is replaced by the extracted text.
 
     Parameters:
     - df: pandas DataFrame with columns 'source_id' and 'content' (base64 encoded PDFs).
-    - task_props: dictionary containing instructions for the pdf processing task.
+    - task_props: dictionary containing instructions for the PDF processing task.
+    - validated_config: configuration object for the extractor.
+    - trace_info: optional trace information to include in extraction.
 
     Returns:
-    - A pandas DataFrame with the PDF content replaced by the extracted text.
+    - A tuple containing:
+      - A pandas DataFrame with the PDF content replaced by the extracted text.
+      - A dictionary with trace information.
     """
     if trace_info is None:
         trace_info = {}
@@ -130,11 +131,13 @@ def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
         task_props = task_props.model_dump()
 
     try:
-        # Apply the helper function to each row in the 'content' column
         _decode_and_extract = functools.partial(
-            decode_and_extract, task_props=task_props, validated_config=validated_config, trace_info=trace_info
+            decode_and_extract,
+            task_props=task_props,
+            validated_config=validated_config,
+            trace_info=trace_info,
         )
-        logger.debug(f"processing ({task_props.get('method', None)})")
+        logger.debug(f"process_pdf_bytes: Processing PDFs with extraction method: {task_props.get('method', None)}")
         sr_extraction = df.apply(_decode_and_extract, axis=1)
         sr_extraction = sr_extraction.explode().dropna()
 
@@ -146,11 +149,9 @@ def process_pdf_bytes(df, task_props, validated_config, trace_info=None):
         return extracted_df, {"trace_info": trace_info}
 
     except Exception as e:
-        err_msg = f"Unhandled exception in process_pdf_bytes: {e}"
-        logger.error(err_msg)
-        traceback.print_exc()
-
-        raise
+        err_msg = f"process_pdf_bytes: Error processing PDF bytes. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def generate_pdf_extractor_stage(
@@ -161,29 +162,33 @@ def generate_pdf_extractor_stage(
     pe_count: int = 24,
 ):
     """
-    Helper function to generate a multiprocessing stage to perform pdf content extraction.
+    Helper function to generate a multiprocessing stage to perform PDF content extraction.
 
     Parameters
     ----------
     c : Config
-        Morpheus global configuration object
+        Morpheus global configuration object.
     extractor_config : dict
-        Configuration parameters for pdf content extractor.
+        Configuration parameters for the PDF content extractor.
     task : str
         The task name to match for the stage worker function.
     task_desc : str
         A descriptor to be used in latency tracing.
     pe_count : int
-        Integer for how many process engines to use for pdf content extraction.
+        The number of process engines to use for PDF content extraction.
 
     Returns
     -------
     MultiProcessingBaseStage
-        A Morpheus stage with applied worker function.
+        A Morpheus stage with the applied worker function.
     """
-    validated_config = PDFExtractorSchema(**extractor_config)
-    _wrapped_process_fn = functools.partial(process_pdf_bytes, validated_config=validated_config)
-
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn, document_type="pdf"
-    )
+    try:
+        validated_config = PDFExtractorSchema(**extractor_config)
+        _wrapped_process_fn = functools.partial(process_pdf_bytes, validated_config=validated_config)
+        return MultiProcessingBaseStage(
+            c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn, document_type="pdf"
+        )
+    except Exception as e:
+        err_msg = f"generate_pdf_extractor_stage: Error generating PDF extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
