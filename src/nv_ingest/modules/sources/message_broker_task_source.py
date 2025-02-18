@@ -7,10 +7,8 @@ import copy
 import json
 import threading
 
-import cudf
 import mrc
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
+import pandas as pd
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from opentelemetry.trace.span import format_trace_id
@@ -27,6 +25,8 @@ from nv_ingest.util.message_brokers.simple_message_broker.simple_client import S
 
 # Import the SimpleMessageBroker server
 from nv_ingest.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
+from nv_ingest_api.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -82,28 +82,10 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
             continue  # Continue fetching the next message
 
 
-def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
+def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
     """
-    Process a job and return a ControlMessage.
-
-    Parameters
-    ----------
-    job : dict
-        The job payload retrieved from the message broker.
-    ts_fetched : datetime
-        The timestamp when the message was fetched.
-
-    Returns
-    -------
-    ControlMessage
-        The control message created from the job.
-
-    Raises
-    ------
-    Exception
-        If the job fails validation or processing.
+    Process a job and return an IngestControlMessage.
     """
-
     if logger.isEnabledFor(logging.DEBUG):
         no_payload = copy.deepcopy(job)
         if "content" in no_payload.get("job_payload", {}):
@@ -111,7 +93,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         logger.debug("Job: %s", json.dumps(no_payload, indent=2))
 
     validate_ingest_job(job)
-    control_message = ControlMessage()
+    control_message = IngestControlMessage()
 
     try:
         ts_entry = datetime.now()
@@ -124,22 +106,28 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
         do_trace_tagging = tracing_options.get("trace", False)
         ts_send = tracing_options.get("ts_send", None)
         if ts_send is not None:
-            # ts_send is in nanoseconds
+            # ts_send is in nanoseconds.
             ts_send = datetime.fromtimestamp(ts_send / 1e9)
         trace_id = tracing_options.get("trace_id", None)
 
         response_channel = f"{job_id}"
 
-        df = cudf.DataFrame(job_payload)
-        message_meta = MessageMeta(df=df)
+        df = pd.DataFrame(job_payload)
+        control_message.payload(df)
 
-        control_message.payload(message_meta)
         annotate_cm(control_message, message="Created")
         control_message.set_metadata("response_channel", response_channel)
         control_message.set_metadata("job_id", job_id)
 
+        # For each task, build a ControlMessageTask instance and add it.
         for task in job_tasks:
-            control_message.add_task(task["type"], task["task_properties"])
+            task_obj = ControlMessageTask(
+                name=task["type"],
+                # Use task["id"] if available; otherwise, default to task["type"] or another unique identifier.
+                id=task.get("id", task["type"]),
+                properties=task["task_properties"],
+            )
+            control_message.add_task(task_obj)
 
         # Debug Tracing
         if do_trace_tagging:
@@ -153,7 +141,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> ControlMessage:
                 control_message.set_timestamp("trace::exit::broker_source_network_in", ts_fetched)
 
             if trace_id is not None:
-                # C++ layer in set_metadata errors out due to size of trace_id if it's an integer.
+                # Convert integer trace_id if necessary.
                 if isinstance(trace_id, int):
                     trace_id = format_trace_id(trace_id)
                 control_message.set_metadata("trace_id", trace_id)
