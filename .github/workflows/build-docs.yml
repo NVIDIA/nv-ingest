@@ -40,6 +40,12 @@ jobs:
       - name: Build MkDocs Site
         run: mkdocs build --config-file docs/mkdocs.yml
 
+      - name: Check permissions
+        run: |
+          echo "Current Git user:"
+          git config --global user.name
+          git
+
       - name: Deploy to GitHub Pages
         uses: peaceiris/actions-gh-pages@v4
         with:
