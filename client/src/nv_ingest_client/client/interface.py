@@ -294,7 +294,7 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future)
+            self._vdb_bulk_upload.run(combined_future.result()[0])
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
