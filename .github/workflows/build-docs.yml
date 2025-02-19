@@ -15,14 +15,13 @@ jobs:
   build:
     runs-on: linux-large-disk
     container:
-      image: ubuntu:latest
+      image: python:3.11-slim
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
       - name: Install system deps
         run: |
-          pip install --upgrade pip
           apt-get update && apt-get install -y make
 
       # Install dependencies from docs/requirements.txt
