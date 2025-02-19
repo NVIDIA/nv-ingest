@@ -55,7 +55,9 @@ jobs:
           mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
 
       - name: Build MkDocs Site
-        run: mkdocs build --config-file docs/mkdocs.yml
+        run: |
+          . venv/bin/activate
+          mkdocs build --config-file docs/mkdocs.yml
 
       - name: Upload Site Artifacts
         uses: actions/upload-pages-artifact@v3
