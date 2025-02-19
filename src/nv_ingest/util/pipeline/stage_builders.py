@@ -203,12 +203,14 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_table_structure")
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,

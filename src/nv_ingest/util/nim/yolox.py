@@ -67,6 +67,26 @@ YOLOX_GRAPHIC_CLASS_LABELS = [
 ]
 
 
+# yolox-table-structure-v1 contants
+YOLOX_TABLE_NUM_CLASSES = 5
+YOLOX_TABLE_CONF_THRESHOLD = 0.01
+YOLOX_TABLE_IOU_THRESHOLD = 0.25
+YOLOX_TABLE_MIN_SCORE = 0.1
+YOLOX_TABLE_FINAL_SCORE = 0.0
+YOLOX_TABLE_NIM_MAX_IMAGE_SIZE = 512_000
+
+YOLOX_TABLE_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_TABLE_IMAGE_PREPROC_WIDTH = 1024
+
+YOLOX_TABLE_CLASS_LABELS = [
+    "border",
+    "cell",
+    "row",
+    "column",
+    "header",
+]
+
+
 # YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
 class YoloxModelInterfaceBase(ModelInterface):
     """
@@ -457,6 +477,65 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
         # bbox extraction: additional postprocessing speicifc to nv-ingest
         for pred, shape in zip(annotation_dicts, original_image_shapes):
             bbox_dict = get_bbox_dict_yolox_graphic(
+                pred,
+                shape,
+                self.class_labels,
+                self.min_score,
+            )
+            # convert numpy arrays to list
+            bbox_dict = {
+                label: array.tolist() if isinstance(array, np.ndarray) else array for label, array in bbox_dict.items()
+            }
+            inference_results.append(bbox_dict)
+
+        return inference_results
+
+
+class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-graphic-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_TABLE_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_TABLE_NUM_CLASSES,
+            conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
+            iou_threshold=YOLOX_TABLE_IOU_THRESHOLD,
+            min_score=YOLOX_TABLE_MIN_SCORE,
+            final_score=YOLOX_TABLE_FINAL_SCORE,
+            class_labels=YOLOX_TABLE_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-table-structure"
+
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        original_image_shapes = kwargs.get("original_image_shapes", [])
+
+        annotation_dicts = self.transform_normalized_coordinates_to_original(annotation_dicts, original_image_shapes)
+
+        inference_results = []
+
+        # bbox extraction: additional postprocessing speicifc to nv-ingest
+        for pred, shape in zip(annotation_dicts, original_image_shapes):
+            bbox_dict = get_bbox_dict_yolox_table(
                 pred,
                 shape,
                 self.class_labels,
@@ -1182,5 +1261,67 @@ def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> D
 
     # Make sure other key not lost
     bbox_dict["other"] = bbox_dict.get("other", [])
+
+    return bbox_dict
+
+
+def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0.0):
+    """
+    Extracts bounding boxes from YOLOX model predictions:
+    - Applies thresholding
+    - Reformats boxes
+    - Reorders predictions
+
+    Args:
+        preds (np.ndarray): YOLOX model predictions including bounding boxes, scores, and labels.
+        shape (tuple): Original image shape.
+        config: Model configuration, including size for bounding box adjustment.
+        threshold (float): Score threshold to filter bounding boxes.
+        delta (float): How much the table was cropped upwards.
+
+    Returns:
+        dict[str, np.ndarray]: Dictionary of bounding boxes, organized by class.
+    """
+    bbox_dict = {label: np.array([]) for label in class_labels}
+
+    for i, label in enumerate(class_labels):
+        if label not in ["cell", "row", "column"]:
+            continue  # Ignore useless classes
+
+        bboxes_class = np.array(preds[label])
+
+        if bboxes_class.size == 0:
+            continue
+
+        # Threshold and clip
+        bboxes_class = bboxes_class[bboxes_class[:, -1] >= threshold][:, :4].astype(int)
+        bboxes_class[:, [0, 2]] = np.clip(bboxes_class[:, [0, 2]], 0, shape[1])
+        bboxes_class[:, [1, 3]] = np.clip(bboxes_class[:, [1, 3]], 0, shape[0])
+
+        # Reorder
+        sort = ["x0", "y0"] if label != "row" else ["y0", "x0"]
+        df = pd.DataFrame(
+            {
+                "y0": (bboxes_class[:, 1] + bboxes_class[:, 3]) / 2,
+                "x0": (bboxes_class[:, 0] + bboxes_class[:, 2]) / 2,
+            }
+        )
+        idxs = df.sort_values(sort).index
+        bboxes_class = bboxes_class[idxs]
+
+        bbox_dict[label] = bboxes_class
+
+    # Enforce spanning the entire table
+    if len(bbox_dict["row"]):
+        bbox_dict["row"][:, 0] = 0
+        bbox_dict["row"][:, 2] = shape[1]
+    if len(bbox_dict["column"]):
+        bbox_dict["column"][:, 1] = 0
+        bbox_dict["column"][:, 3] = shape[0]
+
+    # Shift back if cropped
+    for k in bbox_dict:
+        if len(bbox_dict[k]):
+            bbox_dict[k][:, [1, 3]] = np.add(bbox_dict[k][:, [1, 3]], delta, casting="unsafe")
 
     return bbox_dict
