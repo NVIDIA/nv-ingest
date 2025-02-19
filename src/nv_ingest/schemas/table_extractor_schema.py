@@ -44,6 +44,9 @@ class TableExtractorConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
+    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    yolox_infer_protocol: str = ""
+
     paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     paddle_infer_protocol: str = ""
 
@@ -78,14 +81,15 @@ class TableExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        grpc_service, http_service = values.get("paddle_endpoints", (None, None))
-        grpc_service = clean_service(grpc_service)
-        http_service = clean_service(http_service)
+        for endpoint_name in ["yolox_endpoints", "paddle_endpoints"]:
+            grpc_service, http_service = values.get(endpoint_name, (None, None))
+            grpc_service = clean_service(grpc_service)
+            http_service = clean_service(http_service)
 
-        if not grpc_service and not http_service:
-            raise ValueError("Both gRPC and HTTP services cannot be empty for paddle_endpoints.")
+            if not grpc_service and not http_service:
+                raise ValueError(f"Both gRPC and HTTP services cannot be empty for {endpoint_name}.")
 
-        values["paddle_endpoints"] = (grpc_service, http_service)
+            values[endpoint_name] = (grpc_service, http_service)
 
         return values
 
