@@ -8,3 +8,5 @@ mkdocs-jupyter
 mkdocs-include-dir-to-nav
 mkdocs-literate-nav
 mkdocs-site-urls
+sphinx
+sphinx-rtd-theme

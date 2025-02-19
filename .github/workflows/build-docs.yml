@@ -26,7 +26,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r docs/requirements.txt
 
-      # Builds docs site
-      - name: Build docs site
+      - name: Build Sphinx API Docs
         run: |
-          mkdocs build --config-file docs/mkdocs.yml
+          cd docs/sphinx_docs
+          make html
+          cd ../../
+          mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
+
+      - name: Build MkDocs Site
+        run: mkdocs build --config-file docs/mkdocs.yml
+
+      - name: Deploy to GitHub Pages
+        uses: peaceiris/actions-gh-pages@v4
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          publish_dir: ./site
