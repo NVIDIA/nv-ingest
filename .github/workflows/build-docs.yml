@@ -22,8 +22,7 @@ jobs:
 
       - name: Install system deps
         run: |
-          apt update && apt install -y python3 python3-pip
-          ln -sf /usr/bin/python3 /usr/bin/python
+          apt-get update && apt-get install -y make
 
       # Install dependencies from docs/requirements.txt
       - name: Install mkdocs dependencies
