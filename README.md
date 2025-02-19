@@ -251,7 +251,7 @@ logger = logging.getLogger("nv_ingest_client")
 file_name = "data/multimodal_test.pdf"
 file_content, file_type = extract_file_content(file_name)
 
-# A JobSpec is an object that defines a document 
+# A JobSpec is an object that defines a document
 # and how it should be processed.
 job_spec = JobSpec(
   document_type=file_type,
