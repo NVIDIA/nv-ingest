@@ -79,7 +79,7 @@ def test_split_task_default_params():
     expected_str_contains = [
         "tokenizer: meta-llama/Llama-3.2-1B",
         "chunk_size: 1024",
-        "chunk_overlap: 20",
+        "chunk_overlap: 150",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
@@ -89,7 +89,7 @@ def test_split_task_default_params():
         "task_properties": {
             "tokenizer": "meta-llama/Llama-3.2-1B",
             "chunk_size": 1024,
-            "chunk_overlap": 20,
+            "chunk_overlap": 150,
             "params": {},
         },
     }

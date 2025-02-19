@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 class SplitTaskSchema(BaseModel):
     tokenizer: str = "meta-llama/Llama-3.2-1B"
     chunk_size: int = 1024
-    chunk_overlap: int = 20
+    chunk_overlap: int = 150
     params: dict = {}
 
     class Config:
@@ -35,7 +35,7 @@ class SplitTask(Task):
         self,
         tokenizer: str = "meta-llama/Llama-3.2-1B",
         chunk_size: int = 1024,
-        chunk_overlap: int = 20,
+        chunk_overlap: int = 150,
         params: dict = {},
     ) -> None:
         """

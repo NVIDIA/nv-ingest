@@ -10,7 +10,7 @@ from typing_extensions import Annotated
 class TextSplitterSchema(BaseModel):
     tokenizer: str = "meta-llama/Llama-3.2-1B"
     chunk_size: Annotated[int, Field(gt=0)] = 1024
-    chunk_overlap: Annotated[int, Field(ge=0)] = 20
+    chunk_overlap: Annotated[int, Field(ge=0)] = 150
     raise_on_failure: bool = False
 
     @field_validator("chunk_overlap")
