@@ -29,12 +29,12 @@ jobs:
         run: |
           pip install -r docs/requirements.txt
 
-      - name: Build Sphinx API Docs
-        run: |
-          cd docs/sphinx_docs
-          make html
-          cd ../../
-          mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
+      # - name: Build Sphinx API Docs
+      #   run: |
+      #     cd docs/sphinx_docs
+      #     make html
+      #     cd ../../
+      #     mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
 
       - name: Build MkDocs Site
         run: mkdocs build --config-file docs/mkdocs.yml
