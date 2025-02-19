@@ -179,7 +179,6 @@ services:
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       # build.nvidia.com hosted nemoretriever-parse
-      #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse
       - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
