@@ -6,6 +6,7 @@ import os
 import sys
 
 sys.path.insert(0, os.path.abspath("../../../api/src"))  # nv-ingest-api src
+print(f"!!!!!sys.path: {sys.path}")
 
 project = "nv-ingest"
 copyright = "2025, Nvidia"
