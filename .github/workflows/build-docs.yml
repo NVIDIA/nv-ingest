@@ -11,6 +11,11 @@ on:
     branches:
       - main
 
+permissions:
+  contents: write # gotta have this to push to gh-pages branch
+  pages: write
+  id-token: write
+
 jobs:
   build:
     runs-on: linux-large-disk
@@ -43,4 +48,4 @@ jobs:
         uses: peaceiris/actions-gh-pages@v4
         with:
           github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          publish_dir: ./docs/site
