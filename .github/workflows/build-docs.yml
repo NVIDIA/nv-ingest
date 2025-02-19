@@ -22,7 +22,7 @@ jobs:
 
       - name: Install system deps
         run: |
-          apt-get update && apt-get install -y make
+          apt-get update && apt-get install -y make git
 
       # Install dependencies from docs/requirements.txt
       - name: Install mkdocs dependencies
