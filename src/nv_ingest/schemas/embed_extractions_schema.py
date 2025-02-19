@@ -14,8 +14,8 @@ logger = logging.getLogger(__name__)
 
 class EmbedExtractionsSchema(BaseModel):
     api_key: str = "api_key"
-    batch_size: int = 100
-    model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    batch_size: int = 8192
+    model_name: str = "nvidia/nv-embedqa-e5-v5"
     endpoint_url: str = "http://embedding:8000/v1"
     encoding_format: str = "float"
     httpx_log_level: LogLevel = LogLevel.WARNING

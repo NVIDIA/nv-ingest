@@ -36,18 +36,20 @@ def decode_and_extract(
 
     Parameters
     ----------
-    base64_row : dict
-        A dictionary containing the base64-encoded content and other relevant data.
+    base64_row : pd.Series
+        A series containing the base64-encoded content and other relevant data.
         The key "content" should contain the base64 string, and the key "source_id" is optional.
     task_props : dict
         A dictionary containing task properties. It should have the keys:
         - "method" (str): The extraction method to use (e.g., "image").
         - "params" (dict): Parameters to pass to the extraction function.
     validated_config : Any
-        Configuration object that contains `image_config`. Used if the `image` method is selected.
+        Configuration object that contains `image_extraction_config`. Used if the `image` method is selected.
     default : str, optional
         The default extraction method to use if the specified method in `task_props` is not available
         (default is "image").
+    trace_info : Optional[List], optional
+        An optional list for trace information to pass to the extraction function.
 
     Returns
     -------
@@ -59,36 +61,39 @@ def decode_and_extract(
     KeyError
         If the "content" key is missing from `base64_row`.
     Exception
-        For any other unhandled exceptions during extraction, an error is logged, and the exception is re-raised.
+        For any other unhandled exceptions during extraction.
     """
-
+    # Retrieve document type and initialize source_id.
     document_type = base64_row["document_type"]
     source_id = None
-    try:
-        base64_content = base64_row["content"]
-    except KeyError:
-        log_error_message = f"Unhandled error processing row, no content was found:\n{base64_row}"
-        logger.error(log_error_message)
-        raise
 
     try:
-        # Row data to include in extraction
+        base64_content = base64_row["content"]
+    except KeyError as e:
+        err_msg = f"decode_and_extract: Missing 'content' key in row: {base64_row}"
+        logger.error(err_msg, exc_info=True)
+        raise KeyError(err_msg) from e
+
+    try:
+        # Prepare row data (excluding the "content" column) for extraction.
         bool_index = base64_row.index.isin(("content",))
         row_data = base64_row[~bool_index]
         task_props["params"]["row_data"] = row_data
 
-        # Get source_id
+        # Retrieve source_id if available.
         source_id = base64_row["source_id"] if "source_id" in base64_row.index else None
-        # Decode the base64 content
+
+        # Decode the base64 image content.
         image_bytes = base64.b64decode(base64_content)
         image_stream = io.BytesIO(image_bytes)
 
-        # Type of extraction method to use
+        # Determine the extraction method and parameters.
         extract_method = task_props.get("method", "image")
         extract_params = task_props.get("params", {})
 
         logger.debug(
-            f">>> Extracting image content, image_extraction_config: {validated_config.image_extraction_config}"
+            f"decode_and_extract: Extracting image content using image_extraction_config: "
+            f"{validated_config.image_extraction_config}"
         )
         if validated_config.image_extraction_config is not None:
             extract_params["image_extraction_config"] = validated_config.image_extraction_config
@@ -100,20 +105,14 @@ def decode_and_extract(
             extract_method = default
 
         func = getattr(image_helpers, extract_method, default)
-        logger.debug("Running extraction method: %s", extract_method)
+        logger.debug("decode_and_extract: Running extraction method: %s", extract_method)
         extracted_data = func(image_stream, document_type, **extract_params)
-
         return extracted_data
 
     except Exception as e:
-        traceback.print_exc()
-        err_msg = f"Unhandled exception in decode_and_extract for '{source_id}':\n{e}"
-        logger.error(err_msg)
-
-        raise
-
-    # Propagate error back and tag message as failed.
-    # exception_tag = create_exception_tag(error_message=log_error_message, source_id=source_id)
+        err_msg = f"decode_and_extract: Unhandled exception for source '{source_id}'. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
 def process_image(
@@ -132,22 +131,22 @@ def process_image(
     validated_config : Any
         Configuration object validated for processing images.
     trace_info : dict, optional
-        Dictionary for tracing and logging additional information during processing (default is None).
+        Dictionary for tracing and logging additional information during processing.
 
     Returns
     -------
     Tuple[pd.DataFrame, Dict[str, Any]]
         A tuple containing:
-        - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata',
-          and 'uuid'.
-        - A dictionary with trace information collected during processing.
+          - A pandas DataFrame with the processed image content, including columns 'document_type', 'metadata', and
+          'uuid'.
+          - A dictionary with trace information collected during processing.
 
     Raises
     ------
     Exception
         If an error occurs during the image processing stage.
     """
-    logger.debug("Processing image content")
+    logger.debug("process_image: Processing image content")
     if trace_info is None:
         trace_info = {}
 
@@ -155,11 +154,14 @@ def process_image(
         task_props = task_props.model_dump()
 
     try:
-        # Apply the helper function to each row in the 'content' column
+        # Apply the helper function to each row in the 'content' column.
         _decode_and_extract = functools.partial(
-            decode_and_extract, task_props=task_props, validated_config=validated_config, trace_info=trace_info
+            decode_and_extract,
+            task_props=task_props,
+            validated_config=validated_config,
+            trace_info=trace_info,
         )
-        logger.debug(f"Processing method: {task_props.get('method', None)}")
+        logger.debug(f"process_image: Processing with method: {task_props.get('method', None)}")
         sr_extraction = df.apply(_decode_and_extract, axis=1)
         sr_extraction = sr_extraction.explode().dropna()
 
@@ -171,9 +173,11 @@ def process_image(
         return extracted_df, {"trace_info": trace_info}
 
     except Exception as e:
-        err_msg = f"Unhandled exception in image extractor stage's process_image: {e}"
-        logger.error(err_msg)
-        raise
+        err_msg = f"process_image: Unhandled exception in image extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        traceback.print_exc()
+
+        raise type(e)(err_msg) from e
 
 
 def generate_image_extractor_stage(
@@ -189,29 +193,33 @@ def generate_image_extractor_stage(
     Parameters
     ----------
     c : Config
-        Morpheus global configuration object
+        Morpheus global configuration object.
     extractor_config : dict
-        Configuration parameters for pdf content extractor.
+        Configuration parameters for image content extractor.
     task : str
         The task name to match for the stage worker function.
     task_desc : str
         A descriptor to be used in latency tracing.
     pe_count : int
-        Integer for how many process engines to use for pdf content extraction.
+        The number of process engines to use for image content extraction.
 
     Returns
     -------
     MultiProcessingBaseStage
-        A Morpheus stage with applied worker function.
+        A Morpheus stage with the applied worker function.
     """
-    validated_config = ImageExtractorSchema(**extractor_config)
-    _wrapped_process_fn = functools.partial(process_image, validated_config=validated_config)
-
-    return MultiProcessingBaseStage(
-        c=c,
-        pe_count=pe_count,
-        task=task,
-        task_desc=task_desc,
-        process_fn=_wrapped_process_fn,
-        document_type="regex:^(png|svg|jpeg|jpg|tiff)$",
-    )
+    try:
+        validated_config = ImageExtractorSchema(**extractor_config)
+        _wrapped_process_fn = functools.partial(process_image, validated_config=validated_config)
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+            document_type="regex:^(png|svg|jpeg|jpg|tiff)$",
+        )
+    except Exception as e:
+        err_msg = f"generate_image_extractor_stage: Error generating image extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

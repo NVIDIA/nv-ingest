@@ -226,7 +226,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 #### In Python
 
 > [!NOTE]
-> You can find more examples [here](client/client_examples/examples/).
+> You can find more examples in [the client examples folder](client/client_examples/examples/).
 
 
 ```python
@@ -284,7 +284,7 @@ print(f"Got {len(result)} results")
 #### Using the `nv-ingest-cli`
 
 > [!NOTE]
-> You can find more examples [here](client/client_examples/examples/).
+> You can find more examples in [the client examples folder](client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
@@ -345,7 +345,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](/docs/docs/user-guide/developer-guide/content-metadata.md).
+For the full metadata definitions, refer to [Content Metadata](/docs/docs/user-guide/developer-guide/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 

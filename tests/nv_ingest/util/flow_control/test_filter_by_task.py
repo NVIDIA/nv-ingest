@@ -75,6 +75,7 @@ def test_filter_by_task_without_required_task_properteies_no_forward_func(mock_c
 def test_filter_by_task_without_required_task_with_forward_func(mock_control_message):
     # Create a simple mock function to be decorated
     mock_function = Mock(return_value="some_value")
+    mock_function.__name__ = "mock_function"  # Set a __name__ attribute on the mock.
 
     # Setup the forward function
     forward_func = Mock(return_value=mock_control_message)
@@ -96,6 +97,7 @@ def test_filter_by_task_without_required_task_with_forward_func(mock_control_mes
 def test_filter_by_task_without_required_task_properties_with_forward_func(mock_control_message):
     # Create a simple mock function to be decorated
     mock_function = Mock(return_value="some_value")
+    mock_function.__name__ = "mock_function"  # Set a __name__ attribute on the mock.
 
     # Setup the forward function
     forward_func = Mock(return_value=mock_control_message)
