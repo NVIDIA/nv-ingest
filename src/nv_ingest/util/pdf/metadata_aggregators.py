@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 import pandas as pd
@@ -21,6 +22,7 @@ from pypdfium2 import PdfImage
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
+from nv_ingest.schemas.metadata_schema import NearbyObjectsSchema
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
@@ -145,8 +147,11 @@ def construct_text_metadata(
     text_depth,
     source_metadata,
     base_unified_metadata,
+    delimiter=" ",
+    bbox_max_dimensions: Tuple[int, int] = (-1, -1),
+    nearby_objects: Optional[Dict[str, Any]] = None,
 ):
-    extracted_text = " ".join(accumulated_text)
+    extracted_text = delimiter.join(accumulated_text)
 
     content_metadata = {
         "type": ContentTypeEnum.TEXT,
@@ -158,6 +163,7 @@ def construct_text_metadata(
             "block": -1,
             "line": -1,
             "span": -1,
+            "nearby_objects": nearby_objects or NearbyObjectsSchema(),
         },
     }
 
@@ -172,6 +178,7 @@ def construct_text_metadata(
         "keywords": keywords,
         "language": language,
         "text_location": bbox,
+        "text_location_max_dimensions": bbox_max_dimensions,
     }
 
     ext_unified_metadata = base_unified_metadata.copy()
