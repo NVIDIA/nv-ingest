@@ -14,7 +14,7 @@
 # limitations under the License.
 
 name: Feature Request Form
-description: Request functionality or changes to existing functionality for NV-Ingest
+description: Request functionality or changes to existing functionality for NeMo Retriever Extraction
 title: "[FEA]: "
 labels: ["feature request"]
 

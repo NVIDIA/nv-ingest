@@ -1,4 +1,4 @@
-# Contributing to NV-Ingest
+# Contributing to NeMo Retriever Extraction
 
 External contributions will be welcome soon, and they are greatly appreciated! Every little bit helps, and credit will always be given.
 
@@ -47,7 +47,7 @@ External contributions will be welcome soon, and they are greatly appreciated! E
 1. **Bug Reports, Feature Requests, and Documentation Issues:** Please file
    an [issue](https://github.com/NVIDIA/nv-ingest/issues) with a detailed
    description of
-   the problem, feature request, or documentation issue. The NV-Ingest team will review and triage these issues,
+   the problem, feature request, or documentation issue. The NeMo Retriever extraction team will review and triage these issues,
    and if appropriate, schedule them for a future release.
 
 ## Cloning the repository
@@ -56,7 +56,7 @@ External contributions will be welcome soon, and they are greatly appreciated! E
 DATASET_ROOT=[path to your dataset root]
 MODULE_NAME=[]
 MORPHEUS_ROOT=[path to your Morpheus root]
-NV_INGEST_ROOT=[path to your NV-Ingest root]
+NV_INGEST_ROOT=[path to your NeMo Retriever extraction root]
 git clone https://github.com/nv-morpheus/Morpheus.git $MORPHEUS_ROOT
 git clone https://github.com/NVIDIA/nv-ingest.git $NV_INGEST_ROOT
 cd $NV_INGEST_ROOT
@@ -80,7 +80,7 @@ git submodule update --init --recursive
    ** [Create a pull request](https://github.com/NVIDIA/nv-ingest/pulls) once your
    code is ready.
 5. **Code Review:** Wait for the review by other developers and make necessary updates.
-6. **Merge:** Once approved, an NV-Ingest developer will approve your pull request.
+6. **Merge:** After approval, an NVIDIA developer will approve your pull request.
 
 ### Seasoned Developers
 
@@ -90,7 +90,7 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 
 ### Workflow
 
-1. **NV-Ingest Foundation**: Built on top
+1. **NeMo Retriever Extraction Foundation**: Built on top
    of [NVIDIA Morpheus](https://github.com/nv-morpheus/Morpheus/blob/branch-24.10/docs/source/developer_guide/architecture.md).
 
 2. **Pipeline Structure**: Designed around a pipeline that processes individual jobs within an asynchronous execution
@@ -157,9 +157,9 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
 
 ### Common Processing Patterns
 
-In NV-Ingest, decorators are used to enhance the functionality of functions by adding additional processing logic. These
+In NeMo Retriever extraction, decorators are used to enhance the functionality of functions by adding additional processing logic. These
 decorators help ensure consistency, traceability, and robust error handling across the pipeline. Below, we introduce
-some common decorators used in NV-Ingest, explain their usage, and provide examples.
+some common decorators used in NeMo Retriever extraction, explain their usage, and provide examples.
 
 #### `traceable` -> `src/nv_ingest/util/tracing/tagging.py`
 
@@ -336,7 +336,7 @@ def test_function_handles_invalid_input(mock_external_service):
 
 ### Models
 
-1. **Model Integration**: NV-Ingest is designed to be scalable and flexible, so running models directly in the pipeline
+1. **Model Integration**: NeMo Retriever extraction is designed to be scalable and flexible, so running models directly in the pipeline
    is discouraged.
 2. **Model Export**: Models should be exported to a format compatible with Triton Inference Server or TensorRT.
    - Model acquisition and conversion should be documented in `triton_models/README.md`, including the model name,
@@ -352,7 +352,7 @@ def test_function_handles_invalid_input(mock_external_service):
 
 ## Architectural Guidelines
 
-To ensure the quality and maintainability of the NV-Ingest codebase, the following architectural guidelines should be
+To ensure the quality and maintainability of the NeMo Retriever extraction codebase, the following architectural guidelines should be
 followed:
 
 ### 1. Single Responsibility Principle (SRP)
@@ -475,7 +475,7 @@ to use the Chicago Style Guide as your reference for writing and formatting.
 
 ## Licensing
 
-NV-Ingest is licensed under the NVIDIA Proprietary Software License -- ensure that any contributions are compatible.
+NeMo Retriever Extraction is licensed under the NVIDIA Proprietary Software License -- ensure that any contributions are compatible.
 
 The following should be included in the header of any new files:
 

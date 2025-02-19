@@ -1,6 +1,6 @@
 apiVersion: v2
 name: nv-ingest
-description: NV-Ingest Microservice
+description: NeMo Retriever Extraction Microservice
 type: application
 version: 0.4.0
 maintainers:

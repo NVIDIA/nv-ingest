@@ -1,4 +1,4 @@
-name: Build NV-Ingest Documentation
+name: Build NeMo Retriever Extraction Documentation
 
 # Trigger for pull requests and pushing to main
 on:

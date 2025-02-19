@@ -14,7 +14,7 @@
 # limitations under the License.
 
 name: Documentation - New Documentation Request
-description: Request additions to NV-Ingest documentation
+description: Request additions to NeMo Retriever extraction documentation
 title: "[DOC]: "
 labels: ["doc"]
 

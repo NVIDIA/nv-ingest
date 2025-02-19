@@ -1,13 +1,13 @@
-# NV-Ingest Client Examples
+# NeMo Retriever Extraction Client Examples
 
-Contained in this repository are instructions to build a container with NV-Ingest command line
+Contained in this repository are instructions to build a container with the NeMo Retriever extraction command line
 interface (CLI) and Python API usage examples. Please follow the instructions below
 to access guided examples.
 
 ## Step 0: Prerequisites
 The system running the client does not require a GPU.
 
-[Docker](https://docs.docker.com/get-started/get-docker/) - While the NV-Ingest client can
+[Docker](https://docs.docker.com/get-started/get-docker/) - While the NeMo Retriever extraction client can
 be installed directly on the host, this example creates a container with a few other add-ons.
 Please follow the docker documentation for installation guidance.
 
@@ -15,9 +15,9 @@ Please follow the docker documentation for installation guidance.
 ## Step 1: Set some environment variables
 
 ```bash
-# Used to mount external datasets to the nv-ingest client container
+# Used to mount external datasets to the container
 DATASET_ROOT=...
-# Used to connect to the nv-ingest cluster
+# Used to connect to the cluster
 REDIS_HOST=...
 REDIS_PORT=...
 TASK_QUEUE="morpheus_task_queue"
@@ -26,7 +26,7 @@ MINIO_ACCESS_KEY=...
 MINIO_SECRET_KEY=...
 ```
 
-## Step 2: Build the NV-Ingest client container
+## Step 2: Build the NeMo Retriever extraction client container
 
 ```bash
 docker build -f docker/Dockerfile.client . -t nv-ingest-client
@@ -54,12 +54,12 @@ docker run -it --rm \
 
 There are two usage examples included:
 
-- Illustrates usage of the NV-Ingest client CLI:
+- Illustrates usage of the NeMo Retriever extraction client CLI:
 
     `/workspace/client_examples/examples/cli_client_usage.ipynb`
 
-- Illustrates usage of the NV-Ingest client Python API:
+- Illustrates usage of the NeMo Retriever extraction client Python API:
 
     `/workspace/client_examples/examples/python_client_usage.ipynb`
 
-Note, the default examples use sample data files provided in the NV-Ingest github project. You will need to change these output indices to work with custom pdf source files.
+Note, the default examples use sample data files provided in the NeMo Retriever extraction GitHub project. You will need to change these output indices to work with custom pdf source files.

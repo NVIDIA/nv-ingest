@@ -1,4 +1,4 @@
-# Content Metadata
+# Content Metadata for NeMo Retriever Extraction
 
 **Definitions**:
 
@@ -14,7 +14,7 @@ Metadata: Descriptive data which can be associated with Sources, Content(Image o
 | Source Metadata | Source Name | Name of source | Extracted |
 |  | Source ID | ID of source  | Extracted |
 |  | Source location | URL, URI, pointer to storage location | N/A  |
-|  | Source Type | PDF, HTML, Docx, TXT, PPTx | Extracted |
+|  | Source Type | - `docx` <br/> - `jpeg` <br/> - `pdf` <br/> - `png` <br/> - `pptx` <br/> - `svg` <br/> - `tiff` <br/> - `txt` | Extracted |
 |  | Collection ID | Collection in which the source is contained | N/A |
 |  | Date Created | Date source was created | Extracted |   |
 |  | Last Modified | Date source was last modified | Extracted |   |

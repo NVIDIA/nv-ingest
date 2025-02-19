@@ -1,8 +1,8 @@
 .. nv-ingest-api:
 
-=============
-API reference
-=============
+===========================================
+API Reference for NeMo Retriever Extraction
+===========================================
 
 This page provides a list of all publicly accessible modules, methods and classes through
 ``nv-ingest-api.*`` namespace.

@@ -13,7 +13,7 @@ from fastapi import FastAPI
 from .api.main import app as app_v1
 
 app = FastAPI(
-    title="NV-Ingest Microservice",
+    title="NeMo Retriever Extraction Microservice",
     description="Service for ingesting heterogenous datatypes",
     version="0.1.0",
     contact={

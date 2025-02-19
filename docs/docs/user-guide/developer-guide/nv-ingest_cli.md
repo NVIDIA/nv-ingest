@@ -1,4 +1,4 @@
-# NV-Ingest Command Line (CLI)
+# NeMo Retriever Extraction Command Line (CLI) Reference
 
 After installing the Python dependencies, you'll be able to use the nv-ingest-cli tool.
 

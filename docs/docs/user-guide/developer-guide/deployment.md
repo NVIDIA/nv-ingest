@@ -1,6 +1,6 @@
-# NV-Ingest Deployment
+# Deploy NeMo Retriever Extraction
 
-## Launch NVIDIA Microservice(s)
+## Launch NVIDIA Microservices
 
 ```bash
 # Redis is our message broker for the ingest service, always required.
@@ -42,10 +42,10 @@ c1f1f6b9cc8c   .../tritonserver:24.05-py3       "/opt/nvidia/nvidia_…"   5 day
 d277cf2c2703   redis/redis-stack                           "/entrypoint.sh"         2 weeks ago    Up 8 hours            0.0.0.0:6379->6379/tcp, 8001/tcp   devin-nv-ingest-redis-1
 ```
 
-## Launch NV-Ingest Locally Using Library API
+## Launch NeMo Retriever Extraction Locally Using Library API
 
 ### Prerequisites
-To run the NV-Ingestt service locally, we require [Conda (Mamba) to be installed](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
+To run the NeMo Retriever extraction service locally, we require [Conda (Mamba) to be installed](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
 
 From the root of the repository, run the following commands to create a new Conda environment and install the required dependencies:
 

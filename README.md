@@ -4,17 +4,15 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-## NVIDIA-Ingest: Multi-modal data extraction
+## NeMo Retriever Extraction: Multi-modal data extraction
 
-NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
+NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NeMo Retriever extraction enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
-> [!Note]
-> Cached and Deplot are deprecated.
-> Instead, docker-compose now uses a beta version of the yolox-graphic-elements container.
-> With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU.
-> If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+!!! note
+
+    Cached and Deplot are deprecated. Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. With this change, you should now be able to run NeMo Retriever extraction on a single 80GB A100 or H100 GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 ### Table of Contents
@@ -26,16 +24,16 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ## Introduction
 
-## What NVIDIA-Ingest Is ✔️
+## What NeMo Retriever Extraction Is ✔️
 
-NV-Ingest is a microservice service that does the following:
+NeMo Retriever extraction is a microservice service that does the following:
 
 - Accept a JSON job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
 - Allow the results of a job to be retrieved. The result is a JSON dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
 - Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
-NV-Ingest supports the following file types:
+NeMo Retriever extraction supports the following file types:
 
 - `docx`
 - `jpeg`
@@ -47,9 +45,9 @@ NV-Ingest supports the following file types:
 - `txt`
 
 
-## What NVIDIA-Ingest Isn't ✖️
+## What NeMo Retriever Extraction Isn't ✖️
 
-NV-Ingest does not do the following:
+NeMo Retriever extraction does not do the following:
 
 - Run a static pipeline or fixed set of operations on every submitted document.
 - Act as a wrapper for any specific document parsing library.
@@ -73,7 +71,7 @@ NV-Ingest does not do the following:
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 > [!Note]
-> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+> You install Python in a later step. NeMo Retriever extraction only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
 
 ## Quickstart
 
@@ -123,7 +121,7 @@ NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 ```
 
 > [!NOTE]
-> As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the nv-ingest container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
+> As configured by default in [docker-compose.yaml](docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NeMo Retriever extraction container itself share a second. This is to avoid DePlot and other NIMs competing for VRAM on the same device.
 >
 > Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within docker-compose.yaml.
 
@@ -178,7 +176,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 ```
 
 > [!TIP]
-> nv-ingest is in Early Access mode, meaning the codebase gets frequent updates. To build an updated nv-ingest service container with the latest changes you can:
+> NeMo Retriever extraction is in Early Access mode, meaning the codebase gets frequent updates. To build an updated NeMo Retriever extraction service container with the latest changes you can:
 > ```
 > docker compose build
 > ```
@@ -187,7 +185,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 
 ### Step 2: Installing Python dependencies
 
-To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
+To interact with the NeMo Retriever extraction service, you can do so from the host, or by `docker exec`-ing into the NeMo Retriever extraction container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```bash
@@ -205,9 +203,9 @@ pip install .
 ```
 
 > [!NOTE]
-> Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](docker-compose.yaml).
+> Interacting from the host depends on the appropriate port being exposed from the NeMo Retriever extraction container to the host as defined in [docker-compose.yaml](docker-compose.yaml).
 >
-> If you prefer, you can disable exposing that port, and interact with the nv-ingest service directly from within its container.
+> If you prefer, you can disable exposing that port, and interact with the NeMo Retriever extraction service directly from within its container.
 >
 > To interact within the container:
 > ```
@@ -218,11 +216,11 @@ pip install .
 > (morpheus) root@aba77e2a4bde:/workspace#
 > ```
 >
-> From the bash prompt above, you can run nv-ingest-cli and Python examples described below.
+> From the bash prompt above, you can run the NeMo Retriever extraction CLI and Python examples described below.
 
 ### Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or by using the NeMo Retriever extraction CLI.
 
 In the below examples, we are doing text, chart, table, and image extraction:
 
@@ -253,8 +251,8 @@ logger = logging.getLogger("nv_ingest_client")
 file_name = "data/multimodal_test.pdf"
 file_content, file_type = extract_file_content(file_name)
 
-# A JobSpec is an object that defines a document and how it should
-# be processed by the nv-ingest service.
+# A JobSpec is an object that defines a document 
+# and how it should be processed.
 job_spec = JobSpec(
   document_type=file_type,
   payload=file_content,
@@ -292,7 +290,7 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the `nv-ingest-cli`
+#### Use the NeMo Retriever Extraction CLI
 
 > [!NOTE]
 > You can find more examples in [the client examples folder](client/client_examples/examples/).
@@ -395,18 +393,20 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 Beyond the relevant documentation, examples, and other links above, below is a description of contents in this repo's folders:
 
-1. [.github](.github): GitHub repo configuration files
-2. [ci](ci): scripts used to build the nv-ingest container and other packages
-3. [client](client): docs and source code for the nv-ingest-cli utility
-4. [config](config): various yaml files defining configuration for OTEL, Prometheus
-5. [data](data): Sample PDFs provided for testing convenience
-6. [docker](docker): houses scripts used by the nv-ingest docker container
-7. [docs](docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
-8. [examples](examples): Example notebooks, scripts, and longer form tutorial content
-9. [helm](helm): Documentation for deploying nv-ingest to a Kubernetes cluster via Helm chart
-10. [skaffold](skaffold): Skaffold configuration
-11. [src](src): source code for the nv-ingest pipelines and service
-12. [tests](tests): unit tests for nv-ingest
+- [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
+- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NeMo Retriever extraction container and other packages
+- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the NeMo Retriever extraction CLI utility
+- [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
+- [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
+- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the NeMo Retriever extraction Docker container
+- [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
+- [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
+- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NeMo Retriever extraction to a Kubernetes cluster via Helm chart
+- [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
+- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NeMo Retriever extraction pipelines and service
+- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NeMo Retriever extraction
+
+
 
 ## Notices
 
