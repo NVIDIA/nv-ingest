@@ -15,7 +15,7 @@ jobs:
   build:
     runs-on: linux-large-disk
     container:
-      image: python:3.11-slim
+      image: ubuntu:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
