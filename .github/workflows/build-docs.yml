@@ -22,6 +22,7 @@ jobs:
 
       - name: Install system deps
         run: |
+          pip install --upgrade pip
           apt-get update && apt-get install -y make
 
       # Install dependencies from docs/requirements.txt
