@@ -449,4 +449,7 @@ def pdfium_extractor(
         )
         extracted_data.append(doc_text_meta)
 
+    # Sort by type and page number
+    extracted_data.sort(key=lambda x: (x[0], x[1]["content_metadata"]["page_number"]))
+
     return extracted_data
