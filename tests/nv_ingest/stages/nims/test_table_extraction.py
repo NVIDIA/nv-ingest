@@ -1,19 +1,21 @@
-import base64
-from io import BytesIO
-from unittest.mock import Mock, MagicMock
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import cv2
 import numpy as np
 import pandas as pd
 import pytest
-from PIL import Image
 
-from nv_ingest.stages.nim.table_extraction import _extract_table_data
-from nv_ingest.stages.nim.table_extraction import _update_metadata
-from nv_ingest.stages.nim.table_extraction import PADDLE_MIN_WIDTH, PADDLE_MIN_HEIGHT
-from nv_ingest.util.nim.helpers import NimClient
-from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
+from ....import_checks import MORPHEUS_IMPORT_OK
+from ....import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.stages.nim.table_extraction import _extract_table_data
+    from nv_ingest.stages.nim.table_extraction import _update_metadata
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
@@ -105,8 +107,8 @@ def test_extract_table_data_all_valid(mocker, validated_config):
     mock_update_metadata = mocker.patch(
         f"{MODULE_UNDER_TEST}._update_metadata",
         return_value=[
-            ("imgA", ("tableA", "fmtA")),
-            ("imgB", ("tableB", "fmtB")),
+            ("imgA", [[], ["tableA"]]),
+            ("imgB", [[], ["tableB"]]),
         ],
     )
 
@@ -115,14 +117,14 @@ def test_extract_table_data_all_valid(mocker, validated_config):
             {
                 "metadata": {
                     "content_metadata": {"type": "structured", "subtype": "table"},
-                    "table_metadata": {},
+                    "table_metadata": {"table_content_format": "simple"},
                     "content": "imgA",
                 }
             },
             {
                 "metadata": {
                     "content_metadata": {"type": "structured", "subtype": "table"},
-                    "table_metadata": {},
+                    "table_metadata": {"table_content_format": "simple"},
                     "content": "imgB",
                 }
             },
@@ -133,9 +135,9 @@ def test_extract_table_data_all_valid(mocker, validated_config):
 
     # Each valid row updated
     assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "tableA"
-    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "fmtA"
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "simple"
     assert df_out.at[1, "metadata"]["table_metadata"]["table_content"] == "tableB"
-    assert df_out.at[1, "metadata"]["table_metadata"]["table_content_format"] == "fmtB"
+    assert df_out.at[1, "metadata"]["table_metadata"]["table_content_format"] == "simple"
 
     # Check calls
     mock_create_client.assert_called_once()
@@ -156,7 +158,7 @@ def test_extract_table_data_mixed_rows(mocker, validated_config):
     mock_create_client = mocker.patch(f"{MODULE_UNDER_TEST}._create_paddle_client", return_value=mock_client)
     mock_update_metadata = mocker.patch(
         f"{MODULE_UNDER_TEST}._update_metadata",
-        return_value=[("good1", ("table1", "fmt1")), ("good2", ("table2", "fmt2"))],
+        return_value=[("good1", [[], ["table1"]]), ("good2", [[], ["table2"]])],
     )
 
     df_in = pd.DataFrame(
@@ -164,7 +166,7 @@ def test_extract_table_data_mixed_rows(mocker, validated_config):
             {
                 "metadata": {
                     "content_metadata": {"type": "structured", "subtype": "table"},
-                    "table_metadata": {},
+                    "table_metadata": {"table_content_format": "simple"},
                     "content": "good1",
                 }
             },
@@ -188,14 +190,14 @@ def test_extract_table_data_mixed_rows(mocker, validated_config):
 
     df_out, trace_info = _extract_table_data(df_in, {}, validated_config)
 
-    # row0 => updated with table1/fmt1
+    # row0 => updated with table1/txt1
     assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "table1"
-    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "fmt1"
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "simple"
     # row1 => invalid => no table_content
     assert "table_content" not in df_out.at[1, "metadata"]["table_metadata"]
-    # row2 => updated => table2/fmt2
+    # row2 => updated => table2/txt2
     assert df_out.at[2, "metadata"]["table_metadata"]["table_content"] == "table2"
-    assert df_out.at[2, "metadata"]["table_metadata"]["table_content_format"] == "fmt2"
+    assert df_out.at[2, "metadata"]["table_metadata"]["table_content_format"] == "simple"
 
     mock_update_metadata.assert_called_once_with(
         base64_images=["good1", "good2"],
@@ -308,7 +310,7 @@ def test_update_metadata_skip_small(mocker, paddle_mock):
     res = _update_metadata(imgs, paddle_mock)
     assert len(res) == 2
     # The first image is too small and is skipped.
-    assert res[0] == ("imgSmall", ("", ""))
+    assert res[0] == ("imgSmall", (None, None))
     # The second image is valid and processed.
     assert res[1] == ("imgBig", ("valid_table", "valid_fmt"))
 
@@ -419,8 +421,8 @@ def test_update_metadata_all_small(mocker, paddle_mock):
     mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 30)
 
     res = _update_metadata(imgs, paddle_mock)
-    assert res[0] == ("imgA", ("", ""))
-    assert res[1] == ("imgB", ("", ""))
+    assert res[0] == ("imgA", (None, None))
+    assert res[1] == ("imgB", (None, None))
 
     # No calls to infer
     paddle_mock.infer.assert_not_called()

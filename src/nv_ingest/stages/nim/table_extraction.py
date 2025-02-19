@@ -4,16 +4,23 @@
 
 import functools
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
+from typing import Tuple
 
 import pandas as pd
-
 from morpheus.config import Config
 
+from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import create_inference_client, NimClient, get_version
+from nv_ingest.util.nim.helpers import NimClient
+from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 
 logger = logging.getLogger(__name__)
@@ -33,7 +40,7 @@ def _update_metadata(
     size requirements and then calls the PaddleOCR model via paddle_client.infer to extract table data.
 
     For each base64-encoded image, the result is:
-        (base64_image, (table_content, table_content_format))
+        (base64_image, (text_predictions, bounding_boxes))
 
     Images that do not meet the minimum size are skipped (resulting in ("", "") for that image).
     The paddle_client is expected to handle any necessary batching and concurrency.
@@ -56,7 +63,7 @@ def _update_metadata(
             valid_indices.append(i)
         else:
             # Image is too small; mark as skipped.
-            results[i] = (img, ("", ""))
+            results[i] = (img, (None, None))
 
     if valid_images:
         data = {"base64_images": valid_images}
@@ -83,7 +90,7 @@ def _update_metadata(
         except Exception as e:
             logger.error(f"Error processing images. Error: {e}", exc_info=True)
             for i in valid_indices:
-                results[i] = (base64_images[i], ("", ""))
+                results[i] = (base64_images[i], (None, None))
             raise
 
     return results
@@ -104,7 +111,7 @@ def _create_paddle_client(stage_config) -> NimClient:
         logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest version.")
         paddle_version = None
 
-    paddle_model_interface = PaddleOCRModelInterface(paddle_version=paddle_version)
+    paddle_model_interface = PaddleOCRModelInterface()
 
     paddle_client = create_inference_client(
         endpoints=stage_config.paddle_endpoints,
@@ -189,10 +196,21 @@ def _extract_table_data(
             trace_info=trace_info,
         )
 
-        # 4) Write the results (table_content, table_content_format) back
+        # 4) Write the results (bounding_boxes, text_predictions) back
+        table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
+            "table_content_format", TableFormatEnum.PSEUDO_MARKDOWN
+        )
+
         for row_id, idx in enumerate(valid_indices):
-            # unpack (base64_image, (content, format))
-            _, (table_content, table_content_format) = bulk_results[row_id]
+            # unpack (base64_image, (bounding boxes, text_predictions))
+            _, (bounding_boxes, text_predictions) = bulk_results[row_id]
+
+            if table_content_format == TableFormatEnum.SIMPLE:
+                table_content = " ".join(text_predictions)
+            elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
+                table_content = convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+            else:
+                raise ValueError(f"Unexpected table format: {table_content_format}")
 
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
             df.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
@@ -244,7 +262,6 @@ def generate_table_extractor_stage(
         from PDF content.
     """
 
-    print(f"TableExtractorSchema stage_config: {stage_config}")
     validated_config = TableExtractorSchema(**stage_config)
     _wrapped_process_fn = functools.partial(_extract_table_data, validated_config=validated_config)
 

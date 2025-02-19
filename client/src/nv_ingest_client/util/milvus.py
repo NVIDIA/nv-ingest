@@ -21,6 +21,7 @@ from typing import List
 import time
 from urllib.parse import urlparse
 from typing import Union, Dict
+from nv_ingest_client.util.util import ClientConfigSchema
 import logging
 
 
@@ -55,7 +56,7 @@ class MilvusOperator:
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = True,
-        dense_dim: int = 1024,
+        dense_dim: int = 2048,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,
         enable_charts: bool = True,
@@ -569,6 +570,7 @@ def stream_insert_milvus(
     for result in records:
         for element in result:
             text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
+            _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
             if text:
                 if sparse_model is not None:
                     data.append(record_func(text, element, sparse_model.encode_documents([text])))
@@ -592,6 +594,7 @@ def write_to_nvingest_collection(
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
+    threshold: int = 10,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -654,6 +657,8 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
+    if len(records) < threshold:
+        stream = True
     if stream:
         stream_insert_milvus(
             records,
@@ -836,9 +841,9 @@ def nvingest_retrieval(
     hybrid: bool = False,
     dense_field: str = "vector",
     sparse_field: str = "sparse",
-    embedding_endpoint="http://localhost:8000/v1",
+    embedding_endpoint=None,
     sparse_model_filepath: str = "bm25_model.json",
-    model_name: str = "nvidia/nv-embedqa-e5-v5",
+    model_name: str = None,
     output_fields: List[str] = ["text", "source", "content_metadata"],
     gpu_search: bool = True,
 ):
@@ -878,8 +883,13 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
+    client_config = ClientConfigSchema()
+    nvidia_api_key = client_config.nvidia_build_api_key
+    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
+    embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
+    model_name = model_name if model_name else client_config.embedding_nim_model_name
     local_index = False
-    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name)
+    embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
     if milvus_uri.endswith(".db"):
         local_index = True

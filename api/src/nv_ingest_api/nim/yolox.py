@@ -7,13 +7,15 @@ import base64
 import io
 import logging
 import warnings
-from typing import Any
+from math import log
+from typing import Any, Tuple
 from typing import Dict
 from typing import List
 from typing import Optional
 
 import cv2
 import numpy as np
+import pandas as pd
 import torch
 import torchvision
 from PIL import Image
@@ -23,44 +25,80 @@ from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
 
-YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1536
-YOLOX_MAX_HEIGHT = 1536
-YOLOX_NUM_CLASSES = 3
-YOLOX_CONF_THRESHOLD = 0.01
-YOLOX_IOU_THRESHOLD = 0.5
-YOLOX_MIN_SCORE = 0.1
-YOLOX_FINAL_SCORE = 0.48
-YOLOX_NIM_MAX_IMAGE_SIZE = 512_000
+# yolox-page-elements-v1 contants
+YOLOX_PAGE_NUM_CLASSES = 3
+YOLOX_PAGE_CONF_THRESHOLD = 0.01
+YOLOX_PAGE_IOU_THRESHOLD = 0.5
+YOLOX_PAGE_MIN_SCORE = 0.1
+YOLOX_PAGE_FINAL_SCORE = 0.48
+YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
 
-YOLOX_IMAGE_PREPROC_HEIGHT = 1024
-YOLOX_IMAGE_PREPROC_WIDTH = 1024
+YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
+
+YOLOX_PAGE_CLASS_LABELS = [
+    "table",
+    "chart",
+    "title",
+]
+
+# yolox-graphic-elements-v1 contants
+YOLOX_GRAPHIC_NUM_CLASSES = 10
+YOLOX_GRAPHIC_CONF_THRESHOLD = 0.01
+YOLOX_GRAPHIC_IOU_THRESHOLD = 0.25
+YOLOX_GRAPHIC_MIN_SCORE = 0.1
+YOLOX_GRAPHIC_FINAL_SCORE = 0.0
+YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
+
+YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 768
+YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 768
+
+YOLOX_GRAPHIC_CLASS_LABELS = [
+    "chart_title",
+    "x_title",
+    "y_title",
+    "xlabel",
+    "ylabel",
+    "other",
+    "legend_label",
+    "legend_title",
+    "mark_label",
+    "value_label",
+]
 
 
-def chunkify(lst, chunk_size):
-    for i in range(0, len(lst), chunk_size):
-        yield lst[i : i + chunk_size]
-
-
-# Implementing YoloxPageElemenetsModelInterface with required methods
-class YoloxPageElementsModelInterface(ModelInterface):
+# YoloxModelInterfaceBase implements methods that are common to yolox-page-elements and yolox-graphic-elements
+class YoloxModelInterfaceBase(ModelInterface):
     """
     An interface for handling inference with a Yolox object detection model, supporting both gRPC and HTTP protocols.
     """
 
-    def name(
+    def __init__(
         self,
-    ) -> str:
+        image_preproc_width: Optional[int] = None,
+        image_preproc_height: Optional[int] = None,
+        nim_max_image_size: Optional[int] = None,
+        num_classes: Optional[int] = None,
+        conf_threshold: Optional[float] = None,
+        iou_threshold: Optional[float] = None,
+        min_score: Optional[float] = None,
+        final_score: Optional[float] = None,
+        class_labels: Optional[List[str]] = None,
+    ):
         """
-        Returns the name of the Yolox model interface.
-
-        Returns
-        -------
-        str
-            The name of the model interface.
+        Initialize the YOLOX model interface.
+        Parameters
+        ----------
         """
-
-        return "yolox-page-elements"
+        self.image_preproc_width = image_preproc_width
+        self.image_preproc_height = image_preproc_height
+        self.nim_max_image_size = nim_max_image_size
+        self.num_classes = num_classes
+        self.conf_threshold = conf_threshold
+        self.iou_threshold = iou_threshold
+        self.min_score = min_score
+        self.final_score = final_score
+        self.class_labels = class_labels
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -87,73 +125,110 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> List[Any]:
+    def format_input(
+        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
+    ) -> Tuple[List[Any], List[Dict[str, Any]]]:
         """
-        Format input data for the specified protocol, returning a list of batches
-        each up to 'max_batch_size' in length.
+        Format input data for the specified protocol, returning a tuple of:
+          (formatted_batches, formatted_batch_data)
+        where:
+          - For gRPC: formatted_batches is a list of NumPy arrays, each of shape (B, H, W, C)
+            with B <= max_batch_size.
+          - For HTTP: formatted_batches is a list of JSON-serializable dict payloads.
+          - In both cases, formatted_batch_data is a list of dicts that coalesce the original
+            images and their original shapes in the same order as provided.
 
         Parameters
         ----------
         data : dict
-            The input data to format.
+            The input data to format. Must include:
+              - "images": a list of numpy.ndarray images.
+              - "original_image_shapes": a list of tuples with each image's (height, width),
+                as set by prepare_data_for_inference.
         protocol : str
             The protocol to use ("grpc" or "http").
         max_batch_size : int
-            The maximum batch size to respect.
+            The maximum number of images per batch.
 
         Returns
         -------
-        List[Any]
-            A list of batches, each formatted according to the protocol.
+        tuple
+            A tuple (formatted_batches, formatted_batch_data).
+
+        Raises
+        ------
+        ValueError
+            If the protocol is invalid.
         """
+
+        # Helper functions to chunk a list into sublists of length up to chunk_size.
+        def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+
+        def chunk_list_geometrically(lst: list, max_size: int) -> List[list]:
+            # TRT engine in Yolox NIM (gRPC) only allows a batch size in powers of 2.
+            chunks = []
+            i = 0
+            while i < len(lst):
+                chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+                chunks.append(lst[i : i + chunk_size])
+                i += chunk_size
+            return chunks
+
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
-
-            # Our yolox-page-elements model (gRPC) expects images to be resized to 1024x1024
+            # Resize images for model input (Yolox expects 1024x1024).
             resized_images = [
-                resize_image(image, (YOLOX_IMAGE_PREPROC_WIDTH, YOLOX_IMAGE_PREPROC_HEIGHT)) for image in data["images"]
+                resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
             ]
+            # Chunk the resized images, the original images, and their shapes.
+            resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
+            original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+            shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
-            # Create a list of smaller batches (chunkify)
-            batches = []
-            for chunk in chunkify(resized_images, max_batch_size):
-                # Reorder axes to match model input (batch, channels, height, width)
-                input_array = np.einsum("bijk->bkij", chunk).astype(np.float32)
-                batches.append(input_array)
-
-            return batches
+            batched_inputs = []
+            formatted_batch_data = []
+            for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
+                # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
+                input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
+                batched_inputs.append(input_array)
+                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+            return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
-            content_list = []
+            content_list: List[Dict[str, Any]] = []
             for image in data["images"]:
-                # Convert numpy array to PIL Image
+                # Convert the numpy array to a PIL Image. Assume images are in [0,1].
                 image_pil = Image.fromarray((image * 255).astype(np.uint8))
-                original_size = image_pil.size  # e.g., (1024, 1024)
+                original_size = image_pil.size
 
-                # Save image to buffer
+                # Save the image to a buffer and encode to base64.
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
                 image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
 
-                # Scale the image if necessary
+                # Scale the image if necessary.
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
-                    image_b64, max_base64_size=YOLOX_NIM_MAX_IMAGE_SIZE
+                    image_b64, max_base64_size=self.nim_max_image_size
                 )
-
                 if new_size != original_size:
                     logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                # Add to content_list
                 content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
 
-            # Now split content_list into batches of up to max_batch_size
-            batches = []
-            for chunk in chunkify(content_list, max_batch_size):
-                payload = {"input": chunk}
-                batches.append(payload)
+            # Chunk the payload content, the original images, and their shapes.
+            content_chunks = chunk_list(content_list, max_batch_size)
+            original_chunks = chunk_list(data["images"], max_batch_size)
+            shape_chunks = chunk_list(data["original_image_shapes"], max_batch_size)
 
-            return batches
+            payload_batches = []
+            formatted_batch_data = []
+            for chunk, orig_chunk, shapes in zip(content_chunks, original_chunks, shape_chunks):
+                payload = {"input": chunk}
+                payload_batches.append(payload)
+                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+            return payload_batches, formatted_batch_data
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -192,7 +267,7 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
             batch_results = response.get("data", [])
             for detections in batch_results:
-                new_bounding_boxes = {"table": [], "chart": [], "title": []}
+                new_bounding_boxes = {label: [] for label in self.class_labels}
 
                 bounding_boxes = detections.get("bounding_boxes", [])
                 for obj_type, bboxes in bounding_boxes.items():
@@ -228,11 +303,6 @@ class YoloxPageElementsModelInterface(ModelInterface):
             A list of annotation dictionaries for each image in the batch.
         """
         original_image_shapes = kwargs.get("original_image_shapes", [])
-        num_classes = kwargs.get("num_classes", YOLOX_NUM_CLASSES)
-        conf_thresh = kwargs.get("conf_thresh", YOLOX_CONF_THRESHOLD)
-        iou_thresh = kwargs.get("iou_thresh", YOLOX_IOU_THRESHOLD)
-        min_score = kwargs.get("min_score", YOLOX_MIN_SCORE)
-        final_thresh = kwargs.get("final_thresh", YOLOX_FINAL_SCORE)
 
         if protocol == "http":
             # For http, the output already has postprocessing applied. Skip to table/chart expansion.
@@ -240,11 +310,88 @@ class YoloxPageElementsModelInterface(ModelInterface):
 
         elif protocol == "grpc":
             # For grpc, apply the same NIM postprocessing.
-            pred = postprocess_model_prediction(output, num_classes, conf_thresh, iou_thresh, class_agnostic=True)
-            results = postprocess_results(pred, original_image_shapes, min_score=min_score)
+            pred = postprocess_model_prediction(
+                output, self.num_classes, self.conf_threshold, self.iou_threshold, class_agnostic=True
+            )
+            results = postprocess_results(
+                pred,
+                original_image_shapes,
+                self.image_preproc_width,
+                self.image_preproc_height,
+                self.class_labels,
+                min_score=self.min_score,
+            )
+
+        inference_results = self.postprocess_annotations(results, **kwargs)
+
+        return inference_results
+
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        raise NotImplementedError()
+
+    def transform_normalized_coordinates_to_original(self, results, original_image_shapes):
+        """ """
+        transformed_results = []
+
+        for annotation_dict, shape in zip(results, original_image_shapes):
+            new_dict = {}
+            for label, bboxes_and_scores in annotation_dict.items():
+                new_dict[label] = []
+                for bbox_and_score in bboxes_and_scores:
+                    bbox = bbox_and_score[:4]
+                    transformed_bbox = [
+                        bbox[0] * shape[1],
+                        bbox[1] * shape[0],
+                        bbox[2] * shape[1],
+                        bbox[3] * shape[0],
+                    ]
+                    transformed_bbox += bbox_and_score[4:]
+                    new_dict[label].append(transformed_bbox)
+            transformed_results.append(new_dict)
+
+        return transformed_results
+
+
+class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-page-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_PAGE_NUM_CLASSES,
+            conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
+            iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
+            min_score=YOLOX_PAGE_MIN_SCORE,
+            final_score=YOLOX_PAGE_FINAL_SCORE,
+            class_labels=YOLOX_PAGE_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-page-elements"
+
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        original_image_shapes = kwargs.get("original_image_shapes", [])
 
         # Table/chart expansion is "business logic" specific to nv-ingest
-        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in results]
+        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         inference_results = []
 
@@ -253,12 +400,73 @@ class YoloxPageElementsModelInterface(ModelInterface):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= final_thresh]
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
             if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= final_thresh]
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
+
+        inference_results = self.transform_normalized_coordinates_to_original(inference_results, original_image_shapes)
+
+        return inference_results
+
+
+class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
+    """
+    An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
+    """
+
+    def __init__(self):
+        """
+        Initialize the yolox-graphic-elements model interface.
+        """
+        super().__init__(
+            image_preproc_width=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
+            image_preproc_height=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
+            nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
+            num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
+            conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
+            iou_threshold=YOLOX_GRAPHIC_IOU_THRESHOLD,
+            min_score=YOLOX_GRAPHIC_MIN_SCORE,
+            final_score=YOLOX_GRAPHIC_FINAL_SCORE,
+            class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
+        )
+
+    def name(
+        self,
+    ) -> str:
+        """
+        Returns the name of the Yolox model interface.
+
+        Returns
+        -------
+        str
+            The name of the model interface.
+        """
+
+        return "yolox-graphic-elements"
+
+    def postprocess_annotations(self, annotation_dicts, **kwargs):
+        original_image_shapes = kwargs.get("original_image_shapes", [])
+
+        annotation_dicts = self.transform_normalized_coordinates_to_original(annotation_dicts, original_image_shapes)
+
+        inference_results = []
+
+        # bbox extraction: additional postprocessing speicifc to nv-ingest
+        for pred, shape in zip(annotation_dicts, original_image_shapes):
+            bbox_dict = get_bbox_dict_yolox_graphic(
+                pred,
+                shape,
+                self.class_labels,
+                self.min_score,
+            )
+            # convert numpy arrays to list
+            bbox_dict = {
+                label: array.tolist() if isinstance(array, np.ndarray) else array for label, array in bbox_dict.items()
+            }
+            inference_results.append(bbox_dict)
 
         return inference_results
 
@@ -322,7 +530,9 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
     return output
 
 
-def postprocess_results(results, original_image_shapes, min_score=0.0):
+def postprocess_results(
+    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, min_score=0.0
+):
     """
     For each item (==image) in results, computes annotations in the form
 
@@ -334,7 +544,6 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
     Keep only bboxes with high enough confidence.
     """
-    class_labels = ["table", "chart", "title"]
     out = []
 
     for original_image_shape, result in zip(original_image_shapes, results):
@@ -351,8 +560,8 @@ def postprocess_results(results, original_image_shapes, min_score=0.0):
 
             # ratio is used when image was padded
             ratio = min(
-                YOLOX_IMAGE_PREPROC_WIDTH / original_image_shape[0],
-                YOLOX_IMAGE_PREPROC_HEIGHT / original_image_shape[1],
+                image_preproc_width / original_image_shape[0],
+                image_preproc_height / original_image_shape[1],
             )
             bboxes = result[:, :4] / ratio
 
@@ -870,3 +1079,108 @@ def get_weighted_box(boxes, conf_type="avg"):
     box[3] = -1  # model index field is retained for consistency but is not used.
     box[4:] /= conf
     return box
+
+
+def batched_overlaps(A, B):
+    """
+    Calculate the Intersection over Union (IoU) between
+    two sets of bounding boxes in a batched manner.
+    Normalization is modified to only use the area of A boxes, hence computing the overlaps.
+    Args:
+        A (ndarray): Array of bounding boxes of shape (N, 4) in format [x1, y1, x2, y2].
+        B (ndarray): Array of bounding boxes of shape (M, 4) in format [x1, y1, x2, y2].
+    Returns:
+        ndarray: Array of IoU values of shape (N, M) representing the overlaps
+         between each pair of bounding boxes.
+    """
+    A = A.copy()
+    B = B.copy()
+
+    A = A[None].repeat(B.shape[0], 0)
+    B = B[:, None].repeat(A.shape[1], 1)
+
+    low = np.s_[..., :2]
+    high = np.s_[..., 2:]
+
+    A, B = A.copy(), B.copy()
+    A[high] += 1
+    B[high] += 1
+
+    intrs = (np.maximum(0, np.minimum(A[high], B[high]) - np.maximum(A[low], B[low]))).prod(-1)
+    ious = intrs / (A[high] - A[low]).prod(-1)
+
+    return ious
+
+
+def find_boxes_inside(boxes, boxes_to_check, threshold=0.9):
+    """
+    Find all boxes that are inside another box based on
+    the intersection area divided by the area of the smaller box,
+    and removes them.
+    """
+    overlaps = batched_overlaps(boxes_to_check, boxes)
+    to_keep = (overlaps >= threshold).sum(0) <= 1
+    return boxes_to_check[to_keep]
+
+
+def get_bbox_dict_yolox_graphic(preds, shape, class_labels, threshold_=0.1) -> Dict[str, np.ndarray]:
+    """
+    Extracts bounding boxes from YOLOX model predictions:
+    - Applies thresholding
+    - Reformats boxes
+    - Cleans the `other` detections: removes the ones that are included  in other detections.
+    - If no title is found, the biggest `other` box is used if it is larger than 0.3*img_w.
+    Args:
+        preds (np.ndarray): YOLOX model predictions including bounding boxes, scores, and labels.
+        shape (tuple): Original image shape.
+        threshold_ (float): Score threshold to filter bounding boxes.
+    Returns:
+        Dict[str, np.ndarray]: Dictionary of bounding boxes, organized by class.
+    """
+    bbox_dict = {label: np.array([]) for label in class_labels}
+
+    for i, label in enumerate(class_labels):
+        bboxes_class = np.array(preds[label])
+
+        if bboxes_class.size == 0:
+            continue
+
+        # Try to find a chart_title box
+        threshold = threshold_ if label != "chart_title" else min(threshold_, bboxes_class[:, -1].max())
+        bboxes_class = bboxes_class[bboxes_class[:, -1] >= threshold][:, :4].astype(int)
+
+        sort = ["x0", "y0"] if label != "ylabel" else ["y0", "x0"]
+        idxs = (
+            pd.DataFrame(
+                {
+                    "y0": bboxes_class[:, 1],
+                    "x0": bboxes_class[:, 0],
+                }
+            )
+            .sort_values(sort, ascending=label != "ylabel")
+            .index
+        )
+        bboxes_class = bboxes_class[idxs]
+        bbox_dict[label] = bboxes_class
+
+    # Remove other included
+    if len(bbox_dict.get("other", [])):
+        other = find_boxes_inside(
+            np.concatenate(list([v for v in bbox_dict.values() if len(v)])), bbox_dict["other"], threshold=0.7
+        )
+        del bbox_dict["other"]
+        if len(other):
+            bbox_dict["other"] = other
+
+    # Biggest other is title if no title
+    if not len(bbox_dict.get("chart_title", [])) and len(bbox_dict.get("other", [])):
+        boxes = bbox_dict["other"]
+        ws = boxes[:, 2] - boxes[:, 0]
+        if np.max(ws) > shape[1] * 0.3:
+            bbox_dict["chart_title"] = boxes[np.argmax(ws)][None].copy()
+            bbox_dict["other"] = np.delete(boxes, (np.argmax(ws)), axis=0)
+
+    # Make sure other key not lost
+    bbox_dict["other"] = bbox_dict.get("other", [])
+
+    return bbox_dict

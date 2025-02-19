@@ -138,7 +138,7 @@ def test_extract_table_and_chart_images_empty_annotations():
 
 def test_extract_table_and_chart_images_single_table():
     """Test extraction with a single table bounding box."""
-    annotation_dict = {"table": [[0.1, 0.1, 0.3, 0.3, 0.8]], "chart": []}
+    annotation_dict = {"table": [[64, 64, 192, 192, 0.8]], "chart": []}
     original_image = np.random.rand(640, 640, 3)
     tables_and_charts = []
 
@@ -161,7 +161,7 @@ def test_extract_table_and_chart_images_single_table():
 
 def test_extract_table_and_chart_images_single_chart():
     """Test extraction with a single chart bounding box."""
-    annotation_dict = {"table": [], "chart": [[0.4, 0.4, 0.6, 0.6, 0.9]]}
+    annotation_dict = {"table": [], "chart": [[256, 256, 384, 384, 0.9]]}
     original_image = np.random.rand(640, 640, 3)
     tables_and_charts = []
 
@@ -198,7 +198,7 @@ def test_extract_table_and_chart_images_multiple_objects():
 
 def test_extract_table_and_chart_images_invalid_bounding_box():
     """Test with an invalid bounding box to check handling of incorrect coordinates."""
-    annotation_dict = {"table": [[1.1, 1.1, 1.5, 1.5, 0.9]], "chart": []}  # Out of bounds
+    annotation_dict = {"table": [[704, 704, 960, 960, 0.9]], "chart": []}  # Out of bounds
     original_image = np.random.rand(640, 640, 3)
     tables_and_charts = []
 

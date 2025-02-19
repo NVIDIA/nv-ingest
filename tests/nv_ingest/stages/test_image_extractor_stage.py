@@ -8,8 +8,17 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from nv_ingest.stages.extractors.image_extractor_stage import decode_and_extract
-from nv_ingest.stages.extractors.image_extractor_stage import process_image
+from ...import_checks import MORPHEUS_IMPORT_OK
+from ...import_checks import CUDA_DRIVER_OK
+
+# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
+pytestmark = pytest.mark.skipif(
+    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
+)
+
+if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
+    from nv_ingest.stages.extractors.image_extractor_stage import decode_and_extract
+    from nv_ingest.stages.extractors.image_extractor_stage import process_image
 
 MODULE_UNDER_TEST = "nv_ingest.stages.extractors.image_extractor_stage"
 
@@ -197,4 +206,6 @@ def test_decode_and_extract_handles_exception_in_extraction(mock_image_helpers):
         decode_and_extract(base64_row, task_props, validated_config, trace_info=trace_info)
 
     # Verify the exception message
-    assert str(excinfo.value) == "Extraction error"
+    assert (
+        str(excinfo.value) == "decode_and_extract: Unhandled exception for source '1'. Original error: Extraction error"
+    )

@@ -1,0 +1,11 @@
+=========
+NIM
+=========
+.. currentmodule:: nv-ingest-api.nim
+
+Constructor
+~~~~~~~~~~~
+.. autosummary::
+   :toctree: api/
+
+   NimClient
