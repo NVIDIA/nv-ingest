@@ -11,18 +11,16 @@ import uuid
 
 # pylint: disable=morpheus-incorrect-lib-from-import
 import mrc
+import pandas as pd
 from morpheus.cli import register_stage
 from morpheus.config import Config
 from morpheus.config import PipelineModes
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 from morpheus.pipeline.preallocator_mixin import PreallocatorMixin
 from morpheus.pipeline.single_output_source import SingleOutputSource
 from morpheus.pipeline.stage_schema import StageSchema
 
-import cudf
-
 from nv_ingest.schemas import validate_ingest_job
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -148,14 +146,14 @@ class PdfMemoryFileSource(PreallocatorMixin, SingleOutputSource):
         return False
 
     def compute_schema(self, schema: StageSchema):
-        schema.output_schema.set_type(ControlMessage)
+        schema.output_schema.set_type(IngestControlMessage)
 
     def _build_source(self, builder: mrc.Builder) -> mrc.SegmentObject:
         node = builder.make_source(self.unique_name, self._generate_frames())
 
         return node
 
-    def _generate_frames(self) -> typing.Iterable[ControlMessage]:
+    def _generate_frames(self) -> typing.Iterable[IngestControlMessage]:
         for i in range(self._repeat):
             for job in self._jobs:
                 job = job.copy()
@@ -170,11 +168,10 @@ class PdfMemoryFileSource(PreallocatorMixin, SingleOutputSource):
 
                 response_channel = f"response_{job_id}"
 
-                df = cudf.DataFrame(job_payload)
-                message_meta = MessageMeta(df=df)
+                df = pd.DataFrame(job_payload)
 
-                control_message = ControlMessage()
-                control_message.payload(message_meta)
+                control_message = IngestControlMessage()
+                control_message.payload(df)
                 control_message.set_metadata("response_channel", response_channel)
                 control_message.set_metadata("job_id", job_id)
 

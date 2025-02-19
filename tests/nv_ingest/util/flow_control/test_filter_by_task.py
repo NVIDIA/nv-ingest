@@ -6,18 +6,18 @@ from unittest.mock import Mock
 
 import pytest
 
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 from ....import_checks import MORPHEUS_IMPORT_OK
 from ....import_checks import CUDA_DRIVER_OK
 
+
 if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
-    from nv_ingest.util.flow_control.filter_by_task import remove_task_subset
     from nv_ingest.util.flow_control.filter_by_task import filter_by_task
-    from morpheus.messages import ControlMessage
 
 
 @pytest.fixture
 def mock_control_message():
-    # Create a mock ControlMessage object
+    # Create a mock IngestControlMessage object
     control_message = Mock()
     control_message.payload.return_value = "not processed"
 
@@ -120,31 +120,13 @@ def test_filter_by_task_with_invalid_argument():
     decorated_func = filter_by_task(["task1"])(process_message)
     with pytest.raises(ValueError):
         decorated_func(
-            "not a ControlMessage"
-        ), "Should raise ValueError if the first argument is not a ControlMessage object."
+            "not a IngestControlMessage"
+        ), "Should raise ValueError if the first argument is not a IngestControlMessage object."
 
 
 def create_ctrl_msg(task, task_props_list):
-    ctrl_msg = ControlMessage()
+    ctrl_msg = IngestControlMessage()
     for task_props in task_props_list:
         ctrl_msg.add_task(task, task_props)
 
     return ctrl_msg
-
-
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_remove_task_subset():
-    task_props_list = [
-        {"prop0": "foo0", "prop1": "bar1"},
-        {"prop2": "foo2", "prop3": "bar3"},
-    ]
-
-    subset = {"prop2": "foo2"}
-    subset = task_props_list[1]
-    ctrl_msg = create_ctrl_msg("task1", task_props_list)
-    task_props = remove_task_subset(ctrl_msg, "task1", subset)
-    remaining_tasks = ctrl_msg.get_tasks()
-
-    assert task_props == {"prop2": "foo2", "prop3": "bar3"}
-    assert len(remaining_tasks) == 1
-    assert remaining_tasks["task1"][0] == {"prop0": "foo0", "prop1": "bar1"}
