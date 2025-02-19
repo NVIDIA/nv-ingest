@@ -20,7 +20,6 @@ from nv_ingest.modules.sources.message_broker_task_source import MessageBrokerTa
 from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
-from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
 from nv_ingest.modules.transforms.text_splitter import TextSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
@@ -31,6 +30,7 @@ from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
+from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
 
@@ -204,12 +204,14 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_table_structure")
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
@@ -225,21 +227,15 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
-
-    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
-    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
-    # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_graphic_elements")
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
-                "cached_endpoints": (cached_grpc, cached_http),
-                "cached_infer_protocol": cached_protocol,
-                "deplot_endpoints": (deplot_grpc, deplot_http),
-                "deplot_infer_protocol": deplot_protocol,
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
@@ -420,22 +416,19 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
     embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
 
-    embed_extractions_loader = EmbedExtractionsLoaderFactory.get_instance(
-        module_name="embed_extractions",
-        module_config=ingest_config.get(
-            "embed_extractions_module",
-            {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
-        ),
-    )
+    text_embed_extraction_config = {
+        "api_key": api_key,
+        "embedding_nim_endpoint": embedding_nim_endpoint,
+        "embedding_model": embedding_model,
+    }
 
     embed_extractions_stage = pipe.add_stage(
-        LinearModulesStage(
+        generate_text_embed_extractor_stage(
             morpheus_pipeline_config,
-            embed_extractions_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
-            input_port_name="input",
-            output_port_name="output",
+            text_embed_extraction_config,
+            pe_count=2,
+            task="embed",
+            task_desc="embed_text",
         )
     )
 

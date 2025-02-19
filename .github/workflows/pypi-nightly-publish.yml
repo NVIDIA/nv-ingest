@@ -5,9 +5,6 @@ on:
   schedule:
     # Runs every day at 11:30PM (UTC)
     - cron: "30 23 * * *"
-  push:
-    branches:
-      - main
 
 jobs:
   build:

@@ -16,7 +16,6 @@ import cv2
 import numpy as np
 import requests
 import tritonclient.grpc as grpcclient
-from packaging import version as pkgversion
 
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
@@ -262,7 +261,7 @@ class NimClient:
 
             # 3. Format the input based on protocol.
             formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size
+                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
@@ -468,7 +467,7 @@ def create_inference_client(
     return NimClient(model_interface, infer_protocol, endpoints, auth_token)
 
 
-def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
+def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -501,11 +500,8 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if (not paddle_version) or (pkgversion.parse(paddle_version) < pkgversion.parse("0.2.0-rc1")):
-        return array
-
     height, width = array.shape[:2]
-    scale_factor = 960 / max(height, width)
+    scale_factor = image_max_dimension / max(height, width)
     new_height = int(height * scale_factor)
     new_width = int(width * scale_factor)
     resized = cv2.resize(array, (new_width, new_height))
@@ -515,14 +511,25 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
     # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
     new_height = (normalized.shape[0] + 31) // 32 * 32
     new_width = (normalized.shape[1] + 31) // 32 * 32
-    padded, _ = pad_image(
+    padded, (pad_width, pad_height) = pad_image(
         normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
     )
 
     # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
     transposed = padded.transpose((2, 0, 1))
 
-    return transposed
+    # Metadata can used for inverting transformations on the resulting bounding boxes.
+    metadata = {
+        "original_height": height,
+        "original_width": width,
+        "scale_factor": scale_factor,
+        "new_height": transposed.shape[1],
+        "new_width": transposed.shape[2],
+        "pad_height": pad_height,
+        "pad_width": pad_width,
+    }
+
+    return transposed, metadata
 
 
 def remove_url_endpoints(url) -> str:
@@ -558,7 +565,7 @@ def generate_url(url) -> str:
         str: Fully validated URL
     """
     if not re.match(r"^https?://", url):
-        # Add the default `http://` if its not already present in the URL
+        # Add the default `http://` if it's not already present in the URL
         url = f"http://{url}"
 
     return url

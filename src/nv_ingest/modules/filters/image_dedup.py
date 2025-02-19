@@ -162,7 +162,7 @@ def _dedup_images(builder: mrc.Builder):
         task_params = task_props.get("params", {})
         filter_flag = task_params.get("filter", True)
 
-        logger.info(f"Deduplicating images with filter_flag={filter_flag}")
+        logger.debug(f"Deduplicating images with filter_flag={filter_flag}")
 
         if content_type != ContentTypeEnum.IMAGE:
             return ctrl_msg

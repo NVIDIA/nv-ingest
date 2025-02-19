@@ -1,4 +1,4 @@
-# What is NV-Ingest?
+# What is NVIDIA-Ingest?
 
 NV-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. 
 NV-Ingest uses specialized NVIDIA NIM microservices 
@@ -9,8 +9,12 @@ extracted into discrete content, and further contextualized through optical char
 From there, NVIDIA-Ingest can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
+!!! note
 
-## What NV-Ingest Is ✔️
+    Cached and Deplot are deprecated. Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
+
+## What NVIDIA-Ingest Is ✔️
 
 NV-Ingest is a microservice service that does the following:
 
@@ -20,7 +24,7 @@ NV-Ingest is a microservice service that does the following:
 - Supports multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for PDF documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
 - Supports various types of pre and post processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
-## What NV-Ingest Isn't ✖️
+## What NVIDIA-Ingest Isn't ✖️
 
 NV-Ingest does not do the following:
 

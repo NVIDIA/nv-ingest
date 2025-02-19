@@ -173,15 +173,15 @@ def extract_table_and_chart_images(
         objects = annotation_dict[label]
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = bbox * np.array([height, width, height, width])
+            h1, w1, h2, w2 = bbox
 
-            cropped = crop_image(original_image, (h1, w1, h2, w2))
+            cropped = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
             base64_img = numpy_to_base64(cropped)
 
             table_data = CroppedImageWithContent(
                 content="",
                 image=base64_img,
-                bbox=(w1, h1, w2, h2),
+                bbox=(int(w1), int(h1), int(w2), int(h2)),
                 max_width=width,
                 max_height=height,
                 type_string=label,
@@ -449,5 +449,4 @@ def pdfium_extractor(
         )
         extracted_data.append(doc_text_meta)
 
-    logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
     return extracted_data

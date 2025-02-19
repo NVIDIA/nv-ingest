@@ -173,7 +173,7 @@ def _filter_images(builder: mrc.Builder):
         task_params = task_props.get("params", {})
         filter_flag = task_params.get("filter", True)
 
-        logger.info(f"Filtering images by scale with filter_flag={filter_flag}")
+        logger.debug(f"Filtering images by scale with filter_flag={filter_flag}")
 
         if content_type != ContentTypeEnum.IMAGE:
             return ctrl_msg
