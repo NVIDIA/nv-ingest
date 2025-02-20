@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.4.1-base-ubuntu22.04
+ARG BASE_IMG_TAG=12.5.1-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -21,12 +21,19 @@ LABEL git_commit=$GIT_COMMIT
 
 # Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
-      wget \
       bzip2 \
       ca-certificates \
       curl \
       libgl1-mesa-glx \
+      software-properties-common \
+      wget \
     && apt-get clean
+
+# A workaround for the error (mrc-core): /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
+# Issue: https://github.com/NVIDIA/nv-ingest/issues/474
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && apt-get update \
+    && apt-get install -y --only-upgrade libstdc++6
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
