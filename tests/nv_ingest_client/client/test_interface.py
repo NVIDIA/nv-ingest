@@ -262,8 +262,7 @@ def test_ingest_async(ingestor, mock_client):
         "result_1" if job_id == "job_id_1" else "result_2"
     )
 
-    combined_future = ingestor.ingest_async(timeout=15)
-    combined_result = combined_future.result()
+    combined_result = ingestor.ingest_async(timeout=15)
 
     assert combined_result == ["result_1", "result_2"]
 
