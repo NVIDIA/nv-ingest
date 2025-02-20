@@ -66,9 +66,6 @@ def _update_metadata(
             # Image is too small; mark as skipped.
             results[i] = (img, None)
 
-    if not valid_images:
-        return results
-
     # Prepare data payloads for both clients.
     data_yolox = {"images": valid_arrays}
     data_paddle = {"base64_images": valid_images}
