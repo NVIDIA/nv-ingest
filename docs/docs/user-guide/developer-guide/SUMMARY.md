@@ -4,5 +4,6 @@
 - [Environment Configuration Variables](environment-config.md)
 - [Developing with Kubernetes](kubernetes-dev.md)
 - [NV-Ingest Command Line (CLI)](nv-ingest_cli.md)
+- [API Reference](api-docs)
 - [Telemetry](telemetry.md)
 - [Environment Configuration Variables](environment-config.md)
