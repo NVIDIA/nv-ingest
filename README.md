@@ -411,10 +411,12 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
-- **`Built With Llama:`**:
-  - **Description**: By default, the Split task tokenizer is set to `meta-llama/Llama-3.2-1B`, which will download
-    Llama-3.2-1B materials from Huggingface in order to perform tokenizer based splitting. Please review the
+- **`DOWNLOAD_LLAMA_TOKENIZER` (Built With Llama):**:
+  - **Description**: The Split task uses the `meta-llama/Llama-3.2-1B` tokenizer, which will be downloaded
+    from HuggingFace at build time if `DOWNLOAD_LLAMA_TOKENIZER` is set to `True`. Please review the
     [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this.
+    This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and
+    set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to use it.
 
 
 ### Contributing
