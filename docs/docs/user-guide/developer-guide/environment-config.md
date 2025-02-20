@@ -7,8 +7,6 @@ The following are the environment configuration variables that you can specify i
 |----------------------------------|--------------------------------|-----------------------------------------------------------------------|
 | `CAPTION_CLASSIFIER_GRPC_TRITON` | `triton:8001` <br/>                                      | The endpoint where the caption classifier model is hosted using gRPC for communication. This is used to send requests for caption classification. You must specify only ONE of an http or gRPC endpoint. If both are specified gRPC will take precedence. |
 | `CAPTION_CLASSIFIER_MODEL_NAME`  | `deberta_large` <br/>                                    | The name of the caption classifier model. |
-| `DOUGHNUT_TRITON_HOST`           | `triton-doughnut` <br/>                                  | The hostname or IP address of the DOUGHNUT model service. |
-| `DOUGHNUT_TRITON_PORT`           | `8001` <br/>                                             | The port number on which the DOUGHNUT model service is listening. |
 | `INGEST_LOG_LEVEL`               | - `DEBUG` <br/> - `INFO` <br/> - `WARNING` <br/> - `ERROR` <br/> - `CRITICAL` <br/> | The log level for the ingest service, which controls the verbosity of the logging output. |
 | `MESSAGE_CLIENT_HOST`            | - `redis` <br/> - `localhost` <br/> - `192.168.1.10` <br/> | Specifies the hostname or IP address of the message broker used for communication between services. |
 | `MESSAGE_CLIENT_PORT`            | - `7670` <br/> - `6379` <br/>                              | Specifies the port number on which the message broker is listening. |
