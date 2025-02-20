@@ -2,251 +2,319 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import json
+import copy
 from datetime import datetime
+import json
+from unittest.mock import MagicMock, patch
 
-import pydantic
+import pandas as pd
 import pytest
-from unittest.mock import Mock, patch
+from pydantic import BaseModel
 
-from pydantic import ValidationError
+# Import the functions under test.
+from nv_ingest.modules.sources.message_broker_task_source import (
+    fetch_and_process_messages,
+    process_message,
+)
 
-from ....import_checks import CUDA_DRIVER_OK
-from ....import_checks import MORPHEUS_IMPORT_OK
-
-if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
-    import cudf
-    from morpheus.messages import ControlMessage
-    from morpheus.messages import MessageMeta
-
-    from nv_ingest.modules.sources.message_broker_task_source import process_message
-
+# Define the module under test.
 MODULE_UNDER_TEST = "nv_ingest.modules.sources.message_broker_task_source"
 
-
-@pytest.fixture
-def job_payload():
-    return json.dumps(
-        {
-            "job_payload": {
-                "content": ["sample content"],
-                "source_name": ["source1"],
-                "source_id": ["id1"],
-                "document_type": ["pdf"],
-            },
-            "job_id": "12345",
-            "tasks": [
-                {
-                    "type": "split",
-                    "task_properties": {
-                        "split_by": "word",
-                        "split_length": 100,
-                        "split_overlap": 0,
-                    },
-                },
-                {
-                    "type": "extract",
-                    "task_properties": {
-                        "document_type": "pdf",
-                        "method": "OCR",
-                        "params": {},
-                    },
-                },
-                {"type": "embed", "task_properties": {}},
-            ],
-        }
-    )
+# -----------------------------------------------------------------------------
+# Dummy Classes for Testing (for client and BaseModel response simulation)
+# -----------------------------------------------------------------------------
 
 
-# Test Case 1: Valid job with all required fields
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_valid_job(job_payload):
+class DummyValidatedConfig:
+    def __init__(self, task_queue):
+        self.task_queue = task_queue
+
+
+class DummyResponse(BaseModel):
+    response_code: int
+    response: str  # JSON string
+
+
+class DummyClient:
     """
-    Test that process_message processes a valid job correctly.
+    A dummy client whose fetch_message method returns values from a given list.
+    Instead of raising KeyboardInterrupt when responses are exhausted,
+    it returns None (which in production causes the loop to continue).
     """
-    job = json.loads(job_payload)
+
+    def __init__(self, responses):
+        self.responses = responses
+        self.call_count = 0
+
+    def fetch_message(self, task_queue, count):
+        if self.call_count < len(self.responses):
+            response = self.responses[self.call_count]
+            self.call_count += 1
+            return response
+        else:
+            return None
+
+
+# -----------------------------------------------------------------------------
+# Tests for process_message using mocks
+# -----------------------------------------------------------------------------
+
+
+@patch(f"{MODULE_UNDER_TEST}.MODULE_NAME", new="dummy_module")
+@patch(f"{MODULE_UNDER_TEST}.format_trace_id", return_value="trace-98765")
+@patch(f"{MODULE_UNDER_TEST}.annotate_cm")
+@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job")
+@patch(f"{MODULE_UNDER_TEST}.ControlMessageTask")
+@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
+def test_process_message_normal(
+    mock_IngestControlMessage,
+    mock_ControlMessageTask,
+    mock_validate_ingest_job,
+    mock_annotate_cm,
+    mock_format_trace_id,
+):
+    """
+    Test that process_message correctly processes a valid job.
+    The job dict contains:
+      - "job_id": identifier
+      - "job_payload": a list of dicts to be converted to a DataFrame
+      - "tasks": a list of task dicts (each with optional id, type, task_properties)
+      - "tracing_options": options that trigger trace tagging.
+    Expect that the returned control message:
+      - receives a payload DataFrame built from job_payload,
+      - has metadata "job_id" and "response_channel" set to the job_id,
+      - is annotated with message "Created",
+      - has tasks added (one per task in the job),
+      - and has trace-related metadata/timestamps set.
+    """
+    # Create a fake control message instance.
+    fake_cm = MagicMock()
+    mock_IngestControlMessage.return_value = fake_cm
+
+    # Simulate ControlMessageTask instances.
+    fake_task_instance = MagicMock()
+    fake_task_instance.model_dump.return_value = {"id": "task1", "type": "process", "properties": {"p": 1}}
+    fake_task_instance2 = MagicMock()
+    fake_task_instance2.model_dump.return_value = {"id": "auto", "type": "unknown", "properties": {"p": 2}}
+    mock_ControlMessageTask.side_effect = [fake_task_instance, fake_task_instance2]
+
+    # Build a valid job dictionary.
+    job = {
+        "job_id": "job123",
+        "job_payload": [{"field": "value1"}, {"field": "value2"}],
+        "tasks": [
+            {"id": "task1", "type": "process", "task_properties": {"p": 1}},
+            {"task_properties": {"p": 2}},
+        ],
+        "tracing_options": {
+            "trace": True,
+            "ts_send": datetime.now().timestamp() * 1e9,  # nanoseconds
+            "trace_id": 98765,
+        },
+    }
+    # Make a copy because process_message pops keys.
+    job_copy = copy.deepcopy(job)
     ts_fetched = datetime.now()
 
-    # Mock validate_ingest_job to prevent actual validation logic if needed
-    result = process_message(job, ts_fetched)
+    result_cm = process_message(job_copy, ts_fetched)
 
-    # Check that result is an instance of ControlMessage
-    assert isinstance(result, ControlMessage)
+    # Verify that payload() was called with a DataFrame built from job_payload.
+    fake_cm.payload.assert_called_once()
+    df_arg = fake_cm.payload.call_args[0][0]
+    pd.testing.assert_frame_equal(df_arg, pd.DataFrame(job["job_payload"]))
 
-    # Check that the metadata is set correctly
-    print(result)
-    print(job)
-    assert result.get_metadata("job_id") == "12345"
-    assert result.get_metadata("response_channel") == "12345"
-
-    # Check that tasks are added
-    expected_tasks = job["tasks"]
-    tasks_in_message = result.get_tasks()
-    assert len(tasks_in_message) == len(expected_tasks)
-
-    # Check that the payload is set correctly
-    message_meta = result.payload()
-    assert isinstance(message_meta, MessageMeta)
-
-    # Check that the DataFrame contains the job payload
-    df = message_meta.copy_dataframe()
-    assert isinstance(df, cudf.DataFrame)
-    for column in job["job_payload"]:
-        assert column in df.columns
-        # Convert cudf Series to list for comparison
-        assert df[column].to_arrow().to_pylist() == job["job_payload"][column]
-
-    # Since do_trace_tagging is False by default
-    assert result.get_metadata("config::add_trace_tagging") is None
+    # Verify metadata calls.
+    fake_cm.set_metadata.assert_any_call("job_id", "job123")
+    fake_cm.set_metadata.assert_any_call("response_channel", "job123")
+    mock_annotate_cm.assert_called_with(fake_cm, message="Created")
+    # Verify that tasks were added.
+    assert fake_cm.add_task.call_count == 2
+    # Check trace-related metadata/timestamps.
+    trace_meta_calls = [call for call in fake_cm.set_metadata.call_args_list if "trace" in call[0][0]]
+    trace_timestamp_calls = [call for call in fake_cm.set_timestamp.call_args_list if "trace" in call[0][0]]
+    assert trace_meta_calls or trace_timestamp_calls
+    fake_cm.set_metadata.assert_any_call("trace_id", "trace-98765")
 
 
-# Test Case 2: Job missing 'job_id'
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_missing_job_id(job_payload):
+@patch(f"{MODULE_UNDER_TEST}.MODULE_NAME", new="dummy_module")
+@patch(f"{MODULE_UNDER_TEST}.annotate_cm")
+@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job", side_effect=ValueError("Invalid job"))
+@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
+def test_process_message_validation_failure_with_job_id(
+    mock_IngestControlMessage, mock_validate_ingest_job, mock_annotate_cm
+):
     """
-    Test that process_message raises an exception when 'job_id' is missing.
+    Test that when validate_ingest_job fails—even if the job dict contains a 'job_id'—
+    process_message re‑raises the exception.
     """
-    job = json.loads(job_payload)
-    job.pop("job_id")
+    fake_cm = MagicMock()
+    mock_IngestControlMessage.return_value = fake_cm
+
+    job = {
+        "job_id": "job_fail",
+        "job_payload": [{"a": "b"}],
+        "tasks": [],
+        "tracing_options": {},
+        "invalid": True,  # Triggers failure.
+    }
+    job_copy = copy.deepcopy(job)
     ts_fetched = datetime.now()
 
-    # We expect validate_ingest_job to raise an exception due to missing 'job_id'
-    with patch(f"{MODULE_UNDER_TEST}.validate_ingest_job") as mock_validate_ingest_job:
-        mock_validate_ingest_job.side_effect = KeyError("job_id")
-
-        with pytest.raises(KeyError) as exc_info:
-            process_message(job, ts_fetched)
-
-        assert "job_id" in str(exc_info.value)
-        mock_validate_ingest_job.assert_called_once_with(job)
+    with pytest.raises(ValueError, match="Invalid job"):
+        process_message(job_copy, ts_fetched)
 
 
-# Test Case 3: Job missing 'job_payload'
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_missing_job_payload(job_payload):
+@patch(f"{MODULE_UNDER_TEST}.validate_ingest_job", side_effect=ValueError("Invalid job"))
+@patch(f"{MODULE_UNDER_TEST}.IngestControlMessage")
+def test_process_message_validation_failure_no_job_id(mock_IngestControlJob, mock_validate_ingest_job):
     """
-    Test that process_message handles a job missing 'job_payload'.
+    Test that if validate_ingest_job fails and there is no 'job_id' in the job dict,
+    process_message re‑raises the exception.
     """
-    job = json.loads(job_payload)
-    job.pop("job_payload")
-    ts_fetched = datetime.now()
+    fake_cm = MagicMock()
+    mock_IngestControlJob.return_value = fake_cm
 
-    # We need to allow validate_ingest_job to pass
-    with pytest.raises(pydantic.ValidationError) as exc_info:
-        process_message(job, ts_fetched)
-
-
-# Test Case 5: Job with invalid tasks (missing 'type' in a task)
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_invalid_tasks(job_payload):
-    """
-    Test that process_message raises an exception when a task is invalid.
-    """
-    job = json.loads(job_payload)
-    # Remove 'type' from one of the tasks to make it invalid
-    job["tasks"][0].pop("type")
-    ts_fetched = datetime.now()
-
-    # Since we're not mocking validate_ingest_job, it should raise an exception during validation
-    with pytest.raises(Exception) as exc_info:
-        process_message(job, ts_fetched)
-
-    # Check that the exception message indicates a validation error
-    assert 'task must have a "type"' in str(exc_info.value).lower() or "validation" in str(exc_info.value).lower()
-
-
-# Test Case 6: Job with tracing options enabled
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_with_tracing(job_payload):
-    """
-    Test that process_message adds tracing metadata when tracing options are enabled.
-    """
-    job = json.loads(job_payload)
-    job["tracing_options"] = {
-        "trace": True,
-        "ts_send": int(datetime.now().timestamp() * 1e9),  # ts_send in nanoseconds
-        "trace_id": "trace-123",
+    job = {
+        "job_payload": [{"a": "b"}],
+        "tasks": [],
+        "tracing_options": {},
+        "invalid": True,
     }
     ts_fetched = datetime.now()
 
-    # Adjust MODULE_NAME based on your actual module name
-    MODULE_NAME = "message_broker_task_source"
-
-    # Call the function
-    result = process_message(job, ts_fetched)
-
-    # Assertions
-    assert isinstance(result, ControlMessage)
-
-    # Check that tracing metadata were added
-    assert result.get_metadata("config::add_trace_tagging") is True
-    assert result.get_metadata("trace_id") == "trace-123"
-
-    # Check timestamps
-    assert result.get_timestamp(f"trace::entry::{MODULE_NAME}") is not None
-    assert result.get_timestamp(f"trace::exit::{MODULE_NAME}") is not None
-    assert result.get_timestamp("trace::entry::broker_source_network_in") is not None
-    assert result.get_timestamp("trace::exit::broker_source_network_in") == ts_fetched
-    assert result.get_timestamp("latency::ts_send") is not None
+    with pytest.raises(ValueError, match="Invalid job"):
+        process_message(copy.deepcopy(job), ts_fetched)
 
 
-# Test Case 7: Exception occurs during processing and 'job_id' is present
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_exception_with_job_id(job_payload):
+# -----------------------------------------------------------------------------
+# Tests for fetch_and_process_messages using mocks
+# -----------------------------------------------------------------------------
+
+
+@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
+def test_fetch_and_process_messages_dict_job(mock_process_message):
     """
-    Test that process_message handles exceptions and sets metadata when 'job_id' is present.
+    Test that when the client returns a job as a dictionary,
+    fetch_and_process_messages yields a processed control message.
     """
-    job = json.loads(job_payload)
-    ts_fetched = datetime.now()
+    job = {
+        "job_id": "job_dict",
+        "job_payload": [{"x": 1}, {"x": 2}],
+        "tasks": [],
+        "tracing_options": {},
+    }
+    client = DummyClient([job])
+    config = DummyValidatedConfig(task_queue="queue1")
 
-    # Modify job_payload to cause an exception during DataFrame creation
-    job["job_payload"] = None  # This should cause an exception when creating DataFrame
+    gen = fetch_and_process_messages(client, config)
+    result = next(gen)
+    gen.close()
+    assert result == "processed"
+    mock_process_message.assert_called_once()
 
-    # Call the function
-    with pytest.raises(ValidationError):
-        _ = process_message(job, ts_fetched)
 
-
-# Test Case 8: Exception occurs during processing and 'job_id' is missing
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
-def test_process_message_exception_without_job_id(job_payload):
+@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
+def test_fetch_and_process_messages_base_model_job(mock_process_message):
     """
-    Test that process_message raises an exception when 'job_id' is missing and an exception occurs.
+    Test that when the client returns a job as a BaseModel with response_code 0,
+    the job.response is JSON-decoded and processed.
     """
-    job = json.loads(job_payload)
-    job.pop("job_id")  # Remove 'job_id' to simulate missing job ID
-    ts_fetched = datetime.now()
+    job_dict = {
+        "job_id": "job_bm",
+        "job_payload": [{"y": "a"}],
+        "tasks": [],
+        "tracing_options": {},
+    }
+    response_obj = DummyResponse(response_code=0, response=json.dumps(job_dict))
+    client = DummyClient([response_obj])
+    config = DummyValidatedConfig(task_queue="queue1")
 
-    # Modify job_payload to cause an exception during DataFrame creation
-    job["job_payload"] = None
+    gen = fetch_and_process_messages(client, config)
+    result = next(gen)
+    gen.close()
+    assert result == "processed"
+    mock_process_message.assert_called_once()
 
-    with pytest.raises(Exception) as exc_info:
-        process_message(job, ts_fetched)
+
+@patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed")
+def test_fetch_and_process_messages_skip_on_nonzero_response_code(mock_process_message):
+    """
+    Test that when the client returns a BaseModel job with a nonzero response_code,
+    the job is skipped and not processed.
+    Then a subsequent valid dictionary job is processed.
+    """
+    response_bad = DummyResponse(response_code=1, response="{}")
+    job = {
+        "job_id": "job_valid",
+        "job_payload": [{"z": 100}],
+        "tasks": [],
+        "tracing_options": {},
+    }
+    client = DummyClient([response_bad, job])
+    config = DummyValidatedConfig(task_queue="queue1")
+
+    gen = fetch_and_process_messages(client, config)
+    result = next(gen)
+    gen.close()
+    assert result == "processed"
+    assert mock_process_message.call_count == 1
+
+
+def test_fetch_and_process_messages_timeout_error():
+    """
+    Test that if client.fetch_message raises a TimeoutError,
+    fetch_and_process_messages catches it and continues to the next message.
+    """
+    client = DummyClient([None])
+    call = [0]
+
+    def fetch_override(task_queue, count):
+        if call[0] == 0:
+            call[0] += 1
+            raise TimeoutError("Timeout")
+        else:
+            return {
+                "job_id": "job_after_timeout",
+                "job_payload": [{"a": "b"}],
+                "tasks": [],
+                "tracing_options": {},
+            }
+
+    client.fetch_message = fetch_override
+    config = DummyValidatedConfig(task_queue="queue1")
+    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message:
+        gen = fetch_and_process_messages(client, config)
+        result = next(gen)
+        gen.close()
+        assert result == "processed"
+        mock_process_message.assert_called_once()
+
+
+def test_fetch_and_process_messages_exception_handling():
+    """
+    Test that if client.fetch_message raises a generic Exception,
+    fetch_and_process_messages logs the error and continues fetching.
+    """
+    client = DummyClient([None])
+    call = [0]
+
+    def fetch_override(task_queue, count):
+        if call[0] == 0:
+            call[0] += 1
+            raise Exception("Generic error")
+        else:
+            return {
+                "job_id": "job_after_exception",
+                "job_payload": [{"c": "d"}],
+                "tasks": [],
+                "tracing_options": {},
+            }
+
+    client.fetch_message = fetch_override
+    config = DummyValidatedConfig(task_queue="queue1")
+    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message:
+        gen = fetch_and_process_messages(client, config)
+        result = next(gen)
+        gen.close()
+        assert result == "processed"
+        mock_process_message.assert_called_once()
