@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y \
     && apt-get clean
 
 # A workaround for the error (mrc-core): /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
-# TODO: Create and link a Github issue.
+# Issue: https://github.com/NVIDIA/nv-ingest/issues/474
 RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
     && apt-get update \
     && apt-get install -y --only-upgrade libstdc++6
