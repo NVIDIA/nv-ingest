@@ -30,9 +30,9 @@ from PIL import Image
 from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
-from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
@@ -160,7 +160,8 @@ def extract_table_and_chart_images(
             *bbox, _ = bboxes
             h1, w1, h2, w2 = bbox
 
-            base64_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
+            cropped_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
+            base64_img = numpy_to_base64(cropped_img) if cropped_img is not None else None
 
             table_data = CroppedImageWithContent(
                 content="",

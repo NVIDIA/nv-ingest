@@ -120,7 +120,7 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
 
     # Patch join_yolox_and_paddle_output so that it returns a dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}],
     )
     # Patch process_yolox_graphic_elements to extract the chart title.
@@ -176,7 +176,7 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
 
     # Patch join_yolox_and_paddle_output so it returns the expected joined dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}, {"chart_title": "joined_3"}],
     )
     # Patch process_yolox_graphic_elements to extract the chart title.

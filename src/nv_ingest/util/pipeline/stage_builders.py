@@ -67,7 +67,7 @@ def get_caption_classifier_service():
     return triton_service_caption_classifier, triton_service_caption_classifier_name
 
 
-def get_table_detection_service(env_var_prefix):
+def get_nim_service(env_var_prefix):
     prefix = env_var_prefix.upper()
     grpc_endpoint = os.environ.get(
         f"{prefix}_GRPC_ENDPOINT",
@@ -84,6 +84,7 @@ def get_table_detection_service(env_var_prefix):
         "NGC_API_KEY",
         "",
     )
+
     infer_protocol = os.environ.get(
         f"{prefix}_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
@@ -178,7 +179,10 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
+    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
+        get_nim_service("nemoretriever_parse")
+    )
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -186,7 +190,12 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
-            }
+            },
+            "nemoretriever_parse_config": {
+                "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
+                "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
+                "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+            },
         },
     )
     pdf_extractor_stage = pipe.add_stage(
@@ -203,8 +212,8 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_table_structure")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox_table_structure")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
@@ -226,8 +235,8 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox_graphic_elements")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox_graphic_elements")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
@@ -250,15 +259,14 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     image_extractor_config = ingest_config.get(
         "image_extraction_module",
         {
             "image_extraction_config": {
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
-                "auth_token": yolox_auth,
-                # All auth tokens are the same for the moment
+                "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             }
         },
     )
@@ -275,7 +283,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     docx_extractor_config = ingest_config.get(
         "docx_extraction_module",
         {
@@ -299,7 +307,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
 
 
 def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     pptx_extractor_config = ingest_config.get(
         "pptx_extraction_module",
         {
