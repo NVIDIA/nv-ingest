@@ -518,8 +518,6 @@ class MultiProcessingBaseStage(SinglePortStage):
             ctrl_msg : ControlMessage
                 The control message to handle.
             """
-            logger.info("In on_next")
-
             # Trace the control message
             trace_message(ctrl_msg, self._task_desc)
             # Process and forward the control message

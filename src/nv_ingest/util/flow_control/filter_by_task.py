@@ -105,7 +105,6 @@ def filter_by_task(
                                     func.__name__,
                                 )
 
-                                logger.info(f"Calling function {func.__name__}(args={args}, kwargs={kwargs})")
                                 return func(*args, **kwargs)
                     else:
                         logger.debug(
