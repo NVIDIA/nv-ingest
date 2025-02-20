@@ -6,7 +6,6 @@
 import logging
 
 import mrc
-from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 
@@ -14,6 +13,7 @@ from nv_ingest.schemas.task_injection_schema import TaskInjectionSchema
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -23,7 +23,7 @@ MODULE_NAMESPACE = "nv_ingest"
 TaskInjectorLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, TaskInjectionSchema)
 
 
-def on_data(message: ControlMessage):
+def on_data(message: IngestControlMessage):
     message.get_metadata("task_meta")
 
     return message
@@ -38,7 +38,7 @@ def _task_injection(builder: mrc.Builder):
         raise_on_failure=validated_config.raise_on_failure,
     )
     @traceable(MODULE_NAME)
-    def _on_data(ctrl_msg: ControlMessage):
+    def _on_data(ctrl_msg: IngestControlMessage):
         return on_data(ctrl_msg)
         ctrl_msg.get_metadata("task_meta")
 

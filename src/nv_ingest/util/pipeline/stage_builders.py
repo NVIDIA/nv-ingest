@@ -6,10 +6,8 @@
 import logging
 import math
 import os
-import typing
 
 import click
-from morpheus.messages import ControlMessage
 from morpheus.stages.general.linear_modules_source import LinearModuleSourceStage
 from morpheus.stages.general.linear_modules_stage import LinearModulesStage
 
@@ -33,6 +31,7 @@ from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding
 from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -129,7 +128,7 @@ def add_source_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModuleSourceStage(
             morpheus_pipeline_config,
             source_module_loader,
-            output_type=ControlMessage,
+            output_type=IngestControlMessage,
             output_port_name="output",
         )
     )
@@ -151,8 +150,8 @@ def add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         LinearModulesStage(
             morpheus_pipeline_config,
             submitted_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -169,8 +168,8 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             metadata_injector_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -368,8 +367,8 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             nemo_splitter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -484,8 +483,8 @@ def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             sink_module_loader,
-            input_type=typing.Any,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -510,8 +509,8 @@ def add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             otel_tracer_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -543,8 +542,8 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             otel_meter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -567,8 +566,8 @@ def add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         LinearModulesStage(
             morpheus_pipeline_config,
             completed_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -594,8 +593,8 @@ def add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         LinearModulesStage(
             morpheus_pipeline_config,
             vdb_task_sink_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )

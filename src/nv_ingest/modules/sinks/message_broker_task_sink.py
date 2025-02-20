@@ -13,7 +13,6 @@ from typing import List
 from typing import Tuple
 
 import mrc
-from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
@@ -25,6 +24,7 @@ from nv_ingest.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest.util.tracing.logging import annotate_cm
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -34,25 +34,26 @@ MODULE_NAMESPACE = "nv_ingest"
 MessageBrokerTaskSinkLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
 
 
-def extract_data_frame(message: ControlMessage) -> Tuple[Any, Dict[str, Any]]:
+def extract_data_frame(message: IngestControlMessage) -> Tuple[Any, Dict[str, Any]]:
     """
     Extracts a DataFrame from a message payload and returns it along with a filtered dictionary of required columns.
 
     Parameters
     ----------
-    message : ControlMessage
+    message : IngestControlMessage
         The message object containing the payload.
 
     Returns
     -------
     Tuple[Any, Dict[str, Any]]
-        A tuple containing the mutable DataFrame and a dictionary of selected columns.
+        A tuple containing the DataFrame and a dictionary of selected columns.
     """
     try:
-        with message.payload().mutable_dataframe() as mdf:
-            logger.debug(f"Message broker sink Received DataFrame with {len(mdf)} rows.")
-            keep_cols = ["document_type", "metadata"]
-            return mdf, mdf[keep_cols].to_pandas().to_dict(orient="records")
+        df = message.payload()
+        logger.debug(f"Message broker sink Received DataFrame with {len(df)} rows.")
+        keep_cols = ["document_type", "metadata"]
+
+        return df, df[keep_cols].to_dict(orient="records")
     except Exception as err:
         logger.warning(f"Failed to extract DataFrame from message payload: {err}")
         return None, None
@@ -99,14 +100,14 @@ def split_large_dict(json_data: List[Dict[str, Any]], size_limit: int) -> List[L
     return fragments
 
 
-def create_json_payload(message: ControlMessage, df_json: Dict[str, Any]) -> List[Dict[str, Any]]:
+def create_json_payload(message: IngestControlMessage, df_json: Dict[str, Any]) -> List[Dict[str, Any]]:
     """
     Creates JSON payloads based on message status and data. If the size of df_json exceeds 256 MB, splits it into
     multiple fragments, each less than 256 MB. Adds optional trace and annotation data to the first fragment.
 
     Parameters
     ----------
-    message : ControlMessage
+    message : IngestControlMessage
         The message object from which metadata is extracted.
     df_json : Dict[str, Any]
         The dictionary containing data filtered from the DataFrame.
@@ -276,20 +277,20 @@ def handle_failure(
     broker_client.submit_message(response_channel, json.dumps(fail_msg))
 
 
-def process_and_forward(message: ControlMessage, broker_client: MessageBrokerClientBase) -> ControlMessage:
+def process_and_forward(message: IngestControlMessage, broker_client: MessageBrokerClientBase) -> IngestControlMessage:
     """
     Processes a message by extracting data, creating a JSON payload, and attempting to push it to the message broker.
 
     Parameters
     ----------
-    message : ControlMessage
+    message : IngestControlMessage
         The message to process.
     broker_client : MessageBrokerClientBase
         The message broker client used for pushing data.
 
     Returns
     -------
-    ControlMessage
+    IngestControlMessage
         The processed message.
 
     Raises
@@ -374,18 +375,18 @@ def _message_broker_task_sink(builder: mrc.Builder) -> None:
         raise ValueError(f"Unsupported client_type: {client_type}")
 
     @traceable(MODULE_NAME)
-    def _process_and_forward(message: ControlMessage) -> ControlMessage:
+    def _process_and_forward(message: IngestControlMessage) -> IngestControlMessage:
         """
         Wraps the processing and forwarding functionality with traceability and error handling.
 
         Parameters
         ----------
-        message : ControlMessage
+        message : IngestControlMessage
             The message to be processed and forwarded to the message broker.
 
         Returns
         -------
-        ControlMessage
+        IngestControlMessage
             The processed message, after attempting to forward to the message broker.
         """
         return process_and_forward(message, client)

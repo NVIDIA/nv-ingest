@@ -12,7 +12,6 @@ from urllib.parse import urlparse
 
 import mrc
 from minio import Minio
-from morpheus.messages import ControlMessage
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -33,6 +32,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -264,20 +264,20 @@ def _vdb_task_sink(builder: mrc.Builder):
         if isinstance(service, VectorDBService):
             service.close()
 
-    def extract_df(ctrl_msg: ControlMessage, filter_errors: bool):
+    def extract_df(ctrl_msg: IngestControlMessage, filter_errors: bool):
         df = None
         resource_name = None
 
-        with ctrl_msg.payload().mutable_dataframe() as mdf:
-            # info_msg mask
-            if filter_errors:
-                info_msg_mask = mdf["metadata"].struct.field("info_message_metadata").struct.field("filter")
-                mdf = mdf.loc[~info_msg_mask].copy()
+        mdf = ctrl_msg.payload()
 
-            mdf["embedding"] = mdf["metadata"].struct.field("embedding")
-            mdf["_source_metadata"] = mdf["metadata"].struct.field("source_metadata")
-            mdf["_content_metadata"] = mdf["metadata"].struct.field("content_metadata")
-            df = mdf[mdf["_contains_embeddings"]].copy()
+        if filter_errors:
+            info_msg_mask = mdf["metadata"].struct.field("info_message_metadata").struct.field("filter")
+            mdf = mdf.loc[~info_msg_mask].copy()
+
+        mdf["embedding"] = mdf["metadata"].struct.field("embedding")
+        mdf["_source_metadata"] = mdf["metadata"].struct.field("source_metadata")
+        mdf["_content_metadata"] = mdf["metadata"].struct.field("content_metadata")
+        df = mdf[mdf["_contains_embeddings"]].copy()
 
         df = df[
             [
@@ -298,7 +298,7 @@ def _vdb_task_sink(builder: mrc.Builder):
         annotation_id=MODULE_NAME,
         raise_on_failure=validated_config.raise_on_failure,
     )
-    def on_data(ctrl_msg: ControlMessage):
+    def on_data(ctrl_msg: IngestControlMessage):
         nonlocal service_status
         nonlocal start_time
         nonlocal service
@@ -369,7 +369,7 @@ def _vdb_task_sink(builder: mrc.Builder):
                                 accum_stats.last_insert_time = current_time
                                 accum_stats.msg_count = 0
 
-                            if isinstance(ctrl_msg, ControlMessage):
+                            if isinstance(ctrl_msg, IngestControlMessage):
                                 ctrl_msg.set_metadata(
                                     "insert_response",
                                     {
@@ -382,7 +382,7 @@ def _vdb_task_sink(builder: mrc.Builder):
                                 )
                         else:
                             logger.debug("Accumulated %d rows for collection: %s", accum_stats.msg_count, key)
-                            if isinstance(ctrl_msg, ControlMessage):
+                            if isinstance(ctrl_msg, IngestControlMessage):
                                 ctrl_msg.set_metadata(
                                     "insert_response",
                                     {

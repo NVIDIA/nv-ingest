@@ -53,12 +53,16 @@ class IngestControlMessage:
         """
         return task_id in self._tasks
 
-    def remove_task(self, task_id: str) -> None:
+    def remove_task(self, task_id: str) -> ControlMessageTask:
         """
         Remove a task from the control message. Logs a warning if the task does not exist.
         """
         if task_id in self._tasks:
+            _task = self._tasks[task_id]
+
             del self._tasks[task_id]
+
+            return _task
         else:
             logger.warning(f"Attempted to remove non-existent task with id: {task_id}")
 
