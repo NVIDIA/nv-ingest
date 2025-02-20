@@ -1,4 +1,4 @@
-# Telemetry
+# Telemetry for NeMo Retriever Extraction
 
 
 ## Docker Compose

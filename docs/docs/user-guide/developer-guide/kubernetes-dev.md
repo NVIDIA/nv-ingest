@@ -1,8 +1,8 @@
-# Developing with Kubernetes
+# Developing with Kubernetes for NeMo Retriever Extraction
 
-Developing directly on Kubernetes gives us more confidence that end-user deployments will work as expected.
+Developing directly on Kubernetes gives us more confidence that NeMo Retriever extraction end-user deployments will work as expected.
 
-This page describes how to use Kubernetes generally and how to deploy nv-ingest on a local Kubernetes cluster.
+This page describes how to use Kubernetes generally and how to deploy NeMo Retriever extraction on a local Kubernetes cluster.
 
 !!! warning 
 

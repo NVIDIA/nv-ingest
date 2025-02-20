@@ -1,4 +1,4 @@
-name: Build NV-Ingest Runtime Image
+name: Build NeMo Retriever Extraction Runtime Image
 
 # Trigger for pull requests and pushing to main
 on:

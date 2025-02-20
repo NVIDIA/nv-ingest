@@ -1,4 +1,4 @@
-name: Nv-Ingest Nightly Conda Package Publish
+name: NeMo Retriever Extraction Nightly Conda Package Publish
 
 # Trigger for pull requests and pushing to main
 on:
@@ -23,6 +23,6 @@ jobs:
         run: |
           ./conda/build_conda_packages.sh
 
-      # Publish nv-ingest conda packages
+      # Publish Conda packages
       - name: Publish conda package
         run: anaconda -t "${{ secrets.NVIDIA_CONDA_TOKEN }}" upload --label dev ./conda/output_conda_channel/linux-64/*.conda

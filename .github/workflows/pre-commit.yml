@@ -1,4 +1,4 @@
-name: nv-ingest pre-commit
+name: NeMo Retriever Extraction pre-commit
 
 on:
     pull_request:

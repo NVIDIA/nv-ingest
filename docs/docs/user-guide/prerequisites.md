@@ -1,6 +1,6 @@
-# Prerequisites
+# Prerequisites for NeMo Retriever Extraction
 
-Before you begin using NVIDIA-Ingest, ensure the following hardware and software prerequisites outlined are met.
+Before you can use NeMo Retriever Extraction, you must meet the following hardware and software prerequisites.
 
 ## Hardware
 
@@ -20,4 +20,4 @@ Before you begin using NVIDIA-Ingest, ensure the following hardware and software
 
 !!! note
 
-    You install Python later. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+    You install Python later. NeMo Retriever extraction only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).

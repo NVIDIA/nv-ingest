@@ -1,4 +1,4 @@
-# Contributing to NVIDIA-Ingest
+# Contribute to NeMo Retriever Extraction
 
-External contributions to NVIDIA-Ingest will be welcome soon, and they are greatly appreciated! 
-For more information, refer to [Contributing to NVIDIA-Ingest](https://github.com/NVIDIA/nv-ingest/blob/main/CONTRIBUTING.md).
+External contributions to the NeMo Retriever Extraction project will be welcome soon, and they are greatly appreciated! 
+For more information, refer to [Contributing to NeMo Retriever Extraction](https://github.com/NVIDIA/nv-ingest/blob/main/CONTRIBUTING.md).

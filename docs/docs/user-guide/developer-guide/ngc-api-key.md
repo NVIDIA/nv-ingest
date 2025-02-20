@@ -1,4 +1,4 @@
-# Authenticating Local Docker with NGC
+# Authenticating Local Docker with NGC for NeMo Retriever Extraction
 
 ## Generate an API key
 

@@ -1,4 +1,4 @@
-# NVIDIA-Ingest Release Notes
+# Release Notes for NeMo Retriever Extraction
 
 
 ## Release 24.12.1

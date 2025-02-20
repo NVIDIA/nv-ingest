@@ -1,4 +1,4 @@
-# Environment Configuration Variables
+# Environment Configuration Variables for NeMo Retriever Extraction
 
 The following are the environment configuration variables that you can specify in your .env file.
 

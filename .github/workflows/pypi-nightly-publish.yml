@@ -1,4 +1,4 @@
-name: Nv-Ingest Nightly PyPi Wheel Publish
+name: NeMo Retriever Extraction Nightly PyPi Wheel Publish
 
 # Trigger for pull requests and pushing to main
 on:

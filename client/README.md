@@ -4,9 +4,9 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# NV-Ingest-Client
+# NeMo Retriever Extraction Client
 
-NV-Ingest-Client is a tool designed for efficient ingestion and processing of large datasets. It provides both a Python API and a command-line interface to cater to various ingestion needs.
+NeMo Retriever Extraction Client is a tool designed for efficient ingestion and processing of large datasets. It provides both a Python API and a command-line interface to cater to various ingestion needs.
 
 ## Table of Contents
 
@@ -21,7 +21,7 @@ NV-Ingest-Client is a tool designed for efficient ingestion and processing of la
 
 ## Installation
 
-To install NV-Ingest-Client, run the following command in your terminal:
+To install NeMo Retriever Extraction Client, run the following command in your terminal:
 
 ```bash
 pip install [REPO_ROOT]/client
@@ -36,7 +36,7 @@ command line.
 
 #### JobSpec
 
-Specification for creating a job for submission to the nv-ingest microservice.
+Specification for creating a job for submission to the NeMo Retriever extraction microservice.
 
 - **Parameters**:
 

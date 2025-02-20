@@ -1,9 +1,9 @@
-# Quickstart Guide
+# Quickstart Guide for NeMo Retriever Extraction
 
-To get started using NVIDIA-Ingest, you need to do a few things:
+To get started using NeMo Retriever extraction, you need to do a few things:
 
 1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
-2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
+2. [Install the NeMo Retriever extraction client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
@@ -54,7 +54,7 @@ If you prefer, you can also [start services one by one](developer-guide/deployme
 
     !!! note
 
-        As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device. Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+        As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NeMo Retriever extraction container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device. Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
    
 5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
@@ -107,12 +107,12 @@ If you prefer, you can also [start services one by one](developer-guide/deployme
 
     !!! tip
 
-        NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
+        NeMo Retriever extraction is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NeMo Retriever extraction service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 
 
 ## Step 2: Installing Python Dependencies
 
-You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
+You can interact with the NeMo Retriever extraction service from the host or by `docker exec`-ing into the NeMo Retriever extraction container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
@@ -125,12 +125,12 @@ pip install .
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the NeMo Retriever extraction container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NeMo Retriever extraction service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the NeMo Retriever extraction CLI and Python examples described following.
 
 
 ## Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or using the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or by using the NeMo Retriever extraction CLI.
 
 In the below examples, we are doing text, chart, table, and image extraction:
 
@@ -163,8 +163,8 @@ logger = logging.getLogger("nv_ingest_client")
 file_name = "data/multimodal_test.pdf"
 file_content, file_type = extract_file_content(file_name)
 
-# A JobSpec is an object that defines a document and how it should
-# be processed by the nv-ingest service.
+# A JobSpec is an object that defines a document 
+# and how it should be processed by the service.
 job_spec = JobSpec(
   document_type=file_type,
   payload=file_content,
@@ -202,9 +202,9 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-### Using the `nv-ingest-cli`
+### Use the NeMo Retriever Extraction CLI
 
-You can find more nv-ingest-cli examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+You can find more CLI examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
@@ -299,7 +299,7 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 !!! tip
 
-    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+    Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NeMo Retriever extraction.
 
 
 ## Repo Structure
@@ -307,17 +307,17 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 Beyond the relevant documentation, examples, and other links above, below is a description of the contents in this repo's folders:
 
 - [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
-- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NV-Ingest container and other packages
-- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the nv-ingest-cli utility
+- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NeMo Retriever extraction container and other packages
+- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the NeMo Retriever extraction CLI utility
 - [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
 - [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
-- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the nv-ingest docker container
+- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the NeMo Retriever extraction Docker container
 - [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
 - [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
-- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NV-Ingest to a Kubernetes cluster via Helm chart
+- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NeMo Retriever extraction to a Kubernetes cluster via Helm chart
 - [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
-- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NV-Ingest pipelines and service
-- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NV-Ingest
+- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NeMo Retriever extraction pipelines and service
+- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NeMo Retriever extraction
 
 ## Notices
 

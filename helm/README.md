@@ -1,7 +1,7 @@
-# NVIDIA-Ingest Helm Charts
+# Helm Charts for NeMo Retriever Extraction
 
 > [!WARNING]
-> NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
+> NeMo Retriever extraction version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
 >
 > If using [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08), refer to [this section](#2408-cli-setup-and-usage). However, we strongly recommend upgrading to `24.12`+ when available.
 
@@ -94,17 +94,17 @@ minikube addons enable storage-provisioner-rancher
 
 ## Usage
 
-Jobs are submitted via the `nv-ingest-cli` command.
+Jobs are submitted by using the NeMo Retriever extraction CLI.
 
-#### NV-Ingest CLI Installation
+#### NeMo Retriever Extraction CLI Installation
 
-NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`.
+NV-NeMo Retriever extraction uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`.
 
 > [!TIP]
 > This means that the `nv-ingest-cli` no longer uses a Redis client so users must use the appropriate version to ensure the client is not still trying to use the RedisClient.
 
 First, build `nv-ingest-cli` from the source to ensure you have the latest code.
-For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-ingest/tree/main/client).
+For more information, refer to [NeMo Retriever Extraction Client](https://github.com/NVIDIA/nv-ingest/tree/main/client).
 
 ```bash
 # Just to be cautious we remove any existing installation
@@ -119,12 +119,12 @@ pip install that wheel made above
 
 #### Rest Endpoint Ingress
 
-It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the NV-Ingest pod.
-You can test outside of your Kubernetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NV-Ingest pod to your local environment.
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the NeMo Retriever extraction pod.
+You can test outside of your Kubernetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NeMo Retriever extraction pod to your local environment.
 
 Example:
 
-You can find the name of your NV-Ingest pod you want to forward traffic to by running:
+You can find the name of your NeMo Retriever extraction pod you want to forward traffic to by running:
 
 ```bash
 kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
@@ -167,7 +167,7 @@ nv-ingest-cli \
   --client_port=7670
 ```
 
-You can also use NV-Ingest's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous nv-ingest-cli example.
+You can also use NeMo Retriever extraction's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous `nv-ingest-cli` example.
 
 ## Parameters
 
@@ -177,10 +177,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------- |
 | `affinity`                          | [default: {}] Affinity settings for deployment.                                                                  | `{}`    |
 | `nodeSelector`                      | Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`                                  | `{}`    |
-| `logLevel`                          | Log level of NV-Ingest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
-| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NV-Ingest container                     | `""`    |
-| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Environment variables to include in the NV-Ingest container                   | `""`    |
-| `fullnameOverride`                  | [default: ""] A name to force the fullname of the NV-Ingest container to have, defaults to the Helm Release Name  | `""`    |
+| `logLevel`                          | Log level of NeMo Retriever extraction service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
+| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NeMo Retriever extraction container                     | `""`    |
+| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Environment variables to include in the NeMo Retriever extraction container                   | `""`    |
+| `fullnameOverride`                  | [default: ""] A name to force the fullname of the NeMo Retriever extraction container to have, defaults to the Helm Release Name  | `""`    |
 | `nameOverride`                      | [default: ""] A name to base the objects created by this helm chart                                              | `""`    |
 | `image.repository`                  | NIM Image Repository                                                                                             | `""`    |
 | `image.tag`                         | Image tag or version                                                                                             | `""`    |
@@ -194,7 +194,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | `imagePullSecrets`                  | Specify list of secret names that are needed for the main container and any init containers.                     |         |
 | `containerSecurityContext`          | Sets privilege and access control settings for container (Only affects the main container, not pod-level)        | `{}`    |
 | `tolerations`                       | Specify tolerations for pod assignment. Allows the scheduler to schedule pods with matching taints.              |         |
-| `replicaCount`                      | The number of replicas for NV-Ingest when autoscaling is disabled                                                 | `1`     |
+| `replicaCount`                      | The number of replicas for NeMo Retriever extraction when autoscaling is disabled                                                 | `1`     |
 | `resources.limits."nvidia.com/gpu"` | Specify number of GPUs to present to the running service.                                                        |         |
 | `resources.limits.memory`           | Specify limit for memory                                                                                         | `32Gi`  |
 | `resources.requests.memory`         | Specify request for memory                                                                                       | `16Gi`  |
@@ -219,7 +219,7 @@ explicitly called out here.
 
 ### Milvus Deployment parameters
 
-NV-Ingest uses Milvus and Minio to store extracted images from a document
+NeMo Retriever extraction uses Milvus and Minio to store extracted images from a document
 This chart by default sets up a Milvus standalone instance in the namespace using the
 Helm chart at found https://artifacthub.io/packages/helm/milvus-helm/milvus
 
@@ -260,7 +260,7 @@ Define environment variables as key/value dictionary pairs
 | `envVars`                              | Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value | `sane {}`                  |
 | `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
 | `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"7670"`                   |
-| `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NV-Ingest requests.                                                            | `"1234"`                   |
+| `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NeMo Retriever extraction requests.                                           | `"1234"`                   |
 | `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
 | `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |
 | `envVars.MINIO_BUCKET`                 | Override this for specific minio bucket to upload extracted images to                                     | `"nv-ingest"`              |
@@ -368,9 +368,9 @@ Manage the creation of secrets used by the helm chart
 
 ## 24.08 CLI Setup and Usage
 
-#### NV-Ingest CLI Installation: `24.08`
+#### NeMo Retriever Extraction CLI Installation: `24.08`
 
-You can find the Python wheel for the `nv-ingest-cli` located in our [NV-Ingest 24.08 release artifacts](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08). Installation of the `nv-ingest-cli` goes as follows.
+You can find the Python wheel for the `nv-ingest-cli` located in our [NeMo Retriever extraction 24.08 release artifacts](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08). Installation of the `nv-ingest-cli` goes as follows.
 
 ```shell
 # Just to be cautious we remove any existing installation
@@ -386,7 +386,7 @@ pip install nv_ingest_client-24.08-py3-none-any.whl
 ### Access To Redis: `24.08`
 
 It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the Redis pod.
-You can test outside of your Kuberenetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
+You can test outside of your Kubernetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the Redis pod to your local environment.
 
 Example:
 

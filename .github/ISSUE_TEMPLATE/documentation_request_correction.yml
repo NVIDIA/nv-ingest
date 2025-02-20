@@ -14,7 +14,7 @@
 # limitations under the License.
 
 name: Documentation - Correction/Update Request
-description: Request corrections or updates to existing NV-Ingest documentation
+description: Request corrections or updates to existing NeMo Retriever extraction documentation
 title: "[DOC]: "
 labels: ["doc"]
 

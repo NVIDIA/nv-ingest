@@ -1,7 +1,6 @@
-- [What is NVIDIA Ingest?](index.md)
+- [What is NeMo Retriever Extraction?](index.md)
 - [Prerequisites](prerequisites.md)
 - [Quickstart](quickstart-guide.md)
 - [Developer Guide](developer-guide/)
 - [Contributing](contributing.md)
-- [API Reference](api_docs/)
 - [Release Notes](releasenotes-nv-ingest.md)
