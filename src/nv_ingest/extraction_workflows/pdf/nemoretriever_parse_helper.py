@@ -96,9 +96,6 @@ def nemoretriever_parse(
     """
     logger.debug("Extracting PDF with nemoretriever_parse backend.")
 
-    nemoretriever_parse_config = kwargs.get("nemoretriever_parse_config", {})
-    nemoretriever_parse_config = nemoretriever_parse_config if nemoretriever_parse_config is not None else {}
-
     row_data = kwargs.get("row_data")
     # get source_id
     source_id = row_data["source_id"]
@@ -111,9 +108,10 @@ def nemoretriever_parse(
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
-    pdfium_config = kwargs.get("pdfium_config", {})
-    if isinstance(pdfium_config, dict):
-        pdfium_config = PDFiumConfigSchema(**pdfium_config)
+    if (extract_tables_method == "yolox") and (extract_tables or extract_charts):
+        pdfium_config = kwargs.get("pdfium_config", {})
+        if isinstance(pdfium_config, dict):
+            pdfium_config = PDFiumConfigSchema(**pdfium_config)
     nemoretriever_parse_config = kwargs.get("nemoretriever_parse_config", {})
     if isinstance(nemoretriever_parse_config, dict):
         nemoretriever_parse_config = NemoRetrieverParseConfigSchema(**nemoretriever_parse_config)
