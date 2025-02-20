@@ -4,24 +4,28 @@
 
 import functools
 import logging
+import traceback
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
 
+import numpy as np
 import pandas as pd
 from morpheus.config import Config
 
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
+from nv_ingest.util.nim.yolox import YoloxTableStructureModelInterface
+from nv_ingest.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
+from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 
 logger = logging.getLogger(__name__)
 
@@ -31,8 +35,10 @@ PADDLE_MIN_HEIGHT = 32
 
 def _update_metadata(
     base64_images: List[str],
+    yolox_client: NimClient,
     paddle_client: NimClient,
     worker_pool_size: int = 8,  # Not currently used
+    enable_yolox: bool = False,
     trace_info: Dict = None,
 ) -> List[Tuple[str, Tuple[Any, Any]]]:
     """
@@ -48,79 +54,121 @@ def _update_metadata(
     logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
 
     # Initialize the results list in the same order as base64_images.
-    results: List[Optional[Tuple[str, Tuple[Any, Any]]]] = [None] * len(base64_images)
+    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = [("", None, None, None)] * len(base64_images)
 
     valid_images: List[str] = []
     valid_indices: List[int] = []
+    valid_arrays: List[np.ndarray] = []
 
-    _ = worker_pool_size
     # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
         array = base64_to_numpy(img)
         height, width = array.shape[0], array.shape[1]
         if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
             valid_images.append(img)
+            valid_arrays.append(array)
             valid_indices.append(i)
         else:
             # Image is too small; mark as skipped.
-            results[i] = (img, (None, None))
+            results[i] = (img, None, None, None)
 
-    if valid_images:
-        data = {"base64_images": valid_images}
-        try:
-            # Call infer once for all valid images. The NimClient will handle batching internally.
-            paddle_result = paddle_client.infer(
-                data=data,
-                model_name="paddle",
+    if not valid_images:
+        return results
+
+    # Prepare data payloads for both clients.
+    if enable_yolox:
+        data_yolox = {"images": valid_arrays}
+    data_paddle = {"base64_images": valid_images}
+
+    _ = worker_pool_size
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        if enable_yolox:
+            future_yolox = executor.submit(
+                yolox_client.infer,
+                data=data_yolox,
+                model_name="yolox",
                 stage_name="table_data_extraction",
-                max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
+                max_batch_size=8,
                 trace_info=trace_info,
             )
+        future_paddle = executor.submit(
+            paddle_client.infer,
+            data=data_paddle,
+            model_name="paddle",
+            stage_name="table_data_extraction",
+            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
+            trace_info=trace_info,
+        )
 
-            if not isinstance(paddle_result, list):
-                raise ValueError(f"Expected a list of tuples, got {type(paddle_result)}")
-            if len(paddle_result) != len(valid_images):
-                raise ValueError(f"Expected {len(valid_images)} results, got {len(paddle_result)}")
+        if enable_yolox:
+            try:
+                yolox_results = future_yolox.result()
+            except Exception as e:
+                logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+                raise
+        else:
+            yolox_results = [None] * len(valid_images)
 
-            # Assign each result back to its original position.
-            for idx, result in enumerate(paddle_result):
-                original_index = valid_indices[idx]
-                results[original_index] = (base64_images[original_index], result)
-
+        try:
+            paddle_results = future_paddle.result()
         except Exception as e:
-            logger.error(f"Error processing images. Error: {e}", exc_info=True)
-            for i in valid_indices:
-                results[i] = (base64_images[i], (None, None))
+            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
             raise
+
+    # Ensure both clients returned lists of results matching the number of input images.
+    if not isinstance(yolox_results, list) or not isinstance(paddle_results, list):
+        logger.warning(
+            "Unexpected result types from inference clients: yolox_results=%s, paddle_results=%s. "
+            "Proceeding with available results.",
+            type(yolox_results).__name__,
+            type(paddle_results).__name__,
+        )
+
+        # Assign default values for missing results
+        if not isinstance(yolox_results, list):
+            yolox_results = [None] * len(valid_arrays)
+        if not isinstance(paddle_results, list):
+            paddle_results = [(None, None)] * len(valid_images)  # Default for paddle output
+
+    if len(yolox_results) != len(valid_arrays):
+        raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
+
+    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
+        original_index = valid_indices[idx]
+        results[original_index] = (base64_images[original_index], yolox_res, paddle_res[0], paddle_res[1])
 
     return results
 
 
-def _create_paddle_client(stage_config) -> NimClient:
-    """
-    Helper to create a NimClient for PaddleOCR, retrieving the paddle version from the endpoint.
-    """
-    # Attempt to obtain PaddleOCR version from the second endpoint
-    paddle_endpoint = stage_config.paddle_endpoints[1]
-    try:
-        paddle_version = get_version(paddle_endpoint)
-        if not paddle_version:
-            logger.warning("Failed to obtain PaddleOCR version from the endpoint. Falling back to the latest version.")
-            paddle_version = None
-    except Exception:
-        logger.warning("Failed to get PaddleOCR version after 30 seconds. Falling back to the latest version.")
-        paddle_version = None
-
+def _create_clients(
+    yolox_endpoints: Tuple[str, str],
+    yolox_protocol: str,
+    paddle_endpoints: Tuple[str, str],
+    paddle_protocol: str,
+    auth_token: str,
+) -> Tuple[NimClient, NimClient]:
+    yolox_model_interface = YoloxTableStructureModelInterface()
     paddle_model_interface = PaddleOCRModelInterface()
 
-    paddle_client = create_inference_client(
-        endpoints=stage_config.paddle_endpoints,
-        model_interface=paddle_model_interface,
-        auth_token=stage_config.auth_token,
-        infer_protocol=stage_config.paddle_infer_protocol,
+    logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")
+
+    yolox_client = create_inference_client(
+        endpoints=yolox_endpoints,
+        model_interface=yolox_model_interface,
+        auth_token=auth_token,
+        infer_protocol=yolox_protocol,
     )
 
-    return paddle_client
+    paddle_client = create_inference_client(
+        endpoints=paddle_endpoints,
+        model_interface=paddle_model_interface,
+        auth_token=auth_token,
+        infer_protocol=paddle_protocol,
+    )
+
+    return yolox_client, paddle_client
 
 
 def _extract_table_data(
@@ -157,7 +205,13 @@ def _extract_table_data(
         return df, trace_info
 
     stage_config = validated_config.stage_config
-    paddle_client = _create_paddle_client(stage_config)
+    yolox_client, paddle_client = _create_clients(
+        stage_config.yolox_endpoints,
+        stage_config.yolox_infer_protocol,
+        stage_config.paddle_endpoints,
+        stage_config.paddle_infer_protocol,
+        stage_config.auth_token,
+    )
 
     try:
         # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
@@ -189,26 +243,34 @@ def _extract_table_data(
             base64_images.append(meta["content"])
 
         # 3) Call our bulk _update_metadata to get all results
+        table_content_format = (
+            df.at[valid_indices[0], "metadata"]["table_metadata"].get("table_content_format")
+            or TableFormatEnum.PSEUDO_MARKDOWN
+        )
+        enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
+
         bulk_results = _update_metadata(
             base64_images=base64_images,
+            yolox_client=yolox_client,
             paddle_client=paddle_client,
             worker_pool_size=stage_config.workers_per_progress_engine,
+            enable_yolox=enable_yolox,
             trace_info=trace_info,
         )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
-        table_content_format = df.at[valid_indices[0], "metadata"]["table_metadata"].get(
-            "table_content_format", TableFormatEnum.PSEUDO_MARKDOWN
-        )
-
         for row_id, idx in enumerate(valid_indices):
-            # unpack (base64_image, (bounding boxes, text_predictions))
-            _, (bounding_boxes, text_predictions) = bulk_results[row_id]
+            # unpack (base64_image, (yolox_predictions, paddle_bounding boxes, paddle_text_predictions))
+            _, cell_predictions, bounding_boxes, text_predictions = bulk_results[row_id]
 
             if table_content_format == TableFormatEnum.SIMPLE:
                 table_content = " ".join(text_predictions)
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
                 table_content = convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+            elif table_content_format == TableFormatEnum.MARKDOWN:
+                table_content = join_yolox_table_structure_and_paddle_output(
+                    cell_predictions, bounding_boxes, text_predictions
+                )
             else:
                 raise ValueError(f"Unexpected table format: {table_content_format}")
 
@@ -219,8 +281,10 @@ def _extract_table_data(
 
     except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)
+        traceback.print_exc()
         raise
     finally:
+        yolox_client.close()
         paddle_client.close()
 
 

@@ -2,14 +2,23 @@ name: Build NeMo Retriever Extraction Documentation
 
 # Trigger for pull requests and pushing to main
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  # Runs on pushes targeting the default branch
   push:
-    branches:
-      - main
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build:
@@ -20,28 +29,49 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
+
       - name: Install system deps
         run: |
-          pip install --upgrade pip
-          apt-get update && apt-get install -y make
+          apt-get update && apt-get install -y make git python3-full
 
       # Install dependencies from docs/requirements.txt
       - name: Install mkdocs dependencies
         run: |
+          python3 -m venv venv
+          . venv/bin/activate
           pip install -r docs/requirements.txt
 
       - name: Build Sphinx API Docs
         run: |
+          . venv/bin/activate
+          cd api
+          pip install -e .
+          cd ../
           cd docs/sphinx_docs
           make html
           cd ../../
           mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
 
       - name: Build MkDocs Site
-        run: mkdocs build --config-file docs/mkdocs.yml
+        run: |
+          . venv/bin/activate
+          mkdocs build --config-file docs/mkdocs.yml
 
-      - name: Deploy to GitHub Pages
-        uses: peaceiris/actions-gh-pages@v4
+      - name: Upload Site Artifacts
+        uses: actions/upload-pages-artifact@v3
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}
-          publish_dir: ./site
+          path: ./docs/site
+
+  deploy:
+    needs:
+      - build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4
