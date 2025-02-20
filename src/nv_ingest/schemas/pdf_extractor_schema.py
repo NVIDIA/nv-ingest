@@ -73,7 +73,7 @@ class PDFiumConfigSchema(BaseModel):
 
         for model_name in ["yolox"]:
             endpoint_name = f"{model_name}_endpoints"
-            grpc_service, http_service = values.get(endpoint_name)
+            grpc_service, http_service = values.get(endpoint_name, ("", ""))
             grpc_service = _clean_service(grpc_service)
             http_service = _clean_service(http_service)
 
@@ -156,7 +156,7 @@ class NemoRetrieverParseConfigSchema(BaseModel):
 
         for model_name in ["nemoretriever_parse"]:
             endpoint_name = f"{model_name}_endpoints"
-            grpc_service, http_service = values.get(endpoint_name)
+            grpc_service, http_service = values.get(endpoint_name, ("", ""))
             grpc_service = _clean_service(grpc_service)
             http_service = _clean_service(http_service)
 

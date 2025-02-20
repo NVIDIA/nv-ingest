@@ -54,7 +54,7 @@ def _update_metadata(
     logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
 
     # Initialize the results list in the same order as base64_images.
-    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = ["", (None, None, None)] * len(base64_images)
+    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = [("", None, None, None)] * len(base64_images)
 
     valid_images: List[str] = []
     valid_indices: List[int] = []
@@ -70,7 +70,7 @@ def _update_metadata(
             valid_indices.append(i)
         else:
             # Image is too small; mark as skipped.
-            results[i] = ("", None, None, None)
+            results[i] = (img, None, None, None)
 
     if not valid_images:
         return results
