@@ -43,21 +43,11 @@ jobs:
           . venv/bin/activate
           pip install -r docs/requirements.txt
 
-      - name: Build Sphinx API Docs
+      - name: Build Docs using Makefile
         run: |
           . venv/bin/activate
-          cd api
-          pip install -e .
-          cd ../
-          cd docs/sphinx_docs
-          make html
-          cd ../../
-          mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
-
-      - name: Build MkDocs Site
-        run: |
-          . venv/bin/activate
-          mkdocs build --config-file docs/mkdocs.yml
+          cd docs
+          make docs
 
       - name: Upload Site Artifacts
         uses: actions/upload-pages-artifact@v3
