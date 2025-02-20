@@ -17,7 +17,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import join_yolox_and_paddle_output
+from nv_ingest.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
@@ -47,8 +47,12 @@ def _update_metadata(
     """
     logger.debug("Running chart extraction using updated concurrency handling.")
 
+    # Initialize the results list in the same order as base64_images.
+    results: List[Tuple[str, Any]] = [("", None)] * len(base64_images)
+
     valid_images: List[str] = []
     valid_arrays: List[np.ndarray] = []
+    valid_indices: List[int] = []
 
     # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
@@ -57,6 +61,10 @@ def _update_metadata(
         if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
             valid_images.append(img)
             valid_arrays.append(array)
+            valid_indices.append(i)
+        else:
+            # Image is too small; mark as skipped.
+            results[i] = (img, None)
 
     # Prepare data payloads for both clients.
     data_yolox = {"images": valid_arrays}
@@ -97,18 +105,18 @@ def _update_metadata(
     if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
         raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
 
-    if len(yolox_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} yolox results, got {len(yolox_results)}")
-    if len(paddle_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} paddle results, got {len(paddle_results)}")
+    if len(yolox_results) != len(valid_arrays):
+        raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
 
     # Join the corresponding results from both services for each image.
-    results = []
-    for img_str, yolox_res, paddle_res in zip(base64_images, yolox_results, paddle_results):
+    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
         bounding_boxes, text_predictions = paddle_res
-        yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+        yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
-        results.append((img_str, chart_content))
+        original_index = valid_indices[idx]
+        results[original_index] = (base64_images[original_index], chart_content)
 
     return results
 

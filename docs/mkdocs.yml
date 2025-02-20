@@ -1,6 +1,6 @@
-site_name: MyLibrary Documentation
+site_name: NV-Ingest Documentation
 # site_url:
-# repo_url:
+repo_url: https://github.com/NVIDIA/nv-ingest
 # repo_name:
 
 theme:
@@ -57,8 +57,12 @@ plugins:
   - mkdocstrings:
       handlers:
         python:
+          options:
+            docstring_style: google
+            show_source: true
+            show_if_no_docstring: true
           paths:
-            - ../sub-packages/*/src
+            - ../api/*/src/nv_ingest_api
   - mkdocs-jupyter:
       theme: auto
       highlight_extra_classes: "jupyter-notebook"

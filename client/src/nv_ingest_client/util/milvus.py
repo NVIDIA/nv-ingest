@@ -700,7 +700,7 @@ def write_to_nvingest_collection(
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
         # passes before running a search against the collection.\
-    time.sleep(20)
+        time.sleep(20)
 
 
 def dense_retrieval(

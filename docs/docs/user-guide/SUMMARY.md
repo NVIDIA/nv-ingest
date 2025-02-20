@@ -3,4 +3,5 @@
 - [Quickstart](quickstart-guide.md)
 - [Developer Guide](developer-guide/)
 - [Contributing](contributing.md)
+- [API Reference](api_docs/)
 - [Release Notes](releasenotes-nv-ingest.md)
