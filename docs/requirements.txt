@@ -9,4 +9,5 @@ mkdocs-include-dir-to-nav
 mkdocs-literate-nav
 mkdocs-site-urls
 sphinx
+sphinx-markdown-builder
 sphinx-rtd-theme
