@@ -286,22 +286,20 @@ class Ingestor:
                 if job_state.state != JobStateEnum.FAILED:
                     job_state.state = JobStateEnum.FAILED
             completed_futures.add(future)
-            future_results.append(result)
+            future_results.extend(result)
             if completed_futures == submitted_futures:
                 combined_future.set_result(future_results)
 
         for future in future_to_job_id:
             future.add_done_callback(_done_callback)
 
+        results = combined_future.result()
         if self._vdb_bulk_upload:
-            results = []
-            for res in combined_future.result():
-                results += res
             self._vdb_bulk_upload.run(results)
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
-        return combined_future
+        return results
 
     @ensure_job_specs
     def _prepare_ingest_run(self):
