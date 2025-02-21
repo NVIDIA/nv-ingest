@@ -14,12 +14,12 @@ from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 def cm_ensure_payload_not_null(control_message: IngestControlMessage):
     """
-    Ensures that the payload of a ControlMessage is not None.
+    Ensures that the payload of a IngestControlMessage is not None.
 
     Parameters
     ----------
-    control_message : ControlMessage
-        The ControlMessage to check.
+    control_message : IngestControlMessage
+        The IngestControlMessage to check.
 
     Raises
     ------
@@ -33,19 +33,19 @@ def cm_ensure_payload_not_null(control_message: IngestControlMessage):
 
 def cm_set_failure(control_message: IngestControlMessage, reason: str) -> IngestControlMessage:
     """
-    Sets the failure metadata on a ControlMessage.
+    Sets the failure metadata on a IngestControlMessage.
 
     Parameters
     ----------
-    control_message : ControlMessage
-        The ControlMessage to set the failure metadata on.
+    control_message : IngestControlMessage
+        The IngestControlMessage to set the failure metadata on.
     reason : str
         The reason for the failure.
 
     Returns
     -------
-    control_message : ControlMessage
-        The modified ControlMessage with the failure metadata set.
+    control_message : IngestControlMessage
+        The modified IngestControlMessage with the failure metadata set.
     """
 
     control_message.set_metadata("cm_failed", True)

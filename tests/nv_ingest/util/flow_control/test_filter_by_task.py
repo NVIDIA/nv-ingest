@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import re
-import pytest
 from pydantic import BaseModel
 
 from nv_ingest.util.flow_control.filter_by_task import _is_subset, filter_by_task

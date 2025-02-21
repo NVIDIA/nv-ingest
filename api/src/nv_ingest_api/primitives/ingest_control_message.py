@@ -12,6 +12,46 @@ from nv_ingest_api.primitives.control_message_task import ControlMessageTask
 logger = logging.getLogger(__name__)
 
 
+def remove_task_by_type(ctrl_msg, task: str):
+    """
+    Remove a task from the control message by matching its type.
+
+    This function iterates over the tasks in the control message, and if it finds a task
+    whose type matches the provided task string, it removes that task (using its unique id)
+    and returns the task's properties.
+
+    Parameters
+    ----------
+    ctrl_msg : IngestControlMessage
+        The control message from which to remove the task.
+    task : str
+        The task type to remove.
+
+    Returns
+    -------
+    dict
+        The properties of the removed task.
+
+    Raises
+    ------
+    ValueError
+        If no task with the given type is found.
+    """
+    task_obj = None
+    for t in ctrl_msg.get_tasks():
+        if t.type == task:
+            task_obj = t
+            break
+
+    if task_obj is None:
+        err_msg = f"process_control_message: Task '{task}' not found in control message."
+        logger.error(err_msg)
+        raise ValueError(err_msg)
+
+    removed_task = ctrl_msg.remove_task(task_obj.id)
+    return removed_task.properties
+
+
 class IngestControlMessage:
     """
     A control message class for ingesting tasks and managing associated metadata,

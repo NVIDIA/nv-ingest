@@ -49,7 +49,7 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 
     Yields
     ------
-    ControlMessage
+    IngestControlMessage
         The processed control message for each fetched job.
 
     Raises
@@ -121,7 +121,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
         control_message.set_metadata("response_channel", response_channel)
         control_message.set_metadata("job_id", job_id)
 
-        # For each task, build a ControlMessageTask instance and add it.
+        # For each task, build a IngestControlMessageTask instance and add it.
         for task in job_tasks:
             task_id = task.get("id", str(uuid.uuid4()))
             task_type = task.get("type", "unknown")
@@ -134,7 +134,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
                 type=task_type,
                 properties=task_props,
             )
-            logger.info(task_obj.model_dump())
+            # logger.info(task_obj.model_dump())
             control_message.add_task(task_obj)
 
         # Debug Tracing
@@ -174,7 +174,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
 def _message_broker_task_source(builder: mrc.Builder):
     """
     A module for receiving messages from a message broker, converting them into DataFrames,
-    and attaching job IDs to ControlMessages.
+    and attaching job IDs to IngestControlMessages.
 
     Parameters
     ----------

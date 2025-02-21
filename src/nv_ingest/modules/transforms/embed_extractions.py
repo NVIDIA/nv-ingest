@@ -23,7 +23,7 @@ from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.tracing import traceable
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -351,7 +351,7 @@ def _embed_extractions(builder: mrc.Builder):
     )
     def embed_extractions_fn(message: IngestControlMessage):
         try:
-            task_props = message.remove_task("embed")
+            task_props = remove_task_by_type(message, "embed")
             model_dump = task_props.model_dump()
             filter_errors = model_dump.get("filter_errors", False)
 

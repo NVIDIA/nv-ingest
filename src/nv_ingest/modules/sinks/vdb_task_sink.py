@@ -20,7 +20,6 @@ from morpheus_llm.service.vdb.milvus_client import DATA_TYPE_MAP
 from morpheus_llm.service.vdb.utils import VectorDBServiceFactory
 from morpheus_llm.service.vdb.vector_db_service import VectorDBService
 from mrc.core import operators as ops
-from pydantic import BaseModel
 from pymilvus import BulkInsertState
 from pymilvus import connections
 from pymilvus import utility
@@ -32,7 +31,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -81,7 +80,7 @@ def _bulk_ingest(
         task_ids.append(task_id)
 
     while len(task_ids) > 0:
-        logger.info("Wait 1 second to check bulkinsert tasks state...")
+        logger.debug("Wait 1 second to check bulkinsert tasks state...")
         time.sleep(1)
         for id in task_ids:
             state = utility.get_bulk_insert_state(task_id=id)
@@ -89,7 +88,7 @@ def _bulk_ingest(
                 logger.error(f"The task {state.task_id} failed, reason: {state.failed_reason}")
                 task_ids.remove(id)
             elif state.state == BulkInsertState.ImportCompleted:
-                logger.info(f"The task {state.task_id} completed")
+                logger.debug(f"The task {state.task_id} completed")
                 task_ids.remove(id)
 
     while True:
@@ -200,7 +199,7 @@ class AccumulationStats:
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
 def _vdb_task_sink(builder: mrc.Builder):
     """
-    Receives incoming messages in ControlMessage format.
+    Receives incoming messages in IngestControlMessage format.
 
     Parameters
     ----------
@@ -304,9 +303,7 @@ def _vdb_task_sink(builder: mrc.Builder):
         nonlocal service
 
         try:
-            task_props = ctrl_msg.remove_task("vdb_upload")
-            if isinstance(task_props, BaseModel):
-                task_props = task_props.model_dump()
+            task_props = remove_task_by_type(ctrl_msg, "vdb_upload")
 
             bulk_ingest = task_props.get("bulk_ingest", False)
             bulk_ingest_path = task_props.get("bulk_ingest_path", None)

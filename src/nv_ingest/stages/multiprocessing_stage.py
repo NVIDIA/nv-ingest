@@ -25,7 +25,7 @@ from mrc.core.subscriber import Observer
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -36,7 +36,7 @@ def trace_message(ctrl_msg, task_desc):
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message to trace.
     task_desc : str
         Description of the task for tracing purposes.
@@ -61,7 +61,7 @@ def put_in_queue(ctrl_msg, pass_thru_recv_queue):
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message to put in the queue.
     pass_thru_recv_queue : queue.Queue
         The queue to put the control message into.
@@ -102,21 +102,7 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
         logger.error(err_msg, exc_info=True)
         raise type(e)(err_msg) from e
 
-    # Find the first task that matches the required task type.
-    task_obj = None
-    for t in ctrl_msg.get_tasks():
-        if t.type == task:
-            task_obj = t
-            break
-
-    if task_obj is None:
-        err_msg = f"process_control_message: Task '{task}' not found in control message."
-        logger.error(err_msg)
-        raise ValueError(err_msg)
-
-    # Remove the task using its unique id and extract its properties.
-    removed_task = ctrl_msg.remove_task(task_obj.id)
-    task_props = removed_task.properties
+    task_props = remove_task_by_type(ctrl_msg, task)
 
     cm_id = uuid.uuid4()
     ctrl_msg_ledger[cm_id] = ctrl_msg
@@ -126,7 +112,7 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
 
 class MultiProcessingBaseStage(SinglePortStage):
     """
-    A ControlMessage-oriented base multiprocessing stage to increase parallelism of stages written in Python.
+    A IngestControlMessage-oriented base multiprocessing stage to increase parallelism of stages written in Python.
 
     Parameters
     ----------
@@ -140,7 +126,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         The number of process engines to use.
     process_fn : typing.Callable[[pd.DataFrame, dict], pd.DataFrame]
         The function that will be executed in each process engine. The function will
-        accept a pandas DataFrame from a ControlMessage payload and a dictionary of task arguments.
+        accept a pandas DataFrame from a IngestControlMessage payload and a dictionary of task arguments.
 
     Returns
     -------
@@ -151,10 +137,10 @@ class MultiProcessingBaseStage(SinglePortStage):
     -----
     The data flows through this class in the following way:
 
-    1. **Input Stream Termination**: The input stream is terminated by storing off the `ControlMessage` to a ledger.
-       This acts as a record for the incoming message.
+    1. **Input Stream Termination**: The input stream is terminated by storing off the `IngestControlMessage` to a
+     ledger. This acts as a record for the incoming message.
 
-    2. **Work Queue**: The core work content of the `ControlMessage` is pushed to a work queue. This queue
+    2. **Work Queue**: The core work content of the `IngestControlMessage` is pushed to a work queue. This queue
        forwards the task to a global multi-process worker pool where the heavy-lifting occurs.
 
     3. **Global Worker Pool**: The work is executed in parallel across multiple process engines via the worker pool.
@@ -453,7 +439,7 @@ class MultiProcessingBaseStage(SinglePortStage):
 
         Yields
         ------
-        ControlMessage
+        IngestControlMessage
             The control message from the queue.
         """
         while True:
@@ -473,7 +459,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         Parameters
         ----------
         obs : mrc.Observable
-            The observable stream that emits ControlMessage objects.
+            The observable stream that emits IngestControlMessage objects.
         sub : mrc.Subscriber
             The subscriber that receives processed results.
 
@@ -515,7 +501,7 @@ class MultiProcessingBaseStage(SinglePortStage):
 
             Parameters
             ----------
-            ctrl_msg : ControlMessage
+            ctrl_msg : IngestControlMessage
                 The control message to handle.
             """
             # Trace the control message
@@ -568,7 +554,7 @@ class MultiProcessingBaseStage(SinglePortStage):
 
             Returns
             -------
-            ControlMessage
+            IngestControlMessage
                 The reconstructed control message with the updated payload.
             """
             reconstruct = self._build_reconstruction_function()
@@ -580,12 +566,12 @@ class MultiProcessingBaseStage(SinglePortStage):
 
             Parameters
             ----------
-            ctrl_msg : ControlMessage
+            ctrl_msg : IngestControlMessage
                 The control message to add tracing metadata to.
 
             Returns
             -------
-            ControlMessage
+            IngestControlMessage
                 The control message with updated tracing metadata.
             """
             merge = self._build_merge_function()

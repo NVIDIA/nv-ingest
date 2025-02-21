@@ -57,7 +57,7 @@ class ImageStorageStage(PassThruTypeMixin, SinglePortStage):
 
         Returns
         -------
-        typing.Tuple(ControlMessage, MultiResponseMessage, MultiMessage)
+        typing.Tuple(IngestControlMessage, MultiResponseMessage, MultiMessage)
             Accepted input types.
 
         """

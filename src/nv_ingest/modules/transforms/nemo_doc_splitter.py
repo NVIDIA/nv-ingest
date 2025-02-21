@@ -18,7 +18,6 @@ from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
-from pydantic import BaseModel
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.nemo_doc_splitter_schema import DocumentSplitterSchema
@@ -26,7 +25,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -147,10 +146,7 @@ def _nemo_document_splitter(builder: mrc.Builder):
     def split_and_forward(message: IngestControlMessage):
         try:
             # Assume that df is going to have a 'content' column
-            task_props = message.remove_task("split")
-
-            if isinstance(task_props, BaseModel):
-                task_props = task_props.model_dump()
+            task_props = remove_task_by_type(message, "split")
 
             # Validate that all 'content' values are not None
             df = message.payload()
