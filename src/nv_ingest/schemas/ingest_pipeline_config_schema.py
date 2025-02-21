@@ -13,6 +13,7 @@ from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtrac
 from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.image_storage_schema import ImageStorageModuleSchema
+from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorSchema
 from nv_ingest.schemas.vdb_task_sink_schema import VdbTaskSinkSchema
 from nv_ingest.schemas.job_counter_schema import JobCounterSchema
 from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
@@ -37,6 +38,7 @@ class PipelineConfigSchema(BaseModel):
     image_dedup_module: ImageDedupSchema = ImageDedupSchema()
     image_filter_module: ImageFilterSchema = ImageFilterSchema()
     image_storage_module: ImageStorageModuleSchema = ImageStorageModuleSchema()
+    infographic_extractor_module: InfographicExtractorSchema = InfographicExtractorSchema()
     job_counter_module: JobCounterSchema = JobCounterSchema()
     metadata_injection_module: MetadataInjectorSchema = MetadataInjectorSchema()
     otel_meter_module: OpenTelemetryMeterSchema = OpenTelemetryMeterSchema()

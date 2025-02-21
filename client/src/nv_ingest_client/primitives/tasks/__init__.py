@@ -8,6 +8,7 @@ from .dedup import DedupTask
 from .embed import EmbedTask
 from .extract import ExtractTask
 from .filter import FilterTask
+from .infographic_extraction import InfographicExtractionTask
 from .split import SplitTask
 from .store import StoreTask
 from .store import StoreEmbedTask
@@ -23,6 +24,7 @@ __all__ = [
     "ChartExtractionTask",
     "ExtractTask",
     "is_valid_task_type",
+    "InfographicExtractionTask",
     "SplitTask",
     "StoreEmbedTask",
     "StoreTask",

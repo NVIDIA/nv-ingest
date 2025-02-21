@@ -365,7 +365,7 @@ def construct_image_metadata_from_pdf_image(
 
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
-def construct_table_and_chart_metadata(
+def construct_page_element_metadata(
     structured_image: CroppedImageWithContent,
     page_idx: int,
     page_count: int,
@@ -419,8 +419,17 @@ def construct_table_and_chart_metadata(
         # TODO(Devin) swap this to chart_metadata after we confirm metadata schema changes.
         meta_name = "table_metadata"
 
+    elif structured_image.type_string in ("infographic",):
+        content = structured_image.image
+        structured_content_text = structured_image.content
+        structured_content_format = structured_image.content_format
+        table_format = TableFormatEnum.IMAGE
+        subtype = ContentSubtypeEnum.INFOGRAPHIC
+        description = StdContentDescEnum.PDF_INFOGRAPHIC
+        meta_name = "table_metadata"
+
     else:
-        raise ValueError(f"Unknown table/chart type: {structured_image.type_string}")
+        raise ValueError(f"Unknown table/chart/infographic type: {structured_image.type_string}")
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
@@ -458,3 +467,7 @@ def construct_table_and_chart_metadata(
     validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
     return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
+
+
+# TODO: remove this alias
+construct_table_and_chart_metadata = construct_page_element_metadata
