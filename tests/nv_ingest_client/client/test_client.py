@@ -276,7 +276,7 @@ def test_correct_storage_of_job_details(nv_ingest_client):
 def test_successful_task_creation(nv_ingest_client_with_jobs):
     job_id = "12345678-1234-5678-1234-567812345678"
     task_type = TaskType.SPLIT
-    task_params = {"split_by": "sentence"}
+    task_params = {"tokenizer": "intfloat/e5-large-unsupervised"}
 
     # Assuming task_factory and task creation are implemented
     nv_ingest_client_with_jobs.create_task(job_id, task_type, task_params)
@@ -288,7 +288,9 @@ def test_successful_task_creation(nv_ingest_client_with_jobs):
 
 def test_non_existent_job(nv_ingest_client):
     with pytest.raises(ValueError):
-        nv_ingest_client.create_task("nonexistent_job_id", TaskType.SPLIT, {"split_by": "sentence"})
+        nv_ingest_client.create_task(
+            "nonexistent_job_id", TaskType.SPLIT, {"tokenizer": "intfloat/e5-large-unsupervised"}
+        )
 
 
 def test_add_task_post_submission(nv_ingest_client_with_jobs):
@@ -297,13 +299,13 @@ def test_add_task_post_submission(nv_ingest_client_with_jobs):
     nv_ingest_client_with_jobs._job_states[job_id].state = JobStateEnum.PROCESSING
 
     with pytest.raises(ValueError):
-        nv_ingest_client_with_jobs.create_task(job_id, TaskType.SPLIT, {"split_by": "sentence"})
+        nv_ingest_client_with_jobs.create_task(job_id, TaskType.SPLIT, {"tokenizer": "intfloat/e5-large-unsupervised"})
 
 
 def test_parameter_validation(nv_ingest_client_with_jobs):
     job_id = "12345678-1234-5678-1234-567812345678"
     task_type = TaskType.SPLIT
-    task_params = {"split_by": "sentence", "split_length": 128}
+    task_params = {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 128}
 
     nv_ingest_client_with_jobs.create_task(job_id, task_type, task_params)
     job_state = nv_ingest_client_with_jobs._job_states[job_id]
@@ -580,8 +582,8 @@ def test_create_jobs_for_batch_duplicate_task(nv_ingest_client, mock_create_job_
 
     files = ["file1.pdf"]
     duplicate_tasks = {
-        "split": SplitTask(split_by="sentence"),
-        "store": SplitTask(split_by="sentence"),  # Duplicate task
+        "split": SplitTask(tokenizer="intfloat/e5-large-unsupervised"),
+        "store": SplitTask(tokenizer="intfloat/e5-large-unsupervised"),  # Duplicate task
     }
 
     with pytest.raises(ValueError, match="Duplicate task detected"):

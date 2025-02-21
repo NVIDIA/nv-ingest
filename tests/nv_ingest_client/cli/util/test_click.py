@@ -93,7 +93,7 @@ def test_debug_print_click_options(mock_pprint):
 
 def test_validate_task_with_valid_split():
     """Test with valid split task options."""
-    value = ['split:{"split_by": "page", "split_length": 10}']
+    value = ['split:{"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 300}']
     result = click_validate_task(None, None, value)
 
     assert "split" in result
