@@ -32,5 +32,18 @@ exclude_patterns = []
 # -- Options for HTML output -------------------------------------------------
 # https://www.sphinx-doc.org/en/master/usage/configuration.html#options-for-html-output
 
-html_theme = "alabaster"
+html_theme = "nvidia_sphinx_theme"
+
+html_theme_options = {
+    "header_links": [
+        ("Home", "index"),
+        ("GitHub", "https://github.com/NVIDIA/nvidia-sphinx-theme", True, "fab fa-github"),
+    ],
+    "footer_links": [
+        ("Privacy Policy", "https://www.nvidia.com/en-us/about-nvidia/privacy-policy/"),
+        ("Terms of Use", "https://www.nvidia.com/en-us/about-nvidia/legal-info/"),
+    ],
+    "show_prev_next": True,  # Show next/previous buttons at bottom
+}
+
 html_static_path = ["_static"]
