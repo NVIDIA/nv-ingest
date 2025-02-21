@@ -48,7 +48,7 @@ jobs:
         run: docker wait $CONTAINER_ID
 
       - name: Copy generated docs site from the container
-        run: docker cp $CONTAINER_ID:/workspace/docs ./generated-site
+        run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
 
       - name: Stop and remove the container
         run: docker rm $CONTAINER_ID
