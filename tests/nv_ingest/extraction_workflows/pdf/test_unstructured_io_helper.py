@@ -8,7 +8,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.unstructured_io_helper import unstructured_io
+from nv_ingest_api.extraction.pdf.engines import unstructured_io
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 
 

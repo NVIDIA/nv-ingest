@@ -2,17 +2,10 @@ from io import BytesIO
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import numpy as np
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper import _construct_table_metadata
-from nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper import nemoretriever_parse
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import LatexTable
+from nv_ingest_api.extraction.pdf.engines import nemoretriever_parse
 
 _MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper"
 

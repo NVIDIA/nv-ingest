@@ -56,7 +56,7 @@ YOLOX_FINAL_SCORE = 0.48
 logger = logging.getLogger(__name__)
 
 
-def extract_tables_and_charts_using_image_ensemble(
+def _extract_tables_and_charts_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
@@ -106,7 +106,7 @@ def extract_tables_and_charts_using_image_ensemble(
 
         # Process results: iterate over each image's inference output.
         for annotation_dict, page_index, original_image in zip(inference_results, image_page_indices, original_images):
-            extract_table_and_chart_images(
+            _extract_table_and_chart_images(
                 annotation_dict,
                 original_image,
                 page_index,
@@ -131,7 +131,7 @@ def extract_tables_and_charts_using_image_ensemble(
 
 
 # Handle individual table/chart extraction and model inference
-def extract_table_and_chart_images(
+def _extract_table_and_chart_images(
     annotation_dict,
     original_image,
     page_idx,
@@ -162,7 +162,7 @@ def extract_table_and_chart_images(
     >>> annotation_dict = {"table": [], "chart": []}
     >>> original_image = np.random.rand(1536, 1536, 3)
     >>> tables_and_charts = []
-    >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    >>> _extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
     """
 
     width, height, *_ = original_image.shape
@@ -260,7 +260,7 @@ def _extract_tables_and_charts(
     """
     extracted_table_chart = []
 
-    table_chart_results = extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+    table_chart_results = _extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
 
     # Build metadata for each
     for page_idx, table_or_chart in table_chart_results:

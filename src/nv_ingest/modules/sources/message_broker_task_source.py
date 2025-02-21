@@ -134,7 +134,6 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
                 type=task_type,
                 properties=task_props,
             )
-            # logger.info(task_obj.model_dump())
             control_message.add_task(task_obj)
 
         # Debug Tracing

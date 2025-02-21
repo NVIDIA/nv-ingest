@@ -37,7 +37,7 @@ DEFAULT_MAX_TIMEOUT_SECONDS = 2_000
 logger = logging.getLogger(__name__)
 
 
-def llama_parse(
+def llama_parse_extractor(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,

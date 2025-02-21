@@ -64,7 +64,7 @@ NEMORETRIEVER_PARSE_MAX_BATCH_SIZE = 8
 
 
 # Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
-def nemoretriever_parse(
+def nemoretriever_parse_extractor(
     pdf_stream,
     extract_text: bool,
     extract_images: bool,
