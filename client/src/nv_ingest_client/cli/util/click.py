@@ -28,6 +28,8 @@ from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
+from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionSchema
+from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
@@ -123,6 +125,12 @@ def click_validate_task(ctx, param, value):
                 if task_options.extract_charts is True:
                     subtask_options = check_schema(ChartExtractionSchema, {}, "chart_data_extract", "{}")
                     new_task.append(("chart_data_extract", ChartExtractionTask(**subtask_options.model_dump())))
+
+                if task_options.extract_infographics is True:
+                    subtask_options = check_schema(InfographicExtractionSchema, {}, "infographic_data_extract", "{}")
+                    new_task.append(
+                        ("infographic_data_extract", InfographicExtractionTask(**subtask_options.model_dump()))
+                    )
 
             elif task_id == "store":
                 task_options = check_schema(StoreTaskSchema, options, task_id, json_options)

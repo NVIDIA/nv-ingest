@@ -393,10 +393,15 @@ class Ingestor:
         """
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
+        extract_infographics = kwargs.pop("extract_infographics", True)
 
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(
-                document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
+                document_type,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                **kwargs,
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 

@@ -37,7 +37,7 @@ from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
@@ -45,25 +45,20 @@ from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 
 YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1536
-YOLOX_MAX_HEIGHT = 1536
-YOLOX_NUM_CLASSES = 3
-YOLOX_CONF_THRESHOLD = 0.01
-YOLOX_IOU_THRESHOLD = 0.5
-YOLOX_MIN_SCORE = 0.1
-YOLOX_FINAL_SCORE = 0.48
+YOLOX_MAX_WIDTH = 1024
+YOLOX_MAX_HEIGHT = 1024
 
 logger = logging.getLogger(__name__)
 
 
-def extract_tables_and_charts_using_image_ensemble(
+def extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
     Given a list of (page_index, image) tuples, this function calls the YOLOX-based
-    inference service to extract table and chart annotations from all pages.
+    inference service to extract page element annotations from all pages.
 
     Returns
     -------
@@ -71,7 +66,7 @@ def extract_tables_and_charts_using_image_ensemble(
         For each page, returns (page_index, joined_content) where joined_content
         is the result of combining annotations from the inference.
     """
-    tables_and_charts = []
+    page_elements = []
     yolox_client = None
 
     try:
@@ -95,30 +90,25 @@ def extract_tables_and_charts_using_image_ensemble(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
-            num_classes=YOLOX_NUM_CLASSES,
-            conf_thresh=YOLOX_CONF_THRESHOLD,
-            iou_thresh=YOLOX_IOU_THRESHOLD,
-            min_score=YOLOX_MIN_SCORE,
-            final_thresh=YOLOX_FINAL_SCORE,
             trace_info=trace_info,
             stage_name="pdf_content_extractor",
         )
 
         # Process results: iterate over each image's inference output.
         for annotation_dict, page_index, original_image in zip(inference_results, image_page_indices, original_images):
-            extract_table_and_chart_images(
+            extract_page_element_images(
                 annotation_dict,
                 original_image,
                 page_index,
-                tables_and_charts,
+                page_elements,
             )
 
     except TimeoutError:
-        logger.error("Timeout error during table/chart extraction.")
+        logger.error("Timeout error during page element extraction.")
         raise
 
     except Exception as e:
-        logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
+        logger.error(f"Unhandled error during page element extraction: {str(e)}")
         traceback.print_exc()
         raise
 
@@ -126,19 +116,19 @@ def extract_tables_and_charts_using_image_ensemble(
         if yolox_client:
             yolox_client.close()
 
-    logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
-    return tables_and_charts
+    logger.debug(f"Extracted {len(page_elements)} page elements.")
+    return page_elements
 
 
-# Handle individual table/chart extraction and model inference
-def extract_table_and_chart_images(
+# Handle individual page element extraction and model inference
+def extract_page_element_images(
     annotation_dict,
     original_image,
     page_idx,
-    tables_and_charts,
+    page_elements,
 ):
     """
-    Handle the extraction of tables and charts from the inference results and run additional model inference.
+    Handle the extraction of page elements from the inference results and run additional model inference.
 
     Parameters
     ----------
@@ -148,29 +138,33 @@ def extract_table_and_chart_images(
         The original image from which objects were detected.
     page_idx : int
         The index of the current page being processed.
-    tables_and_charts : List[Tuple[int, ImageTable]]
-        A list to which extracted tables and charts will be appended.
+    page_elements : List[Tuple[int, ImageTable]]
+        A list to which extracted page elements will be appended.
 
     Notes
     -----
     This function iterates over detected objects, crops the original image to the bounding boxes,
-    and runs additional inference on the cropped images to extract detailed information about tables
-    and charts.
+    and runs additional inference on the cropped images to extract detailed information about page
+    elements.
 
     Examples
     --------
     >>> annotation_dict = {"table": [], "chart": []}
     >>> original_image = np.random.rand(1536, 1536, 3)
-    >>> tables_and_charts = []
-    >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    >>> page_elements = []
+    >>> extract_page_element_images(annotation_dict, original_image, 0, page_elements)
     """
 
     width, height, *_ = original_image.shape
-    for label in ["table", "chart"]:
+    for label in ["table", "chart", "infographic"]:
         if not annotation_dict:
             continue
 
+        if label not in annotation_dict:
+            continue
+
         objects = annotation_dict[label]
+
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
             h1, w1, h2, w2 = bbox
@@ -178,7 +172,16 @@ def extract_table_and_chart_images(
             cropped = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
             base64_img = numpy_to_base64(cropped)
 
-            table_data = CroppedImageWithContent(
+            if label == "infographic":
+                import pickle
+                from uuid import uuid4
+
+                fname = f"{str(uuid4())}.pickle"
+                data = {"data": {"base64_image": base64_img}}
+                with open(f"/workspace/data/tmp/0/{fname}", "wb") as f:
+                    pickle.dump(data, f)
+
+            page_element_data = CroppedImageWithContent(
                 content="",
                 image=base64_img,
                 bbox=(int(w1), int(h1), int(w2), int(h2)),
@@ -186,7 +189,7 @@ def extract_table_and_chart_images(
                 max_height=height,
                 type_string=label,
             )
-            tables_and_charts.append((page_idx, table_data))
+            page_elements.append((page_idx, page_element_data))
 
 
 def _extract_page_text(page) -> str:
@@ -245,7 +248,7 @@ def _extract_page_images(
     return extracted_images
 
 
-def _extract_tables_and_charts(
+def _extract_page_elements(
     pages: list,
     pdfium_config: PDFiumConfigSchema,
     page_count: int,
@@ -255,30 +258,30 @@ def _extract_tables_and_charts(
     trace_info=None,
 ) -> list:
     """
-    Always extract tables and charts from the given pages using YOLOX-based logic.
+    Always extract page elements from the given pages using YOLOX-based logic.
     The caller decides whether to call it.
     """
-    extracted_table_chart = []
+    extracted_page_elements = []
 
-    table_chart_results = extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+    page_element_results = extract_page_elements_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
 
     # Build metadata for each
-    for page_idx, table_or_chart in table_chart_results:
-        # If we want all tables and charts, we assume the caller wouldn't call
+    for page_idx, page_element in page_element_results:
+        # If we want all page elements, we assume the caller wouldn't call
         # this function unless we truly want them.
-        if table_or_chart.type_string == "table":
-            table_or_chart.content_format = paddle_output_format
+        if page_element.type_string == "table":
+            page_element.content_format = paddle_output_format
 
-        table_chart_meta = construct_table_and_chart_metadata(
-            table_or_chart,
+        page_element_meta = construct_page_element_metadata(
+            page_element,
             page_idx,
             page_count,
             source_metadata,
             base_unified_metadata,
         )
-        extracted_table_chart.append(table_chart_meta)
+        extracted_page_elements.append(page_element_meta)
 
-    return extracted_table_chart
+    return extracted_page_elements
 
 
 def pdfium_extractor(
@@ -344,7 +347,7 @@ def pdfium_extractor(
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for table/chart extraction
+    # Prepare for page element extraction
     pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
@@ -399,7 +402,7 @@ def pdfium_extractor(
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
-                        _extract_tables_and_charts,
+                        _extract_page_elements,
                         pages_for_tables[:],  # pass a copy
                         pdfium_config,
                         page_count,
@@ -416,7 +419,7 @@ def pdfium_extractor(
         # After page loop, if we still have leftover pages_for_tables, submit one last job
         if (extract_tables or extract_charts) and pages_for_tables:
             future = executor.submit(
-                _extract_tables_and_charts,
+                _extract_page_elements,
                 pages_for_tables[:],
                 pdfium_config,
                 page_count,

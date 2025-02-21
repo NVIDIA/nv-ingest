@@ -26,7 +26,7 @@ from nv_ingest.util.nim.helpers import ModelInterface
 logger = logging.getLogger(__name__)
 
 # yolox-page-elements-v1 contants
-YOLOX_PAGE_NUM_CLASSES = 3
+YOLOX_PAGE_NUM_CLASSES = 4
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
@@ -40,6 +40,7 @@ YOLOX_PAGE_CLASS_LABELS = [
     "table",
     "chart",
     "title",
+    "infographic",
 ]
 
 # yolox-graphic-elements-v1 contants
@@ -331,7 +332,11 @@ class YoloxModelInterfaceBase(ModelInterface):
         elif protocol == "grpc":
             # For grpc, apply the same NIM postprocessing.
             pred = postprocess_model_prediction(
-                output, self.num_classes, self.conf_threshold, self.iou_threshold, class_agnostic=True
+                output,
+                self.num_classes,
+                self.conf_threshold,
+                self.iou_threshold,
+                class_agnostic=False,
             )
             results = postprocess_results(
                 pred,
@@ -420,9 +425,14 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
+                # new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= 0.1]
             if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
+                # new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= 0.01]
+            if "infographic" in annotation_dict:
+                # new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
+                new_dict["infographic"] = [bb for bb in annotation_dict["infographic"] if bb[4] >= 0.01]
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
@@ -693,7 +703,7 @@ def expand_table_bboxes(annotation_dict, labels=None):
 
     """
     if not labels:
-        labels = ["table", "chart", "title"]
+        labels = list(annotation_dict.keys())
 
     if not annotation_dict or len(annotation_dict["table"]) == 0:
         return annotation_dict
@@ -724,7 +734,7 @@ def expand_chart_bboxes(annotation_dict, labels=None):
 
     """
     if not labels:
-        labels = ["table", "chart", "title"]
+        labels = list(annotation_dict.keys())
 
     if not annotation_dict or len(annotation_dict["chart"]) == 0:
         return annotation_dict

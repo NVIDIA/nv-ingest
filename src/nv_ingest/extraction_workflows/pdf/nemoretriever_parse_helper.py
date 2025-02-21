@@ -51,7 +51,7 @@ from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_fro
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import _extract_tables_and_charts
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import _extract_page_elements
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_BATCH_SIZE
 
 
@@ -189,7 +189,7 @@ def nemoretriever_parse(
                 and (len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE)
             ):
                 future_yolox = executor.submit(
-                    lambda *args, **kwargs: ("yolox", _extract_tables_and_charts(*args, **kwargs)),
+                    lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
                     pages_for_tables[:],  # pass a copy
                     pdfium_config,
                     page_count,
@@ -214,7 +214,7 @@ def nemoretriever_parse(
 
         if (extract_tables_method == "yolox") and (extract_tables or extract_charts) and pages_for_tables:
             future_yolox = executor.submit(
-                lambda *args, **kwargs: ("yolox", _extract_tables_and_charts(*args, **kwargs)),
+                lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
                 pages_for_tables[:],
                 pdfium_config,
                 page_count,
