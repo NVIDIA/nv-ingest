@@ -422,12 +422,12 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
         "",
     )
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
-    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
 
     text_embed_extraction_config = {
         "api_key": api_key,
-        "embedding_nim_endpoint": embedding_nim_endpoint,
-        "embedding_model": embedding_model,
+        "endpoint_url": embedding_nim_endpoint,
+        "model_name": embedding_model,
     }
 
     embed_extractions_stage = pipe.add_stage(
