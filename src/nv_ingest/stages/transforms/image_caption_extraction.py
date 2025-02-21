@@ -92,7 +92,7 @@ def _generate_captions(
             infer_protocol="http",
         )
 
-        logger.info(f"Calling: {endpoint_url} with model: {model_name}")
+        logger.debug(f"Calling: {endpoint_url} with model: {model_name}")
         # Call the infer method which handles batching and returns a list of captions.
         captions = nim_client.infer(data, model_name=model_name)
         return captions

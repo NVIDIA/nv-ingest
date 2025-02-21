@@ -20,7 +20,7 @@ def test_add_single_task():
     via has_task and get_tasks.
     """
     cm = IngestControlMessage()
-    task = ControlMessageTask(name="Test Task", id="task1", properties={"key": "value"})
+    task = ControlMessageTask(type="Test Task", id="task1", properties={"key": "value"})
     cm.add_task(task)
     assert cm.has_task("task1")
     tasks = list(cm.get_tasks())
@@ -33,9 +33,9 @@ def test_add_duplicate_task():
     Validate that adding a duplicate task (same id) raises a ValueError indicating that tasks must be unique.
     """
     cm = IngestControlMessage()
-    task = ControlMessageTask(name="Test Task", id="task1", properties={"key": "value"})
+    task = ControlMessageTask(type="Test Task", id="task1", properties={"key": "value"})
     cm.add_task(task)
-    duplicate_task = ControlMessageTask(name="Another Task", id="task1", properties={"key": "other"})
+    duplicate_task = ControlMessageTask(type="Another Task", id="task1", properties={"key": "other"})
     with pytest.raises(ValueError) as exc_info:
         cm.add_task(duplicate_task)
     assert "already exists" in str(exc_info.value)
@@ -48,9 +48,9 @@ def test_multiple_tasks():
     """
     cm = IngestControlMessage()
     task_data = [
-        {"name": "Task A", "id": "a", "properties": {}},
-        {"name": "Task B", "id": "b", "properties": {"x": 10}},
-        {"name": "Task C", "id": "c", "properties": {"y": 20}},
+        {"type": "Task A", "id": "a", "properties": {}},
+        {"type": "Task B", "id": "b", "properties": {"x": 10}},
+        {"type": "Task C", "id": "c", "properties": {"y": 20}},
     ]
     tasks = [ControlMessageTask(**data) for data in task_data]
     for task in tasks:

@@ -4,7 +4,7 @@
 
 import json
 
-from morpheus.config import Config
+from morpheus.config import Config, ExecutionMode
 from morpheus.config import CppConfig
 from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
@@ -88,9 +88,10 @@ def cli(
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
     configure_logging(log_level=log_level)
 
-    CppConfig.set_should_use_cpp(use_cpp)
+    CppConfig.set_should_use_cpp(False)
 
     morpheus_pipeline_config = Config()
+    morpheus_pipeline_config.execution_mode = ExecutionMode.CPU
     morpheus_pipeline_config.debug = True if log_level == "DEBUG" else False
     morpheus_pipeline_config.log_level = log_level
     morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size

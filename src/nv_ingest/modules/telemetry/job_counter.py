@@ -4,10 +4,8 @@
 
 
 import logging
-import traceback
 
 import mrc
-from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
@@ -17,6 +15,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.telemetry.global_stats import GlobalStats
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -26,14 +25,14 @@ MODULE_NAMESPACE = "nv_ingest"
 JobCounterLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE)
 
 
-def _count_jobs_impl(message: ControlMessage, validated_config, stats) -> ControlMessage:
+def _count_jobs_impl(message: IngestControlMessage, validated_config, stats) -> IngestControlMessage:
     """
     Private helper function to count jobs.
 
     Parameters
     ----------
-    message : ControlMessage
-        The ControlMessage instance to process.
+    message : IngestControlMessage
+        The IngestControlMessage instance to process.
     validated_config : JobCounterSchema
         The validated configuration for the job counter.
     stats : GlobalStats
@@ -41,8 +40,8 @@ def _count_jobs_impl(message: ControlMessage, validated_config, stats) -> Contro
 
     Returns
     -------
-    ControlMessage
-        The updated ControlMessage.
+    IngestControlMessage
+        The updated IngestControlMessage.
     """
     logger.debug(f"Performing job counter: {validated_config.name}")
 
@@ -83,13 +82,12 @@ def _job_counter(builder: mrc.Builder) -> None:
         raise_on_failure=validated_config.raise_on_failure,
         skip_processing_if_failed=False,
     )
-    def count_jobs(message: ControlMessage) -> ControlMessage:
+    def count_jobs(message: IngestControlMessage) -> IngestControlMessage:
         try:
             return _count_jobs_impl(message, validated_config, stats)
         except Exception as e:
-            traceback.print_exc()
-            new_message = f"count_jobs: Failed to run job counter. Original error: {str(e)}"
-            raise type(e)(new_message) from e
+            logger.exception("count_jobs: Failed to run job counter")
+            raise type(e)("count_jobs: Failed to run job counter") from e
 
     job_counter_node = builder.make_node(f"{validated_config.name}_counter", ops.map(count_jobs))
     # Register the input and output of the module

@@ -27,7 +27,7 @@ def colorize(message, color_code):
 def latency_logger(name=None):
     """
     A decorator to log the elapsed time of function execution. If available, it also logs
-    the latency based on 'latency::ts_send' metadata in a ControlMessage object.
+    the latency based on 'latency::ts_send' metadata in a IngestControlMessage object.
 
     Parameters
     ----------
@@ -60,7 +60,9 @@ def latency_logger(name=None):
                 message.set_timestamp(f"latency::{func_name}::elapsed_time", elapsed_time)
                 return result
             else:
-                raise ValueError("The first argument must be a ControlMessage object with metadata " "capabilities.")
+                raise ValueError(
+                    "The first argument must be a IngestControlMessage object with metadata " "capabilities."
+                )
 
         return wrapper
 

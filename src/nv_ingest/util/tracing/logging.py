@@ -8,19 +8,21 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+
 
 class TaskResultStatus(Enum):
     SUCCESS = "SUCCESS"
     FAILURE = "FAILURE"
 
 
-def annotate_cm(control_message, source_id=None, **kwargs):
+def annotate_cm(control_message: IngestControlMessage, source_id=None, **kwargs):
     """
-    Annotate a ControlMessage object with arbitrary metadata, a source ID, and a timestamp.
+    Annotate a IngestControlMessage object with arbitrary metadata, a source ID, and a timestamp.
     Each annotation will be uniquely identified by a UUID.
 
     Parameters:
-    - control_message: The ControlMessage object to be annotated.
+    - control_message: The IngestControlMessage object to be annotated.
     - source_id: A unique identifier for the source of the annotation. If None, uses the caller's __name__.
     - **kwargs: Arbitrary key-value pairs to be included in the annotation.
     """
@@ -54,21 +56,21 @@ def annotate_cm(control_message, source_id=None, **kwargs):
     metadata_value.update(kwargs)
 
     try:
-        # Attempt to set the annotated metadata on the ControlMessage object.
+        # Attempt to set the annotated metadata on the IngestControlMessage object.
         control_message.set_metadata(metadata_key, metadata_value)
     except Exception as e:
         # Handle any exceptions that occur when setting metadata.
-        print(f"Failed to annotate ControlMessage: {e}")
+        print(f"Failed to annotate IngestControlMessage: {e}")
 
 
 def annotate_task_result(control_message, result, task_id, source_id=None, **kwargs):
     """
-    Annotate a ControlMessage object with the result of a task, identified by a task_id,
+    Annotate a IngestControlMessage object with the result of a task, identified by a task_id,
     and an arbitrary number of additional key-value pairs. The result can be a TaskResultStatus
     enum or a string that will be converted to the corresponding enum.
 
     Parameters:
-    - control_message: The ControlMessage object to be annotated.
+    - control_message: The IngestControlMessage object to be annotated.
     - result: The result of the task, either SUCCESS or FAILURE, as an enum or string.
     - task_id: A unique identifier for the task.
     - **kwargs: Arbitrary additional key-value pairs to be included in the annotation.
