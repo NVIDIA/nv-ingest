@@ -41,19 +41,17 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.schemas.pdf_extractor_schema import NemoRetrieverParseConfigSchema
 from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
-from nv_ingest.util.image_processing.transforms import crop_image
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
-from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import _extract_tables_and_charts
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_BATCH_SIZE
-
+from nv_ingest_api.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
+from nv_ingest_api.util.image_processing.processing import extract_tables_and_charts_from_image
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
+from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)
 
@@ -189,7 +187,7 @@ def nemoretriever_parse_extractor(
                 and (len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE)
             ):
                 future_yolox = executor.submit(
-                    lambda *args, **kwargs: ("yolox", _extract_tables_and_charts(*args, **kwargs)),
+                    lambda *args, **kwargs: ("yolox", extract_tables_and_charts_from_image(*args, **kwargs)),
                     pages_for_tables[:],  # pass a copy
                     pdfium_config,
                     page_count,
@@ -214,7 +212,7 @@ def nemoretriever_parse_extractor(
 
         if (extract_tables_method == "yolox") and (extract_tables or extract_charts) and pages_for_tables:
             future_yolox = executor.submit(
-                lambda *args, **kwargs: ("yolox", _extract_tables_and_charts(*args, **kwargs)),
+                lambda *args, **kwargs: ("yolox", extract_tables_and_charts_from_image(*args, **kwargs)),
                 pages_for_tables[:],
                 pdfium_config,
                 page_count,
@@ -383,7 +381,6 @@ def _extract_text_and_bounding_boxes(
     nemoretriever_parse_client,
     trace_info=None,
 ) -> list:
-
     # Collect all page indices and images in order.
     image_page_indices = [page[0] for page in pages]
     original_images = [page[1] for page in pages]
@@ -420,7 +417,6 @@ def _send_inference_request(
     nemoretriever_parse_client,
     image_array: np.ndarray,
 ) -> Dict[str, Any]:
-
     try:
         # NIM only supports processing one page at a time (batch size = 1).
         data = {"image": image_array}

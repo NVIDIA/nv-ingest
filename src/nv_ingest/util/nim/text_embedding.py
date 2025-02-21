@@ -1,6 +1,6 @@
 from typing import Any, Dict, List, Optional, Tuple
 
-from nv_ingest.util.nim.helpers import ModelInterface
+from nv_ingest_api.primitives.nim import ModelInterface
 
 
 # Assume ModelInterface is defined elsewhere in the project.

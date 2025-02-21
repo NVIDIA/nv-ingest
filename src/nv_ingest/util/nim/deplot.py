@@ -7,8 +7,8 @@ from typing import Dict, Any, Optional, List
 import numpy as np
 import logging
 
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import ModelInterface
+from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
 

@@ -6,9 +6,9 @@ from typing import Optional
 
 import numpy as np
 
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.helpers import ModelInterface
 from nv_ingest.util.nim.helpers import preprocess_image_for_paddle
+from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
 

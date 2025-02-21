@@ -1,3 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Copyright (c) 2024, NVIDIA CORPORATION.
+
 import base64
 import io
 import pandas as pd
@@ -5,21 +11,16 @@ from typing import Any, Dict, List, Optional, Tuple
 import logging
 
 # Import extraction functions for different engines.
-from nv_ingest_api.extraction.pdf.engines.pdfium import pdfium_extractor
-from nv_ingest_api.extraction.pdf.engines.adobe import adobe_extractor
-from nv_ingest_api.extraction.pdf.engines.llama_parse import llama_parse_extractor
-from nv_ingest_api.extraction.pdf.engines import nemoretriever_parse_extractor
-from nv_ingest_api.extraction.pdf.engines import tika_extractor
-from nv_ingest_api.extraction.pdf.engines.unstructured_io import unstructured_io_extractor
+from nv_ingest_api.extraction.pdf.engines import *
 
 logger = logging.getLogger(__name__)
 
 # Lookup table mapping extraction method names to extractor functions.
 EXTRACTOR_LOOKUP = {
-    "pdfium": pdfium_extractor,
     "adobe": adobe_extractor,
-    "llama_parse": llama_parse_extractor,
-    "nemoretriever_parse": nemoretriever_parse_extractor,
+    "llama": llama_parse_extractor,
+    "nemoretriever": nemoretriever_parse_extractor,
+    "pdfium": pdfium_extractor,
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
 }
@@ -55,8 +56,10 @@ def work_extract_pdf(pdf_stream: io.BytesIO, extract_params: Dict[str, Any]) -> 
     Exception
         Propagates any exception raised by the underlying extraction function.
     """
+
     extract_method = extract_params.pop("extract_method", "pdfium")
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
+
     return extractor_fn(pdf_stream, **extract_params)
 
 
@@ -138,7 +141,7 @@ def orchestrate_row_extraction(
         raise type(e)(err_msg) from e
 
 
-def process_pdf_bytes(
+def run_pdf_extraction(
     df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[List[Any]] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """

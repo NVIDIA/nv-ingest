@@ -10,7 +10,8 @@ from typing import Dict
 
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.extraction.pdf import process_pdf_bytes
+
+from nv_ingest_api.extraction.pdf.pdf_extractor import run_pdf_extraction
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -56,7 +57,7 @@ def generate_pdf_extractor_stage(
     """
     try:
         validated_config = PDFExtractorSchema(**extractor_config)
-        wrapped_process_fn = functools.partial(process_pdf_bytes, validated_config=validated_config)
+        wrapped_process_fn = functools.partial(run_pdf_extraction, validated_config=validated_config)
 
         return MultiProcessingBaseStage(
             c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=wrapped_process_fn, document_type="pdf"

@@ -18,24 +18,15 @@
 
 import concurrent.futures
 import logging
-import traceback
-from typing import List
-from typing import Optional
-from typing import Tuple
 
-import numpy as np
 import pypdfium2 as libpdfium
-import nv_ingest.util.nim.yolox as yolox_utils
 
+from nv_ingest_api.primitives.nim.default_values import *
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.image_processing.transforms import crop_image
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
@@ -43,150 +34,10 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
-
-YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1536
-YOLOX_MAX_HEIGHT = 1536
-YOLOX_NUM_CLASSES = 3
-YOLOX_CONF_THRESHOLD = 0.01
-YOLOX_IOU_THRESHOLD = 0.5
-YOLOX_MIN_SCORE = 0.1
-YOLOX_FINAL_SCORE = 0.48
+from nv_ingest_api.util.image_processing.processing import extract_tables_and_charts_yolox
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
-
-
-def _extract_tables_and_charts_using_image_ensemble(
-    pages: List[Tuple[int, np.ndarray]],
-    config: PDFiumConfigSchema,
-    trace_info: Optional[List] = None,
-) -> List[Tuple[int, object]]:
-    """
-    Given a list of (page_index, image) tuples, this function calls the YOLOX-based
-    inference service to extract table and chart annotations from all pages.
-
-    Returns
-    -------
-    List[Tuple[int, object]]
-        For each page, returns (page_index, joined_content) where joined_content
-        is the result of combining annotations from the inference.
-    """
-    tables_and_charts = []
-    yolox_client = None
-
-    try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
-        yolox_client = create_inference_client(
-            config.yolox_endpoints,
-            model_interface,
-            config.auth_token,
-            config.yolox_infer_protocol,
-        )
-
-        # Collect all page indices and images in order.
-        image_page_indices = [page[0] for page in pages]
-        original_images = [page[1] for page in pages]
-
-        # Prepare the data payload with all images.
-        data = {"images": original_images}
-
-        # Perform inference using the NimClient.
-        inference_results = yolox_client.infer(
-            data,
-            model_name="yolox",
-            max_batch_size=YOLOX_MAX_BATCH_SIZE,
-            num_classes=YOLOX_NUM_CLASSES,
-            conf_thresh=YOLOX_CONF_THRESHOLD,
-            iou_thresh=YOLOX_IOU_THRESHOLD,
-            min_score=YOLOX_MIN_SCORE,
-            final_thresh=YOLOX_FINAL_SCORE,
-            trace_info=trace_info,
-            stage_name="pdf_content_extractor",
-        )
-
-        # Process results: iterate over each image's inference output.
-        for annotation_dict, page_index, original_image in zip(inference_results, image_page_indices, original_images):
-            _extract_table_and_chart_images(
-                annotation_dict,
-                original_image,
-                page_index,
-                tables_and_charts,
-            )
-
-    except TimeoutError:
-        logger.error("Timeout error during table/chart extraction.")
-        raise
-
-    except Exception as e:
-        logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
-        traceback.print_exc()
-        raise
-
-    finally:
-        if yolox_client:
-            yolox_client.close()
-
-    logger.debug(f"Extracted {len(tables_and_charts)} tables and charts.")
-    return tables_and_charts
-
-
-# Handle individual table/chart extraction and model inference
-def _extract_table_and_chart_images(
-    annotation_dict,
-    original_image,
-    page_idx,
-    tables_and_charts,
-):
-    """
-    Handle the extraction of tables and charts from the inference results and run additional model inference.
-
-    Parameters
-    ----------
-    annotation_dict : dict/
-        A dictionary containing detected objects and their bounding boxes.
-    original_image : np.ndarray
-        The original image from which objects were detected.
-    page_idx : int
-        The index of the current page being processed.
-    tables_and_charts : List[Tuple[int, ImageTable]]
-        A list to which extracted tables and charts will be appended.
-
-    Notes
-    -----
-    This function iterates over detected objects, crops the original image to the bounding boxes,
-    and runs additional inference on the cropped images to extract detailed information about tables
-    and charts.
-
-    Examples
-    --------
-    >>> annotation_dict = {"table": [], "chart": []}
-    >>> original_image = np.random.rand(1536, 1536, 3)
-    >>> tables_and_charts = []
-    >>> _extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
-    """
-
-    width, height, *_ = original_image.shape
-    for label in ["table", "chart"]:
-        if not annotation_dict:
-            continue
-
-        objects = annotation_dict[label]
-        for idx, bboxes in enumerate(objects):
-            *bbox, _ = bboxes
-            h1, w1, h2, w2 = bbox
-
-            cropped = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
-            base64_img = numpy_to_base64(cropped)
-
-            table_data = CroppedImageWithContent(
-                content="",
-                image=base64_img,
-                bbox=(int(w1), int(h1), int(w2), int(h2)),
-                max_width=width,
-                max_height=height,
-                type_string=label,
-            )
-            tables_and_charts.append((page_idx, table_data))
 
 
 def _extract_page_text(page) -> str:
@@ -245,6 +96,7 @@ def _extract_page_images(
     return extracted_images
 
 
+# TODO: Replace with common function
 def _extract_tables_and_charts(
     pages: list,
     pdfium_config: PDFiumConfigSchema,
@@ -260,7 +112,7 @@ def _extract_tables_and_charts(
     """
     extracted_table_chart = []
 
-    table_chart_results = _extract_tables_and_charts_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+    table_chart_results = extract_tables_and_charts_yolox(pages, pdfium_config.model_dump(), trace_info=trace_info)
 
     # Build metadata for each
     for page_idx, table_or_chart in table_chart_results:
