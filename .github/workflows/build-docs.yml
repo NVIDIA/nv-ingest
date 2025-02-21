@@ -23,8 +23,6 @@ concurrency:
 jobs:
   build:
     runs-on: linux-large-disk
-    container:
-      image: ubuntu:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
