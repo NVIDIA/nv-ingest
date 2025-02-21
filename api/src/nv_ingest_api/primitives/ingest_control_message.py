@@ -198,7 +198,8 @@ class IngestControlMessage:
         Retrieve timestamps whose keys match the regex filter.
         """
         pattern = re.compile(regex_filter)
-        return {key: ts for key, ts in self._timestamps.items() if pattern.search(key)}
+        timestamps_snapshot = self._timestamps.copy()
+        return {key: ts for key, ts in timestamps_snapshot.items() if pattern.search(key)}
 
     def get_timestamp(self, key: str, fail_if_nonexist: bool = False) -> datetime:
         """
@@ -232,12 +233,14 @@ class IngestControlMessage:
         """
         if isinstance(timestamp, datetime):
             self._timestamps[key] = timestamp
+
         elif isinstance(timestamp, str):
             try:
                 dt = datetime.fromisoformat(timestamp)
                 self._timestamps[key] = dt
             except ValueError as e:
                 raise ValueError(f"Invalid timestamp format: {timestamp}") from e
+
         else:
             raise ValueError("timestamp must be a datetime object or ISO format string")
 

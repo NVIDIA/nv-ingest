@@ -104,18 +104,6 @@ def create_json_payload(message: IngestControlMessage, df_json: Dict[str, Any]) 
     """
     Creates JSON payloads based on message status and data. If the size of df_json exceeds 256 MB, splits it into
     multiple fragments, each less than 256 MB. Adds optional trace and annotation data to the first fragment.
-
-    Parameters
-    ----------
-    message : IngestControlMessage
-        The message object from which metadata is extracted.
-    df_json : Dict[str, Any]
-        The dictionary containing data filtered from the DataFrame.
-
-    Returns
-    -------
-    List[Dict[str, Any]]
-        A list of JSON payloads, possibly split into multiple fragments.
     """
     # Convert df_json to a JSON string to check its size
     df_json_str = json.dumps(df_json)
@@ -126,15 +114,12 @@ def create_json_payload(message: IngestControlMessage, df_json: Dict[str, Any]) 
 
     # If df_json is larger than the size limit, split it into chunks
     if df_json_size > size_limit:
-        # Split df_json into fragments, ensuring each is a valid JSON object
         data_fragments = split_large_dict(df_json, size_limit)
         fragment_count = len(data_fragments)
     else:
-        # No splitting needed, treat the whole thing as one fragment
         data_fragments = [df_json]
         fragment_count = 1
 
-    # Initialize list to store multiple ret_val_json payloads
     ret_val_json_list = []
 
     # Process each fragment and add necessary metadata
@@ -146,16 +131,16 @@ def create_json_payload(message: IngestControlMessage, df_json: Dict[str, Any]) 
                 if not message.get_metadata("cm_failed", False)
                 else "Failed to process the message."
             ),
-            "data": fragment_data,  # Fragmented data
+            "data": fragment_data,
             "fragment": i,
             "fragment_count": fragment_count,
         }
 
-        # Only add trace tagging and annotations to the first fragment (i.e., fragment=0)
+        # Only add trace tagging and annotations to the first fragment
         if i == 0 and message.get_metadata("add_trace_tagging", True):
-            ret_val_json["trace"] = {
-                key: message.get_timestamp(key).timestamp() * 1e9 for key in message.filter_timestamp("trace::")
-            }
+            # Use the snapshot of trace timestamps directly
+            trace_snapshot = message.filter_timestamp("trace::")
+            ret_val_json["trace"] = {key: ts.timestamp() * 1e9 for key, ts in trace_snapshot.items()}
             ret_val_json["annotations"] = {
                 key: message.get_metadata(key) for key in message.list_metadata() if key.startswith("annotation::")
             }
@@ -163,7 +148,6 @@ def create_json_payload(message: IngestControlMessage, df_json: Dict[str, Any]) 
         ret_val_json_list.append(ret_val_json)
 
     logger.debug(f"Message broker sink created {len(ret_val_json_list)} JSON payloads.")
-
     return ret_val_json_list
 
 
