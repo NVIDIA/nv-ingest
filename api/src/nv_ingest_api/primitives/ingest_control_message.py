@@ -104,7 +104,7 @@ class IngestControlMessage:
 
             return _task
         else:
-            logger.warning(f"Attempted to remove non-existent task with id: {task_id}")
+            raise RuntimeError(f"Attempted to remove non-existent task with id: {task_id}")
 
     def config(self, config: Dict[str, Any] = None) -> Dict[str, Any]:
         """
