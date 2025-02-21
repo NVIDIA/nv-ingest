@@ -15,7 +15,7 @@ from functools import partial
 
 import mrc
 import pandas as pd
-from morpheus.config import Config
+from morpheus.config import Config, ExecutionMode
 from morpheus.pipeline.single_port_stage import SinglePortStage
 from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
@@ -207,6 +207,10 @@ class MultiProcessingBaseStage(SinglePortStage):
 
     def supports_cpp_node(self) -> bool:
         return False
+
+    def supported_execution_modes(self) -> tuple[ExecutionMode]:
+        # Provide your own logic here; for example:
+        return (ExecutionMode.CPU,)
 
     # -------------------------------------------------------------------------
     # Static Work Package Handlers (unchanged)

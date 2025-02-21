@@ -6,7 +6,7 @@ import logging
 import typing
 
 import mrc
-from morpheus.config import Config
+from morpheus.config import Config, ExecutionMode
 from morpheus.pipeline.pass_thru_type_mixin import PassThruTypeMixin
 from morpheus.pipeline.single_port_stage import SinglePortStage
 from morpheus.utils.module_utils import ModuleLoader
@@ -66,6 +66,10 @@ class ImageStorageStage(PassThruTypeMixin, SinglePortStage):
     def supports_cpp_node(self):
         """Indicates whether this stage supports a C++ node."""
         return False
+
+    def supported_execution_modes(self) -> tuple[ExecutionMode]:
+        # Provide your own logic here; for example:
+        return (ExecutionMode.CPU,)
 
     def _build_single(self, builder: mrc.Builder, input_node: mrc.SegmentObject) -> mrc.SegmentObject:
         module = self._module_loader.load(builder)
