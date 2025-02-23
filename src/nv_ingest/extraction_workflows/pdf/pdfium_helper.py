@@ -196,10 +196,8 @@ def _extract_page_text(page) -> str:
     """
 
     textpage = page.get_textpage()
-    try:
-        text = textpage.get_text_bounded()
-    finally:
-        textpage.close()  # Explicitly close the textpage to free PDFium resources.
+    text = textpage.get_text_bounded()
+
     return text
 
 
@@ -245,8 +243,6 @@ def _extract_page_images(
                 extracted_images.append(image_meta)
             except Exception as e:
                 logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
-
-        obj.close()
 
     return extracted_images
 
@@ -356,72 +352,66 @@ def pdfium_extractor(
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
-        try:
-            for page_idx in range(page_count):
-                page = doc.get_page(page_idx)
-                page_width, page_height = page.get_size()
+        for page_idx in range(page_count):
+            page = doc.get_page(page_idx)
+            page_width, page_height = page.get_size()
 
-                # If we want text, extract text now.
-                if extract_text:
-                    page_text = _extract_page_text(page)
-                    if text_depth == TextTypeEnum.PAGE:
-                        # Build a page-level text metadata item
-                        text_meta = construct_text_metadata(
-                            [page_text],
-                            pdf_metadata.keywords,
-                            page_idx,
-                            -1,
-                            -1,
-                            -1,
-                            page_count,
-                            text_depth,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
-                        extracted_data.append(text_meta)
-                    else:
-                        # doc-level => accumulate
-                        accumulated_text.append(page_text)
-
-                # If we want images, extract images now.
-                if extract_images:
-                    image_data = _extract_page_images(
-                        page,
+            # If we want text, extract text now.
+            if extract_text:
+                page_text = _extract_page_text(page)
+                if text_depth == TextTypeEnum.PAGE:
+                    # Build a page-level text metadata item
+                    text_meta = construct_text_metadata(
+                        [page_text],
+                        pdf_metadata.keywords,
                         page_idx,
-                        page_width,
-                        page_height,
+                        -1,
+                        -1,
+                        -1,
                         page_count,
+                        text_depth,
                         source_metadata,
                         base_unified_metadata,
                     )
-                    extracted_data.extend(image_data)
+                    extracted_data.append(text_meta)
+                else:
+                    # doc-level => accumulate
+                    accumulated_text.append(page_text)
 
-                # If we want tables or charts, rasterize the page and store it
-                if extract_tables or extract_charts:
-                    image, _ = pdfium_pages_to_numpy(
-                        [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
+            # If we want images, extract images now.
+            if extract_images:
+                image_data = _extract_page_images(
+                    page,
+                    page_idx,
+                    page_width,
+                    page_height,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                )
+                extracted_data.extend(image_data)
+
+            # If we want tables or charts, rasterize the page and store it
+            if extract_tables or extract_charts:
+                image, _ = pdfium_pages_to_numpy(
+                    [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
+                )
+                pages_for_tables.append((page_idx, image[0]))
+
+                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                    future = executor.submit(
+                        _extract_tables_and_charts,
+                        pages_for_tables[:],  # pass a copy
+                        pdfium_config,
+                        page_count,
+                        source_metadata,
+                        base_unified_metadata,
+                        paddle_output_format,
+                        trace_info=trace_info,
                     )
-                    pages_for_tables.append((page_idx, image[0]))
-
-                    # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
-                    if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
-                        future = executor.submit(
-                            _extract_tables_and_charts,
-                            pages_for_tables[:],  # pass a copy
-                            pdfium_config,
-                            page_count,
-                            source_metadata,
-                            base_unified_metadata,
-                            paddle_output_format,
-                            trace_info=trace_info,
-                        )
-                        futures.append(future)
-                        pages_for_tables.clear()
-        except Exception as e:
-            logger.exception(f"Error processing PDF {source_id}: {e}")
-            raise
-        finally:
-            page.close()
+                    futures.append(future)
+                    pages_for_tables.clear()
 
         # After page loop, if we still have leftover pages_for_tables, submit one last job
         if (extract_tables or extract_charts) and pages_for_tables:
@@ -460,5 +450,6 @@ def pdfium_extractor(
         extracted_data.append(doc_text_meta)
 
     doc.close()
+    del doc
 
     return extracted_data
