@@ -96,7 +96,6 @@ def _extract_page_images(
     return extracted_images
 
 
-# TODO: Replace with common function
 def _extract_tables_and_charts(
     pages: list,
     pdfium_config: PDFiumConfigSchema,
@@ -139,27 +138,61 @@ def pdfium_extractor(
     extract_images: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extractor_config: dict,
     trace_info=None,
-    **kwargs,
 ):
-    logger.debug("Extracting PDF with pdfium backend.")
+    # --- Extract and validate extractor_config ---
+    if extractor_config is None or not isinstance(extractor_config, dict):
+        raise ValueError("`extractor_config` must be provided as a dictionary.")
 
-    row_data = kwargs.get("row_data")
+    # Validate and extract row_data
+    row_data = extractor_config.get("row_data")
+    if row_data is None:
+        raise ValueError("`extractor_config` must include a valid 'row_data' dictionary.")
+    if "source_id" not in row_data:
+        raise ValueError("The 'row_data' dictionary must contain the 'source_id' key.")
+
+    # Validate and extract text_depth
+    text_depth_str = extractor_config.get("text_depth", "page")
+    try:
+        text_depth = TextTypeEnum[text_depth_str.upper()]
+    except KeyError:
+        raise ValueError(
+            f"Invalid text_depth: {text_depth_str}. Valid options: {list(TextTypeEnum.__members__.keys())}"
+        )
+
+    # Validate and extract paddle_output_format
+    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    try:
+        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+    except KeyError:
+        raise ValueError(
+            f"Invalid paddle_output_format: {paddle_output_format_str}. "
+            f"Valid options: {list(TableFormatEnum.__members__.keys())}"
+        )
+
+    # Extract metadata_column
+    metadata_column = extractor_config.get("metadata_column", "metadata")
+
+    # Process pdfium_config
+    pdfium_config_raw = extractor_config.get("pdfium_config", {})
+    if isinstance(pdfium_config_raw, dict):
+        pdfium_config = PDFiumConfigSchema(**pdfium_config_raw)
+    elif isinstance(pdfium_config_raw, PDFiumConfigSchema):
+        pdfium_config = pdfium_config_raw
+    else:
+        raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
+    # --- End extractor_config extraction ---
+
+    logger.debug("Extracting PDF with pdfium backend.")
     source_id = row_data["source_id"]
 
-    text_depth = kwargs.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    # Retrieve unified metadata robustly (supporting pandas Series or dict)
+    if hasattr(row_data, "index"):
+        base_unified_metadata = row_data[metadata_column] if metadata_column in row_data.index else {}
+    else:
+        base_unified_metadata = row_data.get(metadata_column, {})
 
-    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
-    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
-
-    # Basic config
-    metadata_col = kwargs.get("metadata_column", "metadata")
-    pdfium_config = kwargs.get("pdfium_config", {})
-    if isinstance(pdfium_config, dict):
-        pdfium_config = PDFiumConfigSchema(**pdfium_config)
-
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
@@ -189,7 +222,7 @@ def pdfium_extractor(
         f"extract_tables={extract_tables}, extract_charts={extract_charts}"
     )
 
-    # Decide if text_depth is PAGE or DOCUMENT
+    # Decide if text extraction should be done at the PAGE or DOCUMENT level
     if text_depth != TextTypeEnum.PAGE:
         text_depth = TextTypeEnum.DOCUMENT
 
@@ -197,8 +230,8 @@ def pdfium_extractor(
     accumulated_text = []
 
     # Prepare for table/chart extraction
-    pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
-    futures = []  # We'll keep track of all the Future objects for table/charts
+    pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
+    futures = []  # To track asynchronous table/chart extraction tasks
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
@@ -206,11 +239,10 @@ def pdfium_extractor(
             page = doc.get_page(page_idx)
             page_width, page_height = page.get_size()
 
-            # If we want text, extract text now.
+            # Text extraction
             if extract_text:
                 page_text = _extract_page_text(page)
                 if text_depth == TextTypeEnum.PAGE:
-                    # Build a page-level text metadata item
                     text_meta = construct_text_metadata(
                         [page_text],
                         pdf_metadata.keywords,
@@ -225,10 +257,9 @@ def pdfium_extractor(
                     )
                     extracted_data.append(text_meta)
                 else:
-                    # doc-level => accumulate
                     accumulated_text.append(page_text)
 
-            # If we want images, extract images now.
+            # Image extraction
             if extract_images:
                 image_data = _extract_page_images(
                     page,
@@ -241,18 +272,16 @@ def pdfium_extractor(
                 )
                 extracted_data.extend(image_data)
 
-            # If we want tables or charts, rasterize the page and store it
+            # Table/Chart extraction: rasterize the page and queue for processing.
             if extract_tables or extract_charts:
                 image, _ = pdfium_pages_to_numpy(
                     [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
                 )
                 pages_for_tables.append((page_idx, image[0]))
-
-                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
                         _extract_tables_and_charts,
-                        pages_for_tables[:],  # pass a copy
+                        pages_for_tables[:],
                         pdfium_config,
                         page_count,
                         source_metadata,
@@ -265,7 +294,7 @@ def pdfium_extractor(
 
             page.close()
 
-        # After page loop, if we still have leftover pages_for_tables, submit one last job
+        # Process any remaining pages queued for table/chart extraction.
         if (extract_tables or extract_charts) and pages_for_tables:
             future = executor.submit(
                 _extract_tables_and_charts,
@@ -280,12 +309,12 @@ def pdfium_extractor(
             futures.append(future)
             pages_for_tables.clear()
 
-        # Now wait for all futures to complete
+        # Wait for all asynchronous jobs to complete.
         for fut in concurrent.futures.as_completed(futures):
-            table_chart_items = fut.result()  # blocks until finished
+            table_chart_items = fut.result()  # Blocks until the job is finished
             extracted_data.extend(table_chart_items)
 
-    # DOC-LEVEL TEXT added last
+    # For document-level text extraction, combine the accumulated text.
     if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
         doc_text_meta = construct_text_metadata(
             accumulated_text,

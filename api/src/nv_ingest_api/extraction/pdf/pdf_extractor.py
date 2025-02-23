@@ -26,123 +26,98 @@ EXTRACTOR_LOOKUP = {
 }
 
 
-def work_extract_pdf(pdf_stream: io.BytesIO, extract_params: Dict[str, Any]) -> Any:
-    """
-    Perform PDF extraction on a decoded PDF stream.
-
-    This work function is solely responsible for performing the extraction
-    from the provided PDF stream using the given extraction parameters. It
-    does not concern itself with orchestration details such as decoding or
-    parameter preparation.
-
-    Parameters
-    ----------
-    pdf_stream : io.BytesIO
-        A BytesIO stream containing the PDF data.
-    extract_params : dict
-        A dictionary of extraction parameters, which may include configuration
-        settings, row metadata, trace information, and other parameters required
-        by the extraction method. It should include the key 'extract_method'
-        indicating which extraction engine to use.
-
-    Returns
-    -------
-    Any
-        The result of the extraction process. The exact type depends on the
-        extraction function being used.
-
-    Raises
-    ------
-    Exception
-        Propagates any exception raised by the underlying extraction function.
-    """
-
-    extract_method = extract_params.pop("extract_method", "pdfium")
-    extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
-
-    return extractor_fn(pdf_stream, **extract_params)
-
-
-def orchestrate_row_extraction(
-    row: pd.Series, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[List[Any]] = None
+def _work_extract_pdf(
+    pdf_stream: io.BytesIO,
+    extract_text: bool,
+    extract_images: bool,
+    extract_tables: bool,
+    extract_charts: bool,
+    extractor_config: dict,
+    trace_info=None,
 ) -> Any:
     """
-    Orchestrate the extraction process for a single DataFrame row.
+    Perform PDF extraction on a decoded PDF stream using the given extraction parameters.
+    """
+    # Pop 'extract_method' from the config if provided, defaulting to 'pdfium'.
+    extract_method = extractor_config.pop("extract_method", "pdfium")
+    extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
+    return extractor_fn(
+        pdf_stream,
+        extract_text,
+        extract_images,
+        extract_tables,
+        extract_charts,
+        extractor_config,
+        trace_info,
+    )
 
-    This function handles the orchestration steps required for processing a single
-    row: it decodes the base64-encoded PDF content, extracts row metadata, augments
-    the extraction parameters with configuration and trace information, and then
-    delegates the extraction work to the work function.
 
-    Parameters
-    ----------
-    row : pd.Series
-        A pandas Series representing a single row from the DataFrame. Must contain a
-        'content' key with base64-encoded PDF data.
-    task_props : dict
-        A dictionary containing task properties including extraction parameters and
-        the desired extraction method.
-    validated_config : Any
-        A configuration object holding settings (e.g., pdfium_config and
-        nemoretriever_parse_config) for the extractor.
-    trace_info : list, optional
-        A list of trace information to be merged into the extraction parameters.
-        Defaults to None.
-
-    Returns
-    -------
-    Any
-        The result returned by the work extraction function.
-
-    Raises
-    ------
-    KeyError
-        If the 'content' key is missing from the row.
-    Exception
-        If an error occurs during the extraction process.
+def _orchestrate_row_extraction(
+    row: pd.Series,
+    task_props: Dict[str, Any],
+    validated_config: Any,
+    trace_info: Optional[List[Any]] = None,
+) -> Any:
+    """
+    Orchestrate extraction for a single DataFrame row by decoding the PDF stream,
+    building an extractor_config, and then delegating to the work function.
     """
     if "content" not in row:
-        err_msg = f"orchestrate_row_extraction: Missing 'content' key in row: {row}"
+        err_msg = f"Missing 'content' key in row: {row}"
         logger.error(err_msg)
         raise KeyError(err_msg)
 
     try:
-        # Decode the base64-encoded PDF content into a BytesIO stream.
         pdf_stream = io.BytesIO(base64.b64decode(row["content"]))
     except Exception as e:
-        err_msg = f"orchestrate_row_extraction: Error decoding base64 content: {e}"
+        err_msg = f"Error decoding base64 content: {e}"
         logger.error(err_msg, exc_info=True)
         raise type(e)(err_msg) from e
 
-    # Prepare extraction parameters from task properties.
-    extract_params = task_props.get("params", {}).copy()
+    # Begin with a copy of the task parameters.
+    params = task_props.get("params", {}).copy()
 
-    # Add row metadata (all columns except 'content').
-    row_metadata = row.drop("content")
-    extract_params["row_data"] = row_metadata
-
-    # Inject configuration settings.
-    if getattr(validated_config, "pdfium_config", None) is not None:
-        extract_params["pdfium_config"] = validated_config.pdfium_config
-    if getattr(validated_config, "nemoretriever_parse_config", None) is not None:
-        extract_params["nemoretriever_parse_config"] = validated_config.nemoretriever_parse_config
-
-    # Include trace information if provided.
-    if trace_info is not None:
-        extract_params["trace_info"] = trace_info
-
-    # Delegate the actual extraction work.
+    # Extract required boolean flags from params.
     try:
-        result = work_extract_pdf(pdf_stream, extract_params)
+        extract_text = params.pop("extract_text")
+        extract_images = params.pop("extract_images")
+        extract_tables = params.pop("extract_tables")
+        extract_charts = params.pop("extract_charts")
+    except KeyError as e:
+        raise ValueError(f"Missing required extraction flag: {e}")
+
+    # Add row metadata (all columns except 'content') into the config.
+    row_metadata = row.drop("content")
+    params["row_data"] = row_metadata
+
+    # Inject configuration settings, if provided.
+    if getattr(validated_config, "pdfium_config", None) is not None:
+        params["pdfium_config"] = validated_config.pdfium_config
+    if getattr(validated_config, "nemoretriever_parse_config", None) is not None:
+        params["nemoretriever_parse_config"] = validated_config.nemoretriever_parse_config
+
+    # The remaining parameters constitute the extractor_config.
+    extractor_config = params
+
+    try:
+        result = _work_extract_pdf(
+            pdf_stream,
+            extract_text,
+            extract_images,
+            extract_tables,
+            extract_charts,
+            extractor_config,
+            trace_info,
+        )
         return result
     except Exception as e:
-        err_msg = f"orchestrate_row_extraction: Extraction failed for row with metadata " f"{row_metadata}: {e}"
+        err_msg = f"Extraction failed for row with metadata {row_metadata}: {e}"
         logger.error(err_msg, exc_info=True)
         raise type(e)(err_msg) from e
 
 
-def run_pdf_extraction(
-    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[List[Any]] = None
+def extract_primitives_from_pdf(
+    df: pd.DataFrame, config: Dict[str, Any], trace_info: Optional[List[Any]] = None
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Process a DataFrame of PDF documents by orchestrating extraction for each row.
@@ -156,10 +131,9 @@ def run_pdf_extraction(
     df : pd.DataFrame
         A pandas DataFrame containing PDF documents. Must include a 'content' column
         with base64-encoded PDF data.
-    task_props : dict
-        A dictionary containing task properties and extraction parameters.
-    validated_config : Any
-        A validated configuration object for the PDF extractor.
+    config : dict
+        A dictionary of configuration parameters. Expected to include 'task_properties'
+        and 'validated_config' keys.
     trace_info : list, optional
         A list for accumulating trace information during extraction. Defaults to None.
 
@@ -176,9 +150,12 @@ def run_pdf_extraction(
         If an error occurs during the extraction process on any row.
     """
     try:
+        task_props = config.get("task_properties", {})
+        validated_config = config.get("validated_config")
+
         # Apply the orchestration function to each row.
         extraction_series = df.apply(
-            lambda row: orchestrate_row_extraction(row, task_props, validated_config, trace_info), axis=1
+            lambda row: _orchestrate_row_extraction(row, task_props, validated_config, trace_info), axis=1
         )
         # Explode the results if the extraction returns lists.
         extraction_series = extraction_series.explode().dropna()
