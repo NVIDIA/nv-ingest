@@ -170,6 +170,7 @@ def pdfium_pages_to_numpy(
 
         # Convert the bitmap to a PIL image
         pil_image = page_bitmap.to_pil()
+        page_bitmap.close()
 
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
