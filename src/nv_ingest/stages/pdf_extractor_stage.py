@@ -42,7 +42,7 @@ def _inject_validated_config(
         The result from extract_primitives_from_pdf.
     """
 
-    updated_config = {"task_properties": config, "validated_config": validated_config}
+    updated_config = {"task_config": config, "extractor_config": validated_config}
 
     return extract_primitives_from_pdf(df_payload, updated_config, tracing_info)
 
