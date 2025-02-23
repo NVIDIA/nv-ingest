@@ -6,8 +6,8 @@ import logging
 
 import pytest
 
-from nv_ingest.util.logging.configuration import LogLevel
-from nv_ingest.util.logging.configuration import configure_logging
+from nv_ingest_api.util.logging.configuration import LogLevel
+from nv_ingest_api.util.logging.configuration import configure_logging
 
 
 def test_valid_log_levels(caplog):

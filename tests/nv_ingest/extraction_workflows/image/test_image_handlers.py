@@ -7,7 +7,7 @@ from PIL import Image
 from nv_ingest.extraction_workflows.image.image_handlers import convert_svg_to_bitmap
 from nv_ingest.extraction_workflows.image.image_handlers import extract_table_and_chart_images
 from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
+from nv_ingest_api.util.pdf import CroppedImageWithContent
 
 
 def test_load_and_preprocess_image_jpeg():

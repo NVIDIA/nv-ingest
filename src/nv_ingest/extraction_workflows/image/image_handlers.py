@@ -31,11 +31,13 @@ from wand.image import Image as WandImage
 
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 from nv_ingest_api.primitives.nim.models.yolox import YoloxPageElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
+from nv_ingest_api.util.metadata.aggregators import (
+    CroppedImageWithContent,
+    construct_table_and_chart_metadata,
+    construct_image_metadata_from_base64,
+)
 from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)

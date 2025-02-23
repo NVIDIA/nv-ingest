@@ -36,8 +36,7 @@ from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest_api.util.converters import bytetools
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
+from nv_ingest_api.util.metadata.aggregators import extract_pdf_metadata, construct_text_metadata
 
 ADOBE_INSTALLED = True
 try:

@@ -7,7 +7,7 @@ import logging
 
 from pydantic import ConfigDict, BaseModel
 
-from nv_ingest.util.logging.configuration import LogLevel
+from nv_ingest_api.util.logging.configuration import LogLevel
 
 logger = logging.getLogger(__name__)
 

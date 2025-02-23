@@ -12,7 +12,7 @@ import pytest
 from pydantic import BaseModel
 
 # Import the functions under test.
-from nv_ingest.modules.sources.message_broker_task_source import (
+from nv_ingest.framework.morpheus.modules import (
     fetch_and_process_messages,
     process_message,
 )

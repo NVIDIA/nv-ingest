@@ -26,14 +26,16 @@ from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
-from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
+from nv_ingest_api.util.metadata.aggregators import (
+    Base64Image,
+    construct_image_metadata_from_pdf_image,
+    construct_table_and_chart_metadata,
+    extract_pdf_metadata,
+    construct_text_metadata,
+)
+from nv_ingest_api.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
+from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 from nv_ingest_api.util.image_processing.processing import extract_tables_and_charts_yolox
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 

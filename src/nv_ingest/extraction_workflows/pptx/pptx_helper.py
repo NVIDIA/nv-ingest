@@ -50,7 +50,7 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.detectors.language import detect_language
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest_api.util.metadata.aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)
 

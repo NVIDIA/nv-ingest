@@ -41,12 +41,14 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.schemas.pdf_extractor_schema import NemoRetrieverParseConfigSchema
 from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
-from nv_ingest.util.pdf.metadata_aggregators import LatexTable
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
-from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.metadata.aggregators import (
+    extract_pdf_metadata,
+    LatexTable,
+    Base64Image,
+    construct_image_metadata_from_pdf_image,
+    construct_text_metadata,
+)
+from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest_api.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest_api.util.image_processing.processing import extract_tables_and_charts_from_image
