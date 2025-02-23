@@ -7,8 +7,8 @@ import re
 import typing
 from functools import wraps
 
-from nv_ingest.util.tracing.logging import TaskResultStatus
-from nv_ingest.util.tracing.logging import annotate_task_result
+from nv_ingest.framework.util.tracing.logging import TaskResultStatus
+from nv_ingest.framework.util.tracing.logging import annotate_task_result
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.util.control_message.validators import cm_ensure_payload_not_null, cm_set_failure
 

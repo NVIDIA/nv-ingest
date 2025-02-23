@@ -6,7 +6,7 @@ import pytest
 from pydantic import BaseModel
 from pydantic import Field
 
-from nv_ingest.util.schema.schema_validator import validate_schema
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 
 class UserSchema(BaseModel):

@@ -9,7 +9,7 @@ from unittest.mock import patch
 import pytest
 from redis import RedisError
 
-from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
+from nv_ingest_api.util.message_brokers.redis import RedisClient
 
 MODULE_UNDER_TEST = "nv_ingest.util.message_brokers.redis.redis_client"
 

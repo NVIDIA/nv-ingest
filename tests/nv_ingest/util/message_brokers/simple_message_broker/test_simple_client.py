@@ -3,7 +3,7 @@ import threading
 import time
 from uuid import uuid4
 
-from nv_ingest.util.message_brokers.simple_message_broker import SimpleClient, SimpleMessageBroker
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient, SimpleMessageBroker
 
 HOST = "127.0.0.1"
 PORT = 9999  # Use an available port

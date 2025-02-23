@@ -14,7 +14,7 @@ from numpy import dtype
 from numpy import ndarray
 from PIL import Image
 
-from nv_ingest.util.tracing.tagging import traceable_func
+from nv_ingest.framework.util.tracing.tagging import traceable_func
 from nv_ingest_api.util.image_processing.transforms import pad_image
 
 logger = logging.getLogger(__name__)

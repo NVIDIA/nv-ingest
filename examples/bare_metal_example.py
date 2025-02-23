@@ -3,8 +3,8 @@ import os
 import sys
 import time
 
-from nv_ingest.framework.morpheus.util.pipeline import start_pipeline_subprocess
-from nv_ingest.framework.morpheus.util.pipeline import PipelineCreationSchema
+from nv_ingest.framework.orchestration_layers.morpheus import start_pipeline_subprocess
+from nv_ingest.framework.orchestration_layers.morpheus import PipelineCreationSchema
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging

@@ -8,8 +8,8 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from nv_ingest.framework.morpheus.stages.extractors.image_extractor_stage import decode_and_extract
-from nv_ingest.framework.morpheus.stages.extractors.image_extractor_stage import process_image
+from nv_ingest.framework.orchestration_layers.morpheus.stages.extractors.image_extractor_stage import decode_and_extract
+from nv_ingest.framework.orchestration_layers.morpheus.stages.extractors.image_extractor_stage import process_image
 
 MODULE_UNDER_TEST = "nv_ingest.stages.extractors.image_extractor_stage"
 

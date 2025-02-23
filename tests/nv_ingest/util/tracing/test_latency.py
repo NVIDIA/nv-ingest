@@ -6,7 +6,7 @@ from unittest.mock import patch
 
 import pytest
 
-from nv_ingest.util.tracing.latency import latency_logger
+from nv_ingest.framework.util.tracing import latency_logger
 
 MODULE_UNDER_TEST = "nv_ingest.util.tracing.latency"
 

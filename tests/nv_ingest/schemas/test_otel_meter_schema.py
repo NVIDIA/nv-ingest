@@ -5,7 +5,6 @@
 
 from nv_ingest.schemas import MessageBrokerClientSchema
 from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
-from nv_ingest.util.message_brokers.client_base import MessageBrokerClientBase
 
 
 def test_otel_meter_schema_defaults():

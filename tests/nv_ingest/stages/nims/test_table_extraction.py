@@ -5,8 +5,8 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from nv_ingest.framework.morpheus.stages.nim.table_extraction import _extract_table_data
-from nv_ingest.framework.morpheus.stages.nim.table_extraction import _update_metadata
+from nv_ingest.framework.orchestration_layers.morpheus.stages.nim.table_extraction import _extract_table_data
+from nv_ingest.framework.orchestration_layers.morpheus.stages.nim.table_extraction import _update_metadata
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 

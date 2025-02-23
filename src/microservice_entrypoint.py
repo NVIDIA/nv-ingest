@@ -13,13 +13,13 @@ from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
 from pydantic import ValidationError
 
-from nv_ingest.framework.morpheus.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.framework.morpheus.util.pipeline.stage_builders import get_default_cpu_count
+from nv_ingest.framework.orchestration_layers.morpheus.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration_layers.morpheus.util.pipeline.stage_builders import get_default_cpu_count
 from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
 from nv_ingest_api.util.converters.containers import merge_dict
 from nv_ingest_api.util.logging.configuration import LogLevel
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
-from nv_ingest.util.schema.schema_validator import validate_schema
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -127,5 +127,6 @@ def cli(
     run_pipeline(morpheus_pipeline_config, final_ingest_config)
 
 
+# TODO: Decouple this from Morpheus
 if __name__ == "__main__":
     cli()
