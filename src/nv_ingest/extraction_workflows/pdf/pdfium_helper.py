@@ -172,15 +172,6 @@ def extract_page_element_images(
             cropped = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
             base64_img = numpy_to_base64(cropped)
 
-            if label == "infographic":
-                import pickle
-                from uuid import uuid4
-
-                fname = f"{str(uuid4())}.pickle"
-                data = {"data": {"base64_image": base64_img}}
-                with open(f"/workspace/data/tmp/0/{fname}", "wb") as f:
-                    pickle.dump(data, f)
-
             page_element_data = CroppedImageWithContent(
                 content="",
                 image=base64_img,
