@@ -20,7 +20,7 @@ from pydantic import ConfigDict, ValidationError
 from pydantic import BaseModel
 
 from nv_ingest.schemas import PipelineConfigSchema
-from nv_ingest.util.converters.containers import merge_dict
+from nv_ingest_api.util.converters.containers import merge_dict
 from morpheus.utils.logger import configure_logging
 from nv_ingest.util.pipeline import setup_ingestion_pipeline
 from morpheus.pipeline.pipeline import Pipeline

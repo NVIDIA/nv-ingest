@@ -5,8 +5,8 @@
 import pytest
 from langdetect import DetectorFactory
 
-from nv_ingest.util.detectors.language import LanguageEnum
-from nv_ingest.util.detectors.language import detect_language
+from nv_ingest_api.util.detectors.language import LanguageEnum
+from nv_ingest_api.util.detectors.language import detect_language
 
 # Ensure langdetect produces consistent results
 DetectorFactory.seed = 0

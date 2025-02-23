@@ -40,7 +40,6 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.schemas.pdf_extractor_schema import NemoRetrieverParseConfigSchema
-from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import LatexTable
@@ -49,6 +48,7 @@ from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest_api.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
+from nv_ingest_api.util.exception_handlers.pdf import pdfium_exception_handler
 from nv_ingest_api.util.image_processing.processing import extract_tables_and_charts_from_image
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 from nv_ingest_api.util.nim import create_inference_client

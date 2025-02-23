@@ -4,7 +4,7 @@
 
 from langdetect.lang_detect_exception import LangDetectException
 
-from nv_ingest.util.exception_handlers.detectors import langdetect_exception_handler
+from nv_ingest_api.util.exception_handlers import langdetect_exception_handler
 
 
 # Sample function to be decorated

@@ -22,7 +22,7 @@ from opentelemetry.trace import StatusCode
 from opentelemetry.trace import TraceFlags
 
 from nv_ingest.schemas.otel_tracer_schema import OpenTelemetryTracerSchema
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import TaskResultStatus
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage

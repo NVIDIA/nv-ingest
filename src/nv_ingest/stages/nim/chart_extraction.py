@@ -17,8 +17,8 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
-from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphic_elements
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
+from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 from nv_ingest_api.primitives.nim import NimClient
 from nv_ingest_api.primitives.nim.models.yolox import YoloxGraphicElementsModelInterface

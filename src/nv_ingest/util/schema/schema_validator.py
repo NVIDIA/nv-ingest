@@ -2,8 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-from nv_ingest.util.exception_handlers.schemas import schema_exception_handler
+from nv_ingest_api.util.exception_handlers.schemas import schema_exception_handler
 
 
 @schema_exception_handler

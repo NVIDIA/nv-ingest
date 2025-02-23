@@ -20,8 +20,8 @@ from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
-from nv_ingest.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
-from nv_ingest.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
+from nv_ingest_api.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest_api.primitives.nim import NimClient
 from nv_ingest_api.primitives.nim.models.yolox import YoloxTableStructureModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy

@@ -12,11 +12,11 @@ from morpheus.utils.module_utils import register_module
 from nv_ingest.schemas import MetadataInjectorSchema
 from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.util.converters.type_mappings import doc_type_to_content_type
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 
 logger = logging.getLogger(__name__)
 

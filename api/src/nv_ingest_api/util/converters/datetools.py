@@ -8,7 +8,7 @@ from datetime import timezone
 
 from dateutil.parser import parse
 
-from nv_ingest.util.exception_handlers.converters import datetools_exception_handler
+from nv_ingest_api.util.exception_handlers.converters import datetools_exception_handler
 
 
 @datetools_exception_handler

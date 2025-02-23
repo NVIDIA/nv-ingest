@@ -4,10 +4,10 @@
 
 import pytest
 
-from nv_ingest.util.converters.bytetools import base64frombytes
-from nv_ingest.util.converters.bytetools import bytesfrombase64
-from nv_ingest.util.converters.bytetools import bytesfromhex
-from nv_ingest.util.converters.bytetools import hexfrombytes
+from nv_ingest_api.util.converters.bytetools import base64frombytes
+from nv_ingest_api.util.converters.bytetools import bytesfrombase64
+from nv_ingest_api.util.converters.bytetools import bytesfromhex
+from nv_ingest_api.util.converters.bytetools import hexfrombytes
 
 
 def test_bytesfromhex_valid_input():

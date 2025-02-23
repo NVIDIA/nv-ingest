@@ -5,7 +5,7 @@
 import json
 import os
 
-from nv_ingest.util.converters.formats import ingest_json_results_to_blob
+from nv_ingest_api.util.converters.formats import ingest_json_results_to_blob
 
 
 sample_result_text_json = """

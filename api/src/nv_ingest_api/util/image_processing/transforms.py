@@ -15,7 +15,7 @@ import numpy as np
 from PIL import Image
 from PIL import UnidentifiedImageError
 
-from nv_ingest.util.converters import bytetools
+from nv_ingest_api.util.converters import bytetools
 
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280

@@ -26,9 +26,9 @@ from nv_ingest.schemas.metadata_schema import NearbyObjectsSchema
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
-from nv_ingest.util.converters import datetools
-from nv_ingest.util.detectors.language import detect_language
-from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
+from nv_ingest_api.util.converters import datetools
+from nv_ingest_api.util.detectors.language import detect_language
+from nv_ingest_api.util.exception_handlers.pdf import pdfium_exception_handler
 
 
 @dataclass

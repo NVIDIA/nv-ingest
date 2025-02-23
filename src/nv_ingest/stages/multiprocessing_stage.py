@@ -22,7 +22,7 @@ from mrc import SegmentObject
 from mrc.core import operators as ops
 from mrc.core.subscriber import Observer
 
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type

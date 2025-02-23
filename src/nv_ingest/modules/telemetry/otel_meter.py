@@ -21,7 +21,7 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.telemetry.global_stats import GlobalStats

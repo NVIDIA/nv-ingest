@@ -4,7 +4,7 @@
 
 import pytest
 
-from nv_ingest.util.exception_handlers.decorators import (
+from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
     nv_ingest_source_failure_context_manager,
     CMNVIngestFailureContextManager,

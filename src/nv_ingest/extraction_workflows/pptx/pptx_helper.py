@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-import io
-
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -18,6 +16,7 @@ import io
 # limitations under the License.
 
 import logging
+import io
 import operator
 import re
 import uuid
@@ -49,8 +48,8 @@ from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
-from nv_ingest.util.converters import bytetools
-from nv_ingest.util.detectors.language import detect_language
+from nv_ingest_api.util.converters import bytetools
+from nv_ingest_api.util.detectors.language import detect_language
 from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
 
 logger = logging.getLogger(__name__)

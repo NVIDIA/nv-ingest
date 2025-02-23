@@ -17,7 +17,7 @@ from morpheus.config import Config
 from nv_ingest.extraction_workflows import docx
 from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.exception_handlers.pdf import create_exception_tag
+from nv_ingest_api.util.exception_handlers.pdf import create_exception_tag
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 

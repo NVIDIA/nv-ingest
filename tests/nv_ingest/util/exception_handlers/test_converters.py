@@ -6,8 +6,8 @@ from datetime import datetime
 from datetime import timedelta
 from datetime import timezone
 
-from nv_ingest.util.converters.datetools import datetools_exception_handler
-from nv_ingest.util.converters.datetools import remove_tz
+from nv_ingest_api.util.converters.datetools import datetools_exception_handler
+from nv_ingest_api.util.converters.datetools import remove_tz
 
 
 # Example functions to test the decorator

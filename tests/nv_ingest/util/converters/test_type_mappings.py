@@ -6,8 +6,8 @@ import pytest
 
 from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.util.converters.type_mappings import DOC_TO_CONTENT_MAP
-from nv_ingest.util.converters.type_mappings import doc_type_to_content_type
+from nv_ingest.util.converters import DOC_TO_CONTENT_MAP
+from nv_ingest.util.converters import doc_type_to_content_type
 
 
 @pytest.mark.parametrize(

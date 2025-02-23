@@ -23,7 +23,7 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
 from redis import RedisError
 
-from nv_ingest.util.converters.formats import ingest_json_results_to_blob
+from nv_ingest_api.util.converters.formats import ingest_json_results_to_blob
 
 from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
 from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob

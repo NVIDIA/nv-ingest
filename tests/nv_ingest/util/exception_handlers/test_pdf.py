@@ -9,8 +9,8 @@ import pytest
 
 from nv_ingest.schemas.metadata_schema import StatusEnum
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum
-from nv_ingest.util.exception_handlers.pdf import create_exception_tag
-from nv_ingest.util.exception_handlers.pdf import pdfium_exception_handler
+from nv_ingest_api.util.exception_handlers import create_exception_tag
+from nv_ingest_api.util.exception_handlers import pdfium_exception_handler
 
 MODULE_UNDER_TEST = "nv_ingest.util.exception_handlers.pdf"
 

@@ -18,7 +18,7 @@ import cudf
 
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum, InfoMessageMetadataSchema, StatusEnum, TaskTypeEnum
-from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.schema.schema_validator import validate_schema
