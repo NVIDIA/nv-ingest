@@ -4,7 +4,7 @@ from typing import Any, Dict
 from unittest.mock import patch, MagicMock
 
 # Import the functions under test from the module.
-from nv_ingest.framework.orchestration_layers.morpheus import (
+from nv_ingest.framework.orchestration.morpheus import (
     _prepare_dataframes_mod,
     _generate_captions,
     caption_extract_stage,

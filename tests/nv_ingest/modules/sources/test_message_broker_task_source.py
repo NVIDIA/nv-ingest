@@ -12,7 +12,7 @@ import pytest
 from pydantic import BaseModel
 
 # Import the functions under test.
-from nv_ingest.framework.orchestration_layers.morpheus import (
+from nv_ingest.framework.orchestration.morpheus import (
     fetch_and_process_messages,
     process_message,
 )

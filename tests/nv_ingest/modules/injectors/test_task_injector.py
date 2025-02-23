@@ -7,7 +7,7 @@ from unittest.mock import MagicMock
 import pytest
 
 try:
-    from nv_ingest.framework.orchestration_layers.morpheus.modules.injectors.task_injection import on_data
+    from nv_ingest.framework.orchestration.morpheus.modules.injectors.task_injection import on_data
 
     morpheus_import = True
 except:

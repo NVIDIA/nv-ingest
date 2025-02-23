@@ -6,7 +6,7 @@
 import pandas as pd
 import pytest
 
-from nv_ingest.framework.orchestration_layers.morpheus.modules.injectors.metadata_injector import on_data
+from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import on_data
 from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
 from nv_ingest.util.converters import doc_type_to_content_type
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage

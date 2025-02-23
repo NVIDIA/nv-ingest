@@ -8,7 +8,7 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel
 
-from nv_ingest.framework.orchestration_layers.morpheus.util.modules.config_validator import (
+from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )
 

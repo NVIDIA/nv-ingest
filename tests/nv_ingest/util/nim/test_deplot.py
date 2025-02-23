@@ -8,8 +8,10 @@ from io import BytesIO
 import base64
 from PIL import Image
 
+from nv_ingest_api.primitives.nim.model_interface.deplot import DeplotModelInterface
+
+
 # Importing the class under test
-from nv_ingest.util.nim.deplot import DeplotModelInterface
 
 
 @pytest.fixture

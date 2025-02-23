@@ -8,9 +8,10 @@ import pytest
 
 from io import BytesIO
 
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.nim.cached import CachedModelInterface
 from PIL import Image
+
+from nv_ingest_api.primitives.nim.model_interface.cached import CachedModelInterface
+from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 
 @pytest.fixture

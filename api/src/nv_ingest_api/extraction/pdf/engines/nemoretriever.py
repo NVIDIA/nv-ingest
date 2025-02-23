@@ -40,7 +40,7 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.schemas.pdf_extractor_schema import NemoRetrieverParseConfigSchema
-from nv_ingest.util.nim import nemoretriever_parse as nemoretriever_parse_utils
+from nv_ingest_api.primitives.nim.model_interface import nemoretriever_parse as nemoretriever_parse_utils
 from nv_ingest_api.util.metadata.aggregators import (
     extract_pdf_metadata,
     LatexTable,

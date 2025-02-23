@@ -31,7 +31,7 @@ from wand.image import Image as WandImage
 
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest_api.primitives.nim.models.yolox import YoloxPageElementsModelInterface
+from nv_ingest_api.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
 from nv_ingest_api.util.metadata.aggregators import (
     CroppedImageWithContent,

@@ -4,20 +4,9 @@
 
 from unittest.mock import Mock, patch
 import numpy as np
-import packaging.version
 import pytest
 
-import requests
-
-from nv_ingest.util.nim.helpers import (
-    NimClient,
-    create_inference_client,
-    preprocess_image_for_paddle,
-    generate_url,
-    remove_url_endpoints,
-    is_ready,
-    get_version,
-)
+from nv_ingest_api.primitives.nim import NimClient
 
 MODULE_UNDER_TEST = "nv_ingest.util.nim.helpers"
 
