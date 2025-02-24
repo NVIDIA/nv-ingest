@@ -3,9 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-def generate_text_embedding_from_primitive():
+def store_embeddings():
     pass
 
 
-def split_text():
+def store_images():
     pass

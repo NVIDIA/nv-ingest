@@ -43,6 +43,7 @@ def extract_primitives_from_pdf(
     ----------
     df_extraction_ledger : pandas.DataFrame
         The extraction ledger containing the PDF documents to process.
+        # TODO(Devin): Add more details about the expected structure of the DataFrame.
     extract_method : str, default "pdfium"
         **Required.** Specifies which extraction method to use. This value determines which Pydantic
         schema is used to validate method-specific configuration options (e.g., "pdfium" or "tika").
@@ -102,4 +103,12 @@ def extract_primitives_from_docx():
 
 
 def extract_primitives_from_image():
+    pass
+
+
+def extract_structured_data_from_chart():
+    pass
+
+
+def extract_structured_data_from_table():
     pass
