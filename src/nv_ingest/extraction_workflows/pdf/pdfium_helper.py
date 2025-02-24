@@ -81,6 +81,7 @@ def extract_page_elements_using_image_ensemble(
         # Collect all page indices and images in order.
         image_page_indices = [page[0] for page in pages]
         original_images = [page[1] for page in pages]
+        padding_offsets = [page[2] for page in pages]
 
         # Prepare the data payload with all images.
         data = {"images": original_images}
@@ -95,12 +96,18 @@ def extract_page_elements_using_image_ensemble(
         )
 
         # Process results: iterate over each image's inference output.
-        for annotation_dict, page_index, original_image in zip(inference_results, image_page_indices, original_images):
+        for annotation_dict, page_index, original_image, padding in zip(
+            inference_results,
+            image_page_indices,
+            original_images,
+            padding_offsets,
+        ):
             extract_page_element_images(
                 annotation_dict,
                 original_image,
                 page_index,
                 page_elements,
+                padding,
             )
 
     except TimeoutError:
@@ -126,6 +133,7 @@ def extract_page_element_images(
     original_image,
     page_idx,
     page_elements,
+    padding,
 ):
     """
     Handle the extraction of page elements from the inference results and run additional model inference.
@@ -154,8 +162,9 @@ def extract_page_element_images(
     >>> page_elements = []
     >>> extract_page_element_images(annotation_dict, original_image, 0, page_elements)
     """
+    orig_width, orig_height, *_ = original_image.shape
+    pad_width, pad_height = padding
 
-    width, height, *_ = original_image.shape
     for label in ["table", "chart", "infographic"]:
         if not annotation_dict:
             continue
@@ -167,17 +176,26 @@ def extract_page_element_images(
 
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = bbox
+            w1, h1, w2, h2 = bbox
 
-            cropped = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
+            cropped = crop_image(original_image, (int(w1), int(h1), int(w2), int(h2)))
             base64_img = numpy_to_base64(cropped)
+
+            bbox_in_original_coord = (
+                int(w1 - pad_width),
+                int(h1 - pad_height),
+                int(w2 - pad_width),
+                int(h2 - pad_height),
+            )
+            max_width = orig_width - 2 * pad_width
+            max_height = orig_height - 2 * pad_height
 
             page_element_data = CroppedImageWithContent(
                 content="",
                 image=base64_img,
-                bbox=(int(w1), int(h1), int(w2), int(h2)),
-                max_width=width,
-                max_height=height,
+                bbox=bbox_in_original_coord,
+                max_width=max_width,
+                max_height=max_height,
                 type_string=label,
             )
             page_elements.append((page_idx, page_element_data))
@@ -385,10 +403,13 @@ def pdfium_extractor(
 
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts:
-                image, _ = pdfium_pages_to_numpy(
-                    [page], scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT), trace_info=trace_info
+                image, padding_offsets = pdfium_pages_to_numpy(
+                    [page],
+                    scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+                    padding_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+                    trace_info=trace_info,
                 )
-                pages_for_tables.append((page_idx, image[0]))
+                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
 
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:

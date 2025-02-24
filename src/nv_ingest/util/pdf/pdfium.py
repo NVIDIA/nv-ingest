@@ -180,8 +180,10 @@ def pdfium_pages_to_numpy(
 
         # Apply padding if specified
         if padding_tuple:
-            img_arr, padding_offset = pad_image(img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1])
-            padding_offsets.append(padding_offset)
+            img_arr, (pad_width, pad_height) = pad_image(
+                img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1]
+            )
+            padding_offsets.append((pad_width, pad_height))
         else:
             padding_offsets.append((0, 0))
 
