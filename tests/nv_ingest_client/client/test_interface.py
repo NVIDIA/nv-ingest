@@ -259,12 +259,10 @@ def test_ingest_async(ingestor, mock_client):
     ingestor._job_states["job_id_2"] = MagicMock(state=JobStateEnum.FAILED)
 
     mock_client.fetch_job_result.side_effect = lambda job_id, *args, **kwargs: (
-        "result_1" if job_id == "job_id_1" else "result_2"
+        ["result_1"] if job_id == "job_id_1" else ["result_2"]
     )
 
-    combined_future = ingestor.ingest_async(timeout=15)
-    combined_result = combined_future.result()
-
+    combined_result = ingestor.ingest_async(timeout=15).result()
     assert combined_result == ["result_1", "result_2"]
 
 

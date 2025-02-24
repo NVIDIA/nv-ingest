@@ -144,3 +144,24 @@ RUN source activate nv_ingest_runtime && \
     pip install -e ./client
 
 CMD ["/bin/bash"]
+
+
+FROM nv_ingest_install AS docs
+
+# Install dependencies needed for docs generation
+RUN apt-get update && apt-get install -y \
+      make \
+    && apt-get clean
+
+COPY docs docs
+
+# Docs needs all the source code present so add it to the container
+COPY src src
+COPY api api
+COPY client client
+
+RUN source activate nv_ingest_runtime && \
+    pip install -r ./docs/requirements.txt
+
+# Default command: Run `make docs`
+CMD ["bash", "-c", "cd /workspace/docs && source activate nv_ingest_runtime && make docs"]

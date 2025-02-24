@@ -51,7 +51,7 @@ Options:
                                   - extract: Extracts content from documents, customizable per document type.
                                       Can be specified multiple times for different 'document_type' values.
                                       Options:
-                                      - document_type (str): Document format ('pdf', 'docx', 'pptx', 'html', 'xml', 'excel', 'csv', 'parquet'). Required.
+                                      - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
                                       - text_depth (str): Depth at which text parsing occurs ('document', 'page'), additional text_depths are partially supported and depend on the specified extraction method ('block', 'line', 'span')
                                       - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
                                       - extract_text (bool): Enables text extraction. Default: False.
