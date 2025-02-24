@@ -27,7 +27,9 @@ from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.milvus import MilvusOperator
 
-MODULE_UNDER_TEST = "nv_ingest_client.client.interface"
+import nv_ingest_client.client.interface as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 @pytest.fixture

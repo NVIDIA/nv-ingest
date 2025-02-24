@@ -29,15 +29,16 @@ import numpy as np
 from PIL import Image
 from wand.image import Image as WandImage
 
-import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.util.image_processing.transforms import crop_image
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
-from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
+from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
+from nv_ingest_api.util.metadata.aggregators import (
+    CroppedImageWithContent,
+    construct_table_and_chart_metadata,
+    construct_image_metadata_from_base64,
+)
+from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)
 
@@ -201,7 +202,7 @@ def extract_tables_and_charts_from_images(
     yolox_client = None
 
     try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
+        model_interface = YoloxPageElementsModelInterface()
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,

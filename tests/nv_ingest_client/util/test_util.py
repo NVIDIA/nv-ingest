@@ -10,7 +10,9 @@ from nv_ingest_client.cli.util.click import generate_matching_files
 from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.util import ClientConfigSchema
 
-_MODULE_UNDER_TEST = "nv_ingest_client.util.util"
+import nv_ingest_client.util.util as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 # @pytest.mark.parametrize(
@@ -113,7 +115,6 @@ def test_generate_matching_directory():
     with patch("glob.glob", return_value=mock_files), patch(
         "os.path.isfile", side_effect=lambda path: path in mock_files
     ), patch("os.path.isdir", side_effect=lambda path: path == "docs"):
-
         assert list(generate_matching_files(patterns)) == expected
 
 

@@ -8,13 +8,11 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel
 
-from ....import_checks import CUDA_DRIVER_OK
-from ....import_checks import MORPHEUS_IMPORT_OK
+from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
+    fetch_and_validate_module_config,
+)
 
-if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
-
-MODULE_UNDER_TEST = "nv_ingest.util.modules.config_validator"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.util.modules.config_validator"
 
 
 class SampleSchema(BaseModel):
@@ -31,11 +29,6 @@ class Builder:
 mock_builder = Mock(spec=Builder)
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
 def test_fetch_and_validate_module_config_valid():
     """
     Test the function with a valid module configuration.
@@ -49,11 +42,6 @@ def test_fetch_and_validate_module_config_valid():
     assert validated_config.age == 30
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
 @patch(f"{MODULE_UNDER_TEST}.logger")
 def test_fetch_and_validate_module_config_invalid(mock_logger):
     """
@@ -70,11 +58,6 @@ def test_fetch_and_validate_module_config_invalid(mock_logger):
     assert "Invalid configuration: age: Field required" in str(exc_info.value)
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
 def test_fetch_and_validate_module_config_raises_with_no_config():
     """
     Test the function when no configuration is provided, ensuring it raises a ValueError.

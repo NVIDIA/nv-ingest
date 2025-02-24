@@ -3,20 +3,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import logging
+import os
 
-from morpheus.config import Config
+import click
+from morpheus.config import Config, ExecutionMode
 from morpheus.config import CppConfig
 from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
 from pydantic import ValidationError
 
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_default_cpu_count
 from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
-from nv_ingest.util.converters.containers import merge_dict
-from nv_ingest.util.logging.configuration import LogLevel
-from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
-from nv_ingest.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.util.schema.schema_validator import validate_schema
-from nv_ingest.util.pipeline.stage_builders import *
+from nv_ingest_api.util.converters.containers import merge_dict
+from nv_ingest_api.util.logging.configuration import LogLevel
+from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -88,9 +91,10 @@ def cli(
     logging.basicConfig(level=log_level, format="%(asctime)s - %(levelname)s - %(message)s")
     configure_logging(log_level=log_level)
 
-    CppConfig.set_should_use_cpp(use_cpp)
+    CppConfig.set_should_use_cpp(False)
 
     morpheus_pipeline_config = Config()
+    morpheus_pipeline_config.execution_mode = ExecutionMode.CPU
     morpheus_pipeline_config.debug = True if log_level == "DEBUG" else False
     morpheus_pipeline_config.log_level = log_level
     morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
@@ -123,5 +127,6 @@ def cli(
     run_pipeline(morpheus_pipeline_config, final_ingest_config)
 
 
+# TODO: Decouple this from Morpheus
 if __name__ == "__main__":
     cli()

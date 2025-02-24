@@ -7,9 +7,9 @@ from datetime import timezone
 
 import pytest
 
-from nv_ingest.util.converters.datetools import datetimefrompdfmeta
-from nv_ingest.util.converters.datetools import remove_tz
-from nv_ingest.util.converters.datetools import validate_iso8601
+from nv_ingest_api.util.converters.datetools import datetimefrompdfmeta
+from nv_ingest_api.util.converters.datetools import remove_tz
+from nv_ingest_api.util.converters.datetools import validate_iso8601
 
 
 @pytest.mark.parametrize(
