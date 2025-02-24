@@ -96,7 +96,7 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
         ) from e
 
     if task_keys is None:
-        task_keys = ["extract_text", "extract_images", "extract_tables", "extract_charts"]
+        task_keys = []
 
     def decorator(user_fn):
         @functools.wraps(user_fn)

@@ -118,14 +118,7 @@ def test_interface_default_task_keys_pdfium():
     ret_ledger, task_config, extractor_config, trace_log = ret
     assert ret_ledger == ledger
     # Default task_keys should have been used.
-    expected_task_config = {
-        "params": {
-            "extract_text": True,
-            "extract_images": False,
-            "extract_tables": True,
-            "extract_charts": False,
-        }
-    }
+    expected_task_config = {"params": {}}
     assert task_config == expected_task_config
     expected_extractor_config = {
         "pdfium_config": {
@@ -153,14 +146,7 @@ def test_interface_default_task_keys_tika():
     )
     ret_ledger, task_config, extractor_config, trace_log = ret
     assert ret_ledger == ledger
-    expected_task_config = {
-        "params": {
-            "extract_text": False,
-            "extract_images": True,
-            "extract_tables": False,
-            "extract_charts": True,
-        }
-    }
+    expected_task_config = {"params": {}}
     assert task_config == expected_task_config
     expected_extractor_config = {"tika_config": {"tika_server_url": "http://tika.server"}}
     assert extractor_config == expected_extractor_config
