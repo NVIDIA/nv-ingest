@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .associate_nearby_text import AssociateNearbyTextLoaderFactory
 from .text_splitter import TextSplitterLoaderFactory
 
-__all__ = ["TextSplitterLoaderFactory", "AssociateNearbyTextLoaderFactory"]
+__all__ = ["TextSplitterLoaderFactory"]

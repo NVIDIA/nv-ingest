@@ -7,17 +7,8 @@ import pytest
 from minio import Minio
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-
-from ....import_checks import CUDA_DRIVER_OK
-from ....import_checks import MORPHEUS_IMPORT_OK
-
-if CUDA_DRIVER_OK and MORPHEUS_IMPORT_OK:
-    from morpheus.messages import ControlMessage
-    from morpheus.messages import MessageMeta
-
-    import cudf
-
-    from nv_ingest.modules.storages.image_storage import upload_images
+from nv_ingest.modules.storages.image_storage import upload_images
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 
 class MockMinioClient:
@@ -47,11 +38,6 @@ def mock_minio(mocker):
     yield patched
 
 
-@pytest.mark.skipif(not MORPHEUS_IMPORT_OK, reason="Morpheus modules are not available.")
-@pytest.mark.skipif(
-    not CUDA_DRIVER_OK,
-    reason="Test environment does not have a compatible CUDA driver.",
-)
 def test_upload_images(mock_minio):
     df = pd.DataFrame(
         {
@@ -75,13 +61,9 @@ def test_upload_images(mock_minio):
     )
     params = {"content_types": {"image": True, "structured": True}}
 
-    gdf = cudf.from_pandas(df)
-    msg = ControlMessage()
-    meta = MessageMeta(df=gdf)
-    msg.payload(meta)
-
-    with msg.payload().mutable_dataframe() as mdf:
-        df = mdf.to_pandas()
+    msg = IngestControlMessage()
+    msg.payload(df)
+    df = msg.payload()
 
     result = upload_images(df, params)
     uploaded_image_url = result.iloc[1]["metadata"]["image_metadata"]["uploaded_image_url"]

@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import os
+import typing
 
 from morpheus.config import Config
 from morpheus.pipeline.pipeline import Pipeline
@@ -87,9 +89,11 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_storage_stage, embedding_storage_stage)
     pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
+
     if add_meter_stage:
         pipe.add_edge(sink_stage, otel_meter_stage)
         pipe.add_edge(otel_meter_stage, otel_tracer_stage)
     else:
         pipe.add_edge(sink_stage, otel_tracer_stage)
+
     pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)

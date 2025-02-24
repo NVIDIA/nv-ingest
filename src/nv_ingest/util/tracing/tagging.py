@@ -11,7 +11,7 @@ from datetime import datetime
 
 def traceable(trace_name=None):
     """
-    A decorator that adds entry and exit trace timestamps to a ControlMessage's metadata
+    A decorator that adds entry and exit trace timestamps to a IngestControlMessage's metadata
     based on the presence of a 'config::add_trace_tagging' flag.
 
     This decorator checks if the 'config::add_trace_tagging' flag is set to True in the
@@ -31,8 +31,8 @@ def traceable(trace_name=None):
 
     Notes
     -----
-    The decorated function must accept a ControlMessage object as its first argument. The
-    ControlMessage object must implement `has_metadata`, `get_metadata`, and `set_metadata`
+    The decorated function must accept a IngestControlMessage object as its first argument. The
+    IngestControlMessage object must implement `has_metadata`, `get_metadata`, and `set_metadata`
     methods used by the decorator to check for the trace tagging flag and to add trace metadata.
 
     The trace metadata added by the decorator includes two entries:
@@ -54,7 +54,7 @@ def traceable(trace_name=None):
     ...     pass
 
     In both examples, `process_message` will have entry and exit timestamps added to the
-    ControlMessage's metadata if 'config::add_trace_tagging' is True.
+    IngestControlMessage's metadata if 'config::add_trace_tagging' is True.
 
     """
 

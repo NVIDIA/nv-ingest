@@ -240,7 +240,6 @@ def _extract_page_images(
                 extracted_images.append(image_meta)
             except Exception as e:
                 logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
-                # continue extracting other images
 
     return extracted_images
 
