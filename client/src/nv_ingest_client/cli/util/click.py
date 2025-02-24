@@ -26,8 +26,6 @@ from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
-from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionSchema
-from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
