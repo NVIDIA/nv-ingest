@@ -23,8 +23,6 @@ concurrency:
 jobs:
   build:
     runs-on: linux-large-disk
-    container:
-      image: ubuntu:latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -32,37 +30,33 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v5
 
-      - name: Install system deps
-        run: |
-          apt-get update && apt-get install -y make git python3-full
+      # Set up Docker Buildx, useful for building multi-platform images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-      # Install dependencies from docs/requirements.txt
-      - name: Install mkdocs dependencies
+      # Build the Docker image using the Dockerfile
+      - name: Build Docker image
         run: |
-          python3 -m venv venv
-          . venv/bin/activate
-          pip install -r docs/requirements.txt
+          docker build --target docs --build-arg GIT_COMMIT=${GITHUB_SHA} -t nv-ingest-docs:latest .
 
-      - name: Build Sphinx API Docs
+      - name: Run the container
         run: |
-          . venv/bin/activate
-          cd api
-          pip install -e .
-          cd ../
-          cd docs/sphinx_docs
-          make html
-          cd ../../
-          mv docs/sphinx_docs/build/html docs/docs/user-guide/api_docs
+          CONTAINER_ID=$(docker run -d nv-ingest-docs:latest)
+          echo "CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_ENV
 
-      - name: Build MkDocs Site
-        run: |
-          . venv/bin/activate
-          mkdocs build --config-file docs/mkdocs.yml
+      - name: Wait for the docs generation to complete in the container
+        run: docker wait $CONTAINER_ID
+
+      - name: Copy generated docs site from the container
+        run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
+
+      - name: Stop and remove the container
+        run: docker rm $CONTAINER_ID
 
       - name: Upload Site Artifacts
         uses: actions/upload-pages-artifact@v3
         with:
-          path: ./docs/site
+          path: ./generated-site
 
   deploy:
     needs:
