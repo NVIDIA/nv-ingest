@@ -15,7 +15,7 @@ from unittest.mock import patch
 
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
-MODULE_UNDER_TEST = "nv_ingest.util.exception_handlers.decorators"
+MODULE_UNDER_TEST = "nv_ingest_api.util.exception_handlers.decorators"
 
 
 # A minimal dummy IngestControlMessage for testing purposes.

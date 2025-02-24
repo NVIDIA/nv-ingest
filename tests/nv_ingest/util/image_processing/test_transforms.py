@@ -12,11 +12,13 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from nv_ingest.util.image_processing.transforms import base64_to_numpy
-from nv_ingest.util.image_processing.transforms import check_numpy_image_size
-from nv_ingest.util.image_processing.transforms import ensure_base64_is_png
-from nv_ingest.util.image_processing.transforms import numpy_to_base64
-from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
+from nv_ingest_api.util.image_processing.transforms import (
+    numpy_to_base64,
+    base64_to_numpy,
+    check_numpy_image_size,
+    scale_image_to_encoding_size,
+    ensure_base64_is_png,
+)
 
 
 # Helper function to create a base64-encoded string from an image

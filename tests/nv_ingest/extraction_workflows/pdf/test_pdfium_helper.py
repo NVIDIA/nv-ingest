@@ -9,8 +9,8 @@ from io import StringIO
 import pandas as pd
 import pytest
 
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import pdfium_extractor
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
+from nv_ingest_api.extraction.pdf.engines import pdfium_extractor
 
 
 @pytest.fixture

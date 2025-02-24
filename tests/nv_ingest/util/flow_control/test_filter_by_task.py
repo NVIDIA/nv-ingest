@@ -4,7 +4,8 @@
 
 from pydantic import BaseModel
 
-from nv_ingest.framework.util.flow_control import _is_subset, filter_by_task
+from nv_ingest.framework.util.flow_control import filter_by_task
+from nv_ingest.framework.util.flow_control.filter_by_task import _is_subset
 
 
 # =============================================================================

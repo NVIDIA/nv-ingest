@@ -2,15 +2,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import json
 import random
-import re
-import uuid
 from concurrent.futures import Future
-from concurrent.futures import as_completed
 from unittest.mock import MagicMock
 from unittest.mock import Mock
-from unittest.mock import mock_open
 from unittest.mock import patch
 
 import pytest
@@ -23,7 +18,9 @@ from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import TaskType
 
-MODULE_UNDER_TEST = "nv_ingest_client.client.client"
+import nv_ingest_client.client.client as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 class MockClient:

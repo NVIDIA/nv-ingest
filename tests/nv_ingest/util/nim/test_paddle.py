@@ -7,9 +7,10 @@ import io
 import numpy as np
 from PIL import Image
 
+import nv_ingest_api.primitives.nim.model_interface.paddle as module_under_test
 from nv_ingest_api.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 
-_MODULE_UNDER_TEST = "nv_ingest.util.nim.paddle"
+_MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 def create_valid_base64_image(width=32, height=32, color=(127, 127, 127)):

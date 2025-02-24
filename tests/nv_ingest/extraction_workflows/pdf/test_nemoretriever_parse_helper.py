@@ -5,9 +5,10 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from nv_ingest_api.extraction.pdf.engines import nemoretriever_parse
+from nv_ingest_api.extraction.pdf.engines.nemoretriever import nemoretriever_parse_extractor
 
-_MODULE_UNDER_TEST = "nv_ingest.extraction_workflows.pdf.nemoretriever_parse_helper"
+
+_MODULE_UNDER_TEST = "nv_ingest_api.util.nim"
 
 
 @pytest.fixture
@@ -48,7 +49,7 @@ def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, doc
         ]
     ]
 
-    result = nemoretriever_parse(
+    result = nemoretriever_parse_extractor(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
@@ -80,7 +81,7 @@ def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, do
         ]
     ]
 
-    result = nemoretriever_parse(
+    result = nemoretriever_parse_extractor(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,
@@ -114,7 +115,7 @@ def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, do
         ]
     ]
 
-    result = nemoretriever_parse(
+    result = nemoretriever_parse_extractor(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=True,
@@ -153,7 +154,7 @@ def test_nemoretriever_parse_text_extraction_bboxes(mock_client, sample_pdf_stre
         ]
     ]
 
-    result = nemoretriever_parse(
+    result = nemoretriever_parse_extractor(
         pdf_stream=sample_pdf_stream,
         extract_text=True,
         extract_images=False,

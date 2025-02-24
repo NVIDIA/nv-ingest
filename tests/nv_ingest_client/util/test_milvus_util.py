@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 from nv_ingest_client.util.milvus import MilvusOperator, _dict_to_params
 

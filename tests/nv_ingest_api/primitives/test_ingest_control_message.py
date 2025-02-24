@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import re
 
 from nv_ingest_api.primitives.control_message_task import ControlMessageTask

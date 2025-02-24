@@ -6,9 +6,10 @@ from unittest.mock import patch
 
 import pytest
 
+import nv_ingest.framework.util.tracing.latency as module_under_test
 from nv_ingest.framework.util.tracing import latency_logger
 
-MODULE_UNDER_TEST = "nv_ingest.util.tracing.latency"
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 class MockControlMessage:

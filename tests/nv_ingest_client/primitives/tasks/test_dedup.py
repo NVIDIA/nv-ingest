@@ -5,8 +5,6 @@
 import pytest
 from nv_ingest_client.primitives.tasks.dedup import DedupTask
 
-# Initialization and Property Setting
-
 
 def test_dedup_task_initialization():
     task = DedupTask(

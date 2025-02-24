@@ -4,11 +4,14 @@ import pytest
 import pandas as pd
 import numpy as np
 
+from nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction import (
+    _update_metadata,
+    _create_clients,
+    _extract_chart_data,
+)
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-from nv_ingest.framework.orchestration.morpheus.stages.nim import _update_metadata, _create_clients
-from nv_ingest.framework.orchestration.morpheus.stages.nim import _extract_chart_data
 
-MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction"
 
 
 @pytest.fixture

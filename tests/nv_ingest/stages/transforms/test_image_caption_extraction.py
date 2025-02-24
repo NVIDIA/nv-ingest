@@ -1,17 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import unittest
 import pandas as pd
 from typing import Any, Dict
 from unittest.mock import patch, MagicMock
 
-# Import the functions under test from the module.
-from nv_ingest.framework.orchestration.morpheus import (
+from nv_ingest.framework.orchestration.morpheus.stages.transforms.image_caption_extraction import (
     _prepare_dataframes_mod,
     _generate_captions,
     caption_extract_stage,
 )
 
+# Import the functions under test from the module.
 # Define the module path for patching.
-MODULE_UNDER_TEST = "nv_ingest.stages.transforms.image_caption_extraction"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.stages.transforms.image_caption_extraction"
 
 
 # For testing _prepare_dataframes_mod we need to supply a dummy for ContentTypeEnum.

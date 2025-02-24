@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import base64
 from unittest.mock import MagicMock
 from unittest.mock import patch
@@ -11,7 +12,7 @@ import pytest
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.image_extractor_stage import decode_and_extract
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.image_extractor_stage import process_image
 
-MODULE_UNDER_TEST = "nv_ingest.stages.extractors.image_extractor_stage"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.stages.extractors.image_extractor_stage"
 
 
 # Define the test function using pytest

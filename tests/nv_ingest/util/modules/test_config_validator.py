@@ -12,7 +12,7 @@ from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator im
     fetch_and_validate_module_config,
 )
 
-MODULE_UNDER_TEST = "nv_ingest.util.modules.config_validator"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.util.modules.config_validator"
 
 
 class SampleSchema(BaseModel):

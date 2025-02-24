@@ -6,8 +6,8 @@ import pandas as pd
 import pytest
 from minio import Minio
 
+from nv_ingest.framework.orchestration.morpheus.modules.storages.image_storage import upload_images
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.framework.orchestration.morpheus import upload_images
 from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 

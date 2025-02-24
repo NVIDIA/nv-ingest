@@ -1,9 +1,15 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from datetime import datetime
 
 from morpheus.messages import ControlMessage
 
-from nv_ingest.framework.orchestration.morpheus.modules.telemetry import extract_annotated_task_results
-from nv_ingest.framework.orchestration.morpheus.modules.telemetry import extract_timestamps_from_message
+from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
+    extract_annotated_task_results,
+    extract_timestamps_from_message,
+)
 
 
 def test_extract_timestamps_single_task():

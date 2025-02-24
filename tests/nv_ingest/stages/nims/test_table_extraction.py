@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
@@ -8,7 +12,7 @@ import pytest
 from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction import _extract_table_data
 from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction import _update_metadata
 
-MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
+MODULE_UNDER_TEST = "nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction"
 
 
 @pytest.fixture

@@ -19,7 +19,9 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 
-_MODULE_UNDER_TEST = "nv_ingest_client.cli.util.click"
+import nv_ingest_client.cli.util.click as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 def test_click_validate_file_exists_with_existing_file(tmp_path):
@@ -82,7 +84,7 @@ def test_validate_batch_size_invalid():
 
 
 # Testing debug_print_click_options
-@patch(f"{_MODULE_UNDER_TEST}.pprint")
+@patch(f"{MODULE_UNDER_TEST}.pprint")
 def test_debug_print_click_options(mock_pprint):
     mock_ctx = Mock()
     mock_ctx.command.params = [click.Option(["--test"], is_flag=False)]
@@ -152,7 +154,7 @@ def test_validate_task_with_incomplete_options():
     assert len(exc_info.value.args) == 1
 
 
-@patch(f"{_MODULE_UNDER_TEST}.check_schema", side_effect=ValueError("Unsupported task type"))
+@patch(f"{MODULE_UNDER_TEST}.check_schema", side_effect=ValueError("Unsupported task type"))
 def test_validate_task_with_invalid_task(mock_check_schema):
     """Test with unsupported task type."""
     value = ['unsupported:{"some_option": "value"}']
@@ -160,7 +162,7 @@ def test_validate_task_with_invalid_task(mock_check_schema):
         click_validate_task(None, None, value)
 
 
-@patch(f"{_MODULE_UNDER_TEST}.check_schema")
+@patch(f"{MODULE_UNDER_TEST}.check_schema")
 def test_validate_task_with_malformed_string(mock_check_schema):
     """Test with malformed task string."""
     mock_check_schema.side_effect = json.JSONDecodeError("Expecting value", "malformed_json", 0)
@@ -170,7 +172,7 @@ def test_validate_task_with_malformed_string(mock_check_schema):
     assert "Unsupported task type" in str(exc_info.value)
 
 
-@patch(f"{_MODULE_UNDER_TEST}.check_schema")
+@patch(f"{MODULE_UNDER_TEST}.check_schema")
 def test_validate_task_with_json_error(mock_check_schema):
     """Test handling of JSON decode error."""
     mock_check_schema.side_effect = json.JSONDecodeError("Expecting value", "{malformed_json", 1)
@@ -240,12 +242,12 @@ def test_empty_file_list(tmp_path):
 
 
 def test_click_match_and_validate_files_found():
-    with patch(f"{_MODULE_UNDER_TEST}.generate_matching_files", return_value=iter(["file1.txt", "file2.txt"])):
+    with patch(f"{MODULE_UNDER_TEST}.generate_matching_files", return_value=iter(["file1.txt", "file2.txt"])):
         result = click_match_and_validate_files(None, None, ["*.txt"])
         assert result == ["file1.txt", "file2.txt"]
 
 
 def test_click_match_and_validate_files_not_found():
-    with patch(f"{_MODULE_UNDER_TEST}.generate_matching_files", return_value=iter([])):
+    with patch(f"{MODULE_UNDER_TEST}.generate_matching_files", return_value=iter([])):
         result = click_match_and_validate_files(None, None, ["*.txt"])
         assert result == []
