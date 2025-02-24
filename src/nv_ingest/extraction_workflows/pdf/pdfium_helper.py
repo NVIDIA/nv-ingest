@@ -194,11 +194,8 @@ def _extract_page_text(page) -> str:
     Always extract text from the given page and return it as a raw string.
     The caller decides whether to use per-page or doc-level logic.
     """
-
     textpage = page.get_textpage()
-    text = textpage.get_text_bounded()
-
-    return text
+    return textpage.get_text_bounded()
 
 
 def _extract_page_images(
@@ -413,6 +410,8 @@ def pdfium_extractor(
                     futures.append(future)
                     pages_for_tables.clear()
 
+            page.close()
+
         # After page loop, if we still have leftover pages_for_tables, submit one last job
         if (extract_tables or extract_charts) and pages_for_tables:
             future = executor.submit(
@@ -448,8 +447,5 @@ def pdfium_extractor(
             base_unified_metadata,
         )
         extracted_data.append(doc_text_meta)
-
-    doc.close()
-    del doc
 
     return extracted_data

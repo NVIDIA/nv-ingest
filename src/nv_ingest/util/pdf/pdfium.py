@@ -172,9 +172,6 @@ def pdfium_pages_to_numpy(
         # Convert the bitmap to a PIL image
         pil_image = page_bitmap.to_pil()
 
-        # Proactively close the bitmap to release its shared frame buffer
-        page_bitmap.close()
-
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
             pil_image.thumbnail(scale_tuple, PIL.Image.LANCZOS)
