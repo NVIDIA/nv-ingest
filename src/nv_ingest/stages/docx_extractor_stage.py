@@ -140,7 +140,8 @@ def _process_docx_bytes(df, task_props, validated_config: Any, trace_info: Optio
 
     except Exception as e:
         err_msg = f"_process_docx_bytes: Failed to extract text from document. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
+        logger.exception(err_msg)
+
         traceback.print_exc()
 
         raise type(e)(err_msg) from e
