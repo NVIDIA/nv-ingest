@@ -13,8 +13,11 @@ from nv_ingest_api.extraction.pdf.engines.pdfium_helpers import _orchestrate_row
 logger = logging.getLogger(__name__)
 
 
-def extract_primitives_from_pdf(
-    df_extraction_ledger: pd.DataFrame, config: Dict[str, Any], execution_trace_log: Optional[List[Any]] = None
+def extract_primitives_from_pdf_internal(
+    df_extraction_ledger: pd.DataFrame,
+    task_config: Dict[str, Any],
+    extractor_config: Any,
+    execution_trace_log: Optional[List[Any]] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Process a DataFrame of PDF documents by orchestrating extraction for each row.
@@ -28,9 +31,11 @@ def extract_primitives_from_pdf(
     df_extraction_ledger : pd.DataFrame
         A pandas DataFrame containing PDF documents. Must include a 'content' column
         with base64-encoded PDF data.
-    config : dict
+    task_config: dict
         A dictionary of configuration parameters. Expected to include 'task_properties'
         and 'validated_config' keys.
+    extractor_config: Any
+        A dictionary of configuration parameters for the extraction process.
     execution_trace_log : list, optional
         A list for accumulating trace information during extraction. Defaults to None.
 
@@ -47,8 +52,8 @@ def extract_primitives_from_pdf(
         If an error occurs during the extraction process on any row.
     """
     try:
-        task_config = config.get("task_config", {})
-        extractor_config = config.get("extractor_config", {})
+        task_config = task_config
+        extractor_config = extractor_config
 
         # Apply the orchestration function to each row.
         extraction_series = df_extraction_ledger.apply(

@@ -13,13 +13,16 @@ import pandas as pd
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
 
-from nv_ingest_api.extraction.pdf.pdf_extractor import extract_primitives_from_pdf
+from nv_ingest_api.extraction.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def _inject_validated_config(
-    df_payload: pd.DataFrame, config: Dict, tracing_info: Optional[List[Any]] = None, validated_config: Any = None
+    df_extraction_ledger: pd.DataFrame,
+    task_config: Dict,
+    execution_trace_log: Optional[List[Any]] = None,
+    validated_config: Any = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Helper function that injects the validated_config into the config dictionary and
@@ -29,9 +32,9 @@ def _inject_validated_config(
     ----------
     df_payload : pd.DataFrame
         A DataFrame containing PDF documents.
-    config : dict
+    task_config : dict
         A dictionary of configuration parameters. Expected to include 'task_props'.
-    tracing_info : list, optional
+    execution_trace_log : list, optional
         Optional list for trace information.
     validated_config : Any, optional
         The validated configuration to be injected.
@@ -42,9 +45,12 @@ def _inject_validated_config(
         The result from extract_primitives_from_pdf.
     """
 
-    updated_config = {"task_config": config, "extractor_config": validated_config}
-
-    return extract_primitives_from_pdf(df_payload, updated_config, tracing_info)
+    return extract_primitives_from_pdf_internal(
+        df_extraction_ledger=df_extraction_ledger,
+        task_config=task_config,
+        extractor_config=validated_config,
+        execution_trace_log=execution_trace_log,
+    )
 
 
 def generate_pdf_extractor_stage(
@@ -85,8 +91,8 @@ def generate_pdf_extractor_stage(
         If an error occurs during the creation of the PDF extractor stage.
     """
     try:
-        validated_config = PDFExtractorSchema(**extractor_config)
-        wrapped_process_fn = functools.partial(_inject_validated_config, validated_config=validated_config)
+        validated_extractor_config = PDFExtractorSchema(**extractor_config)
+        wrapped_process_fn = functools.partial(_inject_validated_config, validated_config=validated_extractor_config)
 
         return MultiProcessingBaseStage(
             c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=wrapped_process_fn, document_type="pdf"

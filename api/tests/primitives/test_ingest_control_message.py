@@ -245,10 +245,9 @@ def test_remove_nonexistent_task():
     cm = IngestControlMessage()
     task = ControlMessageTask(type="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
-    cm.remove_task("nonexistent")
-    assert cm.has_task("task1")
-    tasks = list(cm.get_tasks())
-    assert any(t.id == "task1" for t in tasks)
+
+    with pytest.raises(RuntimeError):
+        cm.remove_task("nonexistent")
 
 
 def test_payload_get_default():
@@ -325,10 +324,3 @@ def test_copy_creates_deep_copy():
     assert cm.get_timestamp("start") == dt
     pd.testing.assert_frame_equal(cm.payload(), df)
     assert cm.config()["config_key"] == "config_value"
-
-
-def test_remove_nonexistent_task_logs_warning(caplog):
-    cm = IngestControlMessage()
-    with caplog.at_level("WARNING"):
-        cm.remove_task("nonexistent")
-        assert "Attempted to remove non-existent task" in caplog.text

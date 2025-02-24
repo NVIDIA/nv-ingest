@@ -93,6 +93,7 @@ def _orchestrate_row_extraction(
     # Inject configuration settings, if provided.
     if getattr(extractor_config, "pdfium_config", None) is not None:
         params["pdfium_config"] = extractor_config.pdfium_config
+
     if getattr(extractor_config, "nemoretriever_parse_config", None) is not None:
         params["nemoretriever_parse_config"] = extractor_config.nemoretriever_parse_config
 
