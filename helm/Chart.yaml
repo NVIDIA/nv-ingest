@@ -26,9 +26,9 @@ dependencies:
     repository: https://open-telemetry.github.io/opentelemetry-helm-charts
     version: 0.78.1
     condition: otelDeployed
-  - name: yolox-nim
+  - name: nvidia-nim-nemoretriever-graphic-elements-v1
     repository: "alias:nemo-microservices"
-    version: 0.2.0
+    version: 1.2.0
     condition: yoloxDeployed
   - name: cached-nim
     repository: "alias:nemo-microservices"
