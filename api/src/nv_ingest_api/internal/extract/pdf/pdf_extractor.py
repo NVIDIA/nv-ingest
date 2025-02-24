@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from nv_ingest_api.extraction.pdf.engines.pdfium_helpers import _orchestrate_row_extraction
+from nv_ingest_api.internal.extract.pdf.engines.pdfium_helpers import _orchestrate_row_extraction
 
 logger = logging.getLogger(__name__)
 

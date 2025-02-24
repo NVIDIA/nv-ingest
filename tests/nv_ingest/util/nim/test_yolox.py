@@ -10,7 +10,7 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from nv_ingest_api.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
 
 
 @pytest.fixture

@@ -8,7 +8,7 @@ from multiprocessing import Queue
 
 import pytest
 
-from nv_ingest_api.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 
 
 @pytest.fixture

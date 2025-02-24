@@ -16,7 +16,7 @@ from morpheus.config import Config
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.primitives.nim.model_interface.vlm import VLMModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.nim import create_inference_client
 

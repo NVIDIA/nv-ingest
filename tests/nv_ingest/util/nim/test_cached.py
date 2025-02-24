@@ -10,7 +10,7 @@ from io import BytesIO
 
 from PIL import Image
 
-from nv_ingest_api.primitives.nim.model_interface.cached import CachedModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.cached import CachedModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 

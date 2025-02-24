@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 
 def cm_ensure_payload_not_null(control_message: IngestControlMessage):

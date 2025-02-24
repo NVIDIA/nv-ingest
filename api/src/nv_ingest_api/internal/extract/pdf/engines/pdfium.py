@@ -21,11 +21,11 @@ import logging
 
 import pypdfium2 as libpdfium
 
-from nv_ingest_api.primitives.nim.default_values import *
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
+from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_WIDTH, YOLOX_MAX_BATCH_SIZE, YOLOX_MAX_HEIGHT
 from nv_ingest_api.util.metadata.aggregators import (
     Base64Image,
     construct_image_metadata_from_pdf_image,

@@ -19,11 +19,18 @@ import logging
 import numpy as np
 from typing import List, Tuple, Optional
 
-from nv_ingest_api.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
+from nv_ingest_api.internal.primitives.nim.default_values import (
+    YOLOX_MAX_BATCH_SIZE,
+    YOLOX_NUM_CLASSES,
+    YOLOX_CONF_THRESHOLD,
+    YOLOX_IOU_THRESHOLD,
+    YOLOX_MIN_SCORE,
+    YOLOX_FINAL_SCORE,
+)
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
 from nv_ingest_api.util.metadata.aggregators import CroppedImageWithContent
 from nv_ingest_api.util.nim import create_inference_client
-from nv_ingest_api.primitives.nim.default_values import *
 
 logger = logging.getLogger(__name__)
 

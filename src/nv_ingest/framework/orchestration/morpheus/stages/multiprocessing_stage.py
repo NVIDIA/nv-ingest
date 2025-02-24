@@ -25,7 +25,7 @@ from mrc.core.subscriber import Observer
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.util.multi_processing import ProcessWorkerPoolSingleton
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 

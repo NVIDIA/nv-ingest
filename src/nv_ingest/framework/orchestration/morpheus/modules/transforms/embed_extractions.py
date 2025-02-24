@@ -25,7 +25,7 @@ from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator im
 )
 from nv_ingest_api.util.schema.schema_validator import validate_schema
 from nv_ingest.framework.util.tracing import traceable
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 

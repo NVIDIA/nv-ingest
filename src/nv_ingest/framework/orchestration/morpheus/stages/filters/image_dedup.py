@@ -22,7 +22,7 @@ from nv_ingest.schemas.metadata_schema import StatusEnum
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum
 from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.util.schema.schema_validator import validate_schema
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 

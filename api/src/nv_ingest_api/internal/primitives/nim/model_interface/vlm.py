@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional, Tuple, List
 
 import logging
 
-from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim import ModelInterface
 
 logger = logging.getLogger(__name__)
 

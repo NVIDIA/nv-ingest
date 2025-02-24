@@ -12,7 +12,7 @@ from morpheus.pipeline.single_port_stage import SinglePortStage
 from morpheus.utils.module_utils import ModuleLoader
 
 from nv_ingest.framework.orchestration.morpheus.modules.storages.image_storage import ImageStorageLoaderFactory
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 

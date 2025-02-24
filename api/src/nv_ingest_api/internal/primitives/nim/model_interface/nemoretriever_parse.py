@@ -9,7 +9,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 
-from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 ACCEPTED_TEXT_CLASSES = set(

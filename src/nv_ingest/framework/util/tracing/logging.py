@@ -8,7 +8,7 @@ import uuid
 from datetime import datetime
 from enum import Enum
 
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 
 class TaskResultStatus(Enum):

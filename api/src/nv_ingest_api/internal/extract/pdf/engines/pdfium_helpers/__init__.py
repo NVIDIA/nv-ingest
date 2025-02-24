@@ -7,11 +7,19 @@
 import base64
 import io
 import pandas as pd
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 import logging
 
+from nv_ingest_api.internal.extract.pdf.engines import (
+    adobe_extractor,
+    llama_parse_extractor,
+    nemoretriever_parse_extractor,
+    pdfium_extractor,
+    tika_extractor,
+    unstructured_io_extractor,
+)
+
 # Import extraction functions for different engines.
-from nv_ingest_api.extraction.pdf.engines import *
 
 logger = logging.getLogger(__name__)
 

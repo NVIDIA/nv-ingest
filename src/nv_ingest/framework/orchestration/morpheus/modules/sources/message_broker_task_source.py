@@ -28,8 +28,8 @@ from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client impo
 
 # Import the SimpleMessageBroker server
 from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
-from nv_ingest_api.primitives.control_message_task import ControlMessageTask
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 

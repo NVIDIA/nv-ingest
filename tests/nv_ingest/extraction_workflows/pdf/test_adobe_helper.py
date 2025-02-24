@@ -13,7 +13,7 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from ....import_checks import ADOBE_IMPORT_OK
 
 if ADOBE_IMPORT_OK:
-    from nv_ingest_api.extraction.pdf.engines import adobe
+    from nv_ingest_api.internal.extract.pdf.engines import adobe
 
 
 def requires_sdk_client_id_and_secret():

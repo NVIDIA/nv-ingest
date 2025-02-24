@@ -19,7 +19,7 @@ import torch
 import torchvision
 from PIL import Image
 
-from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 
 logger = logging.getLogger(__name__)

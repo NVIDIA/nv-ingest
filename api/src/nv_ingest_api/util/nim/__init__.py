@@ -4,8 +4,8 @@
 
 from typing import Tuple, Optional
 
-from nv_ingest_api.primitives.nim.nim_client import NimClient
-from nv_ingest_api.primitives.nim.nim_model_interface import ModelInterface
+from nv_ingest_api.internal.primitives.nim.nim_client import NimClient
+from nv_ingest_api.internal.primitives.nim.nim_model_interface import ModelInterface
 
 __all__ = ["create_inference_client"]
 

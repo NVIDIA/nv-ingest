@@ -7,8 +7,8 @@ import io
 import numpy as np
 from PIL import Image
 
-import nv_ingest_api.primitives.nim.model_interface.paddle as module_under_test
-from nv_ingest_api.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+import nv_ingest_api.internal.primitives.nim.model_interface.paddle as module_under_test
+from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 
 _MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 

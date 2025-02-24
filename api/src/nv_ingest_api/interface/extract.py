@@ -6,7 +6,7 @@
 from typing import Tuple, Optional
 
 from . import extraction_interface_relay_constructor
-from nv_ingest_api.extraction.pdf.pdf_extractor import extract_primitives_from_pdf_internal
+from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 
 
 @extraction_interface_relay_constructor(

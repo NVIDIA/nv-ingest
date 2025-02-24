@@ -4,8 +4,8 @@
 
 import re
 
-from nv_ingest_api.primitives.control_message_task import ControlMessageTask
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 import pytest
 import pandas as pd

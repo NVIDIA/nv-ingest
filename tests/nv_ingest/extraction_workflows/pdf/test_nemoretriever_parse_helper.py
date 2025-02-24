@@ -5,7 +5,7 @@ from unittest.mock import patch
 import pandas as pd
 import pytest
 
-from nv_ingest_api.extraction.pdf.engines.nemoretriever import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines.nemoretriever import nemoretriever_parse_extractor
 
 
 _MODULE_UNDER_TEST = "nv_ingest_api.util.nim"

@@ -10,7 +10,7 @@ import pandas as pd
 import pytest
 
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest_api.extraction.pdf.engines import pdfium_extractor
+from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
 
 
 @pytest.fixture

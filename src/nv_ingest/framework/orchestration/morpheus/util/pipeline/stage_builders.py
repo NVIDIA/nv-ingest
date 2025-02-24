@@ -9,7 +9,7 @@ import os
 
 import click
 
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import (
     MetadataInjectorLoaderFactory,
 )

@@ -6,8 +6,8 @@ from unittest.mock import Mock, patch
 import numpy as np
 import pytest
 
-import nv_ingest_api.primitives.nim.nim_client as module_under_test
-from nv_ingest_api.primitives.nim import NimClient
+import nv_ingest_api.internal.primitives.nim.nim_client as module_under_test
+from nv_ingest_api.internal.primitives.nim import NimClient
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 

@@ -13,7 +13,7 @@ from nv_ingest_api.util.exception_handlers.decorators import (
 import unittest
 from unittest.mock import patch
 
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 MODULE_UNDER_TEST = "nv_ingest_api.util.exception_handlers.decorators"
 

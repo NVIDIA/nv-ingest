@@ -11,7 +11,7 @@ from typing import Any, Dict, Optional, List
 
 import numpy as np
 
-from nv_ingest_api.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
