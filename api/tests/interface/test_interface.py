@@ -7,7 +7,7 @@ from typing import Any, Dict, Optional, List, Tuple
 
 from pydantic import BaseModel, ValidationError
 
-from nv_ingest_api.interface import CONFIG_SCHEMAS, extraction_interface_relay_constructor, build_config_from_schema
+from nv_ingest_api.interface import CONFIG_SCHEMAS, extraction_interface_relay_constructor, _build_config_from_schema
 
 
 # For testing, define two dummy Pydantic schemas.
@@ -86,7 +86,7 @@ def test_build_config_from_schema_valid():
         "yolox_infer_protocol": "https",
         "irrelevant": "ignore me",
     }
-    result = build_config_from_schema(DummyPDFiumConfigSchema, args)
+    result = _build_config_from_schema(DummyPDFiumConfigSchema, args)
     expected = {
         "yolox_auth_token": "secret",
         "yolox_endpoints": ("grpc_ep", "http_ep"),
@@ -98,7 +98,7 @@ def test_build_config_from_schema_valid():
 def test_build_config_from_schema_missing_required():
     args = {"yolox_endpoints": ("grpc_ep", "http_ep"), "yolox_infer_protocol": "https"}
     with pytest.raises(ValidationError):
-        build_config_from_schema(DummyPDFiumConfigSchema, args)
+        _build_config_from_schema(DummyPDFiumConfigSchema, args)
 
 
 def test_interface_default_task_keys_pdfium():

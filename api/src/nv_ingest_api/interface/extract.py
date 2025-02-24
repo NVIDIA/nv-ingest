@@ -16,7 +16,7 @@ from nv_ingest_api.extraction.pdf.pdf_extractor import extract_primitives_from_p
 def extract_primitives_from_pdf(
     *,
     df_extraction_ledger,  # Ledger (e.g., a pandas DataFrame)
-    extract_method: str = "pdfium",  # Determines which schema to use
+    extract_method: str = "pdfium",  # Determines which extraction schema to use
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,

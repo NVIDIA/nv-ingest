@@ -14,7 +14,7 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 CONFIG_SCHEMAS: Dict[str, Any] = {"pdfium": PDFiumConfigSchema}
 
 
-def build_config_from_schema(schema_class: type[BaseModel], args: Dict[str, Any]) -> Dict[str, Any]:
+def _build_config_from_schema(schema_class: type[BaseModel], args: Dict[str, Any]) -> Dict[str, Any]:
     """
     Build and validate a configuration dictionary from the provided arguments using a Pydantic schema.
 
@@ -135,7 +135,7 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
                 raise ValueError(f"Unsupported extraction method: {extract_method}")
 
             # Build the method-specific configuration.
-            extraction_config = build_config_from_schema(schema_class, bound.arguments)
+            extraction_config = _build_config_from_schema(schema_class, bound.arguments)
             extraction_config = {f"{extract_method}_config": extraction_config}
 
             # Call the backend API function.
