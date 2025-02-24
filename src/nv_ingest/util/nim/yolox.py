@@ -30,7 +30,7 @@ YOLOX_PAGE_NUM_CLASSES = 4
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
-YOLOX_PAGE_FINAL_SCORE = 0.48
+YOLOX_PAGE_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
 
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
@@ -415,6 +415,14 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
+        if (not isinstance(self.final_score, dict)) or (
+            sorted(self.final_score.keys()) != ["chart", "infographic", "table"]
+        ):
+            raise ValueError(
+                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
+                "'table', 'chart', 'infographic'"
+            )
+
         # Table/chart expansion is "business logic" specific to nv-ingest
         annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
@@ -425,14 +433,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
-                # new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= 0.1]
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score["table"]]
             if "chart" in annotation_dict:
-                # new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= 0.01]
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score["chart"]]
             if "infographic" in annotation_dict:
-                # new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
-                new_dict["infographic"] = [bb for bb in annotation_dict["infographic"] if bb[4] >= 0.01]
+                new_dict["infographic"] = [
+                    bb for bb in annotation_dict["infographic"] if bb[4] >= self.final_score["infographic"]
+                ]
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)

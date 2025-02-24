@@ -91,7 +91,7 @@ class ExtractTaskSchema(BaseModel):
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
-    extract_infographics: bool = True
+    extract_infographics: Optional[bool] = None  # Initially allow None to set a smart default
     text_depth: str = "document"
     paddle_output_format: str = "pseudo_markdown"
 
@@ -115,7 +115,7 @@ class ExtractTaskSchema(BaseModel):
     @field_validator("extract_charts")
     def set_default_extract_charts(cls, v, values):
         # `extract_charts` is initially set to None for backward compatibility.
-        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
+        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract_charts: true} enables both
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
         extract_charts = v
@@ -123,6 +123,19 @@ class ExtractTaskSchema(BaseModel):
             extract_charts = values.data.get("extract_tables")
 
         return extract_charts
+
+    @field_validator("extract_infographics")
+    def set_default_extract_infographics(cls, v, values):
+        # `extract_infographics` is initially set to None for backward compatibility.
+        # {extract_tables: true, extract_infographics: None} or {extract_tables: true, extract_infographics: true}
+        # enables both table and infographic extraction.
+        # {extract_tables: true, extract_infograhpics: false} enables only the table extraction
+        # and disables infographics extraction.
+        extract_infographics = v
+        if extract_infographics is None:
+            extract_infographics = values.data.get("extract_tables")
+
+        return extract_infographics
 
     @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
@@ -167,7 +180,7 @@ class ExtractTask(Task):
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
-        extract_infographics: bool = True,
+        extract_infographics: Optional[bool] = None,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
     ) -> None:
@@ -186,7 +199,7 @@ class ExtractTask(Task):
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
         self._extract_charts = extract_charts if extract_charts is not None else extract_tables
-        self._extract_infographics = extract_infographics
+        self._extract_infographics = extract_infographics if extract_infographics is not None else extract_tables
         self._extract_text = extract_text
         self._text_depth = text_depth
         self._paddle_output_format = paddle_output_format

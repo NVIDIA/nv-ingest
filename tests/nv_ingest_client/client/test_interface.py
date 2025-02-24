@@ -21,6 +21,7 @@ from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
+from nv_ingest_client.primitives.tasks import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
@@ -224,11 +225,12 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ExtractTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[3], TableExtractionTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[4], ChartExtractionTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], InfographicExtractionTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], FilterTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], SplitTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[8], StoreTask)
     assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
-    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 8
+    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 9
 
 
 def test_ingest(ingestor, mock_client):
