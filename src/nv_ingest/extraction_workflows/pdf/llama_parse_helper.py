@@ -68,7 +68,7 @@ def llama_parse(
         [document type, dictionary] pairs, where the dictionary contains
         content and metadata of the extracted PDF.
     """
-    logger.info("Extracting PDF with LlamaParse backend.")
+    logger.debug("Extracting PDF with LlamaParse backend.")
 
     api_key = kwargs.get("api_key")
     if not api_key:
@@ -182,7 +182,7 @@ async def async_llama_parse(
             ) as response:
                 response_json = await response.json()
                 job_id = response_json["id"]
-                logger.info("Started parsing the file under job_id %s" % job_id)
+                logger.debug("Started parsing the file under job_id %s" % job_id)
 
             result_url = f"{base_url}/job/{job_id}/result/{result_type}"
 

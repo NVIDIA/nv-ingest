@@ -4,7 +4,9 @@ Developing directly on Kubernetes gives us more confidence that end-user deploym
 
 This page describes how to use Kubernetes generally and how to deploy nv-ingest on a local Kubernetes cluster.
 
-> **NOTE:** _Unless otherwise noted, all commands below should be run from the root of this repo._
+!!! warning 
+
+    Unless otherwise noted, all commands below should be run from the root of this repo.
 
 ## Kubernetes Cluster
 

@@ -17,7 +17,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.image_processing.table_and_chart import join_yolox_and_paddle_output
+from nv_ingest.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
@@ -47,8 +47,12 @@ def _update_metadata(
     """
     logger.debug("Running chart extraction using updated concurrency handling.")
 
+    # Initialize the results list in the same order as base64_images.
+    results: List[Tuple[str, Any]] = [("", None)] * len(base64_images)
+
     valid_images: List[str] = []
     valid_arrays: List[np.ndarray] = []
+    valid_indices: List[int] = []
 
     # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
@@ -57,6 +61,10 @@ def _update_metadata(
         if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
             valid_images.append(img)
             valid_arrays.append(array)
+            valid_indices.append(i)
+        else:
+            # Image is too small; mark as skipped.
+            results[i] = (img, None)
 
     # Prepare data payloads for both clients.
     data_yolox = {"images": valid_arrays}
@@ -97,18 +105,18 @@ def _update_metadata(
     if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
         raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
 
-    if len(yolox_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} yolox results, got {len(yolox_results)}")
-    if len(paddle_results) != len(base64_images):
-        raise ValueError(f"Expected {len(base64_images)} paddle results, got {len(paddle_results)}")
+    if len(yolox_results) != len(valid_arrays):
+        raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
 
     # Join the corresponding results from both services for each image.
-    results = []
-    for img_str, yolox_res, paddle_res in zip(base64_images, yolox_results, paddle_results):
+    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
         bounding_boxes, text_predictions = paddle_res
-        yolox_elements = join_yolox_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+        yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
-        results.append((img_str, chart_content))
+        original_index = valid_indices[idx]
+        results[original_index] = (base64_images[original_index], chart_content)
 
     return results
 
@@ -169,6 +177,7 @@ def _extract_chart_data(
     Exception
         If any error occurs during the chart data extraction process.
     """
+
     _ = task_props  # unused
 
     if trace_info is None:
@@ -198,6 +207,7 @@ def _extract_chart_data(
             m = row.get("metadata", {})
             if not m:
                 return False
+
             content_md = m.get("content_metadata", {})
             if (
                 content_md.get("type") == "structured"
@@ -206,22 +216,23 @@ def _extract_chart_data(
                 and m.get("content") not in [None, ""]
             ):
                 return True
+
             return False
 
         mask = df.apply(meets_criteria, axis=1)
         valid_indices = df[mask].index.tolist()
 
-        # If no rows meet the criteria, just return
+        # If no rows meet the criteria, just return.
         if not valid_indices:
             return df, {"trace_info": trace_info}
 
-        # 2) Extract base64 images + keep track of row -> image mapping
+        # 2) Extract base64 images + keep track of row -> image mapping.
         base64_images = []
         for idx in valid_indices:
             meta = df.at[idx, "metadata"]
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
-        # 3) Call our bulk update_metadata to get all results
+        # 3) Call our bulk _update_metadata to get all results.
         bulk_results = _update_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
@@ -241,10 +252,18 @@ def _extract_chart_data(
 
     except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)
+
         raise
+
     finally:
-        yolox_client.close()
-        paddle_client.close()
+        try:
+            if paddle_client is not None:
+                paddle_client.close()
+            if yolox_client is not None:
+                yolox_client.close()
+
+        except Exception as close_err:
+            logger.error(f"Error closing clients: {close_err}", exc_info=True)
 
 
 def generate_chart_extractor_stage(
@@ -284,10 +303,20 @@ def generate_chart_extractor_stage(
         A configured Morpheus stage with an applied worker function that handles chart data extraction
         from PDF content.
     """
+    try:
+        validated_config = ChartExtractorSchema(**stage_config)
 
-    validated_config = ChartExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
+        _wrapped_process_fn = functools.partial(_extract_chart_data, validated_config=validated_config)
 
-    return MultiProcessingBaseStage(
-        c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn
-    )
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_process_fn,
+        )
+
+    except Exception as e:
+        err_msg = f"generate_chart_extractor_stage: Error generating table extractor stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

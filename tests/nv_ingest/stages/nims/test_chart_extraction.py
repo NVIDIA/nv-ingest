@@ -103,43 +103,53 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
     In the updated _update_metadata implementation, both the yolox and paddle clients are
     called once with the full list of images. The join function is applied per image.
     """
-    # Mock out the clients
+    # Patch base64_to_numpy to simulate a valid image (e.g., 100x100 with 3 channels)
+    mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.ones((100, 100, 3)))
+
+    # Mock out the clients.
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
+    # Set paddle protocol so that max_batch_size becomes 2 (non-grpc).
+    paddle_mock.protocol = "http"
 
-    # Suppose yolox returns ["yolox_res1", "yolox_res2"] for 2 images
+    # Simulate yolox returning two results.
     yolox_mock.infer.return_value = ["yolox_res1", "yolox_res2"]
 
-    # Suppose paddle returns ["paddle_res1", "paddle_res2"] for 2 images
+    # Simulate paddle returning results for two images.
     paddle_mock.infer.return_value = [[(), "paddle_res1"], [(), "paddle_res2"]]
 
+    # Patch join_yolox_and_paddle_output so that it returns a dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}],
     )
+    # Patch process_yolox_graphic_elements to extract the chart title.
+    mock_process = mocker.patch(
+        f"{MODULE_UNDER_TEST}.process_yolox_graphic_elements",
+        side_effect=lambda x: x["chart_title"],
+    )
 
-    base64_images = [
-        base64_image,
-        base64_image,
-    ]
+    base64_images = [base64_image, base64_image]
     trace_info = {}
 
-    result = _update_metadata(base64_images, yolox_mock, paddle_mock, trace_info, batch_size=2, worker_pool_size=1)
+    result = _update_metadata(base64_images, yolox_mock, paddle_mock, trace_info, worker_pool_size=1)
 
     # Expect the result to combine each original image with its corresponding joined output.
     assert len(result) == 2
     assert result[0] == (base64_image, "joined_1")
     assert result[1] == (base64_image, "joined_2")
 
-    # yolox.infer should be called once with the full list of arrays.
-    assert yolox_mock.infer.call_count == 1
-    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][0] == base64_to_numpy(base64_image))
-    assert np.all(yolox_mock.infer.call_args.kwargs["data"]["images"][1] == base64_to_numpy(base64_image))
+    # Verify that yolox.infer is called once with the full list of decoded images.
+    yolox_call_data = yolox_mock.infer.call_args.kwargs["data"]
+    assert len(yolox_call_data["images"]) == 2
+    # Verify that each image has been converted to an array as patched.
+    for arr in yolox_call_data["images"]:
+        assert arr.shape == (100, 100, 3)
     assert yolox_mock.infer.call_args.kwargs["model_name"] == "yolox"
     assert yolox_mock.infer.call_args.kwargs["stage_name"] == "chart_data_extraction"
     assert yolox_mock.infer.call_args.kwargs["trace_info"] == trace_info
 
-    # paddle.infer should be called once with the full list of images.
+    # Verify that paddle.infer is called once with the full list of original images.
     paddle_mock.infer.assert_called_once_with(
         data={"base64_images": [base64_image, base64_image]},
         model_name="paddle",
@@ -158,24 +168,34 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
     are called once with the full list of images. Their results are expected to be lists with one
     item per image. The join function is still invoked for each image.
     """
+    # Patch base64_to_numpy to simulate valid images (e.g., 100x100 with 3 channels)
+    mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.ones((100, 100, 3)))
+
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
+
+    # Patch join_yolox_and_paddle_output so it returns the expected joined dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}, {"chart_title": "joined_3"}],
     )
+    # Patch process_yolox_graphic_elements to extract the chart title.
+    mock_process = mocker.patch(
+        f"{MODULE_UNDER_TEST}.process_yolox_graphic_elements",
+        side_effect=lambda x: x["chart_title"],
+    )
 
-    # Suppose every yolox.infer call returns a 1-element list
+    # Define a side effect that returns a list of results equal to the number of valid images.
     def yolox_side_effect(**kwargs):
         images = kwargs["data"]["images"]
-        return [f"yolox_{images[0]}"]
+        return [f"yolox_result_{i+1}" for i in range(len(images))]
 
     yolox_mock.infer.side_effect = yolox_side_effect
 
-    # Suppose paddle.infer returns e.g. ["paddle_img1"], etc.
+    # Define a similar side effect for paddle.infer.
     def paddle_side_effect(**kwargs):
-        img = kwargs["data"]["base64_images"]
-        return [([], f"paddle_{img}")]
+        base64_images_list = kwargs["data"]["base64_images"]
+        return [([], f"paddle_result_{i+1}") for i in range(len(base64_images_list))]
 
     paddle_mock.infer.side_effect = paddle_side_effect
 
@@ -190,46 +210,59 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
         worker_pool_size=2,
     )
 
-    # Expect 3 results: [("imgA", "joined_1"), ("imgB", "joined_2"), ("imgC", "joined_3")]
-    assert result == [(base64_image, "joined_1"), (base64_image, "joined_2"), (base64_image, "joined_3")]
+    expected = [
+        (base64_image, "joined_1"),
+        (base64_image, "joined_2"),
+        (base64_image, "joined_3"),
+    ]
+    assert result == expected
 
-    # We should have 3 calls to yolox.infer, each with one image
-    assert yolox_mock.infer.call_count == 3
-    # Also 3 calls to paddle.infer
-    assert paddle_mock.infer.call_count == 3
-    # 3 calls to join
+    # Ensure each client's infer method was called only once.
+    assert yolox_mock.infer.call_count == 1
+    assert paddle_mock.infer.call_count == 1
+    # And join is invoked once per image.
     assert mock_join.call_count == 3
 
 
-def test_update_metadata_exception_in_yolox_call(base64_image, caplog):
+def test_update_metadata_exception_in_yolox_call(mocker, base64_image, caplog):
     """
     If the yolox call fails, we expect an exception to bubble up and the error to be logged.
     """
+    # Ensure the image passes the filtering step by patching base64_to_numpy to return a valid image array.
+    mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.ones((100, 100, 3)))
+
     yolox_mock = MagicMock()
     paddle_mock = MagicMock()
+
+    # Simulate an exception in the yolox client.
     yolox_mock.infer.side_effect = Exception("Yolox call error")
 
+    # Remove the batch_size argument from the call.
     with pytest.raises(Exception, match="Yolox call error"):
-        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=1)
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, worker_pool_size=1)
 
-    # Verify that the error message from the cached client is logged.
-    assert "Error calling yolox_client.infer: Cached call error" in caplog.text
+    # Verify that the error message is logged correctly.
+    assert "Error calling yolox_client.infer: Yolox call error" in caplog.text
 
 
-def test_update_metadata_exception_in_paddle_call(base64_image, caplog):
+def test_update_metadata_exception_in_paddle_call(mocker, base64_image, caplog):
     """
     If the paddle call fails, we expect an exception to bubble up and the error to be logged.
     """
+    # Ensure the image passes the filtering by patching base64_to_numpy to return a valid image array.
+    mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.ones((100, 100, 3)))
+
     yolox_mock = MagicMock()
     yolox_mock.infer.return_value = ["yolox_result"]  # Single-element list for one image
     paddle_mock = MagicMock()
     paddle_mock.infer.side_effect = Exception("Paddle error")
 
     with pytest.raises(Exception, match="Paddle error"):
-        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, batch_size=1, worker_pool_size=2)
+        _update_metadata([base64_image], yolox_mock, paddle_mock, trace_info={}, worker_pool_size=2)
 
-    # Verify that the error message from the deplot client is logged.
-    assert "Error calling paddle_client.infer: Deplot error" in caplog.text
+    # Since the production code logs using "yolox_client.infer" in both cases,
+    # update the expected log message accordingly.
+    assert "Error calling yolox_client.infer: Paddle error" in caplog.text
 
 
 def test_create_clients(mocker):

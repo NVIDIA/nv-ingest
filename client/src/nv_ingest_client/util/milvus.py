@@ -57,7 +57,7 @@ class MilvusOperator:
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = True,
-        dense_dim: int = 1024,
+        dense_dim: int = 2048,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,
         enable_charts: bool = True,
@@ -571,6 +571,7 @@ def stream_insert_milvus(
     for result in records:
         for element in result:
             text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
+            _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
             if text:
                 if sparse_model is not None:
                     data.append(record_func(text, element, sparse_model.encode_documents([text])))
@@ -696,7 +697,7 @@ def write_to_nvingest_collection(
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
         # passes before running a search against the collection.\
-    time.sleep(20)
+        time.sleep(20)
 
 
 def dense_retrieval(

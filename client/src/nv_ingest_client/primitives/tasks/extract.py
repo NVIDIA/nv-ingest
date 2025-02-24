@@ -19,10 +19,6 @@ from .task_base import Task
 
 logger = logging.getLogger(__name__)
 
-DOUGHNUT_TRITON_HOST = os.environ.get("DOUGHNUT_TRITON_HOST", "localhost")
-DOUGHNUT_TRITON_PORT = os.environ.get("DOUGHNUT_TRITON_PORT", "8001")
-DOUGHNUT_BATCH_SIZE = os.environ.get("DOUGHNUT_TRITON_PORT", "16")
-
 UNSTRUCTURED_API_KEY = os.environ.get("UNSTRUCTURED_API_KEY", None)
 UNSTRUCTURED_URL = os.environ.get("UNSTRUCTURED_URL", "https://api.unstructured.io/general/v0/general")
 UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
@@ -49,7 +45,7 @@ _DEFAULT_EXTRACTOR_MAP = {
 
 _Type_Extract_Method_PDF = Literal[
     "adobe",
-    "doughnut",
+    "nemoretriever_parse",
     "haystack",
     "llama_parse",
     "pdfium",
@@ -74,7 +70,7 @@ _Type_Extract_Method_Map = {
     "tiff": get_args(_Type_Extract_Method_Image),
 }
 
-_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]
+_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium", "nemoretriever_parse"]
 
 _Type_Extract_Tables_Method_DOCX = Literal["python_docx",]
 
@@ -238,13 +234,6 @@ class ExtractTask(Task):
                 "unstructured_url": "",  # TODO(Devin): Should be an environment variable
             }
             task_properties["params"].update(unstructured_properties)
-        elif self._extract_method == "doughnut":
-            doughnut_properties = {
-                "doughnut_triton_host": os.environ.get("DOUGHNUT_TRITON_HOST", DOUGHNUT_TRITON_HOST),
-                "doughnut_triton_port": os.environ.get("DOUGHNUT_TRITON_PORT", DOUGHNUT_TRITON_PORT),
-                "doughnut_batch_size": os.environ.get("DOUGHNUT_BATCH_SIZE", DOUGHNUT_BATCH_SIZE),
-            }
-            task_properties["params"].update(doughnut_properties)
         elif self._extract_method == "unstructured_io":
             unstructured_properties = {
                 "unstructured_api_key": os.environ.get("UNSTRUCTURED_API_KEY", UNSTRUCTURED_API_KEY),
