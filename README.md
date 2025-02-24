@@ -26,22 +26,33 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ## Introduction
 
-### What NVIDIA-Ingest Is ✔️
+## What NVIDIA-Ingest Is ✔️
 
-A microservice that:
+NV-Ingest is a microservice service that does the following:
 
-- Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
-- Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, as well as processing annotations and timing/trace data.
-- Supports PDF, Docx, pptx, and images.
-- Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
-- Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
+- Accept a JSON job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
+- Allow the results of a job to be retrieved. The result is a JSON dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
+- Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
-### What NVIDIA-Ingest Is Not ✖️
+NV-Ingest supports the following file types:
 
-A service that:
+- `docx`
+- `jpeg`
+- `pdf`
+- `png`
+- `pptx`
+- `svg`
+- `tiff`
+- `txt`
 
-- Runs a static pipeline or fixed set of operations on every submitted document.
-- Acts as a wrapper for any specific document parsing library.
+
+## What NVIDIA-Ingest Isn't ✖️
+
+NV-Ingest does not do the following:
+
+- Run a static pipeline or fixed set of operations on every submitted document.
+- Act as a wrapper for any specific document parsing library.
 
 
 ## Prerequisites
