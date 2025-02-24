@@ -293,13 +293,12 @@ class Ingestor:
         for future in future_to_job_id:
             future.add_done_callback(_done_callback)
 
-        results = combined_future.result()
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(results)
+            self._vdb_bulk_upload.run(combined_future.result())
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
-        return results
+        return combined_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):

@@ -11,20 +11,20 @@ from pydantic import ValidationError
 
 def test_valid_task():
     data = {
-        "name": "Example Task",
+        "type": "Example Task",
         "id": "task-123",
         "properties": {"param1": "value1", "param2": 42},
     }
     task = ControlMessageTask(**data)
-    assert task.name == "Example Task"
+    assert task.type == "Example Task"
     assert task.id == "task-123"
     assert task.properties == {"param1": "value1", "param2": 42}
 
 
 def test_valid_task_without_properties():
-    data = {"name": "Minimal Task", "id": "task-456"}
+    data = {"type": "Minimal Task", "id": "task-456"}
     task = ControlMessageTask(**data)
-    assert task.name == "Minimal Task"
+    assert task.type == "Minimal Task"
     assert task.id == "task-456"
     assert task.properties == {}
 
@@ -35,12 +35,12 @@ def test_missing_required_field_name():
         ControlMessageTask(**data)
     errors = exc_info.value.errors()
     assert len(errors) == 1
-    assert errors[0]["loc"] == ("name",)
+    assert errors[0]["loc"] == ("type",)
     assert errors[0]["type"] == "missing"
 
 
 def test_missing_required_field_id():
-    data = {"name": "Task With No ID", "properties": {"some_property": "some_value"}}
+    data = {"type": "Task With No ID", "properties": {"some_property": "some_value"}}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
     errors = exc_info.value.errors()
@@ -50,7 +50,7 @@ def test_missing_required_field_id():
 
 
 def test_extra_fields_forbidden():
-    data = {"name": "Task With Extras", "id": "task-extra", "properties": {}, "unexpected_field": "foo"}
+    data = {"type": "Task With Extras", "id": "task-extra", "properties": {}, "unexpected_field": "foo"}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
     errors = exc_info.value.errors()
@@ -61,7 +61,7 @@ def test_extra_fields_forbidden():
 
 def test_properties_accepts_various_types():
     data = {
-        "name": "Complex Properties Task",
+        "type": "Complex Properties Task",
         "id": "task-complex",
         "properties": {
             "string_prop": "string value",
@@ -78,7 +78,7 @@ def test_properties_accepts_various_types():
 
 
 def test_properties_with_invalid_type():
-    data = {"name": "Invalid Properties Task", "id": "task-invalid-props", "properties": ["this", "should", "fail"]}
+    data = {"type": "Invalid Properties Task", "id": "task-invalid-props", "properties": ["this", "should", "fail"]}
     with pytest.raises(ValidationError) as exc_info:
         ControlMessageTask(**data)
     errors = exc_info.value.errors()
@@ -228,7 +228,7 @@ def test_filter_timestamp():
 
 def test_remove_existing_task():
     cm = IngestControlMessage()
-    task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
+    task = ControlMessageTask(type="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
     assert cm.has_task("task1")
     cm.remove_task("task1")
@@ -239,7 +239,7 @@ def test_remove_existing_task():
 
 def test_remove_nonexistent_task():
     cm = IngestControlMessage()
-    task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
+    task = ControlMessageTask(type="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
     cm.remove_task("nonexistent")
     assert cm.has_task("task1")
@@ -293,7 +293,7 @@ def test_config_update_invalid():
 
 def test_copy_creates_deep_copy():
     cm = IngestControlMessage()
-    task = ControlMessageTask(name="Test Task", id="task1", properties={"param": "value"})
+    task = ControlMessageTask(type="Test Task", id="task1", properties={"param": "value"})
     cm.add_task(task)
     cm.set_metadata("meta", "data")
     dt = datetime(2025, 1, 1, 12, 0, 0)

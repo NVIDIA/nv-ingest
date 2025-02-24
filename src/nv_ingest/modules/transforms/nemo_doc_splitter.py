@@ -14,15 +14,10 @@ from typing import Literal
 import mrc
 import pandas as pd
 from more_itertools import windowed
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
-from pydantic import BaseModel
-
-import cudf
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.nemo_doc_splitter_schema import DocumentSplitterSchema
@@ -30,6 +25,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -147,27 +143,19 @@ def _nemo_document_splitter(builder: mrc.Builder):
         annotation_id=MODULE_NAME,
         raise_on_failure=validated_config.raise_on_failure,
     )
-    def split_and_forward(message: ControlMessage):
+    def split_and_forward(message: IngestControlMessage):
         try:
             # Assume that df is going to have a 'content' column
-            task_props = message.remove_task("split")
-
-            if isinstance(task_props, BaseModel):
-                task_props = task_props.model_dump()
+            task_props = remove_task_by_type(message, "split")
 
             # Validate that all 'content' values are not None
-            with message.payload().mutable_dataframe() as mdf:
-                df = mdf.to_pandas()
+            df = message.payload()
 
             # Filter to text only
             bool_index = df["document_type"] == ContentTypeEnum.TEXT
             df_filtered = df.loc[bool_index]
 
             if df_filtered.empty:
-                gdf = cudf.from_pandas(df)
-                message_meta = MessageMeta(df=gdf)
-                message.payload(message_meta)
-
                 return message
 
             # Override parameters if set
@@ -205,11 +193,8 @@ def _nemo_document_splitter(builder: mrc.Builder):
 
             # Return both processed text and other document types
             split_docs_df = pd.concat([split_docs_df, df[~bool_index]], axis=0).reset_index(drop=True)
-            # Update control message with new payload
-            split_docs_gdf = cudf.from_pandas(split_docs_df)
 
-            message_meta = MessageMeta(df=split_docs_gdf)
-            message.payload(message_meta)
+            message.payload(split_docs_df)
 
             return message
         except Exception as e:

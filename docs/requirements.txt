@@ -9,6 +9,7 @@ mkdocs-include-dir-to-nav
 mkdocs-literate-nav
 mkdocs-site-urls
 myst-parser
+nvidia-sphinx-theme
 sphinx
 sphinx-markdown-builder
 sphinx-rtd-theme

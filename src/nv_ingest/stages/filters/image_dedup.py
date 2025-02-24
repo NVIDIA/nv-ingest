@@ -10,8 +10,6 @@ from typing import Dict
 
 import pandas as pd
 from morpheus.config import Config
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from pydantic import BaseModel
 
@@ -24,6 +22,7 @@ from nv_ingest.schemas.metadata_schema import StatusEnum
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.schema.schema_validator import validate_schema
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -155,16 +154,16 @@ def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool) -> pd.Data
         raise type(e)(err_msg) from e
 
 
-def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool) -> None:
+def _apply_dedup_filter(ctrl_msg: IngestControlMessage, filter_flag: bool) -> None:
     """
-    Applies a deduplication filter to images within a DataFrame encapsulated in a ControlMessage.
+    Applies a deduplication filter to images within a DataFrame encapsulated in a IngestControlMessage.
 
     This function identifies duplicate images based on content hashes within a DataFrame,
     and either filters out the duplicates or marks them as informational messages depending on the `filter_flag`.
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message containing the payload with the DataFrame to be filtered.
     filter_flag : bool
         A flag indicating whether to filter out duplicates (`True`) or mark them with informational messages (`False`).
@@ -184,7 +183,7 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool) -> None:
 
     Examples
     --------
-    >>> ctrl_msg = ControlMessage(payload=some_dataframe)
+    >>> ctrl_msg = IngestControlMessage(payload=some_dataframe)
     >>> _apply_dedup_filter(ctrl_msg, filter_flag=True)
     >>> filtered_df = ctrl_msg.payload().dataframe()
     >>> print(filtered_df)
@@ -217,8 +216,7 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool) -> None:
                 ],
                 axis=0,
             )
-            message_meta = MessageMeta(df=gdf_result)
-            ctrl_msg.payload(message_meta)
+            ctrl_msg.payload(gdf_result.to_pandas())
             return
         gdf_temp = gdf["metadata"].struct.explode()
         exploded_metadata_cols = list(gdf_temp.columns)
@@ -237,8 +235,7 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool) -> None:
         gdf.loc[duplicate_images_gdf["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG.value
         gdf["metadata"] = gdf[exploded_metadata_cols + ["info_message_metadata"]].to_struct()
         gdf.drop(labels=gdf.columns.difference(base_cols), inplace=True, axis=1)
-        message_meta = MessageMeta(df=gdf)
-        ctrl_msg.payload(message_meta)
+        ctrl_msg.payload(gdf.to_pandas())
 
         return
 

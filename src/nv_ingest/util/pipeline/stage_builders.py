@@ -6,13 +6,10 @@
 import logging
 import math
 import os
-import typing
 
 import click
-from morpheus.messages import ControlMessage
-from morpheus.stages.general.linear_modules_source import LinearModuleSourceStage
-from morpheus.stages.general.linear_modules_stage import LinearModulesStage
 
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.modules.injectors.metadata_injector import MetadataInjectorLoaderFactory
 from nv_ingest.modules.sinks.message_broker_task_sink import MessageBrokerTaskSinkLoaderFactory
 from nv_ingest.modules.sinks.vdb_task_sink import VDBTaskSinkLoaderFactory
@@ -22,6 +19,7 @@ from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFacto
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
 from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
+from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
@@ -31,9 +29,9 @@ from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
-from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
+from nv_ingest.util.morpheus.linear_module_source_stage_cpu import LinearModuleSourceStageCPU, LinearModuleStageCPU
 
 logger = logging.getLogger(__name__)
 
@@ -127,10 +125,10 @@ def add_source_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     source_stage = pipe.add_stage(
-        LinearModuleSourceStage(
+        LinearModuleSourceStageCPU(
             morpheus_pipeline_config,
             source_module_loader,
-            output_type=ControlMessage,
+            output_type=IngestControlMessage,
             output_port_name="output",
         )
     )
@@ -149,11 +147,11 @@ def add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         ),
     )
     submitted_job_counter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             submitted_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -167,11 +165,11 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
         module_name="metadata_injection", module_config={}
     )
     metadata_injector_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             metadata_injector_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -387,11 +385,11 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
         module_config=ingest_config.get("text_splitting_module", {}),
     )
     nemo_splitter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             nemo_splitter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -503,11 +501,11 @@ def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     sink_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             sink_module_loader,
-            input_type=typing.Any,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -529,11 +527,11 @@ def add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     otel_tracer_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             otel_tracer_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -562,11 +560,11 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     otel_meter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             otel_meter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -586,11 +584,11 @@ def add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         ),
     )
     completed_job_counter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             completed_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -613,11 +611,11 @@ def add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     vdb_task_sink_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             vdb_task_sink_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )

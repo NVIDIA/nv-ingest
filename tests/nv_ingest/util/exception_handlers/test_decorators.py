@@ -10,17 +10,16 @@ from nv_ingest.util.exception_handlers.decorators import (
     CMNVIngestFailureContextManager,
 )
 
-
 import unittest
 from unittest.mock import patch
 
-from morpheus.messages import ControlMessage
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 MODULE_UNDER_TEST = "nv_ingest.util.exception_handlers.decorators"
 
 
-# A minimal dummy ControlMessage for testing purposes.
-class DummyControlMessage(ControlMessage):
+# A minimal dummy IngestControlMessage for testing purposes.
+class DummyIngestControlMessage(IngestControlMessage):
     def __init__(self, payload="default", metadata=None):
         self.payload = payload
         self._metadata = metadata or {}
@@ -41,7 +40,7 @@ class TestNVIngestNodeFailureContextManager(unittest.TestCase):
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     def test_normal_execution(self, mock_annotate, mock_ensure):
         # Create a control message that is not failed and has non-null payload.
-        cm = DummyControlMessage(payload="data", metadata={"cm_failed": False})
+        cm = DummyIngestControlMessage(payload="data", metadata={"cm_failed": False})
 
         @nv_ingest_node_failure_context_manager("annotation1", payload_can_be_empty=False)
         def dummy_node_func(control_message):
@@ -59,7 +58,7 @@ class TestNVIngestNodeFailureContextManager(unittest.TestCase):
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     def test_skip_processing_with_forward_func(self, mock_annotate):
         # Simulate a control message that is already marked as failed.
-        cm = DummyControlMessage(payload="data", metadata={"cm_failed": True})
+        cm = DummyIngestControlMessage(payload="data", metadata={"cm_failed": True})
 
         def forward_func(control_message):
             control_message.set_metadata("forwarded", True)
@@ -81,7 +80,7 @@ class TestNVIngestNodeFailureContextManager(unittest.TestCase):
     @pytest.mark.xfail(reason="Fix after IngestCM is merged")
     def test_payload_null_raises_error(self, mock_ensure):
         # When payload is None and payload_can_be_empty is False, an error should be raised.
-        cm = DummyControlMessage(payload=None, metadata={"cm_failed": False})
+        cm = DummyIngestControlMessage(payload=None, metadata={"cm_failed": False})
 
         @nv_ingest_node_failure_context_manager("annotation3", payload_can_be_empty=False)
         def dummy_node_func(control_message):
@@ -92,7 +91,7 @@ class TestNVIngestNodeFailureContextManager(unittest.TestCase):
             dummy_node_func(cm)
 
     def test_raise_on_failure_propagates_exception(self):
-        cm = DummyControlMessage(payload="data", metadata={"cm_failed": False})
+        cm = DummyIngestControlMessage(payload="data", metadata={"cm_failed": False})
 
         @nv_ingest_node_failure_context_manager("annotation4", payload_can_be_empty=True, raise_on_failure=True)
         def dummy_node_func(control_message):
@@ -109,20 +108,20 @@ class TestNVIngestSourceFailureContextManager(unittest.TestCase):
 
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     def test_normal_execution(self, mock_annotate):
-        # Function returns a valid ControlMessage with non-null payload.
+        # Function returns a valid IngestControlMessage with non-null payload.
         def dummy_source_func():
-            return DummyControlMessage(payload="data")
+            return DummyIngestControlMessage(payload="data")
 
         decorated = nv_ingest_source_failure_context_manager("annotation_source")(dummy_source_func)
         result = decorated()
-        self.assertIsInstance(result, ControlMessage)
+        self.assertIsInstance(result, IngestControlMessage)
         self.assertIsNotNone(result.payload)
         # Expect a success annotation.
         mock_annotate.assert_called_once()
 
     @pytest.mark.xfail(reason="Fix after IngestCM is merged")
     def test_non_control_message_output(self):
-        # Function returns a non-ControlMessage.
+        # Function returns a non-IngestControlMessage.
         def dummy_source_func():
             return 123
 
@@ -132,9 +131,9 @@ class TestNVIngestSourceFailureContextManager(unittest.TestCase):
 
     @pytest.mark.xfail(reason="Fix after IngestCM is merged")
     def test_null_payload_raises_value_error(self):
-        # Function returns a ControlMessage with a null payload.
+        # Function returns a IngestControlMessage with a null payload.
         def dummy_source_func():
-            return DummyControlMessage(payload=None)
+            return DummyIngestControlMessage(payload=None)
 
         decorated = nv_ingest_source_failure_context_manager("annotation_source", payload_can_be_empty=False)(
             dummy_source_func
@@ -152,7 +151,7 @@ class TestNVIngestSourceFailureContextManager(unittest.TestCase):
             dummy_source_func
         )
         result = decorated()
-        self.assertIsInstance(result, ControlMessage)
+        self.assertIsInstance(result, IngestControlMessage)
         # Expect that both cm_set_failure and annotate_task_result were called.
         mock_set_failure.assert_called_once()
         mock_annotate.assert_called_once()
@@ -177,7 +176,7 @@ class TestCMNVIngestFailureContextManager(unittest.TestCase):
 
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     def test_context_manager_success(self, mock_annotate):
-        cm = DummyControlMessage(payload="data")
+        cm = DummyIngestControlMessage(payload="data")
         # In a context that does not raise, success should be annotated.
         with CMNVIngestFailureContextManager(cm, "annotation_cm", raise_on_failure=False, func_name="test_func"):
             pass
@@ -186,7 +185,7 @@ class TestCMNVIngestFailureContextManager(unittest.TestCase):
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     @patch(f"{MODULE_UNDER_TEST}.cm_set_failure")
     def test_context_manager_failure_suppresses_exception(self, mock_set_failure, mock_annotate):
-        cm = DummyControlMessage(payload="data")
+        cm = DummyIngestControlMessage(payload="data")
         # When an exception is raised in the block, it should be annotated but suppressed.
         try:
             with CMNVIngestFailureContextManager(cm, "annotation_cm", raise_on_failure=False, func_name="test_func"):
@@ -199,7 +198,7 @@ class TestCMNVIngestFailureContextManager(unittest.TestCase):
     @patch(f"{MODULE_UNDER_TEST}.annotate_task_result")
     @patch(f"{MODULE_UNDER_TEST}.cm_set_failure")
     def test_context_manager_failure_raises_exception(self, mock_set_failure, mock_annotate):
-        cm = DummyControlMessage(payload="data")
+        cm = DummyIngestControlMessage(payload="data")
         # When raise_on_failure is True, the exception should propagate.
         with self.assertRaises(ValueError):
             with CMNVIngestFailureContextManager(cm, "annotation_cm", raise_on_failure=True, func_name="test_func"):
