@@ -7,12 +7,13 @@ import pytest
 from PIL import Image
 
 from nv_ingest.util.nim.yolox import YoloxPageElementsModelInterface
-from nv_ingest.util.nim.yolox import YOLOX_PAGE_FINAL_SCORE
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_V1_FINAL_SCORE
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_V2_FINAL_SCORE
 
 
 @pytest.fixture
 def model_interface():
-    return YoloxPageElementsModelInterface()
+    return YoloxPageElementsModelInterface(yolox_model_name="nv-yolox-page-elements-v2")
 
 
 def create_test_image(width=800, height=600, color=(255, 0, 0)):
@@ -241,13 +242,13 @@ def test_process_inference_results_grpc(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["table"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["table"]
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["chart"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["chart"]
         if "infographic" in result:
             for bbox in result["infographic"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["infographic"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["infographic"]
         if "title" in result:
             assert isinstance(result["title"], list)
 
@@ -273,12 +274,12 @@ def test_process_inference_results_http(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["table"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["table"]
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["chart"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["chart"]
         if "infographic" in result:
             for bbox in result["infographic"]:
-                assert bbox[4] >= YOLOX_PAGE_FINAL_SCORE["infographic"]
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["infographic"]
         if "title" in result:
             assert isinstance(result["title"], list)
