@@ -27,14 +27,29 @@ SRC_FILE="/opt/docker/bin/entrypoint_source"
 
 # Check if user supplied a command
 if [ "$#" -gt 0 ]; then
-    # If a command is provided, run it
+    # If a command is provided, run it.
     exec "$@"
 else
-    # If no command is provided, run the default startup launch
+    # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
-      # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'
-      uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
+        # Determine the log level for uvicorn.
+        log_level=$(echo "${INGEST_LOG_LEVEL:-default}" | tr '[:upper:]' '[:lower:]')
+        if [ "$log_level" = "default" ]; then
+            log_level="info"
+        fi
+
+        # Build the uvicorn command with the specified log level.
+        uvicorn_cmd="uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 --log-level ${log_level}"
+
+        # If DISABLE_FAST_API_ACCESS_LOGGING is true, disable access logs.
+        if [ "${DISABLE_FAST_API_ACCESS_LOGGING}" == "true" ]; then
+            uvicorn_cmd="${uvicorn_cmd} --no-access-log"
+        fi
+
+        # Start uvicorn in the background.
+        $uvicorn_cmd &
     fi
 
+    # Start the microservice entrypoint.
     python /workspace/microservice_entrypoint.py
 fi

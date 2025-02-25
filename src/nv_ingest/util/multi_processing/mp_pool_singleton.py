@@ -13,8 +13,6 @@ from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
-# Assume logger is configured elsewhere
-
 
 class SimpleFuture:
     """
@@ -152,9 +150,9 @@ class ProcessWorkerPoolSingleton:
                 max_workers = math.floor(max(1, len(os.sched_getaffinity(0)) * 0.4))
                 cls._instance._initialize(max_workers)
                 cls._instance._start_manager_monitor()
-                logger.debug(f"ProcessWorkerPoolSingleton instance created: {cls._instance}")
+                logger.info(f"ProcessWorkerPoolSingleton instance created: {cls._instance}")
             else:
-                logger.debug(f"ProcessWorkerPoolSingleton instance already exists: {cls._instance}")
+                logger.info(f"ProcessWorkerPoolSingleton instance already exists: {cls._instance}")
         return cls._instance
 
     def _initialize(self, total_max_workers: int, new_manager: Optional[mp.Manager] = None) -> None:
@@ -202,7 +200,7 @@ class ProcessWorkerPoolSingleton:
         """
         import time
 
-        check_interval = 10 * 60  # seconds; adjust as needed
+        check_interval = 5 * 60  # 5 minute Manager cache rotation interval
         while not self._stop_manager_monitor:
             time.sleep(check_interval)
             with self._lock:
@@ -214,21 +212,24 @@ class ProcessWorkerPoolSingleton:
         """
         Refresh the Manager and re-create all worker processes.
 
-        Steps
-        -----
-        1. Close current worker processes (without shutting down the active Manager).
-        2. Create a new Manager.
-        3. Reinitialize the worker pool with the new Manager.
-        4. Swap in the new Manager as the active manager.
+        This method performs the following steps:
+          1. Closes current worker processes without shutting down the active Manager.
+          2. Creates a new Manager.
+          3. Reinitializes the worker pool using the new Manager.
+          4. Swaps in the new Manager as the active manager.
         """
-        logger.warning("Refreshing Manager and worker processes.")
-        # Capture the current active manager if needed (here we simply replace it).
-        old_manager = self._active_manager  # noqa
-        self.close()  # Close current workers.
+        logger.warning("Cycling ProcessWorkerPoolSingleton workers...")
+
+        # Close current workers without waiting (join=False).
+        self.close(join=False)
+
+        # Create a new Manager and reinitialize the worker pool.
         new_manager = mp.Manager()
         self._initialize(self._total_workers, new_manager=new_manager)
+
+        # Swap in the new Manager.
         self._active_manager = new_manager
-        logger.warning("Pool refresh complete.")
+        logger.warning("ProcessWorkerPoolSingleton workers cycled.")
 
     @staticmethod
     def _worker(task_queue: mp.Queue, manager: mp.Manager) -> None:
