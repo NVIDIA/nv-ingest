@@ -129,7 +129,7 @@ def extract_timestamps_from_message(message):
     timestamps = {}
     dedup_counter = {}
 
-    for key, val in message.filter_timestamp("trace::exit::").items():
+    for key, val in message.filter_timestamp("trace::exit::.*").items():
         exit_key = key
         entry_key = exit_key.replace("trace::exit::", "trace::entry::")
 

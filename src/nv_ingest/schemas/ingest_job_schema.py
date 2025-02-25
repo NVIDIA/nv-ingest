@@ -47,6 +47,7 @@ class TaskTypeEnum(str, Enum):
     vdb_upload = "vdb_upload"
     table_data_extract = "table_data_extract"
     chart_data_extract = "chart_data_extract"
+    infographic_data_extract = "infographic_data_extract"
 
 
 class FilterTypeEnum(str, Enum):
@@ -144,7 +145,11 @@ class IngestTaskTableExtraction(BaseModelNoExt):
     params: Dict = {}
 
 
-class IngestChartTableExtraction(BaseModelNoExt):
+class IngestTaskChartExtraction(BaseModelNoExt):
+    params: Dict = {}
+
+
+class IngestTaskInfographicExtraction(BaseModelNoExt):
     params: Dict = {}
 
 
@@ -161,7 +166,8 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
         IngestTaskTableExtraction,
-        IngestChartTableExtraction,
+        IngestTaskChartExtraction,
+        IngestTaskInfographicExtraction,
     ]
     raise_on_failure: bool = False
 
@@ -181,7 +187,8 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
                 TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
-                TaskTypeEnum.chart_data_extract: IngestChartTableExtraction,
+                TaskTypeEnum.chart_data_extract: IngestTaskChartExtraction,
+                TaskTypeEnum.infographic_data_extract: IngestTaskInfographicExtraction,
             }.get(task_type.lower())
 
             # logger.debug(f"Checking task_properties type for task type '{task_type}'")

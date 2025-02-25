@@ -204,9 +204,7 @@ class ProcessWorkerPoolSingleton:
         while not self._stop_manager_monitor:
             time.sleep(check_interval)
             with self._lock:
-                if self._task_queue.empty():
-                    logger.debug("Task queue is empty. Initiating pool refresh.")
-                    self._refresh_manager()
+                self._refresh_manager()
 
     def _refresh_manager(self) -> None:
         """
@@ -214,9 +212,9 @@ class ProcessWorkerPoolSingleton:
 
         This method performs the following steps:
           1. Closes current worker processes without shutting down the active Manager.
+          3. reinitializes the worker pool using the new manager.
+          4. swaps in the new manager as the active manager.
           2. Creates a new Manager.
-          3. Reinitializes the worker pool using the new Manager.
-          4. Swaps in the new Manager as the active manager.
         """
         logger.warning("Cycling ProcessWorkerPoolSingleton workers...")
 
