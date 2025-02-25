@@ -109,7 +109,7 @@ def _text_splitter(builder: mrc.Builder):
             params = task_props.get("params", {})
 
             hf_access_token = params.get("hf_access_token", None)
-            split_source_types = params.get("split_source_types", ["TEXT"])
+            split_source_types = params.get("split_source_types", ["text"])
 
             logger.debug(
                 f"Splitting text with tokenizer: {tokenizer}, "
@@ -118,8 +118,10 @@ def _text_splitter(builder: mrc.Builder):
             )
 
             # Filter to file type
-            bool_index = pd.json_normalize(df_filtered["metadata"])["source_metadata.source_type"].isin(
-                split_source_types
+            bool_index = (
+                pd.json_normalize(df_filtered["metadata"])
+                .set_index(df_filtered.index)["source_metadata.source_type"]
+                .isin(split_source_types)
             )
             df_filtered = df_filtered.loc[bool_index]
 
