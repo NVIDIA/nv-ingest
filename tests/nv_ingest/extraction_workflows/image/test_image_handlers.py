@@ -5,7 +5,7 @@ import numpy as np
 from PIL import Image
 
 from nv_ingest.extraction_workflows.image.image_handlers import convert_svg_to_bitmap
-from nv_ingest.extraction_workflows.image.image_handlers import extract_table_and_chart_images
+from nv_ingest.extraction_workflows.image.image_handlers import extract_page_element_images
 from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 
@@ -124,29 +124,29 @@ def crop_image(image: np.ndarray, bbox: Tuple[int, int, int, int]) -> np.ndarray
     return image[int(h1) : int(h2), int(w1) : int(w2)]
 
 
-def test_extract_table_and_chart_images_empty_annotations():
+def test_extract_page_element_images_empty_annotations():
     """Test when annotation_dict has no objects to extract."""
     annotation_dict = {"table": [], "chart": []}
     original_image = np.random.rand(640, 640, 3)
-    tables_and_charts = []
+    page_elements = []
 
-    extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    extract_page_element_images(annotation_dict, original_image, 0, page_elements)
 
-    # Expect no entries added to tables_and_charts since there are no objects
-    assert tables_and_charts == []
+    # Expect no entries added to page_elements since there are no objects
+    assert page_elements == []
 
 
-def test_extract_table_and_chart_images_single_table():
+def test_extract_page_element_images_single_table():
     """Test extraction with a single table bounding box."""
     annotation_dict = {"table": [[64, 64, 192, 192, 0.8]], "chart": []}
     original_image = np.random.rand(640, 640, 3)
-    tables_and_charts = []
+    page_elements = []
 
-    extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
+    extract_page_element_images(annotation_dict, original_image, 0, page_elements)
 
-    # Expect one entry in tables_and_charts for the table
-    assert len(tables_and_charts) == 1
-    page_idx, cropped_image_data = tables_and_charts[0]
+    # Expect one entry in page_elements for the table
+    assert len(page_elements) == 1
+    page_idx, cropped_image_data = page_elements[0]
     assert page_idx == 0
     assert isinstance(cropped_image_data, CroppedImageWithContent)
 
@@ -159,54 +159,54 @@ def test_extract_table_and_chart_images_single_table():
     assert isinstance(cropped_image_data.image, str)  # Assuming the image is base64-encoded
 
 
-def test_extract_table_and_chart_images_single_chart():
+def test_extract_page_element_images_single_chart():
     """Test extraction with a single chart bounding box."""
     annotation_dict = {"table": [], "chart": [[256, 256, 384, 384, 0.9]]}
     original_image = np.random.rand(640, 640, 3)
-    tables_and_charts = []
+    page_elements = []
 
-    extract_table_and_chart_images(annotation_dict, original_image, 1, tables_and_charts)
+    extract_page_element_images(annotation_dict, original_image, 1, page_elements)
 
-    # Expect one entry in tables_and_charts for the chart
-    assert len(tables_and_charts) == 1
-    page_idx, cropped_image_data = tables_and_charts[0]
+    # Expect one entry in page_elements for the chart
+    assert len(page_elements) == 1
+    page_idx, cropped_image_data = page_elements[0]
     assert page_idx == 1
     assert isinstance(cropped_image_data, CroppedImageWithContent)
     assert cropped_image_data.type_string == "chart"
     assert cropped_image_data.bbox == (256, 256, 384, 384)  # Scaled bounding box
 
 
-def test_extract_table_and_chart_images_multiple_objects():
+def test_extract_page_element_images_multiple_objects():
     """Test extraction with multiple table and chart objects."""
     annotation_dict = {
         "table": [[0.1, 0.1, 0.3, 0.3, 0.8], [0.5, 0.5, 0.7, 0.7, 0.85]],
         "chart": [[0.2, 0.2, 0.4, 0.4, 0.9]],
     }
     original_image = np.random.rand(640, 640, 3)
-    tables_and_charts = []
+    page_elements = []
 
-    extract_table_and_chart_images(annotation_dict, original_image, 2, tables_and_charts)
+    extract_page_element_images(annotation_dict, original_image, 2, page_elements)
 
-    # Expect three entries in tables_and_charts: two tables and one chart
-    assert len(tables_and_charts) == 3
-    for page_idx, cropped_image_data in tables_and_charts:
+    # Expect three entries in page_elements: two tables and one chart
+    assert len(page_elements) == 3
+    for page_idx, cropped_image_data in page_elements:
         assert page_idx == 2
         assert isinstance(cropped_image_data, CroppedImageWithContent)
         assert cropped_image_data.type_string in ["table", "chart"]
         assert cropped_image_data.bbox is not None  # Bounding box should be defined
 
 
-def test_extract_table_and_chart_images_invalid_bounding_box():
+def test_extract_page_element_images_invalid_bounding_box():
     """Test with an invalid bounding box to check handling of incorrect coordinates."""
     annotation_dict = {"table": [[704, 704, 960, 960, 0.9]], "chart": []}  # Out of bounds
     original_image = np.random.rand(640, 640, 3)
-    tables_and_charts = []
+    page_elements = []
 
-    extract_table_and_chart_images(annotation_dict, original_image, 3, tables_and_charts)
+    extract_page_element_images(annotation_dict, original_image, 3, page_elements)
 
     # Verify that the function processes the bounding box as is
-    assert len(tables_and_charts) == 1
-    page_idx, cropped_image_data = tables_and_charts[0]
+    assert len(page_elements) == 1
+    page_idx, cropped_image_data = page_elements[0]
     assert page_idx == 3
     assert isinstance(cropped_image_data, CroppedImageWithContent)
     assert cropped_image_data.type_string == "table"
