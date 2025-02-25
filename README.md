@@ -131,6 +131,9 @@ NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 > Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
+> [!NOTE]
+> The most accurate tokenizer based splitting depends on the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B). To download this model at container build time, you must set `DOWNLOAD_LLAMA_TOKENIZER=True` _and_ supply an authorized HuggingFace access token via `HF_ACCESS_TOKEN=<your access token>`. If not, the ungated [e5-large-unsupervised](https://huggingface.co/intfloat/e5-large-unsupervised) tokenizer model will be downloaded instead. By default, the split task will use whichever model has been predownloaded. Refer to [Environment Configuration Variables](docs/docs/user-guide/developer-guide/environment-config.md) for more info.
+
 5. Start all services:
 `docker compose --profile retrieval up`
 

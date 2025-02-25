@@ -120,7 +120,7 @@ def test_custom_validator_logic_for_sentence_window_size():
     task = {
         "type": "split",
         "task_properties": {
-            "tokanizer": "intfloat/e5-large-unsupervised",
+            "tokenizer": "intfloat/e5-large-unsupervised",
             "chunk_size": 200,
             "chunk_overlap": 250,  # chunk_overlap should always be less than chunk_size
             "params": {},

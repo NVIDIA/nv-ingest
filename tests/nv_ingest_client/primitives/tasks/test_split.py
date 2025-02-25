@@ -77,7 +77,7 @@ def test_split_task_to_dict(
 def test_split_task_default_params():
     task = SplitTask()
     expected_str_contains = [
-        "tokenizer: meta-llama/Llama-3.2-1B",
+        "tokenizer: /workspace/models/tokenizer/",
         "chunk_size: 1024",
         "chunk_overlap: 150",
     ]
@@ -87,7 +87,7 @@ def test_split_task_default_params():
     expected_dict = {
         "type": "split",
         "task_properties": {
-            "tokenizer": "meta-llama/Llama-3.2-1B",
+            "tokenizer": "/workspace/models/tokenizer/",
             "chunk_size": 1024,
             "chunk_overlap": 150,
             "params": {},

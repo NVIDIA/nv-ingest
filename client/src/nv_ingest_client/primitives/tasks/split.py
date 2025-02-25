@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 class SplitTaskSchema(BaseModel):
-    tokenizer: str = "meta-llama/Llama-3.2-1B"
+    tokenizer: str = "/workspace/models/tokenizer/"
     chunk_size: int = 1024
     chunk_overlap: int = 150
     params: dict = {}
@@ -33,7 +33,7 @@ class SplitTask(Task):
 
     def __init__(
         self,
-        tokenizer: str = "meta-llama/Llama-3.2-1B",
+        tokenizer: str = "/workspace/models/tokenizer/",
         chunk_size: int = 1024,
         chunk_overlap: int = 150,
         params: dict = {},
