@@ -7,11 +7,13 @@ import pytest
 from PIL import Image
 
 from nv_ingest.util.nim.yolox import YoloxPageElementsModelInterface
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_V1_FINAL_SCORE
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_V2_FINAL_SCORE
 
 
 @pytest.fixture
 def model_interface():
-    return YoloxPageElementsModelInterface()
+    return YoloxPageElementsModelInterface(yolox_model_name="nv-yolox-page-elements-v2")
 
 
 def create_test_image(width=800, height=600, color=(255, 0, 0)):
@@ -189,6 +191,7 @@ def test_parse_output_http_valid(model_interface):
                     "table": [{"x_min": 0.1, "y_min": 0.1, "x_max": 0.2, "y_max": 0.2, "confidence": 0.9}],
                     "chart": [{"x_min": 0.3, "y_min": 0.3, "x_max": 0.4, "y_max": 0.4, "confidence": 0.8}],
                     "title": [{"x_min": 0.5, "y_min": 0.5, "x_max": 0.6, "y_max": 0.6, "confidence": 0.95}],
+                    "infographic": [{"x_min": 0.7, "y_min": 0.7, "x_max": 0.8, "y_max": 0.8, "confidence": 0.85}],
                 },
             },
             {
@@ -197,6 +200,7 @@ def test_parse_output_http_valid(model_interface):
                     "table": [{"x_min": 0.15, "y_min": 0.15, "x_max": 0.25, "y_max": 0.25, "confidence": 0.85}],
                     "chart": [{"x_min": 0.35, "y_min": 0.35, "x_max": 0.45, "y_max": 0.45, "confidence": 0.75}],
                     "title": [{"x_min": 0.55, "y_min": 0.55, "x_max": 0.65, "y_max": 0.65, "confidence": 0.92}],
+                    "infographic": [{"x_min": 0.75, "y_min": 0.75, "x_max": 0.85, "y_max": 0.85, "confidence": 0.82}],
                 },
             },
         ]
@@ -207,11 +211,13 @@ def test_parse_output_http_valid(model_interface):
             "table": [[0.1, 0.1, 0.2, 0.2, 0.9]],
             "chart": [[0.3, 0.3, 0.4, 0.4, 0.8]],
             "title": [[0.5, 0.5, 0.6, 0.6, 0.95]],
+            "infographic": [[0.7, 0.7, 0.8, 0.8, 0.85]],
         },
         {
             "table": [[0.15, 0.15, 0.25, 0.25, 0.85]],
             "chart": [[0.35, 0.35, 0.45, 0.45, 0.75]],
             "title": [[0.55, 0.55, 0.65, 0.65, 0.92]],
+            "infographic": [[0.75, 0.75, 0.85, 0.85, 0.82]],
         },
     ]
 
@@ -236,10 +242,13 @@ def test_process_inference_results_grpc(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.48
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["table"]
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.48
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["chart"]
+        if "infographic" in result:
+            for bbox in result["infographic"]:
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["infographic"]
         if "title" in result:
             assert isinstance(result["title"], list)
 
@@ -265,9 +274,12 @@ def test_process_inference_results_http(model_interface):
         assert isinstance(result, dict)
         if "table" in result:
             for bbox in result["table"]:
-                assert bbox[4] >= 0.48
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["table"]
         if "chart" in result:
             for bbox in result["chart"]:
-                assert bbox[4] >= 0.48
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["chart"]
+        if "infographic" in result:
+            for bbox in result["infographic"]:
+                assert bbox[4] >= YOLOX_PAGE_V2_FINAL_SCORE["infographic"]
         if "title" in result:
             assert isinstance(result["title"], list)
