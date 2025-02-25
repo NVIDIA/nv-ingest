@@ -7,6 +7,7 @@ import logging
 import math
 import multiprocessing as mp
 import os
+from ctypes import py_object
 from multiprocessing import Manager
 from threading import Lock
 from typing import Any
@@ -48,8 +49,8 @@ class SimpleFuture:
     """
 
     def __init__(self, manager: Manager):
-        self._result = manager.Value("i", None)
-        self._exception = manager.Value("i", None)
+        self._result = manager.Value(py_object, None)
+        self._exception = manager.Value(py_object, None)
         self._done = manager.Event()
 
     def set_result(self, result: Any) -> None:
@@ -151,7 +152,7 @@ class ProcessWorkerPoolSingleton:
         with cls._lock:
             if cls._instance is None:
                 cls._instance = super(ProcessWorkerPoolSingleton, cls).__new__(cls)
-                max_workers = math.floor(max(1, len(os.sched_getaffinity(0)) * 0.4))
+                max_workers = math.floor(max(1, len(os.sched_getaffinity(0)) * 0.2))
                 cls._instance._initialize(max_workers)
                 logger.debug(f"ProcessWorkerPoolSingleton instance created: {cls._instance}")
             else:

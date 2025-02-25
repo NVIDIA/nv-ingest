@@ -2,6 +2,10 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import os
+
+from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
+
 import json
 
 from morpheus.config import Config, ExecutionMode
@@ -24,6 +28,32 @@ local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
 configure_local_logging(logger, local_log_level)
+
+
+def minimal_task(task_number):
+    """
+    A minimal task that returns a string containing the task number and process ID.
+    """
+    return f"Task {task_number} executed by process {os.getpid()}"
+
+    # Grab the singleton instance of the process worker pool.
+
+
+pool = ProcessWorkerPoolSingleton()
+
+# Determine the number of CPUs available.
+cpu_count = len(os.sched_getaffinity(0))
+
+futures = []
+# Wrap the argument in a tuple to match the expected structure.
+for i in range(cpu_count):
+    future = pool.submit_task(minimal_task, (i,))  # Pass a tuple of positional arguments.
+    futures.append(future)
+
+# Collect and print the results.
+for idx, future in enumerate(futures):
+    result = future.result()  # Blocks until the task completes.
+    print(f"Result from task {idx}: {result}")
 
 
 @click.command()
