@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-page-elements-v2}:${YOLOX_TAG:-1.0.0}
+    image: ${YOLOX_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1}:${YOLOX_TAG:-1.0.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -18,7 +18,7 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
       # NIM OpenTelemetry Settings
       - NIM_OTEL_SERVICE_NAME=yolox
