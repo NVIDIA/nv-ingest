@@ -53,8 +53,8 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import _extract_page_elements
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_BATCH_SIZE
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_HEIGHT
-from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_WIDTH
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_PAGE_IMAGE_PREPROC_HEIGHT
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_PAGE_IMAGE_PREPROC_WIDTH
 
 
 logger = logging.getLogger(__name__)
@@ -462,8 +462,8 @@ def _convert_pdfium_page_to_numpy_for_parser(
 
 def _convert_pdfium_page_to_numpy_for_yolox(
     page: pdfium.PdfPage,
-    scale_tuple: Tuple[int, int] = (YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
-    padding_tuple: Tuple[int, int] = (YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+    scale_tuple: Tuple[int, int] = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+    padding_tuple: Tuple[int, int] = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
 ) -> np.ndarray:
     page_images, padding_offsets = pdfium_pages_to_numpy([page], scale_tuple=scale_tuple, padding_tuple=padding_tuple)
 

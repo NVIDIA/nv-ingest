@@ -52,7 +52,7 @@ YOLOX_MAX_BATCH_SIZE = 8
 logger = logging.getLogger(__name__)
 
 
-def extract_tables_and_charts_using_image_ensemble(
+def extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
@@ -111,7 +111,7 @@ def extract_tables_and_charts_using_image_ensemble(
         for annotation_dict, page_index, original_image, padding_offset in zip(
             inference_results, image_page_indices, original_images, padding_offsets
         ):
-            extract_table_and_chart_images(
+            extract_page_element_images(
                 annotation_dict,
                 original_image,
                 page_index,
