@@ -432,4 +432,4 @@ Here are the options provided by the CLI, explained:
 
 ## Examples
 
-You can find a notebook with examples using the client [here](client_examples/examples/cli_client_usage.ipynb).
+You can find a notebook with examples that use the CLI client in [the client examples folder](client/client_examples/examples/).

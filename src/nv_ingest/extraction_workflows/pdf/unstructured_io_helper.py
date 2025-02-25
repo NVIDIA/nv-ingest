@@ -77,7 +77,7 @@ def unstructured_io(
 
     """
 
-    logger.info("Extracting PDF with unstructured-io backend.")
+    logger.debug("Extracting PDF with unstructured-io backend.")
 
     # get unstructured.io api key
     api_key = kwargs.get("unstructured_api_key", None)

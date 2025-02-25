@@ -9,12 +9,12 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import PIL
 import numpy as np
 import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from numpy import dtype
 from numpy import ndarray
-from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
@@ -57,7 +57,7 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     mode = bitmap_info.mode  # Use the mode to identify the correct format
 
     # Convert to a NumPy array using the built-in method
-    img_arr = bitmap.to_numpy()
+    img_arr = bitmap.to_numpy().copy()
 
     # Automatically handle channel swapping if necessary
     if mode in {"BGRA", "BGRX"}:
@@ -145,7 +145,8 @@ def pdfium_pages_to_numpy(
     pages : List[pdfium.PdfPage]
         A list of PdfPage objects to be rendered and converted into NumPy arrays.
     render_dpi : int, optional
-        The DPI (dots per inch) at which to render the pages. Defaults to 300.
+        The DPI (dots per inch) at which to render the pages. Must be between 50 and 1200.
+        Defaults to 300.
     scale_tuple : Optional[Tuple[int, int]], optional
         A tuple (width, height) to resize the rendered image to using the thumbnail approach.
         Defaults to None.
@@ -155,8 +156,11 @@ def pdfium_pages_to_numpy(
 
     Returns
     -------
-    List[np.ndarray]
-        A list of NumPy arrays, where each array corresponds to an image of a PDF page.
+    tuple
+        A tuple containing:
+            - A list of NumPy arrays, where each array corresponds to an image of a PDF page.
+              Each array is an independent copy of the rendered image data.
+            - A list of padding offsets applied to each image, as tuples of (offset_width, offset_height).
 
     Raises
     ------
@@ -183,15 +187,18 @@ def pdfium_pages_to_numpy(
 
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:
-            pil_image.thumbnail(scale_tuple, Image.LANCZOS)
+            pil_image.thumbnail(scale_tuple, PIL.Image.LANCZOS)
 
-        # Convert the PIL image to a NumPy array
-        img_arr = np.array(pil_image)
+        # Convert the PIL image to a NumPy array and force a full copy,
+        # ensuring the returned array is entirely independent of the original buffer.
+        img_arr = np.array(pil_image).copy()
 
         # Apply padding if specified
         if padding_tuple:
-            img_arr, padding_offset = pad_image(img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1])
-            padding_offsets.append(padding_offset)
+            img_arr, (pad_width, pad_height) = pad_image(
+                img_arr, target_width=padding_tuple[0], target_height=padding_tuple[1]
+            )
+            padding_offsets.append((pad_width, pad_height))
         else:
             padding_offsets.append((0, 0))
 

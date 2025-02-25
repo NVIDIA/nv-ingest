@@ -73,9 +73,11 @@ class CachedModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str) -> Any:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
         Format input data for the specified protocol ("grpc" or "http"), handling batched images.
+        Additionally, returns batched data that coalesces the original image arrays and their dimensions
+        in the same order as provided.
 
         Parameters
         ----------
@@ -83,69 +85,91 @@ class CachedModelInterface(ModelInterface):
             The input data dictionary, expected to contain "image_arrays" (a list of np.ndarray).
         protocol : str
             The protocol to use, "grpc" or "http".
+        max_batch_size : int
+            The maximum number of images per batch.
 
         Returns
         -------
-        Any
-            The formatted input data. For gRPC, a single NumPy array of shape (B, H, W, C).
-            For HTTP, a JSON-serializable dict containing base64-encoded images.
+        tuple
+            A tuple (formatted_batches, formatted_batch_data) where:
+              - For gRPC: formatted_batches is a list of NumPy arrays, each of shape (B, H, W, C)
+                with B <= max_batch_size.
+              - For HTTP: formatted_batches is a list of JSON-serializable dict payloads.
+              - In both cases, formatted_batch_data is a list of dicts with the keys:
+                    "image_arrays": the list of original np.ndarray images for that batch, and
+                    "image_dims":  a list of (height, width) tuples for each image in the batch.
 
         Raises
         ------
         KeyError
             If "image_arrays" is missing in the data dictionary.
         ValueError
-            If the protocol is invalid, or if images have differing shapes for gRPC.
+            If the protocol is invalid, or if no valid images are found.
         """
         if "image_arrays" not in data:
             raise KeyError("Expected 'image_arrays' in data. Make sure prepare_data_for_inference was called.")
 
         image_arrays = data["image_arrays"]
+        # Compute dimensions for each image.
+        image_dims = [(img.shape[0], img.shape[1]) for img in image_arrays]
+
+        # Helper: chunk a list into sublists of length up to chunk_size.
+        def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Cached model (batched).")
-
-            batched_images: List[np.ndarray] = []
+            batched_images = []
             for arr in image_arrays:
                 # Expand from (H, W, C) to (1, H, W, C) if needed
                 if arr.ndim == 3:
                     arr = np.expand_dims(arr, axis=0)
-                # Convert to float32
                 batched_images.append(arr.astype(np.float32))
 
             if not batched_images:
                 raise ValueError("No valid images found for gRPC formatting.")
 
-            # Ensure all images have the same shape (beyond batch dimension)
-            shapes = [img.shape[1:] for img in batched_images]  # each is (H, W, C)
-            if any(s != shapes[0] for s in shapes[1:]):
-                raise ValueError(f"All images must have the same dimensions for gRPC batching. Found: {shapes}")
+            # Chunk the processed images, original arrays, and dimensions.
+            batched_image_chunks = chunk_list(batched_images, max_batch_size)
+            orig_chunks = chunk_list(image_arrays, max_batch_size)
+            dims_chunks = chunk_list(image_dims, max_batch_size)
 
-            # Concatenate => shape (B, H, W, C)
-            batched_input = np.concatenate(batched_images, axis=0)
-            return batched_input
+            batched_inputs = []
+            formatted_batch_data = []
+            for proc_chunk, orig_chunk, dims_chunk in zip(batched_image_chunks, orig_chunks, dims_chunks):
+                # Concatenate along the batch dimension => shape (B, H, W, C)
+                batched_input = np.concatenate(proc_chunk, axis=0)
+                batched_inputs.append(batched_input)
+                formatted_batch_data.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Cached model (batched).")
-
             content_list: List[Dict[str, Any]] = []
             for arr in image_arrays:
-                # Convert to uint8 if needed, then to PIL, then to base64
+                # Convert to uint8 if needed, then to PIL Image and base64-encode it.
                 if arr.dtype != np.uint8:
                     arr = (arr * 255).astype(np.uint8)
                 image_pil = Image.fromarray(arr)
                 buffered = io.BytesIO()
                 image_pil.save(buffered, format="PNG")
                 base64_img = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-                # Build item for Nim-like structure
                 image_item = {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}
                 content_list.append(image_item)
 
-            message = {"content": content_list}
-            payload = {"messages": [message]}
+            # Chunk the content list, original arrays, and dimensions.
+            content_chunks = chunk_list(content_list, max_batch_size)
+            orig_chunks = chunk_list(image_arrays, max_batch_size)
+            dims_chunks = chunk_list(image_dims, max_batch_size)
 
-            return payload
+            payload_batches = []
+            formatted_batch_data = []
+            for chunk, orig_chunk, dims_chunk in zip(content_chunks, orig_chunks, dims_chunks):
+                message = {"content": chunk}
+                payload = {"messages": [message]}
+                payload_batches.append(payload)
+                formatted_batch_data.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return payload_batches, formatted_batch_data
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")

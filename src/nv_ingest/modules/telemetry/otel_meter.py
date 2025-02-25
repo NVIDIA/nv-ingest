@@ -9,7 +9,6 @@ import traceback
 from datetime import datetime
 
 import mrc
-from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
@@ -26,6 +25,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.telemetry.global_stats import GlobalStats
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -180,7 +180,7 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
         raise_on_failure=validated_config.raise_on_failure,
         skip_processing_if_failed=False,
     )
-    def aggregate_metrics(message: ControlMessage) -> ControlMessage:
+    def aggregate_metrics(message: IngestControlMessage) -> IngestControlMessage:
         try:
             do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
             if not do_trace_tagging:

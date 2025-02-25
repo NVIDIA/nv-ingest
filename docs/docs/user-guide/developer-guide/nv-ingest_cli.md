@@ -32,7 +32,7 @@ Options:
                                   Example:
                                     --task 'split:{"split_by":"page", "split_length":10}'
                                     --task 'extract:{"document_type":"pdf", "extract_text":true}'
-                                    --task 'extract:{"document_type":"pdf", "extract_method":"doughnut"}'
+                                    --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
                                     --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
                                     --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
                                     --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
@@ -51,7 +51,7 @@ Options:
                                   - extract: Extracts content from documents, customizable per document type.
                                       Can be specified multiple times for different 'document_type' values.
                                       Options:
-                                      - document_type (str): Document format ('pdf', 'docx', 'pptx', 'html', 'xml', 'excel', 'csv', 'parquet'). Required.
+                                      - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
                                       - text_depth (str): Depth at which text parsing occurs ('document', 'page'), additional text_depths are partially supported and depend on the specified extraction method ('block', 'line', 'span')
                                       - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
                                       - extract_text (bool): Enables text extraction. Default: False.
@@ -120,7 +120,7 @@ nv-ingest-cli \
 
 Submit a PDF file with splitting and extraction tasks.
 
-**Note: (TODO)** This currently only works for pdfium, doughnut, and Unstructured.io; haystack, Adobe, and LlamaParse
+**Note: (TODO)** This currently only works for pdfium, nemoretriever_parse, and Unstructured.io; haystack, Adobe, and LlamaParse
 have existing workflows but have not been fully converted to use our unified metadata schema.
 
 ```bash

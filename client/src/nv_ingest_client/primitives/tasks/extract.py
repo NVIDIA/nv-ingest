@@ -23,10 +23,6 @@ from .task_base import Task
 
 logger = logging.getLogger(__name__)
 
-DOUGHNUT_TRITON_HOST = os.environ.get("DOUGHNUT_TRITON_HOST", "localhost")
-DOUGHNUT_TRITON_PORT = os.environ.get("DOUGHNUT_TRITON_PORT", "8001")
-DOUGHNUT_BATCH_SIZE = os.environ.get("DOUGHNUT_TRITON_PORT", "16")
-
 UNSTRUCTURED_API_KEY = os.environ.get("UNSTRUCTURED_API_KEY", None)
 UNSTRUCTURED_URL = os.environ.get("UNSTRUCTURED_URL", "https://api.unstructured.io/general/v0/general")
 UNSTRUCTURED_STRATEGY = os.environ.get("UNSTRUCTURED_STRATEGY", "auto")
@@ -53,7 +49,7 @@ _DEFAULT_EXTRACTOR_MAP = {
 
 _Type_Extract_Method_PDF = Literal[
     "adobe",
-    "doughnut",
+    "nemoretriever_parse",
     "haystack",
     "llama_parse",
     "pdfium",
@@ -78,7 +74,7 @@ _Type_Extract_Method_Map = {
     "tiff": get_args(_Type_Extract_Method_Image),
 }
 
-_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium"]
+_Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium", "nemoretriever_parse"]
 
 _Type_Extract_Tables_Method_DOCX = Literal["python_docx",]
 
@@ -103,6 +99,7 @@ class ExtractTaskSchema(BaseModel):
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
+    extract_infographics: bool = (False,)
     text_depth: str = "document"
     paddle_output_format: str = "pseudo_markdown"
 
@@ -126,7 +123,7 @@ class ExtractTaskSchema(BaseModel):
     @field_validator("extract_charts")
     def set_default_extract_charts(cls, v, values):
         # `extract_charts` is initially set to None for backward compatibility.
-        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract-charts: true} enables both
+        # {extract_tables: true, extract_charts: None} or {extract_tables: true, extract_charts: true} enables both
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
         extract_charts = v
@@ -187,6 +184,7 @@ class ExtractTask(Task):
         extract_images_method: _Type_Extract_Images_Method = "group",
         extract_images_params: Optional[Dict[str, Any]] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
+        extract_infographics: bool = False,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
     ) -> None:
@@ -207,6 +205,7 @@ class ExtractTask(Task):
         # table and chart extraction.
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
         self._extract_charts = extract_charts if extract_charts is not None else extract_tables
+        self._extract_infographics = extract_infographics
         self._extract_text = extract_text
         self._text_depth = text_depth
         self._paddle_output_format = paddle_output_format
@@ -223,6 +222,7 @@ class ExtractTask(Task):
         info += f"  extract images: {self._extract_images}\n"
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
+        info += f"  extract infographics: {self._extract_infographics}\n"
         info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
@@ -243,6 +243,7 @@ class ExtractTask(Task):
             "extract_images_method": self._extract_images_method,
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
+            "extract_infographics": self._extract_infographics,
             "text_depth": self._text_depth,
             "paddle_output_format": self._paddle_output_format,
         }
@@ -268,13 +269,6 @@ class ExtractTask(Task):
                 "unstructured_url": "",  # TODO(Devin): Should be an environment variable
             }
             task_properties["params"].update(unstructured_properties)
-        elif self._extract_method == "doughnut":
-            doughnut_properties = {
-                "doughnut_triton_host": os.environ.get("DOUGHNUT_TRITON_HOST", DOUGHNUT_TRITON_HOST),
-                "doughnut_triton_port": os.environ.get("DOUGHNUT_TRITON_PORT", DOUGHNUT_TRITON_PORT),
-                "doughnut_batch_size": os.environ.get("DOUGHNUT_BATCH_SIZE", DOUGHNUT_BATCH_SIZE),
-            }
-            task_properties["params"].update(doughnut_properties)
         elif self._extract_method == "unstructured_io":
             unstructured_properties = {
                 "unstructured_api_key": os.environ.get("UNSTRUCTURED_API_KEY", UNSTRUCTURED_API_KEY),

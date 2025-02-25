@@ -2,7 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 
 import numpy as np
 import logging
@@ -63,53 +63,102 @@ class DeplotModelInterface(ModelInterface):
 
         return data
 
-    def format_input(self, data: Dict[str, Any], protocol: str, **kwargs) -> Any:
+    def format_input(self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs) -> Any:
         """
-        Format input data for the specified protocol (gRPC or HTTP).
-        For HTTP, we now construct multiple messages—one per image—in the same style
-        as the original single-image code.
+        Format input data for the specified protocol (gRPC or HTTP) for Deplot.
+        For HTTP, we now construct multiple messages—one per image batch—along with
+        corresponding batch data carrying the original image arrays and their dimensions.
+
+        Parameters
+        ----------
+        data : dict of str -> Any
+            The input data dictionary, expected to contain "image_arrays" (a list of np.ndarray).
+        protocol : str
+            The protocol to use, "grpc" or "http".
+        max_batch_size : int
+            The maximum number of images per batch.
+        kwargs : dict
+            Additional parameters to pass to the payload preparation (for HTTP).
+
+        Returns
+        -------
+        tuple
+            (formatted_batches, formatted_batch_data) where:
+              - For gRPC: formatted_batches is a list of NumPy arrays, each of shape (B, H, W, C)
+                with B <= max_batch_size.
+              - For HTTP: formatted_batches is a list of JSON-serializable payload dicts.
+              - In both cases, formatted_batch_data is a list of dicts containing:
+                    "image_arrays": the list of original np.ndarray images for that batch, and
+                    "image_dims":  a list of (height, width) tuples for each image in the batch.
+
+        Raises
+        ------
+        KeyError
+            If "image_arrays" is missing in the data dictionary.
+        ValueError
+            If the protocol is invalid, or if no valid images are found.
         """
         if "image_arrays" not in data:
             raise KeyError("Expected 'image_arrays' in data. Call prepare_data_for_inference first.")
 
         image_arrays = data["image_arrays"]
+        # Compute image dimensions from each image array.
+        image_dims = [(img.shape[0], img.shape[1]) for img in image_arrays]
+
+        # Helper function: chunk a list into sublists of length <= chunk_size.
+        def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Deplot model (potentially batched).")
-            # For each decoded array, expand dims if needed, cast to float32, normalize, then stack.
             processed = []
             for arr in image_arrays:
-                if arr.ndim == 3:  # (H, W, C)
-                    arr = np.expand_dims(arr, axis=0)  # (1, H, W, C)
+                # Ensure each image has shape (1, H, W, C)
+                if arr.ndim == 3:
+                    arr = np.expand_dims(arr, axis=0)
                 arr = arr.astype(np.float32)
                 arr /= 255.0  # Normalize to [0,1]
                 processed.append(arr)
 
-            # Concatenate along batch dimension => shape (batch_size, H, W, C)
-            batched_input = np.concatenate(processed, axis=0)
-            return batched_input
+            if not processed:
+                raise ValueError("No valid images found for gRPC formatting.")
+
+            formatted_batches = []
+            formatted_batch_data = []
+            proc_chunks = chunk_list(processed, max_batch_size)
+            orig_chunks = chunk_list(image_arrays, max_batch_size)
+            dims_chunks = chunk_list(image_dims, max_batch_size)
+
+            for proc_chunk, orig_chunk, dims_chunk in zip(proc_chunks, orig_chunks, dims_chunks):
+                # Concatenate along the batch dimension to form a single input.
+                batched_input = np.concatenate(proc_chunk, axis=0)
+                formatted_batches.append(batched_input)
+                formatted_batch_data.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return formatted_batches, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Deplot model (multiple messages).")
-
-            # In the original single-image approach, we called _prepare_deplot_payload
-            # and inserted one <img> tag in the "content" of a single message.
-            # For multiple images, we replicate that exact logic but create *multiple* messages.
-
-            # Retrieve the original base64 strings (not the arrays) so we can embed them in <img>.
             if "base64_images" in data:
                 base64_list = data["base64_images"]
             else:
-                # single fallback
                 base64_list = [data["base64_image"]]
 
-            payload = self._prepare_deplot_payload(
-                base64_list=base64_list,
-                max_tokens=kwargs.get("max_tokens", 500),
-                temperature=kwargs.get("temperature", 0.5),
-                top_p=kwargs.get("top_p", 0.9),
-            )
-            return payload
+            formatted_batches = []
+            formatted_batch_data = []
+            b64_chunks = chunk_list(base64_list, max_batch_size)
+            orig_chunks = chunk_list(image_arrays, max_batch_size)
+            dims_chunks = chunk_list(image_dims, max_batch_size)
+
+            for b64_chunk, orig_chunk, dims_chunk in zip(b64_chunks, orig_chunks, dims_chunks):
+                payload = self._prepare_deplot_payload(
+                    base64_list=b64_chunk,
+                    max_tokens=kwargs.get("max_tokens", 500),
+                    temperature=kwargs.get("temperature", 0.5),
+                    top_p=kwargs.get("top_p", 0.9),
+                )
+                formatted_batches.append(payload)
+                formatted_batch_data.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+            return formatted_batches, formatted_batch_data
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -147,6 +196,8 @@ class DeplotModelInterface(ModelInterface):
         ----------
         output : Any
             The raw output from the model.
+        protocol : str
+            The protocol used for inference (gRPC or HTTP).
 
         Returns
         -------
@@ -157,8 +208,8 @@ class DeplotModelInterface(ModelInterface):
         # For Deplot, the output is the chart content as a string
         return output
 
+    @staticmethod
     def _prepare_deplot_payload(
-        self,
         base64_list: list,
         max_tokens: int = 500,
         temperature: float = 0.5,
@@ -206,7 +257,8 @@ class DeplotModelInterface(ModelInterface):
         }
         return payload
 
-    def _extract_content_from_deplot_response(self, json_response: Dict[str, Any]) -> Any:
+    @staticmethod
+    def _extract_content_from_deplot_response(json_response: Dict[str, Any]) -> Any:
         """
         Extract content from the JSON response of a Deplot HTTP API request.
         The original code expected a single choice with a single textual content.
