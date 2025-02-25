@@ -36,8 +36,8 @@ EmbedExtractionsLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPAC
 def _make_async_request(
     prompts: List[str],
     api_key: str,
-    embedding_nim_endpoint: str,
-    embedding_model: str,
+    endpoint_url: str,
+    model_name: str,
     encoding_format: str,
     input_type: str,
     truncate: str,
@@ -51,12 +51,12 @@ def _make_async_request(
     try:
         client = OpenAI(
             api_key=api_key,
-            base_url=embedding_nim_endpoint,
+            base_url=endpoint_url,
         )
 
         resp = client.embeddings.create(
             input=prompts,
-            model=embedding_model,
+            model=model_name,
             encoding_format=encoding_format,
             extra_body={"input_type": input_type, "truncate": truncate},
         )
@@ -85,8 +85,8 @@ def _make_async_request(
 def _async_request_handler(
     prompts: List[str],
     api_key: str,
-    embedding_nim_endpoint: str,
-    embedding_model: str,
+    endpoint_url: str,
+    model_name: str,
     encoding_format: str,
     input_type: str,
     truncate: str,
@@ -103,8 +103,8 @@ def _async_request_handler(
                 _make_async_request,
                 prompts=prompt_batch,
                 api_key=api_key,
-                embedding_nim_endpoint=embedding_nim_endpoint,
-                embedding_model=embedding_model,
+                endpoint_url=endpoint_url,
+                model_name=model_name,
                 encoding_format=encoding_format,
                 input_type=input_type,
                 truncate=truncate,
@@ -120,8 +120,8 @@ def _async_request_handler(
 def _async_runner(
     prompts: List[str],
     api_key: str,
-    embedding_nim_endpoint: str,
-    embedding_model: str,
+    endpoint_url: str,
+    model_name: str,
     encoding_format: str,
     input_type: str,
     truncate: str,
@@ -133,8 +133,8 @@ def _async_runner(
     results = _async_request_handler(
         prompts,
         api_key,
-        embedding_nim_endpoint,
-        embedding_model,
+        endpoint_url,
+        model_name,
         encoding_format,
         input_type,
         truncate,
@@ -236,8 +236,8 @@ def _generate_embeddings(
     ctrl_msg: IngestControlMessage,
     batch_size: int,
     api_key: str,
-    embedding_nim_endpoint: str,
-    embedding_model: str,
+    endpoint_url: str,
+    model_name: str,
     encoding_format: str,
     input_type: str,
     truncate: str,
@@ -292,8 +292,8 @@ def _generate_embeddings(
             content_embeddings = _async_runner(
                 filtered_content_batches,
                 api_key,
-                embedding_nim_endpoint,
-                embedding_model,
+                endpoint_url,
+                model_name,
                 encoding_format,
                 input_type,
                 truncate,
@@ -353,14 +353,18 @@ def _embed_extractions(builder: mrc.Builder):
         try:
             task_props = remove_task_by_type(message, "embed")
             model_dump = task_props.model_dump()
+
+            model_name = model_dump.get("model_name") or validated_config.model_name
+            endpoint_url = model_dump.get("endpoint_url") or validated_config.endpoint_url
+            api_key = model_dump.get("api_key") or validated_config.api_key
             filter_errors = model_dump.get("filter_errors", False)
 
             return _generate_embeddings(
                 message,
                 validated_config.batch_size,  # This parameter is now ignored in _generate_embeddings.
-                validated_config.api_key,
-                validated_config.embedding_nim_endpoint,
-                validated_config.embedding_model,
+                api_key,
+                endpoint_url,
+                model_name,
                 validated_config.encoding_format,
                 validated_config.input_type,
                 validated_config.truncate,
