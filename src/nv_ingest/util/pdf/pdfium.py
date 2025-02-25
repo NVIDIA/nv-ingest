@@ -44,6 +44,7 @@ def convert_bitmap_to_corrected_numpy(bitmap: pdfium.PdfBitmap) -> np.ndarray:
     # Get the bitmap format information
     bitmap_info = bitmap.get_info()
     mode = bitmap_info.mode  # Use the mode to identify the correct format
+    del bitmap_info
 
     # Convert to a NumPy array using the built-in method
     img_arr = bitmap.to_numpy().copy()
@@ -109,6 +110,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 
     # Convert the bitmap to a NumPy array
     img_array = convert_bitmap_to_corrected_numpy(image_bitmap)
+    image_bitmap.close()
 
     return img_array
 
@@ -171,6 +173,7 @@ def pdfium_pages_to_numpy(
 
         # Convert the bitmap to a PIL image
         pil_image = page_bitmap.to_pil()
+        page_bitmap.close()
 
         # Apply scaling using the thumbnail approach if specified
         if scale_tuple:

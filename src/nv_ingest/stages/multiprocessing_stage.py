@@ -260,7 +260,9 @@ class MultiProcessingBaseStage(SinglePortStage):
                     # Submit to the process pool and get the future
                     future = process_pool.submit_task(process_fn, (df, task_props))
                     # This can return/raise an exception
+                    logger.debug(f"child_receive_thread got future: {future}.... Waiting")
                     result = future.result()
+                    logger.debug(f"child_receive_thread got result: {result}")
                     extra_results = []
                     if isinstance(result, tuple):
                         result, *extra_results = result
