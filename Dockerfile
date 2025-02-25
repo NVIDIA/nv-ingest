@@ -130,8 +130,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./client/dist/*.whl
 
 
-RUN --mount=type=cache,target=/opt/conda/pkgs \
-    --mount=type=cache,target=/root/.cache/pip \
+RUN  --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
     && python3 /workspace/docker/post_build_triggers.py
 
