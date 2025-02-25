@@ -95,13 +95,6 @@ def _text_splitter(builder: mrc.Builder):
             # Validate that all 'content' values are not None
             df = message.payload()
 
-            # Filter to document type
-            bool_index = df["document_type"] == ContentTypeEnum.TEXT
-            df_filtered = df.loc[bool_index]
-
-            if df_filtered.empty:
-                return message
-
             # Override parameters if set
             tokenizer = task_props.get("tokenizer", validated_config.tokenizer)
             chunk_size = task_props.get("chunk_size", validated_config.chunk_size)
@@ -117,13 +110,11 @@ def _text_splitter(builder: mrc.Builder):
                 f"chunk_overlap: {chunk_overlap}"
             )
 
-            # Filter to file type
-            bool_index = (
-                pd.json_normalize(df_filtered["metadata"])
-                .set_index(df_filtered.index)["source_metadata.source_type"]
-                .isin(split_source_types)
+            # Filter to document and file type
+            bool_index = (df["document_type"] == ContentTypeEnum.TEXT) & (
+                pd.json_normalize(df["metadata"])["source_metadata.source_type"].isin(split_source_types)
             )
-            df_filtered = df_filtered.loc[bool_index]
+            df_filtered = df.loc[bool_index]
 
             if df_filtered.empty:
                 return message
