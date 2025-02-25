@@ -34,9 +34,9 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
-from nv_ingest.util.nim.helpers import get_model_name
 from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_HEIGHT
 from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_WIDTH
+from nv_ingest.util.nim.yolox import get_yolox_model_name
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
@@ -70,7 +70,10 @@ def extract_page_elements_using_image_ensemble(
     page_elements = []
     yolox_client = None
 
-    yolox_model_name = _get_yolox_model_name(config)
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
 
     try:
         model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
@@ -475,24 +478,3 @@ def pdfium_extractor(
         extracted_data.append(doc_text_meta)
 
     return extracted_data
-
-
-def _get_yolox_model_name(config, default_model_name="nv-yolox-page-elements-v1"):
-    # Obtain yolox_version
-    # Assuming that the http endpoint is at index 1
-    yolox_http_endpoint = config.yolox_endpoints[1]
-    try:
-        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
-        if not yolox_model_name:
-            logger.warning(
-                "Failed to obtain yolox-page-elements model name from the endpoint. "
-                f"Falling back to '{default_model_name}'."
-            )
-            yolox_model_name = default_model_name  # Default to v1 until gtc release
-    except Exception:
-        logger.warning(
-            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
-        )
-        yolox_model_name = default_model_name  # Default to v1 until gtc release
-
-    return yolox_model_name

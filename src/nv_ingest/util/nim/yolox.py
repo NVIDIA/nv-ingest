@@ -8,10 +8,11 @@ import io
 import logging
 import warnings
 from math import log
-from typing import Any, Tuple
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -22,6 +23,7 @@ from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
 from nv_ingest.util.nim.helpers import ModelInterface
+from nv_ingest.util.nim.helpers import get_model_name
 
 logger = logging.getLogger(__name__)
 
@@ -1362,3 +1364,21 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
             bbox_dict[k][:, [1, 3]] = np.add(bbox_dict[k][:, [1, 3]], delta, casting="unsafe")
 
     return bbox_dict
+
+
+def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-elements-v1"):
+    try:
+        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
+        if not yolox_model_name:
+            logger.warning(
+                "Failed to obtain yolox-page-elements model name from the endpoint. "
+                f"Falling back to '{default_model_name}'."
+            )
+            yolox_model_name = default_model_name  # Default to v1 until gtc release
+    except Exception:
+        logger.warning(
+            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
+        )
+        yolox_model_name = default_model_name  # Default to v1 until gtc release
+
+    return yolox_model_name
