@@ -312,6 +312,7 @@ def pdfium_extractor(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
+    extract_infographics = kwargs.get("extract_infographics", extract_tables)
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
@@ -348,7 +349,8 @@ def pdfium_extractor(
     logger.debug(f"PDF has {page_count} pages.")
     logger.debug(
         f"extract_text={extract_text}, extract_images={extract_images}, "
-        f"extract_tables={extract_tables}, extract_charts={extract_charts}"
+        f"extract_tables={extract_tables}, extract_charts={extract_charts}, "
+        f"extract_infographics={extract_infographics}"
     )
 
     # Decide if text_depth is PAGE or DOCUMENT
@@ -404,7 +406,7 @@ def pdfium_extractor(
                 extracted_data.extend(image_data)
 
             # If we want tables or charts, rasterize the page and store it
-            if extract_tables or extract_charts:
+            if extract_tables or extract_charts or extract_infographics:
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
@@ -431,7 +433,7 @@ def pdfium_extractor(
             page.close()
 
         # After page loop, if we still have leftover pages_for_tables, submit one last job
-        if (extract_tables or extract_charts) and pages_for_tables:
+        if (extract_tables or extract_charts or extract_infographics) and pages_for_tables:
             future = executor.submit(
                 _extract_page_elements,
                 pages_for_tables[:],

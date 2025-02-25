@@ -103,12 +103,13 @@ def nemoretriever_parse(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
+    extract_infographics = kwargs.get("extract_infographics", True)
     extract_tables_method = kwargs.get("extract_tables_method", "yolox")
     identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
-    if (extract_tables_method == "yolox") and (extract_tables or extract_charts):
+    if (extract_tables_method == "yolox") and (extract_tables or extract_charts or extract_infographics):
         pdfium_config = kwargs.get("pdfium_config", {})
         if isinstance(pdfium_config, dict):
             pdfium_config = PDFiumConfigSchema(**pdfium_config)
@@ -185,7 +186,7 @@ def nemoretriever_parse(
             # Whenever pages_as_images hits YOLOX_MAX_BATCH_SIZE, submit a job
             if (
                 (extract_tables_method == "yolox")
-                and (extract_tables or extract_charts)
+                and (extract_tables or extract_charts or extract_infographics)
                 and (len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE)
             ):
                 future_yolox = executor.submit(
@@ -212,7 +213,11 @@ def nemoretriever_parse(
             futures.append(future_parser)
             pages_for_ocr.clear()
 
-        if (extract_tables_method == "yolox") and (extract_tables or extract_charts) and pages_for_tables:
+        if (
+            (extract_tables_method == "yolox")
+            and (extract_tables or extract_charts or extract_infographics)
+            and pages_for_tables
+        ):
             future_yolox = executor.submit(
                 lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
                 pages_for_tables[:],
@@ -230,7 +235,7 @@ def nemoretriever_parse(
         # Now wait for all futures to complete
         for fut in concurrent.futures.as_completed(futures):
             model_name, extracted_items = fut.result()  # blocks until finished
-            if (model_name == "yolox") and (extract_tables or extract_charts):
+            if (model_name == "yolox") and (extract_tables or extract_charts or extract_infographics):
                 extracted_data.extend(extracted_items)
             elif model_name == "parser":
                 parser_results.extend(extracted_items)
