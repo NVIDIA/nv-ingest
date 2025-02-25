@@ -254,22 +254,3 @@ def test_incorrect_property_types():
     }
     with pytest.raises(ValidationError):
         validate_ingest_job(job_data)
-
-
-def test_missing_required_fields():
-    job_data = {
-        "job_payload": valid_job_payload(),
-        "job_id": "12345",
-        "tasks": [
-            {
-                "type": "split",
-                "task_properties": {
-                    "tokenizer": "intfloat/e5-large-unsupervised",  # Missing chunk_size
-                    "chunk_overlap": 0,
-                    "params": {},
-                },
-            }
-        ],
-    }
-    with pytest.raises(ValidationError):
-        validate_ingest_job(job_data)

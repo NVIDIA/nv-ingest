@@ -4,11 +4,13 @@
 
 from pydantic import Field, BaseModel, field_validator
 
+from typing import Optional
+
 from typing_extensions import Annotated
 
 
 class TextSplitterSchema(BaseModel):
-    tokenizer: str = "/workspace/models/tokenizer/"
+    tokenizer: Optional[str] = None
     chunk_size: Annotated[int, Field(gt=0)] = 1024
     chunk_overlap: Annotated[int, Field(ge=0)] = 150
     raise_on_failure: bool = False

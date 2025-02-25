@@ -8,6 +8,7 @@
 
 import logging
 from typing import Dict
+from typing import Optional
 
 from pydantic import BaseModel
 
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class SplitTaskSchema(BaseModel):
-    tokenizer: str = "/workspace/models/tokenizer/"
+    tokenizer: Optional[str] = None
     chunk_size: int = 1024
     chunk_overlap: int = 150
     params: dict = {}
@@ -33,7 +34,7 @@ class SplitTask(Task):
 
     def __init__(
         self,
-        tokenizer: str = "/workspace/models/tokenizer/",
+        tokenizer: str = None,
         chunk_size: int = 1024,
         chunk_overlap: int = 150,
         params: dict = {},

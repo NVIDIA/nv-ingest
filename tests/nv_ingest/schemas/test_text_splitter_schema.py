@@ -13,7 +13,7 @@ def test_text_splitter_schema_defaults():
     Test the TextSplitterSchema with default values.
     """
     schema = TextSplitterSchema()
-    assert schema.tokenizer == "/workspace/models/tokenizer/"
+    assert schema.tokenizer is None
     assert schema.chunk_size == 1024
     assert schema.chunk_overlap == 150
     assert schema.raise_on_failure is False

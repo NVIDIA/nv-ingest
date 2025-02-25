@@ -59,9 +59,9 @@ class TracingOptionsSchema(BaseModelNoExt):
 
 
 class IngestTaskSplitSchema(BaseModelNoExt):
-    tokenizer: str
-    chunk_size: Annotated[int, Field(gt=0)]
-    chunk_overlap: Annotated[int, Field(ge=0)]
+    tokenizer: Optional[str] = None
+    chunk_size: Annotated[int, Field(gt=0)] = 1024
+    chunk_overlap: Annotated[int, Field(ge=0)] = 150
     params: dict
 
     @field_validator("chunk_overlap")
