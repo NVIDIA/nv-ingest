@@ -5,7 +5,6 @@
 import functools
 import logging
 import traceback
-from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 from typing import Dict
 from typing import List
@@ -67,21 +66,18 @@ def _update_metadata(
     data_paddle = {"base64_images": valid_images}
 
     _ = worker_pool_size
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_paddle = executor.submit(
-            paddle_client.infer,
+
+    try:
+        paddle_results = paddle_client.infer(
             data=data_paddle,
             model_name="paddle",
             stage_name="infographic_data_extraction",
             max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
-
-        try:
-            paddle_results = future_paddle.result()
-        except Exception as e:
-            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
-            raise
+    except Exception as e:
+        logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
+        raise
 
     if len(paddle_results) != len(valid_images):
         raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
