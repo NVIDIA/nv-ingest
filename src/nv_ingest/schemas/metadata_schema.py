@@ -52,6 +52,7 @@ class StdContentDescEnum(str, Enum):
     DOCX_TEXT = "Unstructured text from DOCX document."
     PDF_CHART = "Structured chart extracted from PDF document."
     PDF_IMAGE = "Image extracted from PDF document."
+    PDF_INFOGRAPHIC = "Structured infographic extracted from PDF document."
     PDF_TABLE = "Structured table extracted from PDF document."
     PDF_TEXT = "Unstructured text from PDF document."
     PPTX_IMAGE = "Image extracted from PPTX presentation."
@@ -175,6 +176,7 @@ class StatusEnum(str, Enum):
 class ContentSubtypeEnum(str, Enum):
     TABLE = "table"
     CHART = "chart"
+    INFOGRAPHIC = "infographic"
 
 
 # Sub schemas

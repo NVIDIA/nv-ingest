@@ -8,10 +8,11 @@ import io
 import logging
 import warnings
 from math import log
-from typing import Any, Tuple
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 
 import cv2
 import numpy as np
@@ -22,25 +23,37 @@ from PIL import Image
 
 from nv_ingest.util.image_processing.transforms import scale_image_to_encoding_size
 from nv_ingest.util.nim.helpers import ModelInterface
+from nv_ingest.util.nim.helpers import get_model_name
 
 logger = logging.getLogger(__name__)
 
-# yolox-page-elements-v1 contants
-YOLOX_PAGE_NUM_CLASSES = 3
+# yolox-page-elements-v1 and v2 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
-YOLOX_PAGE_FINAL_SCORE = 0.48
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
-
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
 
-YOLOX_PAGE_CLASS_LABELS = [
+# yolox-page-elements-v1 contants
+YOLOX_PAGE_V1_NUM_CLASSES = 4
+YOLOX_PAGE_V1_FINAL_SCORE = {"table": 0.48, "chart": 0.48}
+YOLOX_PAGE_V1_CLASS_LABELS = [
     "table",
     "chart",
     "title",
 ]
+
+# yolox-page-elements-v2 contants
+YOLOX_PAGE_V2_NUM_CLASSES = 4
+YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
+YOLOX_PAGE_V2_CLASS_LABELS = [
+    "table",
+    "chart",
+    "title",
+    "infographic",
+]
+
 
 # yolox-graphic-elements-v1 contants
 YOLOX_GRAPHIC_NUM_CLASSES = 10
@@ -331,7 +344,11 @@ class YoloxModelInterfaceBase(ModelInterface):
         elif protocol == "grpc":
             # For grpc, apply the same NIM postprocessing.
             pred = postprocess_model_prediction(
-                output, self.num_classes, self.conf_threshold, self.iou_threshold, class_agnostic=True
+                output,
+                self.num_classes,
+                self.conf_threshold,
+                self.iou_threshold,
+                class_agnostic=False,
             )
             results = postprocess_results(
                 pred,
@@ -377,20 +394,29 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, yolox_model_name: str = "nv-yolox-page-elements-v1"):
         """
         Initialize the yolox-page-elements model interface.
         """
+        if yolox_model_name.endswith("-v2"):
+            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+            final_score = YOLOX_PAGE_V2_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+        else:
+            num_classes = YOLOX_PAGE_V1_NUM_CLASSES
+            final_score = YOLOX_PAGE_V1_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V1_CLASS_LABELS
+
         super().__init__(
-            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
             image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_PAGE_NUM_CLASSES,
+            num_classes=num_classes,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
-            final_score=YOLOX_PAGE_FINAL_SCORE,
-            class_labels=YOLOX_PAGE_CLASS_LABELS,
+            final_score=final_score,
+            class_labels=class_labels,
         )
 
     def name(
@@ -410,6 +436,15 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
+        expected_final_score_keys = [x for x in self.class_labels if x != "title"]
+        if (not isinstance(self.final_score, dict)) or (
+            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
+        ):
+            raise ValueError(
+                "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
+                f"{expected_final_score_keys}"
+            )
+
         # Table/chart expansion is "business logic" specific to nv-ingest
         annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
         annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
@@ -420,9 +455,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         for annotation_dict in annotation_dicts:
             new_dict = {}
             if "table" in annotation_dict:
-                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score]
+                new_dict["table"] = [bb for bb in annotation_dict["table"] if bb[4] >= self.final_score["table"]]
             if "chart" in annotation_dict:
-                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score]
+                new_dict["chart"] = [bb for bb in annotation_dict["chart"] if bb[4] >= self.final_score["chart"]]
+            if "infographic" in annotation_dict:
+                new_dict["infographic"] = [
+                    bb for bb in annotation_dict["infographic"] if bb[4] >= self.final_score["infographic"]
+                ]
             if "title" in annotation_dict:
                 new_dict["title"] = annotation_dict["title"]
             inference_results.append(new_dict)
@@ -693,7 +732,7 @@ def expand_table_bboxes(annotation_dict, labels=None):
 
     """
     if not labels:
-        labels = ["table", "chart", "title"]
+        labels = list(annotation_dict.keys())
 
     if not annotation_dict or len(annotation_dict["table"]) == 0:
         return annotation_dict
@@ -724,7 +763,7 @@ def expand_chart_bboxes(annotation_dict, labels=None):
 
     """
     if not labels:
-        labels = ["table", "chart", "title"]
+        labels = list(annotation_dict.keys())
 
     if not annotation_dict or len(annotation_dict["chart"]) == 0:
         return annotation_dict
@@ -1325,3 +1364,21 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
             bbox_dict[k][:, [1, 3]] = np.add(bbox_dict[k][:, [1, 3]], delta, casting="unsafe")
 
     return bbox_dict
+
+
+def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-elements-v1"):
+    try:
+        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
+        if not yolox_model_name:
+            logger.warning(
+                "Failed to obtain yolox-page-elements model name from the endpoint. "
+                f"Falling back to '{default_model_name}'."
+            )
+            yolox_model_name = default_model_name  # Default to v1 until gtc release
+    except Exception:
+        logger.warning(
+            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
+        )
+        yolox_model_name = default_model_name  # Default to v1 until gtc release
+
+    return yolox_model_name

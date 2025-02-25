@@ -24,6 +24,7 @@ from nv_ingest.stages.extractors.image_extractor_stage import generate_image_ext
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
+from nv_ingest.stages.nim.infographic_extraction import generate_infographic_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
 from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
@@ -255,6 +256,27 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     return table_extractor_stage
+
+
+def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+
+    infographic_content_extractor_config = ingest_config.get(
+        "infographic_content_extraction_module",
+        {
+            "stage_config": {
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": paddle_auth,
+            }
+        },
+    )
+
+    infographic_extractor_stage = pipe.add_stage(
+        generate_infographic_extractor_stage(morpheus_pipeline_config, infographic_content_extractor_config, pe_count=5)
+    )
+
+    return infographic_extractor_stage
 
 
 def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):

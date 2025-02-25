@@ -37,6 +37,7 @@ def _dict_to_params(collections_dict: dict, write_params: dict):
             "enable_charts": False,
             "enable_tables": False,
             "enable_images": False,
+            "enable_infographics": False,
         }
         if not isinstance(data_type, list):
             data_type = [data_type]
@@ -62,6 +63,7 @@ class MilvusOperator:
         enable_charts: bool = True,
         enable_tables: bool = True,
         enable_images: bool = True,
+        enable_infographics: bool = True,
         bm25_save_path: str = "bm25_model.json",
         compute_bm25_stats: bool = True,
         access_key: str = "minioadmin",
@@ -345,7 +347,9 @@ def verify_embedding(element):
     return False
 
 
-def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: bool, enable_images: bool):
+def _pull_text(
+    element, enable_text: bool, enable_charts: bool, enable_tables: bool, enable_images: bool, enable_infographics: bool
+):
     text = None
     if element["document_type"] == "text" and enable_text:
         text = element["metadata"]["content"]
@@ -354,6 +358,8 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
         if element["metadata"]["content_metadata"]["subtype"] == "chart" and not enable_charts:
             text = None
         elif element["metadata"]["content_metadata"]["subtype"] == "table" and not enable_tables:
+            text = None
+        elif element["metadata"]["content_metadata"]["subtype"] == "infographic" and not enable_infographics:
             text = None
     elif element["document_type"] == "image" and enable_images:
         text = element["metadata"]["image_metadata"]["caption"]
@@ -371,7 +377,9 @@ def _pull_text(element, enable_text: bool, enable_charts: bool, enable_tables: b
     return text
 
 
-def _insert_location_into_content_metadata(element, enable_charts: bool, enable_tables: bool, enable_images: bool):
+def _insert_location_into_content_metadata(
+    element, enable_charts: bool, enable_tables: bool, enable_images: bool, enable_infographic: bool
+):
     location = max_dimensions = None
     if element["document_type"] == "structured":
         location = element["metadata"]["table_metadata"]["table_location"]
@@ -379,6 +387,8 @@ def _insert_location_into_content_metadata(element, enable_charts: bool, enable_
         if element["metadata"]["content_metadata"]["subtype"] == "chart" and not enable_charts:
             location = max_dimensions = None
         elif element["metadata"]["content_metadata"]["subtype"] == "table" and not enable_tables:
+            location = max_dimensions = None
+        elif element["metadata"]["content_metadata"]["subtype"] == "infographic" and not enable_infographic:
             location = max_dimensions = None
     elif element["document_type"] == "image" and enable_images:
         location = element["metadata"]["image_metadata"]["image_location"]
@@ -401,6 +411,7 @@ def write_records_minio(
     enable_charts: bool = True,
     enable_tables: bool = True,
     enable_images: bool = True,
+    enable_infographics: bool = True,
     record_func=_record_dict,
 ) -> RemoteBulkWriter:
     """
@@ -427,6 +438,8 @@ def write_records_minio(
         When true, ensure all table type records are used.
     enable_images : bool, optional
         When true, ensure all image type records are used.
+    enable_infographics : bool, optional
+        When true, ensure all infographic type records are used.
     record_func : function, optional
         This function will be used to parse the records for necessary information.
 
@@ -437,8 +450,10 @@ def write_records_minio(
     """
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
-            _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
+            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
+            _insert_location_into_content_metadata(
+                element, enable_charts, enable_tables, enable_images, enable_infographics
+            )
             if text:
                 if sparse_model is not None:
                     writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
@@ -491,6 +506,7 @@ def create_bm25_model(
     enable_charts: bool = True,
     enable_tables: bool = True,
     enable_images: bool = True,
+    enable_infographics: bool = True,
 ) -> BM25EmbeddingFunction:
     """
     This function takes the input records and creates a corpus,
@@ -509,6 +525,8 @@ def create_bm25_model(
         When true, ensure all table type records are used.
     enable_images : bool, optional
         When true, ensure all image type records are used.
+    enable_infographics : bool, optional
+        When true, ensure all infographic type records are used.
 
     Returns
     -------
@@ -518,7 +536,7 @@ def create_bm25_model(
     all_text = []
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
+            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
             if text:
                 all_text.append(text)
 
@@ -538,6 +556,7 @@ def stream_insert_milvus(
     enable_charts: bool = True,
     enable_tables: bool = True,
     enable_images: bool = True,
+    enable_infographics: bool = True,
     record_func=_record_dict,
 ):
     """
@@ -562,6 +581,8 @@ def stream_insert_milvus(
         When true, ensure all table type records are used.
     enable_images : bool, optional
         When true, ensure all image type records are used.
+    enable_infographics : bool, optional
+        When true, ensure all infographic type records are used.
     record_func : function, optional
         This function will be used to parse the records for necessary information.
 
@@ -569,8 +590,10 @@ def stream_insert_milvus(
     data = []
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images)
-            _insert_location_into_content_metadata(element, enable_charts, enable_tables, enable_images)
+            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
+            _insert_location_into_content_metadata(
+                element, enable_charts, enable_tables, enable_images, enable_infographics
+            )
             if text:
                 if sparse_model is not None:
                     data.append(record_func(text, element, sparse_model.encode_documents([text])))
@@ -589,6 +612,7 @@ def write_to_nvingest_collection(
     enable_charts: bool = True,
     enable_tables: bool = True,
     enable_images: bool = True,
+    enable_infographics: bool = True,
     bm25_save_path: str = "bm25_model.json",
     compute_bm25_stats: bool = True,
     access_key: str = "minioadmin",
@@ -620,6 +644,8 @@ def write_to_nvingest_collection(
         When true, ensure all table type records are used.
     enable_images : bool, optional
         When true, ensure all image type records are used.
+    enable_infographics : bool, optional
+        When true, ensure all infographic type records are used.
     sparse : bool, optional
         When true, incorporates sparse embedding representations for records.
     bm25_save_path : str, optional
@@ -650,6 +676,7 @@ def write_to_nvingest_collection(
             enable_charts=enable_charts,
             enable_tables=enable_tables,
             enable_images=enable_images,
+            enable_infographics=enable_infographics,
         )
         bm25_ef.save(bm25_save_path)
     elif local_index and sparse:
@@ -669,6 +696,7 @@ def write_to_nvingest_collection(
             enable_charts=enable_charts,
             enable_tables=enable_tables,
             enable_images=enable_images,
+            enable_infographics=enable_infographics,
         )
     else:
         # Connections parameters to access the remote bucket
@@ -690,6 +718,7 @@ def write_to_nvingest_collection(
             enable_charts=enable_charts,
             enable_tables=enable_tables,
             enable_images=enable_images,
+            enable_infographics=enable_infographics,
         )
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time

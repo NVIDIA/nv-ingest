@@ -21,6 +21,7 @@ from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
+from nv_ingest_client.primitives.tasks import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
@@ -89,6 +90,7 @@ def test_extract_task_no_args(ingestor):
     assert isinstance(task, ExtractTask)
     assert task._extract_tables is True
     assert task._extract_charts is True
+    assert task._extract_infographics is False
 
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[1], TableExtractionTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ChartExtractionTask)
@@ -124,13 +126,14 @@ def test_extract_task_args_tables_and_charts_false(ingestor):
 
 
 def test_extract_task_some_args(ingestor):
-    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True)
+    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True, extract_infographics=True)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, ExtractTask)
     assert task._extract_tables is True
     assert task._extract_charts is True
     assert task._extract_images is True
+    assert task._extract_infographics is True
 
 
 def test_filter_task_no_args(ingestor):
