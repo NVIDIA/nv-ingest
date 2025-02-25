@@ -324,6 +324,7 @@ def _pdfium_extraction_worker(
     pdf_stream: bytes,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
     trace_info: Optional[List] = None,
@@ -343,7 +344,6 @@ def _pdfium_extraction_worker(
         text_depth = kwargs.get("text_depth", "page")
         text_depth = TextTypeEnum[text_depth.upper()]
 
-        extract_infographics = kwargs.get("extract_infographics", False)
         paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
         paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
@@ -502,6 +502,7 @@ def pdfium_extractor(
             pdf_stream,
             extract_text,
             extract_images,
+            extract_infographics,
             extract_tables,
             extract_charts,
             trace_info,
