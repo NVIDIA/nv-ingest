@@ -19,6 +19,7 @@
 import concurrent.futures
 import logging
 import traceback
+import multiprocessing as mp
 from typing import List, Dict, Any
 from typing import Optional
 from typing import Tuple
@@ -458,7 +459,7 @@ def pdfium_extractor(
         RuntimeError: If the pdfium extraction process crashes or terminates unexpectedly.
     """
     logger.debug("Launching pdfium extraction in a separate process.")
-    with concurrent.futures.ProcessPoolExecutor(max_workers=1) as executor:
+    with concurrent.futures.ProcessPoolExecutor(max_workers=1, mp_context=mp.get_context("fork")) as executor:
         future = executor.submit(
             _pdfium_extraction_worker,
             pdf_stream,
