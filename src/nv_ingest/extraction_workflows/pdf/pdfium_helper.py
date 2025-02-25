@@ -25,8 +25,8 @@ from typing import Tuple
 
 import numpy as np
 import pypdfium2 as libpdfium
-import nv_ingest.util.nim.yolox as yolox_utils
 
+import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
@@ -34,6 +34,9 @@ from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_model_name
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_HEIGHT
+from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_WIDTH
 from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
@@ -45,8 +48,6 @@ from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
 
 YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1024
-YOLOX_MAX_HEIGHT = 1024
 
 logger = logging.getLogger(__name__)
 
@@ -69,8 +70,10 @@ def extract_page_elements_using_image_ensemble(
     page_elements = []
     yolox_client = None
 
+    yolox_model_name = _get_yolox_model_name(config)
+
     try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -262,7 +265,7 @@ def _extract_page_elements(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
-    paddle_output_format,
+    paddle_output_format: str,
     trace_info=None,
 ) -> list:
     """
@@ -404,8 +407,8 @@ def pdfium_extractor(
             if extract_tables or extract_charts:
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
-                    scale_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
-                    padding_tuple=(YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     trace_info=trace_info,
                 )
                 pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
@@ -464,3 +467,24 @@ def pdfium_extractor(
         extracted_data.append(doc_text_meta)
 
     return extracted_data
+
+
+def _get_yolox_model_name(config, default_model_name="nv-yolox-page-elements-v1"):
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    try:
+        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
+        if not yolox_model_name:
+            logger.warning(
+                "Failed to obtain yolox-page-elements model name from the endpoint. "
+                f"Falling back to '{default_model_name}'."
+            )
+            yolox_model_name = default_model_name  # Default to v1 until gtc release
+    except Exception:
+        logger.warning(
+            "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
+        )
+        yolox_model_name = default_model_name  # Default to v1 until gtc release
+
+    return yolox_model_name

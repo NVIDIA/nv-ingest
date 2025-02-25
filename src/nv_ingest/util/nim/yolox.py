@@ -25,23 +25,33 @@ from nv_ingest.util.nim.helpers import ModelInterface
 
 logger = logging.getLogger(__name__)
 
-# yolox-page-elements-v1 contants
-YOLOX_PAGE_NUM_CLASSES = 4
+# yolox-page-elements-v1 and v2 common contants
 YOLOX_PAGE_CONF_THRESHOLD = 0.01
 YOLOX_PAGE_IOU_THRESHOLD = 0.5
 YOLOX_PAGE_MIN_SCORE = 0.1
-YOLOX_PAGE_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
-
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
 
-YOLOX_PAGE_CLASS_LABELS = [
+# yolox-page-elements-v1 contants
+YOLOX_PAGE_V1_NUM_CLASSES = 4
+YOLOX_PAGE_V1_FINAL_SCORE = {"table": 0.48, "chart": 0.48}
+YOLOX_PAGE_V1_CLASS_LABELS = [
+    "table",
+    "chart",
+    "title",
+]
+
+# yolox-page-elements-v2 contants
+YOLOX_PAGE_V2_NUM_CLASSES = 4
+YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
+YOLOX_PAGE_V2_CLASS_LABELS = [
     "table",
     "chart",
     "title",
     "infographic",
 ]
+
 
 # yolox-graphic-elements-v1 contants
 YOLOX_GRAPHIC_NUM_CLASSES = 10
@@ -382,20 +392,29 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, yolox_model_name: str = "nv-yolox-page-elements-v1"):
         """
         Initialize the yolox-page-elements model interface.
         """
+        if yolox_model_name.endswith("-v2"):
+            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+            final_score = YOLOX_PAGE_V2_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+        else:
+            num_classes = YOLOX_PAGE_V1_NUM_CLASSES
+            final_score = YOLOX_PAGE_V1_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V1_CLASS_LABELS
+
         super().__init__(
-            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
             image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
-            num_classes=YOLOX_PAGE_NUM_CLASSES,
+            num_classes=num_classes,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
             iou_threshold=YOLOX_PAGE_IOU_THRESHOLD,
             min_score=YOLOX_PAGE_MIN_SCORE,
-            final_score=YOLOX_PAGE_FINAL_SCORE,
-            class_labels=YOLOX_PAGE_CLASS_LABELS,
+            final_score=final_score,
+            class_labels=class_labels,
         )
 
     def name(
@@ -415,12 +434,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     def postprocess_annotations(self, annotation_dicts, **kwargs):
         original_image_shapes = kwargs.get("original_image_shapes", [])
 
+        expected_final_score_keys = [x for x in self.class_labels if x != "title"]
         if (not isinstance(self.final_score, dict)) or (
-            sorted(self.final_score.keys()) != ["chart", "infographic", "table"]
+            sorted(self.final_score.keys()) != sorted(expected_final_score_keys)
         ):
             raise ValueError(
                 "yolox-page-elements-v2 requires a dictionary of thresholds per each class: "
-                "'table', 'chart', 'infographic'"
+                f"{expected_final_score_keys}"
             )
 
         # Table/chart expansion is "business logic" specific to nv-ingest

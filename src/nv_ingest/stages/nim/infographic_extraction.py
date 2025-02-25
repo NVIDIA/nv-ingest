@@ -48,11 +48,10 @@ def _update_metadata(
     logger.debug(f"Running infographic extraction using protocol {paddle_client.protocol}")
 
     # Initialize the results list in the same order as base64_images.
-    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = [("", None, None, None)] * len(base64_images)
+    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = [("", None, None)] * len(base64_images)
 
     valid_images: List[str] = []
     valid_indices: List[int] = []
-    valid_arrays: List[np.ndarray] = []
 
     # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
@@ -60,14 +59,10 @@ def _update_metadata(
         height, width = array.shape[0], array.shape[1]
         if width >= PADDLE_MIN_WIDTH and height >= PADDLE_MIN_HEIGHT:
             valid_images.append(img)
-            valid_arrays.append(array)
             valid_indices.append(i)
         else:
             # Image is too small; mark as skipped.
-            results[i] = (img, None, None, None)
-
-    if not valid_images:
-        return results
+            results[i] = (img, None, None)
 
     # Prepare data payloads for both clients.
     data_paddle = {"base64_images": valid_images}
@@ -200,10 +195,9 @@ def _extract_infographic_data(
         for row_id, idx in enumerate(valid_indices):
             # unpack (base64_image, paddle_bounding boxes, paddle_text_predictions)
             _, _, text_predictions = bulk_results[row_id]
-            table_content = " ".join(text_predictions)
+            table_content = " ".join(text_predictions) if text_predictions else None
 
             df.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
-            # df.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
 
         return df, {"trace_info": trace_info}
 

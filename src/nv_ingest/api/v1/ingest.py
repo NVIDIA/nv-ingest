@@ -196,6 +196,7 @@ async def convert_pdf(
     extract_images: bool = Form(True),
     extract_tables: bool = Form(True),
     extract_charts: bool = Form(False),
+    extract_infographics: bool = Form(False),
 ) -> Dict[str, str]:
     try:
 
@@ -234,6 +235,7 @@ async def convert_pdf(
                 extract_images=extract_images,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
             )
 
             job_spec.add_task(extract_task)
@@ -247,7 +249,7 @@ async def convert_pdf(
                 chart_data_extract = ChartExtractionTask()
                 job_spec.add_task(chart_data_extract)
 
-            if extract_tables:
+            if extract_infographics:
                 infographic_data_extract = InfographicExtractionTask()
                 job_spec.add_task(infographic_data_extract)
 
