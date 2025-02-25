@@ -52,8 +52,8 @@ YOLOX_MAX_BATCH_SIZE = 8
 logger = logging.getLogger(__name__)
 
 
-def extract_page_elements_using_image_ensemble(
-    pages: List[Tuple[int, np.ndarray]],
+def extract_tables_and_charts_using_image_ensemble(
+    pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
@@ -82,9 +82,18 @@ def extract_page_elements_using_image_ensemble(
         )
 
         # Collect all page indices and images in order.
-        image_page_indices = [page[0] for page in pages]
-        original_images = [page[1] for page in pages]
-        padding_offsets = [page[2] for page in pages]
+        # Optionally, collect padding offsets if present.
+        image_page_indices = []
+        original_images = []
+        padding_offsets = []
+        for page in pages:
+            image_page_indices.append(page[0])
+            original_images.append(page[1])
+            if len(pages[0]) > 2:
+                padding_offset = page[2]
+            else:
+                padding_offset = 0
+            padding_offsets.append(padding_offset)
 
         # Prepare the data payload with all images.
         data = {"images": original_images}
@@ -99,18 +108,15 @@ def extract_page_elements_using_image_ensemble(
         )
 
         # Process results: iterate over each image's inference output.
-        for annotation_dict, page_index, original_image, padding in zip(
-            inference_results,
-            image_page_indices,
-            original_images,
-            padding_offsets,
+        for annotation_dict, page_index, original_image, padding_offset in zip(
+            inference_results, image_page_indices, original_images, padding_offsets
         ):
-            extract_page_element_images(
+            extract_table_and_chart_images(
                 annotation_dict,
                 original_image,
                 page_index,
                 page_elements,
-                padding,
+                padding_offset,
             )
 
     except TimeoutError:
@@ -136,7 +142,7 @@ def extract_page_element_images(
     original_image,
     page_idx,
     page_elements,
-    padding,
+    padding_offset=(0, 0),
 ):
     """
     Handle the extraction of page elements from the inference results and run additional model inference.
@@ -166,7 +172,7 @@ def extract_page_element_images(
     >>> extract_page_element_images(annotation_dict, original_image, 0, page_elements)
     """
     orig_width, orig_height, *_ = original_image.shape
-    pad_width, pad_height = padding
+    pad_width, pad_height = padding_offset
 
     for label in ["table", "chart", "infographic"]:
         if not annotation_dict:
@@ -184,11 +190,11 @@ def extract_page_element_images(
             cropped = crop_image(original_image, (int(w1), int(h1), int(w2), int(h2)))
             base64_img = numpy_to_base64(cropped)
 
-            bbox_in_original_coord = (
-                int(w1 - pad_width),
-                int(h1 - pad_height),
-                int(w2 - pad_width),
-                int(h2 - pad_height),
+            bbox_in_orig_coord = (
+                int(w1) - pad_width,
+                int(h1) - pad_height,
+                int(w2) - pad_width,
+                int(h2) - pad_height,
             )
             max_width = orig_width - 2 * pad_width
             max_height = orig_height - 2 * pad_height
@@ -196,7 +202,7 @@ def extract_page_element_images(
             page_element_data = CroppedImageWithContent(
                 content="",
                 image=base64_img,
-                bbox=bbox_in_original_coord,
+                bbox=bbox_in_orig_coord,
                 max_width=max_width,
                 max_height=max_height,
                 type_string=label,
@@ -360,8 +366,8 @@ def pdfium_extractor(
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for page element extraction
-    pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
+    # Prepare for table/chart extraction
+    pages_for_tables = []  # We'll accumulate (page_idx, np_image, padding_offset) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:

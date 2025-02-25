@@ -53,6 +53,8 @@ from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import _extract_page_elements
 from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_BATCH_SIZE
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_HEIGHT
+from nv_ingest.extraction_workflows.pdf.pdfium_helper import YOLOX_MAX_WIDTH
 
 
 logger = logging.getLogger(__name__)
@@ -158,7 +160,9 @@ def nemoretriever_parse(
     pages_for_tables = []  # We'll accumulate (page_idx, np_image) here
     futures = []  # We'll keep track of all the Future objects for table/charts
 
-    nemoretriever_parse_client = _create_clients(nemoretriever_parse_config)
+    nemoretriever_parse_client = None
+    if extract_text:
+        nemoretriever_parse_client = _create_clients(nemoretriever_parse_config)
 
     max_workers = nemoretriever_parse_config.workers_per_progress_engine
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -166,14 +170,15 @@ def nemoretriever_parse(
         for page_idx in range(page_count):
             page = doc.get_page(page_idx)
 
-            page_image = _convert_pdfium_page_to_numpy(page)
+            page_image, padding_offset = _convert_pdfium_page_to_numpy_for_parser(page)
             pages_for_ocr.append((page_idx, page_image))
-            pages_for_tables.append((page_idx, page_image))
+            page_image_for_tables, padding_offset_for_tables = _convert_pdfium_page_to_numpy_for_yolox(page)
+            pages_for_tables.append((page_idx, page_image_for_tables, padding_offset_for_tables))
 
             page.close()
 
             # Whenever pages_as_images hits NEMORETRIEVER_PARSE_MAX_BATCH_SIZE, submit a job
-            if len(pages_for_ocr) >= NEMORETRIEVER_PARSE_MAX_BATCH_SIZE:
+            if (extract_text) and (len(pages_for_ocr) >= NEMORETRIEVER_PARSE_MAX_BATCH_SIZE):
                 future_parser = executor.submit(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                     pages_for_ocr[:],  # pass a copy
@@ -203,7 +208,7 @@ def nemoretriever_parse(
                 pages_for_tables.clear()
 
         # After page loop, if we still have leftover pages_as_images, submit one last job
-        if pages_for_ocr:
+        if extract_text and pages_for_ocr:
             future_parser = executor.submit(
                 lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                 pages_for_ocr[:],  # pass a copy
@@ -285,7 +290,7 @@ def nemoretriever_parse(
                 if page is None:
                     page = doc.get_page(page_idx)
                 if page_image is None:
-                    page_image = _convert_pdfium_page_to_numpy(page)
+                    page_image, _ = _convert_pdfium_page_to_numpy_for_parser(page)
 
                 img_numpy = crop_image(page_image, transformed_bbox)
 
@@ -377,7 +382,8 @@ def nemoretriever_parse(
         if len(text_extraction) > 0:
             extracted_data.append(text_extraction)
 
-    nemoretriever_parse_client.close()
+    if nemoretriever_parse_client:
+        nemoretriever_parse_client.close()
     doc.close()
 
     return extracted_data
@@ -441,17 +447,27 @@ def _send_inference_request(
     return response
 
 
-def _convert_pdfium_page_to_numpy(
+def _convert_pdfium_page_to_numpy_for_parser(
     page: pdfium.PdfPage,
     render_dpi: int = NEMORETRIEVER_PARSE_RENDER_DPI,
     scale_tuple: Tuple[int, int] = (NEMORETRIEVER_PARSE_MAX_WIDTH, NEMORETRIEVER_PARSE_MAX_HEIGHT),
     padding_tuple: Tuple[int, int] = (NEMORETRIEVER_PARSE_MAX_WIDTH, NEMORETRIEVER_PARSE_MAX_HEIGHT),
 ) -> np.ndarray:
-    page_images, _ = pdfium_pages_to_numpy(
+    page_images, padding_offsets = pdfium_pages_to_numpy(
         [page], render_dpi=render_dpi, scale_tuple=scale_tuple, padding_tuple=padding_tuple
     )
 
-    return page_images[0]
+    return page_images[0], padding_offsets[0]
+
+
+def _convert_pdfium_page_to_numpy_for_yolox(
+    page: pdfium.PdfPage,
+    scale_tuple: Tuple[int, int] = (YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+    padding_tuple: Tuple[int, int] = (YOLOX_MAX_WIDTH, YOLOX_MAX_HEIGHT),
+) -> np.ndarray:
+    page_images, padding_offsets = pdfium_pages_to_numpy([page], scale_tuple=scale_tuple, padding_tuple=padding_tuple)
+
+    return page_images[0], padding_offsets[0]
 
 
 def _insert_page_nearby_blocks(
