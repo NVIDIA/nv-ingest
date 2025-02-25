@@ -274,6 +274,9 @@ def _extract_page_elements(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
+    extract_tables: bool,
+    extract_charts: bool,
+    extract_infographics: bool,
     paddle_output_format: str,
     trace_info=None,
 ) -> list:
@@ -287,8 +290,13 @@ def _extract_page_elements(
 
     # Build metadata for each
     for page_idx, page_element in page_element_results:
-        # If we want all page elements, we assume the caller wouldn't call
-        # this function unless we truly want them.
+        if (not extract_tables) and (page_element.type_string == "table"):
+            continue
+        if (not extract_charts) and (page_element.type_string == "chart"):
+            continue
+        if (not extract_infographics) and (page_element.type_string == "infographic"):
+            continue
+
         if page_element.type_string == "table":
             page_element.content_format = paddle_output_format
 
@@ -321,7 +329,7 @@ def pdfium_extractor(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
-    extract_infographics = kwargs.get("extract_infographics", extract_tables)
+    extract_infographics = kwargs.get("extract_infographics", False)
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
 
@@ -433,6 +441,9 @@ def pdfium_extractor(
                         page_count,
                         source_metadata,
                         base_unified_metadata,
+                        extract_tables,
+                        extract_charts,
+                        extract_infographics,
                         paddle_output_format,
                         trace_info=trace_info,
                     )
@@ -450,6 +461,9 @@ def pdfium_extractor(
                 page_count,
                 source_metadata,
                 base_unified_metadata,
+                extract_tables,
+                extract_charts,
+                extract_infographics,
                 paddle_output_format,
                 trace_info=trace_info,
             )

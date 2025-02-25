@@ -105,7 +105,7 @@ def nemoretriever_parse(
     text_depth = kwargs.get("text_depth", "page")
     text_depth = TextTypeEnum[text_depth.upper()]
 
-    extract_infographics = kwargs.get("extract_infographics", extract_tables)
+    extract_infographics = kwargs.get("extract_infographics", False)
     extract_tables_method = kwargs.get("extract_tables_method", "yolox")
     identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
@@ -201,6 +201,9 @@ def nemoretriever_parse(
                     page_count,
                     source_metadata,
                     base_unified_metadata,
+                    extract_tables,
+                    extract_charts,
+                    extract_infographics,
                     paddle_output_format,
                     trace_info=trace_info,
                 )
@@ -230,6 +233,9 @@ def nemoretriever_parse(
                 page_count,
                 source_metadata,
                 base_unified_metadata,
+                extract_tables,
+                extract_charts,
+                extract_infographics,
                 paddle_output_format,
                 trace_info=trace_info,
             )

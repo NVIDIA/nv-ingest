@@ -301,7 +301,7 @@ def image_data_extractor(
         "access_level": row_data.get("access_level", AccessLevelEnum.LEVEL_1),
     }
 
-    extract_infographics = kwargs.get("extract_infographics", extract_tables)
+    extract_infographics = kwargs.get("extract_infographics", False)
 
     # Prepare for extraction
     extracted_data = []

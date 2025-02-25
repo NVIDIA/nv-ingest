@@ -392,7 +392,10 @@ class Ingestor:
         """
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
-        extract_infographics = kwargs.pop("extract_infographics", True)
+
+        # Defaulting to False since enabling infographic extraction reduces throughput.
+        # Users have to set to True if infographic extraction is required.
+        extract_infographics = kwargs.pop("extract_infographics", False)
 
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(

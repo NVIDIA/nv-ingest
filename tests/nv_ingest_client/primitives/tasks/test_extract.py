@@ -166,8 +166,7 @@ def test_extract_task_to_dict_basic(
                 "extract_tables_method": extract_tables_method,
                 "extract_charts": extract_tables,  # If extract_charts is not specified,
                 # it defaults to the same value as extract_tables.
-                "extract_infographics": extract_tables,  # If extract_infographics is not specified,
-                # it defaults to the same value as extract_tables.
+                "extract_infographics": False,  # extract_infographics is False by default
                 "text_depth": "document",
                 "paddle_output_format": paddle_output_format,
             },
@@ -219,8 +218,7 @@ def test_extract_task_to_dict_extract_charts_false(
                 "extract_tables": extract_tables,
                 "extract_tables_method": extract_tables_method,
                 "extract_charts": extract_charts,
-                "extract_infographics": extract_tables,  # If extract_infographics is not specified,
-                # it defaults to the same value as extract_tables.
+                "extract_infographics": False,
                 "text_depth": "document",
                 "paddle_output_format": paddle_output_format,
             },

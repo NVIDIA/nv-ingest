@@ -90,6 +90,7 @@ def test_extract_task_no_args(ingestor):
     assert isinstance(task, ExtractTask)
     assert task._extract_tables is True
     assert task._extract_charts is True
+    assert task._extract_infographics is False
 
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[1], TableExtractionTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ChartExtractionTask)
@@ -125,13 +126,14 @@ def test_extract_task_args_tables_and_charts_false(ingestor):
 
 
 def test_extract_task_some_args(ingestor):
-    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True)
+    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True, extract_infographics=True)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, ExtractTask)
     assert task._extract_tables is True
     assert task._extract_charts is True
     assert task._extract_images is True
+    assert task._extract_infographics is True
 
 
 def test_filter_task_no_args(ingestor):
@@ -225,12 +227,11 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[2], ExtractTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[3], TableExtractionTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[4], ChartExtractionTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], InfographicExtractionTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], FilterTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], SplitTask)
-    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[8], StoreTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
+    assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
     assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
-    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 9
+    assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 8
 
 
 def test_ingest(ingestor, mock_client):
