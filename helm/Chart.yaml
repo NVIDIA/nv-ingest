@@ -29,17 +29,16 @@ dependencies:
   - name: yolox-nim
     repository: "alias:nemo-microservices"
     version: 0.2.0
-    # condition: yoloxDeployed
   - name: nvidia-nim-nemoretriever-graphic-elements-v1
     repository: "alias:nemo-microservices"
     version: 1.2.0
     condition: yoloxDeployed
   - name: nvidia-nim-nemoretriever-table-structure-v1
-    repository: "alias:nvstaging-nim"
+    repository: "alias:nemo-microservices"
     version: 1.1.0
     condition: yoloxDeployed
   - name: nim-vlm
-    repository: "alias:nvstaging-nim"
+    repository: "alias:nemo-microservices"
     version: 1.2.0-ea-v4
   - name: paddleocr-nim
     repository: "alias:nemo-microservices"
