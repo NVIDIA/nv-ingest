@@ -51,6 +51,7 @@ extraVolumeMounts: {}
 ## @skip imagePullSecrets[0].name
 imagePullSecrets:
   - name: nvcrimagepullsecret
+  - name: nemoMicroservicesPullSecret
 
 ## @param containerSecurityContext [object] Sets privilege and access control settings for container (Only affects the main container, not pod-level)
 containerSecurityContext: {}
@@ -111,26 +112,6 @@ yolox-nim:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
-
-## @skip cachedDeployed
-## @skip cached-nim
-## @extra cached-nim.image.repository The repository to override the location of the Cached Model NIM
-## @extra cached-nim.image.tag The tag override for Cached Model NIM
-cachedDeployed: true
-cached-nim:
-  fullnameOverride: nv-ingest-cached
-  image:
-    repository: nvcr.io/nvidia/nemo-microservices/cached
-    tag: "0.2.1"
-  service:
-    name: nv-ingest-cached
-    grpcPort: 8001
-  nim:
-    grpcPort: 8001
-  env:
-    - name: NIM_HTTP_API_PORT
-      value: "8000"
-
 ## @skip paddleocrDeployed
 ## @skip paddleocr-nim
 ## @extra paddleocr-nim.image.repository The repository to override the location of the Paddle OCR NIM
@@ -143,25 +124,6 @@ paddleocr-nim:
     tag: "1.0.0"
   service:
     name: nv-ingest-paddle
-    grpcPort: 8001
-  nim:
-    grpcPort: 8001
-  env:
-    - name: NIM_HTTP_API_PORT
-      value: "8000"
-
-## @skip deplotDeployed
-## @skip deplot-nim
-## @extra deplot-nim.image.repository The repository to override the location of the Deplot NIM
-## @extra deplot-nim.image.tag The tag override for Deplot NIM
-deplotDeployed: true
-deplot-nim:
-  fullnameOverride: nv-ingest-deplot
-  image:
-    repository: nvcr.io/nvidia/nemo-microservices/deplot
-    tag: "1.0.0"
-  service:
-    name: nv-ingest-deplot
     grpcPort: 8001
   nim:
     grpcPort: 8001
@@ -276,12 +238,16 @@ redis:
     enabled: false
   replica:
     replicaCount: 1
+    persistence:
+      size: "50Gi"
     resources:
       requests:
         memory: "6Gi"
       limits:
         memory: "12Gi"
   master:
+    persistence:
+      size: "50Gi"
     resources:
       requests:
         memory: "6Gi"
@@ -323,23 +289,27 @@ envVars:
   MINIO_PUBLIC_ADDRESS: http://localhost:9000
   MINIO_BUCKET: nv-ingest
 
-  CACHED_GRPC_ENDPOINT: nv-ingest-cached:8001
-  CACHED_HTTP_ENDPOINT: http://nv-ingest-cached:8000/v1/infer
-  CACHED_INFER_ENDPOINT: grpc
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
   PADDLE_INFER_PROTOCOL: grpc
+  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm:8000/v1/chat/completions
+  NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
   YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
   YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
-  DEPLOT_GRPC_ENDPOINT: ""
-  DEPLOT_HTTP_ENDPOINT: http://nv-ingest-deplot:8000/v1/chat/completions
-  DEPLOT_INFER_PROTOCOL: http
+  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nv-ingest-nvidia-nim-nemoretriever-graphic-elements-v1:8001
+  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nv-ingest-nvidia-nim-nemoretriever-graphic-elements-v1:8000/v1/infer
+  YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: http
+  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nv-ingest-nvidia-nim-nemoretriever-table-structure-v1:8001
+  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nv-ingest-nvidia-nim-nemoretriever-table-structure-v1:8000/v1/infer
+  YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
 
-  EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedding:8000/v1"
+  EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
+  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
   VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+  VLM_CAPTION_MODEL_NAME: meta/llama-3.2-11b-vision-instruct
 
 ## @section Open Telemetry
 ## @descriptionStart
@@ -578,6 +548,7 @@ imagePullSecret:
 
   username: '$oauthtoken'
   password: ""
+
 
 
 ## @skip nemo
