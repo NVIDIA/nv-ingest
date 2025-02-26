@@ -15,13 +15,8 @@ import mrc
 import mrc.core.operators as ops
 import pandas as pd
 from minio import Minio
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
-from pydantic import BaseModel
-
-import cudf
 
 from nv_ingest.schemas.image_storage_schema import ImageStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -29,6 +24,7 @@ from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import remove_task_by_type, IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -66,7 +62,6 @@ def upload_images(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
     Exception
         If the upload process encounters an error.
     """
-
     content_types = params.get("content_types")
     endpoint = params.get("endpoint", _DEFAULT_ENDPOINT)
     bucket_name = params.get("bucket_name", _DEFAULT_BUCKET_NAME)
@@ -92,19 +87,15 @@ def upload_images(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
             continue
 
         metadata = row["metadata"].copy()
-
         content = base64.b64decode(metadata["content"].encode())
-
         source_id = metadata["source_metadata"]["source_id"]
 
         image_type = "png"
         if row["document_type"] == ContentTypeEnum.IMAGE:
             image_type = metadata.get("image_metadata").get("image_type", "png")
 
-        # URL-encode source_id and image_type to ensure they are safe for the URL path
         encoded_source_id = quote(source_id, safe="")
         encoded_image_type = quote(image_type, safe="")
-
         destination_file = f"{encoded_source_id}/{idx}.{encoded_image_type}"
 
         source_file = BytesIO(content)
@@ -127,7 +118,6 @@ def upload_images(df: pd.DataFrame, params: Dict[str, Any]) -> pd.DataFrame:
                 "uploaded_image_url"
             ] = f"{_DEFAULT_READ_ADDRESS}/{bucket_name}/{destination_file}"
 
-        # TODO: validate metadata before putting it back in.
         df.at[idx, "metadata"] = metadata
 
     return df
@@ -148,7 +138,6 @@ def _storage_images(builder: mrc.Builder):
     ValueError
         If storing extracted objects fails.
     """
-
     validated_config = fetch_and_validate_module_config(builder, ImageStorageModuleSchema)
 
     @filter_by_task(["store"])
@@ -157,11 +146,9 @@ def _storage_images(builder: mrc.Builder):
         annotation_id=MODULE_NAME,
         raise_on_failure=validated_config.raise_on_failure,
     )
-    def on_data(ctrl_msg: ControlMessage):
+    def on_data(ctrl_msg: IngestControlMessage):
         try:
-            task_props = ctrl_msg.remove_task("store")
-            if isinstance(task_props, BaseModel):
-                task_props = task_props.model_dump()
+            task_props = remove_task_by_type(ctrl_msg, "store")
 
             store_structured = task_props.get("structured", True)
             store_images = task_props.get("images", False)
@@ -173,26 +160,22 @@ def _storage_images(builder: mrc.Builder):
                 content_types[ContentTypeEnum.IMAGE] = store_images
 
             params = task_props.get("params", {})
-
             params["content_types"] = content_types
 
-            # TODO(Matt) validate this resolves to the right filter criteria....
             logger.debug(f"Processing storage task with parameters: {params}")
 
             with ctrl_msg.payload().mutable_dataframe() as mdf:
                 df = mdf.to_pandas()
 
             storage_obj_mask = df["document_type"].isin(list(content_types.keys()))
-            if (~storage_obj_mask).all():  # if there are no images, return immediately.
+            if (~storage_obj_mask).all():
                 logger.debug(f"No storage objects for '{content_types}' found in the dataframe.")
                 return ctrl_msg
 
             df = upload_images(df, params)
 
-            # Update control message with new payload
-            gdf = cudf.from_pandas(df)
-            msg_meta = MessageMeta(df=gdf)
-            ctrl_msg.payload(msg_meta)
+            # Update control message with new payload using pandas only.
+            ctrl_msg.payload(df)
         except Exception as e:
             traceback.print_exc()
             raise ValueError(f"Failed to store extracted objects: {e}")
@@ -200,6 +183,5 @@ def _storage_images(builder: mrc.Builder):
         return ctrl_msg
 
     input_node = builder.make_node("image_storage", ops.map(on_data))
-
     builder.register_module_input("input", input_node)
     builder.register_module_output("output", input_node)

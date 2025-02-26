@@ -15,20 +15,17 @@ from functools import partial
 
 import mrc
 import pandas as pd
-from morpheus.config import Config
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
+from morpheus.config import Config, ExecutionMode
 from morpheus.pipeline.single_port_stage import SinglePortStage
 from morpheus.pipeline.stage_schema import StageSchema
 from mrc import SegmentObject
 from mrc.core import operators as ops
 from mrc.core.subscriber import Observer
 
-import cudf
-
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -39,25 +36,23 @@ def trace_message(ctrl_msg, task_desc):
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message to trace.
     task_desc : str
         Description of the task for tracing purposes.
     """
-    try:
-        ts_fetched = datetime.now()
-        do_trace_tagging = ctrl_msg.get_metadata("config::add_trace_tagging") is True
-        if do_trace_tagging:
-            ts_send = ctrl_msg.get_timestamp("latency::ts_send")
-            ts_entry = datetime.now()
-            ctrl_msg.set_timestamp(f"trace::entry::{task_desc}", ts_entry)
-            if ts_send:
-                ctrl_msg.set_timestamp(f"trace::entry::{task_desc}_channel_in", ts_send)
-                ctrl_msg.set_timestamp(f"trace::exit::{task_desc}_channel_in", ts_fetched)
-    except Exception as e:
-        err_msg = f"trace_message: Error processing control message for task '{task_desc}'. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    ts_fetched = datetime.now()
+    do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
+        ctrl_msg.get_metadata("config::add_trace_tagging") is True
+    )
+
+    if do_trace_tagging:
+        ts_send = ctrl_msg.get_timestamp("latency::ts_send")
+        ts_entry = datetime.now()
+        ctrl_msg.set_timestamp(f"trace::entry::{task_desc}", ts_entry)
+        if ts_send:
+            ctrl_msg.set_timestamp(f"trace::entry::{task_desc}_channel_in", ts_send)
+            ctrl_msg.set_timestamp(f"trace::exit::{task_desc}_channel_in", ts_fetched)
 
 
 def put_in_queue(ctrl_msg, pass_thru_recv_queue):
@@ -66,32 +61,27 @@ def put_in_queue(ctrl_msg, pass_thru_recv_queue):
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message to put in the queue.
     pass_thru_recv_queue : queue.Queue
         The queue to put the control message into.
     """
-    try:
-        while True:
-            try:
-                pass_thru_recv_queue.put(ctrl_msg, timeout=0.1)
-                break
-            except queue.Full:
-                continue
-    except Exception as e:
-        err_msg = f"put_in_queue: Error putting control message into queue. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    while True:
+        try:
+            pass_thru_recv_queue.put(ctrl_msg, timeout=0.1)
+            break
+        except queue.Full:
+            continue
 
 
 def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_queue):
     """
-    Processes the control message, extracting the dataframe and task properties,
+    Processes the control message, extracting the DataFrame payload and task properties,
     and puts the work package into the send queue.
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message to process.
     task : str
         The task name.
@@ -103,8 +93,7 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
         Queue to send the work package to the child process.
     """
     try:
-        with ctrl_msg.payload().mutable_dataframe() as mdf:
-            df = mdf.to_pandas()
+        df = ctrl_msg.payload()
     except Exception as e:
         err_msg = (
             f"process_control_message: Error extracting DataFrame payload for task "
@@ -113,32 +102,17 @@ def process_control_message(ctrl_msg, task, task_desc, ctrl_msg_ledger, send_que
         logger.error(err_msg, exc_info=True)
         raise type(e)(err_msg) from e
 
-    try:
-        task_props = ctrl_msg.get_tasks().get(task).pop()
-    except Exception as e:
-        err_msg = (
-            f"process_control_message: Error retrieving task properties for task '{task}' "
-            f"from control message. Original error: {e}"
-        )
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    task_props = remove_task_by_type(ctrl_msg, task)
 
-    try:
-        cm_id = uuid.uuid4()
-        ctrl_msg_ledger[cm_id] = ctrl_msg
-        work_package = {"payload": df, "task_props": task_props, "cm_id": cm_id}
-        send_queue.put({"type": "on_next", "value": work_package})
-    except Exception as e:
-        err_msg = (
-            f"process_control_message: Error enqueuing work package for task '{task_desc}'. " f"Original error: {e}"
-        )
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    cm_id = uuid.uuid4()
+    ctrl_msg_ledger[cm_id] = ctrl_msg
+    work_package = {"payload": df, "task_props": task_props, "cm_id": cm_id}
+    send_queue.put({"type": "on_next", "value": work_package})
 
 
 class MultiProcessingBaseStage(SinglePortStage):
     """
-    A ControlMessage-oriented base multiprocessing stage to increase parallelism of stages written in Python.
+    A IngestControlMessage-oriented base multiprocessing stage to increase parallelism of stages written in Python.
 
     Parameters
     ----------
@@ -152,7 +126,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         The number of process engines to use.
     process_fn : typing.Callable[[pd.DataFrame, dict], pd.DataFrame]
         The function that will be executed in each process engine. The function will
-        accept a pandas DataFrame from a ControlMessage payload and a dictionary of task arguments.
+        accept a pandas DataFrame from a IngestControlMessage payload and a dictionary of task arguments.
 
     Returns
     -------
@@ -163,10 +137,10 @@ class MultiProcessingBaseStage(SinglePortStage):
     -----
     The data flows through this class in the following way:
 
-    1. **Input Stream Termination**: The input stream is terminated by storing off the `ControlMessage` to a ledger.
-       This acts as a record for the incoming message.
+    1. **Input Stream Termination**: The input stream is terminated by storing off the `IngestControlMessage` to a
+     ledger. This acts as a record for the incoming message.
 
-    2. **Work Queue**: The core work content of the `ControlMessage` is pushed to a work queue. This queue
+    2. **Work Queue**: The core work content of the `IngestControlMessage` is pushed to a work queue. This queue
        forwards the task to a global multi-process worker pool where the heavy-lifting occurs.
 
     3. **Global Worker Pool**: The work is executed in parallel across multiple process engines via the worker pool.
@@ -210,6 +184,9 @@ class MultiProcessingBaseStage(SinglePortStage):
         if self._document_type is not None:
             self._filter_properties["document_type"] = self._document_type
 
+    # -------------------------------------------------------------------------
+    # Properties
+    # -------------------------------------------------------------------------
     @property
     def name(self) -> str:
         return self._task + uuid.uuid4().hex
@@ -223,14 +200,21 @@ class MultiProcessingBaseStage(SinglePortStage):
         return self._document_type
 
     def accepted_types(self) -> typing.Tuple:
-        return (ControlMessage,)
+        return (IngestControlMessage,)
 
     def compute_schema(self, schema: StageSchema):
-        schema.output_schema.set_type(ControlMessage)
+        schema.output_schema.set_type(IngestControlMessage)
 
     def supports_cpp_node(self) -> bool:
         return False
 
+    def supported_execution_modes(self) -> tuple[ExecutionMode]:
+        # Provide your own logic here; for example:
+        return (ExecutionMode.CPU,)
+
+    # -------------------------------------------------------------------------
+    # Static Work Package Handlers (unchanged)
+    # -------------------------------------------------------------------------
     @staticmethod
     def work_package_input_handler(
         work_package_input_queue: mp.Queue,
@@ -275,7 +259,6 @@ class MultiProcessingBaseStage(SinglePortStage):
                 try:
                     # Submit to the process pool and get the future
                     future = process_pool.submit_task(process_fn, (df, task_props))
-
                     # This can return/raise an exception
                     result = future.result()
                     extra_results = []
@@ -368,13 +351,11 @@ class MultiProcessingBaseStage(SinglePortStage):
             if event["type"] == "on_next":
                 sub.on_next(event["value"])
                 logger.debug(f"Work package input handler sent on_next: {event['value']}")
-
                 continue
 
             if event["type"] == "on_error":
                 sub.on_next(event["value"])
                 logger.error(f"Got error from work package handler: {event['value']['error_message']}")
-
                 continue
 
             if event["type"] == "on_completed":
@@ -385,14 +366,104 @@ class MultiProcessingBaseStage(SinglePortStage):
         sub.on_completed()
         logger.debug("parent_receive completed")
 
+    # -------------------------------------------------------------------------
+    # Instance Helper Methods
+    # -------------------------------------------------------------------------
+    def _build_forwarding_function(self):
+        """
+        Constructs a forwarding function that traces and enqueues an IngestControlMessage.
+        """
+
+        @nv_ingest_node_failure_context_manager(
+            annotation_id=self.task_desc,
+            raise_on_failure=False,
+            forward_func=partial(put_in_queue, pass_thru_recv_queue=self._pass_thru_recv_queue),
+        )
+        def forward_fn(ctrl_msg: IngestControlMessage):
+            # Trace the control message
+            trace_message(ctrl_msg, self._task_desc)
+            # Put the control message into the pass-through receive queue
+            put_in_queue(ctrl_msg, self._pass_thru_recv_queue)
+            return ctrl_msg
+
+        return forward_fn
+
+    def _build_reconstruction_function(self):
+        """
+        Reconstructs the control message from the work package.
+
+        Returns a function that takes a work package and returns the reconstructed IngestControlMessage.
+        """
+
+        def reconstruct_fn(work_package):
+            # Reconstructs the control message from the work package.
+            ctrl_msg = self._ctrl_msg_ledger.pop(work_package.get("cm_id"))
+
+            @nv_ingest_node_failure_context_manager(
+                annotation_id=self.task_desc,
+                raise_on_failure=False,
+            )
+            def cm_func(ctrl_msg: IngestControlMessage, work_package: dict):
+                # This is the first location where we have access to both the control message and the work package,
+                # if we had any errors in the processing, raise them here.
+                if work_package.get("error", False):
+                    logger.error(f"Error in processing: {work_package['error_message']}")
+                    raise RuntimeError(work_package["error_message"])
+                ctrl_msg.payload(work_package["payload"])
+                do_trace_tagging = ctrl_msg.get_metadata("config::add_trace_tagging") is True
+                if do_trace_tagging:
+                    trace_info = work_package.get("trace_info")
+                    if trace_info:
+                        for key, ts in trace_info.items():
+                            ctrl_msg.set_timestamp(key, ts)
+                return ctrl_msg
+
+            return cm_func(ctrl_msg, work_package)
+
+        return reconstruct_fn
+
+    def _build_merge_function(self):
+        """
+        Adds tracing metadata to the control message and marks its completion.
+        """
+
+        def merge_fn(ctrl_msg: IngestControlMessage):
+            do_trace_tagging = ctrl_msg.get_metadata("config::add_trace_tagging") is True
+            if do_trace_tagging:
+                ts_exit = datetime.now()
+                ctrl_msg.set_timestamp(f"trace::exit::{self._task_desc}", ts_exit)
+                ctrl_msg.set_timestamp("latency::ts_send", ts_exit)
+            return ctrl_msg
+
+        return merge_fn
+
+    def _pass_thru_source_fn(self):
+        """
+        Continuously gets control messages from the pass-through receive queue.
+
+        Yields
+        ------
+        IngestControlMessage
+            The control message from the queue.
+        """
+        while True:
+            try:
+                ctrl_msg = self._pass_thru_recv_queue.get(timeout=0.1)
+            except queue.Empty:
+                continue
+            yield ctrl_msg
+
+    # -------------------------------------------------------------------------
+    # Observable Pipeline Setup
+    # -------------------------------------------------------------------------
     def observable_fn(self, obs: mrc.Observable, sub: mrc.Subscriber):
         """
-        Sets up the observable pipeline to receive and process ControlMessage objects.
+        Sets up the observable pipeline to receive and process IngestControlMessage objects.
 
         Parameters
         ----------
         obs : mrc.Observable
-            The observable stream that emits ControlMessage objects.
+            The observable stream that emits IngestControlMessage objects.
         sub : mrc.Subscriber
             The subscriber that receives processed results.
 
@@ -406,9 +477,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         runs the parent_receive function. The thread is responsible for managing
         child processes and collecting results.
         """
-
         work_package_input_queue = self._mp_context.Queue(maxsize=self._max_queue_size)
-
         tid = str(uuid.uuid4())
         self._my_threads[tid] = mt.Thread(
             target=MultiProcessingBaseStage.work_package_response_handler,
@@ -423,60 +492,42 @@ class MultiProcessingBaseStage(SinglePortStage):
             ),
         )
 
-        @nv_ingest_node_failure_context_manager(
-            annotation_id=self.task_desc,
-            raise_on_failure=False,
-            forward_func=partial(put_in_queue, pass_thru_recv_queue=self._pass_thru_recv_queue),
-        )
-        def forward_fn(ctrl_msg: ControlMessage):
-            """
-            Forwards the control message by adding tracing metadata and putting it into the pass-through receive queue.
-
-            Parameters
-            ----------
-            ctrl_msg : ControlMessage
-                The control message to forward.
-            """
-            # Trace the control message
-            trace_message(ctrl_msg, self._task_desc)
-
-            # Put the control message into the pass-through receive queue
-            put_in_queue(ctrl_msg, self._pass_thru_recv_queue)
-
-            return ctrl_msg
+        forward_fn = self._build_forwarding_function()
 
         @filter_by_task([(self._task, self._filter_properties)], forward_func=forward_fn)
         @nv_ingest_node_failure_context_manager(
             annotation_id=self.task_desc, raise_on_failure=False, forward_func=forward_fn
         )
-        def on_next(ctrl_msg: ControlMessage):
+        def on_next(ctrl_msg: IngestControlMessage):
             """
             Handles the receipt of a new control message, traces the message, processes it,
             and submits it to the child process for further handling.
 
             Parameters
             ----------
-            ctrl_msg : ControlMessage
+            ctrl_msg : IngestControlMessage
                 The control message to handle.
             """
             # Trace the control message
             trace_message(ctrl_msg, self._task_desc)
-
             # Process and forward the control message
+
             process_control_message(
                 ctrl_msg, self._task, self._task_desc, self._ctrl_msg_ledger, work_package_input_queue
             )
 
         def on_error(error: BaseException):
-            work_package_input_queue.put({"type": "on_error", "value": error})
+            logger.error(f"Error in observable: {error}")
+            work_package_input_queue.put(
+                {"type": "on_error", "value": {"error": True, "error_message": str(error)}}  # or format it as needed
+            )
 
         def on_completed():
+            logger.info("Observable completed")
             work_package_input_queue.put({"type": "on_completed"})
 
         self._my_threads[tid].start()
-
         obs.subscribe(Observer.make_observer(on_next, on_error, on_completed))  # noqa
-
         self._my_threads[tid].join()
 
     def _build_single(self, builder: mrc.Builder, input_node: SegmentObject) -> SegmentObject:
@@ -507,84 +558,28 @@ class MultiProcessingBaseStage(SinglePortStage):
 
             Returns
             -------
-            ControlMessage
+            IngestControlMessage
                 The reconstructed control message with the updated payload.
             """
-            ctrl_msg = self._ctrl_msg_ledger.pop(work_package["cm_id"])
+            reconstruct = self._build_reconstruction_function()
+            return reconstruct(work_package)
 
-            @nv_ingest_node_failure_context_manager(
-                annotation_id=self.task_desc,
-                raise_on_failure=False,
-            )
-            def cm_func(ctrl_msg: ControlMessage, work_package: dict):
-                # This is the first location where we have access to both the control message and the work package,
-                # if we had any errors in the processing, raise them here.
-                if work_package.get("error", False):
-                    logger.error(f"Error in processing: {work_package['error_message']}")
-
-                    raise RuntimeError(work_package["error_message"])
-
-                gdf = cudf.from_pandas(work_package["payload"])
-                ctrl_msg.payload(MessageMeta(df=gdf))
-
-                do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-                    ctrl_msg.get_metadata("config::add_trace_tagging") is True
-                )
-                if do_trace_tagging:
-                    trace_info = work_package.get("trace_info")
-                    if trace_info:
-                        for key, ts in trace_info.items():
-                            ctrl_msg.set_timestamp(key, ts)
-
-                return ctrl_msg
-
-            return cm_func(ctrl_msg, work_package)
-
-        def pass_thru_source_fn():
-            """
-            Continuously gets control messages from the pass-through receive queue.
-
-            Yields
-            ------
-            ControlMessage
-                The control message from the queue.
-            """
-            while True:
-                try:
-                    ctrl_msg = self._pass_thru_recv_queue.get(timeout=0.1)
-                except queue.Empty:
-                    continue
-
-                yield ctrl_msg
-
-        @nv_ingest_node_failure_context_manager(
-            annotation_id=self.task_desc,
-            raise_on_failure=False,
-        )
-        def merge_fn(ctrl_msg: ControlMessage):
+        def merge_fn(ctrl_msg: IngestControlMessage):
             """
             Adds tracing metadata to the control message and marks its completion.
 
             Parameters
             ----------
-            ctrl_msg : ControlMessage
+            ctrl_msg : IngestControlMessage
                 The control message to add tracing metadata to.
 
             Returns
             -------
-            ControlMessage
+            IngestControlMessage
                 The control message with updated tracing metadata.
             """
-            do_trace_tagging = (ctrl_msg.has_metadata("config::add_trace_tagging") is True) and (
-                ctrl_msg.get_metadata("config::add_trace_tagging") is True
-            )
-
-            if do_trace_tagging:
-                ts_exit = datetime.now()
-                ctrl_msg.set_timestamp(f"trace::exit::{self._task_desc}", ts_exit)
-                ctrl_msg.set_timestamp("latency::ts_send", ts_exit)
-
-            return ctrl_msg
+            merge = self._build_merge_function()
+            return merge(ctrl_msg)
 
         # Create worker node
         worker_node = builder.make_node(f"{self.name}-worker-fn", mrc.core.operators.build(self.observable_fn))  # noqa
@@ -600,7 +595,7 @@ class MultiProcessingBaseStage(SinglePortStage):
         )
 
         # Create pass-through source node
-        pass_thru_source = builder.make_source(f"{self.name}-pass-thru-source", pass_thru_source_fn)
+        pass_thru_source = builder.make_source(f"{self.name}-pass-thru-source", self._pass_thru_source_fn)
 
         # Connect nodes
         builder.make_edge(input_node, worker_node)
