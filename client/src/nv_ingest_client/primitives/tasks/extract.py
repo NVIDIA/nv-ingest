@@ -91,7 +91,7 @@ class ExtractTaskSchema(BaseModel):
     extract_tables: bool = True
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
-    extract_infographics: bool = (False,)
+    extract_infographics: bool = False
     text_depth: str = "document"
     paddle_output_format: str = "pseudo_markdown"
 
