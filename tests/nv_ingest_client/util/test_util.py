@@ -80,7 +80,7 @@ def test_cient_config_schema():
     os.environ["EMBEDDING_NIM_MODEL_NAME"] = "test"
     os.environ["NVIDIA_BUILD_API_KEY"] = "test"
     os.environ["RERANKER_NIM_ENDPOINT"] = "test"
-    os.environ["RERANKER_NUM_MODEL_NAME"] = "test"
+    os.environ["RERANKER_NIM_MODEL_NAME"] = "test"
 
     client_schema = ClientConfigSchema()
     assert client_schema.embedding_nim_endpoint == "test"

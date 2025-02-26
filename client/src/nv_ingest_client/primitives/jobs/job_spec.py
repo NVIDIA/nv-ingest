@@ -16,6 +16,7 @@ from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
 
@@ -169,6 +170,8 @@ class JobSpec:
             self._tasks.append(TableExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_charts is True):
             self._tasks.append(ChartExtractionTask())
+        if isinstance(task, ExtractTask) and (task._extract_infographics is True):
+            self._tasks.append(InfographicExtractionTask())
 
 
 class BatchJobSpec:

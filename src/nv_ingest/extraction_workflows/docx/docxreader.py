@@ -27,6 +27,7 @@ import io
 import logging
 import re
 import uuid
+from datetime import datetime
 from typing import Dict, Optional, Union
 from typing import List
 from typing import Tuple
@@ -46,7 +47,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from nv_ingest.extraction_workflows.image.image_handlers import extract_tables_and_charts_from_images
+from nv_ingest.extraction_workflows.image.image_handlers import extract_page_elements_from_images
 from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -56,7 +57,7 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.util.converters import bytetools
 from nv_ingest.util.detectors.language import detect_language
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata, CroppedImageWithContent
+from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata, CroppedImageWithContent
 
 PARAGRAPH_FORMATS = ["text", "markdown"]
 TABLE_FORMATS = ["markdown", "markdown_light", "csv", "tag"]
@@ -66,40 +67,94 @@ logger = logging.getLogger(__name__)
 
 class DocxProperties:
     """
-    Parse document core properties and update metadata
+    Parse document core properties and update metadata.
+
+    This class extracts core properties from a python-docx Document object
+    and updates a provided metadata dictionary with standardized values.
+    If certain properties are missing, smart defaults are used.
     """
 
-    def __init__(self, document: Document, source_metadata: Dict):
+    def __init__(self, document: Document, source_metadata: dict):
         """
-        Copy over some of the docx core properties
+        Initialize a DocxProperties instance by extracting core properties from a Document.
+
+        Parameters
+        ----------
+        document : Document
+            A python-docx Document object representing the DOCX file.
+        source_metadata : dict
+            A dictionary containing source metadata. This dictionary will be updated
+            with the document's core properties (e.g., creation and modification dates).
+
+        Notes
+        -----
+        The following core properties are extracted:
+          - title: Defaults to "Untitled Document" if not provided.
+          - author: Uses the document's author if available; otherwise falls back to
+            last_modified_by or defaults to "Unknown Author".
+          - created: The creation datetime; if missing, defaults to the current datetime.
+          - modified: The last modified datetime; if missing, defaults to the current datetime.
+          - keywords: The document's keywords; if missing, defaults to an empty list.
+
+        The source_metadata dictionary is updated with:
+          - date_created: ISO formatted string of the created date.
+          - last_modified: ISO formatted string of the modified date.
         """
         self.document = document
         self.source_metadata = source_metadata
 
         core_properties = self.document.core_properties
-        self.title = core_properties.title
-        self.author = core_properties.author if core_properties.author else core_properties.last_modified_by
-        self.created = core_properties.created
-        self.modified = core_properties.modified
-        self.keywords = core_properties.keywords
+
+        # Set default title if missing
+        self.title = core_properties.title if core_properties.title is not None else "Untitled Document"
+
+        # Use author if available; otherwise, fall back to last_modified_by or default
+        self.author = (
+            core_properties.author
+            if core_properties.author is not None and core_properties.author.strip() != ""
+            else (
+                core_properties.last_modified_by if core_properties.last_modified_by is not None else "Unknown Author"
+            )
+        )
+
+        # Use current datetime as fallback for created/modified
+        self.created = core_properties.created if core_properties.created is not None else datetime.now()
+        self.modified = core_properties.modified if core_properties.modified is not None else datetime.now()
+
+        # Default keywords to an empty list if missing
+        self.keywords = core_properties.keywords if core_properties.keywords is not None else []
+
         self._update_source_meta_data()
 
     def __str__(self):
         """
-        Print properties
+        Return a string representation of the document's core properties.
+
+        Returns
+        -------
+        str
+            A formatted string containing the title, author, created date, modified date,
+            and keywords of the document.
         """
         info = "Document Properties:\n"
-        info += f"title {self.title}\n"
-        info += f"author {self.author}\n"
-        info += f"created {self.created.isoformat()}\n"
-        info += f"modified {self.modified.isoformat()}\n"
-        info += f"keywords {self.keywords}\n"
-
+        info += f"title: {self.title}\n"
+        info += f"author: {self.author}\n"
+        info += f"created: {self.created.isoformat()}\n"
+        info += f"modified: {self.modified.isoformat()}\n"
+        info += f"keywords: {self.keywords}\n"
         return info
 
     def _update_source_meta_data(self):
         """
-        Update the source metadata with the document's core properties
+        Update the source metadata dictionary with the document's core properties.
+
+        This method sets the 'date_created' and 'last_modified' fields in the
+        source_metadata dictionary to the ISO formatted string representations of the
+        created and modified dates.
+
+        Returns
+        -------
+        None
         """
         self.source_metadata.update(
             {
@@ -684,7 +739,7 @@ class DocxReader:
         if extract_tables or extract_charts:
             try:
                 # Perform the batched detection on all images
-                detection_results = extract_tables_and_charts_from_images(
+                detection_results = extract_page_elements_from_images(
                     images=all_image_arrays,
                     config=ImageConfigSchema(**self._extraction_config.model_dump()),
                     trace_info=kwargs.get("trace_info"),
@@ -708,7 +763,7 @@ class DocxReader:
             if i in detection_map and detection_map[i]:
                 for table_chart_data in detection_map[i]:
                     # Build structured metadata for each table or chart
-                    structured_entry = construct_table_and_chart_metadata(
+                    structured_entry = construct_page_element_metadata(
                         structured_image=table_chart_data,  # A CroppedImageWithContent
                         page_idx=0,  # docx => single page
                         page_count=1,
@@ -770,7 +825,7 @@ class DocxReader:
         )
 
         self._extracted_data.append(
-            construct_table_and_chart_metadata(
+            construct_page_element_metadata(
                 structured_image=cropped_image_with_content,
                 page_idx=0,  # docx => single page
                 page_count=1,

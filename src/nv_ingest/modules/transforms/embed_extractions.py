@@ -9,7 +9,6 @@ from typing import Iterable, List
 
 import mrc
 import pandas as pd
-from morpheus.messages import ControlMessage, MessageMeta
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory, register_module
 from mrc.core import operators as ops
@@ -24,6 +23,7 @@ from nv_ingest.util.flow_control import filter_by_task
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.schema.schema_validator import validate_schema
 from nv_ingest.util.tracing import traceable
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
 
 logger = logging.getLogger(__name__)
 
@@ -233,7 +233,7 @@ def _generate_batches(prompts: List[str], batch_size: int = 100):
 
 
 def _generate_embeddings(
-    ctrl_msg: ControlMessage,
+    ctrl_msg: IngestControlMessage,
     batch_size: int,
     api_key: str,
     embedding_nim_endpoint: str,
@@ -312,9 +312,10 @@ def _generate_embeddings(
     return message
 
 
-def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataFrame], masks: List[cudf.Series]):
+def _concatenate_extractions(ctrl_msg: IngestControlMessage, dataframes: List[pd.DataFrame], masks: List[cudf.Series]):
     """
-    A function to concatenate extractions enriched with embeddings and remaining extractions into `ControlMessage`.
+    A function to concatenate extractions enriched with embeddings and remaining extractions into
+    `IngestControlMessage`.
     """
     with ctrl_msg.payload().mutable_dataframe() as mdf:
         unified_mask = cudf.Series(False, index=mdf.index)
@@ -326,10 +327,7 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
 
     dataframes.append(df_no_text)
     df = pd.concat(dataframes, axis=0, ignore_index=True).reset_index(drop=True)
-
-    gdf = cudf.from_pandas(df)
-    meta = MessageMeta(df=gdf)
-    ctrl_msg.payload(meta)
+    ctrl_msg.payload(df)
 
     return ctrl_msg
 
@@ -337,7 +335,7 @@ def _concatenate_extractions(ctrl_msg: ControlMessage, dataframes: List[pd.DataF
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
 def _embed_extractions(builder: mrc.Builder):
     """
-    A pipeline module that receives incoming messages in ControlMessage format
+    A pipeline module that receives incoming messages in IngestControlMessage format
     and calculates text embeddings for all supported content types.
     """
     validated_config = fetch_and_validate_module_config(builder, EmbedExtractionsSchema)
@@ -351,9 +349,9 @@ def _embed_extractions(builder: mrc.Builder):
         annotation_id=MODULE_NAME,
         raise_on_failure=validated_config.raise_on_failure,
     )
-    def embed_extractions_fn(message: ControlMessage):
+    def embed_extractions_fn(message: IngestControlMessage):
         try:
-            task_props = message.remove_task("embed")
+            task_props = remove_task_by_type(message, "embed")
             model_dump = task_props.model_dump()
             filter_errors = model_dump.get("filter_errors", False)
 
