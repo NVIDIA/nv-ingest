@@ -53,7 +53,7 @@ class MilvusOperator:
         self,
         collection_name: Union[str, Dict] = "nv_ingest_collection",
         milvus_uri: str = "http://localhost:19530",
-        sparse: bool = True,
+        sparse: bool = False,
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = True,
