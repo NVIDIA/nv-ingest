@@ -170,63 +170,266 @@ nvidia-nim-nemoretriever-graphic-elements-v1:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
+## @skip nvidia-nim-nemoretriever-table-structure-v1
+## @param nvidia-nim-nemoretriever-table-structure-v1.deployed [default: true] true if the nemoretriever-table-structure NIM should be deployed and false otherwise
+## @param nvidia-nim-nemoretriever-table-structure-v1.image.repository The repository to override the location of the nemoretriever-table-structure
+## @param nvidia-nim-nemoretriever-table-structure-v1.image.tag The tag override for nemoretriever-table-structure
+nvidia-nim-nemoretriever-table-structure-v1:
+  deployed: true
+  # fullnameOverride: nvidia-nim-nemoretriever-table-structure-v1
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-table-structure-v1
+    tag: "1.2.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: nvidia-nim-nemoretriever-table-structure-v1
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
 
-## @skip paddleocrDeployed
+## @skip nim-vlm-image-captioning
+## @param nim-vlm-image-captioning.deployed [default: false] true if the vlm-nim should be deployed and false otherwise
+## @param nim-vlm-image-captioning.image.repository The repository to override the location of the nim-vlm
+## @param nim-vlm-image-captioning.image.tag The tag override for nim-vlm
+nim-vlm-image-captioning:
+  deployed: false
+  fullnameOverride: nim-vlm-image-captioning
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nim/meta/llama-3.2-11b-vision-instruct
+    tag: "latest"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  service:
+    type: "ClusterIP"
+    name: nim-vlm-image-captioning
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
+## @skip nim-vlm-text-extraction
+## @param nim-vlm-text-extraction.deployed [default: false] true if the vlm-nim should be deployed and false otherwise
+## @param nim-vlm-text-extraction.image.repository The repository to override the location of the nim-vlm
+## @param nim-vlm-text-extraction.image.tag The tag override for nim-vlm
+nim-vlm-text-extraction:
+  deployed: false
+  fullnameOverride: nim-vlm-text-extraction-nemoretriever-parse
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-parse
+    tag: "1.2.0ea"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  service:
+    type: "ClusterIP"
+    name: nim-vlm-text-extraction-nemoretriever-parse
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
 ## @skip paddleocr-nim
-## @extra paddleocr-nim.image.repository The repository to override the location of the Paddle OCR NIM
-## @extra paddleocr-nim.image.tag The tag override for Paddle OCR NIM
-paddleocrDeployed: true
+## @param paddleocr-nim.deployed [default: true] true if the paddleocr-nim should be deployed and false otherwise
+## @param paddleocr-nim.image.repository The repository to override the location of the Paddle OCR NIM
+## @param paddleocr-nim.image.tag The tag override for Paddle OCR NIM
 paddleocr-nim:
+  paddleocr-nim.deployed: true
   fullnameOverride: nv-ingest-paddle
+  customCommand: []
+  customArgs: []
   image:
     repository: nvcr.io/nvidia/nemo-microservices/paddleocr
     tag: "1.0.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
   service:
+    type: "ClusterIP"
     name: nv-ingest-paddle
+    httpPort: 8000
     grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
   nim:
     grpcPort: 8001
+    logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
-## @skip embedqaDeployed
-## @skip embedqa-nim
-## @extra embedqa-nim.image.repository The repository to override the location of the embedqa NIM
-## @extra embedqa-nim.image.tag The tag override for embedqa NIM
-embedqaDeployed: false
+
+## @skip text-embedding-nim
+## @param text-embedding-nim.deployed [default: false] true if the text-embedding-nim should be deployed and false otherwise
+## @param text-embedding-nim.image.repository The repository to override the location of the text-embedding-nim
+## @param text-embedding-nim.image.tag The tag override for text-embedding-nim
 text-embedding-nim:
-  fullnameOverride: nv-ingest-embedqa
+  deployed: false
+  fullnameOverride: nv-ingest-embedqa # Share name with nvidia-nim-llama-32-nv-embedqa-1b-v2 to ease configuration
+  customCommand: []
+  customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
     tag: "1.1.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
   service:
+    type: "ClusterIP"
     name: nv-ingest-embedqa
+    httpPort: 8000
     grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
   nim:
     grpcPort: 8001
+    logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
-      value: "8000"
 
-## @skip nvEmbedqaDeployed
+
 ## @skip nvidia-nim-llama-32-nv-embedqa-1b-v2
-## @extra nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository The repository to override the location of the nvEmbedqa NIM
-## @extra nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag The tag override for nvEmbedqa NIM
-nvEmbedqaDeployed: true
+## @param nvidia-nim-llama-32-nv-embedqa-1b-v2.deployed [default: true] true if nvidia-nim-llama-32-nv-embedqa-1b-v2 should be deployed and false otherwise
+## @param nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository The repository to override the location of the nvEmbedqa NIM
+## @param nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag The tag override for nvEmbedqa NIM
 nvidia-nim-llama-32-nv-embedqa-1b-v2:
-  fullnameOverride: nv-ingest-embedqa
+  deployed: true
+  fullnameOverride: nv-ingest-embedqa # Share name with text-embedding-nim to ease configuration
+  customCommand: []
+  customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
     tag: "1.3.1"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
   service:
+    type: "ClusterIP"
     name: nv-ingest-embedqa
+    httpPort: 8000
     grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
   nim:
     grpcPort: 8001
+    logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
-      value: "8000"
+
+
+## @skip llama-3.2-nv-rerankqa-1b-v2
+## @param llama-3.2-nv-rerankqa-1b-v2.deployed [default: true] true if llama-3.2-nv-rerankqa-1b-v2 should be deployed and false otherwise
+## @param llama-3.2-nv-rerankqa-1b-v2.image.repository The repository to override the location of the reranker NIM
+## @param llama-3.2-nv-rerankqa-1b-v2.image.tag The tag override for reranker NIM
+llama-3.2-nv-rerankqa-1b-v2:
+  deployed: false
+  # fullnameOverride: llama-3.2-nv-rerankqa-1b-v2
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
+    tag: "1.3.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: llama-3.2-nv-rerankqa-1b-v2
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+
 
 # Use this to load an image Pre NIM Factory via triton
 ## @skip triton
@@ -351,23 +554,23 @@ envVars:
   PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
   PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
   PADDLE_INFER_PROTOCOL: grpc
-  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm:8000/v1/chat/completions
+  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
   NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
   YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
   YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
-  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nv-ingest-nvidia-nim-nemoretriever-graphic-elements-v1:8001
-  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nv-ingest-nvidia-nim-nemoretriever-graphic-elements-v1:8000/v1/infer
+  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nvidia-nim-nemoretriever-graphic-elements-v1:8001
+  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nvidia-nim-nemoretriever-graphic-elements-v1:8000/v1/infer
   YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: http
-  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nv-ingest-nvidia-nim-nemoretriever-table-structure-v1:8001
-  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nv-ingest-nvidia-nim-nemoretriever-table-structure-v1:8000/v1/infer
+  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: -nim-nemoretriever-table-structure-v1:8001
+  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nvidia-nim-nemoretriever-table-structure-v1:8000/v1/infer
   YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+  VLM_CAPTION_ENDPOINT: "http://nim-vlm-image-captioning:8000/v1/chat/completions"
   VLM_CAPTION_MODEL_NAME: meta/llama-3.2-11b-vision-instruct
 
 ## @section Open Telemetry
