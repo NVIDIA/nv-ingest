@@ -517,7 +517,7 @@ def pdfium_extractor(
     extracted_data = result["extracted_data"]
 
     # Use a threadpool in the main thread for _extract_tables_and_charts calls.
-    if (extract_tables or extract_charts) and result["pages_for_tables"]:
+    if (extract_tables or extract_charts or extract_infographics) and result["pages_for_tables"]:
         pages = result["pages_for_tables"]
         pdfium_config = result["pdfium_config"]
         page_count = result["page_count"]
