@@ -47,7 +47,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from nv_ingest.extraction_workflows.image.image_handlers import extract_tables_and_charts_from_images
+from nv_ingest.extraction_workflows.image.image_handlers import extract_page_elements_from_images
 from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -57,7 +57,7 @@ from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.detectors.language import detect_language
-from nv_ingest_api.util.metadata.aggregators import construct_table_and_chart_metadata, CroppedImageWithContent
+from nv_ingest_api.util.metadata.aggregators import construct_page_element_metadata, CroppedImageWithContent
 
 PARAGRAPH_FORMATS = ["text", "markdown"]
 TABLE_FORMATS = ["markdown", "markdown_light", "csv", "tag"]
@@ -739,7 +739,7 @@ class DocxReader:
         if extract_tables or extract_charts:
             try:
                 # Perform the batched detection on all images
-                detection_results = extract_tables_and_charts_from_images(
+                detection_results = extract_page_elements_from_images(
                     images=all_image_arrays,
                     config=ImageConfigSchema(**self._extraction_config.model_dump()),
                     trace_info=kwargs.get("trace_info"),
@@ -763,7 +763,7 @@ class DocxReader:
             if i in detection_map and detection_map[i]:
                 for table_chart_data in detection_map[i]:
                     # Build structured metadata for each table or chart
-                    structured_entry = construct_table_and_chart_metadata(
+                    structured_entry = construct_page_element_metadata(
                         structured_image=table_chart_data,  # A CroppedImageWithContent
                         page_idx=0,  # docx => single page
                         page_count=1,
@@ -825,7 +825,7 @@ class DocxReader:
         )
 
         self._extracted_data.append(
-            construct_table_and_chart_metadata(
+            construct_page_element_metadata(
                 structured_image=cropped_image_with_content,
                 page_idx=0,  # docx => single page
                 page_count=1,

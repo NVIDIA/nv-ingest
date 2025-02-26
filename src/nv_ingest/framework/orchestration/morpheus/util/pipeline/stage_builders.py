@@ -9,6 +9,10 @@ import os
 
 import click
 
+from nv_ingest.framework.orchestration.morpheus.modules.transforms import TextSplitterLoaderFactory
+from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction import (
+    generate_infographic_extractor_stage,
+)
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import (
     MetadataInjectorLoaderFactory,
@@ -26,9 +30,6 @@ from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_meter imp
 )
 from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
     OpenTelemetryTracerLoaderFactory,
-)
-from nv_ingest.framework.orchestration.morpheus.modules.transforms.nemo_doc_splitter import (
-    NemoDocSplitterLoaderFactory,
 )
 from nv_ingest.framework.orchestration.morpheus.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.framework.orchestration.morpheus.stages.embeddings.text_embeddings import (
@@ -280,6 +281,27 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     return table_extractor_stage
 
 
+def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+
+    infographic_content_extractor_config = ingest_config.get(
+        "infographic_content_extraction_module",
+        {
+            "stage_config": {
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": paddle_auth,
+            }
+        },
+    )
+
+    infographic_extractor_stage = pipe.add_stage(
+        generate_infographic_extractor_stage(morpheus_pipeline_config, infographic_content_extractor_config, pe_count=5)
+    )
+
+    return infographic_extractor_stage
+
+
 def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     image_extractor_config = ingest_config.get(
@@ -380,15 +402,15 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
     return image_filter_stage
 
 
-def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
-    nemo_splitter_loader = NemoDocSplitterLoaderFactory.get_instance(
-        module_name="nemo_doc_splitter",
+def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
+    text_splitter_loader = TextSplitterLoaderFactory.get_instance(
+        module_name="text_splitter",
         module_config=ingest_config.get("text_splitting_module", {}),
     )
-    nemo_splitter_stage = pipe.add_stage(
+    text_splitter_stage = pipe.add_stage(
         LinearModuleStageCPU(
             morpheus_pipeline_config,
-            nemo_splitter_loader,
+            text_splitter_loader,
             input_type=IngestControlMessage,
             output_type=IngestControlMessage,
             input_port_name="input",
@@ -396,7 +418,7 @@ def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
         )
     )
 
-    return nemo_splitter_stage
+    return text_splitter_stage
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):

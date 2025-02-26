@@ -131,6 +131,9 @@ NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 > Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
+> [!NOTE]
+> The most accurate tokenizer based splitting depends on the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B). To download this model at container build time, you must set `DOWNLOAD_LLAMA_TOKENIZER=True` _and_ supply an authorized HuggingFace access token via `HF_ACCESS_TOKEN=<your access token>`. If not, the ungated [e5-large-unsupervised](https://huggingface.co/intfloat/e5-large-unsupervised) tokenizer model will be downloaded instead. By default, the split task will use whichever model has been predownloaded. Refer to [Environment Configuration Variables](docs/docs/user-guide/developer-guide/environment-config.md) for more info.
+
 5. Start all services:
 `docker compose --profile retrieval up`
 
@@ -422,6 +425,12 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
+- **`DOWNLOAD_LLAMA_TOKENIZER` (Built With Llama):**:
+  - **Description**: The Split task uses the `meta-llama/Llama-3.2-1B` tokenizer, which will be downloaded
+    from HuggingFace at build time if `DOWNLOAD_LLAMA_TOKENIZER` is set to `True`. Please review the
+    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this.
+    This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and
+    set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to use it.
 
 
 ### Contributing

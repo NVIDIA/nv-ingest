@@ -36,7 +36,7 @@ from pptx.slide import Slide
 
 from nv_ingest.extraction_workflows.image.image_handlers import (
     load_and_preprocess_image,
-    extract_tables_and_charts_from_images,
+    extract_page_elements_from_images,
 )
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
@@ -50,7 +50,7 @@ from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.detectors.language import detect_language
-from nv_ingest_api.util.metadata.aggregators import construct_table_and_chart_metadata
+from nv_ingest_api.util.metadata.aggregators import construct_page_element_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -113,7 +113,7 @@ def _finalize_images(
     if extract_tables or extract_charts:
         try:
             # For example, a call to your function that checks for tables/charts
-            detection_results = extract_tables_and_charts_from_images(
+            detection_results = extract_page_elements_from_images(
                 images=image_arrays,
                 config=ImageConfigSchema(**(pptx_extraction_config.model_dump())),
                 trace_info=trace_info,
@@ -135,7 +135,7 @@ def _finalize_images(
         if i in detection_map and detection_map[i]:
             # We found table(s)/chart(s) in the image
             for cropped_item in detection_map[i]:
-                structured_entry = construct_table_and_chart_metadata(
+                structured_entry = construct_page_element_metadata(
                     structured_image=cropped_item,
                     page_idx=slide_idx,
                     page_count=slide_count,

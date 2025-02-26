@@ -19,10 +19,6 @@ from nv_ingest_api.util.string_processing import generate_url
 
 logger = logging.getLogger(__name__)
 
-DEPLOT_MAX_TOKENS = 128
-DEPLOT_TEMPERATURE = 1.0
-DEPLOT_TOP_P = 1.0
-
 
 class NimClient:
     """
