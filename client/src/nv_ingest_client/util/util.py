@@ -40,7 +40,7 @@ class ClientConfigSchema:
             "RERANKER_NIM_ENDPOINT",
             "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking",
         )
-        self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NUM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
+        self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
 
 
 def estimate_page_count(file_path: str) -> int:
