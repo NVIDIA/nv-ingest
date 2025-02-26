@@ -569,24 +569,24 @@ serviceAccount:
 #   create: false
 #   password: ""
 
-## @param ngcSecret.create Specifies whether to create the ngc api secret
-## @param ngcSecret.password The password to use for the NGC Secret
-ngcSecret:
+## @param ngcApiSecret.create Specifies whether to create the ngc api secret
+## @param ngcApiSecret.password The password to use for the NGC Secret
+ngcApiSecret:
   # If set to false, the chart expects a secret with name ngc-api to exist in the namespace
   # credentials are needed.
   create: false
   password: ""
 
-## @param imagePullSecret.create Specifies whether to create the NVCR Image Pull secret
-## @param imagePullSecret.password The password to use for the NVCR Image Pull Secret
-## @skip imagePullSecret.registry
-## @skip imagePullSecret.name
-## @skip imagePullSecret.username
-imagePullSecret:
+## @param ngcImagePullSecret.create Specifies whether to create the NVCR Image Pull secret
+## @param ngcImagePullSecret.password The password to use for the NVCR Image Pull Secret
+## @skip ngcImagePullSecret.registry
+## @skip ngcImagePullSecret.name
+## @skip ngcImagePullSecret.username
+ngcImagePullSecret:
   create: false
   # Leave blank, if no imagePullSecret is needed.
   registry: "nvcr.io"
-  name: "nvcrimagepullsecret"
+  name: "ngcImagePullSecret"
   # If set to false, the chart expects either a imagePullSecret
   # with the name configured above to be present on the cluster or that no
   # credentials are needed.
