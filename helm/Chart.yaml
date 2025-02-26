@@ -26,22 +26,25 @@ dependencies:
     repository: https://open-telemetry.github.io/opentelemetry-helm-charts
     version: 0.78.1
     condition: otelDeployed
+  - name: yolox-nim
+    repository: "alias:nemo-microservices"
+    version: 0.2.0
+    # condition: yoloxDeployed
   - name: nvidia-nim-nemoretriever-graphic-elements-v1
     repository: "alias:nemo-microservices"
     version: 1.2.0
     condition: yoloxDeployed
-  - name: cached-nim
-    repository: "alias:nemo-microservices"
-    version: 0.2.0
-    condition: cachedDeployed
+  - name: nvidia-nim-nemoretriever-table-structure-v1
+    repository: "alias:nvstaging-nim"
+    version: 1.1.0
+    condition: yoloxDeployed
+  - name: nim-vlm
+    repository: "alias:nvstaging-nim"
+    version: 1.2.0-ea-v4
   - name: paddleocr-nim
     repository: "alias:nemo-microservices"
     version: 0.2.0
     condition: paddleocrDeployed
-  - name: deplot-nim
-    repository: "alias:nemo-microservices"
-    version: 0.1.12
-    condition: deplotDeployed
   - name: text-embedding-nim
     repository: "alias:nvidia-nim"
     version: 1.1.0
@@ -54,3 +57,7 @@ dependencies:
     repository: https://zilliztech.github.io/milvus-helm
     version: 4.1.11
     condition: milvusDeployed
+  # - name: riva-api
+  #   repository: "alias:"
+  #   version: 2.15.1
+  #   condition: rivaDeployed

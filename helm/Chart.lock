@@ -11,18 +11,21 @@ dependencies:
 - name: opentelemetry-collector
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
   version: 0.78.1
+- name: yolox-nim
+  repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
+  version: 0.2.0
 - name: nvidia-nim-nemoretriever-graphic-elements-v1
   repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
   version: 1.2.0
-- name: cached-nim
-  repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
-  version: 0.2.0
+- name: nvidia-nim-nemoretriever-table-structure-v1
+  repository: https://helm.ngc.nvidia.com/nvstaging/nim
+  version: 1.1.0
+- name: nim-vlm
+  repository: https://helm.ngc.nvidia.com/nvstaging/nim
+  version: 1.2.0-ea-v4
 - name: paddleocr-nim
   repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
   version: 0.2.0
-- name: deplot-nim
-  repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
-  version: 0.1.12
 - name: text-embedding-nim
   repository: https://helm.ngc.nvidia.com/nim/nvidia
   version: 1.1.0
@@ -32,5 +35,5 @@ dependencies:
 - name: milvus
   repository: https://zilliztech.github.io/milvus-helm
   version: 4.1.11
-digest: sha256:ef4c88389f8d599de4e7bec26728b29dec279d54173e7a7f61bd6cb91730e534
-generated: "2025-02-24T15:33:27.627868184-05:00"
+digest: sha256:0ded001c600937230f7d0c9b0924cb2f94d16cff6a3222f6e6cac8c86d565758
+generated: "2025-02-25T16:23:02.072562059-05:00"
