@@ -180,6 +180,9 @@ services:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
       target: runtime
+      args:
+        DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
+        HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
