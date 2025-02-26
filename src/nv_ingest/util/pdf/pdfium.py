@@ -211,6 +211,19 @@ def convert_pdfium_position(pos, page_width, page_height):
     """
     Convert a PDFium bounding box (which typically has an origin at the bottom-left)
     to a more standard bounding-box format with y=0 at the top.
+
+    Note:
+        This method assumes the PDF coordinate system follows the common convention
+        where the origin is at the bottom-left. However, per the PDF specification,
+        the coordinate system can theoretically be defined between any opposite corners,
+        and its origin may not necessarily be (0,0). This implementation may not handle
+        all edge cases where the coordinate system is arbitrarily transformed.
+
+        Further processing may be necessary downstream, particularly in filtering or
+        deduplication stages, to account for variations in coordinate transformations
+        and ensure consistent bounding-box comparisons.
+
+        See https://github.com/pypdfium2-team/pypdfium2/discussions/284.
     """
     left, bottom, right, top = pos
     x0, x1 = left, right
