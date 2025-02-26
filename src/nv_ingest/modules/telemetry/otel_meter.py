@@ -109,6 +109,9 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
             ts_entry = message.get_timestamp(entry_key)
             job_name = key.replace("trace::exit::", "")
 
+            if ts_entry is None or ts_exit is None:
+                continue
+
             # Sanitize job name
             sanitized_job_name = sanitize_name(job_name)
 

@@ -261,7 +261,6 @@ class MultiProcessingBaseStage(SinglePortStage):
                     future = process_pool.submit_task(process_fn, (df, task_props))
                     # This can return/raise an exception
                     result = future.result()
-                    del future
 
                     extra_results = []
                     if isinstance(result, tuple):

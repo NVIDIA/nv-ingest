@@ -200,7 +200,7 @@ class ProcessWorkerPoolSingleton:
         """
         import time
 
-        check_interval = 5 * 60  # 5 minute Manager cache rotation interval
+        check_interval = 2 * 60  # 5 minute Manager cache rotation interval
         while not self._stop_manager_monitor:
             time.sleep(check_interval)
             with self._lock:

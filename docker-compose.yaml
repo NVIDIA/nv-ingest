@@ -214,27 +214,27 @@ services:
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       # Self-hosted paddle endpoints.
-      - PADDLE_GRPC_ENDPOINT=paddle:8001
+      #- PADDLE_GRPC_ENDPOINT=paddle:8001
       - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
-      - PADDLE_INFER_PROTOCOL=grpc
+      #- PADDLE_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
-      #- PADDLE_INFER_PROTOCOL=http
+      - PADDLE_INFER_PROTOCOL=http
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       # Self-hosted redis endpoints.
-      - YOLOX_GRPC_ENDPOINT=yolox:8001
+      #- YOLOX_GRPC_ENDPOINT=yolox:8001
       - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      #- YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
-      #- YOLOX_INFER_PROTOCOL=http
-      - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=yolox-graphic-elements:8001
+      - YOLOX_INFER_PROTOCOL=http
+      #- YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=yolox-graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://yolox-graphic-elements:8000/v1/infer
-      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
-      - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=yolox-table-structure:8001
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
+      #- YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=yolox-table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://yolox-table-structure:8000/v1/infer
-      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
