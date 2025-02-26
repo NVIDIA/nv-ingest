@@ -2,6 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from .nemo_doc_splitter import NemoDocSplitterLoaderFactory
+from .text_splitter import TextSplitterLoaderFactory
 
-__all__ = ["NemoDocSplitterLoaderFactory"]
+__all__ = ["TextSplitterLoaderFactory"]

@@ -24,10 +24,6 @@ from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 
-DEPLOT_MAX_TOKENS = 128
-DEPLOT_TEMPERATURE = 1.0
-DEPLOT_TOP_P = 1.0
-
 
 class ModelInterface:
     """
@@ -640,6 +636,58 @@ def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
         return False
 
 
+def _query_metadata(
+    http_endpoint: str,
+    field_name: str,
+    default_value: str,
+    retry_value: str = "",
+    metadata_endpoint: str = "/v1/metadata",
+) -> str:
+    if (http_endpoint is None) or (http_endpoint == ""):
+        return default_value
+
+    url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
+
+    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
+        metadata_endpoint = "/" + metadata_endpoint
+
+    url = url + metadata_endpoint
+
+    # Call the metadata endpoint of the NIM
+    try:
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems reasonable
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            field_value = resp.json().get(field_name, "")
+            if field_value:
+                return field_value
+            else:
+                # If the field is empty, retry
+                logger.warning(f"No {field_name} field in response from '{url}'. Retrying.")
+                return retry_value
+        else:
+            # Any other code is confusing. We should log it with a warning
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.text}")
+            return retry_value
+    except requests.HTTPError as http_err:
+        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
+        return retry_value
+    except requests.Timeout:
+        logger.warning(f"'{url}' request timed out")
+        return retry_value
+    except ConnectionError:
+        logger.warning(f"A connection error for '{url}' occurred")
+        return retry_value
+    except requests.RequestException as err:
+        logger.warning(f"An error occurred: {err} for '{url}'")
+        return retry_value
+    except Exception as ex:
+        # Don't let anything squeeze by
+        logger.warning(f"Exception: {ex}")
+        return retry_value
+
+
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
@@ -660,51 +708,53 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
     str
         The version of the server, or an empty string if unavailable.
     """
+    default_version = "1.0.0"
 
-    if (http_endpoint is None) or (http_endpoint == ""):
-        return ""
-
-    # TODO: Need a way to match NIM versions to API versions.
+    # TODO: Need a way to match NIM version to API versions.
     if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
-        return "1.0.0"
+        return default_version
 
-    url = generate_url(http_endpoint)
-    url = remove_url_endpoints(url)
+    return _query_metadata(
+        http_endpoint,
+        field_name=version_field,
+        default_value=default_version,
+    )
 
-    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
-        metadata_endpoint = "/" + metadata_endpoint
 
-    url = url + metadata_endpoint
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_model_name(
+    http_endpoint: str,
+    default_model_name,
+    metadata_endpoint: str = "/v1/metadata",
+    model_info_field: str = "modelInfo",
+) -> str:
+    """
+    Get the model name of the server from its metadata endpoint.
 
-    # Call the metadata endpoint of the NIM
-    try:
-        # Use a short timeout to prevent long hanging calls. 5 seconds seems reasonable
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            version = resp.json().get(version_field, "")
-            if version:
-                return version
-            else:
-                # If version field is empty, retry
-                logger.warning(f"No version field in response from '{url}'. Retrying.")
-                return ""
-        else:
-            # Any other code is confusing. We should log it with a warning
-            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.text}")
-            return ""
-    except requests.HTTPError as http_err:
-        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
-        return ""
-    except requests.Timeout:
-        logger.warning(f"'{url}' request timed out")
-        return ""
-    except ConnectionError:
-        logger.warning(f"A connection error for '{url}' occurred")
-        return ""
-    except requests.RequestException as err:
-        logger.warning(f"An error occurred: {err} for '{url}'")
-        return ""
-    except Exception as ex:
-        # Don't let anything squeeze by
-        logger.warning(f"Exception: {ex}")
-        return ""
+    Parameters
+    ----------
+    http_endpoint : str
+        The HTTP endpoint of the server.
+    metadata_endpoint : str, optional
+        The metadata endpoint to query (default: "/v1/metadata").
+    model_info_field : str, optional
+        The field containing the model info in the response (default: "modelInfo").
+
+    Returns
+    -------
+    str
+        The model name of the server, or an empty string if unavailable.
+    """
+    if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
+        return http_endpoint.strip("/").strip("/chat/completions").split("/")[-1]
+
+    model_info = _query_metadata(
+        http_endpoint,
+        field_name=model_info_field,
+        default_value={"shortName": default_model_name},
+    )
+    short_name = model_info[0].get("shortName", default_model_name)
+    model_name = short_name.split(":")[0]
+
+    return model_name

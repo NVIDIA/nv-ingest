@@ -10,31 +10,24 @@ from nv_ingest_client.primitives.tasks.split import SplitTask
 
 def test_split_task_initialization():
     task = SplitTask(
-        split_by="word",
-        split_length=100,
-        split_overlap=10,
-        max_character_length=1000,
-        sentence_window_size=5,
+        tokenizer="meta-llama/Llama-3.2-1B",
+        chunk_size=1024,
+        chunk_overlap=0,
+        params={},
     )
-    assert task._split_by == "word"
-    assert task._split_length == 100
-    assert task._split_overlap == 10
-    assert task._max_character_length == 1000
-    assert task._sentence_window_size == 5
+    assert task._tokenizer == "meta-llama/Llama-3.2-1B"
+    assert task._chunk_size == 1024
+    assert task._chunk_overlap == 0
+    assert task._params == {}
 
 
 # String Representation Tests
 
 
 def test_split_task_str_representation():
-    task = SplitTask(split_by="sentence", split_length=50, split_overlap=5)
+    task = SplitTask(tokenizer="intfloat/e5-large-unsupervised", chunk_size=50, chunk_overlap=5)
     expected_str = (
-        "Split Task:\n"
-        "  split_by: sentence\n"
-        "  split_length: 50\n"
-        "  split_overlap: 5\n"
-        "  split_max_character_length: None\n"
-        "  split_sentence_window_size: None\n"
+        "Split Task:\n" "  tokenizer: intfloat/e5-large-unsupervised\n" "  chunk_size: 50\n" "  chunk_overlap: 5\n"
     )
     assert str(task) == expected_str
 
@@ -43,42 +36,37 @@ def test_split_task_str_representation():
 
 
 @pytest.mark.parametrize(
-    "split_by, split_length, split_overlap, max_character_length, sentence_window_size",
+    "tokenizer, chunk_size, chunk_overlap, params",
     [
-        ("word", 100, 10, 1000, 5),
-        ("sentence", 50, 5, None, None),
-        ("passage", None, None, 1500, 3),
-        (None, None, None, None, None),  # Test default parameters
+        ("intfloat/e5-large-unsupervised", 100, 10, {}),
+        ("microsoft/deberta-large", 50, 5, None),
+        ("meta-llama/Llama-3.2-1B", 1024, 0, {"hf_access_token": "TOKEN"}),
     ],
 )
 def test_split_task_to_dict(
-    split_by,
-    split_length,
-    split_overlap,
-    max_character_length,
-    sentence_window_size,
+    tokenizer,
+    chunk_size,
+    chunk_overlap,
+    params,
 ):
     task = SplitTask(
-        split_by=split_by,
-        split_length=split_length,
-        split_overlap=split_overlap,
-        max_character_length=max_character_length,
-        sentence_window_size=sentence_window_size,
+        tokenizer=tokenizer,
+        chunk_size=chunk_size,
+        chunk_overlap=chunk_overlap,
+        params=params,
     )
 
     expected_dict = {"type": "split", "task_properties": {}}
 
     # Only add properties to expected_dict if they are not None
-    if split_by is not None:
-        expected_dict["task_properties"]["split_by"] = split_by
-    if split_length is not None:
-        expected_dict["task_properties"]["split_length"] = split_length
-    if split_overlap is not None:
-        expected_dict["task_properties"]["split_overlap"] = split_overlap
-    if max_character_length is not None:
-        expected_dict["task_properties"]["max_character_length"] = max_character_length
-    if sentence_window_size is not None:
-        expected_dict["task_properties"]["sentence_window_size"] = sentence_window_size
+    if tokenizer is not None:
+        expected_dict["task_properties"]["tokenizer"] = tokenizer
+    if chunk_size is not None:
+        expected_dict["task_properties"]["chunk_size"] = chunk_size
+    if chunk_overlap is not None:
+        expected_dict["task_properties"]["chunk_overlap"] = chunk_overlap
+    if params is not None:
+        expected_dict["task_properties"]["params"] = params
 
     assert task.to_dict() == expected_dict, "The to_dict method did not return the expected dictionary representation"
 
@@ -89,14 +77,18 @@ def test_split_task_to_dict(
 def test_split_task_default_params():
     task = SplitTask()
     expected_str_contains = [
-        "split_by: None",
-        "split_length: None",
-        "split_overlap: None",
-        "split_max_character_length: None",
-        "split_sentence_window_size: None",
+        "chunk_size: 1024",
+        "chunk_overlap: 150",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
 
-    expected_dict = {"type": "split", "task_properties": {}}
+    expected_dict = {
+        "type": "split",
+        "task_properties": {
+            "chunk_size": 1024,
+            "chunk_overlap": 150,
+            "params": {},
+        },
+    }
     assert task.to_dict() == expected_dict

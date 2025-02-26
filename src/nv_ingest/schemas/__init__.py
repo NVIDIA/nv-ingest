@@ -13,13 +13,13 @@ from .message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from .message_broker_source_schema import MessageBrokerTaskSourceSchema
 from .metadata_injector_schema import MetadataInjectorSchema
 from .metadata_schema import validate_metadata
-from .nemo_doc_splitter_schema import DocumentSplitterSchema
+from .text_splitter_schema import TextSplitterSchema
 from .pdf_extractor_schema import PDFExtractorSchema
 from .task_injection_schema import TaskInjectionSchema
 from .vdb_task_sink_schema import VdbTaskSinkSchema
 
 __all__ = [
-    "DocumentSplitterSchema",
+    "TextSplitterSchema",
     "ImageCaptionExtractionSchema",
     "ImageStorageModuleSchema",
     "IngestJobSchema",
