@@ -29,7 +29,7 @@ jobs:
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
-          docker build --target runtime -t nv-ingest:latest .
+          docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t nv-ingest:latest .
 
       - name: Run Pytest inside Docker container
         run: |

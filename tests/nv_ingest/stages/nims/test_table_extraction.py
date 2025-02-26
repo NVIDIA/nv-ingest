@@ -1,404 +1,439 @@
-import base64
-from io import BytesIO
-from unittest.mock import Mock
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
-import cv2
 import numpy as np
 import pandas as pd
 import pytest
-import requests
-from PIL import Image
 
 from nv_ingest.stages.nim.table_extraction import _extract_table_data
 from nv_ingest.stages.nim.table_extraction import _update_metadata
-from nv_ingest.util.nim.helpers import NimClient
-from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
-
-# Constants for minimum image size
-PADDLE_MIN_WIDTH = 32
-PADDLE_MIN_HEIGHT = 32
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.table_extraction"
 
 
-# Mocked PaddleOCRModelInterface
-class MockPaddleOCRModelInterface:
-    def __init__(self, paddle_version=None):
-        self.paddle_version = paddle_version
-
-    def prepare_data_for_inference(self, data):
-        return data
-
-    def format_input(self, data, protocol, **kwargs):
-        return data
-
-    def parse_output(self, response, protocol, **kwargs):
-        table_content = (
-            "Chart 1 This chart shows some gadgets, and some very fictitious costs "
-            "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
-            "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
-            "desk fan Cost"
-        )
-        table_content_format = "simple"
-
-        return table_content, table_content_format
-
-    def process_inference_results(self, output, **kwargs):
-        return output
+@pytest.fixture
+def paddle_mock():
+    """
+    Fixture that returns a MagicMock for the paddle_client,
+    which we'll pass to _update_metadata.
+    """
+    return MagicMock()
 
 
 @pytest.fixture
-def mock_paddle_client_and_requests():
-    # Create a mocked PaddleOCRModelInterface
-    model_interface = MockPaddleOCRModelInterface()
-    # Create a mocked NimClient with the mocked model_interface
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-
-    # Mock response for requests.post
-    mock_response = Mock()
-    mock_response.raise_for_status = Mock()
-    mock_response.json.return_value = {
-        "object": "list",
-        "data": [{"index": 0, "content": "Mocked content from PaddleOCR", "object": "string"}],
-        "model": "paddleocr",
-        "usage": None,
-    }
-
-    # Patching create_inference_client and requests.post
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=paddle_client) as mock_create_client, patch(
-        "requests.post", return_value=mock_response
-    ) as mock_requests_post:
-        yield paddle_client, mock_create_client, mock_requests_post
+def yolox_mock():
+    """
+    Fixture that returns a MagicMock for the yolox_client,
+    which we'll pass to _update_metadata.
+    """
+    return MagicMock()
 
 
-# Fixture for common mock setup (inference failure)
-# Fixture for common mock setup (inference failure)
 @pytest.fixture
-def mock_paddle_client_and_requests_failure():
-    # Create a mocked PaddleOCRModelInterface
-    model_interface = MockPaddleOCRModelInterface()
-    # Create a mocked NimClient with the mocked model_interface
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
+def validated_config():
+    """
+    Fixture that returns a minimal validated_config object
+    with a `stage_config` containing the necessary fields.
+    """
 
-    # Mock the infer method to raise an exception to simulate an inference failure
-    paddle_client.infer = Mock(side_effect=Exception("Inference error"))
+    class FakeStageConfig:
+        # Values that _extract_table_data expects
+        workers_per_progress_engine = 5
+        auth_token = "fake-token"
+        yolox_endpoints = ("grpc_url", "http_url")
+        yolox_infer_protocol = "grpc"
+        paddle_endpoints = ("grpc_url", "http_url")
+        paddle_infer_protocol = "grpc"
 
-    # Patching create_inference_client
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=paddle_client) as mock_create_client:
-        yield paddle_client, mock_create_client
+    class FakeValidatedConfig:
+        stage_config = FakeStageConfig()
 
-
-# Fixture to create a sample image and encode it in base64
-@pytest.fixture
-def base64_encoded_image():
-    # Create a simple image using PIL
-    img = Image.new("RGB", (64, 64), color="white")
-    buffered = BytesIO()
-    img.save(buffered, format="PNG")
-    img_bytes = buffered.getvalue()
-    # Encode the image to base64
-    base64_str = base64.b64encode(img_bytes).decode("utf-8")
-    return base64_str
+    return FakeValidatedConfig()
 
 
-# Fixture for a small image (below minimum size)
-# Fixture for small base64-encoded image
-@pytest.fixture
-def base64_encoded_small_image():
-    # Generate a small image (e.g., 10x10 pixels) and encode it in base64
-    small_image = np.zeros((10, 10, 3), dtype=np.uint8)
-    _, buffer = cv2.imencode(".png", small_image)
-    base64_image = base64.b64encode(buffer).decode("utf-8")
-    return base64_image
+def test_extract_table_data_empty_df(mocker, validated_config):
+    """
+    If df is empty, return the df + an empty trace_info without creating a client or calling _update_metadata.
+    """
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients")
+    mock_update_metadata = mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata")
+
+    df_in = pd.DataFrame()
+
+    df_out, trace_info = _extract_table_data(df_in, {}, validated_config)
+    assert df_out.empty
+    assert trace_info == {}
+    mock_create_clients.assert_not_called()
+    mock_update_metadata.assert_not_called()
 
 
-# Test function for _extract_table_data with an image that is too small
-def test_extract_table_data_image_too_small(base64_encoded_small_image):
-    data = {
-        "metadata": [
+def test_extract_table_data_no_valid_rows(mocker, validated_config):
+    """
+    Rows exist, but none meet the "structured/table" criteria =>
+    skip _update_metadata, still create/close the client,
+    and return the DataFrame unmodified with a trace_info.
+    """
+    mock_clients = (MagicMock(), MagicMock())
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=mock_clients)
+    mock_update_metadata = mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata")
+
+    df_in = pd.DataFrame(
+        [
             {
-                "content": base64_encoded_small_image,
-                "content_metadata": {"type": "image", "subtype": "table"},
-                "table_metadata": {"table_content": ""},
-            }
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "some_base64",
+                }
+            },
+            {"metadata": None},  # also invalid
         ]
-    }
-    df = pd.DataFrame(data)
-
-    # Mock 'validated_config' and its attributes
-    validated_config = Mock()
-    stage_config = Mock()
-    validated_config.stage_config = stage_config
-    stage_config.paddle_endpoints = ("mock_endpoint_grpc", "mock_endpoint_http")
-    stage_config.auth_token = "mock_token"
-    stage_config.paddle_infer_protocol = "http"
-
-    trace_info = {}
-
-    # Mock the NimClient to return a specific result
-    mock_nim_client = Mock(spec=NimClient)
-
-    # Simulate that inference is skipped due to small image
-    def mock_infer(data, model_name, **kwargs):
-        # Simulate behavior when image is too small: return empty result or raise an exception
-        raise Exception("Image too small for inference")
-
-    mock_nim_client.infer.side_effect = mock_infer
-
-    # Patch 'create_inference_client' to return the mocked NimClient
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", return_value=mock_nim_client), patch(
-        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
-    ):
-        # Since the image is too small, we expect the table_content to remain unchanged
-        updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
-
-    # Verify that 'table_content' remains empty
-    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == ""
-
-
-# Fixture for a sample DataFrame
-@pytest.fixture
-def sample_dataframe(base64_encoded_image):
-    data = {
-        "metadata": [
-            {
-                "content": base64_encoded_image,
-                "content_metadata": {"type": "structured", "subtype": "table"},
-                "table_metadata": {"table_content": ""},
-            }
-        ]
-    }
-    df = pd.DataFrame(data)
-    return df
-
-
-# Fixture for DataFrame with missing metadata
-@pytest.fixture
-def dataframe_missing_metadata():
-    data = {"other_data": ["no metadata here"]}
-    df = pd.DataFrame(data)
-    return df
-
-
-# Fixture for DataFrame where content_metadata doesn't meet conditions
-@pytest.fixture
-def dataframe_non_table(base64_encoded_image):
-    data = {
-        "metadata": [
-            {
-                "content": base64_encoded_image,
-                "content_metadata": {"type": "text", "subtype": "paragraph"},  # Not "structured"  # Not "table"
-                "table_metadata": {"table_content": ""},
-            }
-        ]
-    }
-    df = pd.DataFrame(data)
-    return df
-
-
-# Tests for _update_metadata
-def test_update_metadata_missing_metadata():
-    row = pd.Series({"other_data": "not metadata"})
-    model_interface = PaddleOCRModelInterface()
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-    trace_info = {}
-    with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-        _update_metadata(row, paddle_client, trace_info)
-
-
-def test_update_metadata_non_table_content(dataframe_non_table):
-    row = dataframe_non_table.iloc[0]
-    model_interface = PaddleOCRModelInterface()
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-    trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
-    # The metadata should remain unchanged
-    assert result == row["metadata"]
-
-
-def test_update_metadata_image_too_small_1(base64_encoded_small_image):
-    row = pd.Series(
-        {
-            "metadata": {
-                "content": base64_encoded_small_image,
-                "content_metadata": {"type": "structured", "subtype": "table"},
-                "table_metadata": {"table_content": ""},
-            }
-        }
-    )
-    model_interface = PaddleOCRModelInterface()
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-    trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
-    # Since the image is too small, table_content should remain unchanged
-    assert result["table_metadata"]["table_content"] == ""
-
-
-def test_update_metadata_successful_update(sample_dataframe, mock_paddle_client_and_requests):
-    model_interface = MockPaddleOCRModelInterface()
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-
-    row = sample_dataframe.iloc[0]
-    trace_info = {}
-    result = _update_metadata(row, paddle_client, trace_info)
-
-    # Expected content from the mocked response
-    expected_content = (
-        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
-        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
-        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
-        "desk fan Cost"
     )
 
-    # The table_content should be updated with expected_content
-    assert result["table_metadata"]["table_content"] == expected_content
+    df_out, trace_info = _extract_table_data(df_in, {}, validated_config)
+    assert df_out.equals(df_in)
+    assert "trace_info" in trace_info
+    mock_create_clients.assert_called_once()  # We do create a client
+    mock_update_metadata.assert_not_called()  # But never call _update_metadata
+    mock_clients[0].close.assert_called_once()  # Must close client
+    mock_clients[1].close.assert_called_once()  # Must close client
 
 
-def test_update_metadata_inference_failure(sample_dataframe, mock_paddle_client_and_requests_failure):
-    model_interface = MockPaddleOCRModelInterface()
-    paddle_client = NimClient(model_interface, "http", ("mock_endpoint_grpc", "mock_endpoint_http"))
-
-    # Mock response to simulate requests.post behavior
-    mock_response = Mock()
-    mock_response.raise_for_status.side_effect = RuntimeError("HTTP request failed: Inference error")
-    mock_response.json.return_value = {
-        "object": "list",
-        "data": [
-            {
-                "index": 0,
-                "content": (
-                    "Chart 1 This chart shows some gadgets, and some very fictitious costs "
-                    "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
-                    "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
-                    "desk fan Cost"
-                ),
-                "object": "string",
-            }
+def test_extract_table_data_all_valid(mocker, validated_config):
+    """
+    All rows are valid => we pass all base64 images to _update_metadata once,
+    then write the returned content/format back into each row.
+    """
+    mock_clients = (MagicMock(), MagicMock())
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=mock_clients)
+    mock_update_metadata = mocker.patch(
+        f"{MODULE_UNDER_TEST}._update_metadata",
+        return_value=[
+            ("imgA", [], [], ["tableA"]),
+            ("imgB", [], [], ["tableB"]),
         ],
-        "model": "paddleocr",
-        "usage": None,
-    }
-
-    row = sample_dataframe.iloc[0]
-    trace_info = {}
-    with patch("requests.post", return_value=mock_response):
-        with pytest.raises(RuntimeError, match="HTTP request failed: Inference error"):
-            _update_metadata(row, paddle_client, trace_info)
-
-
-# Tests for _extract_table_data
-def test_extract_table_data_successful(sample_dataframe, mock_paddle_client_and_requests):
-    paddle_client, mock_create_client, mock_requests_post = mock_paddle_client_and_requests
-
-    validated_config = Mock()
-    validated_config.stage_config.paddle_endpoints = "mock_endpoint"
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.paddle_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.3.3"):
-        updated_df, trace_info_out = _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
-
-    # Expected content from the mocked response
-    expected_content = (
-        "Chart 1 This chart shows some gadgets, and some very fictitious costs "
-        "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
-        "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
-        "desk fan Cost"
     )
-    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == expected_content
-    assert trace_info_out == {"trace_info": trace_info}
 
-    # Verify that the mocked methods were called
-    mock_create_client.assert_called_once()
-    mock_requests_post.assert_called_once()
-
-
-def test_extract_table_data_missing_metadata(dataframe_missing_metadata, mock_paddle_client_and_requests):
-    paddle_client, mock_create_client, mock_requests_post = mock_paddle_client_and_requests
-
-    validated_config = Mock()
-    validated_config.stage_config.paddle_endpoints = "mock_endpoint"
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.paddle_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.2.1"):
-        with pytest.raises(ValueError, match="Row does not contain 'metadata'."):
-            _extract_table_data(dataframe_missing_metadata, {}, validated_config, trace_info)
-
-    # Verify that the mocked methods were called
-    mock_create_client.assert_called_once()
-    # Since metadata is missing, requests.post should not be called
-    mock_requests_post.assert_not_called()
-
-
-def test_extract_table_data_inference_failure(sample_dataframe, mock_paddle_client_and_requests_failure):
-    validated_config = Mock()
-    validated_config.stage_config.paddle_endpoints = "mock_endpoint"
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.paddle_infer_protocol = "mock_protocol"
-
-    trace_info = {}
-
-    with patch(f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"):
-        with pytest.raises(Exception, match="Inference error"):
-            _extract_table_data(sample_dataframe, {}, validated_config, trace_info)
-
-
-def test_extract_table_data_image_too_small_2(base64_encoded_small_image):
-    data = {
-        "metadata": [
+    df_in = pd.DataFrame(
+        [
             {
-                "content": base64_encoded_small_image,
-                "content_metadata": {"type": "structured", "subtype": "table"},
-                "table_metadata": {"table_content": ""},
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {"table_content_format": "simple"},
+                    "content": "imgA",
+                }
+            },
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {"table_content_format": "simple"},
+                    "content": "imgB",
+                }
+            },
+        ]
+    )
+
+    df_out, trace_info = _extract_table_data(df_in, {}, validated_config)
+
+    # Each valid row updated
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "tableA"
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "simple"
+    assert df_out.at[1, "metadata"]["table_metadata"]["table_content"] == "tableB"
+    assert df_out.at[1, "metadata"]["table_metadata"]["table_content_format"] == "simple"
+
+    # Check calls
+    mock_create_clients.assert_called_once()
+    mock_update_metadata.assert_called_once_with(
+        base64_images=["imgA", "imgB"],
+        yolox_client=mock_clients[0],
+        paddle_client=mock_clients[1],
+        worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
+        enable_yolox=False,
+        trace_info=trace_info.get("trace_info"),
+    )
+    mock_clients[0].close.assert_called_once()
+    mock_clients[1].close.assert_called_once()
+
+
+def test_extract_table_data_mixed_rows(mocker, validated_config):
+    """
+    Some rows valid, some invalid => only valid rows get updated.
+    """
+    mock_clients = (MagicMock(), MagicMock())
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=mock_clients)
+    mock_update_metadata = mocker.patch(
+        f"{MODULE_UNDER_TEST}._update_metadata",
+        return_value=[("good1", [], [], ["table1"]), ("good2", [], [], ["table2"])],
+    )
+
+    df_in = pd.DataFrame(
+        [
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {"table_content_format": "simple"},
+                    "content": "good1",
+                }
+            },
+            {
+                # invalid => subtype=chart
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "chart"},
+                    "table_metadata": {},
+                    "content": "chart_b64",
+                }
+            },
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {},
+                    "content": "good2",
+                }
+            },
+        ]
+    )
+
+    df_out, trace_info = _extract_table_data(df_in, {}, validated_config)
+
+    # row0 => updated with table1/txt1
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "table1"
+    assert df_out.at[0, "metadata"]["table_metadata"]["table_content_format"] == "simple"
+    # row1 => invalid => no table_content
+    assert "table_content" not in df_out.at[1, "metadata"]["table_metadata"]
+    # row2 => updated => table2/txt2
+    assert df_out.at[2, "metadata"]["table_metadata"]["table_content"] == "table2"
+    assert df_out.at[2, "metadata"]["table_metadata"]["table_content_format"] == "simple"
+
+    mock_update_metadata.assert_called_once_with(
+        base64_images=["good1", "good2"],
+        yolox_client=mock_clients[0],
+        paddle_client=mock_clients[1],
+        worker_pool_size=validated_config.stage_config.workers_per_progress_engine,
+        enable_yolox=False,
+        trace_info=trace_info.get("trace_info"),
+    )
+    mock_clients[0].close.assert_called_once()
+    mock_clients[1].close.assert_called_once()
+
+
+def test_extract_table_data_update_error(mocker, validated_config):
+    """
+    If _update_metadata raises an exception, we should re-raise
+    but still close the paddle_client.
+    """
+    # Mock the yolox and paddle clients so we don't make real calls or wait.
+    mock_clients = (MagicMock(), MagicMock())
+    mock_create_clients = mocker.patch(f"{MODULE_UNDER_TEST}._create_clients", return_value=mock_clients)
+
+    # Mock _update_metadata to raise an error
+    mock_update_metadata = mocker.patch(f"{MODULE_UNDER_TEST}._update_metadata", side_effect=RuntimeError("paddle_err"))
+
+    df_in = pd.DataFrame(
+        [
+            {
+                "metadata": {
+                    "content_metadata": {"type": "structured", "subtype": "table"},
+                    "table_metadata": {},
+                    "content": "some_b64",
+                }
             }
         ]
-    }
-    df = pd.DataFrame(data)
+    )
 
-    validated_config = Mock()
-    validated_config.stage_config.paddle_endpoints = "mock_endpoint"
-    validated_config.stage_config.auth_token = "mock_token"
-    validated_config.stage_config.paddle_infer_protocol = "mock_protocol"
+    # We expect a re-raised RuntimeError from _update_metadata
+    with pytest.raises(RuntimeError, match="paddle_err"):
+        _extract_table_data(df_in, {}, validated_config)
 
-    model_interface = PaddleOCRModelInterface()
-    trace_info = {}
+    # Confirm we created a client
+    mock_create_clients.assert_called_once()
+    # Ensure the paddle_client was closed in the finally block
+    mock_clients[0].close.assert_called_once()
+    mock_clients[1].close.assert_called_once()
+    # Confirm _update_metadata was called once with our single row
+    mock_update_metadata.assert_called_once()
 
-    def mock_create_inference_client(endpoints, model_interface, auth_token, infer_protocol):
-        paddle_client = NimClient(model_interface, "http", ("mock_httpendpoint", "mock_grpc_endpoint"))
 
-        return paddle_client
+def test_update_metadata_empty_list(yolox_mock, paddle_mock):
+    """
+    If base64_images is empty, we should return an empty list
+    and never call paddle_mock.infer.
+    """
+    with patch(f"{MODULE_UNDER_TEST}.base64_to_numpy") as mock_b64:
+        result = _update_metadata([], yolox_mock, paddle_mock)
+    assert result == []
+    mock_b64.assert_not_called()
+    paddle_mock.infer.assert_not_called()
 
-    # Mock response to simulate requests.post behavior
-    mock_response = Mock()
-    mock_response.raise_for_status = Mock()  # Does nothing
-    mock_response.json.return_value = {
-        "object": "list",
-        "data": [
-            {
-                "index": 0,
-                "content": (
-                    "Chart 1 This chart shows some gadgets, and some very fictitious costs "
-                    "Gadgets and their cost $160.00 $140.00 $120.00 $100.00 $80.00 $60.00 "
-                    "$40.00 $20.00 $- Hammer Powerdrill Bluetooth speaker Minifridge Premium "
-                    "desk fan Cost"
-                ),
-                "object": "string",
-            }
-        ],
-        "model": "paddleocr",
-        "usage": None,
-    }
 
-    with patch(f"{MODULE_UNDER_TEST}.create_inference_client", side_effect=mock_create_inference_client), patch(
-        f"{MODULE_UNDER_TEST}.get_version", return_value="0.1.0"
-    ), patch("requests.post", return_value=mock_response):
-        updated_df, _ = _extract_table_data(df, {}, validated_config, trace_info)
+def test_update_metadata_all_valid(mocker, yolox_mock, paddle_mock):
+    imgs = ["b64imgA", "b64imgB"]
+    # Patch base64_to_numpy so that both images are valid.
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
+    mock_dim.side_effect = [
+        np.zeros((100, 120, 3), dtype=np.uint8),  # b64imgA is valid
+        np.zeros((80, 80, 3), dtype=np.uint8),  # b64imgB is valid
+    ]
 
-    # The table_content should remain unchanged because the image is too small
-    assert updated_df.loc[0, "metadata"]["table_metadata"]["table_content"] == ""
+    # Set minimum dimensions so that both images pass.
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 50)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 50)
+
+    # The paddle client returns a result for each valid image.
+    paddle_mock.infer.return_value = [
+        ("tableA", "fmtA"),
+        ("tableB", "fmtB"),
+    ]
+
+    res = _update_metadata(imgs, yolox_mock, paddle_mock, worker_pool_size=1)
+    assert len(res) == 2
+    assert res[0] == ("b64imgA", None, "tableA", "fmtA")
+    assert res[1] == ("b64imgB", None, "tableB", "fmtB")
+
+    # Expect one call to infer with all valid images.
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": ["b64imgA", "b64imgB"]},
+        model_name="paddle",
+        stage_name="table_data_extraction",
+        max_batch_size=2,
+        trace_info=None,
+    )
+
+
+def test_update_metadata_skip_small(mocker, yolox_mock, paddle_mock):
+    """
+    Some images are below the min dimension => they skip inference
+    and get ("", "") as results.
+    """
+    imgs = ["imgSmall", "imgBig"]
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
+    # Return NumPy arrays of certain shape to emulate dimension checks.
+    mock_dim.side_effect = [
+        np.zeros((40, 40, 3), dtype=np.uint8),  # too small
+        np.zeros((60, 70, 3), dtype=np.uint8),  # big enough
+    ]
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 50)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 50)
+
+    paddle_mock.infer.return_value = [("valid_table", "valid_fmt")]
+
+    res = _update_metadata(imgs, yolox_mock, paddle_mock)
+    assert len(res) == 2
+    # The first image is too small and is skipped.
+    assert res[0] == ("imgSmall", None, None, None)
+    # The second image is valid and processed.
+    assert res[1] == ("imgBig", None, "valid_table", "valid_fmt")
+
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": ["imgBig"]},
+        model_name="paddle",
+        stage_name="table_data_extraction",
+        max_batch_size=2,
+        trace_info=None,
+    )
+
+
+def test_update_metadata_multiple_batches(mocker, yolox_mock, paddle_mock):
+    imgs = ["img1", "img2", "img3"]
+    # Patch base64_to_numpy so that all images are valid.
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
+    mock_dim.side_effect = [
+        np.zeros((80, 80, 3), dtype=np.uint8),  # img1
+        np.zeros((100, 50, 3), dtype=np.uint8),  # img2
+        np.zeros((64, 64, 3), dtype=np.uint8),  # img3
+    ]
+    # Set minimum dimensions such that all images are considered valid.
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 40)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 40)
+
+    # Since all images are valid, infer is called once with the full list.
+    paddle_mock.infer.return_value = [
+        ("table1", "fmt1"),
+        ("table2", "fmt2"),
+        ("table3", "fmt3"),
+    ]
+
+    res = _update_metadata(imgs, yolox_mock, paddle_mock, worker_pool_size=2)
+    assert len(res) == 3
+    assert res[0] == ("img1", None, "table1", "fmt1")
+    assert res[1] == ("img2", None, "table2", "fmt2")
+    assert res[2] == ("img3", None, "table3", "fmt3")
+
+    # Verify that infer is called only once with all valid images.
+    paddle_mock.infer.assert_called_once_with(
+        data={"base64_images": ["img1", "img2", "img3"]},
+        model_name="paddle",
+        stage_name="table_data_extraction",
+        max_batch_size=2,
+        trace_info=None,
+    )
+
+
+def test_update_metadata_inference_error(mocker, yolox_mock, paddle_mock):
+    """
+    If paddle.infer fails for a batch, all valid images in that batch get ("",""),
+    then we re-raise the exception.
+    """
+    imgs = ["imgA", "imgB"]
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.zeros((60, 60, 3), dtype=np.uint8))
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 20)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 20)
+
+    # Suppose the infer call fails
+    paddle_mock.infer.side_effect = RuntimeError("paddle error")
+
+    with pytest.raises(RuntimeError, match="paddle error"):
+        _update_metadata(imgs, yolox_mock, paddle_mock)
+
+    # The code sets them to ("", "") before re-raising
+    # We can’t see final 'res', but that’s the logic.
+
+
+def test_update_metadata_mismatch_length(mocker, yolox_mock, paddle_mock):
+    """
+    If paddle.infer returns fewer or more results than the valid_images => ValueError
+    """
+    imgs = ["img1", "img2"]
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.zeros((80, 80, 3), dtype=np.uint8))
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 20)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 20)
+
+    # We expect 2 results, but get only 1
+    paddle_mock.infer.return_value = [("tableOnly", "fmtOnly")]
+
+    with pytest.raises(ValueError, match="Expected 2 paddle results"):
+        _update_metadata(imgs, yolox_mock, paddle_mock)
+
+
+def test_update_metadata_non_list_return(mocker, yolox_mock, paddle_mock):
+    """
+    If inference returns something that's not a list, each gets ("", None, ...).
+    """
+    imgs = ["imgX"]
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy", return_value=np.zeros((70, 70, 3), dtype=np.uint8))
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 50)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 50)
+
+    paddle_mock.infer.return_value = "some_string"
+
+    res = _update_metadata(imgs, yolox_mock, paddle_mock)
+    assert len(res) == 1
+    assert res[0] == ("imgX", None, None, None)
+
+
+def test_update_metadata_all_small(mocker, yolox_mock, paddle_mock):
+    """
+    If all images are too small, we skip inference entirely and each gets ("", None, ...
+    """
+    imgs = ["imgA", "imgB"]
+    mock_dim = mocker.patch(f"{MODULE_UNDER_TEST}.base64_to_numpy")
+    mock_dim.side_effect = [np.zeros((10, 10, 3), dtype=np.uint8), np.zeros((5, 20, 3), dtype=np.uint8)]
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_WIDTH", 30)
+    mocker.patch(f"{MODULE_UNDER_TEST}.PADDLE_MIN_HEIGHT", 30)
+
+    res = _update_metadata(imgs, yolox_mock, paddle_mock)
+    assert len(res) == 2
+    assert res[0] == ("imgA", None, None, None)
+    assert res[1] == ("imgB", None, None, None)
+
+    # No calls to infer
+    paddle_mock.infer.assert_not_called()

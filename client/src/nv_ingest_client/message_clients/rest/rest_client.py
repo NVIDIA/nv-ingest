@@ -1,12 +1,6 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 # pylint: skip-file
 
@@ -236,7 +230,7 @@ class RestClient(MessageBrokerClientBase):
                         except RuntimeError as rte:
                             raise rte
 
-            except requests.HTTPError as err:
+            except (ConnectionError, requests.HTTPError, requests.exceptions.ConnectionError) as err:
                 logger.error(f"Error during fetching, retrying... Error: {err}")
                 self._client = None  # Invalidate client to force reconnection
                 try:

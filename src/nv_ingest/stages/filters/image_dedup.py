@@ -2,23 +2,19 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
+import functools
 import hashlib
 import logging
-from functools import partial
 from typing import Any
 from typing import Dict
 
 import pandas as pd
 from morpheus.config import Config
-from morpheus.messages import ControlMessage
-from morpheus.messages import MessageMeta
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from pydantic import BaseModel
 
 import cudf
 
-from nv_ingest.modules.filters.image_filter import add_info_message
 from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import InfoMessageMetadataSchema
@@ -26,6 +22,7 @@ from nv_ingest.schemas.metadata_schema import StatusEnum
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.schema.schema_validator import validate_schema
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +31,7 @@ MODULE_NAMESPACE = "nv-ingest"
 ImageDedupLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, ImageDedupSchema)
 
 
-def hash_content(x: Any, algorithm: str = "md5"):
+def hash_content(x: Any, algorithm: str = "md5") -> bytes:
     """
     Computes a hash of the content using the specified algorithm.
 
@@ -59,16 +56,21 @@ def hash_content(x: Any, algorithm: str = "md5"):
     --------
     >>> x = {"content": "example content"}
     >>> hash_content(x)
-    b'\\x9a\\x03\\x8b\\xad\\x8c\\x52\\x0e\\xa3\\xcd\\x0d\\x1e\\xd6\\x3b\\x2b\\x9c\\xe0'
+    b'\x9a\x03\x8b\xad\x8cR\x0ea\xcd\r\x1e\xd6;+\x9c\xe0'
 
     Notes
     -----
-    This function currently supports only the `md5` algorithm, even though an `algorithm` parameter is present.
+    This function currently supports only the `md5` algorithm.
     """
-    return hashlib.md5(x["content"].encode()).digest()
+    try:
+        return hashlib.md5(x["content"].encode()).digest()
+    except Exception as e:
+        err_msg = f"hash_content: Error computing hash for content. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
-def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool):
+def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool) -> pd.DataFrame:
     """
     Applies a deduplication filter to images in the DataFrame.
 
@@ -92,7 +94,7 @@ def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool):
     -----
     - The function operates only on rows where `document_type` is `ContentTypeEnum.IMAGE`.
     - When `filter_flag` is `False`, duplicate images are marked with an informational message and the `document_type`
-    is updated to `ContentTypeEnum.INFO_MSG`.
+      is updated to `ContentTypeEnum.INFO_MSG`.
 
     Examples
     --------
@@ -102,71 +104,66 @@ def _cpu_only_apply_dedup_filter(df: pd.DataFrame, filter_flag: bool):
     ... })
     >>> result_df = _cpu_only_apply_dedup_filter(df, filter_flag=True)
     >>> result_df
-      document_type metadata
-    0       IMAGE   {'content': 'image1'}
-    2       TEXT    {'content': 'text'}
+      document_type            metadata
+    0       IMAGE  {'content': 'image1'}
+    2        TEXT     {'content': 'text'}
 
     Raises
     ------
     ValueError
         If `df` does not contain the necessary columns `document_type` and `metadata`.
     """
-
-    image_mask = df["document_type"] == ContentTypeEnum.IMAGE
-    if not image_mask.any():
-        return df[~image_mask]
-
-    base_cols = df.columns
-    df_images = df.loc[image_mask].copy()
-    content_hash_sr = df_images["metadata"].apply(hash_content, args=("md5",))
-    df_images.loc[content_hash_sr.index, "_image_content_hash"] = content_hash_sr
-    df_images_deduped = df_images.drop_duplicates(subset="_image_content_hash")
-    deduped_indices = df_images_deduped.index
-    duplicate_indices = df_images.loc[~df_images.index.isin(deduped_indices)].index
-
-    if filter_flag:
-        df_result = pd.concat(
-            [
-                df_images.loc[deduped_indices][df.columns.difference(["_image_content_hash"])],
-                df.loc[~image_mask],
-            ],
-            axis=0,
-        )
-
-        return df_result
-
-    duplicate_images_df = df_images.loc[duplicate_indices]
-
-    # define and validate `info_message_metadata`
-    info_msg = {
-        "task": TaskTypeEnum.FILTER.value,
-        "status": StatusEnum.SUCCESS.value,
-        "message": "Filtered duplicate image.",
-        "filter": True,
-    }
-
-    # update payload with `info_message_metadata` and `document_type`
-    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
-
-    duplicate_images_df["info_message_metadata"] = [validated_info_msg] * duplicate_images_df.shape[0]
-    duplicate_images_df["metadata"] = duplicate_images_df["metadata"].apply(add_info_message, args=(info_msg,))
-
-    df.loc[duplicate_images_df["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG
-    df.drop(labels=df.columns.difference(base_cols), inplace=True, axis=1)
-
-    return df
+    try:
+        for col in ["document_type", "metadata"]:
+            if col not in df.columns:
+                raise ValueError(f"_cpu_only_apply_dedup_filter: Missing required column '{col}'.")
+        image_mask = df["document_type"] == ContentTypeEnum.IMAGE
+        if not image_mask.any():
+            return df[~image_mask]
+        base_cols = df.columns
+        df_images = df.loc[image_mask].copy()
+        content_hash_sr = df_images["metadata"].apply(hash_content, args=("md5",))
+        df_images.loc[content_hash_sr.index, "_image_content_hash"] = content_hash_sr
+        df_images_deduped = df_images.drop_duplicates(subset="_image_content_hash")
+        deduped_indices = df_images_deduped.index
+        duplicate_indices = df_images.loc[~df_images.index.isin(deduped_indices)].index
+        if filter_flag:
+            df_result = pd.concat(
+                [
+                    df_images.loc[deduped_indices][df.columns.difference(["_image_content_hash"])],
+                    df.loc[~image_mask],
+                ],
+                axis=0,
+            )
+            return df_result
+        duplicate_images_df = df_images.loc[duplicate_indices]
+        info_msg = {
+            "task": TaskTypeEnum.FILTER.value,
+            "status": StatusEnum.SUCCESS.value,
+            "message": "Filtered duplicate image.",
+            "filter": True,
+        }
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
+        duplicate_images_df["info_message_metadata"] = [validated_info_msg] * duplicate_images_df.shape[0]
+        df.loc[duplicate_images_df["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG
+        df.drop(labels=df.columns.difference(base_cols), inplace=True, axis=1)
+        return df
+    except Exception as e:
+        err_msg = f"_cpu_only_apply_dedup_filter: Error applying deduplication filter. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e
 
 
-def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool):
+def _apply_dedup_filter(ctrl_msg: IngestControlMessage, filter_flag: bool) -> None:
     """
-    Applies a deduplication filter to images within a DataFrame encapsulated in a ControlMessage.
+    Applies a deduplication filter to images within a DataFrame encapsulated in a IngestControlMessage.
 
     This function identifies duplicate images based on content hashes within a DataFrame,
     and either filters out the duplicates or marks them as informational messages depending on the `filter_flag`.
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
+    ctrl_msg : IngestControlMessage
         The control message containing the payload with the DataFrame to be filtered.
     filter_flag : bool
         A flag indicating whether to filter out duplicates (`True`) or mark them with informational messages (`False`).
@@ -181,12 +178,12 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool):
     - The function operates only on rows where `document_type` is `ContentTypeEnum.IMAGE.value`.
     - When `filter_flag` is `True`, duplicates are removed from the DataFrame.
     - When `filter_flag` is `False`, duplicate images are marked with an informational message and the `document_type`
-    is updated to `ContentTypeEnum.INFO_MSG.value`.
+      is updated to `ContentTypeEnum.INFO_MSG.value`.
     - The `metadata` field in the DataFrame is exploded and restructured as needed.
 
     Examples
     --------
-    >>> ctrl_msg = ControlMessage(payload=some_dataframe)
+    >>> ctrl_msg = IngestControlMessage(payload=some_dataframe)
     >>> _apply_dedup_filter(ctrl_msg, filter_flag=True)
     >>> filtered_df = ctrl_msg.payload().dataframe()
     >>> print(filtered_df)
@@ -194,67 +191,59 @@ def _apply_dedup_filter(ctrl_msg: ControlMessage, filter_flag: bool):
     Raises
     ------
     ValueError
-        If the DataFrame does not contain the necessary columns `document_type` and `metadata`, or if other expected
-        operations fail.
+        If the DataFrame does not contain the necessary columns `document_type` and `metadata`,
+        or if other expected operations fail.
     """
-
-    with ctrl_msg.payload().mutable_dataframe() as mdf:
-        # return if no images
-        image_mask = mdf["document_type"] == ContentTypeEnum.IMAGE.value
-        if not image_mask.any():
+    try:
+        with ctrl_msg.payload().mutable_dataframe() as mdf:
+            image_mask = mdf["document_type"] == ContentTypeEnum.IMAGE.value
+            if not image_mask.any():
+                return
+            gdf = mdf.copy()
+        base_cols = gdf.columns
+        gdf_images = gdf.loc[image_mask]
+        content_sr = gdf_images["metadata"].struct.field("content")
+        content_hash_sr = content_sr.hash_values(method="md5", seed=None)
+        gdf_images.loc[content_hash_sr.index, "_image_content_hash"] = content_hash_sr
+        gdf_images_deduped = gdf_images.drop_duplicates(subset="_image_content_hash")
+        deduped_indices = gdf_images_deduped.index
+        duplicate_indices = gdf_images.loc[~gdf_images.index.isin(deduped_indices)].index
+        if filter_flag:
+            gdf_result = cudf.concat(
+                [
+                    gdf_images.loc[deduped_indices][gdf.columns.difference(["_image_content_hash"])],
+                    gdf.loc[~image_mask],
+                ],
+                axis=0,
+            )
+            ctrl_msg.payload(gdf_result.to_pandas())
             return
-        gdf = mdf.copy()
-
-    base_cols = gdf.columns
-    gdf_images = gdf.loc[image_mask]
-    content_sr = gdf_images["metadata"].struct.field("content")
-    content_hash_sr = content_sr.hash_values(method="md5", seed=None)
-    gdf_images.loc[content_hash_sr.index, "_image_content_hash"] = content_hash_sr
-    gdf_images_deduped = gdf_images.drop_duplicates(subset="_image_content_hash")
-    deduped_indices = gdf_images_deduped.index
-    duplicate_indices = gdf_images.loc[~gdf_images.index.isin(deduped_indices)].index
-
-    if filter_flag:
-        gdf_result = cudf.concat(
-            [
-                gdf_images.loc[deduped_indices][gdf.columns.difference(["_image_content_hash"])],
-                gdf.loc[~image_mask],
-            ],
-            axis=0,
-        )
-
-        message_meta = MessageMeta(df=gdf_result)
-        ctrl_msg.payload(message_meta)
+        gdf_temp = gdf["metadata"].struct.explode()
+        exploded_metadata_cols = list(gdf_temp.columns)
+        gdf[exploded_metadata_cols] = gdf_temp
+        duplicate_images_gdf = gdf_images.loc[duplicate_indices]
+        info_msg = {
+            "task": TaskTypeEnum.FILTER.value,
+            "status": StatusEnum.SUCCESS.value,
+            "message": "Filtered duplicate image.",
+            "filter": True,
+        }
+        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
+        duplicate_images_gdf["info_message_metadata"] = [validated_info_msg] * duplicate_images_gdf.shape[0]
+        gdf.drop(labels=["info_message_metadata", "metadata"], inplace=True, axis=1)
+        gdf["info_message_metadata"] = duplicate_images_gdf["info_message_metadata"]
+        gdf.loc[duplicate_images_gdf["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG.value
+        gdf["metadata"] = gdf[exploded_metadata_cols + ["info_message_metadata"]].to_struct()
+        gdf.drop(labels=gdf.columns.difference(base_cols), inplace=True, axis=1)
+        ctrl_msg.payload(gdf.to_pandas())
 
         return
 
-    # explode to extract individual metadata structs
-    gdf_temp = gdf["metadata"].struct.explode()
-    exploded_metadata_cols = list(gdf_temp.columns)
-    gdf[exploded_metadata_cols] = gdf_temp
-    duplicate_images_gdf = gdf_images.loc[duplicate_indices]
+    except Exception as e:
+        err_msg = f"_apply_dedup_filter: Error applying deduplication filter to control message. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
 
-    # define and validate `info_message_metadata`
-    info_msg = {
-        "task": TaskTypeEnum.FILTER.value,
-        "status": StatusEnum.SUCCESS.value,
-        "message": "Filtered duplicate image.",
-        "filter": True,
-    }
-
-    # update payload with `info_message_metadata` and `document_type`
-    validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
-    duplicate_images_gdf["info_message_metadata"] = [validated_info_msg] * duplicate_images_gdf.shape[0]
-    gdf.drop(labels=["info_message_metadata", "metadata"], inplace=True, axis=1)
-    gdf["info_message_metadata"] = duplicate_images_gdf["info_message_metadata"]
-    gdf.loc[duplicate_images_gdf["document_type"].index, "document_type"] = ContentTypeEnum.INFO_MSG.value
-    gdf["metadata"] = gdf[exploded_metadata_cols + ["info_message_metadata"]].to_struct()
-    gdf.drop(labels=gdf.columns.difference(base_cols), inplace=True, axis=1)
-
-    message_meta = MessageMeta(df=gdf)
-    ctrl_msg.payload(message_meta)
-
-    return
+        raise type(e)(err_msg) from e
 
 
 def dedup_image_stage(df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any) -> pd.DataFrame:
@@ -299,21 +288,28 @@ def dedup_image_stage(df: pd.DataFrame, task_props: Dict[str, Any], validated_co
 
     Raises
     ------
-    ValueError
-        If the DataFrame does not contain the necessary columns for deduplication.
+    Exception
+        If deduplication processing fails.
     """
-    if isinstance(task_props, BaseModel):
-        task_props = task_props.model_dump()
+    try:
+        if isinstance(task_props, BaseModel):
+            task_props = task_props.model_dump()
 
-    task_props.get("content_type")
-    task_params = task_props.get("params", {})
-    filter_flag = task_params.get("filter", True)
+        task_props.get("content_type")  # Preserve any side effects.
+        task_params = task_props.get("params", {})
+        filter_flag = task_params.get("filter", True)
 
-    logger.debug(f"De-duplicating images with filter_flag={filter_flag}")
+        logger.debug(f"dedup_image_stage: De-duplicating images with filter_flag={filter_flag}")
 
-    df_result = _cpu_only_apply_dedup_filter(df, filter_flag)
+        df_result = _cpu_only_apply_dedup_filter(df, filter_flag)
 
-    return df_result
+        return df_result
+
+    except Exception as e:
+        err_msg = f"dedup_image_stage: Error during deduplication. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+
+        raise type(e)(err_msg) from e
 
 
 def generate_dedup_stage(
@@ -362,18 +358,22 @@ def generate_dedup_stage(
 
     Raises
     ------
-    ValidationError
-        If the `dedup_config` does not pass schema validation.
+    Exception
+        If an error occurs during stage generation.
     """
-    validated_config = ImageDedupSchema(**dedup_config)
-    _wrapped_dedup_image_stage = partial(dedup_image_stage, validated_config=validated_config)
-
-    logger.debug(f"Generating deduplication stage with config: {validated_config}")
-    return MultiProcessingBaseStage(
-        c=c,
-        pe_count=pe_count,
-        task=task,
-        task_desc=task_desc,
-        process_fn=_wrapped_dedup_image_stage,
-        filter_properties={"content_type": ContentTypeEnum.IMAGE.value},
-    )
+    try:
+        validated_config = ImageDedupSchema(**dedup_config)
+        _wrapped_dedup_image_stage = functools.partial(dedup_image_stage, validated_config=validated_config)
+        logger.debug(f"generate_dedup_stage: Generating deduplication stage with config: {validated_config}")
+        return MultiProcessingBaseStage(
+            c=c,
+            pe_count=pe_count,
+            task=task,
+            task_desc=task_desc,
+            process_fn=_wrapped_dedup_image_stage,
+            filter_properties={"content_type": ContentTypeEnum.IMAGE.value},
+        )
+    except Exception as e:
+        err_msg = f"generate_dedup_stage: Error generating deduplication stage. Original error: {e}"
+        logger.error(err_msg, exc_info=True)
+        raise type(e)(err_msg) from e

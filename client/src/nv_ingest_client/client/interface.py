@@ -8,6 +8,7 @@ import glob
 import os
 import shutil
 import tempfile
+from tqdm import tqdm
 from concurrent.futures import Future
 from functools import wraps
 from typing import Any, Union
@@ -201,7 +202,7 @@ class Ingestor:
 
         return self
 
-    def ingest(self, **kwargs: Any) -> List[Dict[str, Any]]:
+    def ingest(self, show_progress: bool = False, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Synchronously submits jobs to the NvIngestClient and fetches the results.
 
@@ -209,6 +210,7 @@ class Ingestor:
         ----------
         kwargs : dict
             Additional parameters for `submit_job` and `fetch_job_result` methods of NvIngestClient.
+            Optionally, include 'show_progress' (bool) to display a progress bar while fetching results.
 
         Returns
         -------
@@ -222,12 +224,28 @@ class Ingestor:
         submit_kwargs = filter_function_kwargs(self._client.submit_job, **kwargs)
         self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_kwargs)
 
+        # Pop the show_progress flag from kwargs; default to False if not provided.
         fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
+
+        # If progress display is enabled, create a tqdm progress bar and set a callback to update it.
+        if show_progress:
+            pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
+
+            def progress_callback(result: Dict, job_id: str) -> None:
+                pbar.update(1)
+
+            fetch_kwargs["completion_callback"] = progress_callback
+
         result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
+
+        if show_progress and pbar:
+            pbar.close()
+
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(result)
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
+
         return result
 
     def ingest_async(self, **kwargs: Any) -> Future:
@@ -268,7 +286,7 @@ class Ingestor:
                 if job_state.state != JobStateEnum.FAILED:
                     job_state.state = JobStateEnum.FAILED
             completed_futures.add(future)
-            future_results.append(result)
+            future_results.extend(result)
             if completed_futures == submitted_futures:
                 combined_future.set_result(future_results)
 
@@ -276,7 +294,7 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future)
+            self._vdb_bulk_upload.run(combined_future.result())
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
@@ -375,9 +393,17 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
 
+        # Defaulting to False since enabling infographic extraction reduces throughput.
+        # Users have to set to True if infographic extraction is required.
+        extract_infographics = kwargs.pop("extract_infographics", False)
+
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(
-                document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
+                document_type,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                **kwargs,
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 

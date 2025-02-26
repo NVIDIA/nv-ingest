@@ -1,14 +1,16 @@
 # Developing with Kubernetes
 
-Developing directly on Kubernetes gives us more confidence that things will work as expected in end user deployments.
+Developing directly on Kubernetes gives us more confidence that end-user deployments will work as expected.
 
-This page describes how to use Kubernetes generally, and how to deploy nv-ingest on a local Kubernetes clusters.
+This page describes how to use Kubernetes generally and how to deploy nv-ingest on a local Kubernetes cluster.
 
-> **NOTE:** _Unless otherwise noted, all commands below should be run from the root of this repo._
+!!! warning 
+
+    Unless otherwise noted, all commands below should be run from the root of this repo.
 
 ## Kubernetes Cluster
 
-To start you need a Kubernetes cluster. We recommend that you use `kind`, which creates a single Docker container with a Kubernetes cluster inside it.
+To start, you need a Kubernetes cluster. We recommend that you use `kind`, which creates a single Docker container with a Kubernetes cluster inside it.
 
 Because the `kind` cluster needs access to the GPUs on your system, you need to install `nvkind`.
 For details, see [Running kind clusters with GPUs using nvkind](https://github.com/NVIDIA/nvkind/tree/main).
@@ -89,13 +91,13 @@ docker ps | grep kind
 
 You should be able to use `kubectl` immediately, and it should be pointed at that cluster you just created.
 
-For example, to ensure the cluster was set up successfully, try listing nodes.
+For example, try listing notes to verify that the cluster was set up successfully.
 
 ```shell
 kubectl get nodes
 ```
 
-If that worked, you should see a single node, like this:
+If that worked, you should see a single node like this:
 
 ```text
 NAME                  STATUS   ROLES           AGE   VERSION
@@ -122,7 +124,7 @@ In a single command, Skaffold does the following:
 
 ### Directory Structure
 
-- `skaffold/sensitive/` contains any secrets or manifests you want deployed to your cluster, but not checked into git, as your local cluster is unlikely to have ESO installed. If it does, feel free to use `kind: ExternalSecret` instead.
+- `skaffold/sensitive/` contains any secrets or manifests you want deployed to your cluster but not checked into git, as your local cluster is unlikely to have ESO installed. If it does, feel free to use `kind: ExternalSecret` instead.
 - `skaffold/components` contains any k8s manifests you want deployed in any skaffold file. The paths are relative and can be used in either `kustomize` or `rawYaml` formats:
 
   ```yaml
@@ -141,7 +143,7 @@ In a single command, Skaffold does the following:
 #### Add Helm Repos
 
 The retriever-ingest service's deployment requires pulling in configurations for other services from third-party sources,
-for example, Elasticsearch, OpenTelemetry, and Postgres.
+such as Elasticsearch, OpenTelemetry, and Postgres.
 
 The first time you deploy this project to a local Kubernetes,
 you might need to tell your local version of `Helm` (a package manager for Kubernetes configurations)
@@ -169,7 +171,7 @@ helm repo add \
   https://charts.bitnami.com/bitnami
 ```
 
-For the full list of repositories, refer to the `dependencies` section in the [Chart.yaml](../../../../helm/Chart.yaml) file of this project.
+For the full list of repositories, refer to the `dependencies` section in the [Chart.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/helm/Chart.yaml) file.
 
 #### NVIDIA GPU Support
 

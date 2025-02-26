@@ -7,6 +7,8 @@ import numpy as np
 import pytest
 
 from io import BytesIO
+
+from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.cached import CachedModelInterface
 from PIL import Image
 
@@ -56,11 +58,12 @@ def test_prepare_data_for_inference_valid(model_interface):
     input_data = {"base64_image": base64_img}
 
     result = model_interface.prepare_data_for_inference(input_data)
+    print(result)
 
-    assert "image_array" in result
-    assert isinstance(result["image_array"], np.ndarray)
-    assert result["image_array"].shape == (64, 64, 3)  # Assuming RGB image
-    assert result["image_array"].dtype == np.uint8  # Assuming image is loaded as uint8
+    assert "image_arrays" in result
+    assert isinstance(result["image_arrays"][0], np.ndarray)
+    assert result["image_arrays"][0].shape == (64, 64, 3)  # Assuming RGB image
+    assert result["image_arrays"][0].dtype == np.uint8  # Assuming image is loaded as uint8
 
 
 def test_prepare_data_for_inference_invalid_base64(model_interface):
@@ -88,53 +91,120 @@ def test_prepare_data_for_inference_missing_base64_image(model_interface):
 
 def test_format_input_grpc_with_ndim_3(model_interface):
     """
-    Test format_input for 'grpc' protocol with a 3-dimensional image array.
-    Expects the image array to be expanded and cast to float32.
+    Test format_input for the 'grpc' protocol when given a 3-dimensional image array.
+    The test verifies that the image is expanded along a new batch dimension and cast to float32.
+    It also confirms that the accompanying batch data reflects the original image and its dimensions.
     """
+    # Assume create_base64_image() returns a base64-encoded image that decodes to a (64, 64, 3) array.
     base64_img = create_base64_image()
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
 
-    formatted_input = model_interface.format_input(data, "grpc")
+    # format_input returns a tuple: (batched_inputs, formatted_batch_data)
+    formatted_batches, batch_data = model_interface.format_input(data, "grpc", max_batch_size=1)
 
-    assert isinstance(formatted_input, np.ndarray)
-    assert formatted_input.dtype == np.float32
-    assert formatted_input.shape == (1, 64, 64, 3)  # Expanded along axis 0
+    # Check that the batched input is a single numpy array with a new batch dimension.
+    assert isinstance(formatted_batches, list)
+    assert len(formatted_batches) == 1
+    batched_input = formatted_batches[0]
+    assert isinstance(batched_input, np.ndarray)
+    assert batched_input.dtype == np.float32
+    # The original image shape (64,64,3) should have been expanded to (1,64,64,3).
+    assert batched_input.shape == (1, 64, 64, 3)
+
+    # Verify that batch data contains the original image and its dimensions.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    # The original image should be unmodified (still 3D) in batch_data.
+    assert len(bd["image_arrays"]) == 1
+    # Expect dimensions to be (H, W) i.e. (64, 64).
+    assert bd["image_dims"] == [(64, 64)]
 
 
 def test_format_input_grpc_with_ndim_other(model_interface):
     """
-    Test format_input for 'grpc' protocol with a non-3-dimensional image array.
-    Expects the image array to be cast to float32 without expansion.
+    Test format_input for the 'grpc' protocol when given a non-3-dimensional image array.
+    This test uses a grayscale image which decodes to a 2D array.
+    The expected behavior is that the image is cast to float32 without being expanded.
+    Batch data is also checked for correct original dimensions.
     """
-    # Create a grayscale image (2D array)
+    # Create a grayscale (L mode) image of size 64x64.
     with BytesIO() as buffer:
-        image = Image.new("L", (64, 64), 128)  # 'L' mode for grayscale
+        image = Image.new("L", (64, 64), 128)
         image.save(buffer, format="PNG")
         base64_img = base64.b64encode(buffer.getvalue()).decode("utf-8")
 
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
+    formatted_batches, batch_data = model_interface.format_input(data, "grpc", max_batch_size=1)
 
-    formatted_input = model_interface.format_input(data, "grpc")
+    # Check that the batched input is a numpy array without expansion.
+    assert isinstance(formatted_batches, list)
+    assert len(formatted_batches) == 1
+    batched_input = formatted_batches[0]
+    assert isinstance(batched_input, np.ndarray)
+    assert batched_input.dtype == np.float32
+    # For a 2D image (64,64), no extra batch dimension is added when max_batch_size=1.
+    assert batched_input.shape == (64, 64)
 
-    assert isinstance(formatted_input, np.ndarray)
-    assert formatted_input.dtype == np.float32
-    assert formatted_input.shape == (64, 64)  # No expansion
+    # Verify that batch data correctly reports the original image dimensions.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    assert len(bd["image_arrays"]) == 1
+    # The image dimensions should reflect a 2D image: (64, 64)
+    assert bd["image_dims"] == [(64, 64)]
 
 
 def test_format_input_http(model_interface):
     """
-    Test format_input for 'http' protocol.
-    Ensures that the HTTP payload is correctly formatted based on the base64_image.
+    Test format_input for the 'http' protocol.
+    This test ensures that given data with key "image_arrays", the images are re-encoded as PNG,
+    and a single payload is built with a proper Nim message containing the image content.
+    Additionally, it verifies that the accompanying batch data contains the original images and their dimensions.
     """
+    # Generate a base64-encoded image and decode it into a numpy array.
     base64_img = create_base64_image()
-    data = {"base64_image": base64_img}
-    expected_payload = {
-        "messages": [{"content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}]}]
-    }
+    arr = base64_to_numpy(base64_img)
 
-    formatted_input = model_interface.format_input(data, "http")
+    # Build the data dictionary directly with the "image_arrays" key.
+    data = {"image_arrays": [arr]}
 
-    assert formatted_input == expected_payload
+    payload_batches, batch_data = model_interface.format_input(data, "http", max_batch_size=1)
+
+    # Verify the HTTP payload structure.
+    assert isinstance(payload_batches, list)
+    assert len(payload_batches) == 1
+    payload = payload_batches[0]
+    assert "messages" in payload
+    messages = payload["messages"]
+    assert isinstance(messages, list)
+    assert len(messages) == 1
+    message = messages[0]
+    assert "content" in message
+    content_list = message["content"]
+    assert isinstance(content_list, list)
+    assert len(content_list) == 1
+    content_item = content_list[0]
+    assert content_item["type"] == "image_url"
+    assert "image_url" in content_item and "url" in content_item["image_url"]
+
+    # Check that the URL starts with the expected PNG base64 prefix.
+    url_value = content_item["image_url"]["url"]
+    expected_prefix = "data:image/png;base64,"
+    assert url_value.startswith(expected_prefix)
+    assert len(url_value) > len(expected_prefix)
+
+    # Verify that the batch data is correctly built.
+    assert isinstance(batch_data, list)
+    assert len(batch_data) == 1
+    bd = batch_data[0]
+    assert "image_arrays" in bd and "image_dims" in bd
+    assert len(bd["image_arrays"]) == 1
+    # The expected dimensions should match the original array's height and width.
+    expected_dims = [(arr.shape[0], arr.shape[1])]
+    assert bd["image_dims"] == expected_dims
 
 
 def test_format_input_invalid_protocol(model_interface):
@@ -147,31 +217,36 @@ def test_format_input_invalid_protocol(model_interface):
     data = model_interface.prepare_data_for_inference({"base64_image": base64_img})
 
     with pytest.raises(ValueError, match="Invalid protocol specified. Must be 'grpc' or 'http'."):
-        model_interface.format_input(data, "invalid_protocol")
+        model_interface.format_input(data, "invalid_protocol", max_batch_size=1)
 
 
 def test_parse_output_grpc(model_interface):
     """
     Test parse_output for 'grpc' protocol.
-    Ensures that byte responses are correctly decoded and concatenated.
+    Ensures that byte responses are correctly decoded into a list of strings.
     """
-    response = [[b"Hello"], [b"World"]]  # Each output is a list containing a byte string
+    # Suppose the new parse_output returns ["Hello", "World"] for this input
+    response = [[b"Hello"], [b"World"]]  # Each output is a list of byte strings
 
     parsed_output = model_interface.parse_output(response, "grpc")
 
-    assert parsed_output == "Hello World"
+    # The updated code might now produce a list rather than a single concatenated string
+    assert parsed_output == ["Hello", "World"]
 
 
 def test_parse_output_http(model_interface):
     """
     Test parse_output for 'http' protocol.
-    Ensures that content is correctly extracted from a valid HTTP JSON response.
+    Ensures that content is correctly extracted from a valid HTTP JSON response
+    and returned as a list of strings.
     """
+    # Single "data" entry. The new code returns a list, even if there's only 1 item.
     json_response = {"data": [{"content": "Processed Content"}]}
 
     parsed_output = model_interface.parse_output(json_response, "http")
 
-    assert parsed_output == "Processed Content"
+    # Expect a list with exactly one string in it
+    assert parsed_output == ["Processed Content"]
 
 
 def test_parse_output_http_missing_data_key(model_interface):
@@ -181,7 +256,7 @@ def test_parse_output_http_missing_data_key(model_interface):
     """
     json_response = {}
 
-    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key is missing or empty."):
+    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key missing or empty."):
         model_interface.parse_output(json_response, "http")
 
 
@@ -190,11 +265,9 @@ def test_parse_output_http_empty_data(model_interface):
     Test parse_output for 'http' protocol with empty 'data' list.
     Expects a RuntimeError to be raised.
     """
-    # Arrange
     json_response = {"data": []}
 
-    # Act & Assert
-    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key is missing or empty."):
+    with pytest.raises(RuntimeError, match="Unexpected response format: 'data' key missing or empty."):
         model_interface.parse_output(json_response, "http")
 
 
@@ -219,25 +292,6 @@ def test_process_inference_results(model_interface):
     result = model_interface.process_inference_results(output, "http")
 
     assert result == output
-
-
-# Note: The following tests for private methods are optional and can be omitted
-# in strict blackbox testing as they target internal implementations.
-
-
-def test_prepare_nim_payload(model_interface):
-    """
-    Test the _prepare_nim_payload private method.
-    Ensures that the NIM payload is correctly formatted.
-    """
-    base64_img = create_base64_image()
-    expected_payload = {
-        "messages": [{"content": [{"type": "image_url", "image_url": {"url": f"data:image/png;base64,{base64_img}"}}]}]
-    }
-
-    payload = model_interface._prepare_nim_payload(base64_img)
-
-    assert payload == expected_payload
 
 
 def test_extract_content_from_nim_response_valid(model_interface):

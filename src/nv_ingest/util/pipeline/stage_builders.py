@@ -6,13 +6,10 @@
 import logging
 import math
 import os
-import typing
 
 import click
-from morpheus.messages import ControlMessage
-from morpheus.stages.general.linear_modules_source import LinearModuleSourceStage
-from morpheus.stages.general.linear_modules_stage import LinearModulesStage
 
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.modules.injectors.metadata_injector import MetadataInjectorLoaderFactory
 from nv_ingest.modules.sinks.message_broker_task_sink import MessageBrokerTaskSinkLoaderFactory
 from nv_ingest.modules.sinks.vdb_task_sink import VDBTaskSinkLoaderFactory
@@ -20,13 +17,14 @@ from nv_ingest.modules.sources.message_broker_task_source import MessageBrokerTa
 from nv_ingest.modules.telemetry.job_counter import JobCounterLoaderFactory
 from nv_ingest.modules.telemetry.otel_meter import OpenTelemetryMeterLoaderFactory
 from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFactory
-from nv_ingest.modules.transforms.embed_extractions import EmbedExtractionsLoaderFactory
-from nv_ingest.modules.transforms.nemo_doc_splitter import NemoDocSplitterLoaderFactory
+from nv_ingest.modules.transforms.text_splitter import TextSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
+from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
+from nv_ingest.stages.nim.infographic_extraction import generate_infographic_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
 from nv_ingest.stages.nim.audio_extraction import generate_audio_extractor_stage
 from nv_ingest.stages.pdf_extractor_stage import generate_pdf_extractor_stage
@@ -34,6 +32,7 @@ from nv_ingest.stages.pptx_extractor_stage import generate_pptx_extractor_stage
 from nv_ingest.stages.storages.embedding_storage_stage import generate_embedding_storage_stage
 from nv_ingest.stages.storages.image_storage_stage import ImageStorageStage
 from nv_ingest.stages.transforms.image_caption_extraction import generate_caption_extraction_stage
+from nv_ingest.util.morpheus.linear_module_source_stage_cpu import LinearModuleSourceStageCPU, LinearModuleStageCPU
 
 logger = logging.getLogger(__name__)
 
@@ -69,7 +68,7 @@ def get_caption_classifier_service():
     return triton_service_caption_classifier, triton_service_caption_classifier_name
 
 
-def get_table_detection_service(env_var_prefix):
+def get_nim_service(env_var_prefix):
     prefix = env_var_prefix.upper()
     grpc_endpoint = os.environ.get(
         f"{prefix}_GRPC_ENDPOINT",
@@ -86,6 +85,7 @@ def get_table_detection_service(env_var_prefix):
         "NGC_API_KEY",
         "",
     )
+
     infer_protocol = os.environ.get(
         f"{prefix}_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
@@ -126,10 +126,10 @@ def add_source_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     source_stage = pipe.add_stage(
-        LinearModuleSourceStage(
+        LinearModuleSourceStageCPU(
             morpheus_pipeline_config,
             source_module_loader,
-            output_type=ControlMessage,
+            output_type=IngestControlMessage,
             output_port_name="output",
         )
     )
@@ -148,11 +148,11 @@ def add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         ),
     )
     submitted_job_counter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             submitted_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -166,11 +166,11 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
         module_name="metadata_injection", module_config={}
     )
     metadata_injector_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             metadata_injector_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -180,7 +180,10 @@ def add_metadata_injector_stage(pipe, morpheus_pipeline_config):
 
 
 def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
+    nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
+        get_nim_service("nemoretriever_parse")
+    )
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -188,7 +191,12 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": yolox_auth,  # All auth tokens are the same for the moment
-            }
+            },
+            "nemoretriever_parse_config": {
+                "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
+                "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
+                "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+            },
         },
     )
     pdf_extractor_stage = pipe.add_stage(
@@ -205,12 +213,14 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
 
 
 def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox_table_structure")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
@@ -226,21 +236,15 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    _, _, yolox_auth, _ = get_table_detection_service("yolox")
-
-    deplot_grpc, deplot_http, deplot_auth, deplot_protocol = get_table_detection_service("deplot")
-    cached_grpc, cached_http, cached_auth, cached_protocol = get_table_detection_service("cached")
-    # NOTE: Paddle isn't currently used directly by the chart extraction stage, but will be in the future.
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_table_detection_service("paddle")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox_graphic_elements")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
             "stage_config": {
-                "cached_endpoints": (cached_grpc, cached_http),
-                "cached_infer_protocol": cached_protocol,
-                "deplot_endpoints": (deplot_grpc, deplot_http),
-                "deplot_infer_protocol": deplot_protocol,
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
@@ -255,16 +259,36 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     return table_extractor_stage
 
 
+def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+
+    infographic_content_extractor_config = ingest_config.get(
+        "infographic_content_extraction_module",
+        {
+            "stage_config": {
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": paddle_auth,
+            }
+        },
+    )
+
+    infographic_extractor_stage = pipe.add_stage(
+        generate_infographic_extractor_stage(morpheus_pipeline_config, infographic_content_extractor_config, pe_count=5)
+    )
+
+    return infographic_extractor_stage
+
+
 def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     image_extractor_config = ingest_config.get(
         "image_extraction_module",
         {
             "image_extraction_config": {
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
-                "auth_token": yolox_auth,
-                # All auth tokens are the same for the moment
+                "auth_token": yolox_auth,  # All auth tokens are the same for the moment
             }
         },
     )
@@ -281,7 +305,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
 
 
 def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     docx_extractor_config = ingest_config.get(
         "docx_extraction_module",
         {
@@ -305,7 +329,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
 
 
 def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_table_detection_service("yolox")
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     pptx_extractor_config = ingest_config.get(
         "pptx_extraction_module",
         {
@@ -410,23 +434,23 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
     return image_filter_stage
 
 
-def add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
-    nemo_splitter_loader = NemoDocSplitterLoaderFactory.get_instance(
-        module_name="nemo_doc_splitter",
+def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
+    text_splitter_loader = TextSplitterLoaderFactory.get_instance(
+        module_name="text_splitter",
         module_config=ingest_config.get("text_splitting_module", {}),
     )
-    nemo_splitter_stage = pipe.add_stage(
-        LinearModulesStage(
+    text_splitter_stage = pipe.add_stage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
-            nemo_splitter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            text_splitter_loader,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
     )
 
-    return nemo_splitter_stage
+    return text_splitter_stage
 
 
 def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
@@ -439,12 +463,14 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
         {
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         },
     )
@@ -473,23 +499,22 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
     embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
 
-    embed_extractions_loader = EmbedExtractionsLoaderFactory.get_instance(
-        module_name="embed_extractions",
-        module_config=ingest_config.get(
-            "embed_extractions_module",
-            {"api_key": api_key, "embedding_nim_endpoint": embedding_nim_endpoint, "embedding_model": embedding_model},
-        ),
-    )
+    text_embed_extraction_config = {
+        "api_key": api_key,
+        "embedding_nim_endpoint": embedding_nim_endpoint,
+        "embedding_model": embedding_model,
+    }
+
     embed_extractions_stage = pipe.add_stage(
-        LinearModulesStage(
+        generate_text_embed_extractor_stage(
             morpheus_pipeline_config,
-            embed_extractions_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
-            input_port_name="input",
-            output_port_name="output",
+            text_embed_extraction_config,
+            pe_count=2,
+            task="embed",
+            task_desc="embed_text",
         )
     )
+
     return embed_extractions_stage
 
 
@@ -531,11 +556,11 @@ def add_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     sink_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             sink_module_loader,
-            input_type=typing.Any,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -557,11 +582,11 @@ def add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     otel_tracer_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             otel_tracer_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -590,11 +615,11 @@ def add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     otel_meter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             otel_meter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -614,11 +639,11 @@ def add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_confi
         ),
     )
     completed_job_counter_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             completed_job_counter_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )
@@ -641,11 +666,11 @@ def add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config):
         ),
     )
     vdb_task_sink_stage = pipe.add_stage(
-        LinearModulesStage(
+        LinearModuleStageCPU(
             morpheus_pipeline_config,
             vdb_task_sink_loader,
-            input_type=ControlMessage,
-            output_type=ControlMessage,
+            input_type=IngestControlMessage,
+            output_type=IngestControlMessage,
             input_port_name="input",
             output_port_name="output",
         )

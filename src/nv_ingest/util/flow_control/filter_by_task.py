@@ -3,169 +3,187 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import re
-import typing
-from functools import wraps
-from pydantic import BaseModel
 import logging
+import re
+from typing import Dict, List, Any, Union, Tuple, Optional, Callable
+from functools import wraps
+
+from pydantic import BaseModel
 
 logger = logging.getLogger(__name__)
 
 
-def filter_by_task(required_tasks, forward_func=None):
+def filter_by_task(
+    required_tasks: List[Union[str, Tuple[Any, ...]]],
+    forward_func: Optional[Callable[[Any], Any]] = None,
+) -> Callable:
     """
-    A decorator that checks if the first argument to the wrapped function (expected to be a ControlMessage object)
-    contains any of the tasks specified in `required_tasks`. Each task can be a string of the task name or a tuple
-    of the task name and task properties. If the message does not contain any listed task and/or task properties,
-    the message is returned directly without calling the wrapped function, unless a forwarding
-    function is provided, in which case it calls that function on the ControlMessage.
+    Decorator that checks whether the first argument (an IngestControlMessage) contains any of the
+    required tasks. Each required task can be specified as a string (the task name) or as a tuple/list
+    with the task name as the first element and additional task properties as subsequent elements.
+    If the IngestControlMessage does not match any required task (and its properties), the wrapped function
+    is not called; instead, the original message is returned (or a forward function is invoked, if provided).
 
     Parameters
     ----------
-    required_tasks : list
-        A list of task keys (string or tuple/list of [task_name, task_property_dict(s)]) to check for in the
-        ControlMessage.
-    forward_func : callable, optional
-        A function to be called with the ControlMessage if no required task is found. Defaults to None.
+    required_tasks : list[Union[str, Tuple[Any, ...]]]
+        A list of required tasks. Each element is either a string representing a task name or a tuple/list
+        where the first element is the task name and the remaining elements specify required task properties.
+    forward_func : Optional[Callable[[IngestControlMessage], IngestControlMessage]], optional
+        A function to be called with the IngestControlMessage if no required task is found. Defaults to None.
 
     Returns
     -------
-    callable
-        The wrapped function, conditionally called based on the task check.
+    Callable
+        A decorator that wraps a function expecting an IngestControlMessage as its first argument.
     """
 
-    def decorator(func):
+    def decorator(func: Callable) -> Callable:
         @wraps(func)
-        def wrapper(*args, **kwargs):
-            if not args or not hasattr(args[0], "get_tasks"):
-                raise ValueError("The first argument must be a ControlMessage object with task handling capabilities.")
-
-            message = args[0]
-            tasks = message.get_tasks()
-            logger.debug(f"Tasks in message: {list(tasks.keys())}")
-            logger.debug(f"Required tasks: {required_tasks}")
-
-            for required_task in required_tasks:
-                # 1) If the required task is a string (simple check for existence)
-                if isinstance(required_task, str):
-                    if required_task in tasks:
-                        logger.debug(f"Found required task '{required_task}'. Executing function.")
-                        return func(*args, **kwargs)
-                    else:
-                        logger.debug(f"Task '{required_task}' not found in ControlMessage. Skipping.")
-
-                # 2) If the required task is a tuple/list: (task_name, {prop_key: prop_val}, ...)
-                elif isinstance(required_task, (tuple, list)):
-                    required_task_name, *required_task_props_list = required_task
-                    if required_task_name not in tasks:
-                        logger.debug(f"Task '{required_task_name}' not found in ControlMessage. Skipping.")
-                        continue
-
-                    # We have at least one task of this type. Check the properties:
-                    task_props_list = tasks.get(required_task_name, [])
-                    logger.debug(f"Checking task properties for '{required_task_name}': {task_props_list}")
-                    logger.debug(f"Required task properties: {required_task_props_list}")
-
-                    # Check each set of task_props against the required subset(s)
-                    for task_props in task_props_list:
-                        if isinstance(task_props, BaseModel):
-                            task_props = task_props.model_dump()
-
-                        # We need to match *all* required_task_props in `required_task_props_list`
-                        # with the current `task_props`.
-                        if all(
-                            _is_subset(task_props, required_task_props)
-                            for required_task_props in required_task_props_list
-                        ):
+        def wrapper(*args: Any, **kwargs: Any) -> Any:
+            if args and hasattr(args[0], "get_tasks"):
+                message = args[0]
+                # Build a dict mapping task type to a list of task properties.
+                tasks: Dict[str, List[Any]] = {}
+                for task in message.get_tasks():
+                    tasks.setdefault(task.type, []).append(task.properties)
+                for required_task in required_tasks:
+                    # Case 1: required task is a simple string.
+                    if isinstance(required_task, str):
+                        if required_task in tasks:
                             logger.debug(
-                                f"Task '{required_task_name}' with properties {task_props} "
-                                f"matches all required properties. Executing function."
+                                "Task '%s' found in IngestControlMessage tasks. Proceeding with function '%s'.",
+                                required_task,
+                                func.__name__,
                             )
                             return func(*args, **kwargs)
                         else:
                             logger.debug(
-                                f"Task '{required_task_name}' with properties {task_props} "
-                                f"does not match all required properties {required_task_props_list}. Skipping."
+                                "Required task '%s' not found in IngestControlMessage tasks: %s",
+                                required_task,
+                                list(tasks.keys()),
                             )
+                    # Case 2: required task is a tuple/list with properties.
+                    elif isinstance(required_task, (tuple, list)):
+                        required_task_name, *required_task_props_list = required_task
+                        if required_task_name not in tasks:
+                            logger.debug(
+                                "Required task '%s' not present among IngestControlMessage tasks: %s",
+                                required_task_name,
+                                list(tasks.keys()),
+                            )
+                            continue
 
-            # If we got here, it means none of the required tasks or properties matched
-            logger.debug("No required tasks matched. Forwarding or returning message as configured.")
+                        task_props_list = tasks.get(required_task_name, [])
+                        logger.debug(
+                            "Checking task properties for task '%s'. Found properties: %s; required: %s",
+                            required_task_name,
+                            task_props_list,
+                            required_task_props_list,
+                        )
+                        for task_props in task_props_list:
+                            orig_task_props = task_props
+                            if BaseModel is not None and isinstance(task_props, BaseModel):
+                                task_props = task_props.model_dump()
+                            # Check if every required property is a subset of the task properties.
+                            all_match = True
+                            for required_task_props in required_task_props_list:
+                                if not _is_subset(task_props, required_task_props):
+                                    logger.debug(
+                                        "For task '%s', task properties %s do not match required subset %s.",
+                                        required_task_name,
+                                        orig_task_props,
+                                        required_task_props,
+                                    )
+                                    all_match = False
+                                    break
+                            if all_match:
+                                logger.debug(
+                                    "Task '%s' with properties %s matched the required filter for function '%s'.",
+                                    required_task_name,
+                                    orig_task_props,
+                                    func.__name__,
+                                )
 
-            if forward_func:
-                # If a forward function is provided, call it with the ControlMessage
-                return forward_func(message)
+                                return func(*args, **kwargs)
+                    else:
+                        logger.debug(
+                            "Invalid type for required task filter: %s (expected str, tuple, or list).",
+                            type(required_task),
+                        )
+                # No required task was matched.
+                logger.debug("No required task matched for function '%s'.", func.__name__)
+                if forward_func:
+                    logger.debug("Calling forward function for IngestControlMessage.")
+                    return forward_func(message)
+                else:
+                    logger.debug("Returning original IngestControlMessage without processing.")
+                    return message
             else:
-                # If no forward function is provided, return the message directly
-                return message
+                raise ValueError(
+                    "The first argument must be an IngestControlMessage object with task handling capabilities."
+                )
 
         return wrapper
 
     return decorator
 
 
-def _is_subset(superset, subset):
-    if subset == "*":
-        return True
-
-    if isinstance(superset, dict) and isinstance(subset, dict):
-        return all(key in superset and _is_subset(superset[key], val) for key, val in subset.items())
-
-    if isinstance(subset, str) and subset.startswith("regex:"):
-        # The subset is a regex pattern
-        pattern = subset[len("regex:") :]
-        if isinstance(superset, list):
-            return any(re.match(pattern, str(sup_item)) for sup_item in superset)
-        else:
-            return re.match(pattern, str(superset)) is not None
-
-    if isinstance(superset, list) and not isinstance(subset, list):
-        # Check if the subset value matches any item in the superset
-        return any(_is_subset(sup_item, subset) for sup_item in superset)
-
-    if isinstance(superset, (list, set)) and isinstance(subset, (list, set)):
-        # Check if each sub_item in `subset` is in `superset` (by subset matching)
-        return all(any(_is_subset(sup_item, sub_item) for sup_item in superset) for sub_item in subset)
-
-    return superset == subset
-
-
-def remove_task_subset(ctrl_msg: typing.Any, task_type: typing.List, subset: typing.Dict):
+def _is_subset(superset: Any, subset: Any) -> bool:
     """
-    A helper function to extract a task based on subset matching when the task might be out of order with respect to the
-    Morpheus pipeline. For example, if a deduplication filter occurs before scale filtering in the pipeline, but
-    the task list includes scale filtering before deduplication.
+    Recursively checks whether 'subset' is contained within 'superset'. Supports dictionaries,
+    lists, strings (including regex patterns), and basic types.
 
     Parameters
     ----------
-    ctrl_msg : ControlMessage
-        The ControlMessage object containing tasks.
-    task_type : list
-        The name of the ControlMessage task to operate on.
-    subset : dict
-        The subset of the ControlMessage task to match on.
+    superset : Any
+        The data structure (or value) that is expected to contain the subset.
+    subset : Any
+        The data structure (or value) to be checked for being a subset of 'superset'. A special
+        value "*" matches any value, and strings prefixed with "regex:" are treated as regular
+        expression patterns.
 
     Returns
     -------
-    dict
-        A dictionary representing the matched ControlMessage task properties.
+    bool
+        True if 'subset' is contained within 'superset', False otherwise.
     """
-
-    filter_tasks = []
-    ctrl_msg_tasks = ctrl_msg.get_tasks()
-
-    for task in ctrl_msg_tasks:
-        if task == task_type:
-            for _ in ctrl_msg_tasks[task_type]:
-                task_props = ctrl_msg.remove_task(task_type)
-                if _is_subset(task_props, subset):
-                    logger.debug(
-                        f"Removed task '{task_type}' with properties {task_props} " f"matching subset {subset}."
-                    )
-                    break
-                filter_tasks.append(task_props)
-            break
-
-    for filter_task in filter_tasks:
-        ctrl_msg.add_task(task_type, filter_task)
-
-    return task_props
+    if subset == "*":
+        return True
+    if isinstance(superset, dict) and isinstance(subset, dict):
+        for key, val in subset.items():
+            if key not in superset:
+                logger.debug("Key '%s' not found in superset dictionary: %s", key, superset)
+                return False
+            if not _is_subset(superset[key], val):
+                logger.debug("Value for key '%s' (%s) does not match expected subset (%s).", key, superset[key], val)
+                return False
+        return True
+    if isinstance(subset, str) and subset.startswith("regex:"):
+        pattern = subset[len("regex:") :]
+        if isinstance(superset, list):
+            for sup_item in superset:
+                if re.match(pattern, sup_item):
+                    return True
+            logger.debug("No items in list %s match regex pattern '%s'.", superset, pattern)
+            return False
+        else:
+            if re.match(pattern, superset) is None:
+                logger.debug("Value '%s' does not match regex pattern '%s'.", superset, pattern)
+                return False
+            return True
+    if isinstance(superset, list) and not isinstance(subset, list):
+        for sup_item in superset:
+            if _is_subset(sup_item, subset):
+                return True
+        logger.debug("None of the items in list %s match the value '%s'.", superset, subset)
+        return False
+    if isinstance(superset, (list, set)) and isinstance(subset, list):
+        for sub_item in subset:
+            if not any(_is_subset(sup_item, sub_item) for sup_item in superset):
+                logger.debug("No element in %s matches subset element '%s'.", superset, sub_item)
+                return False
+        return True
+    if superset != subset:
+        logger.debug("Direct comparison failed: %s != %s", superset, subset)
+    return superset == subset

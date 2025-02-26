@@ -26,8 +26,8 @@ nameOverride: ""
 ## @param image.pullPolicy [string] Image pull policy
 image:
   pullPolicy: IfNotPresent
-  repository: "nvcr.io/ohlfw0olaadg/ea-participants/nv-ingest"
-  tag: "24.10"
+  repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
+  tag: "24.12"
 
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
 podAnnotations:
@@ -100,8 +100,8 @@ yoloxDeployed: true
 yolox-nim:
   fullnameOverride: nv-ingest-yolox
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/nv-yolox-structured-images-v1
-    tag: "0.2.0"
+    repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1
+    tag: "1.0.0"
   service:
     name: nv-ingest-yolox
     grpcPort: 8001
@@ -120,8 +120,8 @@ cachedDeployed: true
 cached-nim:
   fullnameOverride: nv-ingest-cached
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/cached
-    tag: "0.2.0"
+    repository: nvcr.io/nvidia/nemo-microservices/cached
+    tag: "0.2.1"
   service:
     name: nv-ingest-cached
     grpcPort: 8001
@@ -139,8 +139,8 @@ paddleocrDeployed: true
 paddleocr-nim:
   fullnameOverride: nv-ingest-paddle
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/paddleocr
-    tag: "0.2.0"
+    repository: nvcr.io/nvidia/nemo-microservices/paddleocr
+    tag: "1.0.0"
   service:
     name: nv-ingest-paddle
     grpcPort: 8001
@@ -158,7 +158,7 @@ deplotDeployed: true
 deplot-nim:
   fullnameOverride: nv-ingest-deplot
   image:
-    repository: nvcr.io/ohlfw0olaadg/ea-participants/deplot
+    repository: nvcr.io/nvidia/nemo-microservices/deplot
     tag: "1.0.0"
   service:
     name: nv-ingest-deplot
@@ -173,12 +173,31 @@ deplot-nim:
 ## @skip embedqa-nim
 ## @extra embedqa-nim.image.repository The repository to override the location of the embedqa NIM
 ## @extra embedqa-nim.image.tag The tag override for embedqa NIM
-embedqaDeployed: true
+embedqaDeployed: false
 text-embedding-nim:
   fullnameOverride: nv-ingest-embedqa
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
     tag: "1.1.0"
+  service:
+    name: nv-ingest-embedqa
+    grpcPort: 8001
+  nim:
+    grpcPort: 8001
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
+## @skip nvEmbedqaDeployed
+## @skip nvidia-nim-llama-32-nv-embedqa-1b-v2
+## @extra nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository The repository to override the location of the nvEmbedqa NIM
+## @extra nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag The tag override for nvEmbedqa NIM
+nvEmbedqaDeployed: true
+nvidia-nim-llama-32-nv-embedqa-1b-v2:
+  fullnameOverride: nv-ingest-embedqa
+  image:
+    repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
+    tag: "1.3.1"
   service:
     name: nv-ingest-embedqa
     grpcPort: 8001

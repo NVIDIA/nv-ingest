@@ -8,10 +8,9 @@
 
 import logging
 from typing import Dict
-from typing import Literal
 from typing import Optional
 
-from pydantic import BaseModel, field_validator
+from pydantic import BaseModel
 
 from .task_base import Task
 
@@ -19,18 +18,10 @@ logger = logging.getLogger(__name__)
 
 
 class SplitTaskSchema(BaseModel):
-    split_by: Optional[str] = "sentence"
-    split_length: Optional[int] = 10
-    split_overlap: Optional[int] = 0
-    max_character_length: Optional[int] = 1024
-    sentence_window_size: Optional[int] = 0
-
-    @field_validator("split_by")
-    def split_by_must_be_valid(cls, v):
-        valid_criteria = ["page", "size", "word", "sentence"]
-        if v not in valid_criteria:
-            raise ValueError(f"split_by must be one of {valid_criteria}")
-        return v
+    tokenizer: Optional[str] = None
+    chunk_size: int = 1024
+    chunk_overlap: int = 150
+    params: dict = {}
 
     class Config:
         extra = "forbid"
@@ -41,25 +32,21 @@ class SplitTask(Task):
     Object for document splitting task
     """
 
-    _TypeSplitBy = Literal["word", "sentence", "passage"]
-
     def __init__(
         self,
-        split_by: _TypeSplitBy = None,
-        split_length: int = None,
-        split_overlap: int = None,
-        max_character_length: int = None,
-        sentence_window_size: int = None,
+        tokenizer: str = None,
+        chunk_size: int = 1024,
+        chunk_overlap: int = 150,
+        params: dict = {},
     ) -> None:
         """
         Setup Split Task Config
         """
         super().__init__()
-        self._split_by = split_by
-        self._split_length = split_length
-        self._split_overlap = split_overlap
-        self._max_character_length = max_character_length
-        self._sentence_window_size = sentence_window_size
+        self._tokenizer = tokenizer
+        self._chunk_size = chunk_size
+        self._chunk_overlap = chunk_overlap
+        self._params = params
 
     def __str__(self) -> str:
         """
@@ -67,11 +54,11 @@ class SplitTask(Task):
         """
         info = ""
         info += "Split Task:\n"
-        info += f"  split_by: {self._split_by}\n"
-        info += f"  split_length: {self._split_length}\n"
-        info += f"  split_overlap: {self._split_overlap}\n"
-        info += f"  split_max_character_length: {self._max_character_length}\n"
-        info += f"  split_sentence_window_size: {self._sentence_window_size}\n"
+        info += f"  tokenizer: {self._tokenizer}\n"
+        info += f"  chunk_size: {self._chunk_size}\n"
+        info += f"  chunk_overlap: {self._chunk_overlap}\n"
+        for key, value in self._params.items():
+            info += f"  {key}: {value}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -80,15 +67,13 @@ class SplitTask(Task):
         """
         split_params = {}
 
-        if self._split_by is not None:
-            split_params["split_by"] = self._split_by
-        if self._split_length is not None:
-            split_params["split_length"] = self._split_length
-        if self._split_overlap is not None:
-            split_params["split_overlap"] = self._split_overlap
-        if self._max_character_length is not None:
-            split_params["max_character_length"] = self._max_character_length
-        if self._sentence_window_size is not None:
-            split_params["sentence_window_size"] = self._sentence_window_size
+        if self._tokenizer is not None:
+            split_params["tokenizer"] = self._tokenizer
+        if self._chunk_size is not None:
+            split_params["chunk_size"] = self._chunk_size
+        if self._chunk_overlap is not None:
+            split_params["chunk_overlap"] = self._chunk_overlap
+        if self._params is not None:
+            split_params["params"] = self._params
 
         return {"type": "split", "task_properties": split_params}

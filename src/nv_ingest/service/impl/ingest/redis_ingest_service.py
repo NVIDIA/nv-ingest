@@ -1,12 +1,6 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
-# SPDX-License-Identifier: LicenseRef-NvidiaProprietary
-#
-# NVIDIA CORPORATION, its affiliates and licensors retain all intellectual
-# property and proprietary rights in and to this material, related
-# documentation and any modifications thereto. Any use, reproduction,
-# disclosure or distribution of this material and related documentation
-# without an express license agreement from NVIDIA CORPORATION or
-# its affiliates is strictly prohibited.
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
 import json
 import logging
@@ -68,7 +62,11 @@ class RedisIngestService(IngestServiceMeta):
 
             for task in tasks:
                 task_prop = task["task_properties"]
-                task_prop_dict = task_prop.dict()
+                if not isinstance(task_prop, dict):
+                    logger.debug(f"Task properties are not a dictionary: {tasks}")
+                    task_prop_dict = task_prop.model_dump()
+                else:
+                    task_prop_dict = task_prop
                 task["task_properties"] = task_prop_dict
                 updated_tasks.append(task)
 
