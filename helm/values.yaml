@@ -63,27 +63,25 @@ containerSecurityContext: {}
 ## @skip tolerations[0].effect
 tolerations: []
 
-# TODO: jdyer - uncomment this when microservice is added, currently no /health endpoint exists to check ...
-
 ## @param replicaCount [default: 1] The number of replicas for NVIngest when autoscaling is disabled
 replicaCount: 1
 
 ## @skip resources Specify resources limits and requests for the running service.
 ## @extra resources.limits."nvidia.com/gpu" Specify number of GPUs to present to the running service.
-## @param resources.limits.memory [default: 32Gi] Specify limit for memory
-## @param resources.requests.memory [default: 16Gi] Specify request for memory
+## @param resources.limits.memory [default: 90Gi] Specify limit for memory
+## @param resources.requests.memory [default: 24Gi] Specify request for memory
 resources:
   limits:
     memory: 90Gi
     nvidia.com/gpu: 1
-    cpu: "36000m"
+    cpu: "48000m"
   requests:
     memory: 24Gi
-    cpu: "16000m"
+    cpu: "24000m"
 
 
-## @param tmpDirSize [default: 8Gi] Specify the amount of space to reserve for temporary storage
-tmpDirSize: 8Gi
+## @param tmpDirSize [default: 16Gi] Specify the amount of space to reserve for temporary storage
+tmpDirSize: 16Gi
 
 
 ## @section NIM Configuration
@@ -93,24 +91,85 @@ tmpDirSize: 8Gi
 ## explicitly called out here.
 ## @descriptionEnd
 
-## @skip yoloxDeployed
 ## @skip yolox-nim
-## @extra yolox-nim.image.repository The repository to override the location of the YOLOX
-## @extra yolox-nim.image.tag The tag override for YOLOX
-yoloxDeployed: true
+## @param yolox-nim.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
+## @param yolox-nim.image.repository The repository to override the location of the YOLOX
+## @param yolox-nim.image.tag The tag override for YOLOX
 yolox-nim:
+  deployed: true
   fullnameOverride: nv-ingest-yolox
   image:
     repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1
     tag: "1.0.0"
+    pullPolicy: IfNotPresent
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
   service:
+    type: "ClusterIP"
     name: nv-ingest-yolox
+    httpPort: 8000
     grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
   nim:
     grpcPort: 8001
+    logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+
+## @skip nvidia-nim-nemoretriever-graphic-elements-v1
+## @param nvidia-nim-nemoretriever-graphic-elements-v1.deployed [default: true] true if the nemoretriever-graphic-elements NIM should be deployed and false otherwise
+## @param nvidia-nim-nemoretriever-graphic-elements-v1.image.repository The repository to override the location of the nemoretriever-graphic-elements
+## @param nvidia-nim-nemoretriever-graphic-elements-v1.image.tag The tag override for nemoretriever-graphic-elements
+nvidia-nim-nemoretriever-graphic-elements-v1:
+  deployed: true
+  # fullnameOverride: nvidia-nim-nemoretriever-graphic-elements-v1
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-graphic-elements-v1
+    tag: "1.2.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: nvidia-nim-nemoretriever-graphic-elements-v1
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
+
 
 ## @skip paddleocrDeployed
 ## @skip paddleocr-nim
@@ -446,32 +505,12 @@ ingress:
 livenessProbe:
   enabled: false
   httpGet:
-    path: /health
+    path: /v1/health/live
     port: http
   initialDelaySeconds: 120
   periodSeconds: 10
   timeoutSeconds: 20
   failureThreshold: 20
-  successThreshold: 1
-
-## @section Probe parameters
-## @param startupProbe.enabled Enables `startupProbe``
-## @param startupProbe.httpGet.path `StartupProbe`` endpoint path
-## @param startupProbe.httpGet.port `StartupProbe`` endpoint port
-## @param startupProbe.initialDelaySeconds Initial delay seconds for `startupProbe`
-## @param startupProbe.timeoutSeconds Timeout seconds for `startupProbe`
-## @param startupProbe.periodSeconds Period seconds for `startupProbe`
-## @param startupProbe.successThreshold Success threshold for `startupProbe`
-## @param startupProbe.failureThreshold Failure threshold for `startupProbe`
-startupProbe:
-  enabled: false
-  httpGet:
-    path: /health
-    port: http
-  initialDelaySeconds: 120
-  periodSeconds: 30
-  timeoutSeconds: 10
-  failureThreshold: 220
   successThreshold: 1
 
 ## @section Probe parameters
@@ -486,7 +525,7 @@ startupProbe:
 readinessProbe:
   enabled: false
   httpGet:
-    path: /health
+    path: /v1/health/ready
     port: http
   initialDelaySeconds: 120
   periodSeconds: 30
@@ -524,6 +563,12 @@ serviceAccount:
 ## @descriptionStart
 ## Manage the creation of secrets used by the helm chart
 ## @descriptionEnd
+
+# ngcApi:
+# # If set to false, the chart expects a secret with the name
+#   create: false
+#   password: ""
+
 ## @param ngcSecret.create Specifies whether to create the ngc api secret
 ## @param ngcSecret.password The password to use for the NGC Secret
 ngcSecret:
