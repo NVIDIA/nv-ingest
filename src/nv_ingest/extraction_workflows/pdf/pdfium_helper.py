@@ -37,15 +37,14 @@ from nv_ingest.util.nim.helpers import create_inference_client
 from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_HEIGHT
 from nv_ingest.util.nim.yolox import YOLOX_PAGE_IMAGE_PREPROC_WIDTH
 from nv_ingest.util.nim.yolox import get_yolox_model_name
-from nv_ingest.util.pdf.metadata_aggregators import Base64Image
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_pdf_image
 from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata
 from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
 from nv_ingest.util.pdf.metadata_aggregators import extract_pdf_metadata
-from nv_ingest.util.pdf.pdfium import PDFIUM_PAGEOBJ_MAPPING
 from nv_ingest.util.pdf.pdfium import pdfium_pages_to_numpy
-from nv_ingest.util.pdf.pdfium import pdfium_try_get_bitmap_as_numpy
+from nv_ingest.util.pdf.pdfium import extract_nested_simple_images_from_pdfium_page
+from nv_ingest.util.pdf.pdfium import extract_image_like_objects_from_pdfium_page
 
 YOLOX_MAX_BATCH_SIZE = 8
 
@@ -191,6 +190,9 @@ def extract_page_element_images(
             w1, h1, w2, h2 = bbox
 
             cropped = crop_image(original_image, (int(w1), int(h1), int(w2), int(h2)))
+            if cropped is None:
+                continue
+
             base64_img = numpy_to_base64(cropped)
 
             bbox_in_orig_coord = (
@@ -223,6 +225,7 @@ def _extract_page_text(page) -> str:
 
 
 def _extract_page_images(
+    extract_images_method: str,
     page,
     page_idx: int,
     page_width: float,
@@ -230,40 +233,31 @@ def _extract_page_images(
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
+    **extract_images_params,
 ) -> list:
     """
     Always extract images from the given page and return a list of image metadata items.
     The caller decides whether to call this based on a flag.
     """
+    if extract_images_method == "simple":
+        extracted_image_data = extract_nested_simple_images_from_pdfium_page(page)
+    else:  # if extract_images_method == "group"
+        extracted_image_data = extract_image_like_objects_from_pdfium_page(page, merge=True, **extract_images_params)
+
     extracted_images = []
-    for obj in page.get_objects():
-        obj_type = PDFIUM_PAGEOBJ_MAPPING.get(obj.type, "UNKNOWN")
-        if obj_type == "IMAGE":
-            try:
-                image_numpy = pdfium_try_get_bitmap_as_numpy(obj)
-                image_base64 = numpy_to_base64(image_numpy)
-                image_bbox = obj.get_pos()
-                image_size = obj.get_size()
-
-                image_data = Base64Image(
-                    image=image_base64,
-                    bbox=image_bbox,
-                    width=image_size[0],
-                    height=image_size[1],
-                    max_width=page_width,
-                    max_height=page_height,
-                )
-
-                image_meta = construct_image_metadata_from_pdf_image(
-                    image_data,
-                    page_idx,
-                    page_count,
-                    source_metadata,
-                    base_unified_metadata,
-                )
-                extracted_images.append(image_meta)
-            except Exception as e:
-                logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
+    for image_data in extracted_image_data:
+        try:
+            image_meta = construct_image_metadata_from_pdf_image(
+                image_data,
+                page_idx,
+                page_count,
+                source_metadata,
+                base_unified_metadata,
+            )
+            extracted_images.append(image_meta)
+        except Exception as e:
+            logger.error(f"Unhandled error extracting image on page {page_idx}: {e}")
+            # continue extracting other images
 
     return extracted_images
 
@@ -332,6 +326,8 @@ def pdfium_extractor(
     extract_infographics = kwargs.get("extract_infographics", False)
     paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
     paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
+    extract_images_method = kwargs.get("extract_images_method", "group")
+    extract_images_params = kwargs.get("extract_images_params") or {}
 
     # Basic config
     metadata_col = kwargs.get("metadata_column", "metadata")
@@ -412,6 +408,7 @@ def pdfium_extractor(
             # If we want images, extract images now.
             if extract_images:
                 image_data = _extract_page_images(
+                    extract_images_method,
                     page,
                     page_idx,
                     page_width,
@@ -419,6 +416,7 @@ def pdfium_extractor(
                     page_count,
                     source_metadata,
                     base_unified_metadata,
+                    **extract_images_params,
                 )
                 extracted_data.extend(image_data)
 
@@ -491,4 +489,7 @@ def pdfium_extractor(
         )
         extracted_data.append(doc_text_meta)
 
+    doc.close()
+
+    logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
     return extracted_data
