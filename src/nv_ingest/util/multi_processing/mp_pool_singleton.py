@@ -152,7 +152,7 @@ class ProcessWorkerPoolSingleton:
             if cls._instance is None:
                 max_worker_limit = int(os.environ.get("MAX_INGEST_PROCESS_WORKERS", -1))
                 cls._instance = super(ProcessWorkerPoolSingleton, cls).__new__(cls)
-                max_workers = min(max_worker_limit, math.floor(max(1, len(os.sched_getaffinity(0)) * 0.4)))
+                max_workers = math.floor(max(1, len(os.sched_getaffinity(0)) * 0.4))
                 if (max_worker_limit > 0) and (max_workers > max_worker_limit):
                     max_workers = max_worker_limit
                 logger.debug("Creating ProcessWorkerPoolSingleton instance with max workers: %d", max_workers)
