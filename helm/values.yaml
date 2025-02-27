@@ -91,15 +91,15 @@ tmpDirSize: 16Gi
 ## explicitly called out here.
 ## @descriptionEnd
 
-## @skip yolox-nim
-## @param yolox-nim.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
-## @param yolox-nim.image.repository The repository to override the location of the YOLOX
-## @param yolox-nim.image.tag The tag override for YOLOX
-yolox-nim:
+## @skip nemoretriever-page-elements-v2
+## @param nemoretriever-page-elements-v2.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
+## @param nemoretriever-page-elements-v2.image.repository The repository to override the location of the YOLOX
+## @param nemoretriever-page-elements-v2.image.tag The tag override for YOLOX
+nemoretriever-page-elements-v2:
   deployed: true
-  fullnameOverride: nv-ingest-yolox
+  # fullnameOverride: nemoretriever-page-elements-v2
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1
+    repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v2
     tag: "1.0.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
@@ -119,7 +119,7 @@ yolox-nim:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nv-ingest-yolox
+    name: nemoretriever-page-elements-v2
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -130,13 +130,13 @@ yolox-nim:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
-## @skip nvidia-nim-nemoretriever-graphic-elements-v1
-## @param nvidia-nim-nemoretriever-graphic-elements-v1.deployed [default: true] true if the nemoretriever-graphic-elements NIM should be deployed and false otherwise
-## @param nvidia-nim-nemoretriever-graphic-elements-v1.image.repository The repository to override the location of the nemoretriever-graphic-elements
-## @param nvidia-nim-nemoretriever-graphic-elements-v1.image.tag The tag override for nemoretriever-graphic-elements
-nvidia-nim-nemoretriever-graphic-elements-v1:
+## @skip nemoretriever-graphic-elements-v1
+## @param nemoretriever-graphic-elements-v1.deployed [default: true] true if the nemoretriever-graphic-elements NIM should be deployed and false otherwise
+## @param nemoretriever-graphic-elements-v1.image.repository The repository to override the location of the nemoretriever-graphic-elements
+## @param nemoretriever-graphic-elements-v1.image.tag The tag override for nemoretriever-graphic-elements
+nemoretriever-graphic-elements-v1:
   deployed: true
-  # fullnameOverride: nvidia-nim-nemoretriever-graphic-elements-v1
+  # fullnameOverride: nemoretriever-graphic-elements-v1
   customCommand: []
   customArgs: []
   image:
@@ -159,7 +159,7 @@ nvidia-nim-nemoretriever-graphic-elements-v1:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nvidia-nim-nemoretriever-graphic-elements-v1
+    name: nemoretriever-graphic-elements-v1
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -170,13 +170,13 @@ nvidia-nim-nemoretriever-graphic-elements-v1:
     - name: NIM_HTTP_API_PORT
       value: "8000"
 
-## @skip nvidia-nim-nemoretriever-table-structure-v1
-## @param nvidia-nim-nemoretriever-table-structure-v1.deployed [default: true] true if the nemoretriever-table-structure NIM should be deployed and false otherwise
-## @param nvidia-nim-nemoretriever-table-structure-v1.image.repository The repository to override the location of the nemoretriever-table-structure
-## @param nvidia-nim-nemoretriever-table-structure-v1.image.tag The tag override for nemoretriever-table-structure
-nvidia-nim-nemoretriever-table-structure-v1:
+## @skip nemoretriever-table-structure-v1
+## @param nemoretriever-table-structure-v1.deployed [default: true] true if the nemoretriever-table-structure NIM should be deployed and false otherwise
+## @param nemoretriever-table-structure-v1.image.repository The repository to override the location of the nemoretriever-table-structure
+## @param nemoretriever-table-structure-v1.image.tag The tag override for nemoretriever-table-structure
+nemoretriever-table-structure-v1:
   deployed: true
-  # fullnameOverride: nvidia-nim-nemoretriever-table-structure-v1
+  # fullnameOverride: nemoretriever-table-structure-v1
   customCommand: []
   customArgs: []
   image:
@@ -199,7 +199,7 @@ nvidia-nim-nemoretriever-table-structure-v1:
     metrics: []
   service:
     type: "ClusterIP"
-    name: nvidia-nim-nemoretriever-table-structure-v1
+    name: nemoretriever-table-structure-v1
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -391,13 +391,13 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
     - name: NIM_HTTP_API_PORT
 
 
-## @skip llama-3.2-nv-rerankqa-1b-v2
-## @param llama-3.2-nv-rerankqa-1b-v2.deployed [default: true] true if llama-3.2-nv-rerankqa-1b-v2 should be deployed and false otherwise
-## @param llama-3.2-nv-rerankqa-1b-v2.image.repository The repository to override the location of the reranker NIM
-## @param llama-3.2-nv-rerankqa-1b-v2.image.tag The tag override for reranker NIM
-llama-3.2-nv-rerankqa-1b-v2:
+## @skip llama-32-nv-rerankqa-1b-v2
+## @param llama-32-nv-rerankqa-1b-v2.deployed [default: true] true if llama-32-nv-rerankqa-1b-v2 should be deployed and false otherwise
+## @param llama-32-nv-rerankqa-1b-v2.image.repository The repository to override the location of the reranker NIM
+## @param llama-32-nv-rerankqa-1b-v2.image.tag The tag override for reranker NIM
+llama-32-nv-rerankqa-1b-v2:
   deployed: false
-  # fullnameOverride: llama-3.2-nv-rerankqa-1b-v2
+  # fullnameOverride: llama-32-nv-rerankqa-1b-v2
   customCommand: []
   customArgs: []
   image:
@@ -420,7 +420,7 @@ llama-3.2-nv-rerankqa-1b-v2:
     metrics: []
   service:
     type: "ClusterIP"
-    name: llama-3.2-nv-rerankqa-1b-v2
+    name: llama-32-nv-rerankqa-1b-v2
     httpPort: 8000
     grpcPort: 8001
     metricsPort: 0  # Generally unused and defaults to 0
@@ -430,11 +430,6 @@ llama-3.2-nv-rerankqa-1b-v2:
   env:
     - name: NIM_HTTP_API_PORT
 
-
-# Use this to load an image Pre NIM Factory via triton
-## @skip triton
-triton:
-  enabled: false
 
 ## @section Milvus Deployment parameters
 ## @descriptionStart
@@ -542,6 +537,7 @@ redis:
 ## @skip envVars.DEPLOT_HTTP_ENDPOINT
 ## @skip envVars.DEPLOT_INFER_ENDPOINT
 envVars:
+  MAX_INGEST_PROCESS_WORKERS: 16
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
   REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
@@ -556,15 +552,15 @@ envVars:
   PADDLE_INFER_PROTOCOL: grpc
   NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
   NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
-  YOLOX_GRPC_ENDPOINT: nv-ingest-yolox:8001
-  YOLOX_HTTP_ENDPOINT: http://nv-ingest-yolox:8000/v1/infer
+  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
+  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
   YOLOX_INFER_PROTOCOL: grpc
-  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nvidia-nim-nemoretriever-graphic-elements-v1:8001
-  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nvidia-nim-nemoretriever-graphic-elements-v1:8000/v1/infer
-  YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: http
-  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: -nim-nemoretriever-table-structure-v1:8001
-  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nvidia-nim-nemoretriever-table-structure-v1:8000/v1/infer
-  YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: http
+  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
+  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
+  YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: grpc
+  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
+  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
+  YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
 
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
