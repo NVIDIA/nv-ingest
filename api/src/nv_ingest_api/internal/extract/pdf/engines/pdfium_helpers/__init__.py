@@ -101,12 +101,12 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
-    # Inject configuration settings, if provided.
-    if getattr(extractor_config, "pdfium_config", None) is not None:
-        params["pdfium_config"] = extractor_config.pdfium_config
-
-    if getattr(extractor_config, "nemoretriever_parse_config", None) is not None:
-        params["nemoretriever_parse_config"] = extractor_config.nemoretriever_parse_config
+    # Determine the extraction method and automatically inject its configuration.
+    extract_method = params.get("extract_method", "pdfium")
+    config_key = f"{extract_method}_config"
+    extractor_specific_config = getattr(extractor_config, config_key, None)
+    if extractor_specific_config is not None:
+        params[config_key] = extractor_specific_config
 
     # The remaining parameters constitute the extractor_config.
     extractor_config = params
