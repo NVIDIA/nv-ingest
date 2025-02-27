@@ -1,5 +1,11 @@
 import pytest
-from nv_ingest_client.util.milvus import MilvusOperator, _dict_to_params
+from nv_ingest_client.util.milvus import (
+    MilvusOperator,
+    _dict_to_params,
+    create_nvingest_collection,
+    grab_meta_collection_info,
+)
+from nv_ingest_client.util.util import ClientConfigSchema
 
 
 @pytest.fixture
@@ -65,3 +71,28 @@ def test_op_dict_to_params(collection_name, expected_results):
         for k, v in expected_results.items():
             assert write_params[k] == v
         coll_name in collection_name.keys()
+
+
+def test_milvus_meta_collection(tmp_path):
+    collection_name = "collection"
+    milvus_uri = f"{tmp_path}/test.db"
+    create_nvingest_collection(collection_name, milvus_uri=milvus_uri)
+    results = grab_meta_collection_info(collection_name, milvus_uri=milvus_uri)
+    keys = list(results[0].keys())
+    assert ["pk", "collection_name", "indexes", "models", "timestamp", "user_fields"] == keys
+    entity = results[0]
+    env_schema = ClientConfigSchema()
+    assert entity["collection_name"] == collection_name
+    assert entity["models"]["embedding_model"] == env_schema.embedding_nim_model_name
+
+
+def test_milvus_meta_multiple_coll(tmp_path):
+    collection_name = "collection"
+    milvus_uri = f"{tmp_path}/test.db"
+    for i in range(0, 3):
+        create_nvingest_collection(f"{collection_name}{i}", milvus_uri=milvus_uri)
+
+    results = grab_meta_collection_info(f"{collection_name}2", milvus_uri=milvus_uri)
+    entity = results[0]
+    assert len(results) == 1
+    assert entity["collection_name"] == f"{collection_name}2"
