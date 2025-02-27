@@ -397,7 +397,13 @@ class Ingestor:
         # Users have to set to True if infographic extraction is required.
         extract_infographics = kwargs.pop("extract_infographics", False)
 
-        for document_type in self._job_specs.file_types:
+        for file_type in self._job_specs.file_types:
+            # Let user override document_type if user explicitly sets document_type.
+            if "document_type" in kwargs:
+                document_type = kwargs.pop("document_type")
+            else:
+                document_type = file_type
+
             extract_task = ExtractTask(
                 document_type,
                 extract_tables=extract_tables,
