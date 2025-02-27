@@ -16,8 +16,8 @@ from morpheus.config import Config
 from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
-from nv_ingest.util.nim.helpers import call_audio_inference_model, create_inference_client
-from nv_ingest.util.nim.parakeet import ParakeetModelInterface
+from nv_ingest.util.audio.parakeet import call_audio_inference_model
+from nv_ingest.util.audio.parakeet import create_audio_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -54,19 +54,16 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
         logger.error("Row does not contain 'metadata'.")
         raise ValueError("Row does not contain 'metadata'.")
 
-    base64_audio = metadata.get("content")
+    base64_audio = metadata.pop("content")
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
     if content_metadata.get("type") != "audio":
         return metadata
 
-    source_metadata = metadata.get("source_metadata")
-    audio_id = source_metadata["source_id"]
-
     # Modify audio metadata with the result from the inference model
     try:
-        audio_result = call_audio_inference_model(audio_client, base64_audio, audio_id, trace_info=trace_info)
+        audio_result = call_audio_inference_model(audio_client, base64_audio, trace_info=trace_info)
         metadata["audio_metadata"] = {"audio_transcript": audio_result}
     except Exception as e:
         logger.error(f"Unhandled error calling audio inference model: {e}", exc_info=True)
@@ -106,24 +103,13 @@ def _transcribe_audio(
     Exception
         If any error occurs during the audio data extraction process.
     """
-
-    # port = 32783
-    # audio_client = create_inference_client(
-    #    (None, f'http://0.0.0.0:{port}/v1/transcribe'),
-    #    None,
-    #    "http"
-    # )
-
     logger.debug(f"Entering audio extraction stage with {len(df)} rows.")
 
     _ = task_props
 
-    parakeet_model_interface = ParakeetModelInterface()
-    parakeet_client = create_inference_client(
+    parakeet_client = create_audio_inference_client(
         validated_config.audio_extraction_config.audio_endpoints,
-        parakeet_model_interface,
         auth_token=validated_config.audio_extraction_config.auth_token,
-        infer_protocol=validated_config.audio_extraction_config.audio_infer_protocol,
     )
 
     if trace_info is None:
@@ -132,8 +118,6 @@ def _transcribe_audio(
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        # audio_version = get_version(validated_config.stage_config.audio_endpoints[1])
-        # audio_version = get_version(f'http://audio:{port}')
         df["metadata"] = df.apply(_update_metadata, axis=1, args=(parakeet_client, trace_info))
 
         return df, trace_info
@@ -194,47 +178,3 @@ def generate_audio_extractor_stage(
         # document_type="regex:^(mp3|wav)$",
         document_type="wav",
     )
-
-
-# if __name__ == "__main__":
-#    metadata = {
-#        "source_metadata": {
-#            "access_level": 1,
-#            "collection_id": "",
-#            "date_created": "2024-11-04T12:29:08",
-#            "last_modified": "2024-11-04T12:29:08",
-#            "partition_id": -1,
-#            "source_id": "https://audio.listennotes.com/e/p/3946bc3aba1f425f8b2e146f0b3f72fc/",
-#            "source_location": "",
-#            "source_type": "wav",
-#            "summary": "",
-#        },
-#        "content_metadata": {"description": "Audio wav file", "type": "audio", "content": ""},
-#    }
-#
-#    metadata = {
-#        "source_metadata": {
-#            "access_level": 1,
-#            "collection_id": "",
-#            "date_created": "2024-11-04T12:29:08",
-#            "last_modified": "2024-11-04T12:29:08",
-#            "partition_id": -1,
-#            "source_id": "test.mp3",
-#            "source_location": "",
-#            "source_type": "mp3",
-#            "summary": "",
-#        },
-#        "content_metadata": {"description": "Audio wav file", "type": "audio", "content": "some base64 string"},
-#    }
-#
-#    data = [{"metadata": metadata}]
-#    df = pd.DataFrame(data)
-#
-#    df.to_csv("test.csv", index=False)
-#
-#    df_result, _ = _transcribe_audio(df)
-#
-#    df_result.to_csv("result.csv", index=False)
-#
-#    print("Done!")
-#
