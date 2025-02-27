@@ -33,8 +33,14 @@ def create_nvingest_meta_schema():
     schema = MilvusClient.create_schema(auto_id=True, enable_dynamic_field=True)
     # collection name, timestamp, index_types - dimensions, embedding_model, fields
     schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
-    schema.add_field(field_name="collection_name", datatype=DataType.VARCHAR, max_length=65535)
-    schema.add_field(field_name="vector", datatype=DataType.BINARY_VECTOR, dim=1)
+    schema.add_field(
+        field_name="collection_name",
+        datatype=DataType.VARCHAR,
+        max_length=65535,
+        # enable_analyzer=True,
+        # enable_match=True
+    )
+    schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=2)
     schema.add_field(field_name="timestamp", datatype=DataType.VARCHAR, max_length=65535)
     schema.add_field(field_name="indexes", datatype=DataType.JSON)
     schema.add_field(field_name="models", datatype=DataType.JSON)
@@ -50,7 +56,14 @@ def create_meta_collection(
         # already exists, dont erase and recreate
         return
     schema = create_nvingest_meta_schema()
-    create_collection(client, collection_name, schema, recreate=recreate)
+    index_params = MilvusClient.prepare_index_params()
+    index_params.add_index(
+        field_name="vector",
+        index_name="dense_index",
+        index_type="FLAT",
+        metric_type="L2",
+    )
+    create_collection(client, collection_name, schema, index_params=index_params, recreate=recreate)
 
 
 def write_meta_collection(
@@ -68,23 +81,80 @@ def write_meta_collection(
     client_config = ClientConfigSchema()
     data = {
         "collection_name": collection_name,
-        "vector": 0,
+        "vector": [0.0] * 2,
         "timestamp": str(creation_timestamp or datetime.datetime.now()),
         "indexes": {"dense_index": dense_index, "dense_dimension": dense_dim, "sparse_index": sparse_index},
-        "model_names": {
+        "models": {
             "embedding_model": embedding_model or client_config.embedding_nim_model_name,
             "embedding_dim": dense_dim,
             "sparse_model": sparse_model,
         },
-        "user_fields": {"fields": fields},
+        "user_fields": [field.name for field in fields],
     }
     client = MilvusClient(milvus_uri)
     client.insert(collection_name=meta_collection_name, data=data)
 
 
-def grab_meta_collection_info(collection_name: str, milvus_uri: str = "http://localhost:19530", filter: str = None):
+def log_new_meta_collection(
+    collection_name: str,
+    fields: List[str],
+    milvus_uri: str = "http://localhost:19530",
+    creation_timestamp: str = None,
+    dense_index: str = None,
+    dense_dim: int = None,
+    sparse_index: str = None,
+    embedding_model: str = None,
+    sparse_model: str = None,
+    meta_collection_name: str = "meta",
+    recreate: bool = False,
+):
+    schema = create_nvingest_meta_schema()
+    create_meta_collection(schema, milvus_uri, recreate=recreate)
+    write_meta_collection(
+        collection_name,
+        fields=fields,
+        milvus_uri=milvus_uri,
+        creation_timestamp=creation_timestamp,
+        dense_index=dense_index,
+        dense_dim=dense_dim,
+        sparse_index=sparse_index,
+        embedding_model=embedding_model,
+        sparse_model=sparse_model,
+        meta_collection_name=meta_collection_name,
+    )
+
+
+def grab_meta_collection_info(
+    collection_name: str,
+    meta_collection_name: str = "meta",
+    timestamp: str = None,
+    embedding_model: str = None,
+    embedding_dim: int = None,
+    milvus_uri: str = "http://localhost:19530",
+):
+    timestamp = timestamp or ""
+    embedding_model = embedding_model or ""
+    embedding_dim = embedding_dim or ""
     client = MilvusClient(milvus_uri)
-    return client.search(collection_name, [0], filter=filter or "")
+    results = client.query_iterator(
+        collection_name=meta_collection_name,
+        output_fields=["collection_name", "timestamp", "indexes", "models", "user_fields"],
+    )
+    query_res = []
+    res = results.next()
+    while res:
+        query_res += res
+        res = results.next()
+    result = []
+    for res in query_res:
+        if (
+            collection_name in res["collection_name"]
+            and timestamp in res["timestamp"]
+            and embedding_model in res["models"]["embedding_model"]
+            and str(embedding_dim) in str(res["models"]["embedding_dim"])
+        ):
+            result.append(res)
+    return result
 
 
 def _dict_to_params(collections_dict: dict, write_params: dict):
@@ -333,6 +403,7 @@ def create_nvingest_collection(
     gpu_index: bool = True,
     gpu_search: bool = True,
     dense_dim: int = 2048,
+    recreate_meta: bool = False,
 ) -> CollectionSchema:
     """
     Creates a milvus collection with an nv-ingest compatible schema under
@@ -379,11 +450,21 @@ def create_nvingest_collection(
         sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
-    create_meta_collection(client, schema)
-    write_meta_collection(
-        client,
+    d_idx = None
+    s_idx = None
+    for k, v in index_params._indexes.items():
+        if k[1] == "dense_index":
+            d_idx = v
+        if sparse and k[1] == "sparse_index":
+            s_idx = v
+    log_new_meta_collection(
         collection_name,
-        schema.fields,
+        fields=schema.fields,
+        milvus_uri=milvus_uri,
+        dense_index=d_idx._index_type,
+        dense_dim=dense_dim,
+        sparse_index=s_idx if sparse else None,
+        recreate=recreate_meta,
     )
 
 
