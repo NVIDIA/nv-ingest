@@ -41,12 +41,12 @@ def llama_parse_extractor(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
-    **kwargs,
+    extractor_config: dict,
 ) -> List[Dict[ContentTypeEnum, Dict[str, Any]]]:
     """
-    Helper function to use LlamaParse API to extract text from a bytestream
-    PDF.
+    Helper function to use LlamaParse API to extract text from a bytestream PDF.
 
     Parameters
     ----------
@@ -58,36 +58,59 @@ def llama_parse_extractor(
         Specifies whether to extract images.
     extract_tables : bool
         Specifies whether to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+    extract_infographics : bool
+        Specifies whether to extract infographics.
+    extractor_config : dict
+        A dictionary containing additional extraction parameters including:
+            - api_key: API key for LlamaParse.
+            - result_type: Type of result to extract (default provided).
+            - file_name: Name of the file (default provided).
+            - check_interval: Interval for checking status (default provided).
+            - max_timeout: Maximum timeout in seconds (default provided).
+            - row_data: Row data for additional metadata.
+            - metadata_column: Column name to extract metadata (default "metadata").
 
     Returns
     -------
-    List[List[ExtractedDocumentType, Dict[str, Any]]]:
-        A list of extracted data. Each item in the list is a list of
-        [document type, dictionary] pairs, where the dictionary contains
-        content and metadata of the extracted PDF.
+    List[Dict[ContentTypeEnum, Dict[str, Any]]]:
+        A list of extracted data. Each item is a dictionary where the key is a
+        ContentTypeEnum and the value is a dictionary containing content and metadata.
+
+    Raises
+    ------
+    ValueError
+        If extractor_config is not a dict or required parameters are missing.
     """
+
     logger.debug("Extracting PDF with LlamaParse backend.")
 
-    api_key = kwargs.get("api_key")
+    # Validate extractor_config.
+    if not isinstance(extractor_config, dict):
+        raise ValueError("extractor_config must be a dictionary.")
+
+    api_key = extractor_config.get("api_key")
     if not api_key:
-        raise ValueError("LLAMA_CLOUD_API_KEY is required.")
+        raise ValueError("LLAMA_CLOUD_API_KEY is required in extractor_config.")
 
-    result_type = kwargs.get("result_type", DEFAULT_RESULT_TYPE)
-    file_name = kwargs.get("max_timeout", DEFAULT_FILE_NAME)
-    check_interval = kwargs.get("check_interval", DEFAULT_CHECK_INTERVAL_SECONDS)
-    max_timeout = kwargs.get("max_timeout", DEFAULT_MAX_TIMEOUT_SECONDS)
+    result_type = extractor_config.get("result_type", DEFAULT_RESULT_TYPE)
+    file_name = extractor_config.get("file_name", DEFAULT_FILE_NAME)
+    check_interval = extractor_config.get("check_interval", DEFAULT_CHECK_INTERVAL_SECONDS)
+    max_timeout = extractor_config.get("max_timeout", DEFAULT_MAX_TIMEOUT_SECONDS)
 
-    row_data = kwargs.get("row_data", None)
-    metadata_column = kwargs.get("metadata_column", "metadata")
-    metadata = row_data[metadata_column] if metadata_column in row_data.index else {}
+    row_data = extractor_config.get("row_data")
+    if row_data is None:
+        raise ValueError("Missing 'row_data' in extractor_config.")
+    metadata_column = extractor_config.get("metadata_column", "metadata")
+    if hasattr(row_data, "index"):
+        metadata = row_data[metadata_column] if metadata_column in row_data.index else {}
+    else:
+        metadata = row_data.get(metadata_column, {})
 
     extracted_data = []
 
     if extract_text:
         # TODO: As of Feb 2024, LlamaParse returns multi-page documents as one
-        # long text. See if we can break it into pages or LlamaParse adds
+        # long text. See if we can break it into pages or if LlamaParse adds
         # support for extracting each page.
         text = asyncio.run(
             async_llama_parse(
@@ -110,21 +133,26 @@ def llama_parse_extractor(
             }
         )
 
-        payload = [
-            ContentTypeEnum[result_type],
-            text_metadata,
-        ]
+        payload = {
+            ContentTypeEnum[result_type]: text_metadata,
+        }
 
         extracted_data.append(payload)
 
     # TODO: LlamaParse extracts tables, but we have to extract the tables
     # ourselves from text/markdown.
     if extract_tables:
+        # Table extraction logic goes here.
         pass
 
     # LlamaParse does not support image extraction as of Feb 2024.
     if extract_images:
+        # Image extraction logic goes here.
         pass
+
+    # Infographics extraction is currently not supported by LlamaParse.
+    if extract_infographics:
+        logger.debug("Infographics extraction requested, but not supported by LlamaParse.")
 
     return extracted_data
 

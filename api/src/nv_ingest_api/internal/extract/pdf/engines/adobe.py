@@ -67,8 +67,10 @@ def adobe_extractor(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
-    **kwargs,
+    extractor_config: dict,
+    trace_info=None,
 ):
     """
     Helper function to use unstructured-io REST API to extract text from a bytestream PDF.
@@ -78,13 +80,16 @@ def adobe_extractor(
     pdf_stream : io.BytesIO
         A bytestream PDF.
     extract_text : bool
-        Specifies whether or not to extract text.
+        Specifies whether to extract text.
     extract_images : bool
-        Specifies whether or not to extract images.
+        Specifies whether to extract images.
     extract_tables : bool
-        Specifies whether or not to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+        Specifies whether to extract tables.
+    extractor_config : dict
+        A dictionary containing additional extraction parameters such as API credentials,
+        row_data, text_depth, and other optional settings.
+    trace_info : optional
+        Trace information for debugging purposes.
 
     Returns
     -------
@@ -93,42 +98,63 @@ def adobe_extractor(
 
     Raises
     ------
+    RuntimeError
+        If the Adobe SDK is not installed.
+    ValueError
+        If required configuration parameters are missing or invalid.
     SDKError
-        If there is an error with the extraction.
-
+        If there is an error during extraction.
     """
+
+    # Not used for Adobe extraction, currently.
+    _ = extract_infographics
 
     logger.debug("Extracting PDF with Adobe backend.")
     if not ADOBE_INSTALLED:
         err_msg = (
             "Adobe SDK not installed -- cannot extract PDF.\r\nTo install the adobe SDK please review the "
-            "license agreement at https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file and"
+            "license agreement at https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file and "
             "re-launch the nv-ingest microservice with -e INSTALL_ADOBE_SDK=True."
         )
         logger.error(err_msg)
         raise RuntimeError(err_msg)
 
-    # get adobe api key
-    client_id = kwargs.get("adobe_client_id", None)
-    client_secret = kwargs.get("adobe_client_secret", None)
+    # Ensure extractor_config is a dictionary.
+    if not isinstance(extractor_config, dict):
+        raise ValueError("extractor_config must be a dictionary.")
 
-    # get row_data
-    row_data = kwargs.get("row_data", None)
+    # Retrieve Adobe API keys.
+    client_id = extractor_config.get("adobe_client_id")
+    client_secret = extractor_config.get("adobe_client_secret")
+    if not client_id or not client_secret:
+        raise ValueError(
+            "Missing Adobe API credentials in extractor_config (adobe_client_id and adobe_client_secret are required)."
+        )
 
-    # get source_id
-    source_id = row_data.get("source_id", None)
+    # Get row_data from configuration.
+    row_data = extractor_config.get("row_data")
+    if row_data is None:
+        raise ValueError("Missing 'row_data' in extractor_config.")
+
+    # Retrieve source information.
+    source_id = row_data.get("source_id")
     file_name = row_data.get("id", "_.pdf")
 
-    # get text_depth
-    text_depth = kwargs.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    # Retrieve and validate text_depth.
+    text_depth_str = extractor_config.get("text_depth", "page")
+    try:
+        text_depth = TextTypeEnum[text_depth_str.upper()]
+    except KeyError:
+        valid_options = [e.name.lower() for e in TextTypeEnum]
+        raise ValueError(f"Invalid text_depth value: {text_depth_str}. Expected one of: {valid_options}")
 
-    # TODO: Not configurable anywhere at the moment; likely don't need to but may be a small perf gain.
-    identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
-
-    # get base metadata
-    metadata_col = kwargs.get("metadata_column", "metadata")
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    # Optional settings.
+    identify_nearby_objects = extractor_config.get("identify_nearby_objects", True)
+    metadata_col = extractor_config.get("metadata_column", "metadata")
+    if hasattr(row_data, "index"):
+        base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    else:
+        base_unified_metadata = row_data.get(metadata_col, {})
 
     # get base source_metadata
     base_source_metadata = base_unified_metadata.get("source_metadata", {})

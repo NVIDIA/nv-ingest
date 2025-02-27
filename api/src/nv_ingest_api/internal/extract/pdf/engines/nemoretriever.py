@@ -1,8 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
-
 # Copyright (c) 2024, NVIDIA CORPORATION.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
@@ -17,6 +15,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
 import logging
 import math
 import traceback
@@ -70,14 +69,15 @@ NEMORETRIEVER_PARSE_MAX_BATCH_SIZE = 8
 
 # Define a helper function to use nemoretriever_parse to extract text from a base64 encoded bytestram PDF
 def nemoretriever_parse_extractor(
-    pdf_stream,
+    pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extractor_config: dict,
     trace_info: Optional[List] = None,
-    **kwargs,
-):
+) -> str:
     """
     Helper function to use nemoretriever_parse to extract text from a bytestream PDF.
 
@@ -91,40 +91,90 @@ def nemoretriever_parse_extractor(
         Specifies whether to extract images.
     extract_tables : bool
         Specifies whether to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+    extract_infographics : bool
+        Specifies whether to extract infographics.
+    extract_charts : bool
+        Specifies whether to extract charts.
+    trace_info : Optional[List], optional
+        Trace information for debugging purposes (default is None).
+    extractor_config : dict
+        A dictionary containing additional extraction parameters. Expected keys include:
+            - row_data : dict
+            - text_depth : str, optional (default is "page")
+            - extract_tables_method : str, optional (default is "yolox")
+            - identify_nearby_objects : bool, optional (default is True)
+            - paddle_output_format : str, optional (default is "pseudo_markdown")
+            - pdfium_config : dict, optional (configuration for PDFium)
+            - nemoretriever_parse_config : dict, optional (configuration for NemoRetrieverParse)
+            - metadata_column : str, optional (default is "metadata")
 
     Returns
     -------
     str
         A string of extracted text.
+
+    Raises
+    ------
+    ValueError
+        If required keys are missing in extractor_config or invalid values are provided.
+    KeyError
+        If required keys are missing in row_data.
     """
+    logger = logging.getLogger(__name__)
     logger.debug("Extracting PDF with nemoretriever_parse backend.")
 
-    row_data = kwargs.get("row_data")
-    # get source_id
-    source_id = row_data["source_id"]
-    # get text_depth
-    text_depth = kwargs.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    # Retrieve row_data from extractor_config.
+    row_data = extractor_config.get("row_data")
+    if row_data is None:
+        raise ValueError("Missing 'row_data' in extractor_config.")
 
-    extract_infographics = kwargs.get("extract_infographics", False)
-    extract_tables_method = kwargs.get("extract_tables_method", "yolox")
-    identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
-    paddle_output_format = kwargs.get("paddle_output_format", "pseudo_markdown")
-    paddle_output_format = TableFormatEnum[paddle_output_format.upper()]
+    # Get source_id from row_data.
+    try:
+        source_id = row_data["source_id"]
+    except KeyError:
+        raise KeyError("row_data must contain 'source_id'.")
 
+    # Get and validate text_depth.
+    text_depth_str = extractor_config.get("text_depth", "page")
+    try:
+        text_depth = TextTypeEnum[text_depth_str.upper()]
+    except KeyError:
+        valid_options = [e.name.lower() for e in TextTypeEnum]
+        raise ValueError(f"Invalid text_depth value: {text_depth_str}. Expected one of: {valid_options}")
+
+    # Get extraction method for tables.
+    extract_tables_method = extractor_config.get("extract_tables_method", "yolox")
+
+    # Flag for identifying nearby objects.
+    identify_nearby_objects = extractor_config.get("identify_nearby_objects", True)
+
+    # Get and validate paddle_output_format.
+    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    try:
+        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+    except KeyError:
+        valid_options = [e.name.lower() for e in TableFormatEnum]
+        raise ValueError(
+            f"Invalid paddle_output_format value: {paddle_output_format_str}. Expected one of: {valid_options}"
+        )
+
+    # Process PDFium configuration if required.
     if (extract_tables_method == "yolox") and (extract_tables or extract_charts or extract_infographics):
-        pdfium_config = kwargs.get("pdfium_config", {})
+        pdfium_config = extractor_config.get("pdfium_config", {})
         if isinstance(pdfium_config, dict):
             pdfium_config = PDFiumConfigSchema(**pdfium_config)
-    nemoretriever_parse_config = kwargs.get("nemoretriever_parse_config", {})
+
+    # Process nemoretriever_parse configuration.
+    nemoretriever_parse_config = extractor_config.get("nemoretriever_parse_config", {})
     if isinstance(nemoretriever_parse_config, dict):
         nemoretriever_parse_config = NemoRetrieverParseConfigSchema(**nemoretriever_parse_config)
 
-    # get base metadata
-    metadata_col = kwargs.get("metadata_column", "metadata")
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    # Get base metadata.
+    metadata_col = extractor_config.get("metadata_column", "metadata")
+    if hasattr(row_data, "index") and metadata_col in row_data.index:
+        base_unified_metadata = row_data[metadata_col]
+    else:
+        base_unified_metadata = row_data.get(metadata_col, {})
 
     # get base source_metadata
     base_source_metadata = base_unified_metadata.get("source_metadata", {})

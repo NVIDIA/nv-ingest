@@ -21,6 +21,7 @@ import io
 import logging
 import uuid
 import warnings
+from typing import Dict, Any
 
 import pypdfium2 as pdfium
 from unstructured_client import UnstructuredClient
@@ -45,70 +46,102 @@ def unstructured_io_extractor(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
-    **kwargs,
-):
+    extractor_config: Dict[str, Any],
+) -> str:
     """
     Helper function to use unstructured-io REST API to extract text from a bytestream PDF.
+
+    This function sends the provided PDF stream to the unstructured-io API and
+    returns the extracted text. Additional parameters for the extraction are
+    provided via the extractor_config dictionary. Note that although flags for
+    image, table, and infographics extraction are provided, the underlying API
+    may not support all of these features.
 
     Parameters
     ----------
     pdf_stream : io.BytesIO
-        A bytestream PDF.
+        A bytestream representing the PDF to be processed.
     extract_text : bool
-        Specifies whether or not to extract text.
+        Specifies whether to extract text.
     extract_images : bool
-        Specifies whether or not to extract images.
+        Specifies whether to extract images.
+    extract_infographics : bool
+        Specifies whether to extract infographics.
     extract_tables : bool
-        Specifies whether or not to extract tables.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+        Specifies whether to extract tables.
+    extractor_config : dict
+        A dictionary containing additional extraction parameters:
+            - unstructured_api_key : API key for unstructured.io.
+            - unstructured_url : URL for the unstructured.io API endpoint.
+            - unstructured_strategy : Strategy for extraction (default: "auto").
+            - unstructured_concurrency_level : Concurrency level for PDF splitting.
+            - row_data : Row data containing source information.
+            - text_depth : Depth of text extraction (e.g., "page").
+            - identify_nearby_objects : Flag for identifying nearby objects.
+            - metadata_column : Column name for metadata extraction.
 
     Returns
     -------
     str
-        A string of extracted text.
+        A string containing the extracted text.
 
     Raises
     ------
+    ValueError
+        If an invalid text_depth value is provided.
     SDKError
-        If there is an error with the extraction.
-
+        If there is an error during the extraction process.
     """
 
+    logger = logging.getLogger(__name__)
     logger.debug("Extracting PDF with unstructured-io backend.")
 
-    # get unstructured.io api key
-    api_key = kwargs.get("unstructured_api_key", None)
+    # Get unstructured.io API key
+    api_key = extractor_config.get("unstructured_api_key", None)
 
-    # get unstructured.io url
-    unstructured_url = kwargs.get("unstructured_url", "https://api.unstructured.io/general/v0/general")
+    # Get unstructured.io URL
+    unstructured_url = extractor_config.get("unstructured_url", "https://api.unstructured.io/general/v0/general")
 
-    # get unstructured.io strategy
-    strategy = kwargs.get("unstructured_strategy", "auto")
+    # Get unstructured.io strategy
+    strategy = extractor_config.get("unstructured_strategy", "auto")
     if (strategy != "hi_res") and (extract_images or extract_tables):
         warnings.warn("'hi_res' strategy required when extracting images or tables")
 
-    # get unstructured.io split pdf concurrency level
-    concurrency_level = kwargs.get("unstructured_concurrency_level", 10)
+    # Get unstructured.io split PDF concurrency level
+    concurrency_level = extractor_config.get("unstructured_concurrency_level", 10)
 
-    # get row_data
-    row_data = kwargs.get("row_data", None)
+    # Get row_data from configuration
+    row_data = extractor_config.get("row_data", None)
 
-    # get source_id
-    source_id = row_data.get("source_id", None)
-    file_name = row_data.get("id", "_.pdf")
+    # Get source_id and file name from row_data
+    source_id = row_data.get("source_id", None) if row_data is not None else None
+    file_name = row_data.get("id", "_.pdf") if row_data is not None else "_.pdf"
 
-    # get text_depth
-    text_depth = kwargs.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
+    # Get and validate text_depth
+    text_depth_str = extractor_config.get("text_depth", "page")
+    try:
+        text_depth = TextTypeEnum[text_depth_str.upper()]
+    except KeyError:
+        valid_options = [e.name.lower() for e in TextTypeEnum]
+        raise ValueError(f"Invalid text_depth value: {text_depth_str}. Expected one of: {valid_options}")
 
-    # TODO: Not configurable anywhere at the moment; likely don't need to but may be a small perf gain.
-    identify_nearby_objects = kwargs.get("identify_nearby_objects", True)
+    # Optional setting: identify_nearby_objects
+    identify_nearby_objects = extractor_config.get("identify_nearby_objects", True)
 
-    # get base metadata
-    metadata_col = kwargs.get("metadata_column", "metadata")
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    # Get base metadata
+    metadata_col = extractor_config.get("metadata_column", "metadata")
+    if row_data is not None and hasattr(row_data, "index") and metadata_col in row_data.index:
+        base_unified_metadata = row_data[metadata_col]
+    elif row_data is not None:
+        base_unified_metadata = row_data.get(metadata_col, {})
+    else:
+        base_unified_metadata = {}
+
+    # Handle infographics flag
+    if extract_infographics:
+        logger.debug("Infographics extraction requested but not supported by unstructured-io extractor.")
 
     # get base source_metadata
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
