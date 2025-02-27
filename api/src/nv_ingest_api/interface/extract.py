@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Any
 
 from . import extraction_interface_relay_constructor
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
@@ -27,7 +27,7 @@ def extract_primitives_from_pdf(
     yolox_infer_protocol: str = "http",
     # Tika-specific parameter:
     tika_server_url: Optional[str] = None,
-    execution_trace_log: Optional[list] = None,
+    execution_trace_log: Optional[list[Any]] = None,
 ):
     """
     High-level extraction function for PDF primitives.

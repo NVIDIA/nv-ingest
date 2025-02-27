@@ -14,125 +14,10 @@ from pydantic import BaseModel
 
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import InfoMessageMetadataSchema
-from nv_ingest.schemas.metadata_schema import StatusEnum
-from nv_ingest.schemas.metadata_schema import TaskTypeEnum
 from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest_api.internal.mutate.filter import filter_images_internal
 
 logger = logging.getLogger(__name__)
-
-
-def add_info_message(x, info_msg):
-    x["info_message_metadata"] = info_msg
-
-    return x
-
-
-def calculate_average_image_size(x):
-    return (x["image_metadata"]["width"] + x["image_metadata"]["height"]) / 2
-
-
-def calculate_aspect_ratio(x):
-    return x["image_metadata"]["width"] / max(x["image_metadata"]["height"], 1e-9)
-
-
-def _cpu_only_apply_filter(df: pd.DataFrame, task_params: dict) -> pd.DataFrame:
-    """
-    Applies a deduplication filter to images in the DataFrame.
-
-    This function identifies duplicate images within a DataFrame based on content hashes and either filters out
-    duplicates or marks them as informational messages, depending on the `filter_flag`.
-
-    Parameters
-    ----------
-    df : pd.DataFrame
-        The DataFrame containing the data to be filtered. It must have a `document_type` column indicating content type
-        and a `metadata` column containing content metadata.
-    filter_flag : bool
-        A flag indicating whether to filter out duplicates (`True`) or mark them with informational messages (`False`).
-
-    Returns
-    -------
-    pd.DataFrame
-        The DataFrame with duplicates either filtered out or marked as informational messages.
-
-    Notes
-    -----
-    - The function operates only on rows where `document_type` is `ContentTypeEnum.IMAGE`.
-    - When `filter_flag` is `False`, duplicate images are marked with an informational message and the `document_type`
-      is updated to `ContentTypeEnum.INFO_MSG`.
-
-    Examples
-    --------
-    >>> df = pd.DataFrame({
-    ...     "document_type": [ContentTypeEnum.IMAGE, ContentTypeEnum.IMAGE, ContentTypeEnum.TEXT],
-    ...     "metadata": [{"content": "image1"}, {"content": "image1"}, {"content": "text"}]
-    ... })
-    >>> result_df = _cpu_only_apply_filter(df, filter_flag=True)
-    >>> result_df
-      document_type            metadata
-    0       IMAGE  {'content': 'image1'}
-    2        TEXT     {'content': 'text'}
-
-    Raises
-    ------
-    ValueError
-        If `df` does not contain the necessary columns `document_type` and `metadata`.
-    """
-    try:
-        min_size = task_params.get("min_size")
-        max_aspect_ratio = task_params.get("max_aspect_ratio")
-        min_aspect_ratio = task_params.get("min_aspect_ratio")
-        filter_images = task_params.get("filter", False)
-
-        # Return if no images
-        image_mask = df["document_type"] == ContentTypeEnum.IMAGE
-        if not image_mask.any():
-            return df[~image_mask]
-
-        df_image = df.loc[image_mask].copy()
-
-        avg_size = df_image["metadata"].apply(calculate_average_image_size)
-        avg_size_mask = avg_size > min_size
-
-        aspect_ratio = df_image["metadata"].apply(calculate_aspect_ratio)
-        min_aspect_ratio_mask = aspect_ratio > min_aspect_ratio
-        max_aspect_ratio_mask = aspect_ratio < max_aspect_ratio
-
-        image_filter_mask = ~(avg_size_mask & min_aspect_ratio_mask & max_aspect_ratio_mask)
-        filter_bool = image_filter_mask.any()
-
-        if filter_bool:
-            filtered_df = df_image.loc[image_filter_mask].copy()
-
-            if filter_images:
-                df.drop(labels=filtered_df.index, inplace=True)
-
-                return df
-
-            info_msg = {
-                "task": TaskTypeEnum.FILTER.value,
-                "status": StatusEnum.SUCCESS.value,
-                "message": "Filtered due to image size.",
-                "filter": True,
-            }
-
-            validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
-
-            filtered_df["info_message_metadata"] = [validated_info_msg] * filtered_df.shape[0]
-            filtered_df["metadata"] = filtered_df["metadata"].apply(add_info_message, args=(info_msg,))
-
-            df.loc[filtered_df.index, "metadata"] = filtered_df["metadata"]
-            df.loc[filtered_df.index, "document_type"] = ContentTypeEnum.INFO_MSG
-
-        return df
-
-    except Exception as e:
-        err_msg = f"_cpu_only_apply_filter: Error applying deduplication filter. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-
-        raise type(e)(err_msg) from e
 
 
 def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
@@ -146,7 +31,7 @@ def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
 
         logger.debug(f"Filtering images by scale with filter_flag={filter_flag}")
 
-        df_result = _cpu_only_apply_filter(df, task_params)
+        df_result = filter_images_internal(df, task_params)
 
         return df_result
 
