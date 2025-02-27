@@ -1,6 +1,7 @@
 import base64
 import logging
 from typing import Any
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -19,9 +20,21 @@ class ParakeetClient:
     A simple interface for handling inference with a Parakeet model (e.g., speech, audio-related).
     """
 
-    def __init__(self, endpoint: str, auth_token: str = ""):
+    def __init__(
+        self,
+        endpoint: str,
+        auth_token: Optional[str] = None,
+        use_ssl: bool = False,
+        ssl_cert: Optional[str] = None,
+        auth_metadata: Optional[Tuple[str, str]] = None,
+    ):
         self.endpoint = endpoint
         self.auth_token = auth_token
+        self.use_ssl = use_ssl
+        self.ssl_cert = ssl_cert
+        self.auth_metadata = auth_metadata or []
+        if self.auth_token:
+            self.auth_metadata.append(("authorization", f"Bearer {self.auth_token}"))
 
     @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
@@ -43,13 +56,77 @@ class ParakeetClient:
             The processed inference results, coalesced in the same order as the input images.
         """
 
-        response = transcribe_file(data, self.auth_token)
+        response = self.transcribe_file(data)
         if response is None:
             return None, None
         segments, transcript = process_transcription_response(response)
         logger.debug("Processing Parakeet inference results (pass-through).")
 
         return transcript
+
+    def transcribe_file(
+        self,
+        audio_content: str,
+        language_code: str = "en-US",
+        automatic_punctuation: bool = True,
+        word_time_offsets: bool = True,
+        max_alternatives: int = 1,
+        profanity_filter: bool = False,
+        verbatim_transcripts: bool = True,
+        speaker_diarization: bool = False,
+        boosted_lm_words: Optional[List[str]] = None,
+        boosted_lm_score: float = 0.0,
+        diarization_max_speakers: int = 0,
+        start_history: float = 0.0,
+        start_threshold: float = 0.0,
+        stop_history: float = 0.0,
+        stop_history_eou: bool = False,
+        stop_threshold: float = 0.0,
+        stop_threshold_eou: bool = False,
+    ):
+        # Create authentication and ASR service objects.
+        auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
+        asr_service = riva.client.ASRService(auth)
+
+        # Build the recognition configuration.
+        recognition_config = riva.client.RecognitionConfig(
+            language_code=language_code,
+            max_alternatives=max_alternatives,
+            profanity_filter=profanity_filter,
+            enable_automatic_punctuation=automatic_punctuation,
+            verbatim_transcripts=verbatim_transcripts,
+            enable_word_time_offsets=word_time_offsets,
+        )
+
+        # Add additional configuration parameters.
+        riva.client.add_word_boosting_to_config(
+            recognition_config,
+            boosted_lm_words or [],
+            boosted_lm_score,
+        )
+        riva.client.add_speaker_diarization_to_config(
+            recognition_config,
+            speaker_diarization,
+            diarization_max_speakers,
+        )
+        riva.client.add_endpoint_parameters_to_config(
+            recognition_config,
+            start_history,
+            start_threshold,
+            stop_history,
+            stop_history_eou,
+            stop_threshold,
+            stop_threshold_eou,
+        )
+        audio_bytes = base64.b64decode(audio_content)
+
+        # Perform offline recognition and print the transcript.
+        try:
+            response = asr_service.offline_recognize(audio_bytes, recognition_config)
+            return response
+        except grpc.RpcError as e:
+            logger.error(f"Error transcribing audio file: {e.details()}")
+            return None
 
 
 def convert_mp3_to_wav(input_mp3_path, output_wav_path):
@@ -114,89 +191,6 @@ def process_transcription_response(response):
         segments.append({"start": segment_start, "end": segment_end, "text": " ".join(current_words)})
 
     return segments, final_transcript
-
-
-def transcribe_file(audio_content, api_key):
-    config_data = {
-        # 'server': 'grpc.nvcf.nvidia.com:443',
-        "server": "audio:50051",
-        # 'use_ssl': True,
-        "use_ssl": False,
-        "metadata": [
-            {"key": "function-id", "value": "e6fa172c-79bf-4b9c-bb37-14fe17b4226c"},
-            {"key": "authorization", "value": f"Bearer {api_key}"},
-        ],
-        "language_code": "en-US",
-        "automatic_punctuation": True,
-        "word_time_offsets": True,
-        "max_alternatives": 1,
-        "profanity_filter": False,
-        "no_verbatim_transcripts": False,
-        "speaker_diarization": False,
-        "boosted_lm_words": [],
-        "boosted_lm_score": 0.0,
-        "diarization_max_speakers": 0,
-        "start_history": 0.0,
-        "start_threshold": 0.0,
-        "stop_history": 0.0,
-        "stop_history_eou": False,
-        "stop_threshold": 0.0,
-        "stop_threshold_eou": False,
-    }
-
-    # Convert metadata from a list of dicts to a list of (key, value) tuples.
-    raw_metadata = config_data.get("metadata", [])
-    if raw_metadata and isinstance(raw_metadata[0], dict):
-        metadata = [(item["key"], item["value"]) for item in raw_metadata]
-    else:
-        metadata = raw_metadata
-
-    # Set ssl_cert to None if not provided or empty.
-    ssl_cert = config_data.get("ssl_cert")
-    if not ssl_cert:
-        ssl_cert = None
-
-    # Create authentication and ASR service objects.
-    auth = riva.client.Auth(ssl_cert, config_data["use_ssl"], config_data["server"], metadata)
-    asr_service = riva.client.ASRService(auth)
-
-    # Build the recognition configuration.
-    recognition_config = riva.client.RecognitionConfig(
-        language_code=config_data["language_code"],
-        max_alternatives=config_data.get("max_alternatives", 1),
-        profanity_filter=config_data.get("profanity_filter", False),
-        enable_automatic_punctuation=config_data.get("automatic_punctuation", False),
-        verbatim_transcripts=not config_data.get("no_verbatim_transcripts", False),
-        enable_word_time_offsets=config_data.get("word_time_offsets", False),
-    )
-
-    # Add additional configuration parameters.
-    riva.client.add_word_boosting_to_config(
-        recognition_config, config_data.get("boosted_lm_words", []), config_data.get("boosted_lm_score", 0.0)
-    )
-    riva.client.add_speaker_diarization_to_config(
-        recognition_config,
-        config_data.get("speaker_diarization", False),
-        config_data.get("diarization_max_speakers", 0),
-    )
-    riva.client.add_endpoint_parameters_to_config(
-        recognition_config,
-        config_data.get("start_history", 0.0),
-        config_data.get("start_threshold", 0.0),
-        config_data.get("stop_history", 0.0),
-        config_data.get("stop_history_eou", False),
-        config_data.get("stop_threshold", 0.0),
-        config_data.get("stop_threshold_eou", False),
-    )
-    audio_bytes = base64.b64decode(audio_content)
-
-    # Perform offline recognition and print the transcript.
-    try:
-        response = asr_service.offline_recognize(audio_bytes, recognition_config)
-        return response
-    except grpc.RpcError as e:
-        logger.error(f"Error transcribing audio file: {e.details()}")
-        return None
 
 
 def create_audio_inference_client(
