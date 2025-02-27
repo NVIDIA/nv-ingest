@@ -25,11 +25,11 @@ NV-Ingest is a microservice service that does the following:
 
 NV-Ingest supports the following file types:
 
-- `docx`
-- `jpeg`
 - `pdf`
-- `png`
+- `docx`
 - `pptx`
+- `jpeg`
+- `png`
 - `svg`
 - `tiff`
 - `txt`
