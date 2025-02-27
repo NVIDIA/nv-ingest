@@ -4,11 +4,16 @@ import pytest
 import pandas as pd
 import numpy as np
 
+from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction import (
+    _update_metadata,
+    _create_clients,
+    _extract_infographic_data,
+)
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
-from nv_ingest.stages.nim.infographic_extraction import _update_metadata, _create_clients
-from nv_ingest.stages.nim.infographic_extraction import _extract_infographic_data
 
-MODULE_UNDER_TEST = "nv_ingest.stages.nim.infographic_extraction"
+import nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 @pytest.fixture

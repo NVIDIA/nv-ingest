@@ -16,10 +16,10 @@ from nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_t
     fetch_and_process_messages,
 )
 
-# Import the functions under test.
+import nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source as module_under_test
 
 # Define the module under test.
-MODULE_UNDER_TEST = "nv_ingest.modules.sources.message_broker_task_source"
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 # -----------------------------------------------------------------------------
 # Dummy Classes for Testing (for client and BaseModel response simulation)
