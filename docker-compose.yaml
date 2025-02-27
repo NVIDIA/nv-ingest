@@ -1,4 +1,4 @@
-# PDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
@@ -197,15 +197,17 @@ services:
       - vlm
 
   audio:
-    image: nvcr.io/nvidian/audio_retrieval:latest
+    image: nvcr.io/nvidia/riva/riva-speech:2.18.0
     shm_size: 2gb
     ports:
-      - "8019:8000"
+      - "8019:50051"  # grpc
+      - "8020:50000"  # http
     user: root
     environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - MODEL_DEPLOY_KEY=tlt_encode
+      - NGC_CLI_API_KEY=${RIVA_NGC_API_KEY}
+      - NGC_CLI_ORG=nvidia
+      - NGC_CLI_TEAM=riva
       - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
@@ -215,7 +217,9 @@ services:
               device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
-    working_dir: /app/audio_retrieval/src
+    command: bash -c "download_and_deploy_ngc_models nvidia/riva/rmir_asr_conformer_en_us_ofl:2.18.0 && start-riva"
+    profiles:
+      - audio
 
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
@@ -236,8 +240,8 @@ services:
     cap_add:
       - sys_nice
     environment:
-      - AUDIO_HTTP_ENDPOINT=http://audio:8000/v1/transcribe
-      - AUDIO_INFER_PROTOCOL=http
+      - AUDIO_GRPC_ENDPOINT=audio:50051
+      - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
       - MAX_INGEST_PROCESS_WORKERS=${MAX_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
