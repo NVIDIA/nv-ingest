@@ -16,7 +16,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](https://
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can also [start services one by one](developer-guide/deployment.md) or run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](developer-guide/environment-config.md) you want to configure.
+If you prefer, you can also [start services one by one](deployment.md) or run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you want to configure.
 
 1. Git clone the repo:
 
@@ -26,7 +26,7 @@ If you prefer, you can also [start services one by one](developer-guide/deployme
    
     `cd nv-ingest`.
 
-3. [Generate API keys](developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 
     ```shell
     # This is required to access pre-built containers and NIM microservices
@@ -39,7 +39,7 @@ If you prefer, you can also [start services one by one](developer-guide/deployme
    
         During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
    
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](developer-guide/environment-config.md).
+4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](environment-config.md).
 
     ```
     # Container images must access resources from NGC.
@@ -266,7 +266,7 @@ processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
 
-For the full metadata definitions, refer to [Content Metadata](developer-guide/content-metadata.md). 
+For the full metadata definitions, refer to [Content Metadata](content-metadata.md). 
 
 We also provide a script for inspecting [extracted images](https://github.com/NVIDIA/nv-ingest/blob/main/src/util/image_viewer.py).
 

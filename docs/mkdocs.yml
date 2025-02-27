@@ -15,6 +15,7 @@ theme:
     - navigation.instant.prefetch
     - navigation.top
     - navigation.footer
+    - navigation.expand
     - search.suggest
     - search.highlight
     - content.code.copy
@@ -46,6 +47,26 @@ extra_css:
   - assets/css/fonts.css
   - assets/css/custom-material.css
   - assets/css/jupyter-themes.css
+
+nav:
+  - Home: index.md
+  - User Guide:
+    - What is NVIDIA Ingest?: user-guide/overview.md
+    - Release Notes: user-guide/releasenotes-nv-ingest.md
+    - Get Started:
+      - Prerequisites: user-guide/prerequisites.md
+      - Generate Your NGC Keys: user-guide/ngc-api-key.md
+      - Quickstart: user-guide/quickstart-guide.md
+    - Developer Guide:
+      - NV-Ingest Deployment: user-guide/deployment.md
+      - Developing with Kubernetes: user-guide/kubernetes-dev.md
+      - Telemetry: user-guide/telemetry.md
+      - Contribute: user-guide/contributing.md
+    - Reference:
+      - Content Metadata: user-guide/content-metadata.md
+      - Environment Variables: user-guide/environment-config.md
+      - NV-Ingest CLI: user-guide/nv-ingest_cli.md
+      - API Reference: user-guide/api-docs.md
 
 plugins:
   - search

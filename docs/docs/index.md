@@ -14,6 +14,6 @@ hide:
 
     Install NV-Ingest and set up your environment to start accelerating your workflows.
 
-    [Get Started](user-guide){ .md-button .md-button }
+    [Get Started](user-guide/overview.md){ .md-button .md-button }
 
 </div>
