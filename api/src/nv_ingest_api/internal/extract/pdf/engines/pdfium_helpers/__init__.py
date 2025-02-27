@@ -38,6 +38,7 @@ def _work_extract_pdf(
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
@@ -53,6 +54,7 @@ def _work_extract_pdf(
         pdf_stream,
         extract_text,
         extract_images,
+        extract_infographics,
         extract_tables,
         extract_charts,
         extractor_config,
@@ -87,10 +89,11 @@ def _orchestrate_row_extraction(
 
     # Extract required boolean flags from params.
     try:
-        extract_text = params.pop("extract_text")
-        extract_images = params.pop("extract_images")
-        extract_tables = params.pop("extract_tables")
-        extract_charts = params.pop("extract_charts")
+        extract_text = params.pop("extract_text", False)
+        extract_images = params.pop("extract_images", False)
+        extract_tables = params.pop("extract_tables", False)
+        extract_charts = params.pop("extract_charts", False)
+        extract_infographics = params.pop("extract_infographics", False)
     except KeyError as e:
         raise ValueError(f"Missing required extraction flag: {e}")
 
@@ -113,6 +116,7 @@ def _orchestrate_row_extraction(
             pdf_stream,
             extract_text,
             extract_images,
+            extract_infographics,
             extract_tables,
             extract_charts,
             extractor_config,
