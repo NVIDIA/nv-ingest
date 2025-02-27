@@ -61,7 +61,7 @@ def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=20):
     # Convert token chunks back to text while preserving original spacing and case
     text_chunks = []
     for chunk in chunks:
-        text_chunk = text[chunk[0][0] : chunk[-1][0]]
+        text_chunk = text[chunk[0][0] : chunk[-1][1]]
         text_chunks.append(text_chunk)
 
     return text_chunks
