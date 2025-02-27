@@ -64,17 +64,16 @@ Create the name of the service account to use
 {{/*
 Create secret to access docker registry
 */}}
-{{- define "nv-ingest.imagePullSecret" }}
-{{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .Values.imagePullSecret.registry (printf "%s:%s" .Values.imagePullSecret.username .Values.imagePullSecret.password | b64enc) | b64enc }}
+{{- define "nv-ingest.ngcImagePullSecret" }}
+{{- printf "{\"auths\": {\"%s\": {\"auth\": \"%s\"}}}" .Values.ngcImagePullSecret.registry (printf "%s:%s" .Values.ngcImagePullSecret.username .Values.ngcImagePullSecret.password | b64enc) | b64enc }}
 {{- end }}
 
 {{/*
-Create secret to access docker registry
-*/}}
-{{- define "nv-ingest.ngcAPIKey" }}
-{{- printf "%s" .Values.ngcSecret.password  }}
-{{- end }}
-
+  Create secret to access NGC Api
+  */}}
+  {{- define "nv-ingest.ngcApiSecret" }}
+  {{- printf "%s" .Values.ngcApiSecret.password  }}
+  {{- end }}
 
 {{/*
 Create a deployment with the NGC Puller
