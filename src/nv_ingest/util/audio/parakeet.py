@@ -7,8 +7,8 @@ from typing import Tuple
 
 import ffmpeg
 import grpc
-import riva.client
 import requests
+import riva.client
 
 from nv_ingest.util.tracing.tagging import traceable_func
 
@@ -119,23 +119,27 @@ class ParakeetClient:
             stop_threshold_eou,
         )
         audio_bytes = base64.b64decode(audio_content)
+        mono_audio_bytes = convert_to_mono_wav(audio_bytes)
 
         # Perform offline recognition and print the transcript.
         try:
-            response = asr_service.offline_recognize(audio_bytes, recognition_config)
+            response = asr_service.offline_recognize(mono_audio_bytes, recognition_config)
             return response
         except grpc.RpcError as e:
             logger.error(f"Error transcribing audio file: {e.details()}")
             return None
 
 
-def convert_mp3_to_wav(input_mp3_path, output_wav_path):
-    (
-        ffmpeg.input(input_mp3_path)
-        .output(output_wav_path, format="wav", acodec="pcm_s16le", ar="44100", ac=1)  # Added ac=1
-        .overwrite_output()
-        .run()
+def convert_to_mono_wav(audio_bytes):
+    process = (
+        ffmpeg.input("pipe:")
+        .output("pipe:", format="wav", acodec="pcm_s16le", ar="44100", ac=1)  # Added ac=1
+        .run_async(pipe_stdin=True, pipe_stdout=True)
     )
+
+    out, _ = process.communicate(input=audio_bytes)
+
+    return out
 
 
 def process_transcription_response(response):
