@@ -1,7 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import os
+import typing
 
 from morpheus.config import Config
 from morpheus.pipeline.pipeline import Pipeline
@@ -41,13 +43,16 @@ def setup_ingestion_pipeline(
     image_filter_stage = add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     table_extraction_stage = add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     chart_extraction_stage = add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    infographic_extraction_stage = add_infographic_extractor_stage(
+        pipe, morpheus_pipeline_config, ingest_config, default_cpu_count
+    )
     image_caption_stage = add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
     ## Transforms and data synthesis
     ########################################################################################################
-    nemo_splitter_stage = add_nemo_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
+    text_splitter_stage = add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
     embed_extractions_stage = add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
     ## Storage and output
@@ -80,16 +85,19 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_dedup_stage, image_filter_stage)
     pipe.add_edge(image_filter_stage, table_extraction_stage)
     pipe.add_edge(table_extraction_stage, chart_extraction_stage)
-    pipe.add_edge(chart_extraction_stage, nemo_splitter_stage)
-    pipe.add_edge(nemo_splitter_stage, image_caption_stage)
+    pipe.add_edge(chart_extraction_stage, infographic_extraction_stage)
+    pipe.add_edge(infographic_extraction_stage, text_splitter_stage)
+    pipe.add_edge(text_splitter_stage, image_caption_stage)
     pipe.add_edge(image_caption_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
     pipe.add_edge(image_storage_stage, embedding_storage_stage)
     pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
     pipe.add_edge(vdb_task_sink_stage, sink_stage)
+
     if add_meter_stage:
         pipe.add_edge(sink_stage, otel_meter_stage)
         pipe.add_edge(otel_meter_stage, otel_tracer_stage)
     else:
         pipe.add_edge(sink_stage, otel_tracer_stage)
+
     pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)

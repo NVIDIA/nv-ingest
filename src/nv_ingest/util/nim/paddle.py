@@ -152,10 +152,12 @@ class PaddleOCRModelInterface(ModelInterface):
                 base64_list = [data["base64_image"]]
 
             input_list: List[Dict[str, Any]] = []
-            for b64 in base64_list:
+            for b64, img in zip(base64_list, images):
                 image_url = f"data:image/png;base64,{b64}"
                 image_obj = {"type": "image_url", "url": image_url}
                 input_list.append(image_obj)
+                _dims = {"new_width": img.shape[0], "new_height": img.shape[1]}
+                dims.append(_dims)
 
             batches = []
             batch_data_list = []
@@ -167,6 +169,7 @@ class PaddleOCRModelInterface(ModelInterface):
                 payload = {"input": input_chunk}
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
+
             return batches, batch_data_list
 
         else:
@@ -255,7 +258,6 @@ class PaddleOCRModelInterface(ModelInterface):
     def _extract_content_from_paddle_http_response(
         self,
         json_response: Dict[str, Any],
-        table_content_format: Optional[str],
     ) -> List[Tuple[str, str]]:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.

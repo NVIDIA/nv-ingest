@@ -2,149 +2,220 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from unittest.mock import Mock
+from pydantic import BaseModel
 
-import pytest
-
-from ....import_checks import MORPHEUS_IMPORT_OK
-from ....import_checks import CUDA_DRIVER_OK
-
-if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
-    from nv_ingest.util.flow_control.filter_by_task import remove_task_subset
-    from nv_ingest.util.flow_control.filter_by_task import filter_by_task
-    from morpheus.messages import ControlMessage
+from nv_ingest.util.flow_control.filter_by_task import _is_subset, filter_by_task
 
 
-@pytest.fixture
-def mock_control_message():
-    # Create a mock ControlMessage object
-    control_message = Mock()
-    control_message.payload.return_value = "not processed"
-
-    # Default to False for unspecified tasks
-    control_message.has_task.return_value = False
-
-    # To simulate has_task returning True for a specific task ("task1")
-    control_message.has_task.side_effect = lambda task: task == "task1"
-
-    # To simulate get_tasks for a specific task "task1"
-    control_message.get_tasks.return_value = {"task1": [{"prop1": "foo"}]}
-
-    return control_message
+# =============================================================================
+# Helper Classes for Testing filter_by_task
+# =============================================================================
 
 
-# Sample function to be decorated
-def process_message(message):
-    message.payload.return_value = "processed"
-    return message
+class DummyTask:
+    """A simple dummy task object with a type and properties."""
+
+    def __init__(self, type, properties):
+        self.type = type
+        self.properties = properties
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_with_required_task(mock_control_message):
-    decorated_func = filter_by_task(["task1"])(process_message)
-    assert (
-        decorated_func(mock_control_message).payload() == "processed"
-    ), "Should process the message when required task is present."
+class DummyMessage:
+    """
+    A dummy IngestControlMessage that provides a get_tasks() method.
+    The get_tasks() method returns a list of DummyTask objects.
+    """
+
+    def __init__(self, tasks):
+        self._tasks = tasks
+
+    def get_tasks(self):
+        return self._tasks
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_with_required_task_properties(mock_control_message):
-    decorated_func = filter_by_task([("task1", {"prop1": "foo"})])(process_message)
-    assert (
-        decorated_func(mock_control_message).payload() == "processed"
-    ), "Should process the message when both required task and required property are present."
+# A dummy Pydantic model for testing tasks with BaseModel properties.
+class DummyModel(BaseModel):
+    a: int
+    b: str
+    c: float = 0.0
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_without_required_task_no_forward_func(mock_control_message):
-    decorated_func = filter_by_task(["task3"])(process_message)
-    assert (
-        decorated_func(mock_control_message).payload() == "not processed"
-    ), "Should return the original message when required task is not present and no forward_func is provided."
+# -----------------------------------------------------------------------------
+# Tests for _is_subset (for reference)
+# -----------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_without_required_task_properteies_no_forward_func(mock_control_message):
-    decorated_func = filter_by_task([("task1", {"prop1": "bar"})])(process_message)
-    assert (
-        decorated_func(mock_control_message).payload() == "not processed"
-    ), "Should return the original message when required task is present but required task property is not present."
+def test_is_subset_wildcard():
+    """Test that the special wildcard '*' matches any value."""
+    assert _is_subset("anything", "*")
+    assert _is_subset(123, "*")
+    assert _is_subset({"a": 1}, "*")
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_without_required_task_with_forward_func(mock_control_message):
-    # Create a simple mock function to be decorated
-    mock_function = Mock(return_value="some_value")
-    mock_function.__name__ = "mock_function"  # Set a __name__ attribute on the mock.
-
-    # Setup the forward function
-    forward_func = Mock(return_value=mock_control_message)
-
-    # Apply the decorator to the mock function
-    decorated_func = filter_by_task(["task3"], forward_func=forward_func)(mock_function)
-
-    # Call the decorated function with the control message
-    result = decorated_func(mock_control_message)
-
-    # Check if forward_func was called since required task is not present
-    forward_func.assert_called_once_with(mock_control_message)
-
-    # Assert that the result of calling the decorated function is as expected
-    assert result == mock_control_message, "Should return the mock_control_message from the forward function."
+def test_is_subset_dict_true():
+    """Test that a dictionary is a subset when all required keys/values are present."""
+    superset = {"a": 1, "b": 2, "c": 3}
+    subset = {"a": 1, "b": 2}
+    assert _is_subset(superset, subset)
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_without_required_task_properties_with_forward_func(mock_control_message):
-    # Create a simple mock function to be decorated
-    mock_function = Mock(return_value="some_value")
-    mock_function.__name__ = "mock_function"  # Set a __name__ attribute on the mock.
-
-    # Setup the forward function
-    forward_func = Mock(return_value=mock_control_message)
-
-    # Apply the decorator to the mock function
-    decorated_func = filter_by_task([("task1", {"prop1": "bar"})], forward_func=forward_func)(mock_function)
-
-    # Call the decorated function with the control message
-    result = decorated_func(mock_control_message)
-
-    # Check if forward_func was called since required task is not present
-    forward_func.assert_called_once_with(mock_control_message)
-
-    # Assert that the result of calling the decorated function is as expected
-    assert result == mock_control_message, "Should return the mock_control_message from the forward function."
+# -----------------------------------------------------------------------------
+# Tests for filter_by_task Decorator – Complex Task and Properties Requirements
+# -----------------------------------------------------------------------------
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_filter_by_task_with_invalid_argument():
-    decorated_func = filter_by_task(["task1"])(process_message)
-    with pytest.raises(ValueError):
-        decorated_func(
-            "not a ControlMessage"
-        ), "Should raise ValueError if the first argument is not a ControlMessage object."
+def test_filter_decorator_complex_nested_match():
+    """
+    Test that a complex nested property requirement with regex and list matching is satisfied.
+
+    Required task:
+      ("taskComplex", {"nested": {"key": "regex:^start"}, "list": [1, 2]})
+
+    Dummy task:
+      - type: "taskComplex"
+      - properties: a dict with a nested dict whose 'key' starts with "start"
+        and a list that includes the elements 1 and 2.
+    """
+    required_tasks = [("taskComplex", {"nested": {"key": "regex:^start"}, "list": [1, 2]})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    properties = {
+        "nested": {"key": "startingValue", "other": "ignored"},
+        "list": [0, 1, 2, 3],
+        "extra": "data",
+    }
+    tasks = [DummyTask("taskComplex", properties)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    assert result == "processed"
 
 
-def create_ctrl_msg(task, task_props_list):
-    ctrl_msg = ControlMessage()
-    for task_props in task_props_list:
-        ctrl_msg.add_task(task, task_props)
+def test_filter_decorator_complex_nested_no_match():
+    """
+    Test that a complex nested property requirement fails when nested values do not match.
 
-    return ctrl_msg
+    Required task:
+      ("taskComplex", {"nested": {"key": "regex:^start"}, "list": [1, 2, 3]})
+
+    Dummy task:
+      - type: "taskComplex"
+      - properties: a dict with a nested dict whose 'key' does not start with "start"
+        and a list missing one required element.
+    """
+    required_tasks = [("taskComplex", {"nested": {"key": "regex:^start"}, "list": [1, 2, 3]})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    properties = {
+        "nested": {"key": "notMatching", "other": "ignored"},
+        "list": [0, 1, 2],  # Missing the element '3'
+    }
+    tasks = [DummyTask("taskComplex", properties)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    # Expecting no match so the original message is returned.
+    assert result == msg
 
 
-@pytest.mark.skipif(not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus modules are not available.")
-def test_remove_task_subset():
-    task_props_list = [
-        {"prop0": "foo0", "prop1": "bar1"},
-        {"prop2": "foo2", "prop3": "bar3"},
-    ]
+def test_filter_decorator_multiple_required_conditions_match():
+    """
+    Test that multiple property conditions within a single required task tuple are all satisfied.
 
-    subset = {"prop2": "foo2"}
-    subset = task_props_list[1]
-    ctrl_msg = create_ctrl_msg("task1", task_props_list)
-    task_props = remove_task_subset(ctrl_msg, "task1", subset)
-    remaining_tasks = ctrl_msg.get_tasks()
+    Required task:
+      ("taskMulti", {"a": 1}, {"b": 2})
 
-    assert task_props == {"prop2": "foo2", "prop3": "bar3"}
-    assert len(remaining_tasks) == 1
-    assert remaining_tasks["task1"][0] == {"prop0": "foo0", "prop1": "bar1"}
+    Dummy task:
+      - type: "taskMulti"
+      - properties: a dict that includes 'a': 1 and 'b': 2 (along with extra data).
+    """
+    required_tasks = [("taskMulti", {"a": 1}, {"b": 2})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    properties = {"a": 1, "b": 2, "c": 3}
+    tasks = [DummyTask("taskMulti", properties)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    assert result == "processed"
+
+
+def test_filter_decorator_multiple_required_conditions_no_match():
+    """
+    Test that if not all property conditions within a required task tuple are satisfied,
+    the function is not executed.
+
+    Required task:
+      ("taskMulti", {"a": 1}, {"b": 2})
+
+    Dummy task:
+      - type: "taskMulti"
+      - properties: a dict that satisfies 'a': 1 but has 'b': 3 (which does not match the required value).
+    """
+    required_tasks = [("taskMulti", {"a": 1}, {"b": 2})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    properties = {"a": 1, "b": 3}  # 'b' does not equal 2.
+    tasks = [DummyTask("taskMulti", properties)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    # Since the conditions are not met, the original message is returned.
+    assert result == msg
+
+
+def test_filter_decorator_pydantic_properties_match():
+    """
+    Test that the decorator correctly handles Pydantic model instances as task properties.
+
+    Required task:
+      ("taskPydantic", {"a": 10, "b": "hello"})
+
+    Dummy task:
+      - type: "taskPydantic"
+      - properties: a DummyModel instance with values that satisfy the requirement.
+    """
+    required_tasks = [("taskPydantic", {"a": 10, "b": "hello"})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    model_instance = DummyModel(a=10, b="hello", c=3.14)
+    tasks = [DummyTask("taskPydantic", model_instance)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    assert result == "processed"
+
+
+def test_filter_decorator_pydantic_properties_no_match():
+    """
+    Test that a Pydantic model instance does not satisfy the required property criteria if its values differ.
+
+    Required task:
+      ("taskPydantic", {"a": 10, "b": "world"})
+
+    Dummy task:
+      - type: "taskPydantic"
+      - properties: a DummyModel instance that does not match the required properties.
+    """
+    required_tasks = [("taskPydantic", {"a": 10, "b": "world"})]
+
+    @filter_by_task(required_tasks)
+    def dummy_func(message):
+        return "processed"
+
+    model_instance = DummyModel(a=10, b="hello", c=3.14)
+    tasks = [DummyTask("taskPydantic", model_instance)]
+    msg = DummyMessage(tasks)
+    result = dummy_func(msg)
+    # Expect no match so the original message is returned.
+    assert result == msg

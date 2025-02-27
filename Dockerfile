@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.4.1-base-ubuntu22.04
+ARG BASE_IMG_TAG=12.5.1-base-ubuntu22.04
 
 # Use NVIDIA Morpheus as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
@@ -12,6 +12,8 @@ FROM $BASE_IMG:$BASE_IMG_TAG AS base
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
+ARG DOWNLOAD_LLAMA_TOKENIZER=""
+ARG HF_ACCESS_TOKEN=""
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
@@ -21,12 +23,19 @@ LABEL git_commit=$GIT_COMMIT
 
 # Install necessary dependencies using apt-get
 RUN apt-get update && apt-get install -y \
-      wget \
       bzip2 \
       ca-certificates \
       curl \
       libgl1-mesa-glx \
+      software-properties-common \
+      wget \
     && apt-get clean
+
+# A workaround for the error (mrc-core): /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
+# Issue: https://github.com/NVIDIA/nv-ingest/issues/474
+RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && apt-get update \
+    && apt-get install -y --only-upgrade libstdc++6
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
@@ -63,6 +72,9 @@ WORKDIR /workspace
 
 # Copy custom entrypoint script
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
+
+# Copy post build triggers script
+COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
 FROM base AS nv_ingest_install
 # Copy the module code
@@ -117,6 +129,11 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./api/dist/*.whl \
     && pip install ./client/dist/*.whl
 
+
+RUN  --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && python3 /workspace/docker/post_build_triggers.py
+
 RUN rm -rf src
 
 FROM nv_ingest_install AS runtime
@@ -137,3 +154,24 @@ RUN source activate nv_ingest_runtime && \
     pip install -e ./client
 
 CMD ["/bin/bash"]
+
+
+FROM nv_ingest_install AS docs
+
+# Install dependencies needed for docs generation
+RUN apt-get update && apt-get install -y \
+      make \
+    && apt-get clean
+
+COPY docs docs
+
+# Docs needs all the source code present so add it to the container
+COPY src src
+COPY api api
+COPY client client
+
+RUN source activate nv_ingest_runtime && \
+    pip install -r ./docs/requirements.txt
+
+# Default command: Run `make docs`
+CMD ["bash", "-c", "cd /workspace/docs && source activate nv_ingest_runtime && make docs"]

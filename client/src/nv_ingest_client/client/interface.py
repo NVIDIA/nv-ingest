@@ -286,7 +286,7 @@ class Ingestor:
                 if job_state.state != JobStateEnum.FAILED:
                     job_state.state = JobStateEnum.FAILED
             completed_futures.add(future)
-            future_results.append(result)
+            future_results.extend(result)
             if completed_futures == submitted_futures:
                 combined_future.set_result(future_results)
 
@@ -294,7 +294,7 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future.result()[0])
+            self._vdb_bulk_upload.run(combined_future.result())
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
@@ -393,9 +393,17 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
 
+        # Defaulting to False since enabling infographic extraction reduces throughput.
+        # Users have to set to True if infographic extraction is required.
+        extract_infographics = kwargs.pop("extract_infographics", False)
+
         for document_type in self._job_specs.file_types:
             extract_task = ExtractTask(
-                document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
+                document_type,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                **kwargs,
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 

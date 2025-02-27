@@ -26,11 +26,10 @@ def valid_task_properties(task_type):
     """Returns valid task properties based on the task type."""
     if task_type == TaskTypeEnum.split:
         return {
-            "split_by": "sentence",
-            "split_length": 10,
-            "split_overlap": 0,
-            "max_character_length": 100,
-            "sentence_window_size": None,  # This is valid when not required
+            "tokenizer": "intfloat/e5-large-unsupervised",
+            "chunk_size": 300,
+            "chunk_overlap": 0,
+            "params": {},
         }
     elif task_type == TaskTypeEnum.extract:
         return {"document_type": "pdf", "method": "OCR", "params": {"language": "en"}}
@@ -117,14 +116,14 @@ def test_field_type_correctness():
 
 
 def test_custom_validator_logic_for_sentence_window_size():
-    """Tests custom validator logic related to sentence_window_size in split tasks."""
+    """Tests custom validator logic related to chunk_size and chunk_overlap in split tasks."""
     task = {
         "type": "split",
         "task_properties": {
-            "split_by": "word",  # Incorrect usage of sentence_window_size
-            "split_length": 10,
-            "split_overlap": 5,
-            "sentence_window_size": 5,  # Should not be set when split_by is not 'sentence'
+            "tokenizer": "intfloat/e5-large-unsupervised",
+            "chunk_size": 200,
+            "chunk_overlap": 250,  # chunk_overlap should always be less than chunk_size
+            "params": {},
         },
     }
     job_data = {
@@ -134,7 +133,7 @@ def test_custom_validator_logic_for_sentence_window_size():
     }
     with pytest.raises(ValidationError) as exc_info:
         validate_ingest_job(job_data)
-    assert "sentence_window_size" in str(exc_info.value) and "must be 'sentence'" in str(exc_info.value)
+    assert "chunk_overlap must be less than chunk_size" in str(exc_info.value)
 
 
 def test_multiple_task_types():
@@ -150,9 +149,10 @@ def test_multiple_task_types():
             {
                 "type": "split",
                 "task_properties": {
-                    "split_by": "word",
-                    "split_length": 100,
-                    "split_overlap": 0,
+                    "tokenizer": "intfloat/e5-large-unsupervised",
+                    "chunk_size": 100,
+                    "chunk_overlap": 0,
+                    "params": {},
                 },
             },
             {
@@ -244,27 +244,10 @@ def test_incorrect_property_types():
             {
                 "type": "split",
                 "task_properties": {
-                    "split_by": "word",
-                    "split_length": {"not an int": 123},  # Incorrect type (should be int)
-                    "split_overlap": 0,
-                },
-            }
-        ],
-    }
-    with pytest.raises(ValidationError):
-        validate_ingest_job(job_data)
-
-
-def test_missing_required_fields():
-    job_data = {
-        "job_payload": valid_job_payload(),
-        "job_id": "12345",
-        "tasks": [
-            {
-                "type": "split",
-                "task_properties": {
-                    "split_by": "sentence",  # Missing split_length
-                    "split_overlap": 0,
+                    "tokenizer": "intfloat/e5-large-unsupervised",
+                    "chunk_size": {"not an int": 123},  # Incorrect type (should be int)
+                    "chunk_overlap": 0,
+                    "params": {},
                 },
             }
         ],

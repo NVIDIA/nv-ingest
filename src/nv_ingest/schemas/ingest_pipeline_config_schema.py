@@ -13,12 +13,13 @@ from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtrac
 from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.image_storage_schema import ImageStorageModuleSchema
+from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorSchema
 from nv_ingest.schemas.vdb_task_sink_schema import VdbTaskSinkSchema
 from nv_ingest.schemas.job_counter_schema import JobCounterSchema
 from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from nv_ingest.schemas.message_broker_source_schema import MessageBrokerTaskSourceSchema
 from nv_ingest.schemas.metadata_injector_schema import MetadataInjectorSchema
-from nv_ingest.schemas.nemo_doc_splitter_schema import DocumentSplitterSchema
+from nv_ingest.schemas.text_splitter_schema import TextSplitterSchema
 from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
 from nv_ingest.schemas.otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
@@ -30,13 +31,14 @@ logger = logging.getLogger(__name__)
 
 class PipelineConfigSchema(BaseModel):
     chart_extractor_module: ChartExtractorSchema = ChartExtractorSchema()
-    document_splitter_module: DocumentSplitterSchema = DocumentSplitterSchema()
+    text_splitter_module: TextSplitterSchema = TextSplitterSchema()
     embedding_storage_module: EmbeddingStorageModuleSchema = EmbeddingStorageModuleSchema()
     embed_extractions_module: EmbedExtractionsSchema = EmbedExtractionsSchema()
     image_caption_extraction_module: ImageCaptionExtractionSchema = ImageCaptionExtractionSchema()
     image_dedup_module: ImageDedupSchema = ImageDedupSchema()
     image_filter_module: ImageFilterSchema = ImageFilterSchema()
     image_storage_module: ImageStorageModuleSchema = ImageStorageModuleSchema()
+    infographic_extractor_module: InfographicExtractorSchema = InfographicExtractorSchema()
     job_counter_module: JobCounterSchema = JobCounterSchema()
     metadata_injection_module: MetadataInjectorSchema = MetadataInjectorSchema()
     otel_meter_module: OpenTelemetryMeterSchema = OpenTelemetryMeterSchema()

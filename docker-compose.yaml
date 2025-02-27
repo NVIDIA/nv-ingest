@@ -76,7 +76,7 @@ services:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["1"]
+              device_ids: ["0"]
               capabilities: [gpu]
     runtime: nvidia
     profiles:
@@ -126,6 +126,28 @@ services:
               capabilities: [gpu]
     runtime: nvidia
 
+  reranker:
+    # NIM ON
+    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-1.3.0}
+    shm_size: 16gb
+    ports:
+      - "8020:8000"
+    environment:
+      - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_LOG_VERBOSE=1
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    profiles:
+      - retrieval
+
   nemoretriever-parse:
     image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0ea}
     ports:
@@ -149,12 +171,40 @@ services:
     profiles:
       - nemoretriever-parse
 
+  vlm:
+    image: ${VLM_IMAGE:-nvcr.io/nim/meta/llama-3.2-11b-vision-instruct}:${VLM_TAG:-latest}
+    ports:
+      - "8018:8000"
+    user: root
+    environment:
+      - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_LOG_VERBOSE=1
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - CUDA_VISIBLE_DEVICES=0
+      # VLM will use all available VRAM on device
+      # For more info
+      # https://docs.nvidia.com/nim/vision-language-models/latest/configuration.html
+      #- NIM_KVCACHE_PERCENT=.25
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    profiles:
+      - vlm
+
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
       target: runtime
+      args:
+        DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
+        HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
@@ -165,7 +215,8 @@ services:
     cap_add:
       - sys_nice
     environment:
-      - CUDA_VISIBLE_DEVICES=0
+      - CUDA_VISIBLE_DEVICES=-1
+      - MAX_INGEST_PROCESS_WORKERS=${MAX_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       # Message client for development
@@ -206,7 +257,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=yolox-table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://yolox-table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
-      - VLM_CAPTION_ENDPOINT=https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions
+      - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1

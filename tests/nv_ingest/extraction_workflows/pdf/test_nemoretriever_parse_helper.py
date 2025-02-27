@@ -34,16 +34,25 @@ def sample_pdf_stream():
     return pdf_stream
 
 
+@pytest.fixture
+def mock_parser_config():
+    return {
+        "nemoretriever_parse_endpoints": ("parser:8001", "http://parser:8000"),
+    }
+
+
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, document_df, mock_parser_config):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
-        {
-            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
-            "text": "testing",
-            "type": "Text",
-        }
+        [
+            {
+                "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+                "text": "testing",
+                "type": "Text",
+            }
+        ]
     ]
 
     result = nemoretriever_parse(
@@ -51,9 +60,11 @@ def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, doc
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        nemoretriever_parse_config=MagicMock(),
+        extract_tables_method="nemoretriever_parse",
+        nemoretriever_parse_config=mock_parser_config,
     )
 
     assert len(result) == 1
@@ -63,15 +74,17 @@ def test_nemoretriever_parse_text_extraction(mock_client, sample_pdf_stream, doc
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, document_df, mock_parser_config):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
-        {
-            "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
-            "text": "table text",
-            "type": "Table",
-        }
+        [
+            {
+                "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
+                "text": "table text",
+                "type": "Table",
+            }
+        ]
     ]
 
     result = nemoretriever_parse(
@@ -79,9 +92,11 @@ def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, do
         extract_text=True,
         extract_images=False,
         extract_tables=True,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        nemoretriever_parse_config=MagicMock(),
+        extract_tables_method="nemoretriever_parse",
+        nemoretriever_parse_config=mock_parser_config,
     )
 
     assert len(result) == 2
@@ -93,15 +108,17 @@ def test_nemoretriever_parse_table_extraction(mock_client, sample_pdf_stream, do
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, document_df, mock_parser_config):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
-        {
-            "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
-            "text": "",
-            "type": "Picture",
-        }
+        [
+            {
+                "bbox": {"xmin": 1 / 1024, "ymin": 2 / 1280, "xmax": 101 / 1024, "ymax": 102 / 1280},
+                "text": "",
+                "type": "Picture",
+            }
+        ]
     ]
 
     result = nemoretriever_parse(
@@ -109,9 +126,11 @@ def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, do
         extract_text=True,
         extract_images=True,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        nemoretriever_parse_config=MagicMock(),
+        extract_tables_method="nemoretriever_parse",
+        nemoretriever_parse_config=mock_parser_config,
     )
 
     assert len(result) == 2
@@ -123,20 +142,22 @@ def test_nemoretriever_parse_image_extraction(mock_client, sample_pdf_stream, do
 
 
 @patch(f"{_MODULE_UNDER_TEST}.create_inference_client")
-def test_nemoretriever_parse_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df):
+def test_nemoretriever_parse_text_extraction_bboxes(mock_client, sample_pdf_stream, document_df, mock_parser_config):
     mock_client_instance = MagicMock()
     mock_client.return_value = mock_client_instance
     mock_client_instance.infer.return_value = [
-        {
-            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
-            "text": "testing0",
-            "type": "Title",
-        },
-        {
-            "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
-            "text": "testing1",
-            "type": "Text",
-        },
+        [
+            {
+                "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+                "text": "testing0",
+                "type": "Title",
+            },
+            {
+                "bbox": {"xmin": 0.16633729456384325, "ymin": 0.0969, "xmax": 0.3097820480404551, "ymax": 0.1102},
+                "text": "testing1",
+                "type": "Text",
+            },
+        ]
     ]
 
     result = nemoretriever_parse(
@@ -144,9 +165,11 @@ def test_nemoretriever_parse_text_extraction_bboxes(mock_client, sample_pdf_stre
         extract_text=True,
         extract_images=False,
         extract_tables=False,
+        extract_charts=False,
         row_data=document_df.iloc[0],
         text_depth="page",
-        nemoretriever_parse_config=MagicMock(),
+        extract_tables_method="nemoretriever_parse",
+        nemoretriever_parse_config=mock_parser_config,
     )
 
     assert len(result) == 1

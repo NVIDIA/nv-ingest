@@ -4,19 +4,9 @@ import pytest
 import pandas as pd
 import numpy as np
 
-from ....import_checks import MORPHEUS_IMPORT_OK
-from ....import_checks import CUDA_DRIVER_OK
-
-# Skip all tests in this module if Morpheus or CUDA dependencies are not available.
-pytestmark = pytest.mark.skipif(
-    not (MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK), reason="Morpheus or CUDA dependencies are not available"
-)
-
-if MORPHEUS_IMPORT_OK and CUDA_DRIVER_OK:
-    from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-    from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
-    from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
-    from nv_ingest.util.image_processing.transforms import base64_to_numpy
+from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
+from nv_ingest.stages.nim.chart_extraction import _update_metadata, _create_clients
+from nv_ingest.stages.nim.chart_extraction import _extract_chart_data
 
 MODULE_UNDER_TEST = "nv_ingest.stages.nim.chart_extraction"
 
@@ -120,7 +110,7 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
 
     # Patch join_yolox_and_paddle_output so that it returns a dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}],
     )
     # Patch process_yolox_graphic_elements to extract the chart title.
@@ -176,7 +166,7 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
 
     # Patch join_yolox_and_paddle_output so it returns the expected joined dict per image.
     mock_join = mocker.patch(
-        f"{MODULE_UNDER_TEST}.join_yolox_and_paddle_output",
+        f"{MODULE_UNDER_TEST}.join_yolox_graphic_elements_and_paddle_output",
         side_effect=[{"chart_title": "joined_1"}, {"chart_title": "joined_2"}, {"chart_title": "joined_3"}],
     )
     # Patch process_yolox_graphic_elements to extract the chart title.
