@@ -12,6 +12,8 @@ FROM $BASE_IMG:$BASE_IMG_TAG AS base
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
+ARG DOWNLOAD_LLAMA_TOKENIZER=""
+ARG HF_ACCESS_TOKEN=""
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
@@ -71,6 +73,9 @@ WORKDIR /workspace
 # Copy custom entrypoint script
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
 
+# Copy post build triggers script
+COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
+
 FROM base AS nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
@@ -123,6 +128,11 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./dist/*.whl \
     && pip install ./api/dist/*.whl \
     && pip install ./client/dist/*.whl
+
+
+RUN  --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && python3 /workspace/docker/post_build_triggers.py
 
 RUN rm -rf src
 

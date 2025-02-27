@@ -21,6 +21,7 @@ from typing import List
 import time
 from urllib.parse import urlparse
 from typing import Union, Dict
+import requests
 from nv_ingest_client.util.util import ClientConfigSchema
 import logging
 
@@ -53,7 +54,7 @@ class MilvusOperator:
         self,
         collection_name: Union[str, Dict] = "nv_ingest_collection",
         milvus_uri: str = "http://localhost:19530",
-        sparse: bool = True,
+        sparse: bool = False,
         recreate: bool = True,
         gpu_index: bool = True,
         gpu_search: bool = True,
@@ -600,6 +601,7 @@ def stream_insert_milvus(
                 else:
                     data.append(record_func(text, element))
     client.insert(collection_name=collection_name, data=data)
+    logger.error(f"logged {len(data)} records")
 
 
 def write_to_nvingest_collection(
@@ -684,6 +686,7 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
+    logger.error(f"{len(records)} records to insert to milvus")
     if len(records) < threshold:
         stream = True
     if stream:
@@ -833,14 +836,14 @@ def hybrid_retrieval(
         "metric_type": "L2",
     }
     if not gpu_search and not local_index:
-        s_param_1["params"] = {"ef": top_k * 2}
+        s_param_1["params"] = {"ef": top_k}
 
     # Create search requests for both vector types
     search_param_1 = {
         "data": dense_embeddings,
         "anns_field": dense_field,
         "param": s_param_1,
-        "limit": top_k * 2,
+        "limit": top_k,
     }
 
     dense_req = AnnSearchRequest(**search_param_1)
@@ -852,7 +855,7 @@ def hybrid_retrieval(
         "data": sparse_embeddings,
         "anns_field": sparse_field,
         "param": s_param_2,
-        "limit": top_k * 2,
+        "limit": top_k,
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
@@ -875,6 +878,13 @@ def nvingest_retrieval(
     model_name: str = None,
     output_fields: List[str] = ["text", "source", "content_metadata"],
     gpu_search: bool = True,
+    nv_ranker: bool = False,
+    nv_ranker_endpoint: str = None,
+    nv_ranker_model_name: str = None,
+    nv_ranker_nvidia_api_key: str = None,
+    nv_ranker_truncate: str = "END",
+    nv_ranker_top_k: int = 5,
+    nv_ranker_max_batch_size: int = 64,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -906,7 +916,20 @@ def nvingest_retrieval(
         The path where the sparse model has been loaded.
     model_name : str, optional
         The name of the dense embedding model available in the NIM embedding endpoint.
-
+    nv_ranker : bool
+        Set to True to use the nvidia reranker.
+    nv_ranker_endpoint : str
+        The endpoint to the nvidia reranker
+    nv_ranker_model_name: str
+        The name of the model host in the nvidia reranker
+    nv_ranker_nvidia_api_key : str,
+        The nvidia reranker api key, necessary when using non-local asset
+    truncate : str [`END`, `NONE`]
+        Truncate the incoming texts if length is longer than the model allows.
+    nv_ranker_max_batch_size : int
+        Max size for the number of candidates to rerank.
+    nv_ranker_top_k : int,
+        The number of candidates to return after reranking.
     Returns
     -------
     List
@@ -920,6 +943,9 @@ def nvingest_retrieval(
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
+    nv_ranker_top_k = top_k
+    if nv_ranker:
+        top_k = top_k * 2
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
@@ -940,6 +966,22 @@ def nvingest_retrieval(
         )
     else:
         results = dense_retrieval(queries, collection_name, client, embed_model, top_k, output_fields=output_fields)
+    if nv_ranker:
+        rerank_results = []
+        for query, candidates in zip(queries, results):
+            rerank_results.append(
+                nv_rerank(
+                    query,
+                    candidates,
+                    reranker_endpoint=nv_ranker_endpoint,
+                    model_name=nv_ranker_model_name,
+                    nvidia_api_key=nv_ranker_nvidia_api_key,
+                    truncate=nv_ranker_truncate,
+                    topk=nv_ranker_top_k,
+                    max_batch_size=nv_ranker_max_batch_size,
+                )
+            )
+
     return results
 
 
@@ -971,3 +1013,64 @@ def remove_records(source_name: str, collection_name: str, milvus_uri: str = "ht
         filter=f'(source["source_name"] == "{source_name}")',
     )
     return result_ids
+
+
+def nv_rerank(
+    query,
+    candidates,
+    reranker_endpoint: str = None,
+    model_name: str = None,
+    nvidia_api_key: str = None,
+    truncate: str = "END",
+    max_batch_size: int = 64,
+    topk: int = 5,
+):
+    """
+    This function allows a user to rerank a set of candidates using the nvidia reranker nim.
+
+    Parameters
+    ----------
+    query : str
+        Query the candidates are supposed to answer.
+    candidates : list
+        List of the candidates to rerank.
+    reranker_endpoint : str
+        The endpoint to the nvidia reranker
+    model_name: str
+        The name of the model host in the nvidia reranker
+    nvidia_api_key : str,
+        The nvidia reranker api key, necessary when using non-local asset
+    truncate : str [`END`, `NONE`]
+        Truncate the incoming texts if length is longer than the model allows.
+    max_batch_size : int
+        Max size for the number of candidates to rerank.
+    topk : int,
+        The number of candidates to return after reranking.
+
+    Returns
+    -------
+    Dict
+        Dictionary with top_k reranked candidates.
+    """
+    client_config = ClientConfigSchema()
+    # reranker = NVIDIARerank(base_url=reranker_endpoint, nvidia_api_key=nvidia_api_key, top_n=top_k)
+    reranker_endpoint = reranker_endpoint if reranker_endpoint else client_config.nv_ranker_nim_endpoint
+    model_name = model_name if model_name else client_config.nv_ranker_nim_model_name
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    headers = {"accept": "application/json", "Content-Type": "application/json"}
+    if nvidia_api_key:
+        headers["Authorization"] = f"Bearer {nvidia_api_key}"
+    texts = []
+    map_candidates = {}
+    for idx, candidate in enumerate(candidates):
+        map_candidates[idx] = candidate
+        texts.append({"text": candidate["entity"]["text"]})
+    payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
+    response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
+    if response.status_code != 200:
+        raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
+    rank_results = []
+    for rank_vals in response.json()["rankings"]:
+        idx = rank_vals["index"]
+        rank_results.append(map_candidates[idx])
+    return rank_results
