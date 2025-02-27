@@ -1,4 +1,10 @@
-# NVIDIA-Ingest Helm Charts
+# NV-Ingest Helm Charts
+
+This documentation contains documentation for the NV-Ingest Helm charts.
+
+> [!Note]
+> NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever Extraction.
+
 
 > [!WARNING]
 > NV-Ingest version 24.08 exposed Redis directly to the client, as such setup for the [24.08](https://github.com/NVIDIA/nv-ingest/releases/tag/24.08) `nv-ingest-cli` differs.
@@ -9,6 +15,7 @@
 ## Prerequisites
 
 ### Hardware/Software
+
 [Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
 ## Setup Environment

@@ -1,7 +1,8 @@
-# Skaffold - Dev Team
+# Skaffold - NV-Ingest Development Team Only
 
-Skaffold is intended to support the nv-ingest development team with kubernetes dev and testing. It is not meant to be used in production deployments or even for local testing.
 
-We offer k8s support via Helm and those instructions can be found at [Helm Documentation](../helm/README.md).
+Skaffold is intended to support the NV-Ingest development team with Kubernetes development and testing. It is not meant to be used in production deployments nor for local testing.
 
-For developers further documentation for using Skaffold can be found at [Skaffold Documentation](/docs/docs/user-guide/kubernetes-dev.md).
+We offer Kubernetes support through Helm and you can find those instructions at [Helm Documentation](../helm/README.md).
+
+Development team members can find Skaffold documentation at [Skaffold Documentation](/docs/docs/user-guide/developer-guide/kubernetes-dev.md).

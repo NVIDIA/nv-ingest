@@ -8,6 +8,9 @@ SPDX-License-Identifier: Apache-2.0
 
 NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
+> [!Note]
+> NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
+
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 > [!Note]
@@ -188,7 +191,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 >
 > After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 
-### Step 2: Installing Python dependencies
+### Step 2: Install Python dependencies
 
 To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
@@ -225,7 +228,7 @@ pip install .
 
 ### Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or via the [NV-Ingest CLI](nv-ingest_cli.md).
 
 In the below examples, we are doing text, chart, table, and image extraction:
 

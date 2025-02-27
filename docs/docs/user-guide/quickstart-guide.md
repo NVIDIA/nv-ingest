@@ -1,6 +1,6 @@
-# Quickstart Guide
+# Quickstart Guide for NV-Ingest
 
-To get started using NVIDIA-Ingest, you need to do a few things:
+To get started using NV-Ingest, you need to do a few things:
 
 1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
 2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
@@ -110,7 +110,7 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
         NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 
 
-## Step 2: Installing Python Dependencies
+## Step 2: Install Python Dependencies
 
 You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
 
@@ -130,7 +130,7 @@ pip install .
 
 ## Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or using the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or using the [NV-Ingest CLI](nv-ingest_cli.md).
 
 In the below examples, we are doing text, chart, table, and image extraction:
 
