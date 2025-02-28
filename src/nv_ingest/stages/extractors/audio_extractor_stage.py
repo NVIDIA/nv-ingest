@@ -175,6 +175,5 @@ def generate_audio_extractor_stage(
         task=task,
         task_desc=task_desc,
         process_fn=_wrapped_process_fn,
-        # document_type="regex:^(mp3|wav)$",
-        document_type="wav",
+        document_type="regex:^(mp3|wav)$",
     )
