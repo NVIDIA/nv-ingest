@@ -43,8 +43,10 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from nv_ingest.extraction_workflows.image.image_handlers import extract_tables_and_charts_from_images
-from nv_ingest.extraction_workflows.image.image_handlers import load_and_preprocess_image
+from nv_ingest.extraction_workflows.image.image_handlers import (
+    load_and_preprocess_image,
+    extract_page_elements_from_images,
+)
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
@@ -681,7 +683,7 @@ class DocxReader:
         if extract_tables or extract_charts:
             try:
                 # Perform the batched detection on all images
-                detection_results = extract_tables_and_charts_from_images(
+                detection_results = extract_page_elements_from_images(
                     images=all_image_arrays,
                     config=ImageConfigSchema(**self._extraction_config.model_dump()),
                     trace_info=kwargs.get("trace_info"),

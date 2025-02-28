@@ -51,7 +51,7 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop
 logger = logging.getLogger(__name__)
 
 
-def extract_page_elements_using_image_ensemble(
+def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     config: PDFiumConfigSchema,
     trace_info: Optional[List] = None,
@@ -113,7 +113,7 @@ def extract_page_elements_using_image_ensemble(
         for annotation_dict, page_index, original_image, padding_offset in zip(
             inference_results, image_page_indices, original_images, padding_offsets
         ):
-            extract_page_element_images(
+            _extract_page_element_images(
                 annotation_dict,
                 original_image,
                 page_index,
@@ -138,7 +138,7 @@ def extract_page_elements_using_image_ensemble(
 
 
 # Handle individual page element extraction and model inference
-def extract_page_element_images(
+def _extract_page_element_images(
     annotation_dict,
     original_image,
     page_idx,
@@ -170,7 +170,7 @@ def extract_page_element_images(
     >>> annotation_dict = {"table": [], "chart": []}
     >>> original_image = np.random.rand(1536, 1536, 3)
     >>> page_elements = []
-    >>> extract_page_element_images(annotation_dict, original_image, 0, page_elements)
+    >>> _extract_page_element_images(annotation_dict, original_image, 0, page_elements)
     """
     orig_width, orig_height, *_ = original_image.shape
     pad_width, pad_height = padding_offset
@@ -284,7 +284,7 @@ def _extract_page_elements(
     """
     extracted_page_elements = []
 
-    page_element_results = extract_page_elements_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+    page_element_results = _extract_page_elements_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
 
     # Build metadata for each
     for page_idx, page_element in page_element_results:
@@ -318,7 +318,7 @@ def pdfium_extractor(
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
-    trace_info=None,
+    execution_trace_log=None,
 ):
     # --- Extract and validate extractor_config ---
     if extractor_config is None or not isinstance(extractor_config, dict):
@@ -458,7 +458,7 @@ def pdfium_extractor(
                     [page],
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    trace_info=trace_info,
+                    trace_info=execution_trace_log,
                 )
                 pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
 
@@ -475,7 +475,7 @@ def pdfium_extractor(
                         extract_charts,
                         extract_infographics,
                         paddle_output_format,
-                        trace_info=trace_info,
+                        trace_info=execution_trace_log,
                     )
                     futures.append(future)
                     pages_for_tables.clear()
@@ -495,7 +495,7 @@ def pdfium_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
-                trace_info=trace_info,
+                trace_info=execution_trace_log,
             )
             futures.append(future)
             pages_for_tables.clear()

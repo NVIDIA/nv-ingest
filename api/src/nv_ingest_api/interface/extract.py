@@ -8,6 +8,7 @@ from typing import Tuple, Optional
 import pandas as pd
 from pandas import DataFrame
 
+from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
 from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from . import extraction_interface_relay_constructor
@@ -22,6 +23,7 @@ from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_i
 from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
+from ..internal.extract.docx.engines.docxreader import docx_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -123,8 +125,80 @@ def extract_primitives_from_pptx():
 
 
 @unified_exception_handler
-def extract_primitives_from_docx():
-    pass
+def extract_primitives_from_docx(
+    df_extraction_ledger: pd.DataFrame,
+    extract_text: bool = True,
+    extract_images: bool = True,
+    extract_tables: bool = True,
+    extract_charts: bool = True,
+    extract_infographics: bool = True,
+    yolox_endpoints: Optional[Tuple[str, str]] = None,
+    yolox_infer_protocol: str = "grpc",
+    auth_token: str = "",
+) -> pd.DataFrame:
+    """
+    Extracts primitives from DOCX documents contained in a DataFrame by configuring and invoking
+    the DOCX extraction process. The extraction process includes options for text, images, tables,
+    charts, and infographics extraction. It also configures the DOCX extraction module with additional
+    settings for YOLOX endpoints, inference protocol, and authentication.
+
+    Parameters
+    ----------
+    df_extraction_ledger : pd.DataFrame
+        The input DataFrame containing DOCX documents in base64 encoding. It is expected that the DataFrame
+        includes the necessary columns required for DOCX extraction.
+    extract_text : bool, default=True
+        Flag indicating whether to extract text content from the DOCX documents.
+    extract_images : bool, default=True
+        Flag indicating whether to extract images from the DOCX documents.
+    extract_tables : bool, default=True
+        Flag indicating whether to extract tables from the DOCX documents.
+    extract_charts : bool, default=True
+        Flag indicating whether to extract charts from the DOCX documents.
+    extract_infographics : bool, default=True
+        Flag indicating whether to extract infographics from the DOCX documents.
+    yolox_endpoints : Optional[Tuple[str, str]], default=None
+        A tuple containing the YOLOX inference endpoints. If None, the default endpoints defined in the
+        DOCX extraction configuration will be used.
+    yolox_infer_protocol : str, default="grpc"
+        The inference protocol to use with the YOLOX endpoints.
+    auth_token : str, default=""
+        The authentication token for accessing the YOLOX inference service.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame after DOCX primitives extraction. The extracted data replaces or augments
+        the original document content as specified by the extraction process.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during the DOCX extraction process, the exception is logged and re-raised.
+    """
+    task_config = {
+        "params": {
+            "extract_text": extract_text,
+            "extract_images": extract_images,
+            "extract_tables": extract_tables,
+            "extract_charts": extract_charts,
+            "extract_infographics": extract_infographics,
+        },
+        "docx_extraction_config": {
+            "yolox_endpoints": yolox_endpoints,
+            "yolox_infer_protocol": yolox_infer_protocol,
+            "auth_token": auth_token,
+        },
+    }
+
+    extraction_config = DocxExtractorSchema()
+
+    return docx_extractor(
+        df_extraction_ledger=df_extraction_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=None,
+    )
 
 
 @unified_exception_handler

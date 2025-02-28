@@ -347,7 +347,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
     docx_extractor_stage = pipe.add_stage(
         generate_docx_extractor_stage(
             morpheus_pipeline_config,
-            extractor_config=docx_extractor_config,
+            extraction_config=docx_extractor_config,
             pe_count=1,
             task="extract",
             task_desc="docx_content_extractor",
@@ -437,7 +437,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
-    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-11b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",

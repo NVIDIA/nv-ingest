@@ -19,9 +19,6 @@
 
 # pylint: disable=too-many-locals
 
-"""
-Helper function for docx extraction
-"""
 
 import logging
 from pathlib import Path
@@ -40,9 +37,11 @@ def python_docx(
     docx: Union[str, Path, IO],
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
-    **kwargs
+    extraction_config: dict,
+    execution_trace_log=None,
 ):
     """
     Helper function that use python-docx to extract text from a bytestream document
@@ -62,12 +61,16 @@ def python_docx(
         Specifies whether to extract text.
     extract_images : bool
         Specifies whether to extract images.
+    extract_infographics : bool
+        Specifies whether to extract infographics.
     extract_tables : bool
         Specifies whether to extract tables.
     extract_charts : bool
         Specifies whether to extract charts.
-    **kwargs
-        The keyword arguments are used for additional extraction parameters.
+    extraction_config : dict
+        A dictionary of configuration parameters for the extraction process.
+    execution_trace_log : list, optional
+        A list for accumulating trace information during extraction. Defaults to None.
 
     Returns
     -------
@@ -75,18 +78,19 @@ def python_docx(
         A string of extracted text.
     """
 
-    logger.debug("Extracting docx with python-docx backend")
+    _ = execution_trace_log
+    _ = extract_infographics
 
-    row_data = kwargs.get("row_data")
+    row_data = extraction_config.get("row_data")
     # get source_id
     source_id = row_data["source_id"]
     # get text_depth
-    text_depth = kwargs.get("text_depth", "document")
+    text_depth = extraction_config.get("text_depth", "document")
     text_depth = TextTypeEnum(text_depth)
     # get base metadata
-    metadata_col = kwargs.get("metadata_column", "metadata")
+    metadata_col = "metadata"
 
-    docx_extractor_config = kwargs.get("docx_extraction_config", {})
+    docx_extractor_config = extraction_config.get("docx_extraction_config", {})
 
     base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
 
