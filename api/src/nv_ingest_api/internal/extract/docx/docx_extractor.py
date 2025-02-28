@@ -85,7 +85,7 @@ def _get_extraction_function(method: str, default_method: str) -> Callable:
     return func
 
 
-def decode_and_extract(
+def _decode_and_extract_from_docx(
     base64_row: pd.Series,
     task_config: Union[Dict[str, Any], BaseModel],
     extraction_config: Any,
@@ -217,7 +217,7 @@ def extract_primitives_from_docx_internal(
     """
     # Create a partial function to decode and extract using the provided configurations.
     _decode_and_extract = functools.partial(
-        decode_and_extract,
+        _decode_and_extract_from_docx,
         task_config=task_config,
         extraction_config=extraction_config,
         execution_trace_log=execution_trace_log,
