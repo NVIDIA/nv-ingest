@@ -5,12 +5,11 @@
 
 import logging
 from functools import partial
-from typing import Any
+from typing import Any, Optional, List
 from typing import Dict
 
 import pandas as pd
 from morpheus.config import Config
-from pydantic import BaseModel
 
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -20,67 +19,101 @@ from nv_ingest_api.internal.mutate.filter import filter_images_internal
 logger = logging.getLogger(__name__)
 
 
-def image_filter_stage(df, task_props, validated_config) -> pd.DataFrame:
+def image_filter_stage(
+    df_ledger: pd.DataFrame,
+    task_config: Dict[str, Any],
+    mutate_config: Any,
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
+    """
+    Apply the image filtering stage to the ledger DataFrame.
+
+    This function extracts image filtering parameters from the provided task
+    configuration and delegates processing to the internal filter_images_internal
+    function.
+
+    Parameters
+    ----------
+    df_ledger : pd.DataFrame
+        The ledger DataFrame containing image metadata. This DataFrame must include
+        the required columns for filtering.
+    task_config : Dict[str, Any]
+        A dictionary containing the task configuration. Expected to have a key "params"
+        holding the filtering parameters.
+    mutate_config : Any
+        Additional mutation configuration (passed directly to the internal function).
+    execution_trace_log : Optional[List[Any]], optional
+        An optional list for execution trace logging, by default None.
+
+    Returns
+    -------
+    pd.DataFrame
+        The resulting DataFrame after the image filtering stage has been applied.
+
+    Raises
+    ------
+    Exception
+        Any exception raised during the filtering process is logged and re-raised with
+        additional context.
+    """
     try:
-        if isinstance(task_props, BaseModel):
-            task_props = task_props.model_dump()
-
-        task_props.get("content_type")
-        task_params = task_props.get("params", {})
-        filter_flag = task_params.get("filter", True)
-
-        logger.debug(f"Filtering images by scale with filter_flag={filter_flag}")
-
-        df_result = filter_images_internal(df, task_params)
-
+        task_params: Dict[str, Any] = task_config.get("params", {})
+        df_result = filter_images_internal(
+            df_ledger=df_ledger,
+            task_config=task_params,
+            mutate_config=mutate_config,
+            execution_trace_log=execution_trace_log,
+        )
         return df_result
-
     except Exception as e:
         err_msg = f"image_filter_stage: Error filtering images. Original error: {e}"
         logger.error(err_msg, exc_info=True)
-
         raise type(e)(err_msg) from e
 
 
 def generate_image_filter_stage(
     c: Config,
-    caption_config: Dict[str, Any],
+    image_filter_config: Dict[str, Any],
     task: str = "filter",
     task_desc: str = "image_filter",
     pe_count: int = 8,
-):
+) -> MultiProcessingBaseStage:
     """
-    Generates a caption extraction stage with the specified configuration.
+    Generate an image filter stage with the specified configuration.
+
+    This function validates the image filter configuration and wraps the image_filter_stage
+    function to produce a multi-processing stage for filtering images.
 
     Parameters
     ----------
     c : Config
-        Morpheus global configuration object.
-    caption_config : dict
-        Configuration parameters for caption extraction.
+        The global configuration object.
+    image_filter_config : Dict[str, Any]
+        A dictionary containing configuration parameters for image filtering.
     task : str, optional
-        The task name to match for the stage worker function, by default "caption".
+        The task name to be assigned to the stage. Default is "filter".
     task_desc : str, optional
-        A descriptor to be used in latency tracing, by default "caption_extraction".
+        A descriptor for latency tracing. Default is "image_filter".
     pe_count : int, optional
-        Number of processing elements to use, by default 8.
+        The number of processing elements to use. Default is 8.
 
     Returns
     -------
     MultiProcessingBaseStage
-        The generated caption extraction stage.
+        The generated multi-processing stage configured for image filtering.
 
     Raises
     ------
-    ValueError
-        If an error occurs during stage generation.
+    Exception
+        Any exception raised during stage generation is logged and re-raised with additional context.
     """
     try:
-        validated_config = ImageFilterSchema(**caption_config)
-        _wrapped_caption_extract = partial(image_filter_stage, validated_config=validated_config)
+        validated_config = ImageFilterSchema(**image_filter_config)
+        wrapped_filter_fn = partial(image_filter_stage, mutate_config=validated_config)
 
         logger.debug(
-            f"Generating image filtering stage with {pe_count} processing elements. task: {task}, document_type: *"
+            f"Generating image filtering stage with {pe_count} processing elements. "
+            f"Task: {task}, Document Type: {ContentTypeEnum.IMAGE.value}"
         )
 
         return MultiProcessingBaseStage(
@@ -88,12 +121,10 @@ def generate_image_filter_stage(
             pe_count=pe_count,
             task=task,
             task_desc=task_desc,
-            process_fn=_wrapped_caption_extract,
+            process_fn=wrapped_filter_fn,
             filter_properties={"content_type": ContentTypeEnum.IMAGE.value},
         )
-
     except Exception as e:
         err_msg = f"generate_image_filter_stage: Error generating image filter stage. Original error: {e}"
         logger.error(err_msg, exc_info=True)
-
         raise type(e)(err_msg) from e

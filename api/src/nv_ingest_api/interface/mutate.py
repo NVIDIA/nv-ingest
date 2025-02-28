@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Union, Dict, Optional, Any
+from typing import Union, Dict, Optional, Any, List
 
 import pandas as pd
 
+from nv_ingest_api.internal.mutate.deduplicate import deduplicate_images_internal
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
 
 logger = logging.getLogger(__name__)
@@ -65,5 +66,42 @@ def filter_images(
         raise type(e)(err_msg) from e
 
 
-def deduplicate_images():
-    pass
+def deduplicate_images(
+    df_ledger: pd.DataFrame,
+    hash_algorithm: str = "md5",
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
+    """
+    Deduplicate images in the DataFrame based on content hashes.
+
+    This function builds a task configuration with the specified hashing algorithm and
+    delegates processing to `deduplicate_images_internal`.
+
+    Parameters
+    ----------
+    df_ledger : pd.DataFrame
+        DataFrame containing image metadata. It must include at least the columns
+        'document_type' and 'metadata'.
+    hash_algorithm : str, optional
+        Hashing algorithm to use for deduplication. Valid algorithms are those supported by
+        Python's hashlib.new() function (e.g., "md5", "sha1", "sha256"). Default is "md5".
+    execution_trace_log : Optional[List[Any]], optional
+        Optional list for execution trace logging (currently unused).
+
+    Returns
+    -------
+    pd.DataFrame
+        The deduplicated DataFrame with duplicate images removed.
+
+    Raises
+    ------
+    Exception
+        Propagates any exceptions raised during the deduplication process.
+    """
+
+    task_config: Dict[str, Union[int, float, bool, str]] = {
+        "hash_algorithm": hash_algorithm,
+    }
+    mutate_config: Dict[str, Any] = {}
+
+    return deduplicate_images_internal(df_ledger, task_config, mutate_config, execution_trace_log)

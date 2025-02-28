@@ -7,6 +7,7 @@ import pandas as pd
 from typing import Any, Dict, Union, Optional, List
 
 from nv_ingest_api.interface.mutate import filter_images
+from nv_ingest_api.interface.mutate import deduplicate_images
 
 
 # Dummy functions to replace filter_images_internal during testing.
@@ -87,4 +88,103 @@ def test_filter_images_exception(monkeypatch):
     assert (
         "filter_images: Error applying deduplication filter. Original error: Dummy error in filter_images_internal"
         in str(exc_info.value)
+    )
+
+
+@pytest.fixture(autouse=True)
+def patch_deduplicate_globals(monkeypatch):
+    import nv_ingest_api.internal.mutate.deduplicate as dedup_mod
+
+    class DummyContentTypeEnum:
+        IMAGE = "IMAGE"
+        INFO_MSG = "INFO_MSG"
+
+    monkeypatch.setattr(dedup_mod, "ContentTypeEnum", DummyContentTypeEnum)
+
+
+def test_deduplicate_images_no_duplicates():
+    """
+    Test that a DataFrame with no duplicate IMAGE rows remains unchanged.
+    """
+    df = pd.DataFrame({"document_type": ["IMAGE", "TEXT"], "metadata": [{"content": "unique"}, {"content": "text"}]})
+    result = deduplicate_images(df, hash_algorithm="md5")
+    # Expect the same DataFrame as there are no duplicates.
+    pd.testing.assert_frame_equal(result.sort_index().reset_index(drop=True), df.sort_index().reset_index(drop=True))
+
+
+def test_deduplicate_images_with_duplicates_md5():
+    """
+    Test that duplicate IMAGE rows are removed using the md5 hash algorithm.
+    """
+    df = pd.DataFrame(
+        {
+            "document_type": ["IMAGE", "IMAGE", "TEXT"],
+            "metadata": [{"content": "dup"}, {"content": "dup"}, {"content": "text"}],
+        }
+    )
+    result = deduplicate_images(df, hash_algorithm="md5")
+    # Expect one IMAGE row for the duplicate content and the TEXT row.
+    expected = pd.DataFrame(
+        {"document_type": ["IMAGE", "TEXT"], "metadata": [{"content": "dup"}, {"content": "text"}]}, index=[0, 2]
+    )
+    pd.testing.assert_frame_equal(
+        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
+    )
+
+
+def test_deduplicate_images_with_duplicates_sha256():
+    """
+    Test that duplicate IMAGE rows are removed using the sha256 hash algorithm.
+    """
+    df = pd.DataFrame({"document_type": ["IMAGE", "IMAGE"], "metadata": [{"content": "dup"}, {"content": "dup"}]})
+    result = deduplicate_images(df, hash_algorithm="sha256")
+    expected = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"content": "dup"}]}, index=[0])
+    pd.testing.assert_frame_equal(
+        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
+    )
+
+
+def test_deduplicate_images_preserves_non_image_rows():
+    """
+    Test that non-IMAGE rows are preserved after deduplication.
+    """
+    df = pd.DataFrame(
+        {
+            "document_type": ["IMAGE", "IMAGE", "TEXT", "PDF"],
+            "metadata": [{"content": "dup"}, {"content": "dup"}, {"content": "text1"}, {"content": "pdf1"}],
+        }
+    )
+    result = deduplicate_images(df, hash_algorithm="md5")
+    # Expect one IMAGE row (deduplicated) plus all non-IMAGE rows.
+    expected = pd.DataFrame(
+        {
+            "document_type": ["IMAGE", "TEXT", "PDF"],
+            "metadata": [{"content": "dup"}, {"content": "text1"}, {"content": "pdf1"}],
+        },
+        index=[0, 2, 3],
+    )
+    pd.testing.assert_frame_equal(
+        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
+    )
+
+
+def test_deduplicate_images_missing_required_columns():
+    """
+    Test that an exception is raised when the DataFrame is missing required columns.
+    """
+    df = pd.DataFrame({"wrong_column": [1, 2], "metadata": [{"content": "a"}, {"content": "b"}]})
+    with pytest.raises(ValueError):
+        deduplicate_images(df, hash_algorithm="md5")
+
+
+def test_deduplicate_images_execution_trace_log_unused():
+    """
+    Test that the optional execution_trace_log parameter does not affect the output.
+    """
+    df = pd.DataFrame({"document_type": ["IMAGE", "IMAGE"], "metadata": [{"content": "dup"}, {"content": "dup"}]})
+    trace_log = ["step1", "step2"]
+    result = deduplicate_images(df, hash_algorithm="md5", execution_trace_log=trace_log)
+    expected = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"content": "dup"}]}, index=[0])
+    pd.testing.assert_frame_equal(
+        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
     )

@@ -13,5 +13,4 @@ logger = logging.getLogger(__name__)
 
 class ImageDedupSchema(BaseModel):
     raise_on_failure: StrictBool = False
-    cpu_only: StrictBool = False
     model_config = ConfigDict(extra="forbid")

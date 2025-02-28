@@ -30,6 +30,7 @@ def _calculate_aspect_ratio(x):
 def filter_images_internal(
     df_ledger: pd.DataFrame,
     task_config: Dict[str, Union[int, float, bool]],
+    mutate_config: Dict[str, Any] = None,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
@@ -59,6 +60,7 @@ def filter_images_internal(
         For other errors encountered during filtering.
     """
 
+    _ = mutate_config  # Unused variable
     _ = execution_trace_log  # TODO(Devin)
 
     try:
