@@ -164,9 +164,6 @@ def python_pptx(
     Helper function to use python-pptx to extract text from a bytestream PPTX,
     while deferring image classification into tables/charts if requested.
     """
-
-    logger.debug("Extracting PPTX with python-pptx backend.")
-
     row_data = kwargs.get("row_data")
     source_id = row_data["source_id"]
 
@@ -382,8 +379,11 @@ def python_pptx(
                     )
                 except ValueError as e:
                     logger.warning(f"No embedded image found for shape {shape_idx} on slide {slide_idx}: {e}")
+                    raise
+
                 except Exception as e:
                     logger.warning(f"Error processing shape {shape_idx} on slide {slide_idx}: {e}")
+                    raise
 
             # ---------------------------------------------
             # 3) Table Handling

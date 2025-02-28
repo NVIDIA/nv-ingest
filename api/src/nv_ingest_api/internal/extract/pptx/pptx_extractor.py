@@ -11,10 +11,9 @@ from typing import Any, Optional, Dict, Union, Callable, Tuple
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest.extraction_workflows import pptx
 from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
+from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import python_pptx
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
-from nv_ingest_api.util.exception_handlers.pdf import create_exception_tag
 
 logger = logging.getLogger(__name__)
 
@@ -123,37 +122,31 @@ def _decode_and_extract_from_pptx(
         Any unhandled exception encountered during extraction is logged and re-raised wrapped with additional context.
     """
     source_id: Optional[str] = None
-    try:
-        # Prepare task properties and extract source_id.
-        prepared_task_props, source_id = _prepare_task_properties(base64_row, task_props)
+    # Prepare task properties and extract source_id.
+    prepared_task_props, source_id = _prepare_task_properties(base64_row, task_props)
 
-        # Retrieve base64 content and decode it.
-        base64_content: str = base64_row["content"]
-        pptx_bytes: bytes = base64.b64decode(base64_content)
-        pptx_stream: io.BytesIO = io.BytesIO(pptx_bytes)
+    # Retrieve base64 content and decode it.
+    base64_content: str = base64_row["content"]
+    pptx_bytes: bytes = base64.b64decode(base64_content)
+    pptx_stream: io.BytesIO = io.BytesIO(pptx_bytes)
 
-        # Determine the extraction method and parameters.
-        extract_method: str = prepared_task_props.get("method", default)
-        extract_params: Dict[str, Any] = prepared_task_props.get("params", {})
+    # Determine the extraction method and parameters.
+    # extract_method: str = prepared_task_props.get("method", default)
+    extract_params: Dict[str, Any] = prepared_task_props.get("params", {})
 
-        # Inject configuration settings and trace information.
-        if getattr(validated_config, "pptx_extraction_config", None) is not None:
-            extract_params["pptx_extraction_config"] = validated_config.pptx_extraction_config
-        if trace_info is not None:
-            extract_params["trace_info"] = trace_info
+    # Inject configuration settings and trace information.
+    if getattr(validated_config, "pptx_extraction_config", None) is not None:
+        extract_params["pptx_extraction_config"] = validated_config.pptx_extraction_config
 
-        # Retrieve the extraction function from the pptx module.
-        extraction_func: Callable = _get_extraction_function(pptx, extract_method, default)
-        logger.debug("decode_and_extract: Running extraction method: %s", extract_method)
+    if trace_info is not None:
+        extract_params["trace_info"] = trace_info
 
-        extracted_data = extraction_func(pptx_stream, **extract_params)
-        return extracted_data
+    # Retrieve the extraction function from the pptx module.
+    # extraction_func: Callable = _get_extraction_function(pptx, extract_method, default)
 
-    except Exception as e:
-        err_msg = f"decode_and_extract: Error processing PPTX for source '{source_id}'. " f"Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        exception_tag = create_exception_tag(error_message=err_msg, source_id=source_id)
-        return exception_tag
+    extracted_data = python_pptx(pptx_stream, **extract_params)
+
+    return extracted_data
 
 
 @unified_exception_handler

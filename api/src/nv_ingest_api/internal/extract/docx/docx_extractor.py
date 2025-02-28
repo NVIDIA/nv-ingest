@@ -7,12 +7,11 @@ import base64
 import functools
 import io
 import logging
-from typing import Optional, Dict, Any, Union, Callable
+from typing import Optional, Dict, Any, Union
 
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest.extraction_workflows import docx
 from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import python_docx
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
@@ -59,30 +58,6 @@ def _prepare_task_props(
     source_id = base64_row.get("source_id", None)
 
     return task_config, source_id
-
-
-def _get_extraction_function(method: str, default_method: str) -> Callable:
-    """
-    Retrieves the extraction function from the docx module.
-
-    If the specified method is not found in the docx module, the default extraction method is used.
-
-    Parameters
-    ----------
-    method : str
-        The name of the extraction method to use.
-    default_method : str
-        The default extraction method name to use if the specified method is unavailable.
-
-    Returns
-    -------
-    Callable
-        The extraction function from the docx module.
-    """
-    if not hasattr(docx, method):
-        method = default_method
-    func = getattr(docx, method)
-    return func
 
 
 def _decode_and_extract_from_docx(
