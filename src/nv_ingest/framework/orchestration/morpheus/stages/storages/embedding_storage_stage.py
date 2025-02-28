@@ -19,7 +19,7 @@ from pydantic import BaseModel
 
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 
 logger = logging.getLogger(__name__)
 

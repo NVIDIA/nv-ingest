@@ -11,7 +11,7 @@ from typing import Dict
 import pandas as pd
 
 from nv_ingest.schemas.pdf_extractor_schema import PDFExtractorSchema
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 

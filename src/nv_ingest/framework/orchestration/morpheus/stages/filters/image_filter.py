@@ -13,7 +13,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
 
 logger = logging.getLogger(__name__)

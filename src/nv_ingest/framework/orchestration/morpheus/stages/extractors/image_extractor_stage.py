@@ -19,7 +19,7 @@ from morpheus.config import Config
 
 import nv_ingest.extraction_workflows.image as image_helpers
 from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 

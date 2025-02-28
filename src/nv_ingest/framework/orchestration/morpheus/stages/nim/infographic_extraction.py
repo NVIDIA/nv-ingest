@@ -14,7 +14,7 @@ from typing import Tuple
 import pandas as pd
 from morpheus.config import Config
 
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorSchema
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface

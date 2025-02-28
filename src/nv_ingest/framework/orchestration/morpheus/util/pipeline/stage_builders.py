@@ -31,7 +31,9 @@ from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_meter imp
 from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
     OpenTelemetryTracerLoaderFactory,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.docx_extractor_stage import generate_docx_extractor_stage
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.docx_extractor_stage import (
+    generate_docx_extractor_stage,
+)
 from nv_ingest.framework.orchestration.morpheus.stages.embeddings.text_embeddings import (
     generate_text_embed_extractor_stage,
 )
@@ -42,8 +44,12 @@ from nv_ingest.framework.orchestration.morpheus.stages.filters import generate_d
 from nv_ingest.framework.orchestration.morpheus.stages.filters import generate_image_filter_stage
 from nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction import generate_table_extractor_stage
-from nv_ingest.framework.orchestration.morpheus.stages.pdf_extractor_stage import generate_pdf_extractor_stage
-from nv_ingest.framework.orchestration.morpheus.stages.pptx_extractor_stage import generate_pptx_extractor_stage
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.pdf_extractor_stage import (
+    generate_pdf_extractor_stage,
+)
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.pptx_extractor_stage import (
+    generate_pptx_extractor_stage,
+)
 from nv_ingest.framework.orchestration.morpheus.stages.storages.embedding_storage_stage import (
     generate_embedding_storage_stage,
 )
@@ -51,7 +57,7 @@ from nv_ingest.framework.orchestration.morpheus.stages.storages.image_storage_st
 from nv_ingest.framework.orchestration.morpheus.stages.transforms.image_caption_extraction import (
     generate_caption_extraction_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.linear_module_source_stage_cpu import (
+from nv_ingest.framework.orchestration.morpheus.stages.meta.linear_module_source_stage_cpu import (
     LinearModuleSourceStageCPU,
     LinearModuleStageCPU,
 )

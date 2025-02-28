@@ -15,7 +15,7 @@ from pydantic import BaseModel
 from morpheus.config import Config
 
 from nv_ingest.extraction_workflows import pptx
-from nv_ingest.framework.orchestration.morpheus.stages.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest_api.util.exception_handlers.pdf import create_exception_tag
 
