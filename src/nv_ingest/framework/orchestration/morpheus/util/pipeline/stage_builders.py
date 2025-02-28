@@ -10,6 +10,9 @@ import os
 import click
 
 from nv_ingest.framework.orchestration.morpheus.modules.transforms import TextSplitterLoaderFactory
+from nv_ingest.framework.orchestration.morpheus.stages.embeddings.embed_text_stage import (
+    generate_text_embed_extractor_stage,
+)
 from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction import (
     generate_infographic_extractor_stage,
 )
@@ -33,9 +36,6 @@ from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer im
 )
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.docx_extractor_stage import (
     generate_docx_extractor_stage,
-)
-from nv_ingest.framework.orchestration.morpheus.stages.embeddings.text_embeddings import (
-    generate_text_embed_extractor_stage,
 )
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.image_extractor_stage import (
     generate_image_extractor_stage,

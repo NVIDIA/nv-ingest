@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Union, Dict, Optional, Any, List
+from typing import Union, Dict, Optional, Any
 
 import pandas as pd
 
@@ -79,7 +79,6 @@ def filter_images(
 def deduplicate_images(
     df_ledger: pd.DataFrame,
     hash_algorithm: str = "md5",
-    execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
     Deduplicate images in the DataFrame based on content hashes.
@@ -118,5 +117,5 @@ def deduplicate_images(
         df_ledger=df_ledger,
         task_config=task_config,
         mutate_config=mutate_config,
-        execution_trace_log=execution_trace_log,
+        execution_trace_log=None,
     )
