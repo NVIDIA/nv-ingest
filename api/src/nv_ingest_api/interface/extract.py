@@ -8,11 +8,16 @@ from typing import Tuple, Optional
 import pandas as pd
 from pandas import DataFrame
 
+from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
 from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from . import extraction_interface_relay_constructor
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-from nv_ingest.schemas.ingest_job_schema import IngestTaskChartExtraction, IngestTaskTableExtraction
+from nv_ingest.schemas.ingest_job_schema import (
+    IngestTaskChartExtraction,
+    IngestTaskTableExtraction,
+    IngestTaskInfographicExtraction,
+)
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_image_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
@@ -253,6 +258,70 @@ def extract_table_data_from_image(
     extraction_config = TableExtractorConfigSchema(**config_kwargs)
 
     result, _ = extract_table_data_from_image_internal(
+        df_extraction_ledger=df_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=None,
+    )
+
+    return result
+
+
+@unified_exception_handler
+def extract_infographic_data_from_image(
+    *,
+    df_ledger: pd.DataFrame,
+    paddle_endpoints: Optional[Tuple[str, str]] = None,
+    paddle_protocol: Optional[str] = None,
+    auth_token: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Extract infographic data from a DataFrame using the configured infographic extraction pipeline.
+
+    This function creates a task configuration for infographic extraction, builds the extraction
+    configuration from the provided PaddleOCR endpoints, protocol, and authentication token (or uses
+    the default values from InfographicExtractorConfigSchema if None), and then calls the internal
+    extraction function to process the DataFrame. The unified exception handler decorator ensures
+    that any errors are appropriately logged and managed.
+
+    Parameters
+    ----------
+    df_ledger : pd.DataFrame
+        DataFrame containing the images and associated metadata from which infographic data is to be extracted.
+    paddle_endpoints : Optional[Tuple[str, str]], default=None
+        A tuple of PaddleOCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
+        If None, the default endpoints from InfographicExtractorConfigSchema are used.
+    paddle_protocol : Optional[str], default=None
+        The protocol (e.g., "grpc" or "http") for PaddleOCR inference.
+        If None, the default protocol from InfographicExtractorConfigSchema is used.
+    auth_token : Optional[str], default=None
+        The authentication token required for secure access to PaddleOCR inference services.
+        If None, the default value from InfographicExtractorConfigSchema is used.
+
+    Returns
+    -------
+    pd.DataFrame
+        The updated DataFrame after infographic extraction has been performed.
+
+    Raises
+    ------
+    Exception
+        Propagates any exception raised during the extraction process, after being handled by the
+        unified exception handler.
+    """
+    task_config = IngestTaskInfographicExtraction()
+
+    config_kwargs = {
+        "paddle_endpoints": paddle_endpoints,
+        "paddle_infer_protocol": paddle_protocol,
+        "auth_token": auth_token,
+    }
+    # Remove keys with None values so that InfographicExtractorConfigSchema's defaults are used.
+    config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
+
+    extraction_config = InfographicExtractorConfigSchema(**config_kwargs)
+
+    result, _ = extract_infographic_data_from_image(
         df_extraction_ledger=df_ledger,
         task_config=task_config,
         extraction_config=extraction_config,

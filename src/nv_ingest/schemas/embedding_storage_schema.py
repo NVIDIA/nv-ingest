@@ -23,6 +23,6 @@ from pydantic import ConfigDict, BaseModel
 logger = logging.getLogger(__name__)
 
 
-class EmbeddingStorageModuleSchema(BaseModel):
+class EmbeddingStorageSchema(BaseModel):
     raise_on_failure: bool = False
     model_config = ConfigDict(extra="forbid")

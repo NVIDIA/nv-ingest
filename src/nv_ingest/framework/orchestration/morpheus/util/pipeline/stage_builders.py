@@ -10,12 +10,14 @@ import os
 import click
 
 from nv_ingest.framework.orchestration.morpheus.modules.transforms import TextSplitterLoaderFactory
-from nv_ingest.framework.orchestration.morpheus.stages.embeddings.embed_text_stage import (
+from nv_ingest.framework.orchestration.morpheus.stages.transforms.embed_text_stage import (
     generate_text_embed_extractor_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction import (
+from nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction_stage import generate_chart_extractor_stage
+from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction_stage import (
     generate_infographic_extractor_stage,
 )
+from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction_stage import generate_table_extractor_stage
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import (
     MetadataInjectorLoaderFactory,
@@ -40,20 +42,18 @@ from nv_ingest.framework.orchestration.morpheus.stages.extractors.docx_extractor
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.image_extractor_stage import (
     generate_image_extractor_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.filters import generate_dedup_stage
-from nv_ingest.framework.orchestration.morpheus.stages.filters import generate_image_filter_stage
-from nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction import generate_chart_extractor_stage
-from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction import generate_table_extractor_stage
+from nv_ingest.framework.orchestration.morpheus.stages.mutate import generate_dedup_stage
+from nv_ingest.framework.orchestration.morpheus.stages.mutate import generate_image_filter_stage
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.pdf_extractor_stage import (
     generate_pdf_extractor_stage,
 )
 from nv_ingest.framework.orchestration.morpheus.stages.extractors.pptx_extractor_stage import (
     generate_pptx_extractor_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.storages.embedding_storage_stage import (
+from nv_ingest.framework.orchestration.morpheus.stages.store.embedding_storage_stage import (
     generate_embedding_storage_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.storages.image_storage_stage import ImageStorageStage
+from nv_ingest.framework.orchestration.morpheus.stages.store.image_storage_stage import ImageStorageStage
 from nv_ingest.framework.orchestration.morpheus.stages.transforms.image_caption_extraction import (
     generate_caption_extraction_stage,
 )
@@ -293,7 +293,7 @@ def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_confi
     infographic_content_extractor_config = ingest_config.get(
         "infographic_content_extraction_module",
         {
-            "stage_config": {
+            "endpoint_config": {
                 "paddle_endpoints": (paddle_grpc, paddle_http),
                 "paddle_infer_protocol": paddle_protocol,
                 "auth_token": paddle_auth,
@@ -496,6 +496,7 @@ def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
     storage_stage = pipe.add_stage(
         generate_embedding_storage_stage(
             morpheus_pipeline_config,
+            store_config={},
             pe_count=2,
             task="store_embedding",
             task_desc="store_embedding_minio",

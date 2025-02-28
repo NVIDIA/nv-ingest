@@ -117,7 +117,7 @@ class InfographicExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    stage_config: Optional[InfographicExtractorConfigSchema] = None
+    endpoint_config: Optional[InfographicExtractorConfigSchema] = None
 
     @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):

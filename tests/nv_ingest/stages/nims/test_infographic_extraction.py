@@ -5,9 +5,9 @@ import pandas as pd
 import numpy as np
 
 from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction import (
-    _update_metadata,
+    _update_infographic_metadata,
     _create_clients,
-    _extract_infographic_data,
+    extract_infographic_data_from_image_internal,
 )
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
 
@@ -61,7 +61,7 @@ def test_update_metadata_empty_list():
     # When given an empty list, both clients return an empty list.
     paddle_mock.infer.return_value = []
 
-    result = _update_metadata(
+    result = _update_infographic_metadata(
         base64_images=[],
         paddle_client=paddle_mock,
         worker_pool_size=1,
@@ -100,7 +100,7 @@ def test_update_metadata_single_batch_single_worker(mocker, base64_image):
     base64_images = [base64_image, base64_image]
     trace_info = {}
 
-    result = _update_metadata(base64_images, paddle_mock, worker_pool_size=1, trace_info=trace_info)
+    result = _update_infographic_metadata(base64_images, paddle_mock, worker_pool_size=1, trace_info=trace_info)
 
     # Expect the result to combine each original image with its corresponding output.
     assert len(result) == 2
@@ -138,7 +138,7 @@ def test_update_metadata_multiple_batches_multi_worker(mocker, base64_image):
     base64_images = [base64_image, base64_image, base64_image]
     trace_info = {}
 
-    result = _update_metadata(
+    result = _update_infographic_metadata(
         base64_images,
         paddle_mock,
         worker_pool_size=2,
@@ -167,7 +167,7 @@ def test_update_metadata_exception_in_paddle_call(mocker, base64_image, caplog):
     paddle_mock.infer.side_effect = Exception("Paddle error")
 
     with pytest.raises(Exception, match="Paddle error"):
-        _update_metadata([base64_image], paddle_mock, trace_info={}, worker_pool_size=2)
+        _update_infographic_metadata([base64_image], paddle_mock, trace_info={}, worker_pool_size=2)
 
     assert "Error calling paddle_client.infer: Paddle error" in caplog.text
 
@@ -208,7 +208,7 @@ def test_extract_infographic_data_empty_df(validated_config, mocker):
 
     empty_df = pd.DataFrame()
 
-    df_out, ti = _extract_infographic_data(empty_df, {}, validated_config)
+    df_out, ti = extract_infographic_data_from_image_internal(empty_df, {}, validated_config)
     assert df_out.empty
     assert ti == {}
 
@@ -236,7 +236,7 @@ def test_extract_infographic_data_no_valid_rows(validated_config, mocker):
             {"metadata": None},
         ]
     )
-    df_out, trace_info = _extract_infographic_data(df_in, {}, validated_config)
+    df_out, trace_info = extract_infographic_data_from_image_internal(df_in, {}, validated_config)
 
     assert df_out.equals(df_in), "No changes should be made"
     assert "trace_info" in trace_info
@@ -281,7 +281,7 @@ def test_extract_infographic_data_all_valid(validated_config, mocker):
     )
 
     # Extract
-    df_out, ti = _extract_infographic_data(df_in, {}, validated_config)
+    df_out, ti = extract_infographic_data_from_image_internal(df_in, {}, validated_config)
     assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "contentA"
     assert df_out.at[1, "metadata"]["table_metadata"]["table_content"] == "contentB"
 
@@ -343,7 +343,7 @@ def test_extract_infographic_data_mixed_rows(validated_config, mocker):
         ]
     )
 
-    df_out, trace = _extract_infographic_data(df_in, {}, validated_config)
+    df_out, trace = extract_infographic_data_from_image_internal(df_in, {}, validated_config)
 
     assert df_out.at[0, "metadata"]["table_metadata"]["table_content"] == "stuff1"
     # row1 => no update
@@ -381,6 +381,6 @@ def test_extract_infographic_data_exception_raised(validated_config, mocker):
     )
 
     with pytest.raises(RuntimeError, match="Test error"):
-        _extract_infographic_data(df_in, {}, validated_config)
+        extract_infographic_data_from_image_internal(df_in, {}, validated_config)
 
     c_mock.close.assert_called_once()

@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Union, Dict, Optional, Any
+from typing import Union, Dict
 
 import pandas as pd
 
@@ -22,7 +22,6 @@ def filter_images(
     min_size: int = 128,
     max_aspect_ratio: Union[float, int] = 5.0,
     min_aspect_ratio: Union[float, int] = 2.0,
-    execution_trace_log: Optional[list[Any]] = None,
 ) -> pd.DataFrame:
     """
     Apply an image filter to the ledger DataFrame based on size and aspect ratio criteria.
@@ -66,9 +65,7 @@ def filter_images(
         }
         mutate_config = ImageFilterSchema()
 
-        return filter_images_internal(
-            df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=execution_trace_log
-        )
+        return filter_images_internal(df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=None)
     except Exception as e:
         err_msg = f"filter_images: Error applying deduplication filter. Original error: {e}"
         logger.error(err_msg, exc_info=True)

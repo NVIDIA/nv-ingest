@@ -7,7 +7,7 @@ import logging
 from pydantic import ConfigDict, BaseModel
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
-from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
+from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageSchema
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
@@ -32,7 +32,7 @@ logger = logging.getLogger(__name__)
 class PipelineConfigSchema(BaseModel):
     chart_extractor_module: ChartExtractorSchema = ChartExtractorSchema()
     text_splitter_module: TextSplitterSchema = TextSplitterSchema()
-    embedding_storage_module: EmbeddingStorageModuleSchema = EmbeddingStorageModuleSchema()
+    embedding_storage_module: EmbeddingStorageSchema = EmbeddingStorageSchema()
     embed_extractions_module: EmbedExtractionsSchema = EmbedExtractionsSchema()
     image_caption_extraction_module: ImageCaptionExtractionSchema = ImageCaptionExtractionSchema()
     image_dedup_module: ImageDedupSchema = ImageDedupSchema()
