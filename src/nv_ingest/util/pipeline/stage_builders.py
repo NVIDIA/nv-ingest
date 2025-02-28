@@ -363,10 +363,7 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
-        "",
-    ) or os.environ.get(
-        "NGC_API_KEY",
+        "RIVA_NGC_API_KEY",
         "",
     )
     infer_protocol = os.environ.get(

@@ -187,6 +187,7 @@ class ExtractTask(Task):
         extract_images: bool = False,
         extract_tables: bool = False,
         extract_charts: Optional[bool] = None,
+        extract_audio_params: Optional[Dict[str, Any]] = None,
         extract_images_method: _Type_Extract_Images_Method = "group",
         extract_images_params: Optional[Dict[str, Any]] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
@@ -200,6 +201,7 @@ class ExtractTask(Task):
         super().__init__()
 
         self._document_type = document_type
+        self._extract_audio_params = extract_audio_params
         self._extract_images = extract_images
         self._extract_method = extract_method
         self._extract_tables = extract_tables
@@ -236,6 +238,8 @@ class ExtractTask(Task):
 
         if self._extract_images_params:
             info += f"  extract images params: {self._extract_images_params}\n"
+        if self._extract_audio_params:
+            info += f"  extract audio params: {self._extract_audio_params}\n"
         return info
 
     def to_dict(self) -> Dict:
@@ -257,6 +261,12 @@ class ExtractTask(Task):
             extract_params.update(
                 {
                     "extract_images_params": self._extract_images_params,
+                }
+            )
+        if self._extract_audio_params:
+            extract_params.update(
+                {
+                    "extract_audio_params": self._extract_audio_params,
                 }
             )
 

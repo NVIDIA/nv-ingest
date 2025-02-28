@@ -5,16 +5,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import glob
+import logging
 import os
 import shutil
 import tempfile
-from tqdm import tqdm
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any, Union
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
@@ -28,8 +29,11 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.util import filter_function_kwargs
+from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -401,6 +405,10 @@ class Ingestor:
             # Let user override document_type if user explicitly sets document_type.
             if "document_type" in kwargs:
                 document_type = kwargs.pop("document_type")
+                if document_type != file_type:
+                    logger.warning(
+                        f"User-specified document_type '{document_type}' overrides the inferred type '{file_type}'.",
+                    )
             else:
                 document_type = file_type
 

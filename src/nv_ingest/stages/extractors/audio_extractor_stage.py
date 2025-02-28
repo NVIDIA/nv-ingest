@@ -58,7 +58,7 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
-    if content_metadata.get("type") != "audio":
+    if (content_metadata.get("type") != "audio") and (base64_audio in (None, "")):
         return metadata
 
     # Modify audio metadata with the result from the inference model
@@ -105,11 +105,24 @@ def _transcribe_audio(
     """
     logger.debug(f"Entering audio extraction stage with {len(df)} rows.")
 
-    _ = task_props
+    extract_params = task_props.get("params", {}).get("extract_audio_params", {})
+    stage_config = validated_config.audio_extraction_config
+
+    grpc_endpoint = extract_params.get("grpc_endpoint") or stage_config.audio_endpoints[0]
+    http_endpoint = extract_params.get("http_endpoint") or stage_config.audio_endpoints[1]
+    infer_protocol = extract_params.get("infer_protocol") or stage_config.audio_infer_protocol
+    auth_token = extract_params.get("auth_token") or stage_config.auth_token
+    auth_metadata = extract_params.get("auth_metadata") or stage_config.auth_metadata
+    use_ssl = extract_params.get("use_ssl") or stage_config.use_ssl
+    ssl_cert = extract_params.get("ssl_cert") or stage_config.ssl_cert
 
     parakeet_client = create_audio_inference_client(
-        validated_config.audio_extraction_config.audio_endpoints,
-        auth_token=validated_config.audio_extraction_config.auth_token,
+        (grpc_endpoint, http_endpoint),
+        infer_protocol=infer_protocol,
+        auth_token=auth_token,
+        auth_metadata=auth_metadata,
+        use_ssl=use_ssl,
+        ssl_cert=ssl_cert,
     )
 
     if trace_info is None:
@@ -175,5 +188,4 @@ def generate_audio_extractor_stage(
         task=task,
         task_desc=task_desc,
         process_fn=_wrapped_process_fn,
-        document_type="regex:^(mp3|wav)$",
     )

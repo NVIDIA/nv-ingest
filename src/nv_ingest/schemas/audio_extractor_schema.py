@@ -45,6 +45,8 @@ class AudioConfigSchema(BaseModel):
     auth_token: Optional[str] = None
     audio_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     audio_infer_protocol: Optional[str] = None
+    use_ssl: Optional[bool] = None
+    ssl_cert: Optional[str] = None
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):

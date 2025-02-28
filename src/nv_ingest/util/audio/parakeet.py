@@ -24,17 +24,33 @@ class ParakeetClient:
         self,
         endpoint: str,
         auth_token: Optional[str] = None,
+        auth_metadata: Optional[Tuple[str, str]] = None,
         use_ssl: bool = False,
         ssl_cert: Optional[str] = None,
-        auth_metadata: Optional[Tuple[str, str]] = None,
     ):
+        """
+        Initialize the ParakeetClient.
+
+        Parameters
+        ----------
+        endpoint : str
+            The URL of the Parakeet service endpoint.
+        auth_token : Optional[str], default=None
+            The authentication token for accessing the service.
+        use_ssl : bool, default=False
+            Whether to use SSL for the connection.
+        ssl_cert : Optional[str], default=None
+            Path to the SSL certificate if required.
+        auth_metadata : Optional[Tuple[str, str]], default=None
+            Additional authentication metadata for the service.
+        """
         self.endpoint = endpoint
         self.auth_token = auth_token
-        self.use_ssl = use_ssl
-        self.ssl_cert = ssl_cert
         self.auth_metadata = auth_metadata or []
         if self.auth_token:
             self.auth_metadata.append(("authorization", f"Bearer {self.auth_token}"))
+        self.use_ssl = use_ssl
+        self.ssl_cert = ssl_cert
 
     @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
@@ -84,6 +100,52 @@ class ParakeetClient:
         stop_threshold: float = 0.0,
         stop_threshold_eou: bool = False,
     ):
+        """
+        Transcribe an audio file using Riva ASR.
+
+        Parameters
+        ----------
+        audio_content : str
+            Base64-encoded audio content to be transcribed.
+        language_code : str, default="en-US"
+            The language code for transcription.
+        automatic_punctuation : bool, default=True
+            Whether to enable automatic punctuation in the transcript.
+        word_time_offsets : bool, default=True
+            Whether to include word-level timestamps in the transcript.
+        max_alternatives : int, default=1
+            The maximum number of alternative transcripts to return.
+        profanity_filter : bool, default=False
+            Whether to filter out profanity from the transcript.
+        verbatim_transcripts : bool, default=True
+            Whether to return verbatim transcripts without normalization.
+        speaker_diarization : bool, default=False
+            Whether to enable speaker diarization.
+        boosted_lm_words : Optional[List[str]], default=None
+            A list of words to boost for language modeling.
+        boosted_lm_score : float, default=0.0
+            The boosting score for language model words.
+        diarization_max_speakers : int, default=0
+            The maximum number of speakers to differentiate in speaker diarization.
+        start_history : float, default=0.0
+            History window size for endpoint detection.
+        start_threshold : float, default=0.0
+            The threshold for starting speech detection.
+        stop_history : float, default=0.0
+            History window size for stopping speech detection.
+        stop_history_eou : bool, default=False
+            Whether to use an end-of-utterance flag for stopping detection.
+        stop_threshold : float, default=0.0
+            The threshold for stopping speech detection.
+        stop_threshold_eou : bool, default=False
+            Whether to use an end-of-utterance flag for stop threshold.
+
+        Returns
+        -------
+        Optional[riva.client.RecognitionResponse]
+            The response containing the transcription results.
+            Returns None if the transcription fails.
+        """
         # Create authentication and ASR service objects.
         auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
         asr_service = riva.client.ASRService(auth)
@@ -131,6 +193,19 @@ class ParakeetClient:
 
 
 def convert_to_mono_wav(audio_bytes):
+    """
+    Convert an audio file to mono WAV format using FFmpeg.
+
+    Parameters
+    ----------
+    audio_bytes : bytes
+        The raw audio data in bytes.
+
+    Returns
+    -------
+    bytes
+        The processed audio in mono WAV format.
+    """
     process = (
         ffmpeg.input("pipe:")
         .output("pipe:", format="wav", acodec="pcm_s16le", ar="44100", ac=1)  # Added ac=1
@@ -199,10 +274,11 @@ def process_transcription_response(response):
 
 def create_audio_inference_client(
     endpoints: Tuple[str, str],
-    auth_token: Optional[str] = None,
     infer_protocol: Optional[str] = None,
-    timeout: float = 120.0,
-    max_retries: int = 5,
+    auth_token: Optional[str] = None,
+    auth_metadata: Optional[Tuple[str, str]] = None,
+    use_ssl: bool = False,
+    ssl_cert: Optional[str] = None,
 ):
     """
     Create a NimClient for interfacing with a model inference server.
@@ -233,13 +309,13 @@ def create_audio_inference_client(
 
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
         infer_protocol = "grpc"
-    elif infer_protocol is None and http_endpoint:
-        infer_protocol = "http"
 
-    if infer_protocol not in ["grpc", "http"]:
-        raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
+    if infer_protocol == "http":
+        raise ValueError("`http` endpoints are not supported for audio. Use `grpc`.")
 
-    return ParakeetClient(grpc_endpoint, auth_token=auth_token)
+    return ParakeetClient(
+        grpc_endpoint, auth_token=auth_token, auth_metadata=auth_metadata, use_ssl=use_ssl, ssl_cert=ssl_cert
+    )
 
 
 def call_audio_inference_model(client, audio_content: str, trace_info: dict):

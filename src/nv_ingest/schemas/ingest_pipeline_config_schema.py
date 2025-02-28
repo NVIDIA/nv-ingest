@@ -6,6 +6,7 @@ import logging
 
 from pydantic import ConfigDict, BaseModel
 
+from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageModuleSchema
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineConfigSchema(BaseModel):
-    # TODO(Devin): Audio
+    audio_extractor_schema: AudioExtractorSchema = AudioExtractorSchema()
     chart_extractor_module: ChartExtractorSchema = ChartExtractorSchema()
     text_splitter_module: TextSplitterSchema = TextSplitterSchema()
     embedding_storage_module: EmbeddingStorageModuleSchema = EmbeddingStorageModuleSchema()
