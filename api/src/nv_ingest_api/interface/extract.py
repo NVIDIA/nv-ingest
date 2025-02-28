@@ -18,10 +18,10 @@ from nv_ingest.schemas.ingest_job_schema import (
     IngestTaskTableExtraction,
     IngestTaskInfographicExtraction,
 )
-from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_image_internal
+from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
+from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
-from ..internal.extract.image.table import extract_table_data_from_image_internal
 
 logger = logging.getLogger(__name__)
 
@@ -129,16 +129,6 @@ def extract_primitives_from_docx():
 
 @unified_exception_handler
 def extract_primitives_from_image():
-    pass
-
-
-@unified_exception_handler
-def extract_structured_data_from_chart():
-    pass
-
-
-@unified_exception_handler
-def extract_structured_data_from_table():
     pass
 
 
