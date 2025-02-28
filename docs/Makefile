@@ -5,7 +5,7 @@
 # Define paths
 SPHINX_BUILD_DIR=sphinx_docs/build
 SPHINX_SOURCE_DIR=sphinx_docs/source
-SPHINX_OUTPUT_DIR=docs/user-guide/developer-guide/api-docs
+SPHINX_OUTPUT_DIR=docs/user-guide/api-docs
 
 # Default target
 .PHONY: all

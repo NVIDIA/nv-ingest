@@ -1,4 +1,4 @@
-# NV-Ingest Deployment
+# Deploy NV-Ingest
 
 ## Launch NVIDIA Microservice(s)
 
