@@ -4,7 +4,7 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -13,6 +13,8 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
+from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
+from nv_ingest.schemas.ingest_job_schema import IngestTaskChartExtraction
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
@@ -27,30 +29,23 @@ PADDLE_MIN_HEIGHT = 32
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
-def _update_metadata(
+def _filter_valid_chart_images(
     base64_images: List[str],
-    yolox_client: NimClient,
-    paddle_client: NimClient,
-    trace_info: Dict,
-    worker_pool_size: int = 8,  # Not currently used.
-) -> List[Tuple[str, Dict]]:
+) -> Tuple[List[str], List[np.ndarray], List[int], List[Tuple[str, Optional[Dict]]]]:
     """
-    Given a list of base64-encoded chart images, this function calls both the Yolox and Paddle
-    inference services concurrently to extract chart data for all images.
+    Filter base64-encoded images based on minimum dimensions for chart extraction.
 
-    For each base64-encoded image, returns:
-      (original_image_str, joined_chart_content_dict)
+    Returns:
+      - valid_images: Base64 strings meeting size requirements.
+      - valid_arrays: Corresponding numpy arrays.
+      - valid_indices: Original indices of valid images.
+      - results: Initial results list where invalid images are set to (img, None).
     """
-    logger.debug("Running chart extraction using updated concurrency handling.")
-
-    # Initialize the results list in the same order as base64_images.
-    results: List[Tuple[str, Any]] = [("", None)] * len(base64_images)
-
+    results: List[Tuple[str, Optional[Dict]]] = [("", None)] * len(base64_images)
     valid_images: List[str] = []
     valid_arrays: List[np.ndarray] = []
     valid_indices: List[int] = []
 
-    # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
         array = base64_to_numpy(img)
         height, width = array.shape[0], array.shape[1]
@@ -61,12 +56,24 @@ def _update_metadata(
         else:
             # Image is too small; mark as skipped.
             results[i] = (img, None)
+    return valid_images, valid_arrays, valid_indices, results
 
-    # Prepare data payloads for both clients.
+
+def _run_chart_inference(
+    yolox_client: Any,
+    paddle_client: Any,
+    valid_arrays: List[np.ndarray],
+    valid_images: List[str],
+    trace_info: Dict,
+) -> Tuple[List[Any], List[Any]]:
+    """
+    Run concurrent inference for chart extraction using YOLOX and Paddle.
+
+    Returns a tuple of (yolox_results, paddle_results).
+    """
     data_yolox = {"images": valid_arrays}
     data_paddle = {"base64_images": valid_images}
 
-    _ = worker_pool_size
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_yolox = executor.submit(
             yolox_client.infer,
@@ -94,10 +101,21 @@ def _update_metadata(
         try:
             paddle_results = future_paddle.result()
         except Exception as e:
-            logger.error(f"Error calling yolox_client.infer: {e}", exc_info=True)
+            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
             raise
 
-    # Ensure both clients returned lists of results matching the number of input images.
+    return yolox_results, paddle_results
+
+
+def _validate_chart_inference_results(
+    yolox_results: Any, paddle_results: Any, valid_arrays: List[Any], valid_images: List[str]
+) -> Tuple[List[Any], List[Any]]:
+    """
+    Ensure inference results are lists and have expected lengths.
+
+    Raises:
+      ValueError if results do not match expected types or lengths.
+    """
     if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
         raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
 
@@ -105,16 +123,69 @@ def _update_metadata(
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
     if len(paddle_results) != len(valid_images):
         raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
+    return yolox_results, paddle_results
 
-    # Join the corresponding results from both services for each image.
+
+def _merge_chart_results(
+    base64_images: List[str],
+    valid_indices: List[int],
+    yolox_results: List[Any],
+    paddle_results: List[Any],
+    initial_results: List[Tuple[str, Optional[Dict]]],
+) -> List[Tuple[str, Optional[Dict]]]:
+    """
+    Merge inference results into the initial results list using the original indices.
+
+    For each valid image, processes the results from both inference calls and updates the
+    corresponding entry in the results list.
+    """
     for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
+        # Unpack paddle result into bounding boxes and text predictions.
         bounding_boxes, text_predictions = paddle_res
         yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
         original_index = valid_indices[idx]
-        results[original_index] = (base64_images[original_index], chart_content)
+        initial_results[original_index] = (base64_images[original_index], chart_content)
+    return initial_results
 
-    return results
+
+def _update_chart_metadata(
+    base64_images: List[str],
+    yolox_client: Any,
+    paddle_client: Any,
+    trace_info: Dict,
+    worker_pool_size: int = 8,  # Not currently used.
+) -> List[Tuple[str, Optional[Dict]]]:
+    """
+    Given a list of base64-encoded chart images, concurrently call both YOLOX and Paddle
+    inference services to extract chart data.
+
+    For each base64-encoded image, returns:
+      (original_image_str, joined_chart_content_dict)
+
+    Images that do not meet minimum size requirements are marked as skipped.
+    """
+    logger.debug("Running chart extraction using updated concurrency handling.")
+
+    # Initialize results with placeholders and filter valid images.
+    valid_images, valid_arrays, valid_indices, results = _filter_valid_chart_images(base64_images)
+
+    # Run concurrent inference only for valid images.
+    yolox_results, paddle_results = _run_chart_inference(
+        yolox_client=yolox_client,
+        paddle_client=paddle_client,
+        valid_arrays=valid_arrays,
+        valid_images=valid_images,
+        trace_info=trace_info,
+    )
+
+    # Validate that the returned inference results are lists of the expected length.
+    yolox_results, paddle_results = _validate_chart_inference_results(
+        yolox_results, paddle_results, valid_arrays, valid_images
+    )
+
+    # Merge the inference results into the results list.
+    return _merge_chart_results(base64_images, valid_indices, yolox_results, paddle_results, results)
 
 
 def _create_clients(
@@ -146,21 +217,24 @@ def _create_clients(
     return yolox_client, paddle_client
 
 
-def extract_data_from_chart_image_internal(
-    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+def extract_chart_data_from_image_internal(
+    df_extraction_ledger: pd.DataFrame,
+    task_config: Union[IngestTaskChartExtraction, Dict[str, Any]],
+    extraction_config: ChartExtractorConfigSchema,
+    execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts chart data from a DataFrame in a bulk fashion rather than row-by-row.
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df_extraction_ledger : pd.DataFrame
         DataFrame containing the content from which chart data is to be extracted.
-    task_props : Dict[str, Any]
+    task_config : Dict[str, Any]
         Dictionary containing task properties and configurations.
-    validated_config : Any
+    extraction_config : Any
         The validated configuration object for chart extraction.
-    trace_info : Optional[Dict], optional
+    execution_trace_log : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
     Returns
@@ -173,23 +247,22 @@ def extract_data_from_chart_image_internal(
     Exception
         If any error occurs during the chart data extraction process.
     """
+    _ = task_config  # Unused variable
 
-    _ = task_props  # unused
-
-    if trace_info is None:
-        trace_info = {}
+    if execution_trace_log is None:
+        execution_trace_log = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
-    if df.empty:
-        return df, trace_info
+    if df_extraction_ledger.empty:
+        return df_extraction_ledger, execution_trace_log
 
-    stage_config = validated_config.stage_config
+    endpoint_config = extraction_config.endpoint_config
     yolox_client, paddle_client = _create_clients(
-        stage_config.yolox_endpoints,
-        stage_config.yolox_infer_protocol,
-        stage_config.paddle_endpoints,
-        stage_config.paddle_infer_protocol,
-        stage_config.auth_token,
+        endpoint_config.yolox_endpoints,
+        endpoint_config.yolox_infer_protocol,
+        endpoint_config.paddle_endpoints,
+        endpoint_config.paddle_infer_protocol,
+        endpoint_config.auth_token,
     )
 
     try:
@@ -215,26 +288,26 @@ def extract_data_from_chart_image_internal(
 
             return False
 
-        mask = df.apply(meets_criteria, axis=1)
-        valid_indices = df[mask].index.tolist()
+        mask = df_extraction_ledger.apply(meets_criteria, axis=1)
+        valid_indices = df_extraction_ledger[mask].index.tolist()
 
         # If no rows meet the criteria, just return.
         if not valid_indices:
-            return df, {"trace_info": trace_info}
+            return df_extraction_ledger, {"trace_info": execution_trace_log}
 
         # 2) Extract base64 images + keep track of row -> image mapping.
         base64_images = []
         for idx in valid_indices:
-            meta = df.at[idx, "metadata"]
+            meta = df_extraction_ledger.at[idx, "metadata"]
             base64_images.append(meta["content"])  # guaranteed by meets_criteria
 
         # 3) Call our bulk _update_metadata to get all results.
-        bulk_results = _update_metadata(
+        bulk_results = _update_chart_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
             paddle_client=paddle_client,
-            worker_pool_size=stage_config.workers_per_progress_engine,
-            trace_info=trace_info,
+            worker_pool_size=endpoint_config.workers_per_progress_engine,
+            trace_info=execution_trace_log,
         )
 
         # 4) Write the results back to each row’s table_metadata
@@ -242,9 +315,9 @@ def extract_data_from_chart_image_internal(
         #    indices if we process them in the same order.
         for row_id, idx in enumerate(valid_indices):
             _, chart_content = bulk_results[row_id]
-            df.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
+            df_extraction_ledger.at[idx, "metadata"]["table_metadata"]["table_content"] = chart_content
 
-        return df, {"trace_info": trace_info}
+        return df_extraction_ledger, {"trace_info": execution_trace_log}
 
     except Exception:
         logger.error("Error occurred while extracting chart data.", exc_info=True)

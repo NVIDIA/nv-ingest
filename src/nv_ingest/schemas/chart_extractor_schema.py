@@ -116,7 +116,7 @@ class ChartExtractorSchema(BaseModel):
     raise_on_failure : bool, default=False
         A flag indicating whether to raise an exception if a failure occurs during chart extraction.
 
-    stage_config : Optional[ChartExtractorConfigSchema], default=None
+    extraction_config: Optional[ChartExtractorConfigSchema], default=None
         Configuration for the chart extraction stage, including yolox and paddle service endpoints.
     """
 
@@ -124,7 +124,7 @@ class ChartExtractorSchema(BaseModel):
     n_workers: int = 2
     raise_on_failure: bool = False
 
-    stage_config: Optional[ChartExtractorConfigSchema] = None
+    endpoint_config: Optional[ChartExtractorConfigSchema] = None
 
     @field_validator("max_queue_size", "n_workers")
     def check_positive(cls, v, field):

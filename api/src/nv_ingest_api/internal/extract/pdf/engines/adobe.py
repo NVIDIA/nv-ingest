@@ -70,7 +70,7 @@ def adobe_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extractor_config: dict,
-    trace_info=None,
+    execution_trace_log=None,
 ):
     """
     Helper function to use unstructured-io REST API to extract text from a bytestream PDF.
@@ -83,12 +83,14 @@ def adobe_extractor(
         Specifies whether to extract text.
     extract_images : bool
         Specifies whether to extract images.
+    extract_infographics : bool
+        Specifies whether to extract infographics.
     extract_tables : bool
         Specifies whether to extract tables.
     extractor_config : dict
         A dictionary containing additional extraction parameters such as API credentials,
         row_data, text_depth, and other optional settings.
-    trace_info : optional
+    execution_trace_log : optional
         Trace information for debugging purposes.
 
     Returns
@@ -107,6 +109,7 @@ def adobe_extractor(
     """
 
     # Not used for Adobe extraction, currently.
+    _ = execution_trace_log
     _ = extract_infographics
 
     logger.debug("Extracting PDF with Adobe backend.")

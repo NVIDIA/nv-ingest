@@ -125,5 +125,5 @@ class TableExtractorSchema(BaseModel):
             raise ValueError(f"{field.field_name} must be greater than 10.")
         return v
 
-    stage_config: Optional[TableExtractorConfigSchema] = None
+    endpoint_config: Optional[TableExtractorConfigSchema] = None
     model_config = ConfigDict(extra="forbid")

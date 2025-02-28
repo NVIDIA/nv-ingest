@@ -2,25 +2,26 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
 import logging
 from enum import Enum
-from typing import Any
-from typing import Dict
-from typing import List
-from typing import Optional
-from typing import Union
+from typing import Any, Dict, List, Optional, Union, Annotated
 
-from pydantic import field_validator, model_validator, Field
+from pydantic import Field, field_validator, model_validator
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from typing_extensions import Annotated
 
+# Assume BaseModelNoExt and ContentTypeEnum are defined elsewhere
+
+# ------------------------------------------------------------------------------
+# Logging Configuration
+# ------------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
 
 
+# ------------------------------------------------------------------------------
 # Enums
+# ------------------------------------------------------------------------------
 class DocumentTypeEnum(str, Enum):
     bmp = "bmp"
     docx = "docx"
@@ -53,10 +54,19 @@ class FilterTypeEnum(str, Enum):
     image = "image"
 
 
+# ------------------------------------------------------------------------------
+# Schemas: Common and Task-Specific
+# ------------------------------------------------------------------------------
+
+
+# Tracing Options Schema
 class TracingOptionsSchema(BaseModelNoExt):
     trace: bool = False
     ts_send: int
     trace_id: Optional[str] = None
+
+
+# Ingest Task Schemas
 
 
 class IngestTaskSplitSchema(BaseModelNoExt):
@@ -99,7 +109,7 @@ class IngestTaskStoreSchema(BaseModelNoExt):
     params: dict
 
 
-# All optional, the captioning stage requires default parameters, each of these are just overrides.
+# Captioning: All fields are optional and override default parameters.
 class IngestTaskCaptionSchema(BaseModelNoExt):
     api_key: Optional[str] = None
     endpoint_url: Optional[str] = None
@@ -115,6 +125,7 @@ class IngestTaskFilterParamsSchema(BaseModelNoExt):
 
 
 class IngestTaskFilterSchema(BaseModelNoExt):
+    # TODO: Ensure ContentTypeEnum is imported/defined as needed.
     content_type: ContentTypeEnum = ContentTypeEnum.IMAGE
     params: IngestTaskFilterParamsSchema = IngestTaskFilterParamsSchema()
 
@@ -124,6 +135,7 @@ class IngestTaskDedupParams(BaseModelNoExt):
 
 
 class IngestTaskDedupSchema(BaseModelNoExt):
+    # TODO: Ensure ContentTypeEnum is imported/defined as needed.
     content_type: ContentTypeEnum = ContentTypeEnum.IMAGE
     params: IngestTaskDedupParams = IngestTaskDedupParams()
 
@@ -134,21 +146,21 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
     bulk_ingest: bool = False
-    bulk_ingest_path: str = None
-    params: dict = None
+    bulk_ingest_path: Optional[str] = None
+    params: Optional[dict] = None
     filter_errors: bool = True
 
 
 class IngestTaskTableExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class IngestTaskChartExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: dict = Field(default_factory=dict)
 
 
 class IngestTaskSchema(BaseModelNoExt):
@@ -179,7 +191,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.dedup: IngestTaskDedupSchema,
                 TaskTypeEnum.embed: IngestTaskEmbedSchema,
                 TaskTypeEnum.extract: IngestTaskExtractSchema,
-                TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend this mapping as necessary
+                TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend mapping as necessary
                 TaskTypeEnum.split: IngestTaskSplitSchema,
                 TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
@@ -189,9 +201,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.infographic_data_extract: IngestTaskInfographicExtraction,
             }.get(task_type.lower())
 
-            # logger.debug(f"Checking task_properties type for task type '{task_type}'")
-
-            # Ensure task_properties is validated against the expected schema
+            # Validate task_properties against the expected schema.
             validated_task_properties = expected_type(**task_properties)
             values["task_properties"] = validated_task_properties
         return values
@@ -205,6 +215,11 @@ class IngestTaskSchema(BaseModelNoExt):
             return TaskTypeEnum(v)
         except ValueError:
             raise ValueError(f"{v} is not a valid TaskTypeEnum value")
+
+
+# ------------------------------------------------------------------------------
+# Schemas: Job Schemas
+# ------------------------------------------------------------------------------
 
 
 class JobPayloadSchema(BaseModelNoExt):
@@ -221,6 +236,11 @@ class IngestJobSchema(BaseModelNoExt):
     tracing_options: Optional[TracingOptionsSchema] = None
 
 
+# ------------------------------------------------------------------------------
+# Utility Functions
+# ------------------------------------------------------------------------------
+
+
 def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
     """
     Validates a dictionary representing an ingest_job using the IngestJobSchema.
@@ -234,5 +254,4 @@ def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
     Raises:
     - ValidationError: If the input data does not conform to the IngestJobSchema.
     """
-
     return IngestJobSchema(**job_data)

@@ -44,6 +44,7 @@ def llama_parse_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extractor_config: dict,
+    execution_trace_log=None,
 ) -> List[Dict[ContentTypeEnum, Dict[str, Any]]]:
     """
     Helper function to use LlamaParse API to extract text from a bytestream PDF.
@@ -69,6 +70,8 @@ def llama_parse_extractor(
             - max_timeout: Maximum timeout in seconds (default provided).
             - row_data: Row data for additional metadata.
             - metadata_column: Column name to extract metadata (default "metadata").
+    execution_trace_log : optional
+        Trace information for debugging purposes.
 
     Returns
     -------
@@ -82,13 +85,15 @@ def llama_parse_extractor(
         If extractor_config is not a dict or required parameters are missing.
     """
 
+    _ = execution_trace_log  # Unused variable
+
     logger.debug("Extracting PDF with LlamaParse backend.")
 
     # Validate extractor_config.
     if not isinstance(extractor_config, dict):
         raise ValueError("extractor_config must be a dictionary.")
 
-    api_key = extractor_config.get("api_key")
+    api_key = extractor_config.get("llama_api_key")
     if not api_key:
         raise ValueError("LLAMA_CLOUD_API_KEY is required in extractor_config.")
 

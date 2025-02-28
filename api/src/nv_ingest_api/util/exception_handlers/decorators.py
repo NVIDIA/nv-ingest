@@ -2,6 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
+import functools
 import inspect
 import re
 import typing
@@ -13,6 +15,10 @@ from nv_ingest_api.internal.primitives.ingest_control_message import IngestContr
 from nv_ingest_api.util.control_message.validators import cm_ensure_payload_not_null, cm_set_failure
 
 
+logger = logging.getLogger(__name__)
+
+
+# TODO(Devin): move back to framework
 def nv_ingest_node_failure_context_manager(
     annotation_id: str,
     payload_can_be_empty: bool = False,
@@ -201,3 +207,18 @@ class CMNVIngestFailureContextManager:
             task_id=self.annotation_id,
         )
         return False
+
+
+def unified_exception_handler(func):
+    @functools.wraps(func)
+    def wrapper(*args, **kwargs):
+        try:
+            return func(*args, **kwargs)
+        except Exception as e:
+            # Use the function's name in the error message
+            func_name = func.__name__
+            err_msg = f"{func_name}: Error extracting chart data. Original error: {e}"
+            logger.exception(err_msg, exc_info=True)
+            raise type(e)(err_msg) from e
+
+    return wrapper

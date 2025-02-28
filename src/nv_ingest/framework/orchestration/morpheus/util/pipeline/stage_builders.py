@@ -246,7 +246,7 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     table_content_extractor_config = ingest_config.get(
         "table_content_extraction_module",
         {
-            "stage_config": {
+            "endpoint_config": {
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),
@@ -268,9 +268,9 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_content_extractor_config = ingest_config.get(
-        "table_content_extraction_module",
+        "chart_content_extraction_module",
         {
-            "stage_config": {
+            "endpoint_config": {
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "paddle_endpoints": (paddle_grpc, paddle_http),

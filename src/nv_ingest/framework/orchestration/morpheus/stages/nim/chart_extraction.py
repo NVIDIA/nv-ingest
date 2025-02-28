@@ -11,14 +11,14 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.internal.extract.image.chart import extract_data_from_chart_image_internal
+from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_image_internal
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
 
 def generate_chart_extractor_stage(
     c: Config,
-    stage_config: Dict[str, Any],
+    extractor_config: Dict[str, Any],
     task: str = "chart_data_extract",
     task_desc: str = "chart_data_extraction",
     pe_count: int = 1,
@@ -31,7 +31,7 @@ def generate_chart_extractor_stage(
     c : Config
         Morpheus global configuration object.
 
-    stage_config : Dict[str, Any]
+    extractor_config : Dict[str, Any]
         Configuration parameters for the chart content extractor, passed as a dictionary
         validated against the `ChartExtractorSchema`.
 
@@ -54,10 +54,10 @@ def generate_chart_extractor_stage(
         from PDF content.
     """
     try:
-        validated_config = ChartExtractorSchema(**stage_config)
+        validated_config = ChartExtractorSchema(**extractor_config)
 
         _wrapped_process_fn = functools.partial(
-            extract_data_from_chart_image_internal, validated_config=validated_config
+            extract_chart_data_from_image_internal, extraction_config=validated_config
         )
 
         return MultiProcessingBaseStage(

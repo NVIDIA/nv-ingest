@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 def image_filter_stage(
     df_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
-    mutate_config: Any,
+    mutate_config: ImageFilterSchema,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """

@@ -5,7 +5,7 @@
 import logging
 import traceback
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any
+from typing import Any, Union
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -14,7 +14,9 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
+from nv_ingest.schemas.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
+from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
@@ -29,34 +31,19 @@ PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
 
-def _update_metadata(
-    base64_images: List[str],
-    yolox_client: NimClient,
-    paddle_client: NimClient,
-    worker_pool_size: int = 8,  # Not currently used
-    enable_yolox: bool = False,
-    trace_info: Dict = None,
-) -> List[Tuple[str, Tuple[Any, Any]]]:
+def _filter_valid_images(base64_images: List[str]) -> Tuple[List[str], List[np.ndarray], List[int]]:
     """
-    Given a list of base64-encoded images, this function filters out images that do not meet the minimum
-    size requirements and then calls the PaddleOCR model via paddle_client.infer to extract table data.
+    Filter base64-encoded images by their dimensions.
 
-    For each base64-encoded image, the result is:
-        (base64_image, (text_predictions, bounding_boxes))
-
-    Images that do not meet the minimum size are skipped (resulting in ("", "") for that image).
-    The paddle_client is expected to handle any necessary batching and concurrency.
+    Returns three lists:
+      - valid_images: The base64 strings that meet minimum size requirements.
+      - valid_arrays: The corresponding numpy arrays.
+      - valid_indices: The original indices in the input list.
     """
-    logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
-
-    # Initialize the results list in the same order as base64_images.
-    results: List[Optional[Tuple[str, Tuple[Any, Any, Any]]]] = [("", None, None, None)] * len(base64_images)
-
     valid_images: List[str] = []
-    valid_indices: List[int] = []
     valid_arrays: List[np.ndarray] = []
+    valid_indices: List[int] = []
 
-    # Pre-decode image dimensions and filter valid images.
     for i, img in enumerate(base64_images):
         array = base64_to_numpy(img)
         height, width = array.shape[0], array.shape[1]
@@ -65,19 +52,31 @@ def _update_metadata(
             valid_arrays.append(array)
             valid_indices.append(i)
         else:
-            # Image is too small; mark as skipped.
-            results[i] = (img, None, None, None)
+            # Image is too small; skip it.
+            continue
 
-    if not valid_images:
-        return results
+    return valid_images, valid_arrays, valid_indices
 
-    # Prepare data payloads for both clients.
+
+def _run_inference(
+    enable_yolox: bool,
+    yolox_client: Any,
+    paddle_client: Any,
+    valid_arrays: List[np.ndarray],
+    valid_images: List[str],
+    trace_info: Optional[Dict] = None,
+) -> Tuple[List[Any], List[Any]]:
+    """
+    Run inference concurrently for YOLOX (if enabled) and Paddle.
+
+    Returns a tuple of (yolox_results, paddle_results).
+    """
+    data_paddle = {"base64_images": valid_images}
     if enable_yolox:
         data_yolox = {"images": valid_arrays}
-    data_paddle = {"base64_images": valid_images}
 
-    _ = worker_pool_size
     with ThreadPoolExecutor(max_workers=2) as executor:
+        future_yolox = None
         if enable_yolox:
             future_yolox = executor.submit(
                 yolox_client.infer,
@@ -111,7 +110,20 @@ def _update_metadata(
             logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
             raise
 
-    # Ensure both clients returned lists of results matching the number of input images.
+    return yolox_results, paddle_results
+
+
+def _validate_inference_results(
+    yolox_results: Any,
+    paddle_results: Any,
+    valid_arrays: List[Any],
+    valid_images: List[str],
+) -> Tuple[List[Any], List[Any]]:
+    """
+    Validate that both inference results are lists and have the expected lengths.
+
+    If not, default values are assigned. Raises a ValueError if the lengths do not match.
+    """
     if not isinstance(yolox_results, list) or not isinstance(paddle_results, list):
         logger.warning(
             "Unexpected result types from inference clients: yolox_results=%s, paddle_results=%s. "
@@ -119,18 +131,65 @@ def _update_metadata(
             type(yolox_results).__name__,
             type(paddle_results).__name__,
         )
-
-        # Assign default values for missing results
         if not isinstance(yolox_results, list):
             yolox_results = [None] * len(valid_arrays)
         if not isinstance(paddle_results, list):
-            paddle_results = [(None, None)] * len(valid_images)  # Default for paddle output
+            paddle_results = [(None, None)] * len(valid_images)
 
     if len(yolox_results) != len(valid_arrays):
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
     if len(paddle_results) != len(valid_images):
         raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
 
+    return yolox_results, paddle_results
+
+
+def _update_table_metadata(
+    base64_images: List[str],
+    yolox_client: Any,
+    paddle_client: Any,
+    worker_pool_size: int = 8,  # Not currently used
+    enable_yolox: bool = False,
+    trace_info: Optional[Dict] = None,
+) -> List[Tuple[str, Any, Any, Any]]:
+    """
+    Given a list of base64-encoded images, this function filters out images that do not meet
+    the minimum size requirements and then calls the PaddleOCR model via paddle_client.infer
+    to extract table data.
+
+    For each base64-encoded image, the result is a tuple:
+        (base64_image, yolox_result, paddle_text_predictions, paddle_bounding_boxes)
+
+    Images that do not meet the minimum size are skipped (resulting in placeholders).
+    The paddle_client is expected to handle any necessary batching and concurrency.
+    """
+    logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
+
+    # Initialize the results list with default placeholders.
+    results: List[Tuple[str, Any, Any, Any]] = [("", None, None, None)] * len(base64_images)
+
+    # Filter valid images based on size requirements.
+    valid_images, valid_arrays, valid_indices = _filter_valid_images(base64_images)
+
+    if not valid_images:
+        return results
+
+    # Run inference concurrently.
+    yolox_results, paddle_results = _run_inference(
+        enable_yolox=enable_yolox,
+        yolox_client=yolox_client,
+        paddle_client=paddle_client,
+        valid_arrays=valid_arrays,
+        valid_images=valid_images,
+        trace_info=trace_info,
+    )
+
+    # Validate that the inference results have the expected structure.
+    yolox_results, paddle_results = _validate_inference_results(
+        yolox_results, paddle_results, valid_arrays, valid_images
+    )
+
+    # Combine results with the original order.
     for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
         original_index = valid_indices[idx]
         results[original_index] = (base64_images[original_index], yolox_res, paddle_res[0], paddle_res[1])
@@ -167,8 +226,11 @@ def _create_clients(
     return yolox_client, paddle_client
 
 
-def extract_data_from_table_image_internal(
-    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+def extract_table_data_from_image_internal(
+    df_extraction_ledger: pd.DataFrame,
+    task_config: Union[IngestTaskTableExtraction, Dict[str, Any]],
+    extraction_config: TableExtractorConfigSchema,
+    execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts table data from a DataFrame in a bulk fashion rather than row-by-row,
@@ -176,13 +238,13 @@ def extract_data_from_table_image_internal(
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df_extraction_ledger : pd.DataFrame
         DataFrame containing the content from which table data is to be extracted.
-    task_props : Dict[str, Any]
+    task_config : Dict[str, Any]
         Dictionary containing task properties and configurations.
-    validated_config : Any
+    extraction_config : Any
         The validated configuration object for table extraction.
-    trace_info : Optional[Dict], optional
+    execution_trace_log : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
     Returns
@@ -191,22 +253,22 @@ def extract_data_from_table_image_internal(
         A tuple containing the updated DataFrame and the trace information.
     """
 
-    _ = task_props  # unused
+    _ = task_config  # unused
 
-    if trace_info is None:
-        trace_info = {}
+    if execution_trace_log is None:
+        execution_trace_log = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
-    if df.empty:
-        return df, trace_info
+    if df_extraction_ledger.empty:
+        return df_extraction_ledger, execution_trace_log
 
-    stage_config = validated_config.stage_config
+    endpoint_config = extraction_config.endpoint_config
     yolox_client, paddle_client = _create_clients(
-        stage_config.yolox_endpoints,
-        stage_config.yolox_infer_protocol,
-        stage_config.paddle_endpoints,
-        stage_config.paddle_infer_protocol,
-        stage_config.auth_token,
+        endpoint_config.yolox_endpoints,
+        endpoint_config.yolox_infer_protocol,
+        endpoint_config.paddle_endpoints,
+        endpoint_config.paddle_infer_protocol,
+        endpoint_config.auth_token,
     )
 
     try:
@@ -225,33 +287,33 @@ def extract_data_from_table_image_internal(
                 return True
             return False
 
-        mask = df.apply(meets_criteria, axis=1)
-        valid_indices = df[mask].index.tolist()
+        mask = df_extraction_ledger.apply(meets_criteria, axis=1)
+        valid_indices = df_extraction_ledger[mask].index.tolist()
 
         # If no rows meet the criteria, just return
         if not valid_indices:
-            return df, {"trace_info": trace_info}
+            return df_extraction_ledger, {"trace_info": execution_trace_log}
 
         # 2) Extract base64 images in the same order
         base64_images = []
         for idx in valid_indices:
-            meta = df.at[idx, "metadata"]
+            meta = df_extraction_ledger.at[idx, "metadata"]
             base64_images.append(meta["content"])
 
         # 3) Call our bulk _update_metadata to get all results
         table_content_format = (
-            df.at[valid_indices[0], "metadata"]["table_metadata"].get("table_content_format")
+            df_extraction_ledger.at[valid_indices[0], "metadata"]["table_metadata"].get("table_content_format")
             or TableFormatEnum.PSEUDO_MARKDOWN
         )
         enable_yolox = True if table_content_format in (TableFormatEnum.MARKDOWN,) else False
 
-        bulk_results = _update_metadata(
+        bulk_results = _update_table_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
             paddle_client=paddle_client,
-            worker_pool_size=stage_config.workers_per_progress_engine,
+            worker_pool_size=endpoint_config.workers_per_progress_engine,
             enable_yolox=enable_yolox,
-            trace_info=trace_info,
+            trace_info=execution_trace_log,
         )
 
         # 4) Write the results (bounding_boxes, text_predictions) back
@@ -270,10 +332,10 @@ def extract_data_from_table_image_internal(
             else:
                 raise ValueError(f"Unexpected table format: {table_content_format}")
 
-            df.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
-            df.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
+            df_extraction_ledger.at[idx, "metadata"]["table_metadata"]["table_content"] = table_content
+            df_extraction_ledger.at[idx, "metadata"]["table_metadata"]["table_content_format"] = table_content_format
 
-        return df, {"trace_info": trace_info}
+        return df_extraction_ledger, {"trace_info": execution_trace_log}
 
     except Exception:
         logger.error("Error occurred while extracting table data.", exc_info=True)

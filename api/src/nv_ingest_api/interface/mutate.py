@@ -7,12 +7,16 @@ from typing import Union, Dict, Optional, Any, List
 
 import pandas as pd
 
+from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
+from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.mutate.deduplicate import deduplicate_images_internal
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
+from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)
 
 
+@unified_exception_handler
 def filter_images(
     df_ledger: pd.DataFrame,
     min_size: int = 128,
@@ -40,6 +44,7 @@ def filter_images(
     min_aspect_ratio : float or int, optional
         Minimum allowed image aspect ratio. Images with an aspect ratio less than or equal to this value
         are considered for filtering. Default is 2.0.
+    execution_trace_log : Optional[List[Any]], optional
 
     Returns
     -------
@@ -59,13 +64,18 @@ def filter_images(
             "min_aspect_ratio": min_aspect_ratio,
             "filter": True,
         }
-        return filter_images_internal(df_ledger, task_params, execution_trace_log)
+        mutate_config = ImageFilterSchema()
+
+        return filter_images_internal(
+            df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=execution_trace_log
+        )
     except Exception as e:
         err_msg = f"filter_images: Error applying deduplication filter. Original error: {e}"
         logger.error(err_msg, exc_info=True)
         raise type(e)(err_msg) from e
 
 
+@unified_exception_handler
 def deduplicate_images(
     df_ledger: pd.DataFrame,
     hash_algorithm: str = "md5",
@@ -102,6 +112,11 @@ def deduplicate_images(
     task_config: Dict[str, Union[int, float, bool, str]] = {
         "hash_algorithm": hash_algorithm,
     }
-    mutate_config: Dict[str, Any] = {}
+    mutate_config = ImageDedupSchema()
 
-    return deduplicate_images_internal(df_ledger, task_config, mutate_config, execution_trace_log)
+    return deduplicate_images_internal(
+        df_ledger=df_ledger,
+        task_config=task_config,
+        mutate_config=mutate_config,
+        execution_trace_log=execution_trace_log,
+    )

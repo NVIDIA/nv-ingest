@@ -2,13 +2,25 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
+from typing import Tuple, Optional, Any, List
 
-from typing import Tuple, Optional, Any
+import pandas as pd
+from pandas import DataFrame
 
+from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
+from nv_ingest.schemas.ingest_job_schema import IngestTaskChartExtraction, IngestTaskTableExtraction
+from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from . import extraction_interface_relay_constructor
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
+from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_image_internal
+from ..internal.extract.image.table import extract_table_data_from_image_internal
+from ..util.exception_handlers.decorators import unified_exception_handler
+
+logger = logging.getLogger(__name__)
 
 
+@unified_exception_handler
 @extraction_interface_relay_constructor(
     api_fn=extract_primitives_from_pdf_internal,
     task_keys=["extract_text", "extract_images", "extract_tables", "extract_charts"],
@@ -21,6 +33,12 @@ def extract_primitives_from_pdf(
     extract_images: bool = True,
     extract_tables: bool = True,
     extract_charts: bool = True,
+    text_depth: str = "page",
+    # Adobe-specific parameters:
+    adobe_client_id: Optional[str] = None,
+    adobe_client_secret: Optional[str] = None,
+    # LLama
+    llama_api_key: Optional[str] = None,
     # PDFium-specific parameters:
     yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
@@ -94,21 +112,151 @@ def extract_primitives_from_pdf(
     pass
 
 
+@unified_exception_handler
 def extract_primitives_from_pptx():
     pass
 
 
+@unified_exception_handler
 def extract_primitives_from_docx():
     pass
 
 
+@unified_exception_handler
 def extract_primitives_from_image():
     pass
 
 
+@unified_exception_handler
 def extract_structured_data_from_chart():
     pass
 
 
+@unified_exception_handler
 def extract_structured_data_from_table():
     pass
+
+
+@unified_exception_handler
+def extract_chart_data_from_image(
+    *,
+    df_ledger: pd.DataFrame,
+    yolox_endpoints: Tuple[str, str],
+    paddle_endpoints: Tuple[str, str],
+    yolox_protocol: str = "grpc",
+    paddle_protocol: str = "grpc",
+    auth_token: str = "",
+    execution_trace_log: Optional[List[Any]] = None,
+) -> tuple[DataFrame, dict]:
+    """
+    Public interface to extract chart data from ledger DataFrame.
+
+    Parameters
+    ----------
+    df_ledger : pd.DataFrame
+        DataFrame containing metadata required for chart extraction.
+    yolox_endpoints : Tuple[str, str]
+        YOLOX inference server endpoints.
+    paddle_endpoints : Tuple[str, str]
+        PaddleOCR inference server endpoints.
+    yolox_protocol : str, optional
+        Protocol for YOLOX inference (default "grpc").
+    paddle_protocol : str, optional
+        Protocol for PaddleOCR inference (default "grpc").
+    auth_token : str, optional
+        Authentication token for inference services.
+    execution_trace_log : list, optional
+        Execution trace logs.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame after chart extraction.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during extraction.
+    """
+    task_config = IngestTaskChartExtraction()
+    extraction_config = ChartExtractorConfigSchema(
+        **{
+            "endpoint_config": {
+                "yolox_endpoints": yolox_endpoints,
+                "paddle_endpoints": paddle_endpoints,
+                "yolox_infer_protocol": yolox_protocol,
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": auth_token,
+            }
+        }
+    )
+
+    return extract_chart_data_from_image_internal(
+        df_extraction_ledger=df_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=execution_trace_log,
+    )
+
+
+@unified_exception_handler
+def extract_table_data_from_image(
+    *,
+    df_ledger: pd.DataFrame,
+    yolox_endpoints: Tuple[str, str],
+    paddle_endpoints: Tuple[str, str],
+    yolox_protocol: str = "grpc",
+    paddle_protocol: str = "grpc",
+    auth_token: str = "",
+    execution_trace_log: Optional[List[Any]] = None,
+) -> tuple[DataFrame, dict]:
+    """
+    Public interface to extract chart data from ledger DataFrame.
+
+    Parameters
+    ----------
+    df_ledger : pd.DataFrame
+        DataFrame containing metadata required for chart extraction.
+    yolox_endpoints : Tuple[str, str]
+        YOLOX inference server endpoints.
+    paddle_endpoints : Tuple[str, str]
+        PaddleOCR inference server endpoints.
+    yolox_protocol : str, optional
+        Protocol for YOLOX inference (default "grpc").
+    paddle_protocol : str, optional
+        Protocol for PaddleOCR inference (default "grpc").
+    auth_token : str, optional
+        Authentication token for inference services.
+    execution_trace_log : list, optional
+        Execution trace logs.
+
+    Returns
+    -------
+    pd.DataFrame
+        Updated DataFrame after chart extraction.
+
+    Raises
+    ------
+    Exception
+        If an error occurs during extraction.
+    """
+
+    task_config = IngestTaskTableExtraction()
+    extraction_config = TableExtractorConfigSchema(
+        **{
+            "endpoint_config": {
+                "yolox_endpoints": yolox_endpoints,
+                "paddle_endpoints": paddle_endpoints,
+                "yolox_infer_protocol": yolox_protocol,
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": auth_token,
+            }
+        }
+    )
+
+    return extract_table_data_from_image_internal(
+        df_extraction_ledger=df_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=execution_trace_log,
+    )

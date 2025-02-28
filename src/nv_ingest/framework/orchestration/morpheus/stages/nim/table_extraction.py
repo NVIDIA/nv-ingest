@@ -11,14 +11,14 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.internal.extract.image.table import extract_data_from_table_image_internal
+from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
 
 logger = logging.getLogger(__name__)
 
 
 def generate_table_extractor_stage(
     c: Config,
-    stage_config: Dict[str, Any],
+    extraction_config: Dict[str, Any],
     task: str = "table_data_extract",
     task_desc: str = "table_data_extraction",
     pe_count: int = 1,
@@ -31,7 +31,7 @@ def generate_table_extractor_stage(
     c : Config
         Morpheus global configuration object.
 
-    stage_config : Dict[str, Any]
+    extraction_config : Dict[str, Any]
         Configuration parameters for the table content extractor, passed as a dictionary
         validated against the `TableExtractorSchema`.
 
@@ -54,8 +54,8 @@ def generate_table_extractor_stage(
         from PDF content.
     """
 
-    validated_config = TableExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(extract_data_from_table_image_internal, validated_config=validated_config)
+    validated_config = TableExtractorSchema(**extraction_config)
+    _wrapped_process_fn = functools.partial(extract_table_data_from_image_internal, extraction_config=validated_config)
 
     return MultiProcessingBaseStage(
         c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn

@@ -23,7 +23,9 @@ MODULE_NAMESPACE = "nv-ingest"
 ImageDedupLoaderFactory = ModuleLoaderFactory(MODULE_NAME, MODULE_NAMESPACE, ImageDedupSchema)
 
 
-def dedup_image_stage(df_ledger: pd.DataFrame, task_config: Dict[str, Any], validated_config: Any) -> pd.DataFrame:
+def dedup_image_stage(
+    df_ledger: pd.DataFrame, task_config: Dict[str, Any], mutate_config: ImageDedupSchema
+) -> pd.DataFrame:
     """
     Deduplicates images in the provided DataFrame based on the task properties.
 
@@ -73,7 +75,7 @@ def dedup_image_stage(df_ledger: pd.DataFrame, task_config: Dict[str, Any], vali
         task_config = {"hash_algorithm": "md5"}
 
         df_result = deduplicate_images_internal(
-            df_ledger=df_ledger, task_config=task_config, mutate_config=validated_config, execution_trace_log=None
+            df_ledger=df_ledger, task_config=task_config, mutate_config=mutate_config, execution_trace_log=None
         )
 
         return df_result
@@ -136,7 +138,7 @@ def generate_dedup_stage(
     """
     try:
         validated_config = ImageDedupSchema(**deduplicate_image_config)
-        _wrapped_dedup_image_stage = functools.partial(dedup_image_stage, validated_config=validated_config)
+        _wrapped_dedup_image_stage = functools.partial(dedup_image_stage, mutate_config=validated_config)
         logger.debug(f"generate_dedup_stage: Generating deduplication stage with config: {validated_config}")
         return MultiProcessingBaseStage(
             c=c,

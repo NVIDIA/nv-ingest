@@ -3,10 +3,11 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Dict, Union, Optional, List, Any
+from typing import Dict, Optional, List, Any
 
 import pandas as pd
 
+from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum, StatusEnum, InfoMessageMetadataSchema, ContentTypeEnum
 from nv_ingest_api.util.schema.schema_validator import validate_schema
 
@@ -29,8 +30,8 @@ def _calculate_aspect_ratio(x):
 
 def filter_images_internal(
     df_ledger: pd.DataFrame,
-    task_config: Dict[str, Union[int, float, bool]],
-    mutate_config: Dict[str, Any] = None,
+    task_config: Dict[str, Any],
+    mutate_config: ImageFilterSchema = ImageFilterSchema(),
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
@@ -46,6 +47,8 @@ def filter_images_internal(
             - "max_aspect_ratio": Maximum allowed aspect ratio.
             - "min_aspect_ratio": Minimum allowed aspect ratio.
             - "filter": If True, rows failing the criteria are dropped; if False, they are flagged.
+    mutate_config : ImageFilterSchema
+    execution_trace_log : Optional[List[Any]], optional
 
     Returns
     -------

@@ -4,10 +4,11 @@
 
 import logging
 import hashlib
-from typing import Any, Dict, Union, Optional, List
+from typing import Any, Dict, Optional, List
 
 import pandas as pd
 
+from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 
 logger = logging.getLogger(__name__)
@@ -39,8 +40,8 @@ def _hash_content(x: Any, algorithm: str = "md5") -> bytes:
 
 def deduplicate_images_internal(
     df_ledger: pd.DataFrame,
-    task_config: Dict[str, Union[int, float, bool, str]],
-    mutate_config: Dict[str, Any] = None,
+    task_config: Dict[str, Any],
+    mutate_config: ImageDedupSchema = ImageDedupSchema(),
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
     """
@@ -58,6 +59,8 @@ def deduplicate_images_internal(
         Configuration parameters, including:
             - "filter": bool, if True duplicate rows are removed; if False, duplicates are marked.
             - "hash_algorithm": str, the algorithm to use for hashing (default "md5").
+    mutate_config : ImageDedupSchema, optional
+    execution_trace_log : Optional[List[Any]], optional
 
     Returns
     -------
