@@ -303,7 +303,7 @@ def _generate_text_embeddings_df(
 
         # Extract content from metadata and filter out rows with empty content.
         extracted_content = df.loc[content_mask, "metadata"].apply(content_getter)
-        non_empty_mask = extracted_content.str.strip() != ""
+        non_empty_mask = extracted_content.notna() & (extracted_content.str.strip() != "")
         final_mask = content_mask & non_empty_mask
         if not final_mask.any():
             continue
