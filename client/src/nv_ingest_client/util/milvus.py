@@ -1078,6 +1078,23 @@ def nv_rerank(
 
 
 def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
+    """
+    This function allows a user reconstruct the pages for a retrieved chunk.
+
+    Parameters
+    ----------
+    anchor_record : dict
+        Query the candidates are supposed to answer.
+    records_list : list
+        List of the candidates to rerank.
+    page_signum : int
+        The endpoint to the nvidia reranker
+
+    Returns
+    -------
+    String
+        Full page(s) corresponding to anchor record.
+    """
     source_file = anchor_record["entity"]["source"]["source_name"]
     page_number = anchor_record["entity"]["content_metadata"]["page_number"]
     min_page = page_number - page_signum
