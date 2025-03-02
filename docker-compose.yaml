@@ -200,8 +200,8 @@ services:
     image: nvcr.io/nvidia/riva/riva-speech:2.18.0
     shm_size: 2gb
     ports:
-      - "8019:50051"  # grpc
-      - "8020:50000"  # http
+      - "8021:50051"  # grpc
+      - "8022:50000"  # http
     user: root
     environment:
       - MODEL_DEPLOY_KEY=tlt_encode
