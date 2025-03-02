@@ -20,12 +20,12 @@ from nv_ingest.schemas.ingest_job_schema import (
     IngestTaskTableExtraction,
     IngestTaskInfographicExtraction,
 )
-from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_image_internal
-from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
 from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitives_from_pptx_internal
+from ..internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
+from ..internal.extract.image.table_extractor import extract_table_data_from_image_internal
 
 logger = logging.getLogger(__name__)
 

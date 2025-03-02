@@ -11,7 +11,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
+from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 
 logger = logging.getLogger(__name__)
 

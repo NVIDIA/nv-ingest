@@ -20,7 +20,7 @@ import io
 import logging
 import traceback
 from datetime import datetime
-from typing import Dict
+from typing import Dict, IO, Any
 from typing import List
 from typing import Optional
 from typing import Tuple
@@ -249,55 +249,77 @@ def extract_page_elements_from_images(
     return page_elements
 
 
-def image_data_extractor(
-    image_stream,
-    document_type: str,
+def unstructured_image_extractor(
+    *,
+    image_stream: IO[bytes],
     extract_text: bool,
     extract_images: bool,
+    extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
-    trace_info: dict = None,
-    **kwargs,
-):
+    extraction_config: Dict[str, Any],
+    extraction_trace_log: Optional[Dict[str, Any]] = None,
+) -> List[Any]:
     """
-    Helper function to extract text, images, tables, and charts from an image bytestream.
+    Extract primitives from an unstructured image bytestream.
+
+    This helper function processes an image bytestream according to the provided extraction
+    configuration. It supports extraction of tables, charts, and infographics from the image.
+    (Note: text and additional image extraction are not supported yet for raw images.)
 
     Parameters
     ----------
-    image_stream : io.BytesIO
-        A bytestream for the image file.
-    document_type : str
-        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff').
+    image_stream : IO[bytes]
+        A bytestream (e.g. io.BytesIO) containing the image file data.
     extract_text : bool
-        Specifies whether to extract text.
+        Flag specifying whether to extract text (currently not supported for raw images).
     extract_images : bool
-        Specifies whether to extract images.
+        Flag specifying whether to extract images (currently not supported for raw images).
+    extract_infographics : bool
+        Flag specifying whether to extract infographics.
     extract_tables : bool
-        Specifies whether to extract tables.
+        Flag specifying whether to extract tables.
     extract_charts : bool
-        Specifies whether to extract charts.
-    trace_info : dict, optional
-        Tracing information for logging or debugging purposes.
-    **kwargs
-        Additional extraction parameters.
+        Flag specifying whether to extract charts.
+    extraction_config : Dict[str, Any]
+        A dictionary containing additional extraction parameters and configurations.
+        Expected keys include "document_type", "row_data", "metadata_column", and
+        "image_extraction_config".
+    extraction_trace_log : Optional[Dict[str, Any]], optional
+        An optional dictionary containing trace information for logging or debugging,
+        by default None.
 
     Returns
     -------
-    list
-        A list of extracted data items.
+    List[Any]
+        A list of extracted data items (e.g., metadata dictionaries) from the image.
+
+    Raises
+    ------
+    ValueError
+        If the document type is unsupported.
+    Exception
+        If an error occurs during extraction.
     """
+    # Note: extract_infographics flag is not currently used in extraction
+    _ = extract_infographics
+
+    # Determine the type of the document from the extraction config.
+    document_type: str = extraction_config.get("document_type", "unknown")
     logger.debug(f"Extracting {document_type.upper()} image with image extractor.")
 
+    # Ensure the document type is supported.
     if document_type not in SUPPORTED_FILE_TYPES:
         raise ValueError(f"Unsupported document type: {document_type}")
 
-    row_data = kwargs.get("row_data")
-    source_id = row_data.get("source_id", "unknown_source")
+    # Retrieve additional row-specific data and source identifier.
+    row_data: Dict[str, Any] = extraction_config.get("row_data", {})
+    source_id: str = row_data.get("source_id", "unknown_source")
 
-    # Metadata extraction setup
-    base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
-    current_iso_datetime = datetime.now().isoformat()
-    source_metadata = {
+    # Build source metadata based on row data.
+    base_unified_metadata: Dict[str, Any] = row_data.get(extraction_config.get("metadata_column", "metadata"), {})
+    current_iso_datetime: str = datetime.now().isoformat()
+    source_metadata: Dict[str, Any] = {
         "source_name": f"{source_id}_{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
@@ -310,17 +332,17 @@ def image_data_extractor(
         "access_level": row_data.get("access_level", AccessLevelEnum.LEVEL_1),
     }
 
-    extract_infographics = kwargs.get("extract_infographics", False)
+    # Optionally update the extract_infographics flag based on extraction_config.
+    extract_infographics = extraction_config.get("extract_infographics", False)
 
-    # Prepare for extraction
-    extracted_data = []
+    # Log which primitives are requested for extraction.
     logger.debug(f"Extract text: {extract_text} (not supported yet for raw images)")
     logger.debug(f"Extract images: {extract_images} (not supported yet for raw images)")
     logger.debug(f"Extract tables: {extract_tables}")
     logger.debug(f"Extract charts: {extract_charts}")
     logger.debug(f"Extract infographics: {extract_infographics}")
 
-    # Preprocess based on image type
+    # Preprocess the image based on the document type.
     if document_type in RAW_FILE_FORMATS:
         logger.debug(f"Loading and preprocessing {document_type} image.")
         image_array = load_and_preprocess_image(image_stream)
@@ -330,25 +352,26 @@ def image_data_extractor(
     else:
         raise ValueError(f"Unsupported document type: {document_type}")
 
-    # Text extraction stub
+    extracted_data: List[Any] = []
+
+    # Text extraction stub (not supported for raw images)
     if extract_text:
-        # Future function for text extraction based on document_type
         logger.warning("Text extraction is not supported for raw images.")
 
-    # Table and chart extraction
+    # Extract tables, charts, or infographics if requested.
     if extract_tables or extract_charts or extract_infographics:
         try:
             page_elements = extract_page_elements_from_images(
                 [image_array],
-                config=kwargs.get("image_extraction_config"),
-                trace_info=trace_info,
+                config=extraction_config.get("image_extraction_config"),
+                trace_info=extraction_trace_log,
             )
             for item in page_elements:
                 table_chart_data = item[1]
                 extracted_data.append(
                     construct_page_element_metadata(
                         table_chart_data,
-                        page_idx=0,  # Single image treated as one page
+                        page_idx=0,  # Treat single image as one page.
                         page_count=1,
                         source_metadata=source_metadata,
                         base_unified_metadata=base_unified_metadata,
@@ -358,13 +381,12 @@ def image_data_extractor(
             logger.error(f"Error extracting tables/charts from image: {e}")
             raise
 
-        # Image extraction stub
-    if extract_images and not extracted_data:  # It's not an unstructured image if we extracted a sturctured image
-        # Placeholder for image-specific extraction process
+    # Image extraction stub: if no structured elements were extracted and image extraction is requested.
+    if extract_images and not extracted_data:
         extracted_data.append(
             construct_image_metadata_from_base64(
                 numpy_to_base64(image_array),
-                page_idx=0,  # Single image treated as one page
+                page_idx=0,  # Treat single image as one page.
                 page_count=1,
                 source_metadata=source_metadata,
                 base_unified_metadata=base_unified_metadata,
@@ -372,5 +394,4 @@ def image_data_extractor(
         )
 
     logger.debug(f"Extracted {len(extracted_data)} items from the image.")
-
     return extracted_data

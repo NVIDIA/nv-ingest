@@ -34,10 +34,6 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
 
-from nv_ingest.extraction_workflows.image.image_handlers import (
-    load_and_preprocess_image,
-    extract_page_elements_from_images,
-)
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
@@ -48,6 +44,10 @@ from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
 from nv_ingest.schemas.pptx_extractor_schema import PPTXConfigSchema
+from nv_ingest_api.internal.extract.image.image_helpers.common import (
+    load_and_preprocess_image,
+    extract_page_elements_from_images,
+)
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.detectors.language import detect_language
 from nv_ingest_api.util.metadata.aggregators import construct_page_element_metadata

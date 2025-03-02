@@ -43,16 +43,16 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from nv_ingest.extraction_workflows.image.image_handlers import (
-    load_and_preprocess_image,
-    extract_page_elements_from_images,
-)
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
+from nv_ingest_api.internal.extract.image.image_helpers.common import (
+    load_and_preprocess_image,
+    extract_page_elements_from_images,
+)
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.detectors.language import detect_language
 from nv_ingest_api.util.metadata.aggregators import construct_table_and_chart_metadata, CroppedImageWithContent

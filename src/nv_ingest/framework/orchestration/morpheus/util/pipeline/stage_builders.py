@@ -323,7 +323,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     image_extractor_stage = pipe.add_stage(
         generate_image_extractor_stage(
             morpheus_pipeline_config,
-            extractor_config=image_extractor_config,
+            extraction_config=image_extractor_config,
             pe_count=8,
             task="extract",
             task_desc="image_content_extractor",
