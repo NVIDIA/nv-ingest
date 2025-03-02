@@ -31,7 +31,10 @@ from wand.image import Image as WandImage
 
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxPageElementsModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+    YoloxPageElementsModelInterface,
+    get_yolox_model_name,
+)
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
 from nv_ingest_api.util.metadata.aggregators import (
     CroppedImageWithContent,
@@ -194,8 +197,13 @@ def extract_page_elements_from_images(
     page_elements = []
     yolox_client = None
 
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+
     try:
-        model_interface = YoloxPageElementsModelInterface()
+        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
