@@ -21,9 +21,7 @@
 
 
 import logging
-from pathlib import Path
-from typing import IO
-from typing import Union
+from typing import IO, Optional, List
 
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import SourceTypeEnum
@@ -34,14 +32,15 @@ logger = logging.getLogger(__name__)
 
 
 def python_docx(
-    docx: Union[str, Path, IO],
+    *,
+    docx_stream: IO,
     extract_text: bool,
     extract_images: bool,
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
     extraction_config: dict,
-    execution_trace_log=None,
+    execution_trace_log: Optional[List] = None,
 ):
     """
     Helper function that use python-docx to extract text from a bytestream document
@@ -55,7 +54,7 @@ def python_docx(
 
     Parameters
     ----------
-    docx:
+    docx_stream:
         Bytestream
     extract_text : bool
         Specifies whether to extract text.
@@ -118,7 +117,7 @@ def python_docx(
     }
 
     # Extract data from the document using python-docx
-    doc = DocxReader(docx, source_metadata, extraction_config=docx_extractor_config)
+    doc = DocxReader(docx_stream, source_metadata, extraction_config=docx_extractor_config)
     extracted_data = doc.extract_data(
         base_unified_metadata, text_depth, extract_text, extract_charts, extract_tables, extract_images
     )

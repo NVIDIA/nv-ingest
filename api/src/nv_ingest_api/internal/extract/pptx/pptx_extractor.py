@@ -6,12 +6,11 @@ import base64
 import functools
 import io
 import logging
-from typing import Any, Optional, Dict, Union, Callable, Tuple
+from typing import Any, Optional, Dict, Union, Tuple
 
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest_api.internal.extract.pptx.engines.pptx_helper import python_pptx
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
@@ -22,11 +21,11 @@ def _prepare_task_properties(
     base64_row: pd.Series, task_props: Union[Dict[str, Any], BaseModel]
 ) -> Tuple[Dict[str, Any], Optional[str]]:
     """
-    Prepares and returns the task properties dictionary and the source identifier from a DataFrame row.
+    Prepare and return the task properties dictionary and source identifier from a DataFrame row.
 
-    This function converts the task properties to a dictionary if provided as a Pydantic model,
-    extracts all row data except the "content" key, and adds this data under the "row_data" key in the
-    task properties. It also retrieves the "source_id" from the row if available.
+    This function converts task properties to a dictionary (if provided as a Pydantic model),
+    extracts row data (excluding the "content" field), and stores it under the "row_data" key within
+    the task properties. It also retrieves the "source_id" from the row if present.
 
     Parameters
     ----------
@@ -39,112 +38,93 @@ def _prepare_task_properties(
     Returns
     -------
     Tuple[Dict[str, Any], Optional[str]]
-        A tuple where the first element is the prepared task properties dictionary with "row_data" added,
+        A tuple where the first element is the prepared task properties dictionary (with "row_data" added)
         and the second element is the source_id if present; otherwise, None.
     """
+    # If task_props is a Pydantic model, convert it to a dictionary.
     if isinstance(task_props, BaseModel):
         task_props = task_props.model_dump()
     else:
         task_props = dict(task_props)
 
-    # Extract row data excluding the "content" field.
+    # Exclude the "content" field from the row data.
     row_data = base64_row.drop(labels=["content"], errors="ignore")
     if "params" not in task_props:
         task_props["params"] = {}
+    # Store the row data in the parameters.
     task_props["params"]["row_data"] = row_data
 
+    # Retrieve the source identifier if available.
     source_id = base64_row.get("source_id", None)
     return task_props, source_id
-
-
-def _get_extraction_function(module: Any, method_name: str, default: str) -> Callable:
-    """
-    Retrieves the extraction function from the specified module using the given method name.
-
-    If the specified method does not exist in the module, the default method is used.
-
-    Parameters
-    ----------
-    module : Any
-        The module from which to retrieve the extraction function.
-    method_name : str
-        The desired extraction method name.
-    default : str
-        The default extraction method name to use if the specified method is not available.
-
-    Returns
-    -------
-    Callable
-        The extraction function from the module.
-    """
-    if not hasattr(module, method_name):
-        method_name = default
-    return getattr(module, method_name)
 
 
 @unified_exception_handler
 def _decode_and_extract_from_pptx(
     base64_row: pd.Series,
     task_props: Union[Dict[str, Any], BaseModel],
-    validated_config: Any,
+    extraction_config: Any,
     trace_info: Dict[str, Any],
-    default: str = "python_pptx",
 ) -> Any:
     """
-    Decodes base64-encoded PPTX content from a DataFrame row and extracts data using the specified extraction method.
+    Decode base64-encoded PPTX content from a DataFrame row and extract data using the specified method.
 
-    This function prepares the task properties for extraction, decodes the base64 content into a byte stream,
-    determines the extraction method to use, and calls the corresponding extraction function from the pptx module.
-    If extraction fails, an exception tag is returned.
+    The function prepares task properties (using `_prepare_task_properties`), decodes the base64 content
+    into a byte stream, determines extraction parameters, and calls the extraction function (e.g. `python_pptx`)
+    with the proper flags. If extraction fails, an exception tag is returned.
 
     Parameters
     ----------
     base64_row : pd.Series
-        A Series containing the base64-encoded PPTX content under the key "content" and optionally a "source_id".
+        A Series containing base64-encoded PPTX content under the key "content" and optionally a "source_id".
     task_props : Union[Dict[str, Any], BaseModel]
-        A dictionary or Pydantic model containing extraction instructions and parameters. It may include a "method"
-        key specifying the extraction method and a "params" key for additional parameters.
-    validated_config : Any
-        A configuration object that contains PPTX extraction settings, such as `pptx_extraction_config`.
+        A dictionary or Pydantic model containing extraction instructions (may include a "method" key and "params").
+    extraction_config : Any
+        A configuration object containing PPTX extraction settings (e.g. `pptx_extraction_config`).
     trace_info : Dict[str, Any]
-        A dictionary containing trace information for logging or debugging.
-    default : str, optional
-        The default extraction method to use if the specified method is not available (default is "python_pptx").
+        A dictionary with trace information for logging or debugging.
 
     Returns
     -------
     Any
-        The extracted data from the PPTX file, or an exception tag indicating failure if an error occurs.
-
-    Raises
-    ------
-    Exception
-        Any unhandled exception encountered during extraction is logged and re-raised wrapped with additional context.
+        The extracted data from the PPTX file, or an exception tag indicating failure.
     """
-    source_id: Optional[str] = None
     # Prepare task properties and extract source_id.
     prepared_task_props, source_id = _prepare_task_properties(base64_row, task_props)
 
-    # Retrieve base64 content and decode it.
+    # Decode base64 content into bytes and create a BytesIO stream.
     base64_content: str = base64_row["content"]
     pptx_bytes: bytes = base64.b64decode(base64_content)
     pptx_stream: io.BytesIO = io.BytesIO(pptx_bytes)
 
-    # Determine the extraction method and parameters.
-    # extract_method: str = prepared_task_props.get("method", default)
+    # Retrieve extraction parameters (and remove boolean flags as they are consumed).
     extract_params: Dict[str, Any] = prepared_task_props.get("params", {})
+    try:
+        extract_text: bool = extract_params.pop("extract_text", False)
+        extract_images: bool = extract_params.pop("extract_images", False)
+        extract_tables: bool = extract_params.pop("extract_tables", False)
+        extract_charts: bool = extract_params.pop("extract_charts", False)
+        extract_infographics: bool = extract_params.pop("extract_infographics", False)
+    except KeyError as e:
+        raise ValueError(f"Missing required extraction flag: {e}")
 
-    # Inject configuration settings and trace information.
-    if getattr(validated_config, "pptx_extraction_config", None) is not None:
-        extract_params["pptx_extraction_config"] = validated_config.pptx_extraction_config
-
+    # Inject additional configuration and trace information.
+    if getattr(extraction_config, "pptx_extraction_config", None) is not None:
+        extract_params["pptx_extraction_config"] = extraction_config.pptx_extraction_config
     if trace_info is not None:
         extract_params["trace_info"] = trace_info
 
-    # Retrieve the extraction function from the pptx module.
-    # extraction_func: Callable = _get_extraction_function(pptx, extract_method, default)
-
-    extracted_data = python_pptx(pptx_stream, **extract_params)
+    # Call the PPTX extraction function.
+    extracted_data = python_pptx(
+        pptx_stream=pptx_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extraction_config=extract_params,
+        execution_trace_log=None,
+    )
 
     return extracted_data
 
@@ -153,61 +133,55 @@ def _decode_and_extract_from_pptx(
 def extract_primitives_from_pptx_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Union[Dict[str, Any], BaseModel],
-    extraction_config: PPTXExtractorSchema,
+    extraction_config: Any,  # Assuming PPTXExtractorSchema or similar type
     execution_trace_log: Optional[Dict[str, Any]] = None,
 ) -> pd.DataFrame:
     """
-    Processes a pandas DataFrame containing PPTX files in base64 encoding and extracts text content from them.
+    Process a DataFrame containing base64-encoded PPTX files and extract primitive data.
 
-    This function applies a decoding and extraction routine to each row of the input DataFrame using the
-    `decode_and_extract` function. The resulting extraction is exploded into individual elements and any
-    missing values are removed. The extracted data is then compiled into a new DataFrame with columns
-    representing the document type, extracted metadata, and a unique identifier (UUID).
+    This function applies a decoding and extraction routine to each row of the DataFrame
+    (via `_decode_and_extract_from_pptx`), then explodes any list results into separate rows, drops missing values,
+    and compiles the extracted data into a new DataFrame. The resulting DataFrame includes columns for document type,
+    extracted metadata, and a unique identifier (UUID).
 
     Parameters
     ----------
     df_extraction_ledger : pd.DataFrame
-        The input DataFrame containing PPTX files in base64 encoding. Expected columns include
-        'source_id' and 'content', where 'content' holds the base64 encoded PPTX document.
+        Input DataFrame with PPTX files in base64 encoding. Expected to include columns 'source_id' and 'content'.
     task_config : Union[Dict[str, Any], BaseModel]
-        Configuration instructions for the PPTX extraction task. This can be provided as a dictionary
-        or as a Pydantic model.
+        Configuration for the PPTX extraction task, as a dict or Pydantic model.
     extraction_config : Any
-        A configuration object for PPTX extraction that provides necessary settings and parameters.
-    execution_trace_log : Optional[Dict[str, Any]], default=None
-        An optional dictionary containing trace information for logging or debugging purposes.
+        Configuration object for PPTX extraction (e.g. PPTXExtractorSchema).
+    execution_trace_log : Optional[Dict[str, Any]], optional
+        Optional dictionary containing trace information for debugging.
 
     Returns
     -------
     pd.DataFrame
-        A DataFrame with the extracted PPTX content. The DataFrame contains the following columns:
-          - "document_type": The type of the document.
-          - "metadata": A dictionary containing the extracted metadata.
-          - "uuid": A unique identifier for the document.
+        DataFrame with extracted PPTX content containing columns:
+        "document_type", "metadata", and "uuid".
 
     Raises
     ------
     Exception
-        If an error occurs during the PPTX extraction process, the error is logged, a traceback is printed,
-        and the exception is re-raised with additional context.
+        Reraises any exception encountered during extraction with additional context.
     """
-    # Create a partial function to decode and extract content from each row.
+    # Create a partial function to decode and extract content from each DataFrame row.
     decode_and_extract_partial = functools.partial(
         _decode_and_extract_from_pptx,
         task_props=task_config,
-        validated_config=extraction_config,
+        extraction_config=extraction_config,
         trace_info=execution_trace_log,
     )
-    # Apply the decode_and_extract function to each row of the DataFrame.
+    # Apply the decoding and extraction to each row.
     extraction_series = df_extraction_ledger.apply(decode_and_extract_partial, axis=1)
-    # Explode any list results into separate rows and drop missing values.
+    # Explode list results into separate rows and remove missing values.
     extraction_series = extraction_series.explode().dropna()
 
-    # Convert the resulting series into a DataFrame with specified columns.
+    # Convert the series into a DataFrame with defined columns.
     if not extraction_series.empty:
         extracted_df = pd.DataFrame(extraction_series.to_list(), columns=["document_type", "metadata", "uuid"])
     else:
         extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-    logger.debug("_process_pptx_bytes: Extraction complete.")
     return extracted_df

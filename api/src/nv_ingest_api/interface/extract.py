@@ -3,13 +3,14 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Tuple, Optional
+from typing import Tuple, Optional, Dict, Any
 
 import pandas as pd
 from pandas import DataFrame
 
 from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
+from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from . import extraction_interface_relay_constructor
 
@@ -23,7 +24,8 @@ from nv_ingest_api.internal.extract.image.chart import extract_chart_data_from_i
 from nv_ingest_api.internal.extract.image.table import extract_table_data_from_image_internal
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
-from ..internal.extract.docx.engines.docxreader import docx_extractor
+from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
+from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitives_from_pptx_internal
 
 logger = logging.getLogger(__name__)
 
@@ -120,8 +122,86 @@ def extract_primitives_from_pdf(
 
 
 @unified_exception_handler
-def extract_primitives_from_pptx():
-    pass
+def extract_primitives_from_pptx(
+    df_extraction_ledger: pd.DataFrame,
+    extract_text: bool = True,
+    extract_images: bool = True,
+    extract_tables: bool = True,
+    extract_charts: bool = True,
+    extract_infographics: bool = True,
+    yolox_endpoints: Optional[Tuple[str, str]] = None,
+    yolox_infer_protocol: str = "grpc",
+    auth_token: str = "",
+) -> pd.DataFrame:
+    """
+    Extract primitives from PPTX files provided in a DataFrame.
+
+    This function configures the PPTX extraction task by assembling a task configuration
+    dictionary using the provided parameters. It then creates an extraction configuration
+    object (e.g., an instance of PPTXExtractorSchema) and delegates the actual extraction
+    process to the internal function `extract_primitives_from_pptx_internal`.
+
+    Parameters
+    ----------
+    df_extraction_ledger : pd.DataFrame
+        A DataFrame containing base64-encoded PPTX files. The DataFrame is expected to include
+        columns such as "content" (with the base64-encoded PPTX) and "source_id".
+    extract_text : bool, default=True
+        Flag indicating whether text should be extracted from the PPTX files.
+    extract_images : bool, default=True
+        Flag indicating whether images should be extracted.
+    extract_tables : bool, default=True
+        Flag indicating whether tables should be extracted.
+    extract_charts : bool, default=True
+        Flag indicating whether charts should be extracted.
+    extract_infographics : bool, default=True
+        Flag indicating whether infographics should be extracted.
+    yolox_endpoints : Optional[Tuple[str, str]], default=None
+        Optional tuple containing endpoints for YOLOX inference, if needed for image analysis.
+    yolox_infer_protocol : str, default="grpc"
+        The protocol to use for YOLOX inference.
+    auth_token : str, default=""
+        Authentication token to be used with the PPTX extraction configuration.
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame containing the extracted primitives from the PPTX files. Expected columns include
+        "document_type", "metadata", and "uuid".
+
+    Notes
+    -----
+    This function is decorated with `@unified_exception_handler` to handle exceptions uniformly.
+    The task configuration is assembled with two main keys:
+      - "params": Contains boolean flags for controlling which primitives to extract.
+      - "pptx_extraction_config": Contains additional settings for PPTX extraction (e.g., YOLOX endpoints,
+        inference protocol, and auth token).
+    It then calls `extract_primitives_from_pptx_internal` with the DataFrame, the task configuration,
+    and the extraction configuration.
+    """
+    task_config: Dict[str, Any] = {
+        "params": {
+            "extract_text": extract_text,
+            "extract_images": extract_images,
+            "extract_tables": extract_tables,
+            "extract_charts": extract_charts,
+            "extract_infographics": extract_infographics,
+        },
+        "pptx_extraction_config": {
+            "yolox_endpoints": yolox_endpoints,
+            "yolox_infer_protocol": yolox_infer_protocol,
+            "auth_token": auth_token,
+        },
+    }
+
+    extraction_config = PPTXExtractorSchema()  # Assuming PPTXExtractorSchema is defined and imported
+
+    return extract_primitives_from_pptx_internal(
+        df_extraction_ledger=df_extraction_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=None,
+    )
 
 
 @unified_exception_handler
@@ -137,46 +217,49 @@ def extract_primitives_from_docx(
     auth_token: str = "",
 ) -> pd.DataFrame:
     """
-    Extracts primitives from DOCX documents contained in a DataFrame by configuring and invoking
-    the DOCX extraction process. The extraction process includes options for text, images, tables,
-    charts, and infographics extraction. It also configures the DOCX extraction module with additional
-    settings for YOLOX endpoints, inference protocol, and authentication.
+    Extract primitives from DOCX documents in a DataFrame.
+
+    This function configures and invokes the DOCX extraction process. It builds a task configuration
+    using the provided extraction flags (for text, images, tables, charts, and infographics) and additional
+    settings for YOLOX endpoints, inference protocol, and authentication. It then creates a DOCX extraction
+    configuration (an instance of DocxExtractorSchema) and delegates the extraction to an internal function.
 
     Parameters
     ----------
     df_extraction_ledger : pd.DataFrame
-        The input DataFrame containing DOCX documents in base64 encoding. It is expected that the DataFrame
-        includes the necessary columns required for DOCX extraction.
-    extract_text : bool, default=True
-        Flag indicating whether to extract text content from the DOCX documents.
-    extract_images : bool, default=True
-        Flag indicating whether to extract images from the DOCX documents.
-    extract_tables : bool, default=True
-        Flag indicating whether to extract tables from the DOCX documents.
-    extract_charts : bool, default=True
-        Flag indicating whether to extract charts from the DOCX documents.
-    extract_infographics : bool, default=True
-        Flag indicating whether to extract infographics from the DOCX documents.
-    yolox_endpoints : Optional[Tuple[str, str]], default=None
-        A tuple containing the YOLOX inference endpoints. If None, the default endpoints defined in the
+        The input DataFrame containing DOCX documents in base64 encoding. The DataFrame is expected to
+        include required columns such as "content" (with the base64-encoded DOCX) and optionally "source_id".
+    extract_text : bool, optional
+        Flag indicating whether to extract text content from the DOCX documents (default is True).
+    extract_images : bool, optional
+        Flag indicating whether to extract images from the DOCX documents (default is True).
+    extract_tables : bool, optional
+        Flag indicating whether to extract tables from the DOCX documents (default is True).
+    extract_charts : bool, optional
+        Flag indicating whether to extract charts from the DOCX documents (default is True).
+    extract_infographics : bool, optional
+        Flag indicating whether to extract infographics from the DOCX documents (default is True).
+    yolox_endpoints : Optional[Tuple[str, str]], optional
+        A tuple containing YOLOX inference endpoints. If None, the default endpoints defined in the
         DOCX extraction configuration will be used.
-    yolox_infer_protocol : str, default="grpc"
-        The inference protocol to use with the YOLOX endpoints.
-    auth_token : str, default=""
-        The authentication token for accessing the YOLOX inference service.
+    yolox_infer_protocol : str, optional
+        The inference protocol to use with the YOLOX endpoints (default is "grpc").
+    auth_token : str, optional
+        The authentication token for accessing the YOLOX inference service (default is an empty string).
 
     Returns
     -------
     pd.DataFrame
-        The updated DataFrame after DOCX primitives extraction. The extracted data replaces or augments
-        the original document content as specified by the extraction process.
+        A DataFrame containing the extracted DOCX primitives. Typically, the resulting DataFrame contains
+        columns such as "document_type", "metadata", and "uuid".
 
     Raises
     ------
     Exception
         If an error occurs during the DOCX extraction process, the exception is logged and re-raised.
     """
-    task_config = {
+    # Build the task configuration with parameters and DOCX-specific extraction settings.
+    task_config: Dict[str, Any] = {
         "params": {
             "extract_text": extract_text,
             "extract_images": extract_images,
@@ -191,9 +274,11 @@ def extract_primitives_from_docx(
         },
     }
 
+    # Create the extraction configuration object (instance of DocxExtractorSchema).
     extraction_config = DocxExtractorSchema()
 
-    return docx_extractor(
+    # Delegate the actual extraction to the internal function.
+    return extract_primitives_from_docx_internal(
         df_extraction_ledger=df_extraction_ledger,
         task_config=task_config,
         extraction_config=extraction_config,

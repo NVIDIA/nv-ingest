@@ -128,14 +128,14 @@ def _decode_and_extract_from_docx(
 
         # extraction_func: Callable = _get_extraction_function(extract_method, default)
         extracted_data: Any = python_docx(
-            doc_stream,
-            extract_text,
-            extract_images,
-            extract_tables,
-            extract_charts,
-            extract_infographics,
-            extract_params,
-            None,
+            docx_stream=doc_stream,
+            extract_text=extract_text,
+            extract_images=extract_images,
+            extract_infographics=extract_infographics,
+            extract_tables=extract_tables,
+            extract_charts=extract_charts,
+            extraction_config=extract_params,
+            execution_trace_log=None,
         )
 
         return extracted_data
