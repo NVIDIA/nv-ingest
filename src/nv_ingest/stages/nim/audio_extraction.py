@@ -16,8 +16,7 @@ from morpheus.config import Config
 from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
-from nv_ingest.util.audio.parakeet import call_audio_inference_model
-from nv_ingest.util.audio.parakeet import create_audio_inference_client
+from nv_ingest.util.nim.parakeet import create_audio_inference_client
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -63,7 +62,12 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
 
     # Modify audio metadata with the result from the inference model
     try:
-        audio_result = call_audio_inference_model(audio_client, base64_audio, trace_info=trace_info)
+        audio_result = audio_client.infer(
+            base64_audio,
+            model_name="parakeet",
+            trace_info=trace_info,  # traceable_func arg
+            stage_name="audio_extraction",
+        )
         metadata["audio_metadata"] = {"audio_transcript": audio_result}
     except Exception as e:
         logger.error(f"Unhandled error calling audio inference model: {e}", exc_info=True)

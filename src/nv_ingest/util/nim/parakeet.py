@@ -7,7 +7,6 @@ from typing import Tuple
 
 import ffmpeg
 import grpc
-import requests
 import riva.client
 
 from nv_ingest.util.tracing.tagging import traceable_func
@@ -24,7 +23,7 @@ class ParakeetClient:
         self,
         endpoint: str,
         auth_token: Optional[str] = None,
-        auth_metadata: Optional[Tuple[str, str]] = None,
+        auth_metadata: Optional[List[Tuple[str, str]]] = None,
         use_ssl: bool = False,
         ssl_cert: Optional[str] = None,
     ):
@@ -41,7 +40,7 @@ class ParakeetClient:
             Whether to use SSL for the connection.
         ssl_cert : Optional[str], default=None
             Path to the SSL certificate if required.
-        auth_metadata : Optional[Tuple[str, str]], default=None
+        auth_metadata : Optional[List[Tuple[str, str]]], default=None
             Additional authentication metadata for the service.
         """
         self.endpoint = endpoint
@@ -51,6 +50,10 @@ class ParakeetClient:
             self.auth_metadata.append(("authorization", f"Bearer {self.auth_token}"))
         self.use_ssl = use_ssl
         self.ssl_cert = ssl_cert
+
+        # Create authentication and ASR service objects.
+        self._auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
+        self._asr_service = riva.client.ASRService(self._auth)
 
     @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
@@ -72,15 +75,15 @@ class ParakeetClient:
             The processed inference results, coalesced in the same order as the input images.
         """
 
-        response = self.transcribe_file(data)
+        response = self.transcribe(data)
         if response is None:
-            return None, None
+            return None
         segments, transcript = process_transcription_response(response)
         logger.debug("Processing Parakeet inference results (pass-through).")
 
         return transcript
 
-    def transcribe_file(
+    def transcribe(
         self,
         audio_content: str,
         language_code: str = "en-US",
@@ -146,10 +149,6 @@ class ParakeetClient:
             The response containing the transcription results.
             Returns None if the transcription fails.
         """
-        # Create authentication and ASR service objects.
-        auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
-        asr_service = riva.client.ASRService(auth)
-
         # Build the recognition configuration.
         recognition_config = riva.client.RecognitionConfig(
             language_code=language_code,
@@ -185,7 +184,7 @@ class ParakeetClient:
 
         # Perform offline recognition and print the transcript.
         try:
-            response = asr_service.offline_recognize(mono_audio_bytes, recognition_config)
+            response = self._asr_service.offline_recognize(mono_audio_bytes, recognition_config)
             return response
         except grpc.RpcError as e:
             logger.error(f"Error transcribing audio file: {e.details()}")
@@ -281,30 +280,35 @@ def create_audio_inference_client(
     ssl_cert: Optional[str] = None,
 ):
     """
-    Create a NimClient for interfacing with a model inference server.
+    Create a ParakeetClient for interfacing with an audio model inference server.
 
     Parameters
     ----------
     endpoints : tuple
-        A tuple containing the gRPC and HTTP endpoints.
-    model_interface : ModelInterface
-        The model interface implementation to use.
-    auth_token : str, optional
-        Authorization token for HTTP requests (default: None).
+        A tuple containing the gRPC and HTTP endpoints. Only the gRPC endpoint is used.
     infer_protocol : str, optional
-        The protocol to use ("grpc" or "http"). If not specified, it is inferred from the endpoints.
+        The protocol to use ("grpc" or "http").
+        If not specified, defaults to "grpc" if a valid gRPC endpoint is provided.
+        HTTP endpoints are not supported for audio inference.
+    auth_token : str, optional
+        Authorization token for authentication (default: None).
+    auth_metadata : list of tuples, optional
+        Additional metadata for authentication in the form of a key-value tuple (default: None).
+    use_ssl : bool, optional
+        Whether to use SSL for secure communication (default: False).
+    ssl_cert : str, optional
+        Path to the SSL certificate file if `use_ssl` is enabled (default: None).
 
     Returns
     -------
-    NimClient
-        The initialized NimClient.
+    ParakeetClient
+        The initialized ParakeetClient configured for audio inference over gRPC.
 
     Raises
     ------
     ValueError
-        If an invalid infer_protocol is specified.
+        If an invalid `infer_protocol` is specified or if an HTTP endpoint is provided.
     """
-
     grpc_endpoint, http_endpoint = endpoints
 
     if (infer_protocol is None) and (grpc_endpoint and grpc_endpoint.strip()):
@@ -316,44 +320,3 @@ def create_audio_inference_client(
     return ParakeetClient(
         grpc_endpoint, auth_token=auth_token, auth_metadata=auth_metadata, use_ssl=use_ssl, ssl_cert=ssl_cert
     )
-
-
-def call_audio_inference_model(client, audio_content: str, trace_info: dict):
-    """
-    Calls an audio inference model using the provided client.
-    If the client is a gRPC client, the inference is performed using gRPC. Otherwise, it is performed using HTTP.
-    Parameters
-    ----------
-    client :
-        The inference client, which is an HTTP client.
-    audio_content: str
-        The audio source to transcribe.
-    audio_id: str
-        The unique identifier for the audio content.
-    trace_info: dict
-        Trace information for debugging or logging.
-    Returns
-    -------
-    str or None
-        The result of the inference as a string if successful, otherwise `None`.
-    Raises
-    ------
-    RuntimeError
-        If the HTTP request fails or if the response format is not as expected.
-    """
-
-    try:
-        parakeet_result = client.infer(
-            audio_content,
-            model_name="parakeet",
-            trace_info=trace_info,  # traceable_func arg
-            stage_name="audio_extraction",
-        )
-
-        return parakeet_result
-    except requests.exceptions.RequestException as e:
-        raise RuntimeError(f"HTTP request failed: {e}")
-    except KeyError as e:
-        raise RuntimeError(f"Missing expected key in response: {e}")
-    except Exception as e:
-        raise RuntimeError(f"An error occurred during inference: {e}")

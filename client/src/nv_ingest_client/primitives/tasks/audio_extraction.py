@@ -53,7 +53,7 @@ class AudioExtractionTask(Task):
         info = ""
         info += "Audio Extraction Task:\n"
 
-        if self._api_key:
+        if self._auth_token:
             info += "  auth_token: [redacted]\n"
         if self._grpc_endpoint:
             info += f"  grpc_endpoint: {self._grpc_endpoint}\n"

@@ -4,6 +4,7 @@
 
 
 import logging
+from typing import List
 from typing import Optional
 from typing import Tuple
 
@@ -45,6 +46,7 @@ class AudioConfigSchema(BaseModel):
     auth_token: Optional[str] = None
     audio_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     audio_infer_protocol: Optional[str] = None
+    auth_metadata: Optional[List[Tuple[str, str]]] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
 

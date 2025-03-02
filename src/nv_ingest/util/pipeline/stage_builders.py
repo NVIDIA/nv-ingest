@@ -20,10 +20,10 @@ from nv_ingest.modules.telemetry.otel_tracer import OpenTelemetryTracerLoaderFac
 from nv_ingest.modules.transforms.text_splitter import TextSplitterLoaderFactory
 from nv_ingest.stages.docx_extractor_stage import generate_docx_extractor_stage
 from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extractor_stage
-from nv_ingest.stages.extractors.audio_extractor_stage import generate_audio_extractor_stage
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
+from nv_ingest.stages.nim.audio_extraction import generate_audio_extractor_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.stages.nim.infographic_extraction import generate_infographic_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
