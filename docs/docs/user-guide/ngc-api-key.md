@@ -1,4 +1,4 @@
-# Authenticating Local Docker with NGC
+# Generate Your NGC Keys
 
 ## Generate an API key
 
@@ -12,7 +12,7 @@ When creating an NGC API key, ensure that all of the following are selected from
 - NGC Catalog
 - Private Registry
 
-![Generate Personal Key](../../assets/images/generate_personal_key.png)
+![Generate Personal Key](../assets/images/generate_personal_key.png)
 
 ### Docker Login to NGC
 

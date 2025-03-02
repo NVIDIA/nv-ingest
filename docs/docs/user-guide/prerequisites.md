@@ -1,6 +1,6 @@
-# Prerequisites
+# Prerequisites for NV-Ingest
 
-Before you begin using NVIDIA-Ingest, ensure the following hardware and software prerequisites outlined are met.
+Before you begin using NV-Ingest, ensure the following hardware and software prerequisites outlined are met.
 
 ## Hardware
 
@@ -20,4 +20,4 @@ Before you begin using NVIDIA-Ingest, ensure the following hardware and software
 
 !!! note
 
-    You install Python later. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+    You install Python later. NV-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
