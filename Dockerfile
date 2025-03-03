@@ -14,6 +14,7 @@ ARG VERSION=""
 ARG VERSION_REV="0"
 ARG DOWNLOAD_LLAMA_TOKENIZER=""
 ARG HF_ACCESS_TOKEN=""
+ARG MODEL_PREDOWNLOAD_PATH=""
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
