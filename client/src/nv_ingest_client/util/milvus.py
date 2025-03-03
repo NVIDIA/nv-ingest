@@ -24,6 +24,7 @@ from urllib.parse import urlparse
 from typing import Union, Dict
 import requests
 from nv_ingest_client.util.util import ClientConfigSchema
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 import logging
 
 
@@ -1220,3 +1221,38 @@ def nv_rerank(
         idx = rank_vals["index"]
         rank_results.append(map_candidates[idx])
     return rank_results
+
+
+def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
+    """
+    This function allows a user reconstruct the pages for a retrieved chunk.
+
+    Parameters
+    ----------
+    anchor_record : dict
+        Query the candidates are supposed to answer.
+    records_list : list
+        List of the candidates to rerank.
+    page_signum : int
+        The endpoint to the nvidia reranker
+
+    Returns
+    -------
+    String
+        Full page(s) corresponding to anchor record.
+    """
+    source_file = anchor_record["entity"]["source"]["source_name"]
+    page_number = anchor_record["entity"]["content_metadata"]["page_number"]
+    min_page = page_number - page_signum
+    max_page = page_number + 1 + page_signum
+    page_numbers = list(range(min_page, max_page))
+
+    target_records = []
+    for sub_records in records_list:
+        for record in sub_records:
+            rec_src_file = record["metadata"]["source_metadata"]["source_name"]
+            rec_pg_num = record["metadata"]["content_metadata"]["page_number"]
+            if source_file == rec_src_file and rec_pg_num in page_numbers:
+                target_records.append(record)
+
+    return ingest_json_results_to_blob(target_records)

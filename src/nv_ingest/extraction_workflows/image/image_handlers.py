@@ -35,6 +35,7 @@ from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.yolox import get_yolox_model_name
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
 from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata
@@ -193,8 +194,13 @@ def extract_page_elements_from_images(
     page_elements = []
     yolox_client = None
 
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+
     try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
