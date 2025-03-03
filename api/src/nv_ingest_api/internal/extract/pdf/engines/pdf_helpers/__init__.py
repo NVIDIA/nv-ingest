@@ -18,6 +18,7 @@ from nv_ingest_api.internal.extract.pdf.engines import (
     tika_extractor,
     unstructured_io_extractor,
 )
+from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 # Import extraction functions for different engines.
 
@@ -42,7 +43,7 @@ def _work_extract_pdf(
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
-    trace_info=None,
+    execution_trace_log=None,
 ) -> Any:
     """
     Perform PDF extraction on a decoded PDF stream using the given extraction parameters.
@@ -58,15 +59,16 @@ def _work_extract_pdf(
         extract_tables,
         extract_charts,
         extractor_config,
-        trace_info,
+        execution_trace_log,
     )
 
 
+@unified_exception_handler
 def _orchestrate_row_extraction(
     row: pd.Series,
     task_config: Dict[str, Any],
     extractor_config: Any,
-    trace_info: Optional[List[Any]] = None,
+    execution_trace_log: Optional[List[Any]] = None,
 ) -> Any:
     """
     Orchestrate extraction for a single DataFrame row by decoding the PDF stream,
@@ -111,19 +113,14 @@ def _orchestrate_row_extraction(
     # The remaining parameters constitute the extractor_config.
     extractor_config = params
 
-    try:
-        result = _work_extract_pdf(
-            pdf_stream,
-            extract_text,
-            extract_images,
-            extract_infographics,
-            extract_tables,
-            extract_charts,
-            extractor_config,
-            trace_info,
-        )
-        return result
-    except Exception as e:
-        err_msg = f"Extraction failed for row with metadata {row_metadata}: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    result = _work_extract_pdf(
+        pdf_stream,
+        extract_text,
+        extract_images,
+        extract_infographics,
+        extract_tables,
+        extract_charts,
+        extractor_config,
+        execution_trace_log,
+    )
+    return result

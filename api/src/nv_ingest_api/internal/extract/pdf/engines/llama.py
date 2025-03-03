@@ -21,7 +21,7 @@ import asyncio
 import io
 import logging
 import time
-from typing import Any
+from typing import Any, Optional
 from typing import Dict
 from typing import List
 
@@ -44,7 +44,7 @@ def llama_parse_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extractor_config: dict,
-    execution_trace_log=None,
+    execution_trace_log: Optional[List[Any]] = None,
 ) -> List[Dict[ContentTypeEnum, Dict[str, Any]]]:
     """
     Helper function to use LlamaParse API to extract text from a bytestream PDF.

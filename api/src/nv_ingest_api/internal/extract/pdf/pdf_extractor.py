@@ -8,7 +8,7 @@ import pandas as pd
 from typing import Any, Dict, List, Optional, Tuple
 import logging
 
-from nv_ingest_api.internal.extract.pdf.engines.pdfium_helpers import _orchestrate_row_extraction
+from nv_ingest_api.internal.extract.pdf.engines.pdf_helpers import _orchestrate_row_extraction
 
 logger = logging.getLogger(__name__)
 
@@ -68,7 +68,7 @@ def extract_primitives_from_pdf_internal(
         else:
             extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-        return extracted_df, {"trace_info": execution_trace_log}
+        return extracted_df, {"execution_trace_log": execution_trace_log}
     except Exception as e:
         err_msg = f"extract_primitives_from_pdf: Error processing PDF bytes: {e}"
         logger.error(err_msg, exc_info=True)

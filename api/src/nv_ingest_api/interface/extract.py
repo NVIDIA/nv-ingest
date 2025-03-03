@@ -36,7 +36,7 @@ logger = logging.getLogger(__name__)
 @unified_exception_handler
 @extraction_interface_relay_constructor(
     api_fn=extract_primitives_from_pdf_internal,
-    task_keys=["extract_text", "extract_images", "extract_tables", "extract_charts"],
+    task_keys=["extract_text", "extract_images", "extract_tables", "extract_charts", "extract_infographics"],
 )
 def extract_primitives_from_pdf(
     *,
@@ -44,6 +44,7 @@ def extract_primitives_from_pdf(
     extract_method: str = "pdfium",  # Determines which extraction schema to use
     extract_text: bool = True,
     extract_images: bool = True,
+    extract_infographics: bool = True,
     extract_tables: bool = True,
     extract_charts: bool = True,
     text_depth: str = "page",
@@ -56,6 +57,8 @@ def extract_primitives_from_pdf(
     yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
+    # UnstructuredIO parameters:
+    unstructured_io_api_key: Optional[str] = None,
     # Tika-specific parameter:
     tika_server_url: Optional[str] = None,
 ):

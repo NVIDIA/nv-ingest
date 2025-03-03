@@ -18,7 +18,6 @@
 import io
 import logging
 import math
-import traceback
 import uuid
 import concurrent.futures
 from typing import Any
@@ -76,7 +75,7 @@ def nemoretriever_parse_extractor(
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
-    trace_info: Optional[List] = None,
+    execution_trace_log: Optional[List[Any]] = None,
 ) -> str:
     """
     Helper function to use nemoretriever_parse to extract text from a bytestream PDF.
@@ -236,7 +235,7 @@ def nemoretriever_parse_extractor(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                     pages_for_ocr[:],  # pass a copy
                     nemoretriever_parse_client,
-                    trace_info=trace_info,
+                    trace_info=execution_trace_log,
                 )
                 futures.append(future_parser)
                 pages_for_ocr.clear()
@@ -258,7 +257,7 @@ def nemoretriever_parse_extractor(
                     extract_charts,
                     extract_infographics,
                     paddle_output_format,
-                    trace_info=trace_info,
+                    trace_info=execution_trace_log,
                 )
                 futures.append(future_yolox)
                 pages_for_tables.clear()
@@ -269,7 +268,7 @@ def nemoretriever_parse_extractor(
                 lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                 pages_for_ocr[:],  # pass a copy
                 nemoretriever_parse_client,
-                trace_info=trace_info,
+                trace_info=execution_trace_log,
             )
             futures.append(future_parser)
             pages_for_ocr.clear()
@@ -290,7 +289,7 @@ def nemoretriever_parse_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
-                trace_info=trace_info,
+                trace_info=execution_trace_log,
             )
             futures.append(future_yolox)
             pages_for_tables.clear()
@@ -451,7 +450,7 @@ def nemoretriever_parse_extractor(
 def _extract_text_and_bounding_boxes(
     pages: list,
     nemoretriever_parse_client,
-    trace_info=None,
+    execution_trace_log=None,
 ) -> list:
 
     # Collect all page indices and images in order.
@@ -467,7 +466,7 @@ def _extract_text_and_bounding_boxes(
         model_name="nemoretriever_parse",
         stage_name="pdf_content_extractor",
         max_batch_size=NEMORETRIEVER_PARSE_MAX_BATCH_SIZE,
-        trace_info=trace_info,
+        trace_info=execution_trace_log,
     )
 
     return list(zip(image_page_indices, inference_results))
@@ -499,8 +498,7 @@ def _send_inference_request(
             model_name="nemoretriever_parse",
         )
     except Exception as e:
-        logger.error(f"Unhandled error during NemoRetrieverParse inference: {e}")
-        traceback.print_exc()
+        logger.exception(f"Unhandled error during NemoRetrieverParse inference: {e}")
         raise e
 
     return response

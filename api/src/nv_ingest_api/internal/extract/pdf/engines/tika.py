@@ -1,9 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-import io
-from typing import Dict, Any
-
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -17,6 +14,11 @@ from typing import Dict, Any
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import io
+from typing import Dict, Any, Optional, List
+
+import pandas as pd
+
 import requests
 
 TIKA_URL = "http://tika:9998/tika"
@@ -27,9 +29,11 @@ def tika_extractor(
     extract_text: bool,
     extract_images: bool,
     extract_infographics: bool,
+    extract_charts: bool,
     extract_tables: bool,
     extractor_config: Dict[str, Any],
-) -> str:
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
     """
     Extract text from a PDF using the Apache Tika server.
 
@@ -46,8 +50,12 @@ def tika_extractor(
         Flag indicating whether text extraction is desired.
     extract_images : bool
         Flag indicating whether image extraction is desired.
+    extract_infographics : bool
+        Flag indicating whether infographic extraction is desired.
+    extract_charts : bool
+        Flag indicating whether chart extraction
     extract_tables : bool
-        Flag indicating whether table extraction is desired.
+        Flag indicating whether table extraction
     extractor_config : dict
         A dictionary of additional configuration options for the extractor. This
         parameter is currently not used by this extractor.
@@ -70,7 +78,14 @@ def tika_extractor(
     >>> text = tika_extractor(pdf_stream, True, False, False, {})
     """
 
-    _, _, _, _, _ = extract_text, extract_images, extract_infographics, extract_tables, extractor_config
+    _, _, _, _, _, _ = (
+        extract_text,
+        extract_images,
+        extract_infographics,
+        extract_charts,
+        extract_tables,
+        extractor_config,
+    )
 
     headers = {"Accept": "text/plain"}
     timeout = 120  # Timeout in seconds

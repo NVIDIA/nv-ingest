@@ -24,6 +24,7 @@ import random
 import time
 import uuid
 import zipfile
+from typing import Optional, List, Any
 
 import pandas as pd
 import pypdfium2 as pdfium
@@ -70,8 +71,8 @@ def adobe_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extractor_config: dict,
-    execution_trace_log=None,
-):
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
     """
     Helper function to use unstructured-io REST API to extract text from a bytestream PDF.
 

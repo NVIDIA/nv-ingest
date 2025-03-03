@@ -21,8 +21,9 @@ import io
 import logging
 import uuid
 import warnings
-from typing import Dict, Any
+from typing import Dict, Any, Optional, List
 
+import pandas as pd
 import pypdfium2 as pdfium
 from unstructured_client import UnstructuredClient
 from unstructured_client.models import operations
@@ -47,9 +48,11 @@ def unstructured_io_extractor(
     extract_text: bool,
     extract_images: bool,
     extract_infographics: bool,
+    extract_charts: bool,
     extract_tables: bool,
     extractor_config: Dict[str, Any],
-) -> str:
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
     """
     Helper function to use unstructured-io REST API to extract text from a bytestream PDF.
 
@@ -94,6 +97,9 @@ def unstructured_io_extractor(
     SDKError
         If there is an error during the extraction process.
     """
+
+    _ = execution_trace_log
+    _ = extract_charts
 
     logger = logging.getLogger(__name__)
     logger.debug("Extracting PDF with unstructured-io backend.")

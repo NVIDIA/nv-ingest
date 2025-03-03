@@ -18,9 +18,10 @@
 
 import concurrent.futures
 import logging
-from typing import List, Tuple, Optional
+from typing import List, Tuple, Optional, Any
 
 import numpy as np
+import pandas as pd
 import pypdfium2 as libpdfium
 
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
@@ -54,7 +55,7 @@ logger = logging.getLogger(__name__)
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     config: PDFiumConfigSchema,
-    trace_info: Optional[List] = None,
+    execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
     Given a list of (page_index, image) tuples, this function calls the YOLOX-based
@@ -105,7 +106,7 @@ def _extract_page_elements_using_image_ensemble(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
-            trace_info=trace_info,
+            trace_info=execution_trace_log,
             stage_name="pdf_content_extractor",
         )
 
@@ -276,7 +277,7 @@ def _extract_page_elements(
     extract_charts: bool,
     extract_infographics: bool,
     paddle_output_format: str,
-    trace_info=None,
+    execution_trace_log=None,
 ) -> list:
     """
     Always extract page elements from the given pages using YOLOX-based logic.
@@ -284,7 +285,9 @@ def _extract_page_elements(
     """
     extracted_page_elements = []
 
-    page_element_results = _extract_page_elements_using_image_ensemble(pages, pdfium_config, trace_info=trace_info)
+    page_element_results = _extract_page_elements_using_image_ensemble(
+        pages, pdfium_config, execution_trace_log=execution_trace_log
+    )
 
     # Build metadata for each
     for page_idx, page_element in page_element_results:
@@ -318,8 +321,8 @@ def pdfium_extractor(
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
-    execution_trace_log=None,
-):
+    execution_trace_log: Optional[List[Any]] = None,
+) -> pd.DataFrame:
     # --- Extract and validate extractor_config ---
     if extractor_config is None or not isinstance(extractor_config, dict):
         raise ValueError("`extractor_config` must be provided as a dictionary.")
@@ -475,7 +478,7 @@ def pdfium_extractor(
                         extract_charts,
                         extract_infographics,
                         paddle_output_format,
-                        trace_info=execution_trace_log,
+                        execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
                     pages_for_tables.clear()
@@ -495,7 +498,7 @@ def pdfium_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
-                trace_info=execution_trace_log,
+                execution_trace_log=execution_trace_log,
             )
             futures.append(future)
             pages_for_tables.clear()

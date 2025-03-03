@@ -65,7 +65,7 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
         dictionary, the extractor configuration, and the execution trace log. This function must conform
         to the signature:
 
-            extract_primitives_from_pdf(df_extraction_ledger: pd.DataFrame,
+            extract_primitives_from_pdf_internal(df_extraction_ledger: pd.DataFrame,
                                         task_config: Dict[str, Any],
                                         extractor_config: Any,
                                         execution_trace_log: Optional[List[Any]] = None)
