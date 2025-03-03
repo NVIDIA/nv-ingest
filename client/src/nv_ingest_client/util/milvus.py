@@ -1082,7 +1082,7 @@ def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
     source_file = anchor_record["entity"]["source"]["source_name"]
     page_number = anchor_record["entity"]["content_metadata"]["page_number"]
     min_page = page_number - page_signum
-    max_page = page_number + 1 + page_signum 
+    max_page = page_number + 1 + page_signum
     page_numbers = list(range(min_page, max_page))
 
     target_records = []
