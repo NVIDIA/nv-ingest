@@ -66,7 +66,7 @@ nav:
       - Content Metadata: user-guide/content-metadata.md
       - Environment Variables: user-guide/environment-config.md
       - CLI Reference: user-guide/nv-ingest_cli.md
-      - API Reference: user-guide/api-docs.md
+      - API Reference: user-guide/api-docs
 
 plugins:
   - search
