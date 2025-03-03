@@ -129,9 +129,7 @@ def _text_splitter(builder: mrc.Builder):
             elif os.path.exists(
                 os.path.join(model_predownload_path, "e5-unsupervised-large/tokenizer/tokenizer.json")
             ) and (tokenizer is None or tokenizer == "intfloat/e5-large-unsupervised"):
-                tokenizer = "/workspace/models/e5-unsupervised-large/tokenizer/"
-
-            logger.info(tokenizer)
+                tokenizer = "/workspace/models/e5-large-unsupervised/tokenizer/"
 
             tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token=hf_access_token)
 
