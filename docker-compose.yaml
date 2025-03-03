@@ -196,6 +196,31 @@ services:
     profiles:
       - vlm
 
+  audio:
+    image: nvcr.io/nvidia/riva/riva-speech:2.18.0
+    shm_size: 2gb
+    ports:
+      - "8021:50051"  # grpc
+      - "8022:50000"  # http
+    user: root
+    environment:
+      - MODEL_DEPLOY_KEY=tlt_encode
+      - NGC_CLI_API_KEY=${RIVA_NGC_API_KEY}
+      - NGC_CLI_ORG=nvidia
+      - NGC_CLI_TEAM=riva
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    command: bash -c "download_and_deploy_ngc_models nvidia/riva/rmir_asr_conformer_en_us_ofl:2.18.0 && start-riva"
+    profiles:
+      - audio
+
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
     build:
@@ -215,6 +240,8 @@ services:
     cap_add:
       - sys_nice
     environment:
+      - AUDIO_GRPC_ENDPOINT=audio:50051
+      - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
       - MAX_INGEST_PROCESS_WORKERS=${MAX_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
