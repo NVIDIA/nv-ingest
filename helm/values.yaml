@@ -50,8 +50,8 @@ extraVolumeMounts: {}
 ## @extra imagePullSecrets Specify list of secret names that are needed for the main container and any init containers.
 ## @skip imagePullSecrets[0].name
 imagePullSecrets:
-  - name: nvcrimagepullsecret
-  - name: nemoMicroservicesPullSecret
+  - name: ngcApiSecret
+  - name: ngcImagePullSecret
 
 ## @param containerSecurityContext [object] Sets privilege and access control settings for container (Only affects the main container, not pod-level)
 containerSecurityContext: {}
