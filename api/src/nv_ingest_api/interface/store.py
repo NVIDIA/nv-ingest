@@ -13,7 +13,8 @@ from nv_ingest_api.util.exception_handlers.decorators import unified_exception_h
 
 @unified_exception_handler
 def store_embeddings(
-    df_store_ledger: pd.DataFrame,
+    *,
+    df_ledger: pd.DataFrame,
     milvus_address: Optional[str] = None,
     milvus_uri: Optional[str] = None,
     milvus_host: Optional[str] = None,
@@ -36,7 +37,7 @@ def store_embeddings(
 
     Parameters
     ----------
-    df_store_ledger : pd.DataFrame
+    df_ledger : pd.DataFrame
         DataFrame containing the data whose embeddings need to be stored.
     milvus_address : Optional[str], default=None
         The address of the Milvus service.
@@ -97,12 +98,15 @@ def store_embeddings(
     store_config = EmbeddingStorageSchema()
 
     return store_embeddings_internal(
-        df_store_ledger,
+        df_ledger,
         task_config=task_config,
         store_config=store_config,
         execution_trace_log=None,
     )
 
 
-def store_images():
+def store_images(
+    *,
+    df_ledger: pd.DataFrame,
+):
     pass

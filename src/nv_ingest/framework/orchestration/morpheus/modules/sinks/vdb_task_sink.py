@@ -8,9 +8,11 @@ import os
 import pickle
 import time
 from dataclasses import dataclass
+from typing import Dict, Optional, Tuple
 from urllib.parse import urlparse
 
 import mrc
+import pandas as pd
 from minio import Minio
 from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_ids import WRITE_TO_VECTOR_DB
@@ -23,8 +25,6 @@ from mrc.core import operators as ops
 from pymilvus import BulkInsertState
 from pymilvus import connections
 from pymilvus import utility
-
-import cudf
 
 from nv_ingest.schemas.vdb_task_sink_schema import VdbTaskSinkSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
@@ -53,7 +53,6 @@ def _bulk_ingest(
     bulk_ingest_path: str = None,
     extra_params: dict = None,
 ):
-
     endpoint = extra_params.get("endpoint", _DEFAULT_ENDPOINT)
     access_key = extra_params.get("access_key", None)
     secret_key = extra_params.get("secret_key", None)
@@ -101,7 +100,7 @@ def _bulk_ingest(
         time.sleep(5)
 
 
-def preprocess_vdb_resources(service, recreate: bool, resource_schemas: dict):
+def _preprocess_vdb_resources(service, recreate: bool, resource_schemas: dict):
     for resource_name, resource_schema_config in resource_schemas.items():
         has_object = service.has_store_object(name=resource_name)
 
@@ -167,7 +166,7 @@ def _create_vdb_service(
             if is_service_serialized
             else VectorDBServiceFactory.create_instance(service_name=service, **service_kwargs)
         )
-        preprocess_vdb_resources(service, recreate, resource_schemas)
+        _preprocess_vdb_resources(service, recreate, resource_schemas)
 
         return service, True
 
@@ -188,48 +187,182 @@ class AccumulationStats:
         Total number of accumulated records.
     last_insert_time : float
         A value representing the time of the most recent database insert.
-    data : list[cudf.DataFrame]
+    data : list[pd.DataFrame]
         A list containing accumulated batches since the last database insert.
 
     """
 
     msg_count: int
     last_insert_time: float
-    data: list[cudf.DataFrame]
+    data: list[pd.DataFrame]
+
+
+def _extract_dataframe_from_control_message(
+    ctrl_msg: IngestControlMessage, filter_errors: bool
+) -> Tuple[pd.DataFrame, Optional[str]]:
+    """
+    Extracts a DataFrame from the control message and applies filtering to remove error messages.
+    Returns a tuple of the processed DataFrame and an optional resource name (always None in this case).
+    """
+    df_payload = ctrl_msg.payload()
+
+    if filter_errors:
+        info_msg_mask = df_payload["metadata"].struct.field("info_message_metadata").struct.field("filter")
+        df_payload = df_payload.loc[~info_msg_mask].copy()
+
+    # Extract necessary fields from metadata.
+    df_payload["embedding"] = df_payload["metadata"].struct.field("embedding")
+    df_payload["_source_metadata"] = df_payload["metadata"].struct.field("source_metadata")
+    df_payload["_content_metadata"] = df_payload["metadata"].struct.field("content_metadata")
+
+    # Filter rows that contain embeddings and select columns.
+    df = df_payload[df_payload["_contains_embeddings"]].copy()
+    df = df[
+        [
+            "embedding",
+            "_content",
+            "_source_metadata",
+            "_content_metadata",
+        ]
+    ]
+    df.columns = ["vector", "text", "source", "content_metadata"]
+
+    return df, None
+
+
+def _update_accumulator_and_flush(
+    df: pd.DataFrame,
+    resource_name: Optional[str],
+    accumulator_dict: Dict[str, AccumulationStats],
+    batch_size: int,
+    write_time_interval: float,
+    service: VectorDBService,
+    resource_kwargs: dict,
+    ctrl_msg: IngestControlMessage,
+    default_resource_name: str,
+) -> None:
+    """
+    Updates the accumulator for the given resource with the new DataFrame.
+    Flushes (inserts) data if the batch size or time interval criteria are met.
+    """
+    if resource_name is None:
+        resource_name = default_resource_name
+
+    if not service.has_store_object(resource_name):
+        logger.error("Resource not exists in the vector database: %s", resource_name)
+        raise ValueError(f"Resource not exists in the vector database: {resource_name}")
+
+    if resource_name in accumulator_dict:
+        accumulator = accumulator_dict[resource_name]
+        accumulator.msg_count += len(df)
+        accumulator.data.append(df)
+    else:
+        accumulator_dict[resource_name] = AccumulationStats(msg_count=len(df), last_insert_time=time.time(), data=[df])
+
+    current_time = time.time()
+    for key, accum_stats in accumulator_dict.items():
+        if accum_stats.msg_count >= batch_size or (
+            accum_stats.last_insert_time != -1 and (current_time - accum_stats.last_insert_time) >= write_time_interval
+        ):
+            if accum_stats.data:
+                merged_df = pd.concat(accum_stats.data, ignore_index=True)
+                service.insert_dataframe(name=key, df=merged_df, **resource_kwargs)
+                accum_stats.data.clear()
+                accum_stats.last_insert_time = current_time
+                accum_stats.msg_count = 0
+                ctrl_msg.set_metadata(
+                    "insert_response",
+                    {
+                        "status": "inserted",
+                        "accum_count": 0,
+                        "insert_count": len(df),
+                        "succ_count": len(df),
+                        "err_count": 0,
+                    },
+                )
+        else:
+            logger.debug("Accumulated %d rows for collection: %s", accum_stats.msg_count, key)
+            ctrl_msg.set_metadata(
+                "insert_response",
+                {
+                    "status": "accumulated",
+                    "accum_count": len(df),
+                    "insert_count": 0,
+                    "succ_count": 0,
+                    "err_count": 0,
+                },
+            )
+
+
+def _finalize_vector_db_service(accumulator_dict: Dict[str, AccumulationStats], service: VectorDBService) -> None:
+    """
+    Flushes any remaining accumulated data to the vector database and closes the service connection.
+    """
+    for key, accum_stats in accumulator_dict.items():
+        try:
+            if accum_stats.data:
+                merged_df = pd.concat(accum_stats.data, ignore_index=True)
+                service.insert_dataframe(name=key, df=merged_df)
+        except Exception as e:
+            logger.error("Unable to upload dataframe entries to vector database: %s", e)
+    if isinstance(service, VectorDBService):
+        service.close()
+
+
+def _process_control_message_data(
+    ctrl_msg: IngestControlMessage,
+    service: VectorDBService,
+    accumulator_dict: Dict[str, AccumulationStats],
+    default_resource_name: str,
+    batch_size: int,
+    write_time_interval: float,
+    resource_kwargs: dict,
+    service_kwargs: dict,
+    filter_errors: bool,
+) -> IngestControlMessage:
+    """
+    Processes the control message for data ingestion. If bulk ingestion is enabled, delegates to the bulk ingest
+    function.
+    Otherwise, it extracts the DataFrame from the message and updates/flushed the accumulator accordingly.
+    """
+    task_props = remove_task_by_type(ctrl_msg, "vdb_upload")
+    bulk_ingest = task_props.get("bulk_ingest", False)
+    bulk_ingest_path = task_props.get("bulk_ingest_path", None)
+    bucket_name = task_props.get("bucket_name", _DEFAULT_BUCKET_NAME)
+    extra_params = task_props.get("params", {})
+    filter_errors = task_props.get("filter_errors", filter_errors)
+
+    if bulk_ingest:
+        _bulk_ingest(service_kwargs["uri"], default_resource_name, bucket_name, bulk_ingest_path, extra_params)
+        return ctrl_msg
+    else:
+        df, msg_resource_target = _extract_dataframe_from_control_message(ctrl_msg, filter_errors)
+        if df is not None and not df.empty:
+            # Ensure that df is a pandas DataFrame.
+            if not isinstance(df, pd.DataFrame):
+                df = pd.DataFrame(df)
+            _update_accumulator_and_flush(
+                df,
+                msg_resource_target,
+                accumulator_dict,
+                batch_size,
+                write_time_interval,
+                service,
+                resource_kwargs,
+                ctrl_msg,
+                default_resource_name,
+            )
+        return ctrl_msg
 
 
 @register_module(MODULE_NAME, MODULE_NAMESPACE)
 def _vdb_task_sink(builder: mrc.Builder):
     """
-    Receives incoming messages in IngestControlMessage format.
+    Receives incoming messages in IngestControlMessage format and writes data to a vector database.
 
-    Parameters
-    ----------
-    builder : mrc.Builder
-        The Morpheus builder instance to attach this module to.
-
-    Notes
-    -----
-    The `module_config` should contain:
-    - 'recreate': bool, whether to recreate the resource if it already exists (default is False).
-    - 'service': str, the name of the service or a serialized instance of VectorDBService.
-    - 'is_service_serialized': bool, whether the provided service is serialized (default is False).
-    - 'default_resource_name': str, the name of the collection resource (must not be None or empty).
-    - 'resource_kwargs': dict, additional keyword arguments for resource creation.
-    - 'resource_schemas': dict, additional keyword arguments for resource creation.
-    - 'service_kwargs': dict, additional keyword arguments for VectorDBService creation.
-    - 'batch_size': int, accumulates messages until reaching the specified batch size for writing to VDB.
-    - 'write_time_interval': float, specifies the time interval (in seconds) for writing messages, or writing messages
-    - 'retry_interval': float, specify the interval to retry connections to milvus
-    when the accumulated batch size is reached.
-
-    Raises
-    ------
-    ValueError
-        If 'resource_name' is None or empty.
-        If 'service' is not provided or is not a valid service name or a serialized instance of VectorDBService.
+    The module configuration (validated using VdbTaskSinkSchema) should include various parameters
+    controlling resource creation, batching, write intervals, and retry intervals.
     """
-
     validated_config = fetch_and_validate_module_config(builder, VdbTaskSinkSchema)
     recreate = validated_config.recreate
     service = validated_config.service
@@ -249,48 +382,9 @@ def _vdb_task_sink(builder: mrc.Builder):
 
     accumulator_dict = {default_resource_name: AccumulationStats(msg_count=0, last_insert_time=time.time(), data=[])}
 
+    # on_completed callback
     def on_completed():
-        final_df_references = []
-
-        # Pushing remaining messages
-        for key, accum_stats in accumulator_dict.items():
-            try:
-                if accum_stats.data:
-                    merged_df = cudf.concat(accum_stats.data)
-                    service.insert_dataframe(name=key, df=merged_df)
-                    final_df_references.append(accum_stats.data)
-            except Exception as e:
-                logger.error("Unable to upload dataframe entries to vector database: %s", e)
-        # Close vector database service connection
-        if isinstance(service, VectorDBService):
-            service.close()
-
-    def extract_df(ctrl_msg: IngestControlMessage, filter_errors: bool):
-        df = None
-        resource_name = None
-
-        mdf = ctrl_msg.payload()
-
-        if filter_errors:
-            info_msg_mask = mdf["metadata"].struct.field("info_message_metadata").struct.field("filter")
-            mdf = mdf.loc[~info_msg_mask].copy()
-
-        mdf["embedding"] = mdf["metadata"].struct.field("embedding")
-        mdf["_source_metadata"] = mdf["metadata"].struct.field("source_metadata")
-        mdf["_content_metadata"] = mdf["metadata"].struct.field("content_metadata")
-        df = mdf[mdf["_contains_embeddings"]].copy()
-
-        df = df[
-            [
-                "embedding",
-                "_content",
-                "_source_metadata",
-                "_content_metadata",
-            ]
-        ]
-        df.columns = ["vector", "text", "source", "content_metadata"]
-
-        return df, resource_name
+        _finalize_vector_db_service(accumulator_dict, service)
 
     @filter_by_task(["vdb_upload"])
     @traceable(MODULE_NAME)
@@ -300,23 +394,17 @@ def _vdb_task_sink(builder: mrc.Builder):
         raise_on_failure=validated_config.raise_on_failure,
     )
     def on_data(ctrl_msg: IngestControlMessage):
-        nonlocal service_status
-        nonlocal start_time
-        nonlocal service
+        nonlocal service_status, start_time, service
 
         try:
             task_props = remove_task_by_type(ctrl_msg, "vdb_upload")
-
             bulk_ingest = task_props.get("bulk_ingest", False)
-            bulk_ingest_path = task_props.get("bulk_ingest_path", None)
-            bucket_name = task_props.get("bucket_name", _DEFAULT_BUCKET_NAME)
-            extra_params = task_props.get("params", {})
-            filter_errors = task_props.get("filter_errors", True)
+            _ = bulk_ingest
 
+            # Reconnect service if necessary.
             if not service_status:
                 curr_time = time.time()
-                delta_t = curr_time - start_time
-                if delta_t >= retry_interval:
+                if curr_time - start_time >= retry_interval:
                     service, service_status = _create_vdb_service(
                         service, is_service_serialized, service_kwargs, recreate, resource_schemas
                     )
@@ -326,72 +414,17 @@ def _vdb_task_sink(builder: mrc.Builder):
                 logger.error("Not connected to vector database.")
                 raise ValueError("Not connected to vector database")
 
-            if bulk_ingest:
-                _bulk_ingest(service_kwargs["uri"], default_resource_name, bucket_name, bulk_ingest_path, extra_params)
-            else:
-                df, msg_resource_target = extract_df(ctrl_msg, filter_errors)
-                if df is not None and not df.empty:
-                    if not isinstance(df, cudf.DataFrame):
-                        df = cudf.DataFrame(df)
-
-                    df_size = len(df)
-                    current_time = time.time()
-
-                    # Use default resource name
-                    if not msg_resource_target:
-                        msg_resource_target = default_resource_name
-                        if not service.has_store_object(msg_resource_target):
-                            logger.error("Resource not exists in the vector database: %s", msg_resource_target)
-                            raise ValueError(f"Resource not exists in the vector database: {msg_resource_target}")
-
-                    if msg_resource_target in accumulator_dict:
-                        accumulator: AccumulationStats = accumulator_dict[msg_resource_target]
-                        accumulator.msg_count += df_size
-                        accumulator.data.append(df)
-                    else:
-                        accumulator_dict[msg_resource_target] = AccumulationStats(
-                            msg_count=df_size, last_insert_time=time.time(), data=[df]
-                        )
-
-                    for key, accum_stats in accumulator_dict.items():
-                        if accum_stats.msg_count >= batch_size or (
-                            accum_stats.last_insert_time != -1
-                            and (current_time - accum_stats.last_insert_time) >= write_time_interval
-                        ):
-                            if accum_stats.data:
-                                merged_df = cudf.concat(accum_stats.data)
-
-                                # pylint: disable=not-a-mapping
-                                service.insert_dataframe(name=key, df=merged_df, **resource_kwargs)
-                                # Reset accumulator stats
-                                accum_stats.data.clear()
-                                accum_stats.last_insert_time = current_time
-                                accum_stats.msg_count = 0
-
-                            if isinstance(ctrl_msg, IngestControlMessage):
-                                ctrl_msg.set_metadata(
-                                    "insert_response",
-                                    {
-                                        "status": "inserted",
-                                        "accum_count": 0,
-                                        "insert_count": df_size,
-                                        "succ_count": df_size,
-                                        "err_count": 0,
-                                    },
-                                )
-                        else:
-                            logger.debug("Accumulated %d rows for collection: %s", accum_stats.msg_count, key)
-                            if isinstance(ctrl_msg, IngestControlMessage):
-                                ctrl_msg.set_metadata(
-                                    "insert_response",
-                                    {
-                                        "status": "accumulated",
-                                        "accum_count": df_size,
-                                        "insert_count": 0,
-                                        "succ_count": 0,
-                                        "err_count": 0,
-                                    },
-                                )
+            ctrl_msg = _process_control_message_data(
+                ctrl_msg,
+                service,
+                accumulator_dict,
+                default_resource_name,
+                batch_size,
+                write_time_interval,
+                resource_kwargs,
+                service_kwargs,
+                filter_errors=True,
+            )
 
         except Exception as e:
             raise ValueError(f"Failed to insert upload to vector database: {e}")
@@ -399,7 +432,10 @@ def _vdb_task_sink(builder: mrc.Builder):
         return ctrl_msg
 
     node = builder.make_node(
-        WRITE_TO_VECTOR_DB, ops.map(on_data), ops.filter(lambda val: val is not None), ops.on_completed(on_completed)
+        WRITE_TO_VECTOR_DB,
+        ops.map(on_data),
+        ops.filter(lambda val: val is not None),
+        ops.on_completed(on_completed),
     )
     node.launch_options.engines_per_pe = validated_config.progress_engines
 

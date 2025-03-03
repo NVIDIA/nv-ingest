@@ -66,6 +66,7 @@ def _decode_and_extract_from_image(
     Exception
         For any other unhandled exceptions during extraction.
     """
+
     # Retrieve document type and initialize source_id.
     document_type: Any = base64_row["document_type"]
     source_id: Optional[Any] = None

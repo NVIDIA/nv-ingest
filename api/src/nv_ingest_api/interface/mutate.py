@@ -18,6 +18,7 @@ logger = logging.getLogger(__name__)
 
 @unified_exception_handler
 def filter_images(
+    *,
     df_ledger: pd.DataFrame,
     min_size: int = 128,
     max_aspect_ratio: Union[float, int] = 5.0,
@@ -74,6 +75,7 @@ def filter_images(
 
 @unified_exception_handler
 def deduplicate_images(
+    *,
     df_ledger: pd.DataFrame,
     hash_algorithm: str = "md5",
 ) -> pd.DataFrame:

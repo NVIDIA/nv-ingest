@@ -15,7 +15,8 @@ from nv_ingest_api.util.exception_handlers.decorators import unified_exception_h
 
 @unified_exception_handler
 def transform_create_text_embeddings(
-    df_transform_ledger: pd.DataFrame,
+    *,
+    df_ledger: pd.DataFrame,
     api_key: str,
     embedding_model: Optional[str] = None,
     embedding_nim_endpoint: Optional[str] = None,
@@ -44,7 +45,7 @@ def transform_create_text_embeddings(
     transform_config = EmbedExtractionsSchema(**config_kwargs)
 
     result, _ = transform_create_text_embeddings_internal(
-        df_transform_ledger=df_transform_ledger,
+        df_transform_ledger=df_ledger,
         task_config=task_config,
         transform_config=transform_config,
         execution_trace_log=None,
@@ -55,7 +56,8 @@ def transform_create_text_embeddings(
 
 @unified_exception_handler
 def transform_create_vlm_caption(
-    df_transform_ledger: pd.DataFrame,
+    *,
+    df_ledger: pd.DataFrame,
     api_key: Optional[str] = None,
     prompt: Optional[str] = None,
     endpoint_url: Optional[str] = None,
@@ -69,7 +71,7 @@ def transform_create_vlm_caption(
 
     Parameters
     ----------
-    df_transform_ledger : pd.DataFrame
+    df_ledger : pd.DataFrame
         DataFrame containing the image content. Each row is expected to have a 'metadata' column
         with image data that will be captioned.
     api_key : Optional[str], default=None
@@ -106,12 +108,14 @@ def transform_create_vlm_caption(
     transform_config = ImageCaptionExtractionSchema(**filtered_task_config)
 
     return transform_create_vlm_caption_internal(
-        df_transform_ledger=df_transform_ledger,
+        df_transform_ledger=df_ledger,
         task_config=filtered_task_config,
         transform_config=transform_config,
         execution_trace_log=None,
     )
 
 
-def transform_split_text():
+def transform_split_text(
+    *, df_ledger: pd.DataFrame, split_column: str, split_delimiter: str, new_column_prefix: str
+) -> pd.DataFrame:
     pass

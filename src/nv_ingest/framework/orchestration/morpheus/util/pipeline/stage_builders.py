@@ -13,11 +13,15 @@ from nv_ingest.framework.orchestration.morpheus.modules.transforms import TextSp
 from nv_ingest.framework.orchestration.morpheus.stages.transforms.embed_text_stage import (
     generate_text_embed_extractor_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.nim.chart_extraction_stage import generate_chart_extractor_stage
-from nv_ingest.framework.orchestration.morpheus.stages.nim.infographic_extraction_stage import (
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.chart_extraction_stage import (
+    generate_chart_extractor_stage,
+)
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.infographic_extraction_stage import (
     generate_infographic_extractor_stage,
 )
-from nv_ingest.framework.orchestration.morpheus.stages.nim.table_extraction_stage import generate_table_extractor_stage
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.table_extraction_stage import (
+    generate_table_extractor_stage,
+)
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import (
     MetadataInjectorLoaderFactory,

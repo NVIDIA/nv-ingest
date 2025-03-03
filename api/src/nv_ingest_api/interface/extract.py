@@ -24,10 +24,13 @@ from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
 from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitives_from_pptx_internal
-from ..internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
-from ..internal.extract.image.table_extractor import extract_table_data_from_image_internal
+from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
+from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
+from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 
 logger = logging.getLogger(__name__)
+
+# TODO(Devin) - Alternate impl that directly takes data type and returns the dataframe
 
 
 @unified_exception_handler
@@ -123,7 +126,8 @@ def extract_primitives_from_pdf(
 
 @unified_exception_handler
 def extract_primitives_from_pptx(
-    df_extraction_ledger: pd.DataFrame,
+    *,
+    df_ledger: pd.DataFrame,
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -143,7 +147,7 @@ def extract_primitives_from_pptx(
 
     Parameters
     ----------
-    df_extraction_ledger : pd.DataFrame
+    df_ledger : pd.DataFrame
         A DataFrame containing base64-encoded PPTX files. The DataFrame is expected to include
         columns such as "content" (with the base64-encoded PPTX) and "source_id".
     extract_text : bool, default=True
@@ -197,7 +201,7 @@ def extract_primitives_from_pptx(
     extraction_config = PPTXExtractorSchema()  # Assuming PPTXExtractorSchema is defined and imported
 
     return extract_primitives_from_pptx_internal(
-        df_extraction_ledger=df_extraction_ledger,
+        df_extraction_ledger=df_ledger,
         task_config=task_config,
         extraction_config=extraction_config,
         execution_trace_log=None,
@@ -206,7 +210,8 @@ def extract_primitives_from_pptx(
 
 @unified_exception_handler
 def extract_primitives_from_docx(
-    df_extraction_ledger: pd.DataFrame,
+    *,
+    df_ledger: pd.DataFrame,
     extract_text: bool = True,
     extract_images: bool = True,
     extract_tables: bool = True,
@@ -226,7 +231,7 @@ def extract_primitives_from_docx(
 
     Parameters
     ----------
-    df_extraction_ledger : pd.DataFrame
+    df_ledger : pd.DataFrame
         The input DataFrame containing DOCX documents in base64 encoding. The DataFrame is expected to
         include required columns such as "content" (with the base64-encoded DOCX) and optionally "source_id".
     extract_text : bool, optional
@@ -279,7 +284,7 @@ def extract_primitives_from_docx(
 
     # Delegate the actual extraction to the internal function.
     return extract_primitives_from_docx_internal(
-        df_extraction_ledger=df_extraction_ledger,
+        df_extraction_ledger=df_ledger,
         task_config=task_config,
         extraction_config=extraction_config,
         execution_trace_log=None,
@@ -287,8 +292,36 @@ def extract_primitives_from_docx(
 
 
 @unified_exception_handler
-def extract_primitives_from_image():
-    pass
+def extract_primitives_from_image(
+    *,
+    df_ledger: pd.DataFrame,
+    extract_text: bool = True,
+    extract_images: bool = True,
+    extract_tables: bool = True,
+    extract_charts: bool = True,
+    extract_infographics: bool = True,
+    yolox_endpoints: Optional[Tuple[str, str]] = None,
+    yolox_infer_protocol: str = "grpc",
+    auth_token: str = "",
+) -> pd.DataFrame:
+    task_config: Dict[str, Any] = {
+        "params": {
+            "extract_text": extract_text,
+            "extract_images": extract_images,
+            "extract_tables": extract_tables,
+            "extract_charts": extract_charts,
+            "extract_infographics": extract_infographics,
+        },
+        "image_extraction_config": {
+            "yolox_endpoints": yolox_endpoints,
+            "yolox_infer_protocol": yolox_infer_protocol,
+            "auth_token": auth_token,
+        },
+    }
+
+    return extract_primitives_from_image_internal(
+        df_extraction_ledger=df_ledger, task_config=task_config, extraction_config=None, execution_trace_log=None
+    )
 
 
 @unified_exception_handler
