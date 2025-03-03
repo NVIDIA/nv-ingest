@@ -32,6 +32,8 @@ class DocumentTypeEnum(str, Enum):
     svg = "svg"
     tiff = "tiff"
     txt = "text"
+    mp3 = "mp3"
+    wav = "wav"
 
 
 # Maps MIME types to DocumentTypeEnum
@@ -64,6 +66,8 @@ EXTENSION_TO_DOCUMENT_TYPE = {
     "svg": DocumentTypeEnum.svg,
     "tiff": DocumentTypeEnum.tiff,
     "txt": DocumentTypeEnum.txt,
+    "mp3": DocumentTypeEnum.mp3,
+    "wav": DocumentTypeEnum.wav,
     # Add more as needed
 }
 

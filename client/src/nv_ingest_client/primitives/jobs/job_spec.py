@@ -14,6 +14,8 @@ from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import ExtractTask
+from nv_ingest_client.primitives.tasks.extract import _DEFAULT_EXTRACTOR_MAP
+from nv_ingest_client.primitives.tasks.audio_extraction import AudioExtractionTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
@@ -172,6 +174,8 @@ class JobSpec:
             self._tasks.append(ChartExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
+        if isinstance(task, ExtractTask) and (_DEFAULT_EXTRACTOR_MAP[self._document_type] == "audio"):
+            self._tasks.append(AudioExtractionTask())
 
 
 class BatchJobSpec:

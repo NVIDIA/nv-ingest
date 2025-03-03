@@ -303,6 +303,11 @@ class ChartMetadataSchema(BaseModelNoExt):
     uploaded_image_uri: str = ""
 
 
+class AudioMetadataSchema(BaseModelNoExt):
+    audio_transcript: str = ""
+    audio_type: str = ""
+
+
 # TODO consider deprecating this in favor of info msg...
 class ErrorMetadataSchema(BaseModelNoExt):
     task: TaskTypeEnum
@@ -325,6 +330,7 @@ class MetadataSchema(BaseModelNoExt):
     embedding: Optional[List[float]] = None
     source_metadata: Optional[SourceMetadataSchema] = None
     content_metadata: Optional[ContentMetadataSchema] = None
+    audio_metadata: Optional[AudioMetadataSchema] = None
     text_metadata: Optional[TextMetadataSchema] = None
     image_metadata: Optional[ImageMetadataSchema] = None
     table_metadata: Optional[TableMetadataSchema] = None
@@ -338,10 +344,12 @@ class MetadataSchema(BaseModelNoExt):
     @classmethod
     def check_metadata_type(cls, values):
         content_type = values.get("content_metadata", {}).get("type", None)
-        if content_type != ContentTypeEnum.TEXT:
-            values["text_metadata"] = None
+        if content_type != ContentTypeEnum.AUDIO:
+            values["audio_metadata"] = None
         if content_type != ContentTypeEnum.IMAGE:
             values["image_metadata"] = None
+        if content_type != ContentTypeEnum.TEXT:
+            values["text_metadata"] = None
         if content_type != ContentTypeEnum.STRUCTURED:
             values["table_metadata"] = None
         return values

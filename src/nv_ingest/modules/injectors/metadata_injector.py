@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import traceback
 
 import mrc
 import pandas as pd
@@ -46,6 +47,9 @@ def on_data(message: IngestControlMessage):
                             "type": content_type.name.lower(),
                         },
                         "error_metadata": None,
+                        "audio_metadata": (
+                            None if content_type != ContentTypeEnum.AUDIO else {"audio_type": row["document_type"]}
+                        ),
                         "image_metadata": (
                             None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
                         ),
@@ -86,7 +90,12 @@ def _metadata_injection(builder: mrc.Builder):
         annotation_id=MODULE_NAME, raise_on_failure=validated_config.raise_on_failure, skip_processing_if_failed=True
     )
     def _on_data(message: IngestControlMessage) -> IngestControlMessage:
-        return on_data(message)
+        try:
+            return on_data(message)
+        except Exception as e:
+            logger.error(f"Unhandled exception in metadata_injector: {e}")
+            traceback.print_exc()
+            raise
 
     node = builder.make_node("metadata_injector", _on_data)
 
