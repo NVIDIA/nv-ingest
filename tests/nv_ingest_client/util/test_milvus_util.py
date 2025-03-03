@@ -9,7 +9,6 @@ from nv_ingest_client.util.milvus import (
 from nv_ingest_client.util.util import ClientConfigSchema
 
 
-
 @pytest.fixture
 def milvus_test_dict():
     mil_op = MilvusOperator()
