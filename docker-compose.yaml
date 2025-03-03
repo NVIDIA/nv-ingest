@@ -146,7 +146,7 @@ services:
               capabilities: [gpu]
     runtime: nvidia
     profiles:
-      - retrieval
+      - reranker
 
   nemoretriever-parse:
     image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0ea}
