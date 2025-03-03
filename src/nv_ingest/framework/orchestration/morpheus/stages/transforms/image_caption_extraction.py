@@ -11,7 +11,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.internal.transform.caption_image import transform_create_vlm_caption_internal
+from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,9 @@ def generate_caption_extraction_stage(
     """
     try:
         validated_config = ImageCaptionExtractionSchema(**transform_config)
-        _wrapped_caption_extract = partial(transform_create_vlm_caption_internal, transform_config=validated_config)
+        _wrapped_caption_extract = partial(
+            transform_image_create_vlm_caption_internal, transform_config=validated_config
+        )
 
         logger.debug(f"Generating caption extraction stage with {pe_count} processing elements. Task: {task}")
 

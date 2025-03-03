@@ -10,6 +10,7 @@ from pydantic import BaseModel
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
+from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.nim import create_inference_client
 
@@ -118,7 +119,8 @@ def _generate_captions(
         raise type(e)(err_msg) from e
 
 
-def transform_create_vlm_caption_internal(
+@unified_exception_handler
+def transform_image_create_vlm_caption_internal(
     df_transform_ledger: pd.DataFrame,
     task_config: Union[BaseModel, Dict[str, Any]],
     transform_config: Any,
@@ -161,48 +163,40 @@ def transform_create_vlm_caption_internal(
 
     _ = execution_trace_log  # Unused variable; placeholder to prevent linter warnings.
 
-    try:
-        logger.debug("Attempting to caption image content")
+    logger.debug("Attempting to caption image content")
 
-        # Convert task_config to dictionary if it is a Pydantic model.
-        if isinstance(task_config, BaseModel):
-            task_config = task_config.model_dump()
+    # Convert task_config to dictionary if it is a Pydantic model.
+    if isinstance(task_config, BaseModel):
+        task_config = task_config.model_dump()
 
-        # Retrieve configuration values with fallback to transform_config defaults.
-        api_key: str = task_config.get("api_key") or transform_config.api_key
-        prompt: str = task_config.get("prompt") or transform_config.prompt
-        endpoint_url: str = task_config.get("endpoint_url") or transform_config.endpoint_url
-        model_name: str = task_config.get("model_name") or transform_config.model_name
+    # Retrieve configuration values with fallback to transform_config defaults.
+    api_key: str = task_config.get("api_key") or transform_config.api_key
+    prompt: str = task_config.get("prompt") or transform_config.prompt
+    endpoint_url: str = task_config.get("endpoint_url") or transform_config.endpoint_url
+    model_name: str = task_config.get("model_name") or transform_config.model_name
 
-        # Create a mask for rows where the content type is "image".
-        df_mask: pd.Series = df_transform_ledger["metadata"].apply(
-            lambda meta: meta.get("content_metadata", {}).get("type") == "image"
-        )
+    # Create a mask for rows where the content type is "image".
+    df_mask: pd.Series = df_transform_ledger["metadata"].apply(
+        lambda meta: meta.get("content_metadata", {}).get("type") == "image"
+    )
 
-        # If no image rows exist, return the original DataFrame.
-        if not df_mask.any():
-            return df_transform_ledger
-
-        # Collect base64-encoded images from the rows where the content type is "image".
-        base64_images: List[str] = (
-            df_transform_ledger.loc[df_mask, "metadata"].apply(lambda meta: meta["content"]).tolist()
-        )
-
-        # Generate captions for the collected images.
-        captions: List[str] = _generate_captions(base64_images, prompt, api_key, endpoint_url, model_name)
-
-        # Update the DataFrame: assign each generated caption to the corresponding row.
-        for idx, caption in zip(df_transform_ledger.loc[df_mask].index, captions):
-            meta: Dict[str, Any] = df_transform_ledger.at[idx, "metadata"]
-            image_meta: Dict[str, Any] = meta.get("image_metadata", {})
-            image_meta["caption"] = caption
-            meta["image_metadata"] = image_meta
-            df_transform_ledger.at[idx, "metadata"] = meta
-
-        logger.debug("Image content captioning complete")
+    # If no image rows exist, return the original DataFrame.
+    if not df_mask.any():
         return df_transform_ledger
 
-    except Exception as e:
-        err_msg = f"caption_extract_stage: Error extracting captions. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    # Collect base64-encoded images from the rows where the content type is "image".
+    base64_images: List[str] = df_transform_ledger.loc[df_mask, "metadata"].apply(lambda meta: meta["content"]).tolist()
+
+    # Generate captions for the collected images.
+    captions: List[str] = _generate_captions(base64_images, prompt, api_key, endpoint_url, model_name)
+
+    # Update the DataFrame: assign each generated caption to the corresponding row.
+    for idx, caption in zip(df_transform_ledger.loc[df_mask].index, captions):
+        meta: Dict[str, Any] = df_transform_ledger.at[idx, "metadata"]
+        image_meta: Dict[str, Any] = meta.get("image_metadata", {})
+        image_meta["caption"] = caption
+        meta["image_metadata"] = image_meta
+        df_transform_ledger.at[idx, "metadata"] = meta
+
+    logger.debug("Image content captioning complete")
+    return df_transform_ledger
