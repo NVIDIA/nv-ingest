@@ -34,7 +34,7 @@ logger = logging.getLogger(__name__)
 class ClientConfigSchema:
     def __init__(self):
         self.embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-        self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+        self.embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
         self.nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
         self.nv_ranker_nim_endpoint: str = os.getenv(
             "RERANKER_NIM_ENDPOINT",
