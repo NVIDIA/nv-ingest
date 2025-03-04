@@ -13,8 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-#!/bin/bash
-
 # Activate the `nv_ingest_runtime` conda environment
 . /opt/conda/etc/profile.d/conda.sh
 conda activate nv_ingest_runtime
@@ -33,6 +31,16 @@ else
     CONFIG_ARG=""
 fi
 
+# Check if INGEST_MEM_TRACE is set to 1, true, on, or yes (case-insensitive)
+MEM_TRACE=false
+if [ -n "${INGEST_MEM_TRACE}" ]; then
+    case "$(echo "${INGEST_MEM_TRACE}" | tr '[:upper:]' '[:lower:]')" in
+        1|true|on|yes)
+            MEM_TRACE=true
+            ;;
+    esac
+fi
+
 # Check if user supplied a command
 if [ "$#" -gt 0 ]; then
     # If a command is provided, run it.
@@ -40,9 +48,15 @@ if [ "$#" -gt 0 ]; then
 else
     # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
-      # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
-      uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
+        # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
+        uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
     fi
 
-    python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
+    if [ "${MEM_TRACE}" = true ]; then
+        # Run the entrypoint wrapped in memray
+        python -m memray run -o memray_trace.bin /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
+    else
+        # Run without memray
+        python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
+    fi
 fi
