@@ -288,6 +288,15 @@ def _generate_text_embeddings_df(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
+    embedding_nim_endpoint = task_props.get("embedding_nim_endpoint", validated_config.embedding_nim_endpoint)
+    embedding_model = task_props.get("embedding_nim_model_name", validated_config.embedding_model)
+    api_key = task_props.get("nvidia_build_api_key", validated_config.api_key)
+    filter_errors = task_props.get("filter_errors", False)
+
+    logger.info(embedding_nim_endpoint)
+    logger.info(embedding_model)
+    logger.info(api_key)
+
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
 
     # Process each supported content type.
@@ -316,13 +325,13 @@ def _generate_text_embeddings_df(
         # Run asynchronous embedding requests.
         content_embeddings = _async_runner(
             filtered_content_batches,
-            validated_config.api_key,
-            validated_config.embedding_nim_endpoint,
-            validated_config.embedding_model,
+            api_key,
+            embedding_nim_endpoint,
+            embedding_model,
             validated_config.encoding_format,
             validated_config.input_type,
             validated_config.truncate,
-            False,  # task_props.get("filter_errors", False),
+            filter_errors,
         )
         # Apply the embeddings (and any error info) to each row.
         df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
