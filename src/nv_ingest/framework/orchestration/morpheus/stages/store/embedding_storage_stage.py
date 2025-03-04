@@ -9,7 +9,7 @@ from morpheus.config import Config
 
 from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest_api.internal.store.embed_text_upload import store_embeddings_internal
+from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 
 logger = logging.getLogger(__name__)
 
@@ -49,7 +49,7 @@ def generate_embedding_storage_stage(
     try:
         validated_config = EmbeddingStorageSchema(**store_config)
 
-        _wrapped_process_fn = functools.partial(store_embeddings_internal, store_config=validated_config)
+        _wrapped_process_fn = functools.partial(store_text_embeddings_internal, store_config=validated_config)
 
         return MultiProcessingBaseStage(
             c=c, pe_count=pe_count, task=task, task_desc=task_desc, process_fn=_wrapped_process_fn

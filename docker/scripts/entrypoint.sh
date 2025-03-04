@@ -14,12 +14,16 @@
 # limitations under the License.
 
 # Activate the `nv_ingest_runtime` conda environment
+set -e
 . /opt/conda/etc/profile.d/conda.sh
 conda activate nv_ingest_runtime
 
 # Source "source" file if it exists
 SRC_FILE="/opt/docker/bin/entrypoint_source"
-[ -f "${SRC_FILE}" ] && source "${SRC_FILE}"
+[ -f "${SRC_FILE}" ] && . "${SRC_FILE}"
+
+SRC_EXT="/workspace/docker/entrypoint_source_ext.sh"
+[ -f "${SRC_EXT}" ] && . "${SRC_EXT}"
 
 # Determine edge buffer size (default: 32)
 EDGE_BUFFER_SIZE="${INGEST_EDGE_BUFFER_SIZE:-32}"

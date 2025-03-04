@@ -24,7 +24,7 @@ _DEFAULT_ENDPOINT = os.environ.get("MINIO_INTERNAL_ADDRESS", "minio:9000")
 _DEFAULT_BUCKET_NAME = os.environ.get("MINIO_BUCKET", "nv-ingest")
 
 
-def _upload_embeddings(df_store_ledger: pd.DataFrame, task_config: Dict[str, Any]) -> pd.DataFrame:
+def _upload_text_embeddings(df_store_ledger: pd.DataFrame, task_config: Dict[str, Any]) -> pd.DataFrame:
     """
     Uploads embeddings to MinIO for contents (e.g., images) contained in a DataFrame.
     The image metadata in the "metadata" column is updated with the URL (or path) of the uploaded data.
@@ -175,7 +175,7 @@ def _upload_embeddings(df_store_ledger: pd.DataFrame, task_config: Dict[str, Any
         raise type(e)(err_msg) from e
 
 
-def store_embeddings_internal(
+def store_text_embeddings_internal(
     df_store_ledger: pd.DataFrame,
     task_config: Union[BaseModel, Dict[str, Any]],
     store_config: EmbeddingStorageSchema,
@@ -223,7 +223,7 @@ def store_embeddings_internal(
         params["content_types"] = content_types
 
         # Perform the upload of embeddings
-        df_store_ledger = _upload_embeddings(df_store_ledger, params)
+        df_store_ledger = _upload_text_embeddings(df_store_ledger, params)
         return df_store_ledger
 
     except Exception as e:

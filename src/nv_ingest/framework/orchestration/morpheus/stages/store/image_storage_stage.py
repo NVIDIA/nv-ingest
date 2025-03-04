@@ -45,6 +45,7 @@ class ImageStorageStage(PassThruTypeMixin, SinglePortStage):
 
         module_name = "image_storage"
 
+        # TODO(Devin): This should just be a stage, not a mixture of model and stage.
         self._module_loader: ModuleLoader = ImageStorageLoaderFactory.get_instance(module_name, module_config)
 
     @property
