@@ -17,6 +17,8 @@
 
 #!/bin/bash
 
+#!/bin/bash
+
 # Activate the `nv_ingest_runtime` conda environment
 . /opt/conda/etc/profile.d/conda.sh
 conda activate nv_ingest_runtime
@@ -24,6 +26,9 @@ conda activate nv_ingest_runtime
 # Source "source" file if it exists
 SRC_FILE="/opt/docker/bin/entrypoint_source"
 [ -f "${SRC_FILE}" ] && source "${SRC_FILE}"
+
+# Determine edge buffer size (default: 32)
+EDGE_BUFFER_SIZE="${INGEST_EDGE_BUFFER_SIZE:-32}"
 
 # Check if user supplied a command
 if [ "$#" -gt 0 ]; then
@@ -36,5 +41,5 @@ else
       uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
     fi
 
-    python /workspace/microservice_entrypoint.py
+    python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}"
 fi

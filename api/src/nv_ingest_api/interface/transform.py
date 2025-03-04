@@ -96,6 +96,7 @@ def transform_image_create_vlm_caption(
         Propagates any exceptions encountered during the caption extraction process, wrapped
         with additional context.
     """
+
     # Build the task configuration and filter out any keys with None values.
     task_config: Dict[str, Optional[str]] = {
         "api_key": api_key,

@@ -10,6 +10,9 @@ import os
 import click
 
 from nv_ingest.framework.orchestration.morpheus.modules.transforms import TextSplitterLoaderFactory
+from nv_ingest.framework.orchestration.morpheus.stages.extractors.audio_extraction_stage import (
+    generate_audio_extractor_stage,
+)
 from nv_ingest.framework.orchestration.morpheus.stages.transforms.embed_text_stage import (
     generate_text_embed_extractor_stage,
 )
@@ -382,6 +385,57 @@ def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
         )
     )
     return pptx_extractor_stage
+
+
+def get_audio_retrieval_service(env_var_prefix):
+    prefix = env_var_prefix.upper()
+    grpc_endpoint = os.environ.get(
+        "AUDIO_GRPC_ENDPOINT",
+        "",
+    )
+    http_endpoint = os.environ.get(
+        "AUDIO_HTTP_ENDPOINT",
+        "",
+    )
+    auth_token = os.environ.get(
+        "RIVA_NGC_API_KEY",
+        "",
+    )
+    infer_protocol = os.environ.get(
+        "AUDIO_INFER_PROTOCOL",
+        "http" if http_endpoint else "grpc" if grpc_endpoint else "",
+    )
+
+    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
+
+    return grpc_endpoint, http_endpoint, auth_token, infer_protocol
+
+
+def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
+    audio_extractor_config = ingest_config.get(
+        "audio_extraction_module",
+        {
+            "audio_extraction_config": {
+                "audio_endpoints": (audio_grpc, audio_http),
+                "audio_infer_protocol": audio_infer_protocol,
+                "auth_token": audio_auth,
+                # All auth tokens are the same for the moment
+            }
+        },
+    )
+    audio_extractor_stage = pipe.add_stage(
+        generate_audio_extractor_stage(
+            morpheus_pipeline_config,
+            stage_config=audio_extractor_config,
+            pe_count=8,
+            task="extract",
+            task_desc="audio_content_extractor",
+        )
+    )
+    return audio_extractor_stage
 
 
 def add_image_dedup_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
