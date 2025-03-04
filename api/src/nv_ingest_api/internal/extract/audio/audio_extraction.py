@@ -10,6 +10,7 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+from nv_ingest.schemas.audio_extractor_schema import AudioConfigSchema
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
 
 logger = logging.getLogger(__name__)
@@ -71,24 +72,27 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
     return metadata
 
 
-def _transcribe_audio(
-    df: pd.DataFrame, task_props: Dict[str, Any], validated_config: Any, trace_info: Optional[Dict] = None
+def extract_text_from_audio_internal(
+    df_extraction_ledger: pd.DataFrame,
+    task_config: Dict[str, Any],
+    extraction_config: AudioConfigSchema,
+    execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
     Extracts audio data from a DataFrame.
 
     Parameters
     ----------
-    df : pd.DataFrame
+    df_extraction_ledger : pd.DataFrame
         DataFrame containing the content from which audio data is to be extracted.
 
-    task_props : Dict[str, Any]
+    task_config : Dict[str, Any]
         Dictionary containing task properties and configurations.
 
-    validated_config : Any
+    extraction_config : Any
         The validated configuration object for audio extraction.
 
-    trace_info : Optional[Dict], optional
+    execution_trace_log : Optional[Dict], optional
         Optional trace information for debugging or logging. Defaults to None.
 
     Returns
@@ -101,18 +105,18 @@ def _transcribe_audio(
     Exception
         If any error occurs during the audio data extraction process.
     """
-    logger.debug(f"Entering audio extraction stage with {len(df)} rows.")
+    logger.debug(f"Entering audio extraction stage with {len(df_extraction_ledger)} rows.")
 
-    extract_params = task_props.get("params", {}).get("extract_audio_params", {})
-    stage_config = validated_config.audio_extraction_config
+    extract_params = task_config.get("params", {}).get("extract_audio_params", {})
+    audio_extraction_config = extraction_config.audio_extraction_config
 
-    grpc_endpoint = extract_params.get("grpc_endpoint") or stage_config.audio_endpoints[0]
-    http_endpoint = extract_params.get("http_endpoint") or stage_config.audio_endpoints[1]
-    infer_protocol = extract_params.get("infer_protocol") or stage_config.audio_infer_protocol
-    auth_token = extract_params.get("auth_token") or stage_config.auth_token
-    auth_metadata = extract_params.get("auth_metadata") or stage_config.auth_metadata
-    use_ssl = extract_params.get("use_ssl") or stage_config.use_ssl
-    ssl_cert = extract_params.get("ssl_cert") or stage_config.ssl_cert
+    grpc_endpoint = extract_params.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
+    http_endpoint = extract_params.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
+    infer_protocol = extract_params.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
+    auth_token = extract_params.get("auth_token") or audio_extraction_config.auth_token
+    auth_metadata = extract_params.get("auth_metadata") or audio_extraction_config.auth_metadata
+    use_ssl = extract_params.get("use_ssl") or audio_extraction_config.use_ssl
+    ssl_cert = extract_params.get("ssl_cert") or audio_extraction_config.ssl_cert
 
     parakeet_client = create_audio_inference_client(
         (grpc_endpoint, http_endpoint),
@@ -123,15 +127,17 @@ def _transcribe_audio(
         ssl_cert=ssl_cert,
     )
 
-    if trace_info is None:
-        trace_info = {}
+    if execution_trace_log is None:
+        execution_trace_log = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        df["metadata"] = df.apply(_update_audio_metadata, axis=1, args=(parakeet_client, trace_info))
+        df_extraction_ledger["metadata"] = df_extraction_ledger.apply(
+            _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
+        )
 
-        return df, trace_info
+        return df_extraction_ledger, execution_trace_log
 
     except Exception as e:
         logger.exception(f"Error occurred while extracting audio data: {e}", exc_info=True)

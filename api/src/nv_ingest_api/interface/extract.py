@@ -8,6 +8,7 @@ from typing import Tuple, Optional, Dict, Any
 import pandas as pd
 from pandas import DataFrame
 
+from nv_ingest.schemas.audio_extractor_schema import AudioConfigSchema
 from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
 from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
@@ -27,8 +28,10 @@ from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitive
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
+from ..internal.extract.audio.audio_extraction import extract_text_from_audio_internal
 
 logger = logging.getLogger(__name__)
+
 
 # TODO(Devin) - Alternate impl that directly takes data type and returns the dataframe
 
@@ -125,6 +128,85 @@ def extract_primitives_from_pdf(
     backend function `extract_primitives_from_pdf_internal`.
     """
     pass
+
+
+@unified_exception_handler
+def extract_primitives_from_audio(
+    *,
+    df_ledger: pd.DataFrame,
+    audio_endpoints: Tuple[str, str],
+    audio_infer_protocol: str = "grpc",
+    auth_token: str = "",
+    use_ssl: bool = False,
+    ssl_cert: str = "",
+) -> Any:
+    """
+    Extract audio primitives from a ledger DataFrame using the specified audio configuration.
+
+    This function builds an extraction configuration based on the provided audio endpoints,
+    inference protocol, authentication token, and SSL settings. It then delegates the extraction
+    work to the internal function ``extract_text_from_audio_internal`` using the constructed
+    configuration and ledger DataFrame.
+
+    Parameters
+    ----------
+    df_ledger : pandas.DataFrame
+        A DataFrame containing the ledger information required for audio extraction.
+    audio_endpoints : Tuple[str, str]
+        A tuple of two strings representing the audio service endpoints gRPC and HTTP services.
+    audio_infer_protocol : str, optional
+        The protocol to use for audio inference (e.g., "grpc"). Default is "grpc".
+    auth_token : str, optional
+        Authentication token for the audio inference service. Default is an empty string.
+    use_ssl : bool, optional
+        Flag indicating whether to use SSL for secure connections. Default is False.
+    ssl_cert : str, optional
+        Path to the SSL certificate file to use if ``use_ssl`` is True. Default is an empty string.
+
+    Returns
+    -------
+    Any
+        The result of the audio extraction as returned by
+        ``extract_text_from_audio_internal``. The specific type depends on the internal implementation.
+
+    Raises
+    ------
+    Exception
+        Any exceptions raised during the extraction process will be handled by the
+        ``@unified_exception_handler`` decorator.
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> # Create a sample DataFrame with ledger data
+    >>> df = pd.DataFrame({"audio_data": ["file1.wav", "file2.wav"]})
+    >>> result = extract_primitives_from_audio(
+    ...     df_ledger=df,
+    ...     audio_endpoints=("http://primary.endpoint", "http://secondary.endpoint"),
+    ...     audio_infer_protocol="grpc",
+    ...     auth_token="secret-token",
+    ...     use_ssl=True,
+    ...     ssl_cert="/path/to/cert.pem"
+    ... )
+    """
+    task_config: Dict[str, Any] = {"params": {"extract_audio_params": {}}}
+
+    extraction_config = AudioConfigSchema(
+        **{
+            "audio_endpoints": audio_endpoints,
+            "audio_infer_protocol": audio_infer_protocol,
+            "auth_token": auth_token,
+            "use_ssl": use_ssl,
+            "ssl_cert": ssl_cert,
+        }
+    )
+
+    return extract_text_from_audio_internal(
+        df_extraction_ledger=df_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=None,
+    )
 
 
 @unified_exception_handler

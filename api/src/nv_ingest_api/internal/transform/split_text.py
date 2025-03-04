@@ -11,7 +11,7 @@ from typing import Any, Optional, Dict
 from typing import List
 
 import pandas as pd
-from transformers import AutoTokenizer, PreTrainedTokenizer
+from transformers import AutoTokenizer
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.text_splitter_schema import TextSplitterSchema
@@ -126,17 +126,18 @@ def transform_text_split_and_tokenize_internal(
     if df_filtered.empty:
         return df_transform_ledger
 
-    # Update tokenizer path based on available local models.
-    if os.path.exists("/workspace/models/llama-3.2-1b/tokenizer/tokenizer.json") and (
+    model_predownload_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
+
+    if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
         tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
     ):
         tokenizer_identifier = "/workspace/models/llama-3.2-1b/tokenizer/"
-    elif os.path.exists("/workspace/models/e5-unsupervised-large/tokenizer/tokenizer.json") and (
+    elif os.path.exists(os.path.join(model_predownload_path, "e5-unsupervised-large/tokenizer/tokenizer.json")) and (
         tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"
     ):
-        tokenizer_identifier = "/workspace/models/e5-unsupervised-large/tokenizer/"
+        tokenizer_identifier = "/workspace/models/e5-large-unsupervised/tokenizer/"
 
-    tokenizer_model: PreTrainedTokenizer = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
+    tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
 
     split_docs: List[Dict[str, Any]] = []
     for _, row in df_filtered.iterrows():

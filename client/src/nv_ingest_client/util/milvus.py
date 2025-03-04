@@ -396,7 +396,8 @@ def create_collection(
     """
     if recreate and client.has_collection(collection_name):
         client.drop_collection(collection_name)
-    client.create_collection(collection_name=collection_name, schema=schema, index_params=index_params)
+    if not client.has_collection(collection_name):
+        client.create_collection(collection_name=collection_name, schema=schema, index_params=index_params)
 
 
 def create_nvingest_collection(
@@ -1241,6 +1242,7 @@ def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
     String
         Full page(s) corresponding to anchor record.
     """
+
     source_file = anchor_record["entity"]["source"]["source_name"]
     page_number = anchor_record["entity"]["content_metadata"]["page_number"]
     min_page = page_number - page_signum

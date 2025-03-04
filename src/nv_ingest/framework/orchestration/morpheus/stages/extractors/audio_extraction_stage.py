@@ -8,7 +8,7 @@ from typing import Dict, Any
 from morpheus.config import Config
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
-from nv_ingest_api.internal.extract.image.audio_extraction import _transcribe_audio
+from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
 
 
 def generate_audio_extractor_stage(
@@ -50,7 +50,7 @@ def generate_audio_extractor_stage(
     """
 
     validated_config = AudioExtractorSchema(**stage_config)
-    _wrapped_process_fn = functools.partial(_transcribe_audio, validated_config=validated_config)
+    _wrapped_process_fn = functools.partial(extract_text_from_audio_internal, validated_config=validated_config)
 
     return MultiProcessingBaseStage(
         c=c,
@@ -58,4 +58,5 @@ def generate_audio_extractor_stage(
         task=task,
         task_desc=task_desc,
         process_fn=_wrapped_process_fn,
+        document_type="regex:^(wav|mp4)$",
     )
