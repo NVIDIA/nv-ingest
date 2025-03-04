@@ -14,6 +14,6 @@ NeMo Retriever Extraction (NV-Ingest) is a scalable, performance-oriented docume
 
     Install NV-Ingest and set up your environment to start accelerating your workflows.
 
-    [Get Started](user-guide/overview.md){ .md-button .md-button }
+    [Get Started](user-guide/overview){ .md-button .md-button }
 
 </div>

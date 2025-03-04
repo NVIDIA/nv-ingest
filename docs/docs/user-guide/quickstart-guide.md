@@ -3,7 +3,7 @@
 To get started using NV-Ingest, you need to do a few things:
 
 1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
-2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-installing-python-dependencies) 🐍
+2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-install-python-dependencies) 🐍
 3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
