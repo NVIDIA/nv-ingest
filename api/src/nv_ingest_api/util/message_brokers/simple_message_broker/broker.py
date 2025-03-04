@@ -12,8 +12,12 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from nv_ingest.schemas.message_brokers.request_schema import PushRequestSchema, PopRequestSchema, SizeRequestSchema
-from nv_ingest.schemas.message_brokers.response_schema import ResponseSchema
+from nv_ingest_api.internal.schemas.message_brokers.request_schema import (
+    PushRequestSchema,
+    PopRequestSchema,
+    SizeRequestSchema,
+)
+from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_api.util.message_brokers.simple_message_broker.ordered_message_queue import OrderedMessageQueue
 
 logger = logging.getLogger(__name__)

@@ -7,10 +7,10 @@ from typing import Union, Dict
 
 import pandas as pd
 
-from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
-from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.mutate.deduplicate import deduplicate_images_internal
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)

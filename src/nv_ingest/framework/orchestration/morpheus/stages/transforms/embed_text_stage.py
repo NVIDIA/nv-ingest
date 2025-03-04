@@ -7,7 +7,7 @@ import logging
 from typing import Dict, Any
 
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 
 logger = logging.getLogger(__name__)
@@ -46,6 +46,7 @@ def generate_text_embed_extractor_stage(
     MultiProcessingBaseStage
         A configured stage that processes a pandas DataFrame and returns a tuple of (DataFrame, trace_info dict).
     """
+
     validated_config = EmbedExtractionsSchema(**transform_config)
     _wrapped_process_fn = functools.partial(
         transform_create_text_embeddings_internal, transform_config=validated_config

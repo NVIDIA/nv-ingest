@@ -20,7 +20,7 @@ from opentelemetry.sdk.metrics.export import PeriodicExportingMetricReader
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
-from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
+from nv_ingest.framework.schemas.framework_otel_meter_schema import OpenTelemetryMeterSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest_api.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (

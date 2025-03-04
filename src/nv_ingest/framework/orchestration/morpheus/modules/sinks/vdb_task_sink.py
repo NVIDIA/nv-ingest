@@ -26,7 +26,7 @@ from pymilvus import BulkInsertState
 from pymilvus import connections
 from pymilvus import utility
 
-from nv_ingest.schemas.vdb_task_sink_schema import VdbTaskSinkSchema
+from nv_ingest.framework.schemas.framework_vdb_task_sink_schema import VdbTaskSinkSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (

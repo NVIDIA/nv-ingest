@@ -7,8 +7,8 @@ import logging
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 
 logger = logging.getLogger(__name__)

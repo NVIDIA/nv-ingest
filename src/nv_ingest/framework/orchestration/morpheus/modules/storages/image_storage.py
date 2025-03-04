@@ -11,8 +11,8 @@ import mrc.core.operators as ops
 import pandas as pd
 from morpheus.utils.module_utils import register_module, ModuleLoaderFactory
 
-from nv_ingest.schemas.image_storage_schema import ImageStorageModuleSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 from nv_ingest_api.internal.store.image_upload import store_images_to_minio_internal
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.framework.util.flow_control import filter_by_task

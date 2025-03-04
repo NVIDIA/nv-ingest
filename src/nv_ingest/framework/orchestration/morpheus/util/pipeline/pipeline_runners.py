@@ -19,7 +19,7 @@ from morpheus.config import PipelineModes, CppConfig, Config
 from pydantic import ConfigDict, ValidationError
 from pydantic import BaseModel
 
-from nv_ingest.schemas import PipelineConfigSchema
+from nv_ingest.framework.schemas.framework_ingest_config_schema import PipelineConfigSchema
 from nv_ingest_api.util.converters.containers import merge_dict
 from morpheus.utils.logger import configure_logging
 from nv_ingest.framework.orchestration.morpheus.util.pipeline import setup_ingestion_pipeline

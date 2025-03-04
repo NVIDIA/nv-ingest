@@ -17,7 +17,7 @@ from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
 
-from nv_ingest.schemas.message_broker_sink_schema import MessageBrokerTaskSinkSchema
+from nv_ingest.framework.schemas.framework_message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from nv_ingest_api.util.message_brokers.client_base import MessageBrokerClientBase
 from nv_ingest_api.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient

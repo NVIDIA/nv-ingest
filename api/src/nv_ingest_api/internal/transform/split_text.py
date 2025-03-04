@@ -14,7 +14,7 @@ import pandas as pd
 from transformers import AutoTokenizer
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)

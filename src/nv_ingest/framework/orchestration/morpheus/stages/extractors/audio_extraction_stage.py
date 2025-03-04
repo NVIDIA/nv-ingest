@@ -7,8 +7,8 @@ from typing import Dict, Any
 
 from morpheus.config import Config
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
 from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 
 
 def generate_audio_extractor_stage(

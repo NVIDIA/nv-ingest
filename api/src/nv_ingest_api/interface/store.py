@@ -6,8 +6,8 @@ from typing import Dict, Any, Optional
 
 import pandas as pd
 
-from nv_ingest.schemas.embedding_storage_schema import EmbeddingStorageSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 from nv_ingest_api.internal.store.image_upload import store_images_to_minio_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler

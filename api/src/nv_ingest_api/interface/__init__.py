@@ -8,7 +8,7 @@ from typing import Dict, Any, Optional, List
 
 from pydantic import BaseModel
 
-from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 
 ## CONFIG_SCHEMAS is a global dictionary that maps extraction methods to Pydantic schemas.
 CONFIG_SCHEMAS: Dict[str, Any] = {"pdfium": PDFiumConfigSchema}

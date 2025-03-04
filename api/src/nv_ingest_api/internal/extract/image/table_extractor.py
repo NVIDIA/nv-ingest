@@ -14,10 +14,10 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from nv_ingest.schemas.ingest_job_schema import IngestTaskTableExtraction
+from nv_ingest.framework.schemas.framework_ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
-from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
 from nv_ingest_api.internal.primitives.nim import NimClient

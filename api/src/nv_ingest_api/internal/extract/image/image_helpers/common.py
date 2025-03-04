@@ -29,12 +29,12 @@ import numpy as np
 from PIL import Image
 from wand.image import Image as WandImage
 
-from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YoloxPageElementsModelInterface,
     get_yolox_model_name,
 )
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.util.image_processing.transforms import crop_image, numpy_to_base64
 from nv_ingest_api.util.metadata.aggregators import (
     CroppedImageWithContent,

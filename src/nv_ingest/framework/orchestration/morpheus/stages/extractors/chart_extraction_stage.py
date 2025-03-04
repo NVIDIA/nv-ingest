@@ -9,9 +9,9 @@ from typing import Dict
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 

@@ -6,8 +6,8 @@ from abc import ABC
 from abc import abstractmethod
 from typing import List
 
-from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
-from nv_ingest.schemas.processing_job_schema import ProcessingJob
+from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
+from nv_ingest.framework.schemas.framework_processing_job_schema import ProcessingJob
 
 
 class IngestServiceMeta(ABC):

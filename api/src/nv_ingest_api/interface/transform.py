@@ -6,8 +6,9 @@ from typing import Optional, Dict, Any, List
 
 import pandas as pd
 
-from nv_ingest.schemas import ImageCaptionExtractionSchema, TextSplitterSchema
-from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal

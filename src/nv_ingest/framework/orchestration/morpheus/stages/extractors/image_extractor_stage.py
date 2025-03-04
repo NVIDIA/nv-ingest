@@ -10,9 +10,9 @@ from typing import Dict
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
 
 logger = logging.getLogger(__name__)
 

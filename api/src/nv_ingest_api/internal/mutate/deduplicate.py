@@ -8,8 +8,8 @@ from typing import Any, Dict, Optional, List
 
 import pandas as pd
 
-from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 
 logger = logging.getLogger(__name__)
 

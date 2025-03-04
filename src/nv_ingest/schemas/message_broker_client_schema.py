@@ -16,7 +16,7 @@ class MessageBrokerClientSchema(BaseModel):
     # Update this for new broker types
     client_type: Literal["redis", "simple"] = "redis"  # Restrict to 'redis' or 'simple'
 
-    broker_params: Optional[dict] = {}
+    broker_params: Optional[dict] = Field(default_factory=dict)
 
     connection_timeout: Optional[Annotated[int, Field(ge=0)]] = 300
     max_backoff: Optional[Annotated[int, Field(ge=0)]] = 300

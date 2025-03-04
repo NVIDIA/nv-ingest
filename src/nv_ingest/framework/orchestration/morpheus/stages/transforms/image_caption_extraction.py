@@ -9,8 +9,8 @@ from typing import Dict
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.image_caption_extraction_schema import ImageCaptionExtractionSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 
 logger = logging.getLogger(__name__)

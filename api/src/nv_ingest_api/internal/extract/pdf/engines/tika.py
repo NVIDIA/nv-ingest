@@ -78,6 +78,8 @@ def tika_extractor(
     >>> text = tika_extractor(pdf_stream, True, False, False, {})
     """
 
+    _ = execution_trace_log
+
     _, _, _, _, _, _ = (
         extract_text,
         extract_images,

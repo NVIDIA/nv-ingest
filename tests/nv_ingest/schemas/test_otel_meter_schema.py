@@ -2,9 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-from nv_ingest.schemas import MessageBrokerClientSchema
-from nv_ingest.schemas.otel_meter_schema import OpenTelemetryMeterSchema
+from nv_ingest.schemas.framework_otel_meter_schema import OpenTelemetryMeterSchema
+from nv_ingest.schemas.message_broker_client_schema import MessageBrokerClientSchema
 
 
 def test_otel_meter_schema_defaults():

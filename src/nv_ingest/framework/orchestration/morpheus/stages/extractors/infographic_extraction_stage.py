@@ -10,8 +10,8 @@ from typing import Dict
 from morpheus.config import Config
 
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorSchema
 from nv_ingest_api.internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
 logger = logging.getLogger(__name__)
 

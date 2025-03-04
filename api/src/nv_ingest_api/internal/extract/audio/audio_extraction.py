@@ -10,8 +10,8 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
-from nv_ingest.schemas.audio_extractor_schema import AudioConfigSchema
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioConfigSchema
 
 logger = logging.getLogger(__name__)
 

@@ -10,8 +10,8 @@ import pandas as pd
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 
-from nv_ingest.schemas import MetadataInjectorSchema
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
+from nv_ingest.framework.schemas.framework_ingest_job_schema import DocumentTypeEnum
+from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (

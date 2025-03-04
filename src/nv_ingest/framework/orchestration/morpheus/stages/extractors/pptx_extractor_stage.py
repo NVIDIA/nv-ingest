@@ -9,8 +9,8 @@ import logging
 from morpheus.config import Config
 
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
 from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitives_from_pptx_internal
+from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
 
 logger = logging.getLogger(__name__)
 

@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional, Union, Annotated
 
 from pydantic import Field, field_validator, model_validator
 
-from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.base_model_noext import BaseModelNoExt
 
 # Assume BaseModelNoExt and ContentTypeEnum are defined elsewhere
 

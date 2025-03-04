@@ -13,8 +13,8 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-from nv_ingest.schemas.ingest_job_schema import IngestTaskChartExtraction
+from nv_ingest.framework.schemas.framework_ingest_job_schema import IngestTaskChartExtraction
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface

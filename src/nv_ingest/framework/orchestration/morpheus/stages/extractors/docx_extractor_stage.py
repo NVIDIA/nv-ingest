@@ -8,9 +8,9 @@ import logging
 
 from morpheus.config import Config
 
-from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 
 logger = logging.getLogger(__name__)
 

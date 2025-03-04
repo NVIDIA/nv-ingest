@@ -12,9 +12,9 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pydantic import field_validator, model_validator
+from pydantic import field_validator, model_validator, Field
 
-from nv_ingest.schemas.base_model_noext import BaseModelNoExt
+from nv_ingest_api.internal.schemas.meta.base_model_noext import BaseModelNoExt
 from nv_ingest_api.util.converters import datetools
 
 logger = logging.getLogger(__name__)
@@ -206,12 +206,12 @@ class SourceMetadataSchema(BaseModelNoExt):
 
 class NearbyObjectsSubSchema(BaseModelNoExt):
     """
-    Schema to hold related extracted object
+    Schema to hold related extracted object.
     """
 
-    content: List[str] = []
-    bbox: List[tuple] = []
-    type: List[str] = []
+    content: List[str] = Field(default_factory=list)
+    bbox: List[tuple] = Field(default_factory=list)
+    type: List[str] = Field(default_factory=list)
 
 
 class NearbyObjectsSchema(BaseModelNoExt):

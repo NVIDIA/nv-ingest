@@ -8,19 +8,13 @@ from typing import Tuple, Optional, Dict, Any
 import pandas as pd
 from pandas import DataFrame
 
-from nv_ingest.schemas.audio_extractor_schema import AudioConfigSchema
-from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
-from nv_ingest.schemas.infographic_extractor_schema import InfographicExtractorConfigSchema
-from nv_ingest.schemas.pptx_extractor_schema import PPTXExtractorSchema
-from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
-from . import extraction_interface_relay_constructor
-
-from nv_ingest.schemas.chart_extractor_schema import ChartExtractorConfigSchema
-from nv_ingest.schemas.ingest_job_schema import (
+from nv_ingest.framework.schemas.framework_ingest_job_schema import (
     IngestTaskChartExtraction,
     IngestTaskTableExtraction,
     IngestTaskInfographicExtraction,
 )
+from . import extraction_interface_relay_constructor
+
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
@@ -29,6 +23,12 @@ from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_d
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 from ..internal.extract.audio.audio_extraction import extract_text_from_audio_internal
+from ..internal.schemas.extract.extract_audio_schema import AudioConfigSchema
+from ..internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema
+from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from ..internal.schemas.extract.extract_infographic_schema import InfographicExtractorConfigSchema
+from ..internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
+from ..internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema
 
 logger = logging.getLogger(__name__)
 

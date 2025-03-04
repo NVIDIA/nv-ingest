@@ -11,10 +11,10 @@ from typing import Dict
 import pandas as pd
 from morpheus.config import Config
 
-from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 
 logger = logging.getLogger(__name__)
 

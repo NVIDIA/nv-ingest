@@ -12,8 +12,8 @@ from typing import Optional, Dict, Any, Union
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest.schemas.docx_extractor_schema import DocxExtractorSchema
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import python_docx
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.exception_handlers.pdf import create_exception_tag
 

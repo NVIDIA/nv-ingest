@@ -15,7 +15,7 @@ from pydantic import ValidationError
 
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_default_cpu_count
-from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
+from nv_ingest.framework.schemas.framework_ingest_config_schema import PipelineConfigSchema
 from nv_ingest_api.util.converters.containers import merge_dict
 from nv_ingest_api.util.logging.configuration import LogLevel
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging

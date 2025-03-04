@@ -27,7 +27,6 @@ import pypdfium2 as libpdfium
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.pdf_extractor_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -35,6 +34,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     get_yolox_model_name,
     YoloxPageElementsModelInterface,
 )
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.util.metadata.aggregators import (
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,

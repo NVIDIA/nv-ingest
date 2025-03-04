@@ -2,8 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
+from nv_ingest.framework.schemas.framework_ingest_job_schema import DocumentTypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 
 DOC_TO_CONTENT_MAP = {

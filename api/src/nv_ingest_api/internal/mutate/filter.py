@@ -7,8 +7,8 @@ from typing import Dict, Optional, List, Any
 
 import pandas as pd
 
-from nv_ingest.schemas.image_filter_schema import ImageFilterSchema
 from nv_ingest.schemas.metadata_schema import TaskTypeEnum, StatusEnum, InfoMessageMetadataSchema, ContentTypeEnum
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
