@@ -1,6 +1,7 @@
-# NV-Ingest Command Line (CLI)
+# NV-Ingest Command Line Interface Reference
 
-After installing the Python dependencies, you'll be able to use the nv-ingest-cli tool.
+After you install the Python dependencies, you can use the NV-Ingest command line interface (CLI). 
+To use the CLI, use the `nv-ingest-cli` command.
 
 ```bash
 nv-ingest-cli --help

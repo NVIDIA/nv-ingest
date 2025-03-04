@@ -146,7 +146,7 @@ services:
               capabilities: [gpu]
     runtime: nvidia
     profiles:
-      - retrieval
+      - reranker
 
   nemoretriever-parse:
     image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0ea}
@@ -196,6 +196,31 @@ services:
     profiles:
       - vlm
 
+  audio:
+    image: nvcr.io/nvidia/riva/riva-speech:2.18.0
+    shm_size: 2gb
+    ports:
+      - "8021:50051"  # grpc
+      - "8022:50000"  # http
+    user: root
+    environment:
+      - MODEL_DEPLOY_KEY=tlt_encode
+      - NGC_CLI_API_KEY=${RIVA_NGC_API_KEY}
+      - NGC_CLI_ORG=nvidia
+      - NGC_CLI_TEAM=riva
+      - CUDA_VISIBLE_DEVICES=0
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["1"]
+              capabilities: [gpu]
+    runtime: nvidia
+    command: bash -c "download_and_deploy_ngc_models nvidia/riva/rmir_asr_conformer_en_us_ofl:2.18.0 && start-riva"
+    profiles:
+      - audio
+
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
     build:
@@ -205,6 +230,7 @@ services:
       args:
         DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
         HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
+        MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
@@ -215,6 +241,8 @@ services:
     cap_add:
       - sys_nice
     environment:
+      - AUDIO_GRPC_ENDPOINT=audio:50051
+      - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
       - MAX_INGEST_PROCESS_WORKERS=${MAX_PROCESS_WORKERS:-16}
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
@@ -260,6 +288,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
+      - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
@@ -277,6 +306,7 @@ services:
     image: otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
+    user: "${UID}:${GID}"
     volumes:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:

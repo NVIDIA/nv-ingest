@@ -1,4 +1,4 @@
-# Developing with Kubernetes
+# Developing with NV-Ingest on Kubernetes
 
 Developing directly on Kubernetes gives us more confidence that end-user deployments will work as expected.
 

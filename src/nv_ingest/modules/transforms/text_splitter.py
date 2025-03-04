@@ -61,7 +61,7 @@ def _split_into_chunks(text, tokenizer, chunk_size=1024, chunk_overlap=20):
     # Convert token chunks back to text while preserving original spacing and case
     text_chunks = []
     for chunk in chunks:
-        text_chunk = text[chunk[0][0] : chunk[-1][0]]
+        text_chunk = text[chunk[0][0] : chunk[-1][1]]
         text_chunks.append(text_chunk)
 
     return text_chunks
@@ -120,14 +120,16 @@ def _text_splitter(builder: mrc.Builder):
             if df_filtered.empty:
                 return message
 
-            if os.path.exists("/workspace/models/llama-3.2-1b/tokenizer/tokenizer.json") and (
+            model_predownload_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
+
+            if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
                 tokenizer is None or tokenizer == "meta-llama/Llama-3.2-1B"
             ):
                 tokenizer = "/workspace/models/llama-3.2-1b/tokenizer/"
-            elif os.path.exists("/workspace/models/e5-unsupervised-large/tokenizer/tokenizer.json") and (
-                tokenizer is None or tokenizer == "intfloat/e5-large-unsupervised"
-            ):
-                tokenizer = "/workspace/models/e5-unsupervised-large/tokenizer/"
+            elif os.path.exists(
+                os.path.join(model_predownload_path, "e5-unsupervised-large/tokenizer/tokenizer.json")
+            ) and (tokenizer is None or tokenizer == "intfloat/e5-large-unsupervised"):
+                tokenizer = "/workspace/models/e5-large-unsupervised/tokenizer/"
 
             tokenizer_model = AutoTokenizer.from_pretrained(tokenizer, token=hf_access_token)
 
