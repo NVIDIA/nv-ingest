@@ -1,4 +1,3 @@
-#!/bin/bash --login
 # SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -14,9 +13,6 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-
-#!/bin/bash
-
 #!/bin/bash
 
 # Activate the `nv_ingest_runtime` conda environment
@@ -30,16 +26,23 @@ SRC_FILE="/opt/docker/bin/entrypoint_source"
 # Determine edge buffer size (default: 32)
 EDGE_BUFFER_SIZE="${INGEST_EDGE_BUFFER_SIZE:-32}"
 
+# Determine ingest config path, if exists and is a valid file.
+if [ -n "${INGEST_CONFIG_PATH}" ] && [ -f "${INGEST_CONFIG_PATH}" ]; then
+    CONFIG_ARG="--ingest_config_path=${INGEST_CONFIG_PATH}"
+else
+    CONFIG_ARG=""
+fi
+
 # Check if user supplied a command
 if [ "$#" -gt 0 ]; then
-    # If a command is provided, run it
+    # If a command is provided, run it.
     exec "$@"
 else
-    # If no command is provided, run the default startup launch
+    # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
-      # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'
+      # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
       uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
     fi
 
-    python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}"
+    python /workspace/microservice_entrypoint.py --edge_buffer_size="${EDGE_BUFFER_SIZE}" ${CONFIG_ARG}
 fi
