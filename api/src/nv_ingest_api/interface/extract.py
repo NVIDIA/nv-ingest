@@ -8,11 +8,7 @@ from typing import Tuple, Optional, Dict, Any
 import pandas as pd
 from pandas import DataFrame
 
-from nv_ingest.framework.schemas.framework_ingest_job_schema import (
-    IngestTaskChartExtraction,
-    IngestTaskTableExtraction,
-    IngestTaskInfographicExtraction,
-)
+
 from . import extraction_interface_relay_constructor
 
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
@@ -29,6 +25,11 @@ from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from ..internal.schemas.extract.extract_infographic_schema import InfographicExtractorConfigSchema
 from ..internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
 from ..internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema
+from ..internal.schemas.meta.ingest_job_schema import (
+    IngestTaskChartExtraction,
+    IngestTaskTableExtraction,
+    IngestTaskInfographicExtraction,
+)
 
 logger = logging.getLogger(__name__)
 

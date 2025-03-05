@@ -5,7 +5,7 @@
 
 from pydantic import ConfigDict, BaseModel
 
-from nv_ingest.schemas.message_broker_client_schema import MessageBrokerClientSchema
+from nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema import MessageBrokerClientSchema
 
 
 class OpenTelemetryMeterSchema(BaseModel):

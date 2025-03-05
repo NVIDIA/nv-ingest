@@ -29,13 +29,13 @@ from typing import Optional, List, Any
 import pandas as pd
 import pypdfium2 as pdfium
 
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import ImageTypeEnum
-from nv_ingest.schemas.metadata_schema import StdContentDescEnum
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.metadata_schema import validate_metadata
+from nv_ingest_api.internal.schemas.meta.metadata_schema import AccessLevelEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ImageTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import StdContentDescEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TableFormatEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TextTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 from nv_ingest_api.util.converters import bytetools
 from nv_ingest_api.util.metadata.aggregators import extract_pdf_metadata, construct_text_metadata
 

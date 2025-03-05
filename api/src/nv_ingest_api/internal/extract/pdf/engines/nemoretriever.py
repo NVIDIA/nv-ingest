@@ -31,13 +31,13 @@ import pypdfium2 as pdfium
 
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements
 from nv_ingest_api.internal.primitives.nim.model_interface import nemoretriever_parse as nemoretriever_parse_utils
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import StdContentDescEnum
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.metadata_schema import validate_metadata
+from nv_ingest_api.internal.schemas.meta.metadata_schema import AccessLevelEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentSubtypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import StdContentDescEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TableFormatEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TextTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,

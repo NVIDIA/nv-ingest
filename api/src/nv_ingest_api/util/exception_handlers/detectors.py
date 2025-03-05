@@ -10,7 +10,7 @@ from typing import Dict
 
 from langdetect.lang_detect_exception import LangDetectException
 
-from nv_ingest.schemas.metadata_schema import LanguageEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import LanguageEnum
 
 logger = logging.getLogger(__name__)
 

@@ -34,14 +34,14 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
 
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import ImageTypeEnum
-from nv_ingest.schemas.metadata_schema import SourceTypeEnum
-from nv_ingest.schemas.metadata_schema import StdContentDescEnum
-from nv_ingest.schemas.metadata_schema import TableFormatEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
-from nv_ingest.schemas.metadata_schema import validate_metadata
+from nv_ingest_api.internal.schemas.meta.metadata_schema import AccessLevelEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ImageTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import SourceTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import StdContentDescEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TableFormatEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TextTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 from nv_ingest_api.internal.extract.image.image_helpers.common import (
     load_and_preprocess_image,
     extract_page_elements_from_images,

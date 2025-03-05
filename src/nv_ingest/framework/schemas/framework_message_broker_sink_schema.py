@@ -5,8 +5,9 @@
 
 from pydantic import Field, BaseModel
 
-from nv_ingest.schemas.message_broker_client_schema import MessageBrokerClientSchema
 from typing_extensions import Annotated
+
+from nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema import MessageBrokerClientSchema
 
 
 class MessageBrokerTaskSinkSchema(BaseModel):

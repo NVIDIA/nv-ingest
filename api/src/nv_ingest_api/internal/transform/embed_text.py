@@ -9,7 +9,12 @@ from typing import Any, Dict, Tuple, Optional, Iterable, List
 import pandas as pd
 from openai import OpenAI
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum, TaskTypeEnum, StatusEnum, InfoMessageMetadataSchema
+from nv_ingest_api.internal.schemas.meta.metadata_schema import (
+    ContentTypeEnum,
+    TaskTypeEnum,
+    StatusEnum,
+    InfoMessageMetadataSchema,
+)
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
 from nv_ingest_api.util.schema.schema_validator import validate_schema
 

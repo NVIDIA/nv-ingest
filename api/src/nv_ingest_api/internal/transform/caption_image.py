@@ -8,8 +8,8 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import pandas as pd
 from pydantic import BaseModel
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.vlm import VLMModelInterface
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.nim import create_inference_client

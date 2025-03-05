@@ -29,7 +29,7 @@ import numpy as np
 from PIL import Image
 from wand.image import Image as WandImage
 
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import AccessLevelEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YoloxPageElementsModelInterface,
     get_yolox_model_name,

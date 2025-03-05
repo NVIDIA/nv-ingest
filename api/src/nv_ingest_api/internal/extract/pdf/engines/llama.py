@@ -27,7 +27,7 @@ from typing import List
 
 import aiohttp
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
 
 DEFAULT_RESULT_TYPE = "text"
 DEFAULT_FILE_NAME = "_.pdf"

@@ -14,7 +14,7 @@ import pypdfium2.raw as pdfium_c
 from numpy import dtype
 from numpy import ndarray
 
-from nv_ingest.framework.util.tracing.tagging import traceable_func
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.util.image_processing.clustering import (
     group_bounding_boxes,
     combine_groups_into_bboxes,

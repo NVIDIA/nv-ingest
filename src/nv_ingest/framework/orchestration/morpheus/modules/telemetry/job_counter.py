@@ -16,7 +16,7 @@ from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator im
     fetch_and_validate_module_config,
 )
 from nv_ingest.framework.util.telemetry.global_stats import GlobalStats
-from nv_ingest.framework.util.tracing import traceable
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)

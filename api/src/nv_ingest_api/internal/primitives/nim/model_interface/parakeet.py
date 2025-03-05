@@ -9,7 +9,7 @@ import ffmpeg
 import grpc
 import riva.client
 
-from nv_ingest.framework.util.tracing.tagging import traceable_func
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
 

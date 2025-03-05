@@ -15,7 +15,7 @@ from pymilvus.bulk_writer.constants import BulkFileType
 from pymilvus.bulk_writer.remote_bulk_writer import RemoteBulkWriter
 from pydantic import BaseModel
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
 from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 
 logger = logging.getLogger(__name__)

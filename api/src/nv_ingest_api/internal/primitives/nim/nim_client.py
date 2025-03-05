@@ -14,7 +14,7 @@ import numpy as np
 import requests
 import tritonclient.grpc as grpcclient
 
-from nv_ingest.framework.util.tracing.tagging import traceable_func
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.util.string_processing import generate_url
 
 logger = logging.getLogger(__name__)

@@ -21,9 +21,9 @@
 import logging
 from typing import IO, Optional, List
 
-from nv_ingest.schemas.metadata_schema import AccessLevelEnum
-from nv_ingest.schemas.metadata_schema import SourceTypeEnum
-from nv_ingest.schemas.metadata_schema import TextTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import AccessLevelEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import SourceTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import TextTypeEnum
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docxreader import DocxReader
 
 logger = logging.getLogger(__name__)
