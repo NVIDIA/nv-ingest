@@ -8,6 +8,7 @@
 
 import logging
 from typing import Dict
+from typing import Optional
 
 from pydantic import BaseModel, root_validator
 
@@ -17,6 +18,9 @@ logger = logging.getLogger(__name__)
 
 
 class EmbedTaskSchema(BaseModel):
+    model_name: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    api_key: Optional[str] = None
     filter_errors: bool = False
 
     @root_validator(pre=True)
@@ -42,7 +46,15 @@ class EmbedTask(Task):
     Object for document embedding task
     """
 
-    def __init__(self, text: bool = None, tables: bool = None, filter_errors: bool = False) -> None:
+    def __init__(
+        self,
+        model_name: str = None,
+        endpoint_url: str = None,
+        api_key: str = None,
+        text: bool = None,
+        tables: bool = None,
+        filter_errors: bool = False,
+    ) -> None:
         """
         Setup Embed Task Config
         """
@@ -58,6 +70,9 @@ class EmbedTask(Task):
                 "'tables' parameter is deprecated and will be ignored. Future versions will remove this argument."
             )
 
+        self._model_name = model_name
+        self._endpoint_url = endpoint_url
+        self._api_key = api_key
         self._filter_errors = filter_errors
 
     def __str__(self) -> str:
@@ -66,7 +81,15 @@ class EmbedTask(Task):
         """
         info = ""
         info += "Embed Task:\n"
+
+        if self._model_name:
+            info += f"  model_name: {self._model_name}\n"
+        if self._endpoint_url:
+            info += f"  endpoint_url: {self._endpoint_url}\n"
+        if self._api_key:
+            info += "  api_key: [redacted]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
+
         return info
 
     def to_dict(self) -> Dict:
@@ -74,8 +97,17 @@ class EmbedTask(Task):
         Convert to a dict for submission to redis
         """
 
-        task_properties = {
-            "filter_errors": False,
-        }
+        task_properties = {}
+
+        if self._model_name:
+            task_properties["model_name"] = self._model_name
+
+        if self._endpoint_url:
+            task_properties["endpoint_url"] = self._endpoint_url
+
+        if self._api_key:
+            task_properties["api_key"] = self._api_key
+
+        task_properties["filter_errors"] = self._filter_errors
 
         return {"type": "embed", "task_properties": task_properties}
