@@ -23,6 +23,7 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.napoleon",
     "sphinx.ext.viewcode",
+    "swagger_plugin_for_sphinx",
 ]
 
 templates_path = ["_templates"]
