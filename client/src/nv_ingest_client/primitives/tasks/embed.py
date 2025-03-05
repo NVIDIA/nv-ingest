@@ -63,7 +63,7 @@ class EmbedTask(Task):
         embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
         if embedding_nim_endpoint == "":
             self._embedding_nim_endpoint = "https://integrate.api.nvidia.com/v1"
-        elif embedding_nim_endpoint[:7] != "http://" and embedding_nim_endpoint[:8] != "https://":
+        elif not(embedding_nim_endpoint.startswith("http://") or embedding_nim_endpoint.startswith("https://")):
             self._embedding_nim_endpoint = "http://" + embedding_nim_endpoint + "/v1"
         else:
             self._embedding_nim_endpoint = embedding_nim_endpoint
