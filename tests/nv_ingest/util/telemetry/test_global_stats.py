@@ -6,7 +6,7 @@ from collections import deque
 from statistics import mean
 from statistics import median
 
-from nv_ingest.util.telemetry.global_stats import GlobalStats
+from nv_ingest.framework.util.telemetry.global_stats import GlobalStats
 
 
 def setup_function():

@@ -6,9 +6,8 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import validate_ingest_job
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
-from nv_ingest.schemas.ingest_job_schema import TaskTypeEnum
+from nv_ingest_api.internal.enums.common import TaskTypeEnum, DocumentTypeEnum
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_ingest_job
 
 
 # Helper Functions

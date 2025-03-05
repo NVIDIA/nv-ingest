@@ -11,14 +11,15 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel
 
-# Import the functions under test.
-from nv_ingest.modules.sources.message_broker_task_source import (
-    fetch_and_process_messages,
+from nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source import (
     process_message,
+    fetch_and_process_messages,
 )
 
+import nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source as module_under_test
+
 # Define the module under test.
-MODULE_UNDER_TEST = "nv_ingest.modules.sources.message_broker_task_source"
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 # -----------------------------------------------------------------------------
 # Dummy Classes for Testing (for client and BaseModel response simulation)

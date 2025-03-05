@@ -6,10 +6,11 @@ import cudf
 import pandas as pd
 from openai import OpenAI
 
-from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum, TaskTypeEnum, StatusEnum, InfoMessageMetadataSchema
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.schema.schema_validator import validate_schema
+from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
+from nv_ingest_api.internal.enums.common import StatusEnum, TaskTypeEnum, ContentTypeEnum
+from nv_ingest_api.internal.schemas.meta.metadata_schema import InfoMessageMetadataSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 

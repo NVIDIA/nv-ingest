@@ -1,8 +1,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas.audio_extractor_schema import AudioConfigSchema
-from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioConfigSchema, AudioExtractorSchema
 
 
 def test_audio_config_schema_valid_grpc():

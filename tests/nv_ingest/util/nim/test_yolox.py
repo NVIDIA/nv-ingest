@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import base64
 import random
 from io import BytesIO
@@ -6,9 +10,10 @@ import numpy as np
 import pytest
 from PIL import Image
 
-from nv_ingest.util.nim.yolox import YoloxPageElementsModelInterface
-from nv_ingest.util.nim.yolox import YOLOX_PAGE_V1_FINAL_SCORE
-from nv_ingest.util.nim.yolox import YOLOX_PAGE_V2_FINAL_SCORE
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
+    YoloxPageElementsModelInterface,
+    YOLOX_PAGE_V2_FINAL_SCORE,
+)
 
 
 @pytest.fixture
