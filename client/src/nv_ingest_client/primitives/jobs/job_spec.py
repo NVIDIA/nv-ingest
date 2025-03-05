@@ -14,7 +14,6 @@ from uuid import UUID
 
 from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.primitives.tasks.extract import _DEFAULT_EXTRACTOR_MAP
 from nv_ingest_client.primitives.tasks.audio_extraction import AudioExtractionTask
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
