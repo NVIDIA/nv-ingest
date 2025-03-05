@@ -12,15 +12,15 @@ from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 @pytest.mark.parametrize(
     "doc_type, expected_content_type",
     [
-        (DocumentTypeEnum.bmp, ContentTypeEnum.IMAGE),
-        (DocumentTypeEnum.docx, ContentTypeEnum.STRUCTURED),
-        (DocumentTypeEnum.html, ContentTypeEnum.STRUCTURED),
-        (DocumentTypeEnum.jpeg, ContentTypeEnum.IMAGE),
-        (DocumentTypeEnum.pdf, ContentTypeEnum.STRUCTURED),
-        (DocumentTypeEnum.png, ContentTypeEnum.IMAGE),
-        (DocumentTypeEnum.pptx, ContentTypeEnum.STRUCTURED),
-        (DocumentTypeEnum.svg, ContentTypeEnum.IMAGE),
-        (DocumentTypeEnum.txt, ContentTypeEnum.TEXT),
+        (DocumentTypeEnum.BMP, ContentTypeEnum.IMAGE),
+        (DocumentTypeEnum.DOCX, ContentTypeEnum.STRUCTURED),
+        (DocumentTypeEnum.HTML, ContentTypeEnum.STRUCTURED),
+        (DocumentTypeEnum.JPEG, ContentTypeEnum.IMAGE),
+        (DocumentTypeEnum.PDF, ContentTypeEnum.STRUCTURED),
+        (DocumentTypeEnum.PNG, ContentTypeEnum.IMAGE),
+        (DocumentTypeEnum.PPTX, ContentTypeEnum.STRUCTURED),
+        (DocumentTypeEnum.SVG, ContentTypeEnum.IMAGE),
+        (DocumentTypeEnum.TXT, ContentTypeEnum.TEXT),
     ],
 )
 def test_doc_type_to_content_type_valid(doc_type, expected_content_type):

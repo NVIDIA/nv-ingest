@@ -31,10 +31,9 @@ from unstructured_client.models import shared
 from unstructured_client.utils import BackoffStrategy
 from unstructured_client.utils import RetryConfig
 
-from nv_ingest_api.internal.enums.common import AccessLevelEnum
+from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
-from nv_ingest_api.internal.enums.common import ImageTypeEnum
-from nv_ingest_api.internal.enums.common import StdContentDescEnum
+from nv_ingest_api.internal.enums.common import ContentDescriptionEnum
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.enums.common import TextTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
@@ -158,7 +157,7 @@ def unstructured_io_extractor(
     # get partition_id (assuming coming in from source_metadata...)
     partition_id = base_source_metadata.get("partition_id", -1)
     # get access_level (assuming coming in from source_metadata...)
-    access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
+    access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     source_metadata = {
         "source_name": file_name,
@@ -347,7 +346,7 @@ def _construct_image_metadata(
 ):
     content_metadata = {
         "type": ContentTypeEnum.IMAGE,
-        "description": StdContentDescEnum.PDF_IMAGE,
+        "description": ContentDescriptionEnum.PDF_IMAGE,
         "page_number": page_idx,
         "hierarchy": {
             "page_count": page_count,
@@ -360,8 +359,8 @@ def _construct_image_metadata(
     }
 
     image_metadata = {
-        "image_type": ImageTypeEnum.JPEG,
-        "structured_image_type": ImageTypeEnum.image_type_1,
+        "image_type": DocumentTypeEnum.JPEG,
+        "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",
         "text": image_text,
         "image_location": bbox,
@@ -394,7 +393,7 @@ def _construct_table_metadata(
 ):
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
-        "description": StdContentDescEnum.PDF_TABLE,
+        "description": ContentDescriptionEnum.PDF_TABLE,
         "page_number": page_idx,
         "hierarchy": {
             "page_count": page_count,

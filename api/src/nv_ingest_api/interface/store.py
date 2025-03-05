@@ -99,12 +99,14 @@ def store_embeddings(
 
     store_config = EmbeddingStorageSchema()
 
-    return store_text_embeddings_internal(
+    result, _ = store_text_embeddings_internal(
         df_ledger,
         task_config=task_config,
         store_config=store_config,
         execution_trace_log=None,
     )
+
+    return result
 
 
 @unified_exception_handler
@@ -206,9 +208,11 @@ def store_images_to_minio(
 
     storage_config = {}
 
-    return store_images_to_minio_internal(
+    result, _ = store_images_to_minio_internal(
         df_storage_ledger=df_ledger,
         task_config=task_config,
         storage_config=storage_config,
         execution_trace_log=None,
     )
+
+    return result

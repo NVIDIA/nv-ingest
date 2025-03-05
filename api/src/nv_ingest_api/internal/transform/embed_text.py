@@ -9,7 +9,7 @@ from typing import Any, Dict, Tuple, Optional, Iterable, List
 import pandas as pd
 from openai import OpenAI
 
-from nv_ingest_api.internal.enums.common import ContentTypeEnum, PrimaryTaskTypeEnum, StatusEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum, StatusEnum, TaskTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     InfoMessageMetadataSchema,
 )
@@ -86,7 +86,7 @@ def _make_async_request(
 
     except Exception as err:
         info_msg = {
-            "task": PrimaryTaskTypeEnum.EMBED.value,
+            "task": TaskTypeEnum.EMBED.value,
             "status": StatusEnum.ERROR.value,
             "message": f"Embedding error: {err}",
             "filter": filter_errors,
@@ -352,6 +352,13 @@ def _generate_batches(prompts: List[str], batch_size: int = 100) -> List[List[st
     return [batch for batch in _batch_generator(prompts, batch_size)]
 
 
+def _get_pandas_audio_content(row):
+    """
+    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
+    """
+    return row["audio_metadata"]["audio_transcript"]
+
+
 # ------------------------------------------------------------------------------
 # DataFrame Concatenation Utility
 # ------------------------------------------------------------------------------
@@ -440,7 +447,7 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
-        ContentTypeEnum.AUDIO: lambda x: None,  # Not supported yet.
+        ContentTypeEnum.AUDIO: lambda x: _get_pandas_audio_content,  # Not supported yet.
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 

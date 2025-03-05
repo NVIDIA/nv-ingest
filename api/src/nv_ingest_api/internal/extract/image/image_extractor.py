@@ -8,7 +8,7 @@ import functools
 import io
 import logging
 import traceback
-from typing import Any, Union
+from typing import Any, Union, Tuple
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -140,7 +140,7 @@ def extract_primitives_from_image_internal(
     task_config: Union[Dict[str, Any], BaseModel],
     extraction_config: Any,
     execution_trace_log: Optional[Dict[str, Any]] = None,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, Dict[str, Any]]:
     """
     Process a DataFrame containing base64-encoded image files and extract primitives from each image.
 

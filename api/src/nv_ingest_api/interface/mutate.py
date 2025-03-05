@@ -66,7 +66,11 @@ def filter_images(
         }
         mutate_config = ImageFilterSchema()
 
-        return filter_images_internal(df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=None)
+        result, _ = filter_images_internal(
+            df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=None
+        )
+
+        return result
     except Exception as e:
         err_msg = f"filter_images: Error applying deduplication filter. Original error: {e}"
         logger.error(err_msg, exc_info=True)
@@ -112,9 +116,11 @@ def deduplicate_images(
     }
     mutate_config = ImageDedupSchema()
 
-    return deduplicate_images_internal(
+    result, _ = deduplicate_images_internal(
         df_ledger=df_ledger,
         task_config=task_config,
         mutate_config=mutate_config,
         execution_trace_log=None,
     )
+
+    return result

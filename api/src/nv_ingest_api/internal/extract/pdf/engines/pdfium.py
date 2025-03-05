@@ -376,7 +376,7 @@ def pdfium_extractor(
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
-    access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
+    access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     doc = libpdfium.PdfDocument(pdf_stream)
     pdf_metadata = extract_pdf_metadata(doc, source_id)

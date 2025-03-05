@@ -329,7 +329,7 @@ def unstructured_image_extractor(
         "last_modified": row_data.get("last_modified", current_iso_datetime),
         "summary": f"Raw {document_type} image extracted from source {source_id}",
         "partition_id": row_data.get("partition_id", -1),
-        "access_level": row_data.get("access_level", AccessLevelEnum.LEVEL_1),
+        "access_level": row_data.get("access_level", AccessLevelEnum.UNKNOWN),
     }
 
     # Optionally update the extract_infographics flag based on extraction_config.

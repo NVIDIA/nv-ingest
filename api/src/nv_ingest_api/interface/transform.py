@@ -110,12 +110,14 @@ def transform_image_create_vlm_caption(
     # Create the transformation configuration using the filtered task configuration.
     transform_config = ImageCaptionExtractionSchema(**filtered_task_config)
 
-    return transform_image_create_vlm_caption_internal(
+    result, _ = transform_image_create_vlm_caption_internal(
         df_transform_ledger=df_ledger,
         task_config=filtered_task_config,
         transform_config=transform_config,
         execution_trace_log=None,
     )
+
+    return result
 
 
 @unified_exception_handler
@@ -174,9 +176,11 @@ def transform_text_split_and_tokenize(
         tokenizer=tokenizer,
     )
 
-    return transform_text_split_and_tokenize_internal(
+    result, _ = transform_text_split_and_tokenize_internal(
         df_transform_ledger=df_ledger,
         task_config=task_config,
         transform_config=transform_config,
         execution_trace_log=None,
     )
+
+    return result

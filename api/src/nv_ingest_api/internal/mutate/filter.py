@@ -7,7 +7,7 @@ from typing import Dict, Optional, List, Any
 
 import pandas as pd
 
-from nv_ingest_api.internal.enums.common import PrimaryTaskTypeEnum
+from nv_ingest_api.internal.enums.common import TaskTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     ContentTypeEnum,
     InfoMessageMetadataSchema,
@@ -112,7 +112,7 @@ def filter_images_internal(
                 return df_ledger
 
             info_msg = {
-                "task": PrimaryTaskTypeEnum.FILTER.value,
+                "task": TaskTypeEnum.FILTER.value,
                 "status": StatusEnum.SUCCESS.value,
                 "message": "Filtered due to image size or aspect ratio.",
                 "filter": True,
@@ -123,7 +123,9 @@ def filter_images_internal(
             df_ledger.loc[filtered_df.index, "metadata"] = filtered_df["metadata"]
             df_ledger.loc[filtered_df.index, "document_type"] = ContentTypeEnum.INFO_MSG
 
-        return df_ledger
+        result, execution_trace_log = df_ledger, {}
+
+        return result
 
     except Exception as e:
         err_msg = f"filter_images_internal: Error applying image filter. Original error: {e}"

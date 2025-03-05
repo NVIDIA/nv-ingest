@@ -202,12 +202,14 @@ def extract_primitives_from_audio(
         }
     )
 
-    return extract_text_from_audio_internal(
+    result, _ = extract_text_from_audio_internal(
         df_extraction_ledger=df_ledger,
         task_config=task_config,
         extraction_config=extraction_config,
         execution_trace_log=None,
     )
+
+    return result
 
 
 @unified_exception_handler
@@ -405,9 +407,11 @@ def extract_primitives_from_image(
         },
     }
 
-    return extract_primitives_from_image_internal(
+    result, _ = extract_primitives_from_image_internal(
         df_extraction_ledger=df_ledger, task_config=task_config, extraction_config=None, execution_trace_log=None
     )
+
+    return result
 
 
 @unified_exception_handler

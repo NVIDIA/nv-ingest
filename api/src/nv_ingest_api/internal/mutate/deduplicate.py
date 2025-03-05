@@ -100,8 +100,10 @@ def deduplicate_images_internal(
         non_image_rows = df_ledger.loc[~image_mask]
         deduped_images = df_images.loc[deduped_indices][df_ledger.columns.difference(["_image_content_hash"])]
 
-        return pd.concat([deduped_images, non_image_rows], axis=0)
+        result, execution_trace_log = pd.concat([deduped_images, non_image_rows], axis=0), {}
+        _ = execution_trace_log
 
+        return result
     except Exception as e:
         msg = f"deduplicate_images_internal: Error applying deduplication filter: {e}"
         logger.error(msg, exc_info=True)

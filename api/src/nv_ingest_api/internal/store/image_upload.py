@@ -226,5 +226,7 @@ def store_images_to_minio_internal(
         logger.debug("No storage objects matching %s found in the DataFrame.", content_types)
         return df_storage_ledger
 
-    # Process the DataFrame by uploading images
-    return _upload_images_to_minio(df_storage_ledger, task_config)
+    result, execution_trace_log = _upload_images_to_minio(df_storage_ledger, task_config), {}
+    _ = execution_trace_log
+
+    return result

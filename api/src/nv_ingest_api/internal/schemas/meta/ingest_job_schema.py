@@ -15,6 +15,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum, TaskTypeEnum, D
 # ------------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
 
+
 # ------------------------------------------------------------------------------
 # Schemas: Common and Task-Specific
 # ------------------------------------------------------------------------------
@@ -155,23 +156,25 @@ class IngestTaskSchema(BaseModelNoExt):
     @model_validator(mode="before")
     @classmethod
     def check_task_properties_type(cls, values):
-        task_type, task_properties = values.get("type"), values.get("task_properties")
+        task_type, task_properties = values.get("type"), values.get("task_properties", {})
         if task_type and task_properties:
             expected_type = {
-                TaskTypeEnum.caption: IngestTaskCaptionSchema,
-                TaskTypeEnum.dedup: IngestTaskDedupSchema,
-                TaskTypeEnum.embed: IngestTaskEmbedSchema,
-                TaskTypeEnum.extract: IngestTaskExtractSchema,
-                TaskTypeEnum.filter: IngestTaskFilterSchema,  # Extend mapping as necessary
-                TaskTypeEnum.split: IngestTaskSplitSchema,
-                TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
-                TaskTypeEnum.store: IngestTaskStoreSchema,
-                TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
-                TaskTypeEnum.audio_data_extract: IngestTaskAudioExtraction,
-                TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
-                TaskTypeEnum.chart_data_extract: IngestTaskChartExtraction,
-                TaskTypeEnum.infographic_data_extract: IngestTaskInfographicExtraction,
-            }.get(task_type.lower())
+                TaskTypeEnum.CAPTION: IngestTaskCaptionSchema,
+                TaskTypeEnum.DEDUP: IngestTaskDedupSchema,
+                TaskTypeEnum.EMBED: IngestTaskEmbedSchema,
+                TaskTypeEnum.EXTRACT: IngestTaskExtractSchema,
+                TaskTypeEnum.FILTER: IngestTaskFilterSchema,  # Extend mapping as necessary
+                TaskTypeEnum.SPLIT: IngestTaskSplitSchema,
+                TaskTypeEnum.STORE_EMBEDDING: IngestTaskStoreEmbedSchema,
+                TaskTypeEnum.STORE: IngestTaskStoreSchema,
+                TaskTypeEnum.VDB_UPLOAD: IngestTaskVdbUploadSchema,
+                TaskTypeEnum.AUDIO_DATA_EXTRACT: IngestTaskAudioExtraction,
+                TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
+                TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
+                TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            }.get(
+                task_type
+            )  # Removed .upper()
 
             # Validate task_properties against the expected schema.
             validated_task_properties = expected_type(**task_properties)
@@ -226,4 +229,5 @@ def validate_ingest_job(job_data: Dict[str, Any]) -> IngestJobSchema:
     Raises:
     - ValidationError: If the input data does not conform to the IngestJobSchema.
     """
+
     return IngestJobSchema(**job_data)

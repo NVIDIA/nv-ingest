@@ -5,8 +5,7 @@
 
 import logging
 
-from nv_ingest_api.internal.enums.common import StatusEnum
-from nv_ingest_api.internal.enums.common import PrimaryTaskTypeEnum
+from nv_ingest_api.internal.enums.common import StatusEnum, TaskTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
 
 logger = logging.getLogger(__name__)
@@ -104,7 +103,7 @@ def create_exception_tag(error_message, source_id=None):
     unified_metadata = {}
 
     error_metadata = {
-        "task": PrimaryTaskTypeEnum.EXTRACT,
+        "task": TaskTypeEnum.EXTRACT,
         "status": StatusEnum.ERROR,
         "source_id": source_id,
         "error_msg": error_message,

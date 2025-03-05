@@ -224,7 +224,11 @@ def store_text_embeddings_internal(
 
         # Perform the upload of embeddings
         df_store_ledger = _upload_text_embeddings(df_store_ledger, params)
-        return df_store_ledger
+
+        result, execution_trace_log = df_store_ledger, {}
+        _ = execution_trace_log  # Unused
+
+        return result
 
     except Exception as e:
         err_msg = f"_store_embeddings: Failed to store embeddings: {e}"

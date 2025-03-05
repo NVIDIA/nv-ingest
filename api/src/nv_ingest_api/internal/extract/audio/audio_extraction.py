@@ -10,12 +10,17 @@ from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioConfigSchema
+from nv_ingest_api.internal.schemas.meta.metadata_schema import MetadataSchema, AudioMetadataSchema
+from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
 
+@unified_exception_handler
 def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
@@ -52,22 +57,21 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
-    if (content_metadata.get("type") != "audio") and (base64_audio in (None, "")):
+    if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return metadata
 
     # Modify audio metadata with the result from the inference model
-    try:
-        audio_result = audio_client.infer(
-            base64_audio,
-            model_name="parakeet",
-            trace_info=trace_info,  # traceable_func arg
-            stage_name="audio_extraction",
-        )
-        metadata["audio_metadata"] = {"audio_transcript": audio_result}
-    except Exception as e:
-        logger.exception(f"Unhandled error calling audio inference model: {e}", exc_info=True)
+    audio_result = audio_client.infer(
+        base64_audio,
+        model_name="parakeet",
+        trace_info=trace_info,  # traceable_func arg
+        stage_name="audio_extraction",
+    )
 
-        raise
+    row["document_type"] = ContentTypeEnum.AUDIO
+    audio_metadata = {"audio_transcript": audio_result}
+    metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+    row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
 
     return metadata
 

@@ -32,9 +32,8 @@ import pypdfium2 as pdfium
 from nv_ingest_api.internal.extract.pdf.engines.pdfium import _extract_page_elements
 from nv_ingest_api.internal.primitives.nim.model_interface import nemoretriever_parse as nemoretriever_parse_utils
 from nv_ingest_api.internal.enums.common import AccessLevelEnum
-from nv_ingest_api.internal.enums.common import ContentSubtypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
-from nv_ingest_api.internal.enums.common import StdContentDescEnum
+from nv_ingest_api.internal.enums.common import ContentDescriptionEnum
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.enums.common import TextTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
@@ -183,7 +182,7 @@ def nemoretriever_parse_extractor(
     # get partition_id (assuming coming in from source_metadata...)
     partition_id = base_source_metadata.get("partition_id", -1)
     # get access_level (assuming coming in from source_metadata...)
-    access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
+    access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     extracted_data = []
     doc = pdfium.PdfDocument(pdf_stream)
@@ -554,8 +553,8 @@ def _construct_table_metadata(
 ):
     content = table.latex
     table_format = TableFormatEnum.LATEX
-    subtype = ContentSubtypeEnum.TABLE
-    description = StdContentDescEnum.PDF_TABLE
+    subtype = ContentTypeEnum.TABLE
+    description = ContentDescriptionEnum.PDF_TABLE
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,

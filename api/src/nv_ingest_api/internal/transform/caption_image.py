@@ -199,4 +199,7 @@ def transform_image_create_vlm_caption_internal(
         df_transform_ledger.at[idx, "metadata"] = meta
 
     logger.debug("Image content captioning complete")
-    return df_transform_ledger
+    result, execution_trace_log = df_transform_ledger, {}
+    _ = execution_trace_log  # Unused variable; placeholder to prevent linter warnings.
+
+    return result

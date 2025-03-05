@@ -78,11 +78,11 @@ class RedisIngestService(IngestServiceMeta):
             return trace_id
 
         except JSONDecodeError as err:
-            logger.error("Error: %s", err)
+            logger.exception("Error: %s", err)
             raise
 
         except Exception as err:
-            logger.error("Error: %s", err)
+            logger.exception("Error: %s", err)
             raise
 
     async def fetch_job(self, job_id: str) -> Any:
@@ -99,7 +99,7 @@ class RedisIngestService(IngestServiceMeta):
         try:
             self._ingest_client.get_client().set(cache_key, json.dumps([job.dict() for job in jobs_data]), ex=3600)
         except Exception as err:
-            logger.error(f"Error setting cache for {cache_key}: {err}")
+            logger.exception(f"Error setting cache for {cache_key}: {err}")
             raise
 
     async def get_processing_cache(self, job_id: str) -> List[ProcessingJob]:
@@ -111,5 +111,5 @@ class RedisIngestService(IngestServiceMeta):
                 return []
             return [ProcessingJob(**job) for job in json.loads(data)]
         except Exception as err:
-            logger.error(f"Error getting cache for {cache_key}: {err}")
+            logger.exception(f"Error getting cache for {cache_key}: {err}")
             raise

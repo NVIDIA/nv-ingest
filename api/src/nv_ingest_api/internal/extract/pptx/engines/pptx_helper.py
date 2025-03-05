@@ -34,11 +34,9 @@ from pptx.enum.shapes import PP_PLACEHOLDER
 from pptx.shapes.autoshape import Shape
 from pptx.slide import Slide
 
-from nv_ingest_api.internal.enums.common import AccessLevelEnum
+from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
-from nv_ingest_api.internal.enums.common import ImageTypeEnum
-from nv_ingest_api.internal.enums.common import SourceTypeEnum
-from nv_ingest_api.internal.enums.common import StdContentDescEnum
+from nv_ingest_api.internal.enums.common import ContentDescriptionEnum
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.enums.common import TextTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
@@ -243,7 +241,7 @@ def python_pptx(
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
-    access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
+    access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     presentation = Presentation(pptx_stream)
 
@@ -259,7 +257,7 @@ def python_pptx(
         else datetime.now().isoformat()
     )
     keywords = presentation.core_properties.keywords
-    source_type = SourceTypeEnum.PPTX
+    source_type = DocumentTypeEnum.PPTX
     source_metadata = {
         "source_name": source_id,  # python-pptx doesn't maintain filename; re-use source_id
         "source_id": source_id,
@@ -505,7 +503,7 @@ def _construct_text_metadata(
 
     content_metadata = {
         "type": ContentTypeEnum.TEXT,
-        "description": StdContentDescEnum.PPTX_TEXT,
+        "description": ContentDescriptionEnum.PPTX_TEXT,
         "page_number": slide_idx,
         "hierarchy": {
             "page_count": slide_count,
@@ -565,7 +563,7 @@ def _construct_image_metadata(
 
     content_metadata = {
         "type": ContentTypeEnum.IMAGE,
-        "description": StdContentDescEnum.PPTX_IMAGE,
+        "description": ContentDescriptionEnum.PPTX_IMAGE,
         "page_number": slide_idx,
         "hierarchy": {
             "page_count": slide_count,
@@ -578,8 +576,8 @@ def _construct_image_metadata(
     }
 
     image_metadata = {
-        "image_type": ImageTypeEnum.image_type_1,
-        "structured_image_type": ImageTypeEnum.image_type_1,
+        "image_type": DocumentTypeEnum.PNG,
+        "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",  # could attempt to guess a caption from nearby text
         "text": "",
         "image_location": bbox,
@@ -621,7 +619,7 @@ def _construct_table_metadata(
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
-        "description": StdContentDescEnum.PPTX_TABLE,
+        "description": ContentDescriptionEnum.PPTX_TABLE,
         "page_number": slide_idx,
         "hierarchy": {
             "page_count": slide_count,

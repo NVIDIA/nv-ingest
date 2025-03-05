@@ -14,16 +14,14 @@ from typing import Union
 from pydantic import field_validator, model_validator, Field
 
 from nv_ingest_api.internal.enums.common import (
-    SourceTypeEnum,
     AccessLevelEnum,
     ContentTypeEnum,
-    ContentSubtypeEnum,
     TextTypeEnum,
     LanguageEnum,
-    ImageTypeEnum,
     TableFormatEnum,
     StatusEnum,
-    PrimaryTaskTypeEnum,
+    DocumentTypeEnum,
+    TaskTypeEnum,
 )
 from nv_ingest_api.internal.schemas.meta.base_model_noext import BaseModelNoExt
 from nv_ingest_api.util.converters import datetools
@@ -41,13 +39,13 @@ class SourceMetadataSchema(BaseModelNoExt):
     source_name: str
     source_id: str
     source_location: str = ""
-    source_type: Union[SourceTypeEnum, str]
+    source_type: Union[DocumentTypeEnum, str]
     collection_id: str = ""
     date_created: str = datetime.now().isoformat()
     last_modified: str = datetime.now().isoformat()
     summary: str = ""
     partition_id: int = -1
-    access_level: Union[AccessLevelEnum, int] = -1
+    access_level: Union[AccessLevelEnum, int] = AccessLevelEnum.UNKNOWN
 
     @field_validator("date_created", "last_modified")
     @classmethod
@@ -98,7 +96,7 @@ class ContentMetadataSchema(BaseModelNoExt):
     description: str = ""
     page_number: int = -1
     hierarchy: ContentHierarchySchema = ContentHierarchySchema()
-    subtype: Union[ContentSubtypeEnum, str] = ""
+    subtype: Union[ContentTypeEnum, str] = ""
 
 
 class TextMetadataSchema(BaseModelNoExt):
@@ -111,8 +109,8 @@ class TextMetadataSchema(BaseModelNoExt):
 
 
 class ImageMetadataSchema(BaseModelNoExt):
-    image_type: Union[ImageTypeEnum, str]
-    structured_image_type: ImageTypeEnum = ImageTypeEnum.image_type_1
+    image_type: Union[DocumentTypeEnum, str]
+    structured_image_type: ContentTypeEnum = ContentTypeEnum.NONE
     caption: str = ""
     text: str = ""
     image_location: tuple = (0, 0, 0, 0)
@@ -123,8 +121,8 @@ class ImageMetadataSchema(BaseModelNoExt):
 
     @field_validator("image_type")
     def validate_image_type(cls, v):
-        if not isinstance(v, (ImageTypeEnum, str)):
-            raise ValueError("image_type must be a string or ImageTypeEnum")
+        if not isinstance(v, (DocumentTypeEnum, str)):
+            raise ValueError("image_type must be a string or DocumentTypeEnum")
         return v
 
     @field_validator("width", "height")
@@ -162,14 +160,14 @@ class AudioMetadataSchema(BaseModelNoExt):
 
 # TODO consider deprecating this in favor of info msg...
 class ErrorMetadataSchema(BaseModelNoExt):
-    task: PrimaryTaskTypeEnum
+    task: TaskTypeEnum
     status: StatusEnum
     source_id: str = ""
     error_msg: str
 
 
 class InfoMessageMetadataSchema(BaseModelNoExt):
-    task: PrimaryTaskTypeEnum
+    task: TaskTypeEnum
     status: StatusEnum
     message: str
     filter: bool

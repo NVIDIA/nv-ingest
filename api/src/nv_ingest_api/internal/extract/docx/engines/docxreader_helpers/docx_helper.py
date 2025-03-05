@@ -21,8 +21,7 @@
 import logging
 from typing import IO, Optional, List
 
-from nv_ingest_api.internal.enums.common import AccessLevelEnum
-from nv_ingest_api.internal.enums.common import SourceTypeEnum
+from nv_ingest_api.internal.enums.common import AccessLevelEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import TextTypeEnum
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docxreader import DocxReader
 
@@ -100,14 +99,14 @@ def python_docx(
     # get partition_id (assuming coming in from source_metadata...)
     partition_id = base_source_metadata.get("partition_id", -1)
     # get access_level (assuming coming in from source_metadata...)
-    access_level = base_source_metadata.get("access_level", AccessLevelEnum.LEVEL_1)
+    access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
     # python-docx doesn't maintain filename; re-use source_id
     source_metadata = {
         "source_name": source_id,
         "source_id": source_id,
         "source_location": source_location,
-        "source_type": SourceTypeEnum.DOCX,
+        "source_type": DocumentTypeEnum.DOCX,
         "collection_id": collection_id,
         "partition_id": partition_id,
         "access_level": access_level,

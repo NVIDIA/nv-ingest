@@ -19,10 +19,8 @@ import pypdfium2 as pdfium
 from PIL import Image
 from pypdfium2 import PdfImage
 
-from nv_ingest_api.internal.enums.common import StdContentDescEnum
-from nv_ingest_api.internal.enums.common import ContentSubtypeEnum
+from nv_ingest_api.internal.enums.common import ContentDescriptionEnum, DocumentTypeEnum
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
-from nv_ingest_api.internal.enums.common import ImageTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import NearbyObjectsSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
@@ -155,7 +153,7 @@ def construct_text_metadata(
 
     content_metadata = {
         "type": ContentTypeEnum.TEXT,
-        "description": StdContentDescEnum.PDF_TEXT,
+        "description": ContentDescriptionEnum.PDF_TEXT,
         "page_number": page_idx,
         "hierarchy": {
             "page_count": page_count,
@@ -245,7 +243,7 @@ def construct_image_metadata_from_base64(
     # Construct content metadata
     content_metadata: Dict[str, Any] = {
         "type": ContentTypeEnum.IMAGE,
-        "description": StdContentDescEnum.PDF_IMAGE,
+        "description": ContentDescriptionEnum.PDF_IMAGE,
         "page_number": page_idx,
         "hierarchy": {
             "page_count": page_count,
@@ -258,8 +256,8 @@ def construct_image_metadata_from_base64(
 
     # Construct image metadata
     image_metadata: Dict[str, Any] = {
-        "image_type": "PNG",  # This can be dynamic if needed
-        "structured_image_type": ImageTypeEnum.image_type_1,
+        "image_type": DocumentTypeEnum.PNG,
+        "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",
         "text": "",
         "image_location": bbox,
@@ -318,13 +316,11 @@ def construct_image_metadata_from_pdf_image(
         If the image cannot be extracted due to an issue with the PdfImage object.
         :param pdf_image:
     """
-    # Define the assumed image type (e.g., PNG)
-    image_type: str = "PNG"
 
     # Construct content metadata
     content_metadata: Dict[str, Any] = {
         "type": ContentTypeEnum.IMAGE,
-        "description": StdContentDescEnum.PDF_IMAGE,
+        "description": ContentDescriptionEnum.PDF_IMAGE,
         "page_number": page_idx,
         "hierarchy": {
             "page_count": page_count,
@@ -337,8 +333,8 @@ def construct_image_metadata_from_pdf_image(
 
     # Construct image metadata
     image_metadata: Dict[str, Any] = {
-        "image_type": image_type,
-        "structured_image_type": ImageTypeEnum.image_type_1,
+        "image_type": DocumentTypeEnum.PNG,
+        "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",
         "text": "",
         "image_location": pdf_image.bbox,
@@ -405,8 +401,8 @@ def construct_page_element_metadata(
         structured_content_text = structured_image.content
         structured_content_format = structured_image.content_format
         table_format = TableFormatEnum.IMAGE
-        subtype = ContentSubtypeEnum.TABLE
-        description = StdContentDescEnum.PDF_TABLE
+        subtype = ContentTypeEnum.TABLE
+        description = ContentDescriptionEnum.PDF_TABLE
         meta_name = "table_metadata"
 
     elif structured_image.type_string in ("chart",):
@@ -414,8 +410,8 @@ def construct_page_element_metadata(
         structured_content_text = structured_image.content
         structured_content_format = structured_image.content_format
         table_format = TableFormatEnum.IMAGE
-        subtype = ContentSubtypeEnum.CHART
-        description = StdContentDescEnum.PDF_CHART
+        subtype = ContentTypeEnum.CHART
+        description = ContentDescriptionEnum.PDF_CHART
         # TODO(Devin) swap this to chart_metadata after we confirm metadata schema changes.
         meta_name = "table_metadata"
 
@@ -424,8 +420,8 @@ def construct_page_element_metadata(
         structured_content_text = structured_image.content
         structured_content_format = structured_image.content_format
         table_format = TableFormatEnum.IMAGE
-        subtype = ContentSubtypeEnum.INFOGRAPHIC
-        description = StdContentDescEnum.PDF_INFOGRAPHIC
+        subtype = ContentTypeEnum.INFOGRAPHIC
+        description = ContentDescriptionEnum.PDF_INFOGRAPHIC
         meta_name = "table_metadata"
 
     else:

@@ -79,8 +79,8 @@ def highlight_error_in_original(original_str: str, task_name: str, error_detail:
     ...     "type": "value_error.extra",
     ...     "loc": ["extra_field"]
     ... }
-    >>> highlighted_str = highlight_error_in_original(original_str, task_name, error_detail)
-    >>> print(highlighted_str)
+    >>> highlighted_str_ex = highlight_error_in_original(original_str, task_name, error_detail)
+    >>> print(highlighted_str_ex)
     {"name": "file1.txt", "extra_field": "some_value"}  # The 'extra_field' will be highlighted
 
     In this case, the function will highlight the `extra_field` in blue and bold in the returned string.

@@ -42,7 +42,7 @@ def test_detect_and_read_text_file(mock_detect):
 def test_extract_file_content_pdf(mock_file):
     path = "dummy_path.pdf"
     content, doc_type = extract_file_content(path)
-    assert doc_type == DocumentTypeEnum.pdf
+    assert doc_type == DocumentTypeEnum.PDF
     assert isinstance(content, str)  # Assuming the content is correctly base64 encoded
 
 
@@ -60,7 +60,7 @@ def test_extract_file_content_unsupported(mock_magic):
 def test_extract_file_content_text(mock_open, mock_detect):
     mock_detect.return_value = {"encoding": "utf-8"}
     content, doc_type = extract_file_content("dummy_path.txt")
-    assert doc_type == DocumentTypeEnum.txt
+    assert doc_type == DocumentTypeEnum.TXT
     assert content == "Simple text"
 
 
@@ -79,13 +79,13 @@ def test_extract_file_content_text_bad(mock_magic, mock_open, mock_detect):
 @pytest.mark.parametrize(
     "file_path,expected_type",
     [
-        ("/fake/path/to/document.pdf", DocumentTypeEnum.pdf),
-        ("/fake/path/to/document.txt", DocumentTypeEnum.txt),
-        ("/fake/path/to/document.docx", DocumentTypeEnum.docx),
-        ("/fake/path/to/image.jpg", DocumentTypeEnum.jpeg),
+        ("/fake/path/to/document.pdf", DocumentTypeEnum.PDF),
+        ("/fake/path/to/document.txt", DocumentTypeEnum.TXT),
+        ("/fake/path/to/document.docx", DocumentTypeEnum.DOCX),
+        ("/fake/path/to/image.jpg", DocumentTypeEnum.JPEG),
         (
             "/fake/path/unknown.extension",
-            DocumentTypeEnum.txt,
+            DocumentTypeEnum.TXT,
         ),  # This line simulates 'text/plain'
     ],
 )

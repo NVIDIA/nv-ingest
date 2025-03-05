@@ -152,4 +152,6 @@ def transform_text_split_and_tokenize_internal(
         drop=True
     )
 
-    return merged_df
+    result, execution_trace_log = merged_df, {}
+
+    return result

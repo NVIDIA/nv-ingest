@@ -15,6 +15,7 @@ from typing import List
 
 import pypdfium2 as pdfium
 from docx import Document as DocxDocument
+
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
 from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
@@ -47,22 +48,22 @@ def estimate_page_count(file_path: str) -> int:
     document_type = get_or_infer_file_type(file_path)
 
     if document_type in [
-        DocumentTypeEnum.pdf,
-        DocumentTypeEnum.docx,
-        DocumentTypeEnum.pptx,
+        DocumentTypeEnum.PDF,
+        DocumentTypeEnum.DOCX,
+        DocumentTypeEnum.PPTX,
     ]:
         return count_pages_for_documents(file_path, document_type)
     elif document_type in [
-        DocumentTypeEnum.txt,
-        DocumentTypeEnum.md,
-        DocumentTypeEnum.html,
+        DocumentTypeEnum.TXT,
+        DocumentTypeEnum.MD,
+        DocumentTypeEnum.HTML,
     ]:
         return count_pages_for_text(file_path)
     elif document_type in [
-        DocumentTypeEnum.jpeg,
-        DocumentTypeEnum.bmp,
-        DocumentTypeEnum.png,
-        DocumentTypeEnum.svg,
+        DocumentTypeEnum.JPEG,
+        DocumentTypeEnum.BMP,
+        DocumentTypeEnum.PNG,
+        DocumentTypeEnum.SVG,
     ]:
         return 1  # Image types assumed to be 1 page
     else:
@@ -71,14 +72,14 @@ def estimate_page_count(file_path: str) -> int:
 
 def count_pages_for_documents(file_path: str, document_type: DocumentTypeEnum) -> int:
     try:
-        if document_type == DocumentTypeEnum.pdf:
+        if document_type == DocumentTypeEnum.PDF:
             doc = pdfium.PdfDocument(file_path)
             return len(doc)
-        elif document_type == DocumentTypeEnum.docx:
+        elif document_type == DocumentTypeEnum.DOCX:
             doc = DocxDocument(file_path)
             # Approximation, as word documents do not have a direct 'page count' attribute
             return len(doc.paragraphs) // 15
-        elif document_type == DocumentTypeEnum.pptx:
+        elif document_type == DocumentTypeEnum.PPTX:
             ppt = Presentation(file_path)
             return len(ppt.slides)
     except FileNotFoundError:
@@ -414,7 +415,7 @@ def filter_function_kwargs(func, **kwargs):
     -------
     >>> def example_function(a, b, c):
     ...     pass
-    >>> filtered_kwargs = filter_function_kwargs(example_function, a=1, b=2, d=4)
+    >>> filtered_kwargs = filter_function_kwargs(example_function, a={}, b={}, d={})
     >>> print(filtered_kwargs)
     {'a': 1, 'b': 2}
     """

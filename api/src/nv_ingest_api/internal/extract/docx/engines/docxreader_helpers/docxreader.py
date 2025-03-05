@@ -43,7 +43,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-from nv_ingest_api.internal.enums.common import StdContentDescEnum
+from nv_ingest_api.internal.enums.common import ContentDescriptionEnum, DocumentTypeEnum
 from nv_ingest_api.internal.extract.image.image_helpers.common import (
     load_and_preprocess_image,
     extract_page_elements_from_images,
@@ -51,7 +51,6 @@ from nv_ingest_api.internal.extract.image.image_helpers.common import (
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     ContentTypeEnum,
-    ImageTypeEnum,
     validate_metadata,
     TextTypeEnum,
 )
@@ -461,7 +460,7 @@ class DocxReader:
 
         content_metadata = {
             "type": ContentTypeEnum.IMAGE,
-            "description": StdContentDescEnum.DOCX_IMAGE,
+            "description": ContentDescriptionEnum.DOCX_IMAGE,
             "page_number": page_idx,
             "hierarchy": {
                 "page_count": page_count,
@@ -474,8 +473,8 @@ class DocxReader:
         }
 
         image_metadata = {
-            "image_type": ImageTypeEnum.image_type_1,
-            "structured_image_type": ImageTypeEnum.image_type_1,
+            "image_type": DocumentTypeEnum.PNG,
+            "structured_image_type": ContentTypeEnum.NONE,
             "caption": caption,
             "text": "",
             "image_location": bbox,
@@ -560,7 +559,7 @@ class DocxReader:
         page_number = 0 if text_depth == TextTypeEnum.PAGE else -1
         content_metadata = {
             "type": ContentTypeEnum.TEXT,
-            "description": StdContentDescEnum.DOCX_TEXT,
+            "description": ContentDescriptionEnum.DOCX_TEXT,
             "page_number": page_number,
             "hierarchy": {
                 "page_count": 1,
@@ -599,7 +598,7 @@ class DocxReader:
         paragraph,
         paragraph_text,
         base_unified_metadata: Dict,
-        text_depth: "TextTypeEnum",
+        text_depth: str,
         para_idx: int,
     ) -> None:
         """

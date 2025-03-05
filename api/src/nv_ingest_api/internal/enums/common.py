@@ -10,34 +10,11 @@ from typing import Type, Any
 logger = logging.getLogger(__name__)
 
 
-class SourceTypeEnum(str, Enum):
-    """
-    Enum for representing different source file types.
-
-    Attributes
-    ----------
-    PDF : str
-        Represents a PDF file type.
-    DOCX : str
-        Represents a DOCX file type.
-    PPTX : str
-        Represents a PPTX file type.
-    source_type_1 : str
-        Represents a custom source type 1.
-    source_type_2 : str
-        Represents a custom source type 2.
-    """
-
-    PDF: str = "pdf"
-    DOCX: str = "docx"
-    PPTX: str = "pptx"
-    source_type_1: str = "source_type_1"
-    source_type_2: str = "source_type_2"
-
-
 class AccessLevelEnum(int, Enum):
     """
-    Note: This is for future use, and currently has no functional use case.
+    Note
+    ----
+    This is for future use, and currently has no functional use case.
 
     Enum for representing different access levels.
 
@@ -51,45 +28,13 @@ class AccessLevelEnum(int, Enum):
         Represents access level 3.
     """
 
+    UNKNOWN: int = -1
     LEVEL_1: int = 1
     LEVEL_2: int = 2
     LEVEL_3: int = 3
 
 
-class ContentTypeEnum(str, Enum):
-    """
-    Enum for representing various content types.
-
-    Attributes
-    ----------
-    AUDIO : str
-        Represents audio content.
-    EMBEDDING : str
-        Represents embedding content.
-    IMAGE : str
-        Represents image content.
-    INFO_MSG : str
-        Represents an informational message.
-    STRUCTURED : str
-        Represents structured content.
-    TEXT : str
-        Represents text content.
-    UNSTRUCTURED : str
-        Represents unstructured content.
-    VIDEO : str
-        Represents video content.
-    """
-
-    AUDIO: str = "audio"
-    EMBEDDING: str = "embedding"
-    IMAGE: str = "image"
-    INFO_MSG: str = "info_message"
-    STRUCTURED: str = "structured"
-    TEXT: str = "text"
-    VIDEO: str = "video"
-
-
-class StdContentDescEnum(str, Enum):
+class ContentDescriptionEnum(str, Enum):
     """
     Enum for standard content descriptions extracted from different source types.
 
@@ -132,41 +77,96 @@ class StdContentDescEnum(str, Enum):
     PPTX_TEXT: str = "Unstructured text from PPTX presentation."
 
 
-class TextTypeEnum(str, Enum):
+class ContentTypeEnum(str, Enum):
     """
-    Enum for representing different types of text segments.
+    Enum for representing various content types.
+
+    Note: Content type declares the broad category of the content, such as text, image, audio, etc.
+    This is not equivalent to the Document type, which is a specific file format.
 
     Attributes
     ----------
-    BLOCK : str
-        Represents a text block.
-    BODY : str
-        Represents body text.
-    DOCUMENT : str
-        Represents an entire document.
-    HEADER : str
-        Represents a header text.
-    LINE : str
-        Represents a single line of text.
-    NEARBY_BLOCK : str
-        Represents a block of text in close proximity to another.
-    OTHER : str
-        Represents other unspecified text type.
-    PAGE : str
-        Represents a page of text.
-    SPAN : str
-        Represents an inline text span.
+    AUDIO : str
+        Represents audio content.
+    EMBEDDING : str
+        Represents embedding content.
+    IMAGE : str
+        Represents image content.
+    INFO_MSG : str
+        Represents an informational message.
+    STRUCTURED : str
+        Represents structured content.
+    TEXT : str
+        Represents text content.
+    UNSTRUCTURED : str
+        Represents unstructured content.
+    VIDEO : str
+        Represents video content.
     """
 
-    BLOCK: str = "block"
-    BODY: str = "body"
-    DOCUMENT: str = "document"
-    HEADER: str = "header"
-    LINE: str = "line"
-    NEARBY_BLOCK: str = "nearby_block"
-    OTHER: str = "other"
-    PAGE: str = "page"
-    SPAN: str = "span"
+    AUDIO: str = "audio"
+    CHART: str = "chart"
+    EMBEDDING: str = "embedding"
+    IMAGE: str = "image"
+    INFOGRAPHIC: str = "infographic"
+    INFO_MSG: str = "info_message"
+    NONE: str = "none"
+    STRUCTURED: str = "structured"
+    TABLE: str = "table"
+    TEXT: str = "text"
+    UNKNOWN: str = "unknown"
+    VIDEO: str = "video"
+
+
+class DocumentTypeEnum(str, Enum):
+    """
+    Enum for representing various document file types.
+
+    Note: Document type refers to the specific file format of the content, such as PDF, DOCX, etc.
+    This is not equivalent to the Content type, which is a broad category of the content.
+
+    Attributes
+    ----------
+    BMP: str
+        BMP image format.
+    DOCX: str
+        Microsoft Word document format.
+    HTML: str
+        HTML document.
+    JPEG: str
+        JPEG image format.
+    PDF: str
+        PDF document format.
+    PNG: str
+        PNG image format.
+    PPTX: str
+        PowerPoint presentation format.
+    SVG: str
+        SVG image format.
+    TIFF: str
+        TIFF image format.
+    TXT: str
+        Plain text file.
+    MP3: str
+        MP3 audio format.
+    WAV: str
+        WAV audio format.
+    """
+
+    BMP: str = "bmp"
+    DOCX: str = "docx"
+    HTML: str = "html"
+    JPEG: str = "jpeg"
+    PDF: str = "pdf"
+    PNG: str = "png"
+    PPTX: str = "pptx"
+    SVG: str = "svg"
+    TIFF: str = "tiff"
+    TXT: str = "text"
+    MD: str = "text"
+    MP3: str = "mp3"
+    WAV: str = "wav"
+    UNKNOWN: str = "unknown"
 
 
 class LanguageEnum(str, Enum):
@@ -359,57 +359,25 @@ class LanguageEnum(str, Enum):
         Returns
         -------
         bool
-            True if value exists in the enum, False otherwise.
+            True if the value exists in the enum, False otherwise.
         """
         return value in cls._value2member_map_
 
 
-class ImageTypeEnum(str, Enum):
+class StatusEnum(str, Enum):
     """
-    Enum for representing different image file types.
+    Enum for representing status messages.
 
     Attributes
     ----------
-    BMP : str
-        Represents BMP image type.
-    GIF : str
-        Represents GIF image type.
-    JPEG : str
-        Represents JPEG image type.
-    PNG : str
-        Represents PNG image type.
-    TIFF : str
-        Represents TIFF image type.
-    image_type_1 : str
-        Custom image type 1 (until classifier developed).
-    image_type_2 : str
-        Custom image type 2 (until classifier developed).
+    ERROR : str
+        Represents an error status.
+    SUCCESS : str
+        Represents a success status.
     """
 
-    BMP: str = "bmp"
-    GIF: str = "gif"
-    JPEG: str = "jpeg"
-    PNG: str = "png"
-    TIFF: str = "tiff"
-    image_type_1: str = "image_type_1"  # until classifier developed
-    image_type_2: str = "image_type_2"  # until classifier developed
-
-    @classmethod
-    def has_value(cls: Type["ImageTypeEnum"], value: Any) -> bool:
-        """
-        Check if the enum contains the given image type value.
-
-        Parameters
-        ----------
-        value : Any
-            The value to check against the enum members.
-
-        Returns
-        -------
-        bool
-            True if value exists in the enum, False otherwise.
-        """
-        return value in cls._value2member_map_
+    ERROR: str = "error"
+    SUCCESS: str = "success"
 
 
 class TableFormatEnum(str, Enum):
@@ -440,14 +408,16 @@ class TableFormatEnum(str, Enum):
     SIMPLE: str = "simple"
 
 
-class PrimaryTaskTypeEnum(str, Enum):
+class TaskTypeEnum(str, Enum):
     """
-    Enum for representing different types of tasks.
+    Enum for representing various task types.
 
     Attributes
     ----------
     CAPTION : str
-        Represents a captioning task.
+        Represents a caption task.
+    DEDUP : str
+        Represents a deduplication task.
     EMBED : str
         Represents an embedding task.
     EXTRACT : str
@@ -456,79 +426,69 @@ class PrimaryTaskTypeEnum(str, Enum):
         Represents a filtering task.
     SPLIT : str
         Represents a splitting task.
-    TRANSFORM : str
-        Represents a transforming task.
+    STORE : str
+        Represents a storing task.
+    STORE_EMBEDDING : str
+        Represents a task for storing embeddings.
+    VDB_UPLOAD : str
+        Represents a task for uploading to a vector database.
+    AUDIO_DATA_EXTRACT : str
+        Represents a task for extracting audio data.
+    TABLE_DATA_EXTRACT : str
+        Represents a task for extracting table data.
+    CHART_DATA_EXTRACT : str
+        Represents a task for extracting chart data.
+    INFOGRAPHIC_DATA_EXTRACT : str
+        Represents a task for extracting infographic data.
     """
 
+    AUDIO_DATA_EXTRACT: str = "audio_data_extract"
     CAPTION: str = "caption"
+    CHART_DATA_EXTRACT: str = "chart_data_extract"
+    DEDUP: str = "dedup"
     EMBED: str = "embed"
     EXTRACT: str = "extract"
     FILTER: str = "filter"
+    INFOGRAPHIC_DATA_EXTRACT: str = "infographic_data_extract"
     SPLIT: str = "split"
-    TRANSFORM: str = "transform"
+    STORE_EMBEDDING: str = "store_embedding"
+    STORE: str = "store"
+    TABLE_DATA_EXTRACT: str = "table_data_extract"
+    VDB_UPLOAD: str = "vdb_upload"
 
 
-class StatusEnum(str, Enum):
+class TextTypeEnum(str, Enum):
     """
-    Enum for representing status messages.
+    Enum for representing different types of text segments.
 
     Attributes
     ----------
-    ERROR : str
-        Represents an error status.
-    SUCCESS : str
-        Represents a success status.
+    BLOCK : str
+        Represents a text block.
+    BODY : str
+        Represents body text.
+    DOCUMENT : str
+        Represents an entire document.
+    HEADER : str
+        Represents a header text.
+    LINE : str
+        Represents a single line of text.
+    NEARBY_BLOCK : str
+        Represents a block of text in close proximity to another.
+    OTHER : str
+        Represents other unspecified text type.
+    PAGE : str
+        Represents a page of text.
+    SPAN : str
+        Represents an inline text span.
     """
 
-    ERROR: str = "error"
-    SUCCESS: str = "success"
-
-
-class ContentSubtypeEnum(str, Enum):
-    """
-    Enum for representing different content subtypes.
-
-    Attributes
-    ----------
-    TABLE : str
-        Represents a table subtype.
-    CHART : str
-        Represents a chart subtype.
-    INFOGRAPHIC : str
-        Represents an infographic subtype.
-    """
-
-    TABLE: str = "table"
-    CHART: str = "chart"
-    INFOGRAPHIC: str = "infographic"
-
-
-class DocumentTypeEnum(str, Enum):
-    bmp = "bmp"
-    docx = "docx"
-    html = "html"
-    jpeg = "jpeg"
-    pdf = "pdf"
-    png = "png"
-    pptx = "pptx"
-    svg = "svg"
-    tiff = "tiff"
-    txt = "text"
-    mp3 = "mp3"
-    wav = "wav"
-
-
-class TaskTypeEnum(str, Enum):
-    caption = "caption"
-    dedup = "dedup"
-    embed = "embed"
-    extract = "extract"
-    filter = "filter"
-    split = "split"
-    store = "store"
-    store_embedding = "store_embedding"
-    vdb_upload = "vdb_upload"
-    audio_data_extract = "audio_data_extract"
-    table_data_extract = "table_data_extract"
-    chart_data_extract = "chart_data_extract"
-    infographic_data_extract = "infographic_data_extract"
+    BLOCK: str = "block"
+    BODY: str = "body"
+    DOCUMENT: str = "document"
+    HEADER: str = "header"
+    LINE: str = "line"
+    NEARBY_BLOCK: str = "nearby_block"
+    OTHER: str = "other"
+    PAGE: str = "page"
+    SPAN: str = "span"
