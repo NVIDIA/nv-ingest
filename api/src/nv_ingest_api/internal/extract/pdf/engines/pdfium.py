@@ -32,7 +32,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YoloxPageElementsModelInterface,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
-from nv_ingest_api.internal.schemas.meta.metadata_schema import TableFormatEnum, TextTypeEnum, AccessLevelEnum
+from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
 from nv_ingest_api.util.metadata.aggregators import (
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,

@@ -11,7 +11,7 @@ import pandas as pd
 from morpheus.config import Config
 from morpheus.utils.module_utils import ModuleLoaderFactory
 
-from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest.framework.orchestration.morpheus.stages.meta.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest_api.internal.mutate.deduplicate import deduplicate_images_internal
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema

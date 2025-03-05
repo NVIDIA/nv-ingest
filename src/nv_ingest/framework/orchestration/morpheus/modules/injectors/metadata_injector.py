@@ -14,7 +14,7 @@ from nv_ingest.framework.schemas.framework_metadata_injector_schema import Metad
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import DocumentTypeEnum
-from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,

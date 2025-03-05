@@ -43,7 +43,7 @@ from docx.text.paragraph import Paragraph
 from docx.text.run import Run
 from pandas import DataFrame
 
-
+from nv_ingest_api.internal.enums.common import StdContentDescEnum
 from nv_ingest_api.internal.extract.image.image_helpers.common import (
     load_and_preprocess_image,
     extract_page_elements_from_images,
@@ -51,7 +51,6 @@ from nv_ingest_api.internal.extract.image.image_helpers.common import (
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     ContentTypeEnum,
-    StdContentDescEnum,
     ImageTypeEnum,
     validate_metadata,
     TextTypeEnum,

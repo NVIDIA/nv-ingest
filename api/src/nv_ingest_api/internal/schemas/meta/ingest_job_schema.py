@@ -3,59 +3,17 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from enum import Enum
 from typing import Any, Dict, List, Optional, Union, Annotated
 
 from pydantic import Field, field_validator, model_validator
 
 from nv_ingest_api.internal.schemas.meta.base_model_noext import BaseModelNoExt
-from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
-
-# Assume BaseModelNoExt and ContentTypeEnum are defined elsewhere
+from nv_ingest_api.internal.enums.common import ContentTypeEnum, TaskTypeEnum, DocumentTypeEnum
 
 # ------------------------------------------------------------------------------
 # Logging Configuration
 # ------------------------------------------------------------------------------
 logger = logging.getLogger(__name__)
-
-
-# ------------------------------------------------------------------------------
-# Enums
-# ------------------------------------------------------------------------------
-class DocumentTypeEnum(str, Enum):
-    bmp = "bmp"
-    docx = "docx"
-    html = "html"
-    jpeg = "jpeg"
-    pdf = "pdf"
-    png = "png"
-    pptx = "pptx"
-    svg = "svg"
-    tiff = "tiff"
-    txt = "text"
-    mp3 = "mp3"
-    wav = "wav"
-
-
-class TaskTypeEnum(str, Enum):
-    caption = "caption"
-    dedup = "dedup"
-    embed = "embed"
-    extract = "extract"
-    filter = "filter"
-    split = "split"
-    store = "store"
-    store_embedding = "store_embedding"
-    vdb_upload = "vdb_upload"
-    audio_data_extract = "audio_data_extract"
-    table_data_extract = "table_data_extract"
-    chart_data_extract = "chart_data_extract"
-    infographic_data_extract = "infographic_data_extract"
-
-
-class FilterTypeEnum(str, Enum):
-    image = "image"
-
 
 # ------------------------------------------------------------------------------
 # Schemas: Common and Task-Specific

@@ -15,7 +15,7 @@ import numpy as np
 import pandas as pd
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
-from nv_ingest_api.internal.schemas.meta.metadata_schema import TableFormatEnum
+from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output

@@ -9,10 +9,8 @@ from typing import Any, Dict, Tuple, Optional, Iterable, List
 import pandas as pd
 from openai import OpenAI
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum, PrimaryTaskTypeEnum, StatusEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
-    ContentTypeEnum,
-    TaskTypeEnum,
-    StatusEnum,
     InfoMessageMetadataSchema,
 )
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
@@ -88,7 +86,7 @@ def _make_async_request(
 
     except Exception as err:
         info_msg = {
-            "task": TaskTypeEnum.EMBED.value,
+            "task": PrimaryTaskTypeEnum.EMBED.value,
             "status": StatusEnum.ERROR.value,
             "message": f"Embedding error: {err}",
             "filter": filter_errors,

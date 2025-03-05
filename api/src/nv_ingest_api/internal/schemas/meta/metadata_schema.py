@@ -5,7 +5,6 @@
 
 import logging
 from datetime import datetime
-from enum import Enum
 from typing import Any
 from typing import Dict
 from typing import List
@@ -14,169 +13,22 @@ from typing import Union
 
 from pydantic import field_validator, model_validator, Field
 
+from nv_ingest_api.internal.enums.common import (
+    SourceTypeEnum,
+    AccessLevelEnum,
+    ContentTypeEnum,
+    ContentSubtypeEnum,
+    TextTypeEnum,
+    LanguageEnum,
+    ImageTypeEnum,
+    TableFormatEnum,
+    StatusEnum,
+    PrimaryTaskTypeEnum,
+)
 from nv_ingest_api.internal.schemas.meta.base_model_noext import BaseModelNoExt
 from nv_ingest_api.util.converters import datetools
 
 logger = logging.getLogger(__name__)
-
-
-# Do we want types and similar items to be enums or just strings?
-class SourceTypeEnum(str, Enum):
-    PDF = "pdf"
-    DOCX = "docx"
-    PPTX = "pptx"
-    source_type_1 = "source_type_1"
-    source_type_2 = "source_type_2"
-
-
-class AccessLevelEnum(int, Enum):
-    LEVEL_1 = 1
-    LEVEL_2 = 2
-    LEVEL_3 = 3
-
-
-class ContentTypeEnum(str, Enum):
-    AUDIO = "audio"
-    EMBEDDING = "embedding"
-    IMAGE = "image"
-    INFO_MSG = "info_message"
-    STRUCTURED = "structured"
-    TEXT = "text"
-    UNSTRUCTURED = "unstructured"
-    VIDEO = "video"
-
-
-class StdContentDescEnum(str, Enum):
-    DOCX_IMAGE = "Image extracted from DOCX document."
-    DOCX_TABLE = "Structured table extracted from DOCX document."
-    DOCX_TEXT = "Unstructured text from DOCX document."
-    PDF_CHART = "Structured chart extracted from PDF document."
-    PDF_IMAGE = "Image extracted from PDF document."
-    PDF_INFOGRAPHIC = "Structured infographic extracted from PDF document."
-    PDF_TABLE = "Structured table extracted from PDF document."
-    PDF_TEXT = "Unstructured text from PDF document."
-    PPTX_IMAGE = "Image extracted from PPTX presentation."
-    PPTX_TABLE = "Structured table extracted from PPTX presentation."
-    PPTX_TEXT = "Unstructured text from PPTX presentation."
-
-
-class TextTypeEnum(str, Enum):
-    BLOCK = "block"
-    BODY = "body"
-    DOCUMENT = "document"
-    HEADER = "header"
-    LINE = "line"
-    NEARBY_BLOCK = "nearby_block"
-    OTHER = "other"
-    PAGE = "page"
-    SPAN = "span"
-
-
-class LanguageEnum(str, Enum):
-    AF = "af"
-    AR = "ar"
-    BG = "bg"
-    BN = "bn"
-    CA = "ca"
-    CS = "cs"
-    CY = "cy"
-    DA = "da"
-    DE = "de"
-    EL = "el"
-    EN = "en"
-    ES = "es"
-    ET = "et"
-    FA = "fa"
-    FI = "fi"
-    FR = "fr"
-    GU = "gu"
-    HE = "he"
-    HI = "hi"
-    HR = "hr"
-    HU = "hu"
-    ID = "id"
-    IT = "it"
-    JA = "ja"
-    KN = "kn"
-    KO = "ko"
-    LT = "lt"
-    LV = "lv"
-    MK = "mk"
-    ML = "ml"
-    MR = "mr"
-    NE = "ne"
-    NL = "nl"
-    NO = "no"
-    PA = "pa"
-    PL = "pl"
-    PT = "pt"
-    RO = "ro"
-    RU = "ru"
-    SK = "sk"
-    SL = "sl"
-    SO = "so"
-    SQ = "sq"
-    SV = "sv"
-    SW = "sw"
-    TA = "ta"
-    TE = "te"
-    TH = "th"
-    TL = "tl"
-    TR = "tr"
-    UK = "uk"
-    UR = "ur"
-    VI = "vi"
-    ZH_CN = "zh-cn"
-    ZH_TW = "zh-tw"
-    UNKNOWN = "unknown"
-
-    @classmethod
-    def has_value(cls, value):
-        return value in cls._value2member_map_
-
-
-class ImageTypeEnum(str, Enum):
-    BMP = "bmp"
-    GIF = "gif"
-    JPEG = "jpeg"
-    PNG = "png"
-    TIFF = "tiff"
-
-    image_type_1 = "image_type_1"  # until classifier developed
-    image_type_2 = "image_type_2"  # until classifier developed
-
-    @classmethod
-    def has_value(cls, value):
-        return value in cls._value2member_map_
-
-
-class TableFormatEnum(str, Enum):
-    HTML = "html"
-    IMAGE = "image"
-    LATEX = "latex"
-    MARKDOWN = "markdown"
-    PSEUDO_MARKDOWN = "pseudo_markdown"
-    SIMPLE = "simple"
-
-
-class TaskTypeEnum(str, Enum):
-    CAPTION = "caption"
-    EMBED = "embed"
-    EXTRACT = "extract"
-    FILTER = "filter"
-    SPLIT = "split"
-    TRANSFORM = "transform"
-
-
-class StatusEnum(str, Enum):
-    ERROR: str = "error"
-    SUCCESS: str = "success"
-
-
-class ContentSubtypeEnum(str, Enum):
-    TABLE = "table"
-    CHART = "chart"
-    INFOGRAPHIC = "infographic"
 
 
 # Sub schemas
@@ -310,14 +162,14 @@ class AudioMetadataSchema(BaseModelNoExt):
 
 # TODO consider deprecating this in favor of info msg...
 class ErrorMetadataSchema(BaseModelNoExt):
-    task: TaskTypeEnum
+    task: PrimaryTaskTypeEnum
     status: StatusEnum
     source_id: str = ""
     error_msg: str
 
 
 class InfoMessageMetadataSchema(BaseModelNoExt):
-    task: TaskTypeEnum
+    task: PrimaryTaskTypeEnum
     status: StatusEnum
     message: str
     filter: bool

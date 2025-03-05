@@ -13,7 +13,7 @@ from urllib.parse import quote
 import pandas as pd
 from minio import Minio
 
-from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 
 logger = logging.getLogger(__name__)
 

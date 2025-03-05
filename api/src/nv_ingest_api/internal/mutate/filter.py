@@ -7,11 +7,11 @@ from typing import Dict, Optional, List, Any
 
 import pandas as pd
 
+from nv_ingest_api.internal.enums.common import PrimaryTaskTypeEnum
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     ContentTypeEnum,
     InfoMessageMetadataSchema,
     StatusEnum,
-    TaskTypeEnum,
 )
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.util.schema.schema_validator import validate_schema
@@ -112,7 +112,7 @@ def filter_images_internal(
                 return df_ledger
 
             info_msg = {
-                "task": TaskTypeEnum.FILTER.value,
+                "task": PrimaryTaskTypeEnum.FILTER.value,
                 "status": StatusEnum.SUCCESS.value,
                 "message": "Filtered due to image size or aspect ratio.",
                 "filter": True,
