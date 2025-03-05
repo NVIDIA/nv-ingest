@@ -29,10 +29,10 @@ jobs:
 
       - name: Determine CONDA_CHANNEL
         run: |
-          if [ "${{ github.event_name }}" == "schedule" ]; then
-            echo "CONDA_CHANNEL=dev" >> $GITHUB_ENV
-          else
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "CONDA_CHANNEL=${{ github.event.inputs.CONDA_CHANNEL }}" >> $GITHUB_ENV
+          else
+            echo "CONDA_CHANNEL=dev" >> $GITHUB_ENV
           fi
 
       # Build the Conda packages
