@@ -14,7 +14,7 @@ import logging
 from typing import Optional
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
-from nv_ingest_client.message_clients.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
 

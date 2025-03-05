@@ -21,8 +21,8 @@ from typing import Optional
 from typing import Tuple
 from typing import Union
 
-from nv_ingest_client.message_clients import MessageBrokerClientBase
-from nv_ingest_client.message_clients.rest.rest_client import RestClient
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.rest.rest_client import RestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives import JobSpec
 from nv_ingest_client.primitives.jobs import JobState

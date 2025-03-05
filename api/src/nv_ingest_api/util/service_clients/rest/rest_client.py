@@ -11,8 +11,9 @@ from typing import Any
 
 import httpx
 import requests
-from nv_ingest_client.message_clients import MessageBrokerClientBase
-from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
+
+from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
 
 logger = logging.getLogger(__name__)
 
@@ -155,7 +156,8 @@ class RestClient(MessageBrokerClientBase):
         except (httpx.HTTPError, AttributeError):
             return ResponseSchema(response_code=1, response_reason="Failed to ping HTTP server")
 
-    def generate_url(self, user_provided_url, user_provided_port) -> str:
+    @staticmethod
+    def generate_url(user_provided_url, user_provided_port) -> str:
         """Examines the user defined URL for http*://. If that
         pattern is detected the URL is used as provided by the user.
         If that pattern does not exist then the assumption is made that

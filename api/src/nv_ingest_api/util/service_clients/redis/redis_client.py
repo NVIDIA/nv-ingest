@@ -15,7 +15,7 @@ from typing import Union
 import redis
 from redis.exceptions import RedisError
 
-from nv_ingest_api.util.message_brokers.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
 
 # pylint: skip-file
 

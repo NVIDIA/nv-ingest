@@ -19,14 +19,14 @@ from mrc.core import operators as ops
 
 from nv_ingest.framework.schemas.framework_message_broker_sink_schema import MessageBrokerTaskSinkSchema
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
-from nv_ingest_api.util.message_brokers.client_base import MessageBrokerClientBase
-from nv_ingest_api.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 

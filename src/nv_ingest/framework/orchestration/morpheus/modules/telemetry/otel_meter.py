@@ -22,12 +22,12 @@ from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapProp
 
 from nv_ingest.framework.schemas.framework_otel_meter_schema import OpenTelemetryMeterSchema
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
-from nv_ingest_api.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )
 from nv_ingest.framework.util.telemetry.global_stats import GlobalStats
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 

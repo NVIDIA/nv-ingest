@@ -23,13 +23,13 @@ from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_ingest_job
 
 # Import the clients
-from nv_ingest_api.util.message_brokers.redis.redis_client import RedisClient
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 
 # Import the SimpleMessageBroker server
 from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
 
@@ -206,7 +206,6 @@ def _message_broker_task_source(builder: mrc.Builder):
         )
     elif client_type == "simple":
         # Start or retrieve the singleton SimpleMessageBroker server
-        # TODO(Devin) add config param for max_queue_size
         max_queue_size = broker_params.get("max_queue_size", 10000)
         server_host = validated_config.broker_client.host
         server_port = validated_config.broker_client.port
