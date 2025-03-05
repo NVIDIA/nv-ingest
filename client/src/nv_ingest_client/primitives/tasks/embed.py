@@ -91,7 +91,7 @@ class EmbedTask(Task):
         """
 
         task_properties = {
-            "filter_errors": False,
+            "filter_errors": self._filter_errors,
         }
 
         if self._embedding_nim_endpoint is not None:
