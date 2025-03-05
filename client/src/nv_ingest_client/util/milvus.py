@@ -497,7 +497,13 @@ def verify_embedding(element):
 
 
 def _pull_text(
-    element, enable_text: bool, enable_charts: bool, enable_tables: bool, enable_images: bool, enable_infographics: bool
+    element,
+    enable_text: bool,
+    enable_charts: bool,
+    enable_tables: bool,
+    enable_images: bool,
+    enable_infographics: bool,
+    enable_audio: bool,
 ):
     text = None
     if element["document_type"] == "text" and enable_text:
@@ -512,10 +518,12 @@ def _pull_text(
             text = None
     elif element["document_type"] == "image" and enable_images:
         text = element["metadata"]["image_metadata"]["caption"]
+    elif element["document_type"] == "audio" and enable_audio:
+        text = element["metadata"]["audio_metadata"]["audio_transcript"]
     verify_emb = verify_embedding(element)
     if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
-        pg_num = element["metadata"]["content_metadata"]["page_number"]
+        pg_num = element["metadata"]["content_metadata"].get("page_number")
         doc_type = element["document_type"]
         if not verify_emb:
             logger.error(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
@@ -544,7 +552,7 @@ def _insert_location_into_content_metadata(
         max_dimensions = element["metadata"]["image_metadata"]["image_location_max_dimensions"]
     if (not location) and (element["document_type"] != "text"):
         source_name = element["metadata"]["source_metadata"]["source_name"]
-        pg_num = element["metadata"]["content_metadata"]["page_number"]
+        pg_num = element["metadata"]["content_metadata"].get("page_number")
         doc_type = element["document_type"]
         logger.error(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
         location = max_dimensions = None
@@ -561,6 +569,7 @@ def write_records_minio(
     enable_tables: bool = True,
     enable_images: bool = True,
     enable_infographics: bool = True,
+    enable_audio: bool = True,
     record_func=_record_dict,
 ) -> RemoteBulkWriter:
     """
@@ -589,6 +598,8 @@ def write_records_minio(
         When true, ensure all image type records are used.
     enable_infographics : bool, optional
         When true, ensure all infographic type records are used.
+    enable_audio : bool, optional
+        When true, ensure all audio transcript type records are used.
     record_func : function, optional
         This function will be used to parse the records for necessary information.
 
@@ -599,7 +610,9 @@ def write_records_minio(
     """
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
+            text = _pull_text(
+                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+            )
             _insert_location_into_content_metadata(
                 element, enable_charts, enable_tables, enable_images, enable_infographics
             )
@@ -656,6 +669,7 @@ def create_bm25_model(
     enable_tables: bool = True,
     enable_images: bool = True,
     enable_infographics: bool = True,
+    enable_audio: bool = True,
 ) -> BM25EmbeddingFunction:
     """
     This function takes the input records and creates a corpus,
@@ -676,6 +690,8 @@ def create_bm25_model(
         When true, ensure all image type records are used.
     enable_infographics : bool, optional
         When true, ensure all infographic type records are used.
+    enable_audio : bool, optional
+        When true, ensure all audio transcript type records are used.
 
     Returns
     -------
@@ -685,7 +701,9 @@ def create_bm25_model(
     all_text = []
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
+            text = _pull_text(
+                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+            )
             if text:
                 all_text.append(text)
 
@@ -706,6 +724,7 @@ def stream_insert_milvus(
     enable_tables: bool = True,
     enable_images: bool = True,
     enable_infographics: bool = True,
+    enable_audio: bool = True,
     record_func=_record_dict,
 ):
     """
@@ -732,6 +751,8 @@ def stream_insert_milvus(
         When true, ensure all image type records are used.
     enable_infographics : bool, optional
         When true, ensure all infographic type records are used.
+    enable_audio : bool, optional
+        When true, ensure all audio transcript type records are used.
     record_func : function, optional
         This function will be used to parse the records for necessary information.
 
@@ -739,7 +760,9 @@ def stream_insert_milvus(
     data = []
     for result in records:
         for element in result:
-            text = _pull_text(element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics)
+            text = _pull_text(
+                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+            )
             _insert_location_into_content_metadata(
                 element, enable_charts, enable_tables, enable_images, enable_infographics
             )

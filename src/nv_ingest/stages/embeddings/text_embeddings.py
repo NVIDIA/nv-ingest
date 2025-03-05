@@ -176,6 +176,13 @@ def _get_pandas_image_content(row):
     return row["image_metadata"]["caption"]
 
 
+def _get_pandas_audio_content(row):
+    """
+    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
+    """
+    return row["audio_metadata"]["audio_transcript"]
+
+
 def _get_cudf_text_content(df: cudf.DataFrame):
     """
     A cuDF UDF used to select extracted text content to be used to create embeddings.
@@ -284,11 +291,11 @@ def _generate_text_embeddings_df(
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
-        ContentTypeEnum.AUDIO: lambda x: None,  # Not supported yet.
+        ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
-    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
+    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE, AUDIO.")
 
     # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
