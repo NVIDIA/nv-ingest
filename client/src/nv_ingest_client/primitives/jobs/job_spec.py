@@ -174,7 +174,7 @@ class JobSpec:
             self._tasks.append(ChartExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
-        if isinstance(task, ExtractTask) and (_DEFAULT_EXTRACTOR_MAP[self._document_type] == "audio"):
+        if isinstance(task, ExtractTask) and (task._extract_method == "audio"):
             self._tasks.append(AudioExtractionTask())
 
 
