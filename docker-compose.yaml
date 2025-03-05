@@ -8,8 +8,8 @@ services:
     ports:
       - "6379:6379"
 
-  yolox:
-    image: ${YOLOX_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1}:${YOLOX_TAG:-1.0.0}
+  yolox-page-elements:
+    image: ${YOLOX_PAGE_ELEMENTS_IMAGE:-nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v1}:${YOLOX_PAGE_ELEMENTS_TAG:-1.0.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -20,8 +20,9 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_MODEL_BATCH_SIZE=1
       # NIM OpenTelemetry Settings
-      - NIM_OTEL_SERVICE_NAME=yolox
+      - NIM_OTEL_SERVICE_NAME=yolox-page-elements
       - NIM_OTEL_TRACES_EXPORTER=otlp
       - NIM_OTEL_METRICS_EXPORTER=console
       - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
@@ -50,6 +51,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_MODEL_BATCH_SIZE=1
     deploy:
       resources:
         reservations:
@@ -71,6 +73,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_MODEL_BATCH_SIZE=1
     deploy:
       resources:
         reservations:
@@ -117,6 +120,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+      - NIM_TRITON_MAX_BATCH_SIZE=1
     deploy:
       resources:
         reservations:
@@ -220,7 +224,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12.1
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
@@ -271,12 +275,12 @@ services:
       - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       # Self-hosted redis endpoints.
-      - YOLOX_GRPC_ENDPOINT=yolox:8001
-      - YOLOX_HTTP_ENDPOINT=http://yolox:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      - YOLOX_PAGE_ELEMENTS_GRPC_ENDPOINT=yolox-page-elements:8001
+      - YOLOX_PAGE_ELEMENTS_HTTP_ENDPOINT=http://yolox-page-elements:8000/v1/infer
+      - YOLOX_PAGE_ELEMENTS_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted yolox endpoints.
-      #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
-      #- YOLOX_INFER_PROTOCOL=http
+      #- YOLOX_PAGE_ELEMENTS_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
+      #- YOLOX_PAGE_ELEMENTS_INFER_PROTOCOL=http
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=yolox-graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://yolox-graphic-elements:8000/v1/infer
       - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
