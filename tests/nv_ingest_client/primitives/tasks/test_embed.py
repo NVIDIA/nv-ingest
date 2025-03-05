@@ -19,14 +19,14 @@ def test_embed_task_initialization():
         filter_errors=True,
     )
 
-    del os.environ['EMBEDDING_NIM_ENDPOINT']
-    del os.environ['EMBEDDING_NIM_MODEL_NAME']
+    del os.environ["EMBEDDING_NIM_ENDPOINT"]
+    del os.environ["EMBEDDING_NIM_MODEL_NAME"]
     del os.environ["NVIDIA_BUILD_API_KEY"]
 
     assert task._embedding_nim_endpoint == "http://embedding-ms:8000/v1"
     assert task._embedding_nim_model_name == "nvidia/test-model"
     assert task._nvidia_build_api_key == "api-key"
-    assert task._filter_errors == True
+    assert task._filter_errors
 
 
 # Dictionary Representation Tests
@@ -50,19 +50,20 @@ def test_embed_task_to_dict(
     os.environ["EMBEDDING_NIM_MODEL_NAME"] = embedding_nim_model_name
     os.environ["NVIDIA_BUILD_API_KEY"] = nvidia_build_api_key
 
-    task = EmbedTask(
-        filter_errors = filter_errors
-    )
+    task = EmbedTask(filter_errors=filter_errors)
 
-    del os.environ['EMBEDDING_NIM_ENDPOINT']
-    del os.environ['EMBEDDING_NIM_MODEL_NAME']
+    del os.environ["EMBEDDING_NIM_ENDPOINT"]
+    del os.environ["EMBEDDING_NIM_MODEL_NAME"]
     del os.environ["NVIDIA_BUILD_API_KEY"]
 
-    expected_dict = {"type": "embed", "task_properties": {
-        "embedding_nim_model_name": embedding_nim_model_name,
-        "nvidia_build_api_key": nvidia_build_api_key,
-        "filter_errors": filter_errors,
-    }}
+    expected_dict = {
+        "type": "embed",
+        "task_properties": {
+            "embedding_nim_model_name": embedding_nim_model_name,
+            "nvidia_build_api_key": nvidia_build_api_key,
+            "filter_errors": filter_errors,
+        },
+    }
 
     if embedding_nim_endpoint == "":
         expected_dict["task_properties"]["embedding_nim_endpoint"] = "https://integrate.api.nvidia.com/v1"
@@ -70,7 +71,7 @@ def test_embed_task_to_dict(
         expected_dict["task_properties"]["embedding_nim_endpoint"] = "http://" + embedding_nim_endpoint + "/v1"
     else:
         expected_dict["task_properties"]["embedding_nim_endpoint"] = embedding_nim_endpoint
-    
+
     print(expected_dict)
     print(task.to_dict())
 
@@ -86,7 +87,7 @@ def test_embed_task_default_params():
         "embedding_nim_endpoint: https://integrate.api.nvidia.com/v1",
         "embedding_nim_model_name: nvidia/llama-3.2-nv-embedqa-1b-v2",
         "nvidia_build_api_key: [redacted]",
-        "filter_errors: False"
+        "filter_errors: False",
     ]
     for expected_part in expected_str_contains:
         assert expected_part in str(task)
