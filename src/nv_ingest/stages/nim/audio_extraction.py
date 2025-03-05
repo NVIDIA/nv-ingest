@@ -2,21 +2,24 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
+import logging
 import traceback
-
-import pandas as pd
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 from morpheus.config import Config
-from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
+from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
+from nv_ingest.schemas.metadata_schema import AudioMetadataSchema
+from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest.schemas.metadata_schema import MetadataSchema
+from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.parakeet import create_audio_inference_client
+from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -57,7 +60,7 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
-    if (content_metadata.get("type") != "audio") and (base64_audio in (None, "")):
+    if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return metadata
 
     # Modify audio metadata with the result from the inference model
@@ -68,7 +71,11 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
             trace_info=trace_info,  # traceable_func arg
             stage_name="audio_extraction",
         )
-        metadata["audio_metadata"] = {"audio_transcript": audio_result}
+
+        row["document_type"] = ContentTypeEnum.AUDIO
+        audio_metadata = {"audio_transcript": audio_result}
+        metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+        row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
     except Exception as e:
         logger.error(f"Unhandled error calling audio inference model: {e}", exc_info=True)
         traceback.print_exc()
