@@ -66,7 +66,7 @@ def test_docx_all_text(doc_stream, document_df):
     assert extracted_data[0][1]["source_metadata"]["source_id"] == "woods_frost"
 
 
-@pytest.mark.xfail(reason="Table extract requires yolox, disabling for now")
+@pytest.mark.xfail(reason="Table extract requires page-elements, disabling for now")
 def test_docx_table(doc_stream, document_df):
     """
     Validate text and table extraction. Table content is converted into markdown text.
