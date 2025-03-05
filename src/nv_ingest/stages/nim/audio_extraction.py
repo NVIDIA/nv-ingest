@@ -60,7 +60,7 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
-    if (content_metadata.get("type") != ContentTypeEnum.AUDIO) and (base64_audio in (None, "")):
+    if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return metadata
 
     # Modify audio metadata with the result from the inference model
