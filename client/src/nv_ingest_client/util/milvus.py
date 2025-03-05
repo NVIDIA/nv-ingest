@@ -396,7 +396,8 @@ def create_collection(
     """
     if recreate and client.has_collection(collection_name):
         client.drop_collection(collection_name)
-    client.create_collection(collection_name=collection_name, schema=schema, index_params=index_params)
+    if not client.has_collection(collection_name):
+        client.create_collection(collection_name=collection_name, schema=schema, index_params=index_params)
 
 
 def create_nvingest_collection(
@@ -517,9 +518,9 @@ def _pull_text(
         pg_num = element["metadata"]["content_metadata"]["page_number"]
         doc_type = element["document_type"]
         if not verify_emb:
-            logger.error(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
+            logger.info(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
         if not text:
-            logger.error(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
+            logger.info(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
         # if we do find text but no embedding remove anyway
         text = None
     return text
@@ -545,7 +546,7 @@ def _insert_location_into_content_metadata(
         source_name = element["metadata"]["source_metadata"]["source_name"]
         pg_num = element["metadata"]["content_metadata"]["page_number"]
         doc_type = element["document_type"]
-        logger.error(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
+        logger.info(f"failed to find location for entity: {source_name} page: {pg_num} type: {doc_type}")
         location = max_dimensions = None
     element["metadata"]["content_metadata"]["location"] = location
     element["metadata"]["content_metadata"]["max_dimensions"] = max_dimensions
@@ -567,6 +568,8 @@ def write_records_minio(
     If a sparse model is supplied, it will be used to generate sparse
     embeddings to allow for hybrid search. Will filter records based on
     type, depending on what types are enabled via the boolean parameters.
+    If the user sets the log level to info, any time a record fails
+    ingestion, it will be reported to the user.
 
     Parameters
     ----------
@@ -659,7 +662,9 @@ def create_bm25_model(
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
-    a BM25 model with that information.
+    a BM25 model with that information. If the user sets the log
+    level to info, any time a record fails ingestion, it will be
+    reported to the user.
 
     Parameters
     ----------
@@ -710,7 +715,9 @@ def stream_insert_milvus(
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
-    a BM25 model with that information.
+    a BM25 model with that information. If the user sets the log
+    level to info, any time a record fails ingestion, it will be
+    reported to the user.
 
     Parameters
     ----------
@@ -1241,6 +1248,7 @@ def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
     String
         Full page(s) corresponding to anchor record.
     """
+
     source_file = anchor_record["entity"]["source"]["source_name"]
     page_number = anchor_record["entity"]["content_metadata"]["page_number"]
     min_page = page_number - page_signum
