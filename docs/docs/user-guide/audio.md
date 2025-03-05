@@ -21,7 +21,6 @@ Password: <your-ngc-key>
 ```
 - Replace `<your-ngc-key>` with your actual NGC API key.
 - The username should always be `$oauthtoken`.
-- Ensure that your NGC key belongs to the `nvidia/riva` org/team.
 
 ### Step 2. Store the NGC API Key in an Environment File
 
@@ -30,7 +29,7 @@ This allows services to access it without needing to enter the key manually each
 
 Create a .env file in your working directory and add the following line:
 ```ini
-RIVA_NGC_API_KEY=<your-ngc-key>
+NGC_API_KEY=<your-ngc-key>
 ```
 Again, replace <your-ngc-key> with your actual API key.
 
