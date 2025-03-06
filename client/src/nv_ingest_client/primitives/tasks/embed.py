@@ -79,12 +79,16 @@ class EmbedTask(Task):
         """
         Returns a string with the object's config and run time state
         """
-        info = ""
-        info += "Embed Task:\n"
-        info += f"  endpoint_url: {self._endpoint_url}\n"
-        info += f"  model_name: {self._model_name}\n"
-        info += "  api_key: [redacted]\n"
+        info = "Embed Task:\n"
+
+        if self._endpoint_url:
+            info += f"  endpoint_url: {self._endpoint_url}\n"
+        if self._model_name:
+            info += f"  model_name: {self._model_name}\n"
+        if self._api_key:
+            info += "  api_key: [redacted]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
+
         return info
 
     def to_dict(self) -> Dict:
@@ -96,11 +100,13 @@ class EmbedTask(Task):
             "filter_errors": self._filter_errors,
         }
 
-        if self._endpoint_url is not None:
+        if self._endpoint_url:
             task_properties["endpoint_url"] = self._endpoint_url
-        if self._model_name is not None:
+
+        if self._model_name:
             task_properties["model_name"] = self._model_name
-        if self._api_key is not None:
+
+        if self._api_key:
             task_properties["api_key"] = self._api_key
 
         return {"type": "embed", "task_properties": task_properties}

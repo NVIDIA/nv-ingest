@@ -300,10 +300,6 @@ def _generate_text_embeddings_df(
     api_key = task_props.get("api_key") or validated_config.api_key
     filter_errors = task_props.get("filter_errors", False)
 
-    logger.info(endpoint_url)
-    logger.info(model_name)
-    logger.info(api_key)
-
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE, AUDIO.")
 
     # Process each supported content type.
