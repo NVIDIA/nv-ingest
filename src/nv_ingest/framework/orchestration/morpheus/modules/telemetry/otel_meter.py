@@ -5,7 +5,6 @@
 
 import logging
 import re
-import traceback
 from datetime import datetime
 
 import mrc
@@ -21,7 +20,10 @@ from opentelemetry.sdk.resources import Resource
 from opentelemetry.trace.propagation.tracecontext import TraceContextTextMapPropagator
 
 from nv_ingest.framework.schemas.framework_otel_meter_schema import OpenTelemetryMeterSchema
-from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_context_manager,
+    unified_exception_handler,
+)
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )
@@ -182,23 +184,20 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
         raise_on_failure=validated_config.raise_on_failure,
         skip_processing_if_failed=False,
     )
+    @unified_exception_handler
     def aggregate_metrics(message: IngestControlMessage) -> IngestControlMessage:
-        try:
-            do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
-            if not do_trace_tagging:
-                return message
-
-            logger.debug("Performing statistics aggregation.")
-
-            update_job_stats()
-            update_job_latency(message)
-            update_e2e_latency(message)
-            update_response_stats(message)
-
+        do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
+        if not do_trace_tagging:
             return message
-        except Exception as e:
-            traceback.print_exc()
-            raise ValueError(f"Failed to perform statistics aggregation: {e}")
+
+        logger.debug("Performing statistics aggregation.")
+
+        update_job_stats()
+        update_job_latency(message)
+        update_e2e_latency(message)
+        update_response_stats(message)
+
+        return message
 
     aggregate_node = builder.make_node("opentelemetry_meter", ops.map(aggregate_metrics))
 

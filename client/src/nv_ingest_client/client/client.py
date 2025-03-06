@@ -10,7 +10,6 @@ import json
 import logging
 import math
 import time
-import traceback
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
@@ -545,9 +544,10 @@ class NvIngestClient:
 
             return x_trace_id
         except Exception as err:
-            traceback.print_exc()
-            logger.error(f"Failed to submit job {job_index} to queue {job_queue_id}: {err}")
+            err_msg = f"Failed to submit job {job_index} to queue {job_queue_id}: {err}"
+            logger.exception(err_msg)
             job_state.state = JobStateEnum.FAILED
+
             raise
 
     def submit_job(

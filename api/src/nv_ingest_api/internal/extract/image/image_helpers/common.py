@@ -18,7 +18,6 @@
 
 import io
 import logging
-import traceback
 from datetime import datetime
 from typing import Dict, IO, Any
 from typing import List
@@ -237,8 +236,7 @@ def extract_page_elements_from_images(
         raise
 
     except Exception as e:
-        logger.error(f"Unhandled error during table/chart extraction: {str(e)}")
-        traceback.print_exc()
+        logger.exception(f"Unhandled error during table/chart extraction: {str(e)}")
         raise
 
     finally:

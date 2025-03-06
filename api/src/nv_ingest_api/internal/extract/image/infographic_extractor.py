@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import traceback
 from typing import Any
 from typing import Dict
 from typing import List
@@ -243,8 +242,8 @@ def extract_infographic_data_from_image_internal(
         return df_extraction_ledger, {"trace_info": execution_trace_log}
 
     except Exception:
-        logger.error("Error occurred while extracting infographic data.", exc_info=True)
-        traceback.print_exc()
+        err_msg = "Error occurred while extracting infographic data."
+        logger.exception(err_msg)
         raise
 
     finally:

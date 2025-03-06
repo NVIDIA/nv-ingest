@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import traceback
 
 import mrc
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -22,7 +21,10 @@ from opentelemetry.trace import StatusCode
 from opentelemetry.trace import TraceFlags
 
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
-from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_context_manager,
+    unified_exception_handler,
+)
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )
@@ -106,20 +108,17 @@ def _trace(builder: mrc.Builder) -> None:
         raise_on_failure=validated_config.raise_on_failure,
         skip_processing_if_failed=False,
     )
+    @unified_exception_handler
     def on_next(message: IngestControlMessage) -> IngestControlMessage:
-        try:
-            do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
-            if not do_trace_tagging:
-                return message
-
-            logger.debug("Sending traces to OpenTelemetry collector.")
-
-            collect_timestamps(message)
-
+        do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
+        if not do_trace_tagging:
             return message
-        except Exception as e:
-            traceback.print_exc()
-            raise ValueError(f"Failed to perform statistics aggregation: {e}")
+
+        logger.debug("Sending traces to OpenTelemetry collector.")
+
+        collect_timestamps(message)
+
+        return message
 
     aggregate_node = builder.make_node("stats_aggregation", ops.map(on_next))
 

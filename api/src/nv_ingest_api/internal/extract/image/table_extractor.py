@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-import traceback
 from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Union
 from typing import Dict
@@ -338,8 +337,7 @@ def extract_table_data_from_image_internal(
         return df_extraction_ledger, {"trace_info": execution_trace_log}
 
     except Exception:
-        logger.error("Error occurred while extracting table data.", exc_info=True)
-        traceback.print_exc()
+        logger.exception("Error occurred while extracting table data.", exc_info=True)
         raise
     finally:
         yolox_client.close()

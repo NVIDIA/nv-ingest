@@ -7,7 +7,6 @@ import inspect
 import logging
 import os
 import time
-import traceback
 import typing
 from io import BytesIO
 from typing import Dict
@@ -16,6 +15,7 @@ from typing import List
 import pypdfium2 as pdfium
 from docx import Document as DocxDocument
 
+from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
 from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
@@ -25,11 +25,10 @@ from pptx import Presentation
 
 logger = logging.getLogger(__name__)
 
+
 # pylint: disable=invalid-name
 # pylint: disable=missing-class-docstring
 # pylint: disable=logging-fstring-interpolation
-
-logger = logging.getLogger(__name__)
 
 
 class ClientConfigSchema:
@@ -111,6 +110,7 @@ def count_pages_for_text(file_path: str) -> int:
         return 0
 
 
+@unified_exception_handler
 def _process_file(file_path: str):
     """
     Synchronously processes a single file, extracting its content and collecting file details.
@@ -145,20 +145,15 @@ def _process_file(file_path: str):
       logging.
     """
 
-    try:
-        file_name = os.path.basename(file_path)
-        content, document_type = extract_file_content(file_path)  # Call the synchronous function directly
+    file_name = os.path.basename(file_path)
+    content, document_type = extract_file_content(file_path)  # Call the synchronous function directly
 
-        return {
-            "source_name": file_name,
-            "source_id": file_name,
-            "content": content,
-            "document_type": document_type,
-        }
-    except Exception as e:
-        traceback.print_exc()
-        logger.error(f"Error processing file {file_path}: {e}")
-        raise
+    return {
+        "source_name": file_name,
+        "source_id": file_name,
+        "content": content,
+        "document_type": document_type,
+    }
 
 
 def load_data_from_path(path: str) -> Dict:

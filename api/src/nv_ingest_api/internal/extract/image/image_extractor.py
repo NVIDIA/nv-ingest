@@ -7,7 +7,6 @@ import base64
 import functools
 import io
 import logging
-import traceback
 from typing import Any, Union, Tuple
 from typing import Dict
 from typing import List
@@ -200,6 +199,5 @@ def extract_primitives_from_image_internal(
 
     except Exception as e:
         err_msg = f"process_image: Unhandled exception in image extractor stage. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        traceback.print_exc()
+        logger.exception(err_msg)
         raise type(e)(err_msg) from e

@@ -6,7 +6,6 @@
 import json
 import logging
 import sys
-import traceback
 from typing import Any
 from typing import Dict
 from typing import List
@@ -303,8 +302,8 @@ def process_and_forward(message: IngestControlMessage, broker_client: MessageBro
         mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
-        traceback.print_exc()
-        logger.error(f"Critical error processing message: {e}")
+        err_msg = f"Critical error processing message: {e}"
+        logger.exception(err_msg)
 
         mdf_size = len(mdf) if not mdf.empty else 0
         handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)

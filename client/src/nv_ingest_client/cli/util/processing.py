@@ -9,7 +9,6 @@ import logging
 import os
 import re
 import time
-import traceback
 from collections import defaultdict
 from concurrent.futures import as_completed
 from statistics import mean
@@ -21,7 +20,6 @@ from typing import Tuple
 from typing import Type
 
 from click import style
-from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.processing import handle_future_result
 from nv_ingest_client.util.util import estimate_page_count
 from PIL import Image
@@ -36,94 +34,126 @@ def highlight_error_in_original(original_str: str, task_name: str, error_detail:
     """
     Highlights the error-causing text in the original JSON string based on the error type.
 
-    This function identifies errors in the original JSON string and highlights the specific
-    part of the string responsible for the error. It handles two main types of errors:
-    - For 'extra fields' errors, it highlights the extra field that caused the issue.
-    - For 'missing fields' errors, it appends a clear message indicating the missing field.
+    This function identifies the problematic portion of the JSON string by inspecting the
+    provided error details. For errors due to extra fields, it highlights the extra field
+    (using blue and bold formatting). For errors due to missing fields or insufficient
+    string length, it appends a clear message indicating the missing field and its location.
 
     Parameters
     ----------
     original_str : str
-        The original JSON string that caused the error. The function will modify and return this
-        string with the problematic fields highlighted.
-
+        The original JSON string that caused the error. This string will be modified to highlight
+        the problematic field.
     task_name : str
-        The name of the task associated with the error. This is included in the error message when
+        The name of the task associated with the error. This is used in the error message when
         highlighting missing fields.
-
     error_detail : Dict[str, Any]
-        A dictionary containing details about the error. The dictionary should contain the following keys:
-        - 'type' (str): The type of error (e.g., "value_error.extra", "value_error.missing").
-        - 'loc' (List[Any]): A list of keys/indices indicating the location of the error in the JSON structure.
+        A dictionary containing details about the error. Expected keys are:
+        - 'type' (str): The type of error (e.g., "value_error.extra", "value_error.missing",
+          "value_error.any_str.min_length").
+        - 'loc' (List[Any]): A list representing the path to the error-causing field in the JSON structure.
 
     Returns
     -------
     str
-        The original string with the error-causing field highlighted. If the error is related to
-        extra fields, the problematic field is highlighted in blue and bold. If the error is due
-        to missing fields, a message indicating the missing field is appended to the string.
+        The modified JSON string with the error-causing field highlighted or a message appended indicating
+        the missing field.
 
     Notes
     -----
-    - The function uses the `style` method (assumed to be defined elsewhere, likely from a
-      terminal or text formatting library) to apply color and bold formatting to the highlighted text.
-    - The 'loc' key in `error_detail` is a list that represents the path to the error-causing field in the JSON.
-
-    Examples
-    --------
-    Suppose there is an error in the original JSON string due to an extra field:
-
-    >>> original_str = '{"name": "file1.txt", "extra_field": "some_value"}'
-    >>> task_name = "validate_document"
-    >>> error_detail = {
-    ...     "type": "value_error.extra",
-    ...     "loc": ["extra_field"]
-    ... }
-    >>> highlighted_str_ex = highlight_error_in_original(original_str, task_name, error_detail)
-    >>> print(highlighted_str_ex)
-    {"name": "file1.txt", "extra_field": "some_value"}  # The 'extra_field' will be highlighted
-
-    In this case, the function will highlight the `extra_field` in blue and bold in the returned string.
-
-    See Also
-    --------
-    style : Function used to apply formatting to the error-causing text (e.g., coloring or bolding).
+    - The function uses the `style` function to apply formatting to the error-causing text.
+    - If the error detail does not include the expected keys, a fallback is used and the original string is returned.
     """
+    try:
+        error_type: str = error_detail.get("type", "unknown")
+        loc: List[Any] = error_detail.get("loc", [])
+        if loc:
+            # Build a string representation of the error location
+            error_location: str = "->".join(map(str, loc))
+            error_key: str = str(loc[-1])
+        else:
+            error_location = "unknown"
+            error_key = ""
 
-    error_type = error_detail["type"]
-    error_location = "->".join(map(str, error_detail["loc"]))
-    if error_type == "value_error.extra":
-        error_key = error_detail["loc"][-1]
-        highlighted_key = style(error_key, fg="blue", bold=True)
-        highlighted_str = original_str.replace(f'"{error_key}"', highlighted_key)
-    elif error_type in ["value_error.missing", "value_error.any_str.min_length"]:
-        missing_message = style(f"'{error_location}'", fg="blue", bold=True)
-        highlighted_str = (
-            f"{original_str}\n(Schema Error): Missing required parameter for task '{task_name}'"
-            f" {missing_message}\n -> {original_str}"
-        )
-    else:
-        error_key = error_detail["loc"][-1]
-        highlighted_key = style(error_key, fg="blue", bold=True)
-        highlighted_str = original_str.replace(f'"{error_key}"', highlighted_key)
+        if error_type == "value_error.extra" and error_key:
+            # Use regex substitution to only highlight the first occurrence of the error field.
+            highlighted_key = style(error_key, fg="blue", bold=True)
+            highlighted_str = re.sub(f'("{re.escape(error_key)}")', highlighted_key, original_str, count=1)
+        elif error_type in ["value_error.missing", "value_error.any_str.min_length"]:
+            # Provide a clear message about the missing field.
+            if error_key:
+                missing_field = style(f"'{error_key}'", fg="blue", bold=True)
+            else:
+                missing_field = style(f"at '{error_location}'", fg="blue", bold=True)
+            highlighted_str = (
+                f"{original_str}\n(Schema Error): Missing required parameter for task '{task_name}': {missing_field}"
+            )
+        else:
+            # For any other error types, attempt to highlight the field if available.
+            if error_key:
+                highlighted_key = style(error_key, fg="blue", bold=True)
+                highlighted_str = re.sub(f'("{re.escape(error_key)}")', highlighted_key, original_str, count=1)
+            else:
+                highlighted_str = original_str
+    except Exception as e:
+        logger.error(f"Error while highlighting error in original string: {e}")
+        highlighted_str = original_str
 
     return highlighted_str
 
 
-def format_validation_error(e: ValidationError, task_id, original_str: str) -> str:
+def format_validation_error(e: ValidationError, task_id: str, original_str: str) -> str:
     """
     Formats validation errors with appropriate highlights and returns a detailed error message.
+
+    Parameters
+    ----------
+    e : ValidationError
+        The validation error raised by the schema.
+    task_id : str
+        The identifier of the task for which the error occurred.
+    original_str : str
+        The original JSON string that caused the validation error.
+
+    Returns
+    -------
+    str
+        A detailed error message with highlighted problematic fields.
     """
-    error_messages = []
+    error_messages: List[str] = []
     for error in e.errors():
         error_message = f"(Schema Error): {error['msg']}"
         highlighted_str = highlight_error_in_original(original_str, task_id, error)
         error_messages.append(f"{error_message}\n -> {highlighted_str}")
-
     return "\n".join(error_messages)
 
 
 def check_schema(schema: Type[BaseModel], options: dict, task_id: str, original_str: str) -> BaseModel:
+    """
+    Validates the provided options against the given schema and returns a schema instance.
+
+    Parameters
+    ----------
+    schema : Type[BaseModel]
+        A Pydantic model class used for validating the options.
+    options : dict
+        The options dictionary to validate.
+    task_id : str
+        The identifier of the task associated with the options.
+    original_str : str
+        The original JSON string representation of the options.
+
+    Returns
+    -------
+    BaseModel
+        An instance of the validated schema populated with the provided options.
+
+    Raises
+    ------
+    ValueError
+        If validation fails, a ValueError is raised with a formatted error message highlighting
+        the problematic parts of the original JSON string.
+    """
     try:
         return schema(**options)
     except ValidationError as e:
@@ -175,7 +205,10 @@ def report_stage_statistics(stage_elapsed_times: defaultdict, total_trace_elapse
 
 def report_overall_speed(total_pages_processed: int, start_time_ns: int, total_files: int) -> None:
     """
-    Reports the overall processing speed based on the number of pages and files processed.
+    Report the overall processing speed based on the number of pages and files processed.
+
+    This function calculates the total elapsed time from the start of processing and reports the throughput
+    in terms of pages and files processed per second.
 
     Parameters
     ----------
@@ -188,15 +221,13 @@ def report_overall_speed(total_pages_processed: int, start_time_ns: int, total_f
 
     Notes
     -----
-    This function calculates the total elapsed time from the start of processing and reports the throughput
-    in terms of pages and files processed per second.
+    The function converts the elapsed time from nanoseconds to seconds and logs the overall throughput.
     """
+    total_elapsed_time_ns: int = time.time_ns() - start_time_ns
+    total_elapsed_time_s: float = total_elapsed_time_ns / 1_000_000_000  # Convert nanoseconds to seconds
 
-    total_elapsed_time_ns = time.time_ns() - start_time_ns
-    total_elapsed_time_s = total_elapsed_time_ns / 1_000_000_000  # Convert nanoseconds to seconds
-
-    throughput_pages = total_pages_processed / total_elapsed_time_s  # pages/sec
-    throughput_files = total_files / total_elapsed_time_s  # files/sec
+    throughput_pages: float = total_pages_processed / total_elapsed_time_s  # pages/sec
+    throughput_files: float = total_files / total_elapsed_time_s  # files/sec
 
     logger.info(f"Processed {total_files} files in {total_elapsed_time_s:.2f} seconds.")
     logger.info(f"Total pages processed: {total_pages_processed}")
@@ -211,15 +242,19 @@ def report_statistics(
     total_files: int,
 ) -> None:
     """
-    Aggregates and reports statistics for the entire processing session.
+    Aggregate and report statistics for the entire processing session.
+
+    This function calculates the absolute elapsed time from the start of processing to the current time and
+    the total time taken by all stages. It then reports detailed stage statistics along with overall
+    processing throughput.
 
     Parameters
     ----------
     start_time_ns : int
         The nanosecond timestamp marking the start of the processing.
-    stage_elapsed_times : defaultdict(list)
-        A defaultdict where each key is a processing stage and each value is a list
-        of elapsed times in nanoseconds for that stage.
+    stage_elapsed_times : defaultdict
+        A defaultdict where each key is a processing stage (str) and each value is a list of elapsed times
+        (int, in nanoseconds) for that stage.
     total_pages_processed : int
         The total number of pages processed during the session.
     total_files : int
@@ -227,84 +262,79 @@ def report_statistics(
 
     Notes
     -----
-    This function calculates the absolute elapsed time from the start of processing to the current
-    time and the total time taken by all stages.
+    The function calls `report_stage_statistics` to log detailed timing information per stage, then calls
+    `report_overall_speed` to log the overall throughput.
     """
-
-    abs_elapsed = time.time_ns() - start_time_ns
-    total_trace_elapsed = sum(sum(times) for times in stage_elapsed_times.values())
-    report_stage_statistics(stage_elapsed_times, total_trace_elapsed, abs_elapsed)
+    abs_elapsed: int = time.time_ns() - start_time_ns
+    total_trace_elapsed: int = sum(sum(times) for times in stage_elapsed_times.values())
+    report_stage_statistics(stage_elapsed_times, total_trace_elapsed, abs_elapsed)  # Assumes implementation exists
     report_overall_speed(total_pages_processed, start_time_ns, total_files)
 
 
-def process_response(response, stage_elapsed_times):
+def process_response(response: Dict[str, Any], stage_elapsed_times: defaultdict) -> None:
     """
     Process the response to extract trace data and calculate elapsed time for each stage.
 
+    This function iterates over trace data in the response, identifies entry and exit times for each stage,
+    calculates the elapsed time, and appends the elapsed time to the corresponding stage in the provided
+    `stage_elapsed_times` dictionary.
+
     Parameters
     ----------
-    response : dict
+    response : Dict[str, Any]
         The response dictionary containing trace information for processing stages.
-    stage_elapsed_times : defaultdict(list)
-        A defaultdict to accumulate elapsed times for each processing stage.
+    stage_elapsed_times : defaultdict
+        A defaultdict where keys are stage names (str) and values are lists of elapsed times (int, in nanoseconds).
 
     Notes
     -----
-    The function iterates over trace data in the response, identifying entry and exit times for
-    each stage, and calculates the elapsed time which is then appended to the respective stage in
-    `stage_elapsed_times`.
+    The function expects trace keys to include "entry" and "exit" substrings. For each entry key, the corresponding
+    exit key is determined by replacing "entry" with "exit". The stage name is assumed to be the third element when
+    splitting the key by "::".
     """
-
-    trace_data = response.get("trace", {})
+    trace_data: Dict[str, Any] = response.get("trace", {})
     for key, entry_time in trace_data.items():
         if "entry" in key:
-            exit_key = key.replace("entry", "exit")
-            exit_time = trace_data.get(exit_key)
+            exit_key: str = key.replace("entry", "exit")
+            exit_time: Any = trace_data.get(exit_key)
             if exit_time:
-                stage_name = key.split("::")[2]
-                elapsed_time = exit_time - entry_time
-                stage_elapsed_times[stage_name].append(elapsed_time)
+                # Assumes the stage name is in the third position when splitting the key
+                stage_parts = key.split("::")
+                if len(stage_parts) >= 3:
+                    stage_name: str = stage_parts[2]
+                    elapsed_time: int = exit_time - entry_time
+                    stage_elapsed_times[stage_name].append(elapsed_time)
 
 
 def organize_documents_by_type(response_data: List[Dict[str, Any]]) -> Dict[str, List[Dict[str, Any]]]:
     """
     Organize documents by their content type.
 
-    This function takes a list of response documents, extracts the content type from
-    each document's metadata, and organizes the documents into a dictionary, where the
-    keys are content types and the values are lists of documents belonging to each type.
+    This function takes a list of response documents, extracts the content type from each document's metadata,
+    and organizes the documents into a dictionary, where the keys are content types and the values are lists of
+    documents belonging to each type.
 
     Parameters
     ----------
     response_data : List[Dict[str, Any]]
-        A list of documents, where each document is represented as a dictionary.
-        Each dictionary must contain a 'metadata' field that may be either a JSON
-        string or a dictionary. The metadata is expected to have a "content_metadata"
-        field containing the document's type.
+        A list of documents, where each document is represented as a dictionary. Each dictionary must contain
+        a 'metadata' field that may be either a JSON string or a dictionary. The metadata is expected to have a
+        "content_metadata" field containing the document's type.
 
     Returns
     -------
     Dict[str, List[Dict[str, Any]]]
-        A dictionary mapping document types (as strings) to lists of documents.
-        Each key represents a document type, and the associated value is a list of
-        documents that belong to that type.
+        A dictionary mapping document types (as strings) to lists of documents. Each key represents a document type,
+        and the associated value is a list of documents that belong to that type.
 
     Notes
     -----
-    - The 'metadata' field of each document can be either a JSON string or a
-      dictionary. If it is a string, it will be parsed into a dictionary.
-
-    - The function assumes that each document has a valid "content_metadata" field,
-      which contains a "type" key that indicates the document's type.
-
-    - If a document type is encountered for the first time, a new entry is created
-      in the result dictionary, and subsequent documents of the same type are added
-      to the corresponding list.
+    - If the 'metadata' field of a document is a string, it is parsed into a dictionary using `json.loads`.
+    - The function assumes that each document's metadata has a valid "content_metadata" field with a "type" key.
+    - Documents are grouped by the value of the "type" key in their "content_metadata".
 
     Examples
     --------
-    Suppose `response_data` contains the following structure:
-
     >>> response_data = [
     ...     {"metadata": {"content_metadata": {"type": "report"}}},
     ...     {"metadata": '{"content_metadata": {"type": "summary"}}'},
@@ -314,52 +344,40 @@ def organize_documents_by_type(response_data: List[Dict[str, Any]]) -> Dict[str,
     {'report': [{'metadata': {'content_metadata': {'type': 'report'}}},
                 {'metadata': {'content_metadata': {'type': 'report'}}}],
      'summary': [{'metadata': {'content_metadata': {'type': 'summary'}}}]}
-
-    In this example, the documents are organized into two types: "report" and "summary".
-
-    See Also
-    --------
-    json.loads : Used to parse metadata if it is a JSON string.
     """
-
-    doc_map = {}
+    doc_map: Dict[str, List[Dict[str, Any]]] = {}
     for document in response_data:
-        doc_meta = document["metadata"]
+        doc_meta: Any = document["metadata"]
         if isinstance(doc_meta, str):
             doc_meta = json.loads(doc_meta)
-        doc_content_metadata = doc_meta["content_metadata"]
-        doc_type = doc_content_metadata["type"]
+        doc_content_metadata: Dict[str, Any] = doc_meta["content_metadata"]
+        doc_type: str = doc_content_metadata["type"]
         if doc_type not in doc_map:
             doc_map[doc_type] = []
         doc_map[doc_type].append(document)
     return doc_map
 
 
-def save_response_data(response, output_directory, images_to_disk=False):
+def save_response_data(response: Dict[str, Any], output_directory: str, images_to_disk: bool = False) -> None:
     """
     Save the response data into categorized metadata JSON files and optionally save images to disk.
 
-    This function processes the response data, organizes it based on document
-    types, and saves the organized data into a specified output directory as JSON
-    files. If 'images_to_disk' is True and the document type is 'image', it decodes
-    and writes base64 encoded images to disk.
+    This function processes the response data, organizes it based on document types, and saves the organized data
+    into a specified output directory as JSON files. If 'images_to_disk' is True and the document type is 'image',
+    it decodes and writes base64 encoded images to disk.
 
     Parameters
     ----------
-    response : dict
-        A dictionary containing the API response data. It must contain a "data"
-        field, which is expected to be a list of document entries. Each document
-        entry should contain metadata, which includes information about the
-        document's source.
-
+    response : Dict[str, Any]
+        A dictionary containing the API response data. It must contain a "data" field, which is expected to be a
+        list of document entries. Each document entry should contain metadata, which includes information about
+        the document's source.
     output_directory : str
-        The path to the directory where the JSON metadata files should be saved.
-        Subdirectories will be created based on the document types, and the
-        metadata files will be stored within these subdirectories.
-
+        The path to the directory where the JSON metadata files should be saved. Subdirectories will be created based
+        on the document types, and the metadata files will be stored within these subdirectories.
     images_to_disk : bool, optional
-        If True, base64 encoded images in the 'metadata.content' field will be
-        decoded and saved to disk.
+        If True, base64 encoded images in the 'metadata.content' field will be decoded and saved to disk.
+        Default is False.
 
     Returns
     -------
@@ -368,10 +386,9 @@ def save_response_data(response, output_directory, images_to_disk=False):
 
     Notes
     -----
-    - If 'images_to_disk' is True and 'doc_type' is 'image', images will be decoded
-      and saved to the disk with appropriate file types based on 'metadata.image_metadata.image_type'.
+    - If 'images_to_disk' is True and 'doc_type' is 'image', images will be decoded and saved to disk with appropriate
+      file types based on 'metadata.image_metadata.image_type'.
     """
-
     if ("data" not in response) or (not response["data"]):
         logger.debug("Data is not in the response or response.data is empty")
         return
@@ -396,7 +413,7 @@ def save_response_data(response, output_directory, images_to_disk=False):
 
         if doc_type in ("image", "structured") and images_to_disk:
             for i, doc in enumerate(documents):
-                meta = doc.get("metadata", {})
+                meta: Dict[str, Any] = doc.get("metadata", {})
                 image_content = meta.get("content")
                 if doc_type == "image":
                     image_type = meta.get("image_metadata", {}).get("image_type", "png").lower()
@@ -437,7 +454,7 @@ def generate_job_batch_for_iteration(
     client: Any,
     pbar: Any,
     files: List[str],
-    tasks: Dict,
+    tasks: Dict[str, Any],
     processed: int,
     batch_size: int,
     retry_job_ids: List[str],
@@ -453,10 +470,10 @@ def generate_job_batch_for_iteration(
     client : Any
         The client object used to submit jobs asynchronously.
     pbar : Any
-        The progress bar object to update the progress as jobs are processed.
+        The progress bar object used to update the progress as jobs are processed.
     files : List[str]
         The list of file paths to be processed.
-    tasks : Dict
+    tasks : Dict[str, Any]
         A dictionary of tasks to be executed as part of the job specifications.
     processed : int
         The number of files that have been processed so far.
@@ -465,7 +482,7 @@ def generate_job_batch_for_iteration(
     retry_job_ids : List[str]
         A list of job IDs that need to be retried due to previous failures.
     fail_on_error : bool, optional
-        Whether to raise an error and stop processing if job specifications are missing, by default False.
+        Whether to raise an error and stop processing if job specifications are missing. Default is False.
 
     Returns
     -------
@@ -480,23 +497,22 @@ def generate_job_batch_for_iteration(
     RuntimeError
         If `fail_on_error` is True and there are missing job specifications, a RuntimeError is raised.
     """
-
-    job_indices = []
-    job_index_map_updates = {}
-    cur_job_count = 0
+    job_indices: List[str] = []
+    job_index_map_updates: Dict[str, str] = {}
+    cur_job_count: int = 0
 
     if retry_job_ids:
         job_indices.extend(retry_job_ids)
         cur_job_count = len(job_indices)
 
     if (cur_job_count < batch_size) and (processed < len(files)):
-        new_job_count = min(batch_size - cur_job_count, len(files) - processed)
-        batch_files = files[processed : processed + new_job_count]  # noqa: E203
+        new_job_count: int = min(batch_size - cur_job_count, len(files) - processed)
+        batch_files: List[str] = files[processed : processed + new_job_count]
 
-        new_job_indices = client.create_jobs_for_batch(batch_files, tasks)
+        new_job_indices: List[str] = client.create_jobs_for_batch(batch_files, tasks)
         if len(new_job_indices) != new_job_count:
-            missing_jobs = new_job_count - len(new_job_indices)
-            error_msg = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"
+            missing_jobs: int = new_job_count - len(new_job_indices)
+            error_msg: str = f"Missing {missing_jobs} job specs -- this is likely due to bad reads or file corruption"
             logger.warning(error_msg)
 
             if fail_on_error:
@@ -514,7 +530,7 @@ def generate_job_batch_for_iteration(
 
 def create_and_process_jobs(
     files: List[str],
-    client: NvIngestClient,
+    client: Any,  # Replace Any with NvIngestClient if available
     tasks: Dict[str, Any],
     output_directory: str,
     batch_size: int,
@@ -523,96 +539,67 @@ def create_and_process_jobs(
     save_images_separately: bool = False,
 ) -> Tuple[int, Dict[str, List[float]], int, Dict[str, str]]:
     """
-    Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.
+    Process a list of files by creating and submitting jobs for each file, then fetching
+    and handling the results asynchronously.
 
-    This function creates job specifications (JobSpecs) for a list of files, submits the jobs to the
-    client, and processes the results asynchronously. It handles job retries for timeouts, logs failures,
-    and limits the number of JobSpecs in memory to `batch_size * 2`. Progress is reported on a per-file basis,
-    including the pages processed per second.
+    This function creates job specifications (JobSpecs) for the provided list of files,
+    submits the jobs to the client, and processes the results asynchronously. It handles
+    job retries for timeouts, logs failures, and limits the number of JobSpecs in memory to
+    `batch_size * 2`. Progress is reported on a per-file basis, including the pages processed
+    per second.
 
     Parameters
     ----------
     files : List[str]
-        A list of file paths to be processed. Each file is used to create a job, which is then submitted to the client.
-
-    client : NvIngestClient
+        A list of file paths to be processed. Each file is used to create a job which is then
+        submitted to the client.
+    client : Any
         An instance of NvIngestClient used to submit jobs and fetch results asynchronously.
-
     tasks : Dict[str, Any]
-        A dictionary of tasks to be added to each job. The keys represent task names, and the values represent task
-        configurations. Tasks may include "split", "extract", "store", "caption", etc.
-
+        A dictionary of tasks to be added to each job. The keys represent task names (e.g., "split",
+        "extract", "store", "caption", etc.) and the values represent task configurations.
     output_directory : str
-        The directory path where the processed job results will be saved. If an empty string or None is provided,
-        results will not be saved.
-
+        The directory path where the processed job results will be saved. If an empty string or None
+        is provided, results will not be saved.
     batch_size : int
-        The number of jobs to process in each batch. Memory is limited to `batch_size * 2` jobs at any time.
-
+        The number of jobs to process in each batch. Memory is limited to `batch_size * 2` jobs at
+        any time.
     timeout : int, optional
         The timeout in seconds for each job to complete before it is retried. Default is 10 seconds.
-
     fail_on_error : bool, optional
-        If True, the function will raise an error and stop processing when encountering an unrecoverable error.
-        If False, the function logs the error and continues processing other jobs. Default is False.
+        If True, the function will raise an error and stop processing when encountering an unrecoverable
+        error. If False, the function logs the error and continues processing other jobs. Default is False.
+    save_images_separately : bool, optional
+        If True, images will be saved separately to disk. Default is False.
 
     Returns
     -------
-    Tuple[int, Dict[str, List[float]], int]
+    Tuple[int, Dict[str, List[float]], int, Dict[str, str]]
         A tuple containing:
-        - `total_files` (int): The total number of files processed.
-        - `trace_times` (Dict[str, List[float]]): A dictionary mapping job IDs to a list of trace times for
-          diagnostic purposes.
-        - `total_pages_processed` (int): The total number of pages processed from the files.
-        - `trace_ids`  (Dict[str, str]): A dictionary mapping a source file to its correlating trace_id
+        - total_files (int): The total number of files processed.
+        - trace_times (Dict[str, List[float]]): A dictionary mapping job IDs to a list of trace times
+          for diagnostic purposes.
+        - total_pages_processed (int): The total number of pages processed from the files.
+        - trace_ids (Dict[str, str]): A dictionary mapping a source file to its correlating trace_id.
 
     Raises
     ------
     RuntimeError
-        If `fail_on_error` is True and an error occurs during job submission or processing, a `RuntimeError` is raised.
-
-    Notes
-    -----
-    - The function limits the number of JobSpecs in memory to `batch_size * 2` for efficient resource management.
-    - It manages job retries for timeouts and logs decoding or processing errors.
-    - The progress bar reports progress on a per-file basis and shows the pages processed per second.
-
-    Examples
-    --------
-    Suppose we have a list of files and tasks to process:
-
-    >>> files = ["file1.txt", "file2.pdf", "file3.docx"]
-    >>> client = NvIngestClient()
-    >>> tasks = {"split": ..., "extract": ..., "store": ...}
-    >>> output_directory = "/path/to/output"
-    >>> batch_size = 5
-    >>> total_files, trace_times, total_pages_processed = create_and_process_jobs(
-    ...     files, client, tasks, output_directory, batch_size
-    ... )
-    >>> print(f"Processed {total_files} files, {total_pages_processed} pages.")
-
-    In this example, the function processes the files, submits jobs, fetches results, handles retries for
-    timeouts, and logs failures. The number of files and pages processed is printed.
-
-    See Also
-    --------
-    generate_job_batch_for_iteration : Function to generate job batches for processing.
-    handle_future_result : Function to process and handle the result of completed future jobs.
+        If `fail_on_error` is True and an error occurs during job submission or processing.
     """
+    total_files: int = len(files)
+    total_pages_processed: int = 0
+    trace_times: Dict[str, List[float]] = defaultdict(list)
+    trace_ids: Dict[str, str] = defaultdict(list)  # type: ignore
+    failed_jobs: List[str] = []
+    retry_job_ids: List[str] = []
+    job_id_map: Dict[str, str] = {}
+    retry_counts: Dict[str, int] = defaultdict(int)
+    file_page_counts: Dict[str, int] = {file: estimate_page_count(file) for file in files}
 
-    total_files = len(files)
-    total_pages_processed = 0
-    trace_times = defaultdict(list)
-    trace_ids = defaultdict(list)
-    failed_jobs = []
-    retry_job_ids = []
-    job_id_map = {}
-    retry_counts = defaultdict(int)
-    file_page_counts = {file: estimate_page_count(file) for file in files}
-
-    start_time_ns = time.time_ns()
+    start_time_ns: int = time.time_ns()
     with tqdm(total=total_files, desc="Processing files", unit="file") as pbar:
-        processed = 0
+        processed: int = 0
         while (processed < len(files)) or retry_job_ids:
             # Process new batch of files or retry failed job IDs
             job_ids, job_id_map_updates, processed = generate_job_batch_for_iteration(
@@ -621,11 +608,11 @@ def create_and_process_jobs(
             job_id_map.update(job_id_map_updates)
             retry_job_ids = []
 
-            futures_dict = client.fetch_job_result_async(job_ids, timeout=timeout, data_only=False)
+            futures_dict: Dict[Any, str] = client.fetch_job_result_async(job_ids, timeout=timeout, data_only=False)
             for future in as_completed(futures_dict.keys()):
-                retry = False
-                job_id = futures_dict[future]
-                source_name = job_id_map[job_id]
+                retry: bool = False
+                job_id: str = futures_dict[future]
+                source_name: str = job_id_map[job_id]
                 try:
                     future_response, trace_id = handle_future_result(future, futures_dict)
                     trace_ids[source_name] = trace_id
@@ -634,49 +621,63 @@ def create_and_process_jobs(
                         save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
 
                     total_pages_processed += file_page_counts[source_name]
-                    elapsed_time = (time.time_ns() - start_time_ns) / 1e9
-                    pages_per_sec = total_pages_processed / elapsed_time if elapsed_time > 0 else 0
+                    elapsed_time: float = (time.time_ns() - start_time_ns) / 1e9
+                    pages_per_sec: float = total_pages_processed / elapsed_time if elapsed_time > 0 else 0
                     pbar.set_postfix(pages_per_sec=f"{pages_per_sec:.2f}")
 
                     process_response(future_response, trace_times)
 
                 except TimeoutError:
-                    source_name = job_id_map[job_id]
                     retry_counts[source_name] += 1
                     retry_job_ids.append(job_id)  # Add job_id back to retry list
                     retry = True
                 except json.JSONDecodeError as e:
-                    source_name = job_id_map[job_id]
-                    logger.error(f"Decoding while processing {job_id}({source_name}) {e}")
+                    logger.error(f"Decoding error while processing {job_id}({source_name}): {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except RuntimeError as e:
-                    source_name = job_id_map[job_id]
                     logger.error(f"Error while processing '{job_id}' - ({source_name}):\n{e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 except Exception as e:
-                    traceback.print_exc()
-                    source_name = job_id_map[job_id]
-                    logger.error(f"Unhandled error while processing {job_id}({source_name}) {e}")
+                    logger.exception(f"Unhandled error while processing {job_id}({source_name}): {e}")
                     failed_jobs.append(f"{job_id}::{source_name}")
                 finally:
-                    # Don't update progress bar if we're going to retry the job
+                    # Do not update progress bar if we're going to retry the job.
                     if not retry:
                         pbar.update(1)
 
     return total_files, trace_times, total_pages_processed, trace_ids
 
 
-def get_valid_filename(name):
+def get_valid_filename(name: Any) -> str:
     """
-    Taken from https://github.com/django/django/blob/main/django/utils/text.py.
-    Return the given string converted to a string that can be used for a clean
-    filename. Remove leading and trailing spaces; convert other spaces to
-    underscores; and remove anything that is not an alphanumeric, dash,
-    underscore, or dot.
+    Return a sanitized version of the given filename.
+
+    This function, adapted from Django (https://github.com/django/django/blob/main/django/utils/text.py),
+    converts the input string to a form that is safe to use as a filename. It trims leading and trailing spaces,
+    replaces remaining spaces with underscores, and removes any characters that are not alphanumeric, dashes,
+    underscores, or dots.
+
+    Parameters
+    ----------
+    name : Any
+        The input value to be converted into a valid filename. It will be converted to a string.
+
+    Returns
+    -------
+    str
+        A sanitized string that can be used as a filename.
+
+    Raises
+    ------
+    ValueError
+        If a valid filename cannot be derived from the input.
+
+    Examples
+    --------
     >>> get_valid_filename("john's portrait in 2004.jpg")
     'johns_portrait_in_2004.jpg'
     """
-    s = str(name).strip().replace(" ", "_")
+    s: str = str(name).strip().replace(" ", "_")
     s = re.sub(r"(?u)[^-\w.]", "", s)
     if s in {"", ".", ".."}:
         raise ValueError("Could not derive file name from '%s'" % name)

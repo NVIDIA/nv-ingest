@@ -1,5 +1,4 @@
 import logging
-import traceback
 import uuid
 from datetime import datetime
 from functools import partial
@@ -78,10 +77,9 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
         except TimeoutError:
             continue
         except Exception as err:
-            logger.error(
+            logger.exception(
                 f"Irrecoverable error occurred during message processing, likely malformed JSON JOB structure: {err}"
             )
-            traceback.print_exc()
             continue  # Continue fetching the next message
 
 

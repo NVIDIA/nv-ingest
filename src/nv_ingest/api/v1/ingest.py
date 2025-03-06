@@ -10,7 +10,6 @@ import base64
 import json
 import logging
 import time
-import traceback
 import uuid
 
 from fastapi import APIRouter, Request, Response
@@ -96,7 +95,7 @@ async def submit_job_curl_friendly(ingest_service: INGEST_SERVICE_T, file: Uploa
         submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
         return submitted_job_id
     except Exception as ex:
-        traceback.print_exc()
+        logger.exception(f"Error submitting job: {str(ex)}")
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
@@ -151,7 +150,7 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             return job_id
 
         except Exception as ex:
-            traceback.print_exc()
+            logger.exception(f"Error submitting job: {str(ex)}")
             raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
@@ -184,7 +183,7 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
         raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
     except Exception as ex:
         # Catch-all for other exceptions, returning a 500 Internal Server Error
-        traceback.print_exc()
+        logger.exception(f"Error fetching job: {str(ex)}")
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
