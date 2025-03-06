@@ -11,6 +11,7 @@ from datetime import datetime
 from typing import Any
 from typing import Dict
 from typing import List
+from typing import Optional
 from typing import Tuple
 
 import pandas as pd
@@ -21,6 +22,7 @@ from pypdfium2 import PdfImage
 from nv_ingest.schemas.metadata_schema import ContentSubtypeEnum
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.schemas.metadata_schema import ImageTypeEnum
+from nv_ingest.schemas.metadata_schema import NearbyObjectsSchema
 from nv_ingest.schemas.metadata_schema import StdContentDescEnum
 from nv_ingest.schemas.metadata_schema import TableFormatEnum
 from nv_ingest.schemas.metadata_schema import validate_metadata
@@ -145,8 +147,11 @@ def construct_text_metadata(
     text_depth,
     source_metadata,
     base_unified_metadata,
+    delimiter=" ",
+    bbox_max_dimensions: Tuple[int, int] = (-1, -1),
+    nearby_objects: Optional[Dict[str, Any]] = None,
 ):
-    extracted_text = " ".join(accumulated_text)
+    extracted_text = delimiter.join(accumulated_text)
 
     content_metadata = {
         "type": ContentTypeEnum.TEXT,
@@ -158,6 +163,7 @@ def construct_text_metadata(
             "block": -1,
             "line": -1,
             "span": -1,
+            "nearby_objects": nearby_objects or NearbyObjectsSchema(),
         },
     }
 
@@ -172,6 +178,7 @@ def construct_text_metadata(
         "keywords": keywords,
         "language": language,
         "text_location": bbox,
+        "text_location_max_dimensions": bbox_max_dimensions,
     }
 
     ext_unified_metadata = base_unified_metadata.copy()
@@ -358,7 +365,7 @@ def construct_image_metadata_from_pdf_image(
 
 # TODO(Devin): Disambiguate tables and charts, create two distinct processing methods
 @pdfium_exception_handler(descriptor="pdfium")
-def construct_table_and_chart_metadata(
+def construct_page_element_metadata(
     structured_image: CroppedImageWithContent,
     page_idx: int,
     page_count: int,
@@ -412,8 +419,17 @@ def construct_table_and_chart_metadata(
         # TODO(Devin) swap this to chart_metadata after we confirm metadata schema changes.
         meta_name = "table_metadata"
 
+    elif structured_image.type_string in ("infographic",):
+        content = structured_image.image
+        structured_content_text = structured_image.content
+        structured_content_format = structured_image.content_format
+        table_format = TableFormatEnum.IMAGE
+        subtype = ContentSubtypeEnum.INFOGRAPHIC
+        description = StdContentDescEnum.PDF_INFOGRAPHIC
+        meta_name = "table_metadata"
+
     else:
-        raise ValueError(f"Unknown table/chart type: {structured_image.type_string}")
+        raise ValueError(f"Unknown table/chart/infographic type: {structured_image.type_string}")
 
     content_metadata = {
         "type": ContentTypeEnum.STRUCTURED,
@@ -451,3 +467,7 @@ def construct_table_and_chart_metadata(
     validated_unified_metadata = validate_metadata(ext_unified_metadata)
 
     return [ContentTypeEnum.STRUCTURED, validated_unified_metadata.model_dump(), str(uuid.uuid4())]
+
+
+# TODO: remove this alias
+construct_table_and_chart_metadata = construct_page_element_metadata

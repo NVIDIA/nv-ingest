@@ -116,7 +116,7 @@ Each task must be specified with its type and corresponding options in the '[tas
 Example:
   --task 'split:{"split_by":"page", "split_length":10}'
   --task 'extract:{"document_type":"pdf", "extract_text":true}'
-  --task 'extract:{"document_type":"pdf", "extract_method":"doughnut"}'
+  --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
@@ -147,7 +147,7 @@ Tasks and Options:
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.
     Options:
-    - document_type (str): Document format ('pdf', 'docx', 'pptx', 'html', 'xml', 'excel', 'csv', 'parquet'). Required.
+    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
     - extract_charts (bool): Enables chart extraction. Default: False.
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.

@@ -7,15 +7,21 @@ from nv_ingest_client.primitives.tasks.extract import ExtractTask
 
 
 @pytest.mark.parametrize(
-    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts",
+    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts, extract_infographics",
     [
-        ("pdf", "tika", True, False, True, True),
-        (None, "pdfium", False, True, None, False),
-        ("txt", None, None, None, False, False),
+        ("pdf", "tika", True, False, True, True, True),
+        (None, "pdfium", False, True, None, False, False),
+        ("txt", None, None, None, False, False, False),
     ],
 )
 def test_extract_task_str_representation(
-    document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts
+    document_type,
+    extract_method,
+    extract_text,
+    extract_images,
+    extract_tables,
+    extract_charts,
+    extract_infographics,
 ):
     task = ExtractTask(
         document_type=document_type,
@@ -24,6 +30,7 @@ def test_extract_task_str_representation(
         extract_images=extract_images,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
     )
 
     task_str = str(task)
@@ -37,6 +44,8 @@ def test_extract_task_str_representation(
         f"extract tables: {extract_tables}",
         f"extract charts: {extract_charts}",  # If extract_charts is not specified,
         # it defaults to the same value as extract_tables.
+        f"extract infographics: {extract_infographics}",  # If extract_infographics is not specified,
+        # it defaults to the same value as extract_tables.
         "text depth: document",  # Assuming this is a fixed value for all instances
     ]
 
@@ -45,15 +54,21 @@ def test_extract_task_str_representation(
 
 
 @pytest.mark.parametrize(
-    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts",
+    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts, extract_infographics",
     [
-        ("pdf", "tika", True, False, True, False),
-        (None, "pdfium", False, True, None, False),
-        ("txt", None, None, None, False, False),
+        ("pdf", "tika", True, False, True, False, False),
+        (None, "pdfium", False, True, None, False, False),
+        ("txt", None, None, None, False, False, False),
     ],
 )
 def test_extract_task_str_representation_extract_charts_false(
-    document_type, extract_method, extract_text, extract_images, extract_tables, extract_charts
+    document_type,
+    extract_method,
+    extract_text,
+    extract_images,
+    extract_tables,
+    extract_charts,
+    extract_infographics,
 ):
     task = ExtractTask(
         document_type=document_type,
@@ -62,6 +77,7 @@ def test_extract_task_str_representation_extract_charts_false(
         extract_images=extract_images,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
     )
 
     task_str = str(task)
@@ -74,6 +90,7 @@ def test_extract_task_str_representation_extract_charts_false(
         f"extract images: {extract_images}",
         f"extract tables: {extract_tables}",
         f"extract charts: {extract_charts}",
+        f"extract infographics: {extract_infographics}",
         "text depth: document",  # Assuming this is a fixed value for all instances
     ]
 
@@ -111,12 +128,12 @@ def test_extract_task_initialization(extract_method, extract_text, extract_image
 
 
 @pytest.mark.parametrize(
-    "document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method,"
-    "paddle_output_format",
+    "document_type, extract_method, extract_text, extract_images, extract_tables,"
+    "extract_images_method, extract_tables_method, paddle_output_format",
     [
-        ("pdf", "tika", True, False, False, "yolox", "pseudo_markdown"),
-        ("docx", "haystack", False, True, True, "python_docx", "simple"),
-        ("txt", "llama_parse", True, True, False, None, "simple"),
+        ("pdf", "tika", True, False, False, "merged", "yolox", "pseudo_markdown"),
+        ("docx", "haystack", False, True, True, "simple", "yolox", "simple"),
+        ("txt", "llama_parse", True, True, False, "simple", "yolox", "simple"),
     ],
 )
 def test_extract_task_to_dict_basic(
@@ -125,6 +142,7 @@ def test_extract_task_to_dict_basic(
     extract_text,
     extract_images,
     extract_tables,
+    extract_images_method,
     extract_tables_method,
     paddle_output_format,
 ):
@@ -133,6 +151,7 @@ def test_extract_task_to_dict_basic(
         extract_method=extract_method,
         extract_text=extract_text,
         extract_images=extract_images,
+        extract_images_method=extract_images_method,
         extract_tables=extract_tables,
         extract_tables_method=extract_tables_method,
         paddle_output_format=paddle_output_format,
@@ -146,9 +165,11 @@ def test_extract_task_to_dict_basic(
                 "extract_text": extract_text,
                 "extract_images": extract_images,
                 "extract_tables": extract_tables,
+                "extract_images_method": extract_images_method,
                 "extract_tables_method": extract_tables_method,
                 "extract_charts": extract_tables,  # If extract_charts is not specified,
                 # it defaults to the same value as extract_tables.
+                "extract_infographics": False,  # extract_infographics is False by default
                 "text_depth": "document",
                 "paddle_output_format": paddle_output_format,
             },
@@ -160,13 +181,13 @@ def test_extract_task_to_dict_basic(
 
 @pytest.mark.parametrize(
     (
-        "document_type, extract_method, extract_text, extract_images, extract_tables, extract_tables_method,"
-        "extract_charts, paddle_output_format"
+        "document_type, extract_method, extract_text, extract_images, extract_tables,"
+        "extract_images_method, extract_tables_method, extract_charts, paddle_output_format"
     ),
     [
-        ("pdf", "tika", True, False, False, "yolox", False, "pseudo_markdown"),
-        ("docx", "haystack", False, True, True, "python_docx", False, "simple"),
-        ("txt", "llama_parse", True, True, False, None, False, "simple"),
+        ("pdf", "tika", True, False, False, "merged", "yolox", False, "pseudo_markdown"),
+        ("docx", "haystack", False, True, True, "simple", "yolox", False, "simple"),
+        ("txt", "llama_parse", True, True, False, "simple", "yolox", False, "simple"),
     ],
 )
 def test_extract_task_to_dict_extract_charts_false(
@@ -175,6 +196,7 @@ def test_extract_task_to_dict_extract_charts_false(
     extract_text,
     extract_images,
     extract_tables,
+    extract_images_method,
     extract_tables_method,
     extract_charts,
     paddle_output_format,
@@ -184,6 +206,7 @@ def test_extract_task_to_dict_extract_charts_false(
         extract_method=extract_method,
         extract_text=extract_text,
         extract_images=extract_images,
+        extract_images_method=extract_images_method,
         extract_tables=extract_tables,
         extract_tables_method=extract_tables_method,
         extract_charts=extract_charts,
@@ -198,8 +221,10 @@ def test_extract_task_to_dict_extract_charts_false(
                 "extract_text": extract_text,
                 "extract_images": extract_images,
                 "extract_tables": extract_tables,
+                "extract_images_method": extract_images_method,
                 "extract_tables_method": extract_tables_method,
                 "extract_charts": extract_charts,
+                "extract_infographics": False,
                 "text_depth": "document",
                 "paddle_output_format": paddle_output_format,
             },

@@ -8,6 +8,10 @@ SPDX-License-Identifier: Apache-2.0
 
 NV-Ingest-Client is a tool designed for efficient ingestion and processing of large datasets. It provides both a Python API and a command-line interface to cater to various ingestion needs.
 
+> [!Note]
+> NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever Extraction.
+
+
 ## Table of Contents
 
 1. [Installation](#installation)
@@ -432,4 +436,4 @@ Here are the options provided by the CLI, explained:
 
 ## Examples
 
-You can find a notebook with examples using the client [here](client_examples/examples/cli_client_usage.ipynb).
+You can find a notebook with examples that use the CLI client in [the client examples folder](client/client_examples/examples/).

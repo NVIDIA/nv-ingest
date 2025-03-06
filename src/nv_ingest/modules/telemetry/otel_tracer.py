@@ -6,7 +6,6 @@ import logging
 import traceback
 
 import mrc
-from morpheus.messages import ControlMessage
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
@@ -26,6 +25,7 @@ from nv_ingest.schemas.otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
 from nv_ingest.util.modules.config_validator import fetch_and_validate_module_config
 from nv_ingest.util.tracing.logging import TaskResultStatus
+from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
 
 logger = logging.getLogger(__name__)
 
@@ -63,12 +63,12 @@ def _trace(builder: mrc.Builder) -> None:
 
     def collect_timestamps(message):
         job_id = message.get_metadata("job_id")
-
-        trace_id = message.get_metadata("trace_id")
-        if trace_id is None:
+        if isinstance(job_id, str) and len(job_id) == 36:
+            job_id = uuid_to_trace_id(job_id)
+        if job_id is None:
             trace_id = RandomIdGenerator().generate_trace_id()
-        elif isinstance(trace_id, str):
-            trace_id = int(trace_id, 16)
+        elif isinstance(job_id, str):
+            trace_id = int(job_id, 16)
         span_id = RandomIdGenerator().generate_span_id()
 
         timestamps = extract_timestamps_from_message(message)
@@ -104,7 +104,7 @@ def _trace(builder: mrc.Builder) -> None:
         raise_on_failure=validated_config.raise_on_failure,
         skip_processing_if_failed=False,
     )
-    def on_next(message: ControlMessage) -> ControlMessage:
+    def on_next(message: IngestControlMessage) -> IngestControlMessage:
         try:
             do_trace_tagging = message.get_metadata("config::add_trace_tagging") is True
             if not do_trace_tagging:
@@ -203,3 +203,11 @@ def create_span_with_timestamps(tracer, parent_span, message):
 
     for _, (span, ts_exit) in ctx_store.items():
         span.end(end_time=ts_exit)
+
+
+def uuid_to_trace_id(uuid_str: str) -> str:
+    """Convert a UUID-like format back to a 32-character OpenTelemetry trace ID."""
+    if not isinstance(uuid_str, str) or len(uuid_str) != 36:
+        raise ValueError("UUID must be a 36-character string with hyphens")
+
+    return uuid_str.replace("-", "")

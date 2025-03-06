@@ -30,25 +30,19 @@ from PIL import Image
 from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
-from nv_ingest.extraction_workflows.pdf.doughnut_utils import crop_image
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
 from nv_ingest.schemas.metadata_schema import AccessLevelEnum
+from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.yolox import get_yolox_model_name
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
-from nv_ingest.util.pdf.metadata_aggregators import construct_table_and_chart_metadata
+from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata
 
 logger = logging.getLogger(__name__)
 
 YOLOX_MAX_BATCH_SIZE = 8
-YOLOX_MAX_WIDTH = 1536
-YOLOX_MAX_HEIGHT = 1536
-YOLOX_NUM_CLASSES = 3
-YOLOX_CONF_THRESHOLD = 0.01
-YOLOX_IOU_THRESHOLD = 0.5
-YOLOX_MIN_SCORE = 0.1
-YOLOX_FINAL_SCORE = 0.48
 
 RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
 PREPROC_FILE_FORMATS = ["svg"]
@@ -107,11 +101,11 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     return image_array
 
 
-def extract_table_and_chart_images(
+def extract_page_element_images(
     annotation_dict: Dict[str, List[List[float]]],
     original_image: np.ndarray,
     page_idx: int,
-    tables_and_charts: List[Tuple[int, "CroppedImageWithContent"]],
+    page_elements: List[Tuple[int, "CroppedImageWithContent"]],
 ) -> None:
     """
     Handle the extraction of tables and charts from the inference results and run additional model inference.
@@ -125,7 +119,7 @@ def extract_table_and_chart_images(
         The original image from which objects were detected, expected to be in RGB format with shape (H, W, 3).
     page_idx : int
         The index of the current page being processed.
-    tables_and_charts : list of tuple of (int, CroppedImageWithContent)
+    page_elements : list of tuple of (int, CroppedImageWithContent)
         A list to which extracted tables and charts will be appended. Each item in the list is a tuple where the first
         element is the page index, and the second is an instance of CroppedImageWithContent representing a cropped image
         and associated metadata.
@@ -138,15 +132,15 @@ def extract_table_and_chart_images(
     -----
     This function iterates over detected objects labeled as "table" or "chart". For each object, it crops the original
     image according to the bounding box coordinates, then creates an instance of `CroppedImageWithContent` containing
-    the cropped image and metadata, and appends it to `tables_and_charts`.
+    the cropped image and metadata, and appends it to `page_elements`.
 
     Examples
     --------
     >>> annotation_dict = {"table": [[0.1, 0.1, 0.5, 0.5, 0.8]], "chart": [[0.6, 0.6, 0.9, 0.9, 0.9]]}
     >>> original_image = np.random.rand(1536, 1536, 3)
-    >>> tables_and_charts = []
-    >>> extract_table_and_chart_images(annotation_dict, original_image, 0, tables_and_charts)
-    >>> len(tables_and_charts)
+    >>> page_elements = []
+    >>> extract_page_element_images(annotation_dict, original_image, 0, page_elements)
+    >>> len(page_elements)
     2
     """
 
@@ -158,9 +152,10 @@ def extract_table_and_chart_images(
         objects = annotation_dict[label]
         for idx, bboxes in enumerate(objects):
             *bbox, _ = bboxes
-            h1, w1, h2, w2 = np.array(bbox) * np.array([height, width, height, width])
+            h1, w1, h2, w2 = bbox
 
-            base64_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
+            cropped_img = crop_image(original_image, (int(h1), int(w1), int(h2), int(w2)))
+            base64_img = numpy_to_base64(cropped_img) if cropped_img is not None else None
 
             table_data = CroppedImageWithContent(
                 content="",
@@ -170,10 +165,10 @@ def extract_table_and_chart_images(
                 max_height=height,
                 type_string=label,
             )
-            tables_and_charts.append((page_idx, table_data))
+            page_elements.append((page_idx, table_data))
 
 
-def extract_tables_and_charts_from_images(
+def extract_page_elements_from_images(
     images: List[np.ndarray],
     config: ImageConfigSchema,
     trace_info: Optional[List] = None,
@@ -196,11 +191,16 @@ def extract_tables_and_charts_from_images(
         A list of (image_index, CroppedImageWithContent) representing extracted
         table/chart data from each image.
     """
-    tables_and_charts = []
+    page_elements = []
     yolox_client = None
 
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+
     try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -216,22 +216,17 @@ def extract_tables_and_charts_from_images(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
-            num_classes=YOLOX_NUM_CLASSES,
-            conf_thresh=YOLOX_CONF_THRESHOLD,
-            iou_thresh=YOLOX_IOU_THRESHOLD,
-            min_score=YOLOX_MIN_SCORE,
-            final_thresh=YOLOX_FINAL_SCORE,
             trace_info=trace_info,
             stage_name="pdf_content_extractor",
         )
 
         # Process each result along with its corresponding image.
         for i, (annotation_dict, original_image) in enumerate(zip(inference_results, images)):
-            extract_table_and_chart_images(
+            extract_page_element_images(
                 annotation_dict,
                 original_image,
                 i,
-                tables_and_charts,
+                page_elements,
             )
 
     except TimeoutError:
@@ -247,8 +242,8 @@ def extract_tables_and_charts_from_images(
         if yolox_client:
             yolox_client.close()
 
-    logger.debug(f"Extracted {len(tables_and_charts)} tables and charts from image.")
-    return tables_and_charts
+    logger.debug(f"Extracted {len(page_elements)} tables and charts from image.")
+    return page_elements
 
 
 def image_data_extractor(
@@ -312,12 +307,15 @@ def image_data_extractor(
         "access_level": row_data.get("access_level", AccessLevelEnum.LEVEL_1),
     }
 
+    extract_infographics = kwargs.get("extract_infographics", False)
+
     # Prepare for extraction
     extracted_data = []
     logger.debug(f"Extract text: {extract_text} (not supported yet for raw images)")
     logger.debug(f"Extract images: {extract_images} (not supported yet for raw images)")
     logger.debug(f"Extract tables: {extract_tables}")
     logger.debug(f"Extract charts: {extract_charts}")
+    logger.debug(f"Extract infographics: {extract_infographics}")
 
     # Preprocess based on image type
     if document_type in RAW_FILE_FORMATS:
@@ -335,17 +333,17 @@ def image_data_extractor(
         logger.warning("Text extraction is not supported for raw images.")
 
     # Table and chart extraction
-    if extract_tables or extract_charts:
+    if extract_tables or extract_charts or extract_infographics:
         try:
-            tables_and_charts = extract_tables_and_charts_from_images(
+            page_elements = extract_page_elements_from_images(
                 [image_array],
                 config=kwargs.get("image_extraction_config"),
                 trace_info=trace_info,
             )
-            for item in tables_and_charts:
+            for item in page_elements:
                 table_chart_data = item[1]
                 extracted_data.append(
-                    construct_table_and_chart_metadata(
+                    construct_page_element_metadata(
                         table_chart_data,
                         page_idx=0,  # Single image treated as one page
                         page_count=1,

@@ -4,12 +4,21 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-
 ## NVIDIA-Ingest: Multi-modal data extraction
 
 NVIDIA-Ingest is a scalable, performance-oriented document content and metadata extraction microservice. Including support for parsing PDFs, Word and PowerPoint documents, it uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.
 
+> [!Note]
+> NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
+
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+
+> [!Note]
+> Cached and Deplot are deprecated.
+> Instead, docker-compose now uses a beta version of the yolox-graphic-elements container.
+> With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU.
+> If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
 
 ### Table of Contents
 1. [Introduction](#introduction)
@@ -20,22 +29,33 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 ## Introduction
 
-### What NVIDIA-Ingest Is ✔️
+## What NVIDIA-Ingest Is ✔️
 
-A microservice that:
+NV-Ingest is a microservice service that does the following:
 
-- Accepts a JSON Job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
-- Allows the results of a Job to be retrieved; the result is a JSON dictionary containing a list of Metadata describing objects extracted from the base document, as well as processing annotations and timing/trace data.
-- Supports PDF, Docx, pptx, and images.
-- Supports multiple methods of extraction for each document type in order to balance trade-offs between throughput and accuracy. For example, for PDF documents we support extraction via pdfium, Unstructured.io, and Adobe Content Extraction Services.
-- Supports various types of pre and post processing operations, including text splitting and chunking; transform, and filtering; embedding generation, and image offloading to storage.
+- Accept a JSON job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
+- Allow the results of a job to be retrieved. The result is a JSON dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
+- Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
-### What NVIDIA-Ingest Is Not ✖️
+NV-Ingest supports the following file types:
 
-A service that:
+- `pdf`
+- `docx`
+- `pptx`
+- `jpeg`
+- `png`
+- `svg`
+- `tiff`
+- `txt`
 
-- Runs a static pipeline or fixed set of operations on every submitted document.
-- Acts as a wrapper for any specific document parsing library.
+
+## What NVIDIA-Ingest Isn't ✖️
+
+NV-Ingest does not do the following:
+
+- Run a static pipeline or fixed set of operations on every submitted document.
+- Act as a wrapper for any specific document parsing library.
 
 
 ## Prerequisites
@@ -44,8 +64,8 @@ A service that:
 
 | GPU | Family | Memory | # of GPUs (min.) |
 | ------ | ------ | ------ | ------ |
-| H100 | SXM or PCIe | 80GB | 2 |
-| A100 | SXM or PCIe | 80GB | 2 |
+| H100 | SXM or PCIe | 80GB | 1 |
+| A100 | SXM or PCIe | 80GB | 1 |
 
 ### Software
 
@@ -67,7 +87,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 Optional:
-1. [Direct Library Deployment](docs/docs/user-guide/developer-guide/deployment.md) 📦
+1. [Direct Library Deployment](docs/docs/user-guide/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -76,14 +96,14 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If you prefer, you can also [start services one by one](docs/docs/user-guide/developer-guide/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/user-guide/developer-guide/environment-config.md) you may wish to configure.
+If you prefer, you can also [start services one by one](docs/docs/user-guide/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/user-guide/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
 2. Change directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](docs/docs/user-guide/developer-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](docs/docs/user-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -95,7 +115,7 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/user-guide/developer-guide/environment-config.md).
+4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/user-guide/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
@@ -114,13 +134,16 @@ NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 > Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
+> [!NOTE]
+> The most accurate tokenizer based splitting depends on the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B). To download this model at container build time, you must set `DOWNLOAD_LLAMA_TOKENIZER=True` _and_ supply an authorized HuggingFace access token via `HF_ACCESS_TOKEN=<your access token>`. If not, the ungated [e5-large-unsupervised](https://huggingface.co/intfloat/e5-large-unsupervised) tokenizer model will be downloaded instead. By default, the split task will use whichever model has been predownloaded. Refer to [Environment Configuration Variables](docs/docs/user-guide/environment-config.md) for more info.
+
 5. Start all services:
 `docker compose --profile retrieval up`
 
 > [!TIP]
 > By default we have [configured log levels to be verbose](docker-compose.yaml).
 >
-> It's possible to observe service startup proceeding: you will notice _many_ log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
+> It's possible to observe service startup proceeding: you will notice many log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](docker-compose.yaml).
 >
 > If you want to build from source, use `docker compose up --build` instead. This will build from your repo's code rather than from an already published container.
 
@@ -166,16 +189,16 @@ ac27e5297d57   prom/prometheus:latest                                           
 > docker compose build
 > ```
 >
-> After the image is built, run `docker compose up` per item 5 above.
+> After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
 
-### Step 2: Installing Python dependencies
+### Step 2: Install Python dependencies
 
 To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```bash
 # conda not required, but makes it easy to create a fresh python environment
-conda create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
+conda env create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
 conda activate nv-ingest-dev
 
 cd client
@@ -205,13 +228,14 @@ pip install .
 
 ### Step 3: Ingesting Documents
 
-You can submit jobs programmatically in Python or via the nv-ingest-cli tool.
+You can submit jobs programmatically in Python or via the [NV-Ingest CLI](nv-ingest_cli.md).
 
 In the below examples, we are doing text, chart, table, and image extraction:
-- `extract_text`, - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages
-- `extract_images` - uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images
-- `extract_tables` - uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction
-- `extract_charts` - (optional) enables or disables the use of Deplot and CACHED for chart extraction.
+
+- **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
+- **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
+- **extract_tables** — Uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction.
+- **extract_charts** — (Optional) Enables or disables Deplot and CACHED for chart extraction.
 
 > [!IMPORTANT]
 > `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
@@ -219,7 +243,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 #### In Python
 
 > [!NOTE]
-> You can find more examples [here](client/client_examples/examples/).
+> You can find more examples in [the client examples folder](client/client_examples/examples/).
 
 
 ```python
@@ -274,10 +298,10 @@ result = client.fetch_job_result(job_id, timeout=60)
 print(f"Got {len(result)} results")
 ```
 
-#### Using the the `nv-ingest-cli`
+#### Using the `nv-ingest-cli`
 
 > [!NOTE]
-> You can find more examples [here](client/client_examples/examples/).
+> You can find more examples in [the client examples folder](client/client_examples/examples/).
 
 ```shell
 nv-ingest-cli \
@@ -338,23 +362,31 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-You can view the full JSON extracts and the metadata definitions [here](/docs/docs/user-guide/developer-guide/content-metadata.md).
+For the full metadata definitions, refer to [Content Metadata](/docs/docs/user-guide/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
-First, install `tkinter` by running the following commands depending on your OS.
+
+First, install `tkinter` by running the following code. Choose the code for your OS.
+
 - For Ubuntu/Debian Linux:
-```shell
-sudo apt-get update
-sudo apt-get install python3-tk
-```
+
+  ```shell
+  sudo apt-get update
+  sudo apt-get install python3-tk
+  ```
+
 - For Fedora/RHEL Linux:
-```shell
-sudo dnf install python3-tkinter
-```
+
+  ```shell
+  sudo dnf install python3-tkinter
+  ```
+
 - For macOS using Homebrew:
-```shell
-brew install python-tk
-```
+
+  ```shell
+  brew install python-tk
+  ```
+
 Then run the following command to execute the script for inspecting the extracted image:
 ```shell
 python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_test.pdf.metadata.json
@@ -396,6 +428,12 @@ https://pypi.org/project/pdfservices-sdk/
     required if you want to use the Adobe extraction service for PDF decomposition. Please review the
     [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
     pdfservices-sdk before enabling this option.
+- **`DOWNLOAD_LLAMA_TOKENIZER` (Built With Llama):**:
+  - **Description**: The Split task uses the `meta-llama/Llama-3.2-1B` tokenizer, which will be downloaded
+    from HuggingFace at build time if `DOWNLOAD_LLAMA_TOKENIZER` is set to `True`. Please review the
+    [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this.
+    This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and
+    set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to use it.
 
 
 ### Contributing

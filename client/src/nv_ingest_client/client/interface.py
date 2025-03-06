@@ -5,16 +5,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import glob
+import logging
 import os
 import shutil
 import tempfile
-from tqdm import tqdm
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any, Union
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
@@ -28,8 +29,11 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.util import filter_function_kwargs
+from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -286,7 +290,7 @@ class Ingestor:
                 if job_state.state != JobStateEnum.FAILED:
                     job_state.state = JobStateEnum.FAILED
             completed_futures.add(future)
-            future_results.append(result)
+            future_results.extend(result)
             if completed_futures == submitted_futures:
                 combined_future.set_result(future_results)
 
@@ -294,7 +298,7 @@ class Ingestor:
             future.add_done_callback(_done_callback)
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future)
+            self._vdb_bulk_upload.run(combined_future.result())
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
 
@@ -393,9 +397,27 @@ class Ingestor:
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
 
-        for document_type in self._job_specs.file_types:
+        # Defaulting to False since enabling infographic extraction reduces throughput.
+        # Users have to set to True if infographic extraction is required.
+        extract_infographics = kwargs.pop("extract_infographics", False)
+
+        for file_type in self._job_specs.file_types:
+            # Let user override document_type if user explicitly sets document_type.
+            if "document_type" in kwargs:
+                document_type = kwargs.pop("document_type")
+                if document_type != file_type:
+                    logger.warning(
+                        f"User-specified document_type '{document_type}' overrides the inferred type '{file_type}'.",
+                    )
+            else:
+                document_type = file_type
+
             extract_task = ExtractTask(
-                document_type, extract_tables=extract_tables, extract_charts=extract_charts, **kwargs
+                document_type,
+                extract_tables=extract_tables,
+                extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
+                **kwargs,
             )
             self._job_specs.add_task(extract_task, document_type=document_type)
 

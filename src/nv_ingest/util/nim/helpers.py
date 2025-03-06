@@ -7,7 +7,6 @@ import re
 import threading
 import time
 from concurrent.futures import ThreadPoolExecutor
-from functools import partial
 from typing import Any
 from typing import Optional
 from typing import Tuple
@@ -17,7 +16,6 @@ import cv2
 import numpy as np
 import requests
 import tritonclient.grpc as grpcclient
-from packaging import version as pkgversion
 
 from nv_ingest.util.image_processing.transforms import normalize_image
 from nv_ingest.util.image_processing.transforms import pad_image
@@ -25,10 +23,6 @@ from nv_ingest.util.nim.decorators import multiprocessing_cache
 from nv_ingest.util.tracing.tagging import traceable_func
 
 logger = logging.getLogger(__name__)
-
-DEPLOT_MAX_TOKENS = 128
-DEPLOT_TEMPERATURE = 1.0
-DEPLOT_TOP_P = 1.0
 
 
 class ModelInterface:
@@ -183,32 +177,32 @@ class NimClient:
                 client = self.client if self.client else grpcclient.InferenceServerClient(url=self._grpc_endpoint)
                 model_config = client.get_model_config(model_name=model_name, model_version=model_version)
                 self._max_batch_sizes[model_name] = model_config.config.max_batch_size
-                logger.info(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
+                logger.debug(f"Max batch size for model '{model_name}': {self._max_batch_sizes[model_name]}")
             except Exception as e:
                 self._max_batch_sizes[model_name] = 1
                 logger.warning(f"Failed to retrieve max batch size: {e}, defaulting to 1")
 
             return self._max_batch_sizes[model_name]
 
-    def _process_batch(self, batch_input, *, prepared_data, model_name, **kwargs):
+    def _process_batch(self, batch_input, *, batch_data, model_name, **kwargs):
         """
-        Process a single batch input for inference.
+        Process a single batch input for inference using its corresponding batch_data.
 
         Parameters
         ----------
         batch_input : Any
-            The batch input data to process.
-        prepared_data : Any
-            The prepared data used for inference.
+            The input data for this batch.
+        batch_data : Any
+            The corresponding scratch-pad data for this batch as returned by format_input.
         model_name : str
-            The model name to use for inference.
+            The model name for inference.
         kwargs : dict
-            Additional parameters for inference.
+            Additional parameters.
 
         Returns
         -------
-        Any
-            The parsed output from the inference request.
+        tuple
+            A tuple (parsed_output, batch_data) for subsequent post-processing.
         """
         if self.protocol == "grpc":
             logger.debug("Performing gRPC inference for a batch...")
@@ -221,7 +215,8 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        return self.model_interface.parse_output(response, protocol=self.protocol, data=prepared_data, **kwargs)
+        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=batch_data, **kwargs)
+        return parsed_output, batch_data
 
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
         """Attempt to set the max batch size for the model if it is not already set, ensuring thread safety."""
@@ -237,58 +232,57 @@ class NimClient:
         data : dict
             The input data for inference.
         model_name : str
-            The name of the model to use for inference.
+            The model name.
         kwargs : dict
-            Additional parameters for inference. Optionally supports "max_pool_workers" to set
-            the number of worker threads in the thread pool.
+            Additional parameters for inference.
 
         Returns
         -------
         Any
-            The processed inference results.
-
-        Raises
-        ------
-        ValueError
-            If an invalid protocol is specified.
+            The processed inference results, coalesced in the same order as the input images.
         """
         try:
             # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
             max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
             force_requested_batch_size = kwargs.get("force_max_batch_size", False)
-
-            if not force_requested_batch_size:
-                max_batch_size = min(batch_size, max_requested_batch_size)
-            else:
-                max_batch_size = max_requested_batch_size
+            max_batch_size = (
+                min(batch_size, max_requested_batch_size)
+                if not force_requested_batch_size
+                else max_requested_batch_size
+            )
 
             # 2. Prepare data for inference.
-            prepared_data = self.model_interface.prepare_data_for_inference(data)
+            data = self.model_interface.prepare_data_for_inference(data)
 
             # 3. Format the input based on protocol.
-            #    NOTE: This now returns a list of batches.
-            formatted_batches = self.model_interface.format_input(
-                prepared_data, protocol=self.protocol, max_batch_size=max_batch_size
+            formatted_batches, formatted_batch_data = self.model_interface.format_input(
+                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
             max_pool_workers = kwargs.pop("max_pool_workers", 16)
 
             # 4. Process each batch concurrently using a thread pool.
-            process_batch_partial = partial(
-                self._process_batch, prepared_data=prepared_data, model_name=model_name, **kwargs
-            )
-
+            #    We enumerate the batches so that we can later reassemble results in order.
+            results = [None] * len(formatted_batches)
             with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                all_parsed_outputs = list(executor.map(process_batch_partial, formatted_batches))
+                futures = []
+                for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
+                    future = executor.submit(
+                        self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
+                    )
+                    futures.append((idx, future))
+                for idx, future in futures:
+                    results[idx] = future.result()
 
-            # 5. Process the parsed outputs for each batch.
+            # 5. Process the parsed outputs for each batch using its corresponding batch_data.
+            #    As the batches are in order, we coalesce their outputs accordingly.
             all_results = []
-            for parsed_output in all_parsed_outputs:
+            for parsed_output, batch_data in results:
                 batch_results = self.model_interface.process_inference_results(
                     parsed_output,
-                    original_image_shapes=data.get("original_image_shapes"),
+                    original_image_shapes=batch_data.get("original_image_shapes"),
                     protocol=self.protocol,
                     **kwargs,
                 )
@@ -430,6 +424,8 @@ def create_inference_client(
     model_interface: ModelInterface,
     auth_token: Optional[str] = None,
     infer_protocol: Optional[str] = None,
+    timeout: float = 120.0,
+    max_retries: int = 5,
 ) -> NimClient:
     """
     Create a NimClient for interfacing with a model inference server.
@@ -466,10 +462,10 @@ def create_inference_client(
     if infer_protocol not in ["grpc", "http"]:
         raise ValueError("Invalid infer_protocol specified. Must be 'grpc' or 'http'.")
 
-    return NimClient(model_interface, infer_protocol, endpoints, auth_token)
+    return NimClient(model_interface, infer_protocol, endpoints, auth_token, timeout, max_retries)
 
 
-def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str] = None) -> np.ndarray:
+def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -502,11 +498,8 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
       a requirement for PaddleOCR.
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
-    if (not paddle_version) or (pkgversion.parse(paddle_version) < pkgversion.parse("0.2.0-rc1")):
-        return array
-
     height, width = array.shape[:2]
-    scale_factor = 960 / max(height, width)
+    scale_factor = image_max_dimension / max(height, width)
     new_height = int(height * scale_factor)
     new_width = int(width * scale_factor)
     resized = cv2.resize(array, (new_width, new_height))
@@ -516,14 +509,25 @@ def preprocess_image_for_paddle(array: np.ndarray, paddle_version: Optional[str]
     # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
     new_height = (normalized.shape[0] + 31) // 32 * 32
     new_width = (normalized.shape[1] + 31) // 32 * 32
-    padded, _ = pad_image(
+    padded, (pad_width, pad_height) = pad_image(
         normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
     )
 
     # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
     transposed = padded.transpose((2, 0, 1))
 
-    return transposed
+    # Metadata can used for inverting transformations on the resulting bounding boxes.
+    metadata = {
+        "original_height": height,
+        "original_width": width,
+        "scale_factor": scale_factor,
+        "new_height": transposed.shape[1],
+        "new_width": transposed.shape[2],
+        "pad_height": pad_height,
+        "pad_width": pad_width,
+    }
+
+    return transposed, metadata
 
 
 def remove_url_endpoints(url) -> str:
@@ -559,7 +563,7 @@ def generate_url(url) -> str:
         str: Fully validated URL
     """
     if not re.match(r"^https?://", url):
-        # Add the default `http://` if its not already present in the URL
+        # Add the default `http://` if it's not already present in the URL
         url = f"http://{url}"
 
     return url
@@ -632,6 +636,58 @@ def is_ready(http_endpoint: str, ready_endpoint: str) -> bool:
         return False
 
 
+def _query_metadata(
+    http_endpoint: str,
+    field_name: str,
+    default_value: str,
+    retry_value: str = "",
+    metadata_endpoint: str = "/v1/metadata",
+) -> str:
+    if (http_endpoint is None) or (http_endpoint == ""):
+        return default_value
+
+    url = generate_url(http_endpoint)
+    url = remove_url_endpoints(url)
+
+    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
+        metadata_endpoint = "/" + metadata_endpoint
+
+    url = url + metadata_endpoint
+
+    # Call the metadata endpoint of the NIM
+    try:
+        # Use a short timeout to prevent long hanging calls. 5 seconds seems reasonable
+        resp = requests.get(url, timeout=5)
+        if resp.status_code == 200:
+            field_value = resp.json().get(field_name, "")
+            if field_value:
+                return field_value
+            else:
+                # If the field is empty, retry
+                logger.warning(f"No {field_name} field in response from '{url}'. Retrying.")
+                return retry_value
+        else:
+            # Any other code is confusing. We should log it with a warning
+            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.text}")
+            return retry_value
+    except requests.HTTPError as http_err:
+        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
+        return retry_value
+    except requests.Timeout:
+        logger.warning(f"'{url}' request timed out")
+        return retry_value
+    except ConnectionError:
+        logger.warning(f"A connection error for '{url}' occurred")
+        return retry_value
+    except requests.RequestException as err:
+        logger.warning(f"An error occurred: {err} for '{url}'")
+        return retry_value
+    except Exception as ex:
+        # Don't let anything squeeze by
+        logger.warning(f"Exception: {ex}")
+        return retry_value
+
+
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", version_field: str = "version") -> str:
@@ -652,51 +708,53 @@ def get_version(http_endpoint: str, metadata_endpoint: str = "/v1/metadata", ver
     str
         The version of the server, or an empty string if unavailable.
     """
+    default_version = "1.0.0"
 
-    if (http_endpoint is None) or (http_endpoint == ""):
-        return ""
-
-    # TODO: Need a way to match NIM versions to API versions.
+    # TODO: Need a way to match NIM version to API versions.
     if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
-        return "1.0.0"
+        return default_version
 
-    url = generate_url(http_endpoint)
-    url = remove_url_endpoints(url)
+    return _query_metadata(
+        http_endpoint,
+        field_name=version_field,
+        default_value=default_version,
+    )
 
-    if not metadata_endpoint.startswith("/") and not url.endswith("/"):
-        metadata_endpoint = "/" + metadata_endpoint
 
-    url = url + metadata_endpoint
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_model_name(
+    http_endpoint: str,
+    default_model_name,
+    metadata_endpoint: str = "/v1/metadata",
+    model_info_field: str = "modelInfo",
+) -> str:
+    """
+    Get the model name of the server from its metadata endpoint.
 
-    # Call the metadata endpoint of the NIM
-    try:
-        # Use a short timeout to prevent long hanging calls. 5 seconds seems reasonable
-        resp = requests.get(url, timeout=5)
-        if resp.status_code == 200:
-            version = resp.json().get(version_field, "")
-            if version:
-                return version
-            else:
-                # If version field is empty, retry
-                logger.warning(f"No version field in response from '{url}'. Retrying.")
-                return ""
-        else:
-            # Any other code is confusing. We should log it with a warning
-            logger.warning(f"'{url}' HTTP Status: {resp.status_code} - Response Payload: {resp.text}")
-            return ""
-    except requests.HTTPError as http_err:
-        logger.warning(f"'{url}' produced a HTTP error: {http_err}")
-        return ""
-    except requests.Timeout:
-        logger.warning(f"'{url}' request timed out")
-        return ""
-    except ConnectionError:
-        logger.warning(f"A connection error for '{url}' occurred")
-        return ""
-    except requests.RequestException as err:
-        logger.warning(f"An error occurred: {err} for '{url}'")
-        return ""
-    except Exception as ex:
-        # Don't let anything squeeze by
-        logger.warning(f"Exception: {ex}")
-        return ""
+    Parameters
+    ----------
+    http_endpoint : str
+        The HTTP endpoint of the server.
+    metadata_endpoint : str, optional
+        The metadata endpoint to query (default: "/v1/metadata").
+    model_info_field : str, optional
+        The field containing the model info in the response (default: "modelInfo").
+
+    Returns
+    -------
+    str
+        The model name of the server, or an empty string if unavailable.
+    """
+    if "ai.api.nvidia.com" in http_endpoint or "api.nvcf.nvidia.com" in http_endpoint:
+        return http_endpoint.strip("/").strip("/chat/completions").split("/")[-1]
+
+    model_info = _query_metadata(
+        http_endpoint,
+        field_name=model_info_field,
+        default_value={"shortName": default_model_name},
+    )
+    short_name = model_info[0].get("shortName", default_model_name)
+    model_name = short_name.split(":")[0]
+
+    return model_name

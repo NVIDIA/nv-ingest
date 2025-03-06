@@ -7,250 +7,188 @@ import logging
 import math
 import multiprocessing as mp
 import os
-from multiprocessing import Manager
 from threading import Lock
-from typing import Any
-from typing import Callable
-from typing import Optional
+from typing import Any, Callable, Optional
 
 logger = logging.getLogger(__name__)
 
 
 class SimpleFuture:
     """
-    A simplified future object for handling asynchronous task results.
+    A simplified future object that uses a multiprocessing Pipe to receive its result.
 
-    This class allows the storage and retrieval of the result or exception from an asynchronous task,
-    using multiprocessing primitives for inter-process communication.
-
-    Parameters
-    ----------
-    manager : multiprocessing.Manager
-        A multiprocessing manager that provides shared memory for the result and exception.
-
-    Attributes
-    ----------
-    _result : multiprocessing.Value
-        A shared memory object to store the result of the asynchronous task.
-    _exception : multiprocessing.Value
-        A shared memory object to store any exception raised during task execution.
-    _done : multiprocessing.Event
-        An event that signals the completion of the task.
-
-    Methods
-    -------
-    set_result(result)
-        Sets the result of the task and marks the task as done.
-    set_exception(exception)
-        Sets the exception of the task and marks the task as done.
-    result()
-        Waits for the task to complete and returns the result, or raises the exception if one occurred.
+    When the result() method is called, it blocks until the worker sends a tuple
+    (result, error) over the pipe.
     """
 
-    def __init__(self, manager: Manager):
-        self._result = manager.Value("i", None)
-        self._exception = manager.Value("i", None)
-        self._done = manager.Event()
-
-    def set_result(self, result: Any) -> None:
+    def __init__(self, parent_conn: mp.connection.Connection) -> None:
         """
-        Sets the result of the asynchronous task and signals task completion.
-
         Parameters
         ----------
-        result : Any
-            The result of the asynchronous task.
-
-        Returns
-        -------
-        None
+        parent_conn : mp.connection.Connection
+            The parent end of the multiprocessing Pipe used to receive the result.
         """
-        self._result.value = result
-        self._done.set()
-
-    def set_exception(self, exception: Exception) -> None:
-        """
-        Sets the exception raised by the asynchronous task and signals task completion.
-
-        Parameters
-        ----------
-        exception : Exception
-            The exception raised during task execution.
-
-        Returns
-        -------
-        None
-        """
-        self._exception.value = exception
-        self._done.set()
+        self._parent_conn: mp.connection.Connection = parent_conn
 
     def result(self) -> Any:
         """
-        Retrieves the result of the asynchronous task or raises the exception if one occurred.
-
-        This method blocks until the task is complete.
+        Retrieve the result from the future, blocking until it is available.
 
         Returns
         -------
         Any
-            The result of the asynchronous task.
+            The result returned by the worker function.
 
         Raises
         ------
         Exception
-            The exception raised during task execution, if any.
+            If the worker function raised an exception, it is re-raised here.
         """
-        self._done.wait()
-        if self._exception.value is not None:
-            raise self._exception.value
-        return self._result.value
+        result, error = self._parent_conn.recv()
+        if error is not None:
+            raise error
+        return result
 
 
 class ProcessWorkerPoolSingleton:
     """
-    A singleton process worker pool for managing a fixed number of worker processes.
+    A singleton process worker pool using a dual-queue implementation.
 
-    This class implements a process pool using the singleton pattern, ensuring that only one instance
-    of the pool exists. It manages worker processes that can execute tasks asynchronously.
-
-    Attributes
-    ----------
-    _instance : ProcessWorkerPoolSingleton or None
-        The singleton instance of the class.
-    _lock : threading.Lock
-        A lock to ensure thread-safe initialization of the singleton instance.
-    _total_workers : int
-        The total number of worker processes.
-
-    Methods
-    -------
-    __new__(cls)
-        Ensures only one instance of the class is created.
-    _initialize(total_max_workers)
-        Initializes the worker pool with the specified number of workers.
-    submit_task(process_fn, *args)
-        Submits a task to the worker pool for asynchronous execution.
-    close()
-        Closes the worker pool and terminates all worker processes.
+    Instead of a global result queue, each submitted task gets its own Pipe.
+    The submit_task() method returns a SimpleFuture, whose result() call blocks
+    until the task completes.
     """
 
     _instance: Optional["ProcessWorkerPoolSingleton"] = None
     _lock: Lock = Lock()
     _total_workers: int = 0
 
-    def __new__(cls):
+    def __new__(cls) -> "ProcessWorkerPoolSingleton":
         """
-        Ensures that only one instance of the ProcessWorkerPoolSingleton is created.
+        Create or return the singleton instance of ProcessWorkerPoolSingleton.
 
         Returns
         -------
         ProcessWorkerPoolSingleton
-            The singleton instance of the class.
+            The singleton instance.
         """
         logger.debug("Creating ProcessWorkerPoolSingleton instance...")
         with cls._lock:
             if cls._instance is None:
-                cls._instance = super(ProcessWorkerPoolSingleton, cls).__new__(cls)
-                max_workers = math.floor(max(1, len(os.sched_getaffinity(0)) * 0.4))
-                cls._instance._initialize(max_workers)
-                logger.debug(f"ProcessWorkerPoolSingleton instance created: {cls._instance}")
+                max_worker_limit: int = int(os.environ.get("MAX_INGEST_PROCESS_WORKERS", -1))
+                instance = super().__new__(cls)
+                # Determine available CPU count using affinity if possible
+                available: Optional[int] = (
+                    len(os.sched_getaffinity(0)) if hasattr(os, "sched_getaffinity") else os.cpu_count()
+                )
+                # Use 40% of available CPUs, ensuring at least one worker
+                max_workers: int = math.floor(max(1, available * 0.4))
+                if (max_worker_limit > 0) and (max_workers > max_worker_limit):
+                    max_workers = max_worker_limit
+                logger.debug("Creating ProcessWorkerPoolSingleton instance with max workers: %d", max_workers)
+                instance._initialize(max_workers)
+                logger.debug("ProcessWorkerPoolSingleton instance created: %s", instance)
+                cls._instance = instance
             else:
-                logger.debug(f"ProcessWorkerPoolSingleton instance already exists: {cls._instance}")
+                logger.debug("ProcessWorkerPoolSingleton instance already exists: %s", cls._instance)
         return cls._instance
 
     def _initialize(self, total_max_workers: int) -> None:
         """
-        Initializes the worker pool with the specified number of worker processes.
+        Initialize the worker pool with the specified number of worker processes.
 
         Parameters
         ----------
         total_max_workers : int
-            The maximum number of worker processes to create.
-
-        Returns
-        -------
-        None
+            The total number of worker processes to start.
         """
-        self._total_max_workers = total_max_workers
-        self._context = mp.get_context("fork")
-        self._task_queue = self._context.Queue()
-        self._manager = mp.Manager()
-        self._processes = []
-        logger.debug(f"Initializing ProcessWorkerPoolSingleton with {total_max_workers} workers.")
+        self._total_workers = total_max_workers
+        self._context: mp.context.ForkContext = mp.get_context("fork")
+        # Bounded task queue: maximum tasks queued = 2 * total_max_workers.
+        self._task_queue: mp.Queue = self._context.Queue(maxsize=2 * total_max_workers)
+        self._next_task_id: int = 0
+        self._processes: list[mp.Process] = []
+        logger.debug(
+            "Initializing ProcessWorkerPoolSingleton with %d workers and queue size %d.",
+            total_max_workers,
+            2 * total_max_workers,
+        )
         for i in range(total_max_workers):
-            p = self._context.Process(target=self._worker, args=(self._task_queue, self._manager))
+            p: mp.Process = self._context.Process(target=self._worker, args=(self._task_queue,))
             p.start()
             self._processes.append(p)
-            logger.debug(f"Started worker process {i + 1}/{total_max_workers}: PID {p.pid}")
-        logger.debug(f"Initialized with max workers: {total_max_workers}")
+            logger.debug("Started worker process %d/%d: PID %d", i + 1, total_max_workers, p.pid)
+        logger.debug("Initialized with max workers: %d", total_max_workers)
 
     @staticmethod
-    def _worker(task_queue: mp.Queue, manager: mp.Manager) -> None:
+    def _worker(task_queue: mp.Queue) -> None:
         """
-        The worker process function that executes tasks from the queue.
+        Worker process that continuously processes tasks from the task queue.
 
         Parameters
         ----------
-        task_queue : multiprocessing.Queue
+        task_queue : mp.Queue
             The queue from which tasks are retrieved.
-        manager : multiprocessing.Manager
-            The manager providing shared memory for inter-process communication.
-
-        Returns
-        -------
-        None
         """
-        logger.debug(f"Worker process started: PID {os.getpid()}")
+        logger.debug("Worker process started: PID %d", os.getpid())
         while True:
             task = task_queue.get()
-            if task is None:  # Stop signal
-                logger.debug(f"Worker process {os.getpid()} received stop signal.")
+            if task is None:
+                # Stop signal received; exit the loop.
+                logger.debug("Worker process %d received stop signal.", os.getpid())
                 break
-
-            future, process_fn, args = task
-            args, *kwargs = args
+            # Unpack task: (task_id, process_fn, args, child_conn)
+            task_id, process_fn, args, child_conn = task
             try:
-                result = process_fn(*args, **{k: v for kwarg in kwargs for k, v in kwarg.items()})
-                future.set_result(result)
+                result = process_fn(*args)
+                child_conn.send((result, None))
             except Exception as e:
-                logger.error(f"Future result failure - {e}\n")
-                future.set_exception(e)
+                logger.error("Task %d error in worker %d: %s", task_id, os.getpid(), e)
+                child_conn.send((None, e))
+            finally:
+                child_conn.close()
 
     def submit_task(self, process_fn: Callable, *args: Any) -> SimpleFuture:
         """
         Submits a task to the worker pool for asynchronous execution.
 
+        If a single tuple is passed as the only argument, it is unpacked.
+
         Parameters
         ----------
-        process_fn : callable
-            The function to be executed by the worker process.
-        args : tuple
-            The arguments to pass to the function.
+        process_fn : Callable
+            The function to be executed asynchronously.
+        *args : Any
+            The arguments to pass to the process function. If a single argument is a tuple,
+            it will be unpacked as the function arguments.
 
         Returns
         -------
         SimpleFuture
-            A future object representing the result of the task.
+            A future object that can be used to retrieve the result of the task.
         """
-        future = SimpleFuture(self._manager)
-        self._task_queue.put((future, process_fn, args))
-        return future
+        # Unpack tuple if a single tuple argument is provided.
+        if len(args) == 1 and isinstance(args[0], tuple):
+            args = args[0]
+        parent_conn, child_conn = mp.Pipe(duplex=False)
+        task_id: int = self._next_task_id
+        self._next_task_id += 1
+        self._task_queue.put((task_id, process_fn, args, child_conn))
+        return SimpleFuture(parent_conn)
 
     def close(self) -> None:
         """
         Closes the worker pool and terminates all worker processes.
 
-        This method sends a stop signal to each worker and waits for them to terminate.
-
-        Returns
-        -------
-        None
+        Sends a stop signal to each worker and waits for them to terminate.
         """
         logger.debug("Closing ProcessWorkerPoolSingleton...")
-        for _ in range(self._total_max_workers):
-            self._task_queue.put(None)  # Send stop signal to all workers
+        # Send a stop signal (None) for each worker.
+        for _ in range(self._total_workers):
+            self._task_queue.put(None)
             logger.debug("Sent stop signal to worker.")
+        # Wait for all processes to finish.
         for i, p in enumerate(self._processes):
             p.join()
-            logger.debug(f"Worker process {i + 1}/{self._total_max_workers} joined: PID {p.pid}")
+            logger.debug("Worker process %d/%d joined: PID %d", i + 1, self._total_workers, p.pid)
         logger.debug("ProcessWorkerPoolSingleton closed.")

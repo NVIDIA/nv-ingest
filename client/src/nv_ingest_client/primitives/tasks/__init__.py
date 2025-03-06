@@ -2,12 +2,14 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from .audio_extraction import AudioExtractionTask
 from .caption import CaptionTask
 from .chart_extraction import ChartExtractionTask
 from .dedup import DedupTask
 from .embed import EmbedTask
 from .extract import ExtractTask
 from .filter import FilterTask
+from .infographic_extraction import InfographicExtractionTask
 from .split import SplitTask
 from .store import StoreTask
 from .store import StoreEmbedTask
@@ -19,10 +21,12 @@ from .task_factory import task_factory
 from .vdb_upload import VdbUploadTask
 
 __all__ = [
+    "AudioExtractionTask",
     "CaptionTask",
     "ChartExtractionTask",
     "ExtractTask",
     "is_valid_task_type",
+    "InfographicExtractionTask",
     "SplitTask",
     "StoreEmbedTask",
     "StoreTask",

@@ -52,6 +52,7 @@ class StdContentDescEnum(str, Enum):
     DOCX_TEXT = "Unstructured text from DOCX document."
     PDF_CHART = "Structured chart extracted from PDF document."
     PDF_IMAGE = "Image extracted from PDF document."
+    PDF_INFOGRAPHIC = "Structured infographic extracted from PDF document."
     PDF_TABLE = "Structured table extracted from PDF document."
     PDF_TEXT = "Unstructured text from PDF document."
     PPTX_IMAGE = "Image extracted from PPTX presentation."
@@ -175,6 +176,7 @@ class StatusEnum(str, Enum):
 class ContentSubtypeEnum(str, Enum):
     TABLE = "table"
     CHART = "chart"
+    INFOGRAPHIC = "infographic"
 
 
 # Sub schemas
@@ -209,6 +211,7 @@ class NearbyObjectsSubSchema(BaseModelNoExt):
 
     content: List[str] = []
     bbox: List[tuple] = []
+    type: List[str] = []
 
 
 class NearbyObjectsSchema(BaseModelNoExt):
@@ -252,6 +255,7 @@ class TextMetadataSchema(BaseModelNoExt):
     keywords: Union[str, List[str], Dict] = ""
     language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
     text_location: tuple = (0, 0, 0, 0)
+    text_location_max_dimensions: tuple = (0, 0, 0, 0)
 
 
 class ImageMetadataSchema(BaseModelNoExt):
@@ -299,6 +303,11 @@ class ChartMetadataSchema(BaseModelNoExt):
     uploaded_image_uri: str = ""
 
 
+class AudioMetadataSchema(BaseModelNoExt):
+    audio_transcript: str = ""
+    audio_type: str = ""
+
+
 # TODO consider deprecating this in favor of info msg...
 class ErrorMetadataSchema(BaseModelNoExt):
     task: TaskTypeEnum
@@ -321,6 +330,7 @@ class MetadataSchema(BaseModelNoExt):
     embedding: Optional[List[float]] = None
     source_metadata: Optional[SourceMetadataSchema] = None
     content_metadata: Optional[ContentMetadataSchema] = None
+    audio_metadata: Optional[AudioMetadataSchema] = None
     text_metadata: Optional[TextMetadataSchema] = None
     image_metadata: Optional[ImageMetadataSchema] = None
     table_metadata: Optional[TableMetadataSchema] = None
@@ -334,10 +344,12 @@ class MetadataSchema(BaseModelNoExt):
     @classmethod
     def check_metadata_type(cls, values):
         content_type = values.get("content_metadata", {}).get("type", None)
-        if content_type != ContentTypeEnum.TEXT:
-            values["text_metadata"] = None
+        if content_type != ContentTypeEnum.AUDIO:
+            values["audio_metadata"] = None
         if content_type != ContentTypeEnum.IMAGE:
             values["image_metadata"] = None
+        if content_type != ContentTypeEnum.TEXT:
+            values["text_metadata"] = None
         if content_type != ContentTypeEnum.STRUCTURED:
             values["table_metadata"] = None
         return values

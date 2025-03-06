@@ -31,6 +31,7 @@ from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestServic
 from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
+from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
 
 logger = logging.getLogger("uvicorn")
 tracer = trace.get_tracer(__name__)
@@ -195,6 +196,7 @@ async def convert_pdf(
     extract_images: bool = Form(True),
     extract_tables: bool = Form(True),
     extract_charts: bool = Form(False),
+    extract_infographics: bool = Form(False),
 ) -> Dict[str, str]:
     try:
 
@@ -233,6 +235,7 @@ async def convert_pdf(
                 extract_images=extract_images,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
+                extract_infographics=extract_infographics,
             )
 
             job_spec.add_task(extract_task)
@@ -245,6 +248,10 @@ async def convert_pdf(
             if extract_charts:
                 chart_data_extract = ChartExtractionTask()
                 job_spec.add_task(chart_data_extract)
+
+            if extract_infographics:
+                infographic_data_extract = InfographicExtractionTask()
+                job_spec.add_task(infographic_data_extract)
 
             submitted_job_id = await ingest_service.submit_job(
                 MessageWrapper(payload=json.dumps(job_spec.to_dict())), job_id

@@ -2,31 +2,70 @@ name: Build NV-Ingest Documentation
 
 # Trigger for pull requests and pushing to main
 on:
-  pull_request:
-    types:
-      - opened
-      - synchronize
-      - reopened
+  # Runs on pushes targeting the default branch
   push:
-    branches:
-      - main
+    branches: ["main"]
+
+  # Allows you to run this workflow manually from the Actions tab
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
+# However, do NOT cancel in-progress runs as we want to allow these production deployments to complete.
+concurrency:
+  group: "pages"
+  cancel-in-progress: false
 
 jobs:
   build:
     runs-on: linux-large-disk
-    container:
-      image: python:3.11-slim
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      # Install dependencies from docs/requirements.txt
-      - name: Install mkdocs dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r docs/requirements.txt
+      - name: Setup Pages
+        uses: actions/configure-pages@v5
 
-      # Builds docs site
-      - name: Build docs site
+      # Set up Docker Buildx, useful for building multi-platform images
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      # Build the Docker image using the Dockerfile
+      - name: Build Docker image
         run: |
-          mkdocs build --config-file docs/mkdocs.yml
+          docker build --target docs --build-arg GIT_COMMIT=${GITHUB_SHA} -t nv-ingest-docs:latest .
+
+      - name: Run the container
+        run: |
+          CONTAINER_ID=$(docker run -d nv-ingest-docs:latest)
+          echo "CONTAINER_ID=$CONTAINER_ID" >> $GITHUB_ENV
+
+      - name: Wait for the docs generation to complete in the container
+        run: docker wait $CONTAINER_ID
+
+      - name: Copy generated docs site from the container
+        run: docker cp $CONTAINER_ID:/workspace/docs/site ./generated-site
+
+      - name: Stop and remove the container
+        run: docker rm $CONTAINER_ID
+
+      - name: Upload Site Artifacts
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: ./generated-site
+
+  deploy:
+    needs:
+      - build
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v4

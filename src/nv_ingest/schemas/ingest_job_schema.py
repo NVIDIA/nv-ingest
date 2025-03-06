@@ -8,7 +8,6 @@ from enum import Enum
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Literal
 from typing import Optional
 from typing import Union
 
@@ -33,6 +32,8 @@ class DocumentTypeEnum(str, Enum):
     svg = "svg"
     tiff = "tiff"
     txt = "text"
+    mp3 = "mp3"
+    wav = "wav"
 
 
 class TaskTypeEnum(str, Enum):
@@ -45,8 +46,10 @@ class TaskTypeEnum(str, Enum):
     store = "store"
     store_embedding = "store_embedding"
     vdb_upload = "vdb_upload"
+    audio_data_extract = "audio_data_extract"
     table_data_extract = "table_data_extract"
     chart_data_extract = "chart_data_extract"
+    infographic_data_extract = "infographic_data_extract"
 
 
 class FilterTypeEnum(str, Enum):
@@ -60,16 +63,15 @@ class TracingOptionsSchema(BaseModelNoExt):
 
 
 class IngestTaskSplitSchema(BaseModelNoExt):
-    split_by: Literal["word", "sentence", "passage"]
-    split_length: Annotated[int, Field(gt=0)]
-    split_overlap: Annotated[int, Field(ge=0)]
-    max_character_length: Optional[Annotated[int, Field(gt=0)]] = None
-    sentence_window_size: Optional[Annotated[int, Field(ge=0)]] = None
+    tokenizer: Optional[str] = None
+    chunk_size: Annotated[int, Field(gt=0)] = 1024
+    chunk_overlap: Annotated[int, Field(ge=0)] = 150
+    params: dict
 
-    @field_validator("sentence_window_size")
-    def check_sentence_window_size(cls, v, values, **kwargs):
-        if v is not None and v > 0 and values.data["split_by"] != "sentence":
-            raise ValueError("When using sentence_window_size, split_by must be 'sentence'.")
+    @field_validator("chunk_overlap")
+    def check_chunk_overlap(cls, v, values, **kwargs):
+        if v is not None and "chunk_size" in values.data and v >= values.data["chunk_size"]:
+            raise ValueError("chunk_overlap must be less than chunk_size")
         return v
 
 
@@ -130,6 +132,9 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
+    embedding_nim_endpoint: str = "http://embedding:8000/v1"
+    embedding_nim_model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
+    nvidia_build_api_key: Optional[str] = None
     filter_errors: bool = False
 
 
@@ -140,11 +145,24 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
     filter_errors: bool = True
 
 
+class IngestTaskAudioExtraction(BaseModelNoExt):
+    auth_token: Optional[str] = None
+    grpc_endpoint: Optional[str] = None
+    http_endpoint: Optional[str] = None
+    infer_protocol: Optional[str] = None
+    use_ssl: Optional[bool] = None
+    ssl_cert: Optional[str] = None
+
+
 class IngestTaskTableExtraction(BaseModelNoExt):
     params: Dict = {}
 
 
-class IngestChartTableExtraction(BaseModelNoExt):
+class IngestTaskChartExtraction(BaseModelNoExt):
+    params: Dict = {}
+
+
+class IngestTaskInfographicExtraction(BaseModelNoExt):
     params: Dict = {}
 
 
@@ -160,8 +178,10 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskDedupSchema,
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
+        IngestTaskAudioExtraction,
         IngestTaskTableExtraction,
-        IngestChartTableExtraction,
+        IngestTaskChartExtraction,
+        IngestTaskInfographicExtraction,
     ]
     raise_on_failure: bool = False
 
@@ -180,8 +200,10 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
+                TaskTypeEnum.audio_data_extract: IngestTaskAudioExtraction,
                 TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
-                TaskTypeEnum.chart_data_extract: IngestChartTableExtraction,
+                TaskTypeEnum.chart_data_extract: IngestTaskChartExtraction,
+                TaskTypeEnum.infographic_data_extract: IngestTaskInfographicExtraction,
             }.get(task_type.lower())
 
             # logger.debug(f"Checking task_properties type for task type '{task_type}'")

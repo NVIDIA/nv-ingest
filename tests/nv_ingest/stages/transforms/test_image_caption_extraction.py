@@ -1,323 +1,212 @@
-# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
-# All rights reserved.
-# SPDX-License-Identifier: Apache-2.0
-import base64
-import io
-from unittest.mock import MagicMock
-from unittest.mock import patch
-
-import pytest
-import requests
-from PIL import Image
-
+import unittest
 import pandas as pd
+from typing import Any, Dict
+from unittest.mock import patch, MagicMock
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.stages.transforms.image_caption_extraction import _generate_captions
-from nv_ingest.stages.transforms.image_caption_extraction import _prepare_dataframes_mod
-from nv_ingest.stages.transforms.image_caption_extraction import caption_extract_stage
+# Import the functions under test from the module.
+from nv_ingest.stages.transforms.image_caption_extraction import (
+    _prepare_dataframes_mod,
+    _generate_captions,
+    caption_extract_stage,
+)
 
+# Define the module path for patching.
 MODULE_UNDER_TEST = "nv_ingest.stages.transforms.image_caption_extraction"
 
 
-def generate_base64_png_image() -> str:
-    """Helper function to generate a base64-encoded PNG image."""
-    img = Image.new("RGB", (10, 10), color="blue")  # Create a simple blue image
-    buffered = io.BytesIO()
-    img.save(buffered, format="PNG")
-    return base64.b64encode(buffered.getvalue()).decode("utf-8")
+# For testing _prepare_dataframes_mod we need to supply a dummy for ContentTypeEnum.
+class DummyContentTypeEnum:
+    IMAGE = "image"
 
 
-def test_prepare_dataframes_empty_dataframe():
-    # Test with an empty DataFrame
-    df = pd.DataFrame()
+# A dummy BaseModel that simply returns a dictionary when model_dump is called.
+class DummyBaseModel:
+    def __init__(self, data: Dict[str, Any]):
+        self.data = data
 
-    df_out, df_matched, bool_index = _prepare_dataframes_mod(df)
-
-    assert df_out.equals(df)
-    assert df_matched.empty
-    assert bool_index.empty
-    assert bool_index.dtype == bool
+    def model_dump(self):
+        return self.data
 
 
-def test_prepare_dataframes_missing_document_type_column():
-    # Test with a DataFrame missing the 'document_type' column
-    df = pd.DataFrame({"other_column": [1, 2, 3]})
+class TestImageCaptionExtraction(unittest.TestCase):
 
-    df_out, df_matched, bool_index = _prepare_dataframes_mod(df)
+    # ------------------------------
+    # Tests for _prepare_dataframes_mod
+    # ------------------------------
+    def test_prepare_dataframes_mod_empty_df(self):
+        df = pd.DataFrame()
+        full_df, image_df, bool_index = _prepare_dataframes_mod(df)
+        self.assertTrue(full_df.empty)
+        self.assertTrue(image_df.empty)
+        self.assertTrue(bool_index.empty)
 
-    assert df_out.equals(df)
-    assert df_matched.empty
-    assert bool_index.empty
-    assert bool_index.dtype == bool
+    def test_prepare_dataframes_mod_no_document_type(self):
+        df = pd.DataFrame({"some_column": [1, 2, 3]})
+        full_df, image_df, bool_index = _prepare_dataframes_mod(df)
+        self.assertTrue(full_df.equals(df))
+        self.assertTrue(image_df.empty)
+        self.assertTrue(bool_index.empty)
 
+    @patch(f"{MODULE_UNDER_TEST}.ContentTypeEnum", new=DummyContentTypeEnum)
+    def test_prepare_dataframes_mod_valid(self):
+        # Build a DataFrame with a "document_type" column.
+        df = pd.DataFrame({"document_type": ["image", "text", "image"], "other_column": [10, 20, 30]})
+        full_df, image_df, bool_index = _prepare_dataframes_mod(df)
+        # Only the rows with document_type equal to "image" should be selected.
+        expected_mask = df["document_type"] == "image"
+        self.assertTrue(bool_index.equals(expected_mask))
+        self.assertEqual(len(image_df), 2)
+        self.assertTrue((image_df["document_type"] == "image").all())
 
-def test_prepare_dataframes_no_matches():
-    # Test with a DataFrame where no 'document_type' matches ContentTypeEnum.IMAGE
-    df = pd.DataFrame(
-        {"document_type": [ContentTypeEnum.TEXT, ContentTypeEnum.STRUCTURED, ContentTypeEnum.UNSTRUCTURED]}
-    )
+    # ------------------------------
+    # Tests for _generate_captions
+    # ------------------------------
+    @patch(f"{MODULE_UNDER_TEST}.scale_image_to_encoding_size")
+    @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
+    def test_generate_captions_success(self, mock_create_inference_client, mock_scale):
+        # For each call, just append "_scaled" to the input image.
+        mock_scale.side_effect = lambda b64: (b64 + "_scaled", None)
 
-    df_out, df_matched, bool_index = _prepare_dataframes_mod(df)
+        # Create a fake client instance whose infer() returns a list of captions.
+        fake_client = MagicMock()
+        fake_client.infer.return_value = ["caption1", "caption2"]
+        mock_create_inference_client.return_value = fake_client
 
-    assert df_out.equals(df)
-    assert df_matched.empty
-    assert bool_index.equals(pd.Series([False, False, False]))
-    assert bool_index.dtype == bool
+        base64_images = ["image1", "image2"]
+        prompt = "Test prompt"
+        api_key = "dummy_api_key"
+        endpoint_url = "http://dummy-endpoint"
+        model_name = "dummy_model"
 
+        captions = _generate_captions(base64_images, prompt, api_key, endpoint_url, model_name)
 
-def test_prepare_dataframes_partial_matches():
-    # Test with a DataFrame where some rows match ContentTypeEnum.IMAGE
-    df = pd.DataFrame({"document_type": [ContentTypeEnum.IMAGE, ContentTypeEnum.TEXT, ContentTypeEnum.IMAGE]})
+        # Check that scale_image_to_encoding_size was called once per image.
+        self.assertEqual(mock_scale.call_count, len(base64_images))
 
-    df_out, df_matched, bool_index = _prepare_dataframes_mod(df)
-
-    assert df_out.equals(df)
-    assert not df_matched.empty
-    assert df_matched.equals(df[df["document_type"] == ContentTypeEnum.IMAGE])
-    assert bool_index.equals(pd.Series([True, False, True]))
-    assert bool_index.dtype == bool
-
-
-def test_prepare_dataframes_all_matches():
-    # Test with a DataFrame where all rows match ContentTypeEnum.IMAGE
-    df = pd.DataFrame({"document_type": [ContentTypeEnum.IMAGE, ContentTypeEnum.IMAGE, ContentTypeEnum.IMAGE]})
-
-    df_out, df_matched, bool_index = _prepare_dataframes_mod(df)
-
-    assert df_out.equals(df)
-    assert df_matched.equals(df)
-    assert bool_index.equals(pd.Series([True, True, True]))
-    assert bool_index.dtype == bool
-
-
-@patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_caption_extract_no_image_content(mock_generate_captions):
-    # DataFrame with no image content
-    df = pd.DataFrame({"metadata": [{"content_metadata": {"type": "text"}}, {"content_metadata": {"type": "pdf"}}]})
-    task_props = {
-        "api_key": "test_api_key",
-        "prompt": "Describe the image",
-        "endpoint_url": "https://api.example.com",
-        "model_name": "some-vlm-model",
-    }
-    validated_config = MagicMock()
-    trace_info = {}
-
-    # Call the function
-    result_df = caption_extract_stage(df, task_props, validated_config, trace_info)
-
-    # Check that _generate_captions was not called and df is unchanged
-    mock_generate_captions.assert_not_called()
-    assert result_df.equals(df)
-
-
-@patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_caption_extract_with_image_content(mock_generate_captions):
-    # Mock caption generation
-    mock_generate_captions.return_value = "A description of the image."
-
-    # DataFrame with image content
-    df = pd.DataFrame({"metadata": [{"content_metadata": {"type": "image"}, "content": "base64_encoded_image_data"}]})
-    task_props = {
-        "api_key": "test_api_key",
-        "prompt": "Describe the image",
-        "endpoint_url": "https://api.example.com",
-        "model_name": "some-vlm-model",
-    }
-    validated_config = MagicMock()
-    trace_info = {}
-
-    # Call the function
-    result_df = caption_extract_stage(df, task_props, validated_config, trace_info)
-
-    # Check that _generate_captions was called once
-    mock_generate_captions.assert_called_once_with(
-        "base64_encoded_image_data",
-        "Describe the image",
-        "test_api_key",
-        "https://api.example.com",
-        "some-vlm-model",
-    )
-
-    # Verify that the caption was added to image_metadata
-    assert result_df.loc[0, "metadata"]["image_metadata"]["caption"] == "A description of the image."
-
-
-@patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_caption_extract_mixed_content(mock_generate_captions):
-    # Mock caption generation
-    mock_generate_captions.return_value = "A description of the image."
-
-    # DataFrame with mixed content types
-    df = pd.DataFrame(
-        {
-            "metadata": [
-                {"content_metadata": {"type": "image"}, "content": "image_data_1"},
-                {"content_metadata": {"type": "text"}, "content": "text_data"},
-                {"content_metadata": {"type": "image"}, "content": "image_data_2"},
-            ]
+        # Verify that the scaled images are passed to the fake client's infer() method.
+        expected_data = {
+            "base64_images": ["image1_scaled", "image2_scaled"],
+            "prompt": prompt,
         }
-    )
-    task_props = {
-        "api_key": "test_api_key",
-        "prompt": "Describe the image",
-        "endpoint_url": "https://api.example.com",
-        "model_name": "some-vlm-model",
-    }
-    validated_config = MagicMock()
-    trace_info = {}
+        fake_client.infer.assert_called_once_with(expected_data, model_name=model_name)
 
-    # Call the function
-    result_df = caption_extract_stage(df, task_props, validated_config, trace_info)
+        # Check that the returned captions match the fake infer result.
+        self.assertEqual(captions, ["caption1", "caption2"])
 
-    # Check that _generate_captions was called twice for images only
-    assert mock_generate_captions.call_count == 2
-    mock_generate_captions.assert_any_call(
-        "image_data_1",
-        "Describe the image",
-        "test_api_key",
-        "https://api.example.com",
-        "some-vlm-model",
-    )
-    mock_generate_captions.assert_any_call(
-        "image_data_2",
-        "Describe the image",
-        "test_api_key",
-        "https://api.example.com",
-        "some-vlm-model",
-    )
+    # ------------------------------
+    # Tests for caption_extract_stage
+    # ------------------------------
+    @patch(f"{MODULE_UNDER_TEST}._generate_captions")
+    def test_caption_extract_stage_success(self, mock_generate_captions):
+        # Setup the mock to return a predictable list of captions.
+        mock_generate_captions.return_value = ["caption1", "caption2"]
 
-    # Verify that captions were added only for image rows
-    assert result_df.loc[0, "metadata"]["image_metadata"]["caption"] == "A description of the image."
-    assert "caption" not in result_df.loc[1, "metadata"].get("image_metadata", {})
-    assert result_df.loc[2, "metadata"]["image_metadata"]["caption"] == "A description of the image."
+        # Create a DataFrame with three rows; two with image content and one with non-image.
+        data = [
+            {"metadata": {"content": "img1", "content_metadata": {"type": "image"}}},
+            {"metadata": {"content": "img2", "content_metadata": {"type": "image"}}},
+            {"metadata": {"content": "txt1", "content_metadata": {"type": "text"}}},
+        ]
+        df = pd.DataFrame(data)
 
+        # Prepare task properties and validated config.
+        task_props = {
+            "api_key": "dummy_api_key",
+            "prompt": "Test prompt",
+            "endpoint_url": "http://dummy-endpoint",
+            "model_name": "dummy_model",
+        }
+        # Simulate validated_config as an object with attributes.
+        DummyConfig = type(
+            "DummyConfig",
+            (),
+            {
+                "api_key": "dummy_api_key_conf",
+                "prompt": "Test prompt conf",
+                "endpoint_url": "http://dummy-endpoint-conf",
+                "model_name": "dummy_model_conf",
+            },
+        )
+        validated_config = DummyConfig()
 
-@patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_caption_extract_empty_dataframe(mock_generate_captions):
-    # Empty DataFrame
-    df = pd.DataFrame(columns=["metadata"])
-    task_props = {"api_key": "test_api_key", "prompt": "Describe the image", "endpoint_url": "https://api.example.com"}
-    validated_config = MagicMock()
-    trace_info = {}
+        # Call caption_extract_stage.
+        updated_df = caption_extract_stage(df.copy(), task_props, validated_config)
 
-    # Call the function
-    result_df = caption_extract_stage(df, task_props, validated_config, trace_info)
+        # Verify that _generate_captions was called once with the list of base64 images for image rows.
+        mock_generate_captions.assert_called_once()
+        args, _ = mock_generate_captions.call_args
+        # Expect the two image contents.
+        self.assertEqual(args[0], ["img1", "img2"])
+        self.assertEqual(args[1], task_props["prompt"])
+        self.assertEqual(args[2], task_props["api_key"])
+        self.assertEqual(args[3], task_props["endpoint_url"])
+        self.assertEqual(args[4], task_props["model_name"])
 
-    # Check that _generate_captions was not called and df is still empty
-    mock_generate_captions.assert_not_called()
-    assert result_df.empty
+        # Check that the metadata for image rows got updated with the corresponding captions.
+        meta0 = updated_df.at[0, "metadata"]
+        meta1 = updated_df.at[1, "metadata"]
+        self.assertEqual(meta0.get("image_metadata", {}).get("caption"), "caption1")
+        self.assertEqual(meta1.get("image_metadata", {}).get("caption"), "caption2")
+        # The non-image row (index 2) should remain unchanged.
+        meta2 = updated_df.at[2, "metadata"]
+        self.assertNotIn("image_metadata", meta2)
 
+    @patch(f"{MODULE_UNDER_TEST}._generate_captions")
+    def test_caption_extract_stage_no_images(self, mock_generate_captions):
+        # Create a DataFrame with no image rows.
+        data = [
+            {"metadata": {"content": "txt1", "content_metadata": {"type": "text"}}},
+            {"metadata": {"content": "txt2", "content_metadata": {"type": "text"}}},
+        ]
+        df = pd.DataFrame(data)
+        task_props = {
+            "api_key": "dummy_api_key",
+            "prompt": "Test prompt",
+            "endpoint_url": "http://dummy-endpoint",
+            "model_name": "dummy_model",
+        }
+        DummyConfig = type(
+            "DummyConfig",
+            (),
+            {
+                "api_key": "dummy_api_key_conf",
+                "prompt": "Test prompt conf",
+                "endpoint_url": "http://dummy-endpoint-conf",
+                "model_name": "dummy_model_conf",
+            },
+        )
+        validated_config = DummyConfig()
 
-@patch(f"{MODULE_UNDER_TEST}._generate_captions")
-def test_caption_extract_malformed_metadata(mock_generate_captions):
-    # Mock caption generation
-    mock_generate_captions.return_value = "A description of the image."
+        # With no images, _generate_captions should not be called.
+        updated_df = caption_extract_stage(df.copy(), task_props, validated_config)
+        mock_generate_captions.assert_not_called()
+        # The returned DataFrame should be the same as the input.
+        self.assertTrue(df.equals(updated_df))
 
-    # DataFrame with malformed metadata (missing 'content' key in one row)
-    df = pd.DataFrame({"metadata": [{"unexpected_key": "value"}, {"content_metadata": {"type": "image"}}]})
-    task_props = {"api_key": "test_api_key", "prompt": "Describe the image", "endpoint_url": "https://api.example.com"}
-    validated_config = MagicMock()
-    trace_info = {}
+    @patch(f"{MODULE_UNDER_TEST}._generate_captions")
+    def test_caption_extract_stage_error(self, mock_generate_captions):
+        # Simulate an error when generating captions.
+        mock_generate_captions.side_effect = Exception("Test error")
+        data = [{"metadata": {"content": "img1", "content_metadata": {"type": "image"}}}]
+        df = pd.DataFrame(data)
+        task_props = {
+            "api_key": "dummy_api_key",
+            "prompt": "Test prompt",
+            "endpoint_url": "http://dummy-endpoint",
+            "model_name": "dummy_model",
+        }
+        DummyConfig = type(
+            "DummyConfig",
+            (),
+            {
+                "api_key": "dummy_api_key_conf",
+                "prompt": "Test prompt conf",
+                "endpoint_url": "http://dummy-endpoint-conf",
+                "model_name": "dummy_model_conf",
+            },
+        )
+        validated_config = DummyConfig()
 
-    # Expecting KeyError for missing 'content' in the second row
-    with pytest.raises(KeyError, match="'content'"):
-        caption_extract_stage(df, task_props, validated_config, trace_info)
-
-
-@patch(f"{MODULE_UNDER_TEST}.requests.post")
-def test_generate_captions_successful(mock_post):
-    # Mock the successful API response
-    mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json.return_value = {"choices": [{"message": {"content": "A beautiful sunset over the mountains."}}]}
-    mock_post.return_value = mock_response
-
-    # Parameters
-    base64_image = generate_base64_png_image()
-    prompt = "Describe the image"
-    api_key = "test_api_key"
-    endpoint_url = "https://api.example.com"
-    model_name = "some-vlm-model"
-
-    # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
-
-    # Verify that the correct caption was returned
-    assert result == "A beautiful sunset over the mountains."
-    mock_post.assert_called_once_with(
-        endpoint_url,
-        headers={"Authorization": f"Bearer {api_key}", "Accept": "application/json"},
-        json={
-            "model": "some-vlm-model",
-            "messages": [{"role": "user", "content": f'{prompt} <img src="data:image/png;base64,{base64_image}" />'}],
-            "max_tokens": 512,
-            "temperature": 1.00,
-            "top_p": 1.00,
-            "stream": False,
-        },
-    )
-
-
-@patch(f"{MODULE_UNDER_TEST}.requests.post")
-def test_generate_captions_api_error(mock_post):
-    # Mock a 500 Internal Server Error response
-    mock_response = MagicMock()
-    mock_response.raise_for_status.side_effect = requests.exceptions.HTTPError("500 Server Error")
-    mock_post.return_value = mock_response
-
-    # Parameters
-    base64_image = generate_base64_png_image()
-    prompt = "Describe the image"
-    api_key = "test_api_key"
-    endpoint_url = "https://api.example.com"
-    model_name = "some-vlm-model"
-
-    # Expect an exception due to the server error
-    with pytest.raises(requests.exceptions.RequestException, match="500 Server Error"):
-        _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
-
-
-@patch(f"{MODULE_UNDER_TEST}.requests.post")
-def test_generate_captions_malformed_json(mock_post):
-    # Mock a response with an unexpected JSON structure
-    mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json.return_value = {"unexpected_key": "unexpected_value"}
-    mock_post.return_value = mock_response
-
-    # Parameters
-    base64_image = generate_base64_png_image()
-    prompt = "Describe the image"
-    api_key = "test_api_key"
-    endpoint_url = "https://api.example.com"
-    model_name = "some-vlm-model"
-
-    # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
-
-    # Verify fallback response when JSON is malformed
-    assert result == "No caption returned"
-
-
-@patch(f"{MODULE_UNDER_TEST}.requests.post")
-def test_generate_captions_empty_caption_content(mock_post):
-    # Mock a response with empty caption content
-    mock_response = MagicMock()
-    mock_response.raise_for_status = MagicMock()
-    mock_response.json.return_value = {"choices": [{"message": {"content": ""}}]}
-    mock_post.return_value = mock_response
-
-    # Parameters
-    base64_image = generate_base64_png_image()
-    prompt = "Describe the image"
-    api_key = "test_api_key"
-    endpoint_url = "https://api.example.com"
-    model_name = "some-vlm-model"
-
-    # Call the function
-    result = _generate_captions(base64_image, prompt, api_key, endpoint_url, model_name)
-
-    # Verify that the fallback response is returned
-    assert result == ""
+        with self.assertRaises(Exception) as context:
+            caption_extract_stage(df.copy(), task_props, validated_config)
+        self.assertIn("Test error", str(context.exception))
