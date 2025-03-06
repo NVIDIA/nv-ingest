@@ -54,6 +54,7 @@ ingestor = (
     .files("./data/*.wav")
     .extract(
         document_type="wav"  # Optional, Ingestor should detect automatically in most cases
+        extract_method="audio",
     )
 )
 ```
@@ -80,6 +81,7 @@ ingestor = (
     .files("./data/*.mp3")
     .extract(
         document_type="mp3",
+        extract_method="audio",
         extract_audio_params={
             "grpc_endpoint": "grpc.nvcf.nvidia.com:443",
             "auth_token": "<API key>",
