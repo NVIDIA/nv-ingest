@@ -28,11 +28,11 @@ from nv_ingest.util.image_processing.clustering import remove_superset_bboxes
 logger = logging.getLogger(__name__)
 
 PDFIUM_PAGEOBJ_MAPPING = {
-    pdfium_c.FPDF_PAGEOBJ_TEXT:    "TEXT",
-    pdfium_c.FPDF_PAGEOBJ_PATH:    "PATH",
-    pdfium_c.FPDF_PAGEOBJ_IMAGE:   "IMAGE",
+    pdfium_c.FPDF_PAGEOBJ_TEXT: "TEXT",
+    pdfium_c.FPDF_PAGEOBJ_PATH: "PATH",
+    pdfium_c.FPDF_PAGEOBJ_IMAGE: "IMAGE",
     pdfium_c.FPDF_PAGEOBJ_SHADING: "SHADING",
-    pdfium_c.FPDF_PAGEOBJ_FORM:    "FORM",
+    pdfium_c.FPDF_PAGEOBJ_FORM: "FORM",
 }
 
 
