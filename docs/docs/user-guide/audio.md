@@ -53,7 +53,7 @@ ingestor = (
     Ingestor()
     .files("./data/*.wav")
     .extract(
-        document_type="wav"  # Optional, Ingestor should detect automatically in most cases
+        document_type="wav",  # Optional, Ingestor should detect automatically in most cases
         extract_method="audio",
     )
 )
