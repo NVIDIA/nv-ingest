@@ -216,7 +216,7 @@ def unified_exception_handler(func):
         except Exception as e:
             # Use the function's name in the error message
             func_name = func.__name__
-            err_msg = f"{func_name}: Error extracting chart data. Original error: {e}"
+            err_msg = f"{func_name}: error: {e}"
             logger.exception(err_msg, exc_info=True)
             raise type(e)(err_msg) from e
 

@@ -20,12 +20,13 @@ def transform_text_create_embeddings(
     *,
     df_ledger: pd.DataFrame,
     api_key: str,
+    batch_size: Optional[int] = 8192,
     embedding_model: Optional[str] = None,
     embedding_nim_endpoint: Optional[str] = None,
     encoding_format: Optional[str] = None,
     input_type: Optional[str] = None,
     truncate: Optional[str] = None,
-):
+) -> pd.DataFrame:
     """
     Creates text embeddings using the provided configuration.
     Parameters provided as None will use the default values from EmbedExtractionsSchema.
@@ -34,6 +35,7 @@ def transform_text_create_embeddings(
 
     # Build configuration parameters only if provided; defaults come from EmbedExtractionsSchema.
     config_kwargs = {
+        "batch_size": batch_size,
         "embedding_model": embedding_model,
         "embedding_nim_endpoint": embedding_nim_endpoint,
         "encoding_format": encoding_format,
@@ -110,7 +112,7 @@ def transform_image_create_vlm_caption(
     # Create the transformation configuration using the filtered task configuration.
     transform_config = ImageCaptionExtractionSchema(**filtered_task_config)
 
-    result, _ = transform_image_create_vlm_caption_internal(
+    result = transform_image_create_vlm_caption_internal(
         df_transform_ledger=df_ledger,
         task_config=filtered_task_config,
         transform_config=transform_config,
@@ -176,7 +178,7 @@ def transform_text_split_and_tokenize(
         tokenizer=tokenizer,
     )
 
-    result, _ = transform_text_split_and_tokenize_internal(
+    result = transform_text_split_and_tokenize_internal(
         df_transform_ledger=df_ledger,
         task_config=task_config,
         transform_config=transform_config,
