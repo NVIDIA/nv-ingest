@@ -132,9 +132,9 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
-    embedding_nim_endpoint: str = "http://embedding:8000/v1"
-    embedding_nim_model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
-    nvidia_build_api_key: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
     filter_errors: bool = False
 
 
