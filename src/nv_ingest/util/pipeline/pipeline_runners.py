@@ -32,11 +32,8 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineCreationSchema(BaseModel):
-    audio_http_endpoint: str = "http://something"
+    audio_http_endpoint: str = ""
     audio_infer_protocol: str = "http"
-    cached_http_endpoint: str = os.getenv(
-        "CACHED_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached"
-    )
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
     embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
     ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
@@ -56,15 +53,17 @@ class PipelineCreationSchema(BaseModel):
     paddle_infer_protocol: str = "http"
     redis_morpheus_task_queue: str = "morpheus_task_queue"
     vlm_caption_endpoint: str = os.getenv(
-        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
     )
-    yolox_graphic_elements_http_endpoint: str = "http://something"
+    yolox_graphic_elements_http_endpoint: str = (
+        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+    )
     yolox_graphic_elements_inf_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
-        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1"
+        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
     yolox_infer_protocol: str = "http"
-    yolox_table_structure_http_endpoint: str = "http://something"
+    yolox_table_structure_http_endpoint: str = "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
     yolox_table_structure_inf_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
