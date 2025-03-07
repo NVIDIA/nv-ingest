@@ -4,7 +4,7 @@
 
 import pytest
 
-from nv_ingest.util.exception_handlers.decorators import (
+from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
     nv_ingest_source_failure_context_manager,
     CMNVIngestFailureContextManager,
@@ -13,9 +13,9 @@ from nv_ingest.util.exception_handlers.decorators import (
 import unittest
 from unittest.mock import patch
 
-from nv_ingest_api.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
-MODULE_UNDER_TEST = "nv_ingest.util.exception_handlers.decorators"
+MODULE_UNDER_TEST = "nv_ingest_api.util.exception_handlers.decorators"
 
 
 # A minimal dummy IngestControlMessage for testing purposes.

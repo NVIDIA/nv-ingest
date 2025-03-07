@@ -6,8 +6,6 @@ from nv_ingest_client.primitives.tasks.caption import CaptionTask
 from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
 from pydantic import ValidationError
 
-# Testing CaptionTaskSchema
-
 
 def test_valid_schema_initialization():
     """Test valid initialization of CaptionTaskSchema with all fields."""

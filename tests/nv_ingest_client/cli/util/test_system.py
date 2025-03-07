@@ -11,7 +11,9 @@ from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.cli.util.system import has_permissions
 
-_MODULE_UNDER_TEST = "nv_ingest_client.cli.util.system"
+import nv_ingest_client.cli.util.system as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 @pytest.fixture

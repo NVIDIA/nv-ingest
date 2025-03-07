@@ -17,7 +17,9 @@ from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import Task
 
-MODULE_UNDER_TEST = "nv_ingest_client.primitives.jobs.job_spec"
+import nv_ingest_client.primitives.jobs.job_spec as module_under_test
+
+MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
 
 # Assuming the Task class has a to_dict method

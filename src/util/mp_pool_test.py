@@ -9,7 +9,7 @@ import numpy as np
 import psutil
 from tqdm import tqdm
 
-from nv_ingest.util.multi_processing import ProcessWorkerPoolSingleton
+from nv_ingest_api.util.multi_processing import ProcessWorkerPoolSingleton
 
 
 # Example CPU-intensive task
