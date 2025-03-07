@@ -13,7 +13,7 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
@@ -220,7 +220,7 @@ def _create_clients(
 def extract_chart_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Union[IngestTaskChartExtraction, Dict[str, Any]],
-    extraction_config: ChartExtractorConfigSchema,
+    extraction_config: ChartExtractorSchema,
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """

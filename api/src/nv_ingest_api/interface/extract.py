@@ -20,7 +20,7 @@ from nv_ingest_api.internal.extract.image.table_extractor import extract_table_d
 from ..internal.extract.audio.audio_extraction import extract_text_from_audio_internal
 from ..internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
 from ..internal.schemas.extract.extract_audio_schema import AudioConfigSchema
-from ..internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema
+from ..internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from ..internal.schemas.extract.extract_infographic_schema import (
     InfographicExtractorConfigSchema,
@@ -457,7 +457,7 @@ def extract_chart_data_from_image(
         If an error occurs during extraction.
     """
     task_config = IngestTaskChartExtraction()
-    extraction_config = ChartExtractorConfigSchema(
+    extraction_config = ChartExtractorSchema(
         **{
             "endpoint_config": {
                 "yolox_endpoints": yolox_endpoints,
