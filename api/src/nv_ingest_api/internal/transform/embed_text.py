@@ -447,7 +447,7 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
-        ContentTypeEnum.AUDIO: lambda x: _get_pandas_audio_content,  # Not supported yet.
+        ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
