@@ -92,7 +92,7 @@ def nemoretriever_parse_extractor(
         Specifies whether to extract infographics.
     extract_charts : bool
         Specifies whether to extract charts.
-    trace_info : Optional[List], optional
+    execution_trace_log : Optional[List], optional
         Trace information for debugging purposes (default is None).
     extractor_config : dict
         A dictionary containing additional extraction parameters. Expected keys include:
@@ -157,14 +157,24 @@ def nemoretriever_parse_extractor(
 
     # Process PDFium configuration if required.
     if (extract_tables_method == "yolox") and (extract_tables or extract_charts or extract_infographics):
-        pdfium_config = extractor_config.get("pdfium_config", {})
-        if isinstance(pdfium_config, dict):
-            pdfium_config = PDFiumConfigSchema(**pdfium_config)
+        pdfium_config_raw = extractor_config.get("pdfium_config", {})
+        if isinstance(pdfium_config_raw, dict):
+            pdfium_config = PDFiumConfigSchema(**pdfium_config_raw)
+        elif isinstance(pdfium_config_raw, PDFiumConfigSchema):
+            pdfium_config = pdfium_config_raw
+        else:
+            raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
 
     # Process nemoretriever_parse configuration.
-    nemoretriever_parse_config = extractor_config.get("nemoretriever_parse_config", {})
-    if isinstance(nemoretriever_parse_config, dict):
-        nemoretriever_parse_config = NemoRetrieverParseConfigSchema(**nemoretriever_parse_config)
+    nemoretriever_parse_config_raw = extractor_config.get("nemoretriever_parse_config", {})
+    if isinstance(nemoretriever_parse_config_raw, dict):
+        nemoretriever_parse_config = NemoRetrieverParseConfigSchema(**nemoretriever_parse_config_raw)
+    elif isinstance(nemoretriever_parse_config_raw, NemoRetrieverParseConfigSchema):
+        nemoretriever_parse_config = nemoretriever_parse_config_raw
+    else:
+        raise ValueError(
+            "`nemoretriever_parse_config` must be a dictionary or a NemoRetrieverParseConfigSchema instance."
+        )
 
     # Get base metadata.
     metadata_col = extractor_config.get("metadata_column", "metadata")
@@ -233,7 +243,7 @@ def nemoretriever_parse_extractor(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                     pages_for_ocr[:],  # pass a copy
                     nemoretriever_parse_client,
-                    trace_info=execution_trace_log,
+                    execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_parser)
                 pages_for_ocr.clear()
@@ -255,7 +265,7 @@ def nemoretriever_parse_extractor(
                     extract_charts,
                     extract_infographics,
                     paddle_output_format,
-                    trace_info=execution_trace_log,
+                    execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_yolox)
                 pages_for_tables.clear()
@@ -266,7 +276,7 @@ def nemoretriever_parse_extractor(
                 lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
                 pages_for_ocr[:],  # pass a copy
                 nemoretriever_parse_client,
-                trace_info=execution_trace_log,
+                execution_trace_log=execution_trace_log,
             )
             futures.append(future_parser)
             pages_for_ocr.clear()
@@ -287,7 +297,7 @@ def nemoretriever_parse_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
-                trace_info=execution_trace_log,
+                execution_trace_log=execution_trace_log,
             )
             futures.append(future_yolox)
             pages_for_tables.clear()
@@ -464,14 +474,16 @@ def _extract_text_and_bounding_boxes(
         model_name="nemoretriever_parse",
         stage_name="pdf_content_extractor",
         max_batch_size=NEMORETRIEVER_PARSE_MAX_BATCH_SIZE,
-        trace_info=execution_trace_log,
+        execution_trace_log=execution_trace_log,
     )
 
     return list(zip(image_page_indices, inference_results))
 
 
 def _create_clients(nemoretriever_parse_config):
-    model_interface = nemoretriever_parse_utils.NemoRetrieverParseModelInterface()
+    model_interface = nemoretriever_parse_utils.NemoRetrieverParseModelInterface(
+        model_name=nemoretriever_parse_config.model_name,
+    )
     nemoretriever_parse_client = create_inference_client(
         nemoretriever_parse_config.nemoretriever_parse_endpoints,
         model_interface,

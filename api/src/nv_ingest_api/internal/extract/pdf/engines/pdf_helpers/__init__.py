@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 EXTRACTOR_LOOKUP = {
     "adobe": adobe_extractor,
     "llama": llama_parse_extractor,
-    "nemoretriever": nemoretriever_parse_extractor,
+    "nemoretriever_parse": nemoretriever_parse_extractor,
     "pdfium": pdfium_extractor,
     "tika": tika_extractor,
     "unstructured_io": unstructured_io_extractor,
@@ -103,12 +103,19 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
+    # Always inject pdfium configuration if it exists.
+    pdfium_config = getattr(extractor_config, "pdfium_config", None)
+    if pdfium_config is not None:
+        params["pdfium_config"] = pdfium_config
+
     # Determine the extraction method and automatically inject its configuration.
-    extract_method = params.get("extract_method", "pdfium")
-    config_key = f"{extract_method}_config"
-    extractor_specific_config = getattr(extractor_config, config_key, None)
-    if extractor_specific_config is not None:
-        params[config_key] = extractor_specific_config
+    extract_method = task_config.get("method")
+    if extract_method is not None:
+        params["extract_method"] = extract_method
+        config_key = f"{extract_method}_config"
+        extractor_specific_config = getattr(extractor_config, config_key, None)
+        if extractor_specific_config is not None:
+            params[config_key] = extractor_specific_config
 
     # The remaining parameters constitute the extractor_config.
     extractor_config = params
