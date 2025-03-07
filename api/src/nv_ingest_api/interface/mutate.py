@@ -57,24 +57,17 @@ def filter_images(
         If an error occurs during the filtering process.
     """
 
-    try:
-        task_params: Dict[str, Union[int, float, bool]] = {
-            "min_size": min_size,
-            "max_aspect_ratio": max_aspect_ratio,
-            "min_aspect_ratio": min_aspect_ratio,
-            "filter": True,
-        }
-        mutate_config = ImageFilterSchema()
+    task_params: Dict[str, Union[int, float, bool]] = {
+        "min_size": min_size,
+        "max_aspect_ratio": max_aspect_ratio,
+        "min_aspect_ratio": min_aspect_ratio,
+        "filter": True,
+    }
+    mutate_config = ImageFilterSchema()
 
-        result, _ = filter_images_internal(
-            df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=None
-        )
+    result = filter_images_internal(df_ledger, task_params, mutate_config=mutate_config, execution_trace_log=None)
 
-        return result
-    except Exception as e:
-        err_msg = f"filter_images: Error applying deduplication filter. Original error: {e}"
-        logger.error(err_msg, exc_info=True)
-        raise type(e)(err_msg) from e
+    return result
 
 
 @unified_exception_handler
@@ -86,37 +79,72 @@ def deduplicate_images(
     """
     Deduplicate images in the DataFrame based on content hashes.
 
-    This function builds a task configuration with the specified hashing algorithm and
-    delegates processing to `deduplicate_images_internal`.
+    This function constructs a task configuration using the specified hashing algorithm
+    and delegates the deduplication process to the internal function
+    ``deduplicate_images_internal``. The deduplication is performed by computing content
+    hashes for each image in the DataFrame and then removing duplicate images.
 
     Parameters
     ----------
     df_ledger : pd.DataFrame
-        DataFrame containing image metadata. It must include at least the columns
-        'document_type' and 'metadata'.
+        A pandas DataFrame containing image metadata. The DataFrame must include at least
+        the columns:
+            - ``document_type``: A string representing the document type (e.g., "png").
+            - ``metadata``: A dictionary that contains image-related metadata. For example,
+              it should include keys such as ``content`` (base64-encoded image data),
+              ``source_metadata``, and ``content_metadata``.
     hash_algorithm : str, optional
-        Hashing algorithm to use for deduplication. Valid algorithms are those supported by
-        Python's hashlib.new() function (e.g., "md5", "sha1", "sha256"). Default is "md5".
-    execution_trace_log : Optional[List[Any]], optional
-        Optional list for execution trace logging (currently unused).
+        The hashing algorithm to use for deduplication. Valid algorithms are those supported
+        by Python's ``hashlib.new()`` function (e.g., "md5", "sha1", "sha256"). Default is "md5".
 
     Returns
     -------
     pd.DataFrame
-        The deduplicated DataFrame with duplicate images removed.
+        A deduplicated DataFrame in which duplicate images have been removed. The structure
+        of the returned DataFrame is the same as the input, with duplicate rows eliminated.
 
     Raises
     ------
     Exception
-        Propagates any exceptions raised during the deduplication process.
-    """
+        Propagates any exceptions encountered during the deduplication process.
 
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> # Example DataFrame with image metadata.
+    >>> df = pd.DataFrame({
+    ...     "source_name": ["image1.png", "image2.png"],
+    ...     "source_id": ["image1.png", "image2.png"],
+    ...     "content": ["<base64-encoded-image-1>", "<base64-encoded-image-2>"],
+    ...     "document_type": ["png", "png"],
+    ...     "metadata": [{
+    ...         "content": "<base64-encoded-image-1>",
+    ...         "source_metadata": {"source_id": "image1.png", "source_name": "image1.png", "source_type": "png"},
+    ...         "content_metadata": {"type": "image"},
+    ...         "audio_metadata": None,
+    ...         "text_metadata": None,
+    ...         "image_metadata": {},
+    ...         "raise_on_failure": False,
+    ...     },
+    ...     {
+    ...         "content": "<base64-encoded-image-2>",
+    ...         "source_metadata": {"source_id": "image2.png", "source_name": "image2.png", "source_type": "png"},
+    ...         "content_metadata": {"type": "image"},
+    ...         "audio_metadata": None,
+    ...         "text_metadata": None,
+    ...         "image_metadata": {},
+    ...         "raise_on_failure": False,
+    ...     }]
+    ... })
+    >>> dedup_df = deduplicate_images(df_ledger=df, hash_algorithm="md5")
+    >>> dedup_df
+    """
     task_config: Dict[str, Union[int, float, bool, str]] = {
         "hash_algorithm": hash_algorithm,
     }
-    mutate_config = ImageDedupSchema()
+    mutate_config: ImageDedupSchema = ImageDedupSchema()
 
-    result, _ = deduplicate_images_internal(
+    result = deduplicate_images_internal(
         df_ledger=df_ledger,
         task_config=task_config,
         mutate_config=mutate_config,

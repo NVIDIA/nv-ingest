@@ -2,189 +2,377 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import pytest
+
+import copy
+from typing import Dict, Any
+
 import pandas as pd
-from typing import Any, Dict, Union, Optional, List
+import pytest
+from datetime import datetime
 
-from nv_ingest_api.interface.mutate import filter_images
-from nv_ingest_api.interface.mutate import deduplicate_images
-
-
-# Dummy functions to replace filter_images_internal during testing.
-def dummy_success(
-    df: pd.DataFrame, task_params: Dict[str, Union[int, float, bool]], trace_log: Optional[List[Any]] = None
-) -> pd.DataFrame:
-    # Simulate processing by adding a new column.
-    return df.assign(processed=True)
+from nv_ingest_api.interface.mutate import deduplicate_images, filter_images
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 
 
-def dummy_capture(
-    df: pd.DataFrame, task_params: Dict[str, Union[int, float, bool]], trace_log: Optional[List[Any]] = None
-) -> pd.DataFrame:
-    # Capture the parameters for later inspection.
-    dummy_capture.captured_params = task_params
-    dummy_capture.captured_trace = trace_log
-    return df
-
-
-def dummy_exception(
-    df: pd.DataFrame, task_params: Dict[str, Union[int, float, bool]], trace_log: Optional[List[Any]] = None
-) -> pd.DataFrame:
-    raise ValueError("Dummy error in filter_images_internal")
-
-
-# Initialize captured variables.
-dummy_capture.captured_params = {}
-dummy_capture.captured_trace = None
-
-
-def test_filter_images_success(monkeypatch):
-    sample_df = pd.DataFrame({"document_type": ["IMAGE", "TEXT"], "metadata": [{"dummy": "data1"}, {"dummy": "data2"}]})
-
-    # Override filter_images_internal with dummy_success.
-    monkeypatch.setattr("nv_ingest_api.interface.mutate.filter_images_internal", dummy_success)
-
-    result = filter_images(sample_df, min_size=100, max_aspect_ratio=3, min_aspect_ratio=1)
-    expected = sample_df.assign(processed=True)
-    pd.testing.assert_frame_equal(result, expected)
-
-
-def test_filter_images_parameters(monkeypatch):
-    sample_df = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"dummy": "data"}]})
-
-    monkeypatch.setattr("nv_ingest_api.interface.mutate.filter_images_internal", dummy_capture)
-
-    trace_log = ["trace1", "trace2"]
-    min_size = 150
-    max_aspect_ratio = 4.5
-    min_aspect_ratio = 2.5
-
-    result = filter_images(
-        sample_df,
-        min_size=min_size,
-        max_aspect_ratio=max_aspect_ratio,
-        min_aspect_ratio=min_aspect_ratio,
-        execution_trace_log=trace_log,
-    )
-
-    expected_params = {
-        "min_size": min_size,
-        "max_aspect_ratio": max_aspect_ratio,
-        "min_aspect_ratio": min_aspect_ratio,
-        "filter": True,
-    }
-    assert dummy_capture.captured_params == expected_params
-    assert dummy_capture.captured_trace == trace_log
-    pd.testing.assert_frame_equal(result, sample_df)
-
-
-def test_filter_images_exception(monkeypatch):
-    sample_df = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"dummy": "data"}]})
-
-    monkeypatch.setattr("nv_ingest_api.interface.mutate.filter_images_internal", dummy_exception)
-
-    with pytest.raises(ValueError) as exc_info:
-        filter_images(sample_df)
-    assert (
-        "filter_images: Error applying deduplication filter. Original error: Dummy error in filter_images_internal"
-        in str(exc_info.value)
-    )
-
-
-@pytest.fixture(autouse=True)
-def patch_deduplicate_globals(monkeypatch):
-    import nv_ingest_api.internal.mutate.deduplicate as dedup_mod
-
-    class DummyContentTypeEnum:
-        IMAGE = "IMAGE"
-        INFO_MSG = "INFO_MSG"
-
-    monkeypatch.setattr(dedup_mod, "ContentTypeEnum", DummyContentTypeEnum)
-
-
-def test_deduplicate_images_no_duplicates():
+def create_image_row(source: str, content: str, width: int, height: int) -> Dict[str, Any]:
     """
-    Test that a DataFrame with no duplicate IMAGE rows remains unchanged.
-    """
-    df = pd.DataFrame({"document_type": ["IMAGE", "TEXT"], "metadata": [{"content": "unique"}, {"content": "text"}]})
-    result = deduplicate_images(df, hash_algorithm="md5")
-    # Expect the same DataFrame as there are no duplicates.
-    pd.testing.assert_frame_equal(result.sort_index().reset_index(drop=True), df.sort_index().reset_index(drop=True))
+    Create a simulated image row dictionary for testing the image filter.
 
+    Parameters
+    ----------
+    source : str
+        A unique identifier for the image (e.g., file name).
+    content : str
+        A string representing the image content (for hashing).
+    width : int
+        Simulated image width.
+    height : int
+        Simulated image height.
 
-def test_deduplicate_images_with_duplicates_md5():
+    Returns
+    -------
+    Dict[str, Any]
+        A dictionary representing an image row with metadata.
+        Note: The 'document_type' is set to ContentTypeEnum.IMAGE so that the filter function
+        recognizes the row as an image.
     """
-    Test that duplicate IMAGE rows are removed using the md5 hash algorithm.
-    """
-    df = pd.DataFrame(
-        {
-            "document_type": ["IMAGE", "IMAGE", "TEXT"],
-            "metadata": [{"content": "dup"}, {"content": "dup"}, {"content": "text"}],
-        }
-    )
-    result = deduplicate_images(df, hash_algorithm="md5")
-    # Expect one IMAGE row for the duplicate content and the TEXT row.
-    expected = pd.DataFrame(
-        {"document_type": ["IMAGE", "TEXT"], "metadata": [{"content": "dup"}, {"content": "text"}]}, index=[0, 2]
-    )
-    pd.testing.assert_frame_equal(
-        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
-    )
-
-
-def test_deduplicate_images_with_duplicates_sha256():
-    """
-    Test that duplicate IMAGE rows are removed using the sha256 hash algorithm.
-    """
-    df = pd.DataFrame({"document_type": ["IMAGE", "IMAGE"], "metadata": [{"content": "dup"}, {"content": "dup"}]})
-    result = deduplicate_images(df, hash_algorithm="sha256")
-    expected = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"content": "dup"}]}, index=[0])
-    pd.testing.assert_frame_equal(
-        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
-    )
-
-
-def test_deduplicate_images_preserves_non_image_rows():
-    """
-    Test that non-IMAGE rows are preserved after deduplication.
-    """
-    df = pd.DataFrame(
-        {
-            "document_type": ["IMAGE", "IMAGE", "TEXT", "PDF"],
-            "metadata": [{"content": "dup"}, {"content": "dup"}, {"content": "text1"}, {"content": "pdf1"}],
-        }
-    )
-    result = deduplicate_images(df, hash_algorithm="md5")
-    # Expect one IMAGE row (deduplicated) plus all non-IMAGE rows.
-    expected = pd.DataFrame(
-        {
-            "document_type": ["IMAGE", "TEXT", "PDF"],
-            "metadata": [{"content": "dup"}, {"content": "text1"}, {"content": "pdf1"}],
+    return {
+        "source_name": source,
+        "source_id": source,
+        "content": content,
+        "document_type": ContentTypeEnum.IMAGE,  # Important: use "image" to trigger filtering.
+        "metadata": {
+            "content": content,
+            "content_url": "",
+            "embedding": None,
+            "source_metadata": {
+                "source_name": source,
+                "source_id": source,
+                "source_location": "",
+                "source_type": "png",
+                "collection_id": "",
+                "date_created": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "summary": "",
+                "partition_id": -1,
+                "access_level": "unknown",
+            },
+            "content_metadata": {
+                "type": ContentTypeEnum.IMAGE,
+                "description": "",
+                "page_number": -1,
+                "hierarchy": {
+                    "page_count": -1,
+                    "page": -1,
+                    "block": -1,
+                    "line": -1,
+                    "span": -1,
+                    "nearby_objects": {
+                        "text": {"content": [], "bbox": [], "type": []},
+                        "images": {"content": [], "bbox": [], "type": []},
+                        "structured": {"content": [], "bbox": [], "type": []},
+                    },
+                },
+                "subtype": "",
+            },
+            "audio_metadata": None,
+            "text_metadata": None,
+            # Initialize image_metadata as a dict containing dimensions.
+            "image_metadata": {"caption": "", "width": width, "height": height},
+            "table_metadata": None,
+            "chart_metadata": None,
+            "error_metadata": None,
+            "info_message_metadata": None,
+            "debug_metadata": None,
+            "raise_on_failure": False,
         },
-        index=[0, 2, 3],
+    }
+
+
+def create_text_row(source: str, content: str) -> Dict[str, Any]:
+    """
+    Create a simulated text row dictionary for testing the image filter.
+
+    Parameters
+    ----------
+    source : str
+        A unique identifier for the text document.
+    content : str
+        The text content.
+
+    Returns
+    -------
+    Dict[str, Any]
+        A dictionary representing a text row with metadata.
+    """
+    return {
+        "source_name": source,
+        "source_id": source,
+        "content": content,
+        "document_type": "text",
+        "metadata": {
+            "content": content,
+            "content_url": "",
+            "embedding": None,
+            "source_metadata": {
+                "source_name": source,
+                "source_id": source,
+                "source_location": "",
+                "source_type": "txt",
+                "collection_id": "",
+                "date_created": datetime.now().isoformat(),
+                "last_modified": datetime.now().isoformat(),
+                "summary": "",
+                "partition_id": -1,
+                "access_level": "unknown",
+            },
+            "content_metadata": {
+                "type": "text",
+                "description": "",
+                "page_number": -1,
+                "hierarchy": {},
+                "subtype": "",
+            },
+            "audio_metadata": None,
+            "text_metadata": None,
+            "image_metadata": None,
+            "table_metadata": None,
+            "chart_metadata": None,
+            "error_metadata": None,
+            "info_message_metadata": None,
+            "debug_metadata": None,
+            "raise_on_failure": False,
+        },
+    }
+
+
+@pytest.mark.integration
+def test_filter_images_integration() -> None:
+    """
+    Integration test for the filter_images function.
+
+    This test constructs a DataFrame containing four rows:
+
+      - Three image rows with simulated dimensions:
+          1. A "good" image row: width=300, height=100
+             (average size = 200, aspect ratio = 3.0) → Meets criteria.
+          2. A "small" image row: width=50, height=50
+             (average size = 50, aspect ratio = 1.0) → Fails min_size and min_aspect_ratio.
+          3. A "wide" image row: width=500, height=50
+             (average size = 275, aspect ratio = 10.0) → Fails max_aspect_ratio.
+      - One non-image row (text) which should remain unaffected.
+
+    The filter_images function is invoked with:
+        - min_size = 128,
+        - max_aspect_ratio = 5.0,
+        - min_aspect_ratio = 2.0.
+
+    Expected Outcome:
+      - Only the "good" image row should be retained among images.
+      - The text row should be preserved.
+      - The final DataFrame should have 2 rows.
+      - The internal hash column (_image_content_hash) should not be present.
+
+    Raises
+    ------
+    AssertionError
+        If the resulting DataFrame does not match the expected row count or if filtering fails.
+    """
+    # Create simulated image rows.
+    good_image = create_image_row("good.png", "duplicate_image", width=300, height=100)
+    small_image = create_image_row("small.png", "duplicate_image", width=50, height=50)
+    wide_image = create_image_row("wide.png", "duplicate_image", width=500, height=50)
+
+    # Create a non-image (text) row.
+    text_row = create_text_row("doc.txt", "unique_text")
+
+    # Build the input DataFrame using the provided utility (if available) or construct manually.
+    df_input = pd.DataFrame([good_image, small_image, wide_image, text_row])
+
+    # Call the filter_images function.
+    result_df = filter_images(
+        df_ledger=df_input,
+        min_size=128,
+        max_aspect_ratio=5.0,
+        min_aspect_ratio=2.0,
     )
-    pd.testing.assert_frame_equal(
-        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
-    )
+
+    # Expected outcome: 1 good image + 1 text row = 2 rows.
+    expected_total_rows = 2
+    assert (
+        len(result_df) == expected_total_rows
+    ), f"Expected {expected_total_rows} rows after filtering, got {len(result_df)}."
+
+    # Verify that non-image rows are preserved.
+    non_image_df = result_df[result_df["document_type"] != ContentTypeEnum.IMAGE]
+    assert not non_image_df.empty, "Non-image rows should be preserved."
+
+    # Verify that only one unique image row remains.
+    image_df = result_df[result_df["document_type"] == ContentTypeEnum.IMAGE]
+    assert len(image_df) == 1, f"Expected 1 unique image row after filtering, got {len(image_df)}."
+
+    # Ensure the internal hash column is not present.
+    assert "_image_content_hash" not in result_df.columns, "Internal hash column should not be present in the output."
 
 
-def test_deduplicate_images_missing_required_columns():
+@pytest.mark.integration
+def test_deduplicate_images_integration():
     """
-    Test that an exception is raised when the DataFrame is missing required columns.
-    """
-    df = pd.DataFrame({"wrong_column": [1, 2], "metadata": [{"content": "a"}, {"content": "b"}]})
-    with pytest.raises(ValueError):
-        deduplicate_images(df, hash_algorithm="md5")
+    Integration test for deduplicate_images.
 
+    This test creates a DataFrame containing image and non-image rows to validate that
+    duplicate images are removed based on content hashes, while non-image rows are preserved.
 
-def test_deduplicate_images_execution_trace_log_unused():
+    Test Data:
+        - Two image rows (document_type set to "image") with identical image content in
+          metadata["content"] ("duplicate_image"). These are duplicates.
+        - One text row (document_type "text") with unique content ("unique_text").
+          This row should remain unaffected.
+
+    Expected Behavior:
+        - The deduplication process computes a hash for each image's metadata.content using the specified
+          hashing algorithm (default "md5").
+        - Duplicate image rows (with identical content) are removed.
+        - Non-image rows are preserved.
+        - The output DataFrame should have the same structure as the input, without an internal column
+          (e.g. "_image_content_hash").
+
+    Returns
+    -------
+    None
+
+    Raises
+    ------
+    AssertionError
+        If the deduplicated DataFrame does not match the expected row count or if duplicate removal fails.
     """
-    Test that the optional execution_trace_log parameter does not affect the output.
-    """
-    df = pd.DataFrame({"document_type": ["IMAGE", "IMAGE"], "metadata": [{"content": "dup"}, {"content": "dup"}]})
-    trace_log = ["step1", "step2"]
-    result = deduplicate_images(df, hash_algorithm="md5", execution_trace_log=trace_log)
-    expected = pd.DataFrame({"document_type": ["IMAGE"], "metadata": [{"content": "dup"}]}, index=[0])
-    pd.testing.assert_frame_equal(
-        result.sort_index().reset_index(drop=True), expected.sort_index().reset_index(drop=True)
-    )
+    # Create dummy content for image and text rows.
+    duplicate_image_content = "duplicate_image"  # This string is used to simulate image content.
+    unique_text_content = "unique_text"
+
+    # Build two duplicate image rows.
+    image_metadata_template = {
+        "content": duplicate_image_content,
+        "content_url": "",
+        "embedding": None,
+        "source_metadata": {
+            "source_name": "img1.png",
+            "source_id": "img1.png",
+            "source_location": "",
+            "source_type": "png",
+            "collection_id": "",
+            "date_created": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+            "summary": "",
+            "partition_id": -1,
+            "access_level": "unknown",
+        },
+        "content_metadata": {
+            "type": ContentTypeEnum.IMAGE,
+            "description": "",
+            "page_number": -1,
+            "hierarchy": {
+                "page_count": -1,
+                "page": -1,
+                "block": -1,
+                "line": -1,
+                "span": -1,
+                "nearby_objects": {
+                    "text": {"content": [], "bbox": [], "type": []},
+                    "images": {"content": [], "bbox": [], "type": []},
+                    "structured": {"content": [], "bbox": [], "type": []},
+                },
+            },
+            "subtype": "",
+        },
+        "audio_metadata": None,
+        "text_metadata": None,
+        # For image rows, image_metadata is initialized as an empty dict so that captions can be added.
+        "image_metadata": {},
+        "table_metadata": None,
+        "chart_metadata": None,
+        "error_metadata": None,
+        "info_message_metadata": None,
+        "debug_metadata": None,
+        "raise_on_failure": False,
+    }
+    image_row_1 = {
+        "source_name": "img1.png",
+        "source_id": "img1.png",
+        "content": duplicate_image_content,
+        "document_type": ContentTypeEnum.IMAGE,
+        "metadata": copy.deepcopy(image_metadata_template),
+    }
+    image_row_2 = {
+        "source_name": "img2.png",
+        "source_id": "img2.png",
+        "content": duplicate_image_content,
+        "document_type": ContentTypeEnum.IMAGE,
+        "metadata": copy.deepcopy(image_metadata_template),
+    }
+
+    # Build a non-image (text) row.
+    text_metadata = {
+        "content": unique_text_content,
+        "content_url": "",
+        "embedding": None,
+        "source_metadata": {
+            "source_name": "doc1.txt",
+            "source_id": "doc1.txt",
+            "source_location": "",
+            "source_type": "txt",
+            "collection_id": "",
+            "date_created": datetime.now().isoformat(),
+            "last_modified": datetime.now().isoformat(),
+            "summary": "",
+            "partition_id": -1,
+            "access_level": "unknown",
+        },
+        "content_metadata": {
+            "type": "text",
+            "description": "",
+            "page_number": -1,
+            "hierarchy": {},
+            "subtype": "",
+        },
+        "audio_metadata": None,
+        "text_metadata": None,
+        "image_metadata": None,
+        "table_metadata": None,
+        "chart_metadata": None,
+        "error_metadata": None,
+        "info_message_metadata": None,
+        "debug_metadata": None,
+        "raise_on_failure": False,
+    }
+    text_row = {
+        "source_name": "doc1.txt",
+        "source_id": "doc1.txt",
+        "content": unique_text_content,
+        "document_type": "text",
+        "metadata": text_metadata,
+    }
+
+    # Construct the input DataFrame.
+    df_input = pd.DataFrame([image_row_1, image_row_2, text_row])
+
+    # Call the deduplication function using the wrapper.
+    # Use the default "md5" hashing algorithm.
+    dedup_df = deduplicate_images(df_ledger=df_input, hash_algorithm="md5")
+
+    # Expected: Only one unique image row (from the duplicates) plus the text row should remain.
+    expected_row_count = 2
+    assert (
+        len(dedup_df) == expected_row_count
+    ), f"Expected {expected_row_count} rows after deduplication, got {len(dedup_df)}."
+
+    # Verify that non-image rows are preserved.
+    non_image_df = dedup_df[dedup_df["document_type"] != ContentTypeEnum.IMAGE]
+    assert not non_image_df.empty, "Non-image rows should be preserved."
+
+    # Verify that only one unique image row remains.
+    image_df = dedup_df[dedup_df["document_type"] == ContentTypeEnum.IMAGE]
+    assert len(image_df) == 1, f"Expected 1 unique image row after deduplication, got {len(image_df)}."
+
+    # Ensure that the internal hash column used for deduplication is not present.
+    assert "_image_content_hash" not in dedup_df.columns, "Internal hash column should not be present in the output."
