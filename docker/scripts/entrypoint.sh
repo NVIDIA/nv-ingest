@@ -1,3 +1,4 @@
+#!/bin/bash
 # SPDX-FileCopyrightText: Copyright (c) 2021-2024, NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 #
@@ -13,7 +14,11 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+#!/bin/bash
+
 # Activate the `nv_ingest_runtime` conda environment
+
 set -e
 . /opt/conda/etc/profile.d/conda.sh
 conda activate nv_ingest_runtime

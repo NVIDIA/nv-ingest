@@ -103,6 +103,9 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
+    endpoint_url: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
     filter_errors: bool = False
 
 
