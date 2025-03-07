@@ -333,7 +333,7 @@ def _batch_generator(iterable: Iterable, batch_size: int = 10):
         yield iterable[idx : min(idx + batch_size, iter_len)]
 
 
-def _generate_batches(prompts: List[str], batch_size: int = 100) -> List[List[str]]:
+def _generate_batches(prompts: List[str], batch_size: int = 100) -> List[str]:
     """
     Splits a list of prompts into batches.
 
@@ -463,8 +463,9 @@ def transform_create_text_embeddings_internal(
         if not content_mask.any():
             continue
 
+        # Extract content from metadata and filter out rows with empty content.
         extracted_content = df_transform_ledger.loc[content_mask, "metadata"].apply(content_getter)
-        non_empty_mask = extracted_content.str.strip() != ""
+        non_empty_mask = extracted_content.notna() & (extracted_content.str.strip() != "")
         final_mask = content_mask & non_empty_mask
         if not final_mask.any():
             continue
