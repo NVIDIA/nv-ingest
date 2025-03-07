@@ -24,7 +24,7 @@ from nv_ingest_api.internal.schemas.store.store_embedding_schema import Embeddin
 from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
-from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 
 logger = logging.getLogger(__name__)
@@ -35,7 +35,7 @@ class PipelineConfigSchema(BaseModel):
     chart_extractor_module: ChartExtractorSchema = ChartExtractorSchema()
     text_splitter_module: TextSplitterSchema = TextSplitterSchema()
     embedding_storage_module: EmbeddingStorageSchema = EmbeddingStorageSchema()
-    embed_extractions_module: EmbedExtractionsSchema = EmbedExtractionsSchema()
+    embed_extractions_module: TextEmbeddingSchema = TextEmbeddingSchema()
     image_caption_extraction_module: ImageCaptionExtractionSchema = ImageCaptionExtractionSchema()
     image_dedup_module: ImageDedupSchema = ImageDedupSchema()
     image_filter_module: ImageFilterSchema = ImageFilterSchema()

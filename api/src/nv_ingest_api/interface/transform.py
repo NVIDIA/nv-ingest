@@ -12,7 +12,7 @@ from nv_ingest_api.interface.utility import (
 )
 from nv_ingest_api.internal.enums.common import DocumentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
-from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
@@ -51,7 +51,7 @@ def transform_text_create_embeddings(
     config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
     config_kwargs["api_key"] = api_key
 
-    transform_config = EmbedExtractionsSchema(**config_kwargs)
+    transform_config = TextEmbeddingSchema(**config_kwargs)
 
     result, _ = transform_create_text_embeddings_internal(
         df_transform_ledger=inputs,

@@ -12,7 +12,7 @@ from nv_ingest_api.util.logging.configuration import LogLevel
 logger = logging.getLogger(__name__)
 
 
-class EmbedExtractionsSchema(BaseModel):
+class TextEmbeddingSchema(BaseModel):
     api_key: str = "api_key"
     batch_size: int = 8192
     embedding_model: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"

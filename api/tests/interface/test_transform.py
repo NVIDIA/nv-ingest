@@ -18,7 +18,7 @@ from nv_ingest_api.interface.transform import (
 )
 from nv_ingest_api.internal.enums.common import DocumentTypeEnum, ContentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
-from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 
 logger = logging.getLogger(__name__)
 
@@ -51,7 +51,7 @@ def test_transform_text_create_embeddings_integration():
     )
 
     # Build the default input arguments from the EmbedExtractionsSchema.
-    default_schema = EmbedExtractionsSchema()
+    default_schema = TextEmbeddingSchema()
     default_args = default_schema.model_dump() if hasattr(default_schema, "model_dump") else default_schema.dict()
 
     # Pull configuration values from the environment.
@@ -201,7 +201,7 @@ def test_transform_text_create_embeddings_all_primitive_types_integration():
     )
 
     # Build the default input arguments from the EmbedExtractionsSchema.
-    default_schema = EmbedExtractionsSchema()
+    default_schema = TextEmbeddingSchema()
     default_args = default_schema.model_dump() if hasattr(default_schema, "model_dump") else default_schema.dict()
 
     # Pull configuration values from the environment, with fallbacks to schema defaults.

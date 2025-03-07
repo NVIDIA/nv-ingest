@@ -13,7 +13,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum, StatusEnum, Tas
 from nv_ingest_api.internal.schemas.meta.metadata_schema import (
     InfoMessageMetadataSchema,
 )
-from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import EmbedExtractionsSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
@@ -404,7 +404,7 @@ def _concatenate_extractions_pandas(
 def transform_create_text_embeddings_internal(
     df_transform_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
-    transform_config: EmbedExtractionsSchema = EmbedExtractionsSchema(),
+    transform_config: TextEmbeddingSchema = TextEmbeddingSchema(),
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
