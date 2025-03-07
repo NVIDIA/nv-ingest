@@ -15,7 +15,7 @@ from ctypes import c_int, CDLL
 
 from datetime import datetime
 
-from morpheus.config import PipelineModes, CppConfig, Config
+from morpheus.config import PipelineModes, CppConfig, Config, ExecutionMode
 from pydantic import ConfigDict, ValidationError
 from pydantic import BaseModel
 
@@ -32,23 +32,23 @@ logger = logging.getLogger(__name__)
 
 
 class PipelineCreationSchema(BaseModel):
+    audio_http_endpoint: str = "http://something"
+    audio_infer_protocol: str = "http"
     cached_http_endpoint: str = os.getenv(
         "CACHED_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/university-at-buffalo/cached"
     )
-    cached_infer_protocol: str = "http"
-    deplot_http_endpoint: str = os.getenv("DEPLOT_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/google/deplot")
-    deplot_infer_protocol: str = "http"
-    nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse"
-    )
-    nemoretriever_parse_infer_protocol: str = "http"
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+    embedding_nim_model_name: str = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
     ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
+    max_ingest_process_workers: str = "16"
     message_client_host: str = "localhost"
     message_client_port: str = "7671"
     message_client_type: str = "simple"
     mrc_ignore_numa_check: str = "1"
+    nemoretriever_parse_http_endpoint: str = os.getenv(
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse"
+    )
+    nemoretriever_parse_infer_protocol: str = "http"
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
     nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
     otel_exporter_otlp_endpoint: str = "localhost:4317"
@@ -58,10 +58,14 @@ class PipelineCreationSchema(BaseModel):
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
     )
+    yolox_graphic_elements_http_endpoint: str = "http://something"
+    yolox_graphic_elements_inf_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1"
     )
     yolox_infer_protocol: str = "http"
+    yolox_table_structure_http_endpoint: str = "http://something"
+    yolox_table_structure_inf_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -215,6 +219,8 @@ def run_ingest_pipeline(
     morpheus_pipeline_config.feature_length = feature_length
     morpheus_pipeline_config.num_threads = num_threads
     morpheus_pipeline_config.model_max_batch_size = model_max_batch_size
+    morpheus_pipeline_config.edge_buffer_size = 32
+    morpheus_pipeline_config.execution_mode = ExecutionMode.CPU
     morpheus_pipeline_config.mode = PipelineModes[mode.upper()]
 
     cli_ingest_config = {}  # TODO: Create a config for overrides -- not necessary yet.
