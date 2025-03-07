@@ -127,7 +127,7 @@ def _text_splitter(builder: mrc.Builder):
             ):
                 tokenizer = "/workspace/models/llama-3.2-1b/tokenizer/"
             elif os.path.exists(
-                os.path.join(model_predownload_path, "e5-unsupervised-large/tokenizer/tokenizer.json")
+                os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")
             ) and (tokenizer is None or tokenizer == "intfloat/e5-large-unsupervised"):
                 tokenizer = "/workspace/models/e5-large-unsupervised/tokenizer/"
 
