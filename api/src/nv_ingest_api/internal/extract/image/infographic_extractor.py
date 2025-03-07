@@ -13,6 +13,9 @@ import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
+    InfographicExtractorSchema,
+)
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
 
@@ -174,7 +177,7 @@ def _meets_infographic_criteria(row: pd.Series) -> bool:
 def extract_infographic_data_from_image_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
-    extraction_config: Any,
+    extraction_config: InfographicExtractorSchema,
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """

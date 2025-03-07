@@ -8,7 +8,6 @@ from typing import Tuple, Optional, Dict, Any
 import pandas as pd
 from pandas import DataFrame
 
-
 from . import extraction_interface_relay_constructor
 
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
@@ -19,16 +18,19 @@ from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_d
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 from ..internal.extract.audio.audio_extraction import extract_text_from_audio_internal
+from ..internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
 from ..internal.schemas.extract.extract_audio_schema import AudioConfigSchema
 from ..internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema
 from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
-from ..internal.schemas.extract.extract_infographic_schema import InfographicExtractorConfigSchema
+from ..internal.schemas.extract.extract_infographic_schema import (
+    InfographicExtractorConfigSchema,
+    InfographicExtractorSchema,
+)
 from ..internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
-from ..internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema
+from ..internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from ..internal.schemas.meta.ingest_job_schema import (
     IngestTaskChartExtraction,
     IngestTaskTableExtraction,
-    IngestTaskInfographicExtraction,
 )
 
 logger = logging.getLogger(__name__)
@@ -518,16 +520,18 @@ def extract_table_data_from_image(
     task_config = IngestTaskTableExtraction()
 
     config_kwargs = {
-        "yolox_endpoints": yolox_endpoints,
-        "paddle_endpoints": paddle_endpoints,
-        "yolox_infer_protocol": yolox_protocol,
-        "paddle_infer_protocol": paddle_protocol,
-        "auth_token": auth_token,
+        "endpoint_config": {
+            "yolox_endpoints": yolox_endpoints,
+            "paddle_endpoints": paddle_endpoints,
+            "yolox_infer_protocol": yolox_protocol,
+            "paddle_infer_protocol": paddle_protocol,
+            "auth_token": auth_token,
+        }
     }
     # Remove keys with None values so that ChartExtractorConfigSchema's defaults are used.
     config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
 
-    extraction_config = TableExtractorConfigSchema(**config_kwargs)
+    extraction_config = TableExtractorSchema(**config_kwargs)
 
     result, _ = extract_table_data_from_image_internal(
         df_extraction_ledger=df_ledger,
@@ -558,7 +562,7 @@ def extract_infographic_data_from_image(
 
     Parameters
     ----------
-    df_ledger : pd.DataFrame
+    df_extraction_ledger : pd.DataFrame
         DataFrame containing the images and associated metadata from which infographic data is to be extracted.
     paddle_endpoints : Optional[Tuple[str, str]], default=None
         A tuple of PaddleOCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
@@ -581,19 +585,24 @@ def extract_infographic_data_from_image(
         Propagates any exception raised during the extraction process, after being handled by the
         unified exception handler.
     """
-    task_config = IngestTaskInfographicExtraction()
 
-    config_kwargs = {
-        "paddle_endpoints": paddle_endpoints,
-        "paddle_infer_protocol": paddle_protocol,
-        "auth_token": auth_token,
+    task_config = {}
+
+    extractor_config_kwargs = {
+        "endpoint_config": InfographicExtractorConfigSchema(
+            **{
+                "paddle_endpoints": paddle_endpoints,
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": auth_token,
+            }
+        )
     }
     # Remove keys with None values so that InfographicExtractorConfigSchema's defaults are used.
-    config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
+    extractor_config_kwargs = {k: v for k, v in extractor_config_kwargs.items() if v is not None}
 
-    extraction_config = InfographicExtractorConfigSchema(**config_kwargs)
+    extraction_config = InfographicExtractorSchema(**extractor_config_kwargs)
 
-    result, _ = extract_infographic_data_from_image(
+    result, _ = extract_infographic_data_from_image_internal(
         df_extraction_ledger=df_ledger,
         task_config=task_config,
         extraction_config=extraction_config,
