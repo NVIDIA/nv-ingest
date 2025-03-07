@@ -431,8 +431,6 @@ def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
             morpheus_pipeline_config,
             stage_config=audio_extractor_config,
             pe_count=8,
-            task="extract",
-            task_desc="audio_content_extractor",
         )
     )
     return audio_extractor_stage
