@@ -87,7 +87,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 Optional:
-1. [Direct Library Deployment](docs/docs/user-guide/deployment.md) 📦
+1. [Direct Library Deployment](docs/docs/extraction/deployment.md) 📦
 
 ### Step 1: Starting containers
 
@@ -96,14 +96,14 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If you prefer, you can also [start services one by one](docs/docs/user-guide/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/user-guide/environment-config.md) you may wish to configure.
+If you prefer, you can also [start services one by one](docs/docs/extraction/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/extraction/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
 2. Change directory to the cloned repo
 `cd nv-ingest`.
 
-3. [Generate API keys](docs/docs/user-guide/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
+3. [Generate API keys](docs/docs/extraction/ngc-api-key.md) and authenticate with NGC with the `docker login` command:
 ```shell
 # This is required to access pre-built containers and NIM microservices
 $ docker login nvcr.io
@@ -115,7 +115,7 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/user-guide/environment-config.md).
+4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
@@ -135,7 +135,7 @@ NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 > `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 > [!NOTE]
-> The most accurate tokenizer based splitting depends on the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B). To download this model at container build time, you must set `DOWNLOAD_LLAMA_TOKENIZER=True` _and_ supply an authorized HuggingFace access token via `HF_ACCESS_TOKEN=<your access token>`. If not, the ungated [e5-large-unsupervised](https://huggingface.co/intfloat/e5-large-unsupervised) tokenizer model will be downloaded instead. By default, the split task will use whichever model has been predownloaded. Refer to [Environment Configuration Variables](docs/docs/user-guide/environment-config.md) for more info.
+> The most accurate tokenizer based splitting depends on the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B). To download this model at container build time, you must set `DOWNLOAD_LLAMA_TOKENIZER=True` _and_ supply an authorized HuggingFace access token via `HF_ACCESS_TOKEN=<your access token>`. If not, the ungated [e5-large-unsupervised](https://huggingface.co/intfloat/e5-large-unsupervised) tokenizer model will be downloaded instead. By default, the split task will use whichever model has been predownloaded. Refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md) for more info.
 
 5. Start all services:
 `docker compose --profile retrieval up`
@@ -362,7 +362,7 @@ multimodal_test.pdf.metadata.json
 processed_docs/text:
 multimodal_test.pdf.metadata.json
 ```
-For the full metadata definitions, refer to [Content Metadata](/docs/docs/user-guide/content-metadata.md).
+For the full metadata definitions, refer to [Content Metadata](/docs/docs/extraction/content-metadata.md).
 
 #### We also provide a script for inspecting [extracted images](src/util/image_viewer.py)
 
