@@ -5,4 +5,4 @@ Skaffold is intended to support the NV-Ingest development team with Kubernetes d
 
 We offer Kubernetes support through Helm and you can find those instructions at [Helm Documentation](../helm/README.md).
 
-Development team members can find Skaffold documentation at [Skaffold Documentation](/docs/docs/user-guide/developer-guide/kubernetes-dev.md).
+Development team members can find Skaffold documentation at [Skaffold Documentation](/docs/docs/extraction/kubernetes-dev.md).

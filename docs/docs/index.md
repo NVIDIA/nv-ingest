@@ -1,19 +1,21 @@
----
-hide:
-  - navigation
----
+# Overview of NVIDIA NeMo Retriever
 
-NeMo Retriever Extraction (NV-Ingest) is a scalable, performance-oriented document content and metadata extraction microservice. NV-Ingest uses specialized NVIDIA NIM microservices to find, contextualize, and extract text, tables, charts and images for use in downstream generative applications.. You can access NV-Ingest as a free community resource or learn more about getting an enterprise license for improved expert-level support at the [NV-Ingest homepage](https://www.nvidia.com).
+NVIDIA NeMo Retriever is a collection of microservices 
+for building and scaling multimodal data extraction, embedding, and reranking pipelines 
+with high accuracy and maximum data privacy – built with NVIDIA NIM.
+
+NeMo Retriever provides the following:
+
+- **Multimodal Data Extraction** — Quickly extract documents at scale that include text, tables, charts, and infographics.
+- **Embedding + Indexing** — Embed all extracted text from text chunks and images, and then insert into Milvus - accelerated with NVIDIA cuVS.
+- **Retrieval** — Leverage semantic + hybrid search for high accuracy retrieval with the embedding + reranking NIM microservice.
 
 
-<div class="grid cards" markdown>
+<!--
+## Related Topics
 
--   :material-book-open-variant:{ .lg } __User Guide__
-
-    ---
-
-    Install NV-Ingest and set up your environment to start accelerating your workflows.
-
-    [Get Started](user-guide/overview){ .md-button .md-button }
-
-</div>
+- [NeMo Retriever Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html)
+- [NeMo Retriever Text Reranking NIM](https://docs.nvidia.com/nim/nemo-retriever/text-reranking/latest/overview.html)
+- [NVIDIA NIM for Object Detection](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html)
+- [NVIDIA NIM for Table Extraction](https://docs.nvidia.com/nim/ingestion/table-extraction/latest/overview.html)
+-->

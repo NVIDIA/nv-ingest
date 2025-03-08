@@ -11,7 +11,7 @@ $ docker compose up otel-collector
 
 Once OpenTelemetry and Zipkin are running, you can open your browser to explore traces: http://$YOUR_DOCKER_HOST:9411/zipkin/.
 
-![](../assets/images/zipkin.png)
+![](images/zipkin.png)
 
 To run Prometheus, run:
 
@@ -21,4 +21,4 @@ $ docker compose up prometheus
 
 Once Promethus is running, you can open your browser to explore metrics: [http://$YOUR_DOCKER_HOST:9090/]
 
-![](../assets/images/prometheus.png)
+![](images/prometheus.png)
