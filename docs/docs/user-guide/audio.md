@@ -85,7 +85,7 @@ ingestor = (
         extract_audio_params={
             "grpc_endpoint": "grpc.nvcf.nvidia.com:443",
             "auth_token": "<API key>",
-            "auth_metadata": [("function-id", "<function ID>")],
+            "function_id": "<function ID>",
             "use_ssl": True,
         },
     )
