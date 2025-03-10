@@ -118,7 +118,7 @@ def extract_text_from_audio_internal(
     http_endpoint = extract_params.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
     infer_protocol = extract_params.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
     auth_token = extract_params.get("auth_token") or audio_extraction_config.auth_token
-    auth_metadata = extract_params.get("auth_metadata") or audio_extraction_config.auth_metadata
+    function_id = extract_params.get("function_id") or audio_extraction_config.function_id
     use_ssl = extract_params.get("use_ssl") or audio_extraction_config.use_ssl
     ssl_cert = extract_params.get("ssl_cert") or audio_extraction_config.ssl_cert
 
@@ -126,7 +126,7 @@ def extract_text_from_audio_internal(
         (grpc_endpoint, http_endpoint),
         infer_protocol=infer_protocol,
         auth_token=auth_token,
-        auth_metadata=auth_metadata,
+        function_id=function_id,
         use_ssl=use_ssl,
         ssl_cert=ssl_cert,
     )

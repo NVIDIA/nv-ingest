@@ -37,9 +37,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import (
 logger = logging.getLogger(__name__)
 
 
-# TODO(Devin) - Alternate impl that directly takes data type and returns the dataframe
-
-
 @unified_exception_handler
 @extraction_interface_relay_constructor(
     api_fn=extract_primitives_from_pdf_internal,
