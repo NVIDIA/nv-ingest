@@ -11,11 +11,35 @@ NeMo Retriever provides the following:
 - **Retrieval** — Leverage semantic + hybrid search for high accuracy retrieval with the embedding + reranking NIM microservice.
 
 
-<!--
+
+## Enterprise-Ready Features
+
+NVIDIA NeMo Retriever comes with enterprise-ready features, including the following:
+
+- **High Accuracy** — NeMo Retriever exhibits a high level of accuracy when retrieving across various modalities through enterprise documents. 
+- **High Throughput** — NeMo Retriever is capable of extracting, embedding, indexing and retrieving across hundreds of thousands of documents at scale with high throughput. 
+- **Decomposable/Customizable** — NeMo Retriever consists of modules that can be separately used and deployed in your own environment. 
+- **Enterprise-Grade Security** — NeMo Retriever NIMs come with security features such as the use of [safetensors](https://huggingface.co/docs/safetensors/index), continuous patching of CVEs, and more. 
+
+
+
+## Applications
+
+The following are some applications that use NVIDIA Nemo Retriever:
+
+- [Document Research Assistant for Blog Creation](https://github.com/run-llama/llama_index/blob/main/docs/docs/examples/agent/nvidia_document_research_assistant_for_blog_creation.ipynb) (LlamaIndex Jupyter Notebook)
+- [Digital Human for Customer Service](https://github.com/NVIDIA-AI-Blueprints/digital-human) (NVIDIA AI Blueprint)
+- [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
+- [Building Code Documentation Agents with CrewAI](https://github.com/crewAIInc/nvidia-demo) (CrewAI Demo)
+
+<!-- [Build an Enterprise RAG Pipeline](https://github.com/NVIDIA-AI-Blueprints/rag/tree/v2.0.0) -->
+<!-- [Visual AI Agent for Video Search and Summarization]() -->
+
+
+
 ## Related Topics
 
 - [NeMo Retriever Text Embedding NIM](https://docs.nvidia.com/nim/nemo-retriever/text-embedding/latest/overview.html)
 - [NeMo Retriever Text Reranking NIM](https://docs.nvidia.com/nim/nemo-retriever/text-reranking/latest/overview.html)
 - [NVIDIA NIM for Object Detection](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html)
 - [NVIDIA NIM for Table Extraction](https://docs.nvidia.com/nim/ingestion/table-extraction/latest/overview.html)
--->
