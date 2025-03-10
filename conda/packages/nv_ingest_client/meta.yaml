@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{% set version = environ['NV_INGEST_CLIENT_VERSION'] %}
 {% set py_version = environ['CONDA_PY'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
