@@ -6,7 +6,7 @@ SPDX-License-Identifier: Apache-2.0
 
 ## NVIDIA-Ingest: Multi-modal data extraction
 
-NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, textfiles, Microsoft Word & PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts and unstructured images that you can use in downstream generative applications.
+NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, text files, Microsoft Word and PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts, and unstructured images that you can use in downstream generative applications.
 
 > [!Note]
 > NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
