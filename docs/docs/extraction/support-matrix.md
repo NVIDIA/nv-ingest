@@ -9,8 +9,8 @@ Before you begin using NV-Ingest, ensure that you have the hardware for your use
 |--------|-------------|--------|--------------|
 | H100   | SXM or PCIe | 80GB   | 1            |
 | A100   | SXM or PCIe | 80GB   | 1            |
-| A10G   |             |        |              |
-| L40S   |             |        |              |
+| A10G   | —           | 24GB   | 1            |
+| L40S   | —           | 48GB   | 1            |
 
 
 
