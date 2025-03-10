@@ -48,6 +48,17 @@ class NemoRetrieverParseModelInterface(ModelInterface):
     An interface for handling inference with a NemoRetrieverParse model.
     """
 
+    def __init__(self, model_name: str = "nvidia/nemoretriever-parse"):
+        """
+        Initialize the instance with a specified model name.
+
+        Parameters
+        ----------
+        model_name : str, optional
+            The name of the model to be used, by default "nvidia/nemoretriever-parse".
+        """
+        self.model_name = model_name
+
     def name(self) -> str:
         """
         Get the name of the model interface.
@@ -195,7 +206,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
                 }
             )
         payload = {
-            "model": "nvidia/nemoretriever-parse",
+            "model": self.model_name,
             "messages": messages,
         }
 

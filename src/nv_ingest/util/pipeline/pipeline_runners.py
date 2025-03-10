@@ -62,9 +62,10 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse"
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
     nemoretriever_parse_infer_protocol: str = "http"
+    nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
