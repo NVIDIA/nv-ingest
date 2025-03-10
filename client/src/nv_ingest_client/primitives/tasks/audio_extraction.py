@@ -10,7 +10,8 @@ import logging
 from typing import Dict
 from typing import Optional
 
-from pydantic import ConfigDict, BaseModel
+from pydantic import BaseModel
+from pydantic import ConfigDict
 
 from .task_base import Task
 
@@ -22,6 +23,7 @@ class AudioExtractionSchema(BaseModel):
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
+    function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
 
@@ -35,6 +37,7 @@ class AudioExtractionTask(Task):
         auth_token: str = None,
         grpc_endpoint: str = None,
         infer_protocol: str = None,
+        function_id: Optional[str] = None,
         use_ssl: bool = None,
         ssl_cert: str = None,
     ) -> None:
@@ -43,6 +46,7 @@ class AudioExtractionTask(Task):
         self._auth_token = auth_token
         self._grpc_endpoint = grpc_endpoint
         self._infer_protocol = infer_protocol
+        self._function_id = function_id
         self._use_ssl = use_ssl
         self._ssl_cert = ssl_cert
 
@@ -59,6 +63,8 @@ class AudioExtractionTask(Task):
             info += f"  grpc_endpoint: {self._grpc_endpoint}\n"
         if self._infer_protocol:
             info += f"  infer_protocol: {self._infer_protocol}\n"
+        if self._function_id:
+            info += "  function_id: [redacted]\n"
         if self._use_ssl:
             info += f"  use_ssl: {self._use_ssl}\n"
         if self._ssl_cert:
@@ -80,6 +86,9 @@ class AudioExtractionTask(Task):
 
         if self._infer_protocol:
             task_properties["infer_protocol"] = self._infer_protocol
+
+        if self._function_id:
+            task_properties["function_id"] = self._function_id
 
         if self._use_ssl:
             task_properties["use_ssl"] = self._use_ssl

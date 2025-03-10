@@ -365,7 +365,10 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "RIVA_NGC_API_KEY",
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
         "",
     )
     infer_protocol = os.environ.get(
@@ -382,6 +385,7 @@ def get_audio_retrieval_service(env_var_prefix):
 
 def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
+    audio_function_id = os.getenv("AUDIO_FUNCTION_ID", "")
     audio_extractor_config = ingest_config.get(
         "audio_extraction_module",
         {
@@ -389,6 +393,7 @@ def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
                 "audio_endpoints": (audio_grpc, audio_http),
                 "audio_infer_protocol": audio_infer_protocol,
                 "auth_token": audio_auth,
+                "function_id": audio_function_id,
                 # All auth tokens are the same for the moment
             }
         },

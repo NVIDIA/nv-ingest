@@ -23,8 +23,8 @@ class ParakeetClient:
         self,
         endpoint: str,
         auth_token: Optional[str] = None,
-        auth_metadata: Optional[List[Tuple[str, str]]] = None,
-        use_ssl: bool = False,
+        function_id: Optional[str] = None,
+        use_ssl: Optional[bool] = None,
         ssl_cert: Optional[str] = None,
     ):
         """
@@ -36,6 +36,8 @@ class ParakeetClient:
             The URL of the Parakeet service endpoint.
         auth_token : Optional[str], default=None
             The authentication token for accessing the service.
+        function_id: Optional[str]
+            The NVCF function ID for invoking the service.
         use_ssl : bool, default=False
             Whether to use SSL for the connection.
         ssl_cert : Optional[str], default=None
@@ -45,11 +47,18 @@ class ParakeetClient:
         """
         self.endpoint = endpoint
         self.auth_token = auth_token
-        self.auth_metadata = auth_metadata or []
+        self.function_id = function_id
+        if use_ssl is None:
+            self.use_ssl = True if self.function_id else False
+        else:
+            self.use_ssl = use_ssl
+        self.ssl_cert = ssl_cert
+
+        self.auth_metadata = []
         if self.auth_token:
             self.auth_metadata.append(("authorization", f"Bearer {self.auth_token}"))
-        self.use_ssl = use_ssl
-        self.ssl_cert = ssl_cert
+        if self.function_id:
+            self.auth_metadata.append(("function-id", self.function_id))
 
         # Create authentication and ASR service objects.
         self._auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
@@ -275,7 +284,7 @@ def create_audio_inference_client(
     endpoints: Tuple[str, str],
     infer_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
-    auth_metadata: Optional[Tuple[str, str]] = None,
+    function_id: Optional[str] = None,
     use_ssl: bool = False,
     ssl_cert: Optional[str] = None,
 ):
@@ -292,8 +301,8 @@ def create_audio_inference_client(
         HTTP endpoints are not supported for audio inference.
     auth_token : str, optional
         Authorization token for authentication (default: None).
-    auth_metadata : list of tuples, optional
-        Additional metadata for authentication in the form of a key-value tuple (default: None).
+    function_id : str, optional
+        NVCF function ID of the invocation (default: None)
     use_ssl : bool, optional
         Whether to use SSL for secure communication (default: False).
     ssl_cert : str, optional
@@ -318,5 +327,5 @@ def create_audio_inference_client(
         raise ValueError("`http` endpoints are not supported for audio. Use `grpc`.")
 
     return ParakeetClient(
-        grpc_endpoint, auth_token=auth_token, auth_metadata=auth_metadata, use_ssl=use_ssl, ssl_cert=ssl_cert
+        grpc_endpoint, auth_token=auth_token, function_id=function_id, use_ssl=use_ssl, ssl_cert=ssl_cert
     )
