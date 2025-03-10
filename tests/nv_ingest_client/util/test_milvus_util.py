@@ -74,10 +74,11 @@ def test_op_dict_to_params(collection_name, expected_results):
         coll_name in collection_name.keys()
 
 
-def test_milvus_meta_collection(tmp_path):
+@pytest.mark.parametrize("sparse", [True, False])
+def test_milvus_meta_collection(tmp_path, sparse):
     collection_name = "collection"
     milvus_uri = f"{tmp_path}/test.db"
-    create_nvingest_collection(collection_name, milvus_uri=milvus_uri)
+    create_nvingest_collection(collection_name, milvus_uri=milvus_uri, sparse=sparse)
     results = grab_meta_collection_info(collection_name, milvus_uri=milvus_uri)
     keys = list(results[0].keys())
     assert ["pk", "collection_name", "indexes", "models", "timestamp", "user_fields"] == keys
