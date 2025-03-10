@@ -100,6 +100,7 @@ NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
 You can submit jobs programmatically in Python.
 
 ```python
+# must be first: pipeline subprocesses pickup config from env variables
 from dotenv import load_dotenv
 load_dotenv(".env")
 
