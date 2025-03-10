@@ -1,13 +1,7 @@
 # Prerequisites for NV-Ingest
 
-Before you begin using NV-Ingest, ensure the following hardware and software prerequisites outlined are met.
+Before you begin using NV-Ingest, ensure the following software prerequisites are met.
 
-## Hardware
-
-| GPU | Family | Memory | # of GPUs (min.) |
-| ------ | ------ | ------ | ------ |
-| H100 | SXM or PCIe | 80GB | 1 |
-| A100 | SXM or PCIe | 80GB | 1 |
 
 ## Software
 
@@ -21,3 +15,9 @@ Before you begin using NV-Ingest, ensure the following hardware and software pre
 !!! note
 
     You install Python later. NV-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+
+
+## Related Topics
+
+- [Support Matrix](support-matrix.md)
+- [Quickstart Guide](quickstart-guide.md)
