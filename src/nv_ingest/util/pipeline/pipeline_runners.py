@@ -84,6 +84,7 @@ class PipelineCreationSchema(BaseModel):
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
     )
+    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     # YOLOX model endpoints for various document processing tasks
     yolox_graphic_elements_http_endpoint: str = os.getenv(

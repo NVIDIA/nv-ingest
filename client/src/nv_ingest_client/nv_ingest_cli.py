@@ -131,7 +131,7 @@ Tasks and Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_BUILD_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/meta/llama-3.2-90b-vision-instruct'.
+      Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b
