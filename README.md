@@ -131,7 +131,7 @@ client = NvIngestClient(
 )                                                                  
                                             
 # Note: gpu_cagra accelerated indexing is not yet available in milvus-lite
-# Providing a filename for milvus_uri will use milvus-lite
+# Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"                
 collection_name = "test"      
 sparse=False
