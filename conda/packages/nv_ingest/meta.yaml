@@ -66,6 +66,9 @@ requirements:
     - unstructured-client>=0.25.9
     - uvicorn
     - wand>=0.6.10
+  pip:
+    - ffmpeg>=1.1
+    - nvidia-riva-client=2.18.0
 
   test:
     commands:
