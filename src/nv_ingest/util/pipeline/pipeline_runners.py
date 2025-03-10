@@ -41,8 +41,9 @@ class PipelineCreationSchema(BaseModel):
     """
 
     # Audio processing settings
-    audio_http_endpoint: str = "unavailable"
-    audio_infer_protocol: str = "http"
+    audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
+    audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "")
+    audio_infer_protocol: str = "grpc"
 
     # Embedding model settings
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
