@@ -96,7 +96,7 @@ def test_extract_primitives_from_pdf_integration():
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Call the high-level function with appropriate parameters
-    df_result, _ = extract_primitives_from_pdf(
+    df_result = extract_primitives_from_pdf(
         df_extraction_ledger=df_ledger,
         extract_method="pdfium",  # This is required and determines which schema to use
         extract_text=True,

@@ -138,26 +138,68 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
             if schema_class is None:
                 raise ValueError(f"Unsupported extraction method: {extract_method}")
 
-            # Build the method-specific configuration.
-            extraction_config = _build_config_from_schema(schema_class, bound.arguments)
-            extraction_config = {f"{extract_method}_config": extraction_config}
+            # Build the method-specific configuration using the schema class.
+            extraction_config_dict = _build_config_from_schema(schema_class, bound.arguments)
 
-            # Pretty print the task and extractor configurations for debugging
+            # Create a Pydantic object instead of a dictionary for the specific extractor config
+            extractor_schema = None
+            try:
+                # Find the appropriate extractor schema class based on the extraction method
+                extractor_schema_name = f"{extract_method.capitalize()}ExtractorSchema"
+                extractor_schema_class = globals().get(extractor_schema_name)
+
+                if extractor_schema_class is None:
+                    # Try another common naming pattern
+                    extractor_schema_name = f"{extract_method.upper()}ExtractorSchema"
+                    extractor_schema_class = globals().get(extractor_schema_name)
+
+                if extractor_schema_class is None:
+                    # Final fallback attempt with camelCase
+                    extractor_schema_name = f"{extract_method[0].upper() + extract_method[1:]}ExtractorSchema"
+                    extractor_schema_class = globals().get(extractor_schema_name)
+
+                if extractor_schema_class is not None:
+                    # Create the extractor schema with the method-specific config
+                    config_key = f"{extract_method}_config"
+                    extractor_schema = extractor_schema_class(**{config_key: extraction_config_dict})
+                else:
+                    logger.warning(f"Could not find extractor schema class for method: {extract_method}")
+            except Exception as e:
+                logger.warning(f"Error creating extractor schema: {str(e)}")
+                # Fall back to dictionary approach if schema creation fails
+                extractor_schema = {f"{extract_method}_config": extraction_config_dict}
+
+            # If schema creation failed, fall back to dictionary
+            if extractor_schema is None:
+                extractor_schema = {f"{extract_method}_config": extraction_config_dict}
+
+            # Log the task and extractor configurations for debugging
             logger.debug("\n" + "=" * 80)
             logger.debug(f"DEBUG - API Function: {api_fn.__name__}")
             logger.debug(f"DEBUG - Extract Method: {extract_method}")
             logger.debug("-" * 80)
 
-            logger.debug("DEBUG - Task Config:")
-            pprint.pprint(task_config, width=100, sort_dicts=False)
+            # Format the task config as a string and log it
+            task_config_str = pprint.pformat(task_config, width=100, sort_dicts=False)
+            logger.debug(f"DEBUG - Task Config:\n{task_config_str}")
             logger.debug("-" * 80)
 
-            logger.debug("DEBUG - Extractor Config:")
-            pprint.pprint(extraction_config, width=100, sort_dicts=False)
+            # Format the extractor config as a string and log it
+            if hasattr(extractor_schema, "model_dump"):
+                extractor_config_str = pprint.pformat(extractor_schema.model_dump(), width=100, sort_dicts=False)
+            else:
+                extractor_config_str = pprint.pformat(extractor_schema, width=100, sort_dicts=False)
+            logger.debug(f"DEBUG - Extractor Config Type: {type(extractor_schema)}")
+            logger.debug(f"DEBUG - Extractor Config:\n{extractor_config_str}")
             logger.debug("=" * 80 + "\n")
 
             # Call the backend API function.
-            return api_fn(ledger, task_config, extraction_config, execution_trace_log)
+            result = api_fn(ledger, task_config, extractor_schema, execution_trace_log)
+
+            # If the result is a tuple, return only the first element
+            if isinstance(result, tuple):
+                return result[0]
+            return result
 
         return wrapper
 
