@@ -44,7 +44,7 @@ NV-Ingest supports the following file types:
 
 ## Prerequisites
 
-For production level performance and scalability, we recommend deploying the pipeline and supporting NIMs via Docker Compose or Kubernetes (via the [provided helm charts](helm). See the hardware and software requirments [here](https://docs.nvidia.com/nv-ingest/user-guide/getting-started/prerequisites).
+For production-level performance and scalability, we recommend that you deploy the pipeline and supporting NIMs by using Docker Compose or Kubernetes ([helm charts](helm)). For more information, refer to [prerequisites](https://docs.nvidia.com/nv-ingest/user-guide/getting-started/prerequisites).
 
 ## Library Mode Quickstart
 
