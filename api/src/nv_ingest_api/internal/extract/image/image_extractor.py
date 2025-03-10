@@ -180,7 +180,6 @@ def extract_primitives_from_image_internal(
         task_config = task_config.model_dump()
 
     try:
-        df_extraction_ledger.to_json("df_extraction_ledger_pre.json")
         # Create a partial function to decode and extract image data for each row.
         _decode_and_extract = functools.partial(
             _decode_and_extract_from_image,
@@ -197,7 +196,6 @@ def extract_primitives_from_image_internal(
         else:
             extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-        extracted_df.to_json("df_extraction_ledger_post.json")
         return extracted_df, {"trace_info": execution_trace_log}
 
     except Exception as e:
