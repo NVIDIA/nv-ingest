@@ -184,6 +184,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
     )
+    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -196,6 +197,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
                 "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
                 "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+                "model_name": model_name,
             },
         },
     )
