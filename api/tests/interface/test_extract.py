@@ -27,12 +27,33 @@ logger = logging.getLogger(__name__)
 
 
 @pytest.mark.integration
-def test_extract_primitives_from_pdf_integration():
+@pytest.mark.parametrize(
+    "extract_method",
+    [
+        "pdfium",
+        "nemoretriever_parse",
+        pytest.param("adobe", marks=pytest.mark.xfail(reason="Adobe extraction not configured in test environment")),
+        pytest.param("llama", marks=pytest.mark.xfail(reason="Llama extraction not configured in test environment")),
+        pytest.param(
+            "unstructured_io",
+            marks=pytest.mark.xfail(reason="Unstructured.io extraction not configured in test environment"),
+        ),
+        pytest.param("tika", marks=pytest.mark.xfail(reason="Tika extraction not configured in test environment")),
+    ],
+)
+def test_extract_primitives_from_pdf_integration(extract_method):
     """
     Integration test for the extract_primitives_from_pdf function.
 
     This test verifies that the PDF primitive extraction pipeline correctly processes
-    a test PDF document and returns a DataFrame with extracted primitives.
+    a test PDF document and returns a DataFrame with extracted primitives. The test
+    is parameterized to test multiple extraction methods, with some methods marked as
+    expected to fail in standard test environments.
+
+    Parameters
+    ----------
+    extract_method : str
+        The PDF extraction method to test (e.g., "pdfium", "adobe", "llama")
     """
     # Get the test file path using helper functions
     test_file_rel_path = "./data/multimodal_test.pdf"
@@ -84,32 +105,79 @@ def test_extract_primitives_from_pdf_integration():
         }
     )
 
-    # Ensure at least one valid endpoint is provided for YOLOX
-    # The PDFiumConfigSchema requires at least one non-empty endpoint
+    # Retrieve environment variables for all possible extraction methods
+    # YOLOX parameters (used by multiple methods)
     _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8000/v1/infer")
-
-    # The gRPC endpoint can be None, as long as the HTTP endpoint is valid
     _YOLOX_GRPC_ENDPOINT = os.getenv("INGEST_YOLOX_GRPC_ENDPOINT", None)
-
-    # Set default protocol to match the available endpoint
     _YOLOX_INFER_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
-    # Call the high-level function with appropriate parameters
-    df_result = extract_primitives_from_pdf(
-        df_extraction_ledger=df_ledger,
-        extract_method="pdfium",  # This is required and determines which schema to use
-        extract_text=True,
-        extract_images=True,
-        extract_tables=True,
-        extract_charts=True,
-        extract_infographics=True,
-        text_depth="page",
-        # PDFium-specific configuration parameters
-        yolox_endpoints=(_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
-        yolox_infer_protocol=_YOLOX_INFER_PROTOCOL,
-        yolox_auth_token=_AUTH_TOKEN,
+    # NemoRetriever Parse parameters
+    _NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT = os.getenv(
+        "INGEST_NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT", "http://localhost:8000/v1/chat/completions:8015"
     )
+    _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT", None)
+    _NEMO_RETRIEVER_PARSE_PROTOCOL = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_PROTOCOL", "http")
+    _NEMO_RETRIEVER_PARSE_MODEL_NAME = os.getenv("INGEST_NEMO_RETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
+
+    # Method-specific configuration parameters
+    extraction_params = {
+        "df_extraction_ledger": df_ledger,
+        "extract_method": extract_method,
+        "extract_text": True,
+        "extract_images": True,
+        "extract_tables": True,
+        "extract_charts": True,
+        "extract_infographics": True,
+        "text_depth": "page",
+    }
+
+    # Add method-specific parameters
+    if extract_method == "pdfium" or extract_method == "adobe" or extract_method == "tika":
+        extraction_params.update(
+            {
+                "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
+                "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
+                "yolox_auth_token": _AUTH_TOKEN,
+            }
+        )
+    elif extract_method == "llama":
+        extraction_params.update(
+            {
+                "llama_api_key": os.getenv("INGEST_LLAMA_API_KEY", "dummy-api-key"),
+                "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
+                "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
+                "yolox_auth_token": _AUTH_TOKEN,
+            }
+        )
+    elif extract_method == "unstructured_io":
+        extraction_params.update(
+            {
+                "unstructured_io_api_key": os.getenv("INGEST_UNSTRUCTURED_IO_API_KEY", "dummy-api-key"),
+                "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
+                "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
+                "yolox_auth_token": _AUTH_TOKEN,
+            }
+        )
+    elif extract_method == "nemoretriever_parse":
+        extraction_params.update(
+            {
+                # NemoRetriever Parse specific parameters
+                "nemoretriever_parse_endpoints": (
+                    _NEMO_RETRIEVER_PARSE_GRPC_ENDPOINT,
+                    _NEMO_RETRIEVER_PARSE_HTTP_ENDPOINT,
+                ),
+                "nemoretriever_parse_protocol": _NEMO_RETRIEVER_PARSE_PROTOCOL,
+                "nemoretriever_parse_model_name": _NEMO_RETRIEVER_PARSE_MODEL_NAME,
+                # Also include YOLOX parameters for image processing capability
+                "yolox_endpoints": (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
+                "yolox_infer_protocol": _YOLOX_INFER_PROTOCOL,
+                "yolox_auth_token": _AUTH_TOKEN,
+            }
+        )
+
+    # Call the high-level function with appropriate parameters
+    df_result = extract_primitives_from_pdf(**extraction_params)
 
     # Assert that the returned DataFrame is not empty
     assert not df_result.empty, "Resulting DataFrame should not be empty"

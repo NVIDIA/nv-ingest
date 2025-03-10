@@ -53,12 +53,25 @@ logger = logging.getLogger(__name__)
 
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
-    config: PDFiumConfigSchema,
+    yolox_client,
+    yolox_model_name: str = "yolox",
     execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
-    Given a list of (page_index, image) tuples, this function calls the YOLOX-based
-    inference service to extract page element annotations from all pages.
+    Given a list of (page_index, image) tuples and a YOLOX client, this function performs
+    inference to extract page element annotations from all pages.
+
+    Parameters
+    ----------
+    pages : List[Tuple[int, np.ndarray, Tuple[int, int]]]
+        List of tuples containing page index, image data as numpy array,
+        and optional padding offset information.
+    yolox_client : object
+        A pre-configured client instance for the YOLOX inference service.
+    yolox_model_name : str, default="yolox"
+        The name of the YOLOX model to use for inference.
+    execution_trace_log : Optional[List], default=None
+        List for accumulating execution trace information.
 
     Returns
     -------
@@ -67,22 +80,8 @@ def _extract_page_elements_using_image_ensemble(
         is the result of combining annotations from the inference.
     """
     page_elements = []
-    yolox_client = None
-
-    # Obtain yolox_version
-    # Assuming that the http endpoint is at index 1
-    yolox_http_endpoint = config.yolox_endpoints[1]
-    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
 
     try:
-        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
-        yolox_client = create_inference_client(
-            config.yolox_endpoints,
-            model_interface,
-            config.auth_token,
-            config.yolox_infer_protocol,
-        )
-
         # Collect all page indices and images in order.
         # Optionally, collect padding offsets if present.
         image_page_indices = []
@@ -103,7 +102,7 @@ def _extract_page_elements_using_image_ensemble(
         # Perform inference using the NimClient.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name=yolox_model_name,
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
             trace_info=execution_trace_log,
             stage_name="pdf_content_extractor",
@@ -124,14 +123,9 @@ def _extract_page_elements_using_image_ensemble(
     except TimeoutError:
         logger.error("Timeout error during page element extraction.")
         raise
-
     except Exception as e:
         logger.exception(f"Unhandled error during page element extraction: {str(e)}")
         raise
-
-    finally:
-        if yolox_client:
-            yolox_client.close()
 
     logger.debug(f"Extracted {len(page_elements)} page elements.")
     return page_elements
@@ -263,7 +257,6 @@ def _extract_page_images(
 
 def _extract_page_elements(
     pages: list,
-    pdfium_config: PDFiumConfigSchema,
     page_count: int,
     source_metadata: dict,
     base_unified_metadata: dict,
@@ -271,38 +264,115 @@ def _extract_page_elements(
     extract_charts: bool,
     extract_infographics: bool,
     paddle_output_format: str,
+    yolox_endpoints: Tuple[Optional[str], Optional[str]],
+    yolox_infer_protocol: str = "http",
+    auth_token: Optional[str] = None,
     execution_trace_log=None,
 ) -> list:
     """
-    Always extract page elements from the given pages using YOLOX-based logic.
-    The caller decides whether to call it.
+    Extract page elements from the given pages using YOLOX-based inference.
+
+    This function creates a YOLOX client using the provided parameters, extracts elements
+    from pages, and builds metadata for each extracted element based on the specified
+    extraction flags.
+
+    Parameters
+    ----------
+    pages : list
+        List of page images to process.
+    page_count : int
+        Total number of pages in the document.
+    source_metadata : dict
+        Metadata about the source document.
+    base_unified_metadata : dict
+        Base metadata to include in all extracted elements.
+    extract_tables : bool
+        Flag indicating whether to extract tables.
+    extract_charts : bool
+        Flag indicating whether to extract charts.
+    extract_infographics : bool
+        Flag indicating whether to extract infographics.
+    paddle_output_format : str
+        Format to use for table content.
+    yolox_endpoints : Tuple[Optional[str], Optional[str]]
+        A tuple containing the gRPC and HTTP endpoints for the YOLOX service.
+    yolox_infer_protocol : str, default="http"
+        Protocol to use for inference (either "http" or "grpc").
+    auth_token : Optional[str], default=None
+        Authentication token for the inference service.
+    execution_trace_log : optional
+        List for accumulating execution trace information.
+
+    Returns
+    -------
+    list
+        List of extracted page elements with their metadata.
     """
     extracted_page_elements = []
+    yolox_client = None
 
-    page_element_results = _extract_page_elements_using_image_ensemble(
-        pages, pdfium_config, execution_trace_log=execution_trace_log
-    )
+    try:
+        # Default model name
+        yolox_model_name = "yolox"
 
-    # Build metadata for each
-    for page_idx, page_element in page_element_results:
-        if (not extract_tables) and (page_element.type_string == "table"):
-            continue
-        if (not extract_charts) and (page_element.type_string == "chart"):
-            continue
-        if (not extract_infographics) and (page_element.type_string == "infographic"):
-            continue
+        # Get the HTTP endpoint to determine the model name if needed
+        yolox_http_endpoint = yolox_endpoints[1]
+        if yolox_http_endpoint:
+            try:
+                yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+            except Exception as e:
+                logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
 
-        if page_element.type_string == "table":
-            page_element.content_format = paddle_output_format
+        # Create the model interface
+        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
 
-        page_element_meta = construct_page_element_metadata(
-            page_element,
-            page_idx,
-            page_count,
-            source_metadata,
-            base_unified_metadata,
+        # Create the inference client
+        yolox_client = create_inference_client(
+            yolox_endpoints,
+            model_interface,
+            auth_token,
+            yolox_infer_protocol,
         )
-        extracted_page_elements.append(page_element_meta)
+
+        # Extract page elements using the client
+        page_element_results = _extract_page_elements_using_image_ensemble(
+            pages, yolox_client, yolox_model_name, execution_trace_log=execution_trace_log
+        )
+
+        # Process each extracted element based on extraction flags
+        for page_idx, page_element in page_element_results:
+            # Skip elements that shouldn't be extracted based on flags
+            if (not extract_tables) and (page_element.type_string == "table"):
+                continue
+            if (not extract_charts) and (page_element.type_string == "chart"):
+                continue
+            if (not extract_infographics) and (page_element.type_string == "infographic"):
+                continue
+
+            # Set content format for tables
+            if page_element.type_string == "table":
+                page_element.content_format = paddle_output_format
+
+            # Construct metadata for the page element
+            page_element_meta = construct_page_element_metadata(
+                page_element,
+                page_idx,
+                page_count,
+                source_metadata,
+                base_unified_metadata,
+            )
+            extracted_page_elements.append(page_element_meta)
+
+    except Exception as e:
+        logger.exception(f"Error in page element extraction: {str(e)}")
+        raise
+    finally:
+        # Ensure client is closed properly
+        if yolox_client:
+            try:
+                yolox_client.close()
+            except Exception as e:
+                logger.warning(f"Error closing YOLOX client: {str(e)}")
 
     return extracted_page_elements
 
@@ -469,7 +539,6 @@ def pdfium_extractor(
                     future = executor.submit(
                         _extract_page_elements,
                         pages_for_tables[:],  # pass a copy
-                        pdfium_config,
                         page_count,
                         source_metadata,
                         base_unified_metadata,
@@ -477,6 +546,9 @@ def pdfium_extractor(
                         extract_charts,
                         extract_infographics,
                         paddle_output_format,
+                        pdfium_config.yolox_endpoints,
+                        pdfium_config.yolox_infer_protocol,
+                        pdfium_config.auth_token,
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
@@ -489,7 +561,6 @@ def pdfium_extractor(
             future = executor.submit(
                 _extract_page_elements,
                 pages_for_tables[:],
-                pdfium_config,
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -497,6 +568,9 @@ def pdfium_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
+                pdfium_config.yolox_endpoints,
+                pdfium_config.yolox_infer_protocol,
+                pdfium_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)

@@ -6,6 +6,7 @@
 
 import base64
 import io
+
 import pandas as pd
 from typing import Any, Dict, List, Optional
 import logging
@@ -48,8 +49,8 @@ def _work_extract_pdf(
     """
     Perform PDF extraction on a decoded PDF stream using the given extraction parameters.
     """
-    # Pop 'extract_method' from the config if provided, defaulting to 'pdfium'.
-    extract_method = extractor_config.pop("extract_method", "pdfium")
+
+    extract_method = extractor_config["extract_method"]
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
     return extractor_fn(
         pdf_stream,
@@ -96,6 +97,7 @@ def _orchestrate_row_extraction(
         extract_tables = params.pop("extract_tables", False)
         extract_charts = params.pop("extract_charts", False)
         extract_infographics = params.pop("extract_infographics", False)
+        extract_method = params.get("extract_method", "pdfium")
     except KeyError as e:
         raise ValueError(f"Missing required extraction flag: {e}")
 
@@ -103,28 +105,31 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
-    # Handle both object and dictionary cases
-    if hasattr(extractor_config, "pdfium_config"):
-        pdfium_config = extractor_config.pdfium_config
-    elif isinstance(extractor_config, dict) and "pdfium_config" in extractor_config:
-        pdfium_config = extractor_config["pdfium_config"]
+    # Construct the config key based on the extraction method
+    config_key = f"{extract_method}_config"
+
+    # Handle both object and dictionary cases for extractor_config
+    if hasattr(extractor_config, config_key):
+        # Object case: extractor_config is a Pydantic model with attribute access
+        method_config = getattr(extractor_config, config_key)
+    elif isinstance(extractor_config, dict) and config_key in extractor_config:
+        # Dictionary case: extractor_config is a dict with key access
+        method_config = extractor_config[config_key]
     else:
-        pdfium_config = None
+        # If no matching config is found, log a warning but don't fail
+        logger.warning(f"No {config_key} found in extractor_config: {extractor_config}")
+        method_config = None
 
-    if pdfium_config is not None:
-        params["pdfium_config"] = pdfium_config
+    # Add the method-specific config to the parameters if available
+    if method_config is not None:
+        params[config_key] = method_config
+        logger.debug(f"Added {config_key} to extraction parameters")
 
-    # Determine the extraction method and automatically inject its configuration.
-    extract_method = task_config.get("method")
-    if extract_method is not None:
-        params["extract_method"] = extract_method
-        config_key = f"{extract_method}_config"
-        extractor_specific_config = getattr(extractor_config, config_key, None)
-        if extractor_specific_config is not None:
-            params[config_key] = extractor_specific_config
-
-    # The remaining parameters constitute the extractor_config.
+    # The resulting parameters constitute the complete extractor_config
     extractor_config = params
+
+    # Log the final extractor configuration for debugging
+    logger.debug(f"Final extractor_config: {extractor_config}")
 
     result = _work_extract_pdf(
         pdf_stream,
@@ -136,4 +141,5 @@ def _orchestrate_row_extraction(
         extractor_config,
         execution_trace_log,
     )
+
     return result

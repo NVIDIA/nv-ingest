@@ -10,12 +10,19 @@ from typing import Dict, Any, Optional, List
 
 from pydantic import BaseModel
 
-from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema, NemoRetrieverParseConfigSchema
 
 logger = logging.getLogger(__name__)
 
 ## CONFIG_SCHEMAS is a global dictionary that maps extraction methods to Pydantic schemas.
-CONFIG_SCHEMAS: Dict[str, Any] = {"pdfium": PDFiumConfigSchema}
+CONFIG_SCHEMAS: Dict[str, Any] = {
+    "adobe": PDFiumConfigSchema,
+    "llama": PDFiumConfigSchema,
+    "nemoretriever_parse": NemoRetrieverParseConfigSchema,
+    "pdfium": PDFiumConfigSchema,
+    "tika": PDFiumConfigSchema,
+    "unstructured_io": PDFiumConfigSchema,
+}
 
 
 def _build_config_from_schema(schema_class: type[BaseModel], args: Dict[str, Any]) -> Dict[str, Any]:
@@ -43,7 +50,6 @@ def _build_config_from_schema(schema_class: type[BaseModel], args: Dict[str, Any
     pydantic.ValidationError
         If the provided arguments do not conform to the schema.
     """
-    # Use Pydantic v2's model_fields to retrieve the field names.
     field_names = schema_class.model_fields.keys()
     config_data = {k: v for k, v in args.items() if k in field_names}
     # Instantiate the schema to perform validation, then return the model's dictionary representation.
@@ -131,6 +137,7 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
 
             # Extract common task parameters using the specified task_keys.
             task_params = {key: bound.arguments[key] for key in task_keys if key in bound.arguments}
+            task_params["extract_method"] = extract_method
             task_config = {"params": task_params}
 
             # Look up the appropriate Pydantic schema.
@@ -194,6 +201,8 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
             logger.debug("=" * 80 + "\n")
 
             # Call the backend API function.
+            pprint.pprint(task_config)
+            pprint.pprint(extractor_schema)
             result = api_fn(ledger, task_config, extractor_schema, execution_trace_log)
 
             # If the result is a tuple, return only the first element

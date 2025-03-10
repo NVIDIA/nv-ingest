@@ -125,6 +125,9 @@ class NemoRetrieverParseConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
+    yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    yolox_infer_protocol: str = ""
+
     nemoretriever_parse_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     nemoretriever_parse_infer_protocol: str = ""
 

@@ -41,7 +41,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
 )
-from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemoRetrieverParseConfigSchema, PDFiumConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemoRetrieverParseConfigSchema
 from nv_ingest_api.util.metadata.aggregators import (
     extract_pdf_metadata,
     LatexTable,
@@ -155,16 +155,6 @@ def nemoretriever_parse_extractor(
             f"Invalid paddle_output_format value: {paddle_output_format_str}. Expected one of: {valid_options}"
         )
 
-    # Process PDFium configuration if required.
-    if (extract_tables_method == "yolox") and (extract_tables or extract_charts or extract_infographics):
-        pdfium_config_raw = extractor_config.get("pdfium_config", {})
-        if isinstance(pdfium_config_raw, dict):
-            pdfium_config = PDFiumConfigSchema(**pdfium_config_raw)
-        elif isinstance(pdfium_config_raw, PDFiumConfigSchema):
-            pdfium_config = pdfium_config_raw
-        else:
-            raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
-
     # Process nemoretriever_parse configuration.
     nemoretriever_parse_config_raw = extractor_config.get("nemoretriever_parse_config", {})
     if isinstance(nemoretriever_parse_config_raw, dict):
@@ -257,7 +247,6 @@ def nemoretriever_parse_extractor(
                 future_yolox = executor.submit(
                     lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
                     pages_for_tables[:],  # pass a copy
-                    pdfium_config,
                     page_count,
                     source_metadata,
                     base_unified_metadata,
@@ -265,6 +254,9 @@ def nemoretriever_parse_extractor(
                     extract_charts,
                     extract_infographics,
                     paddle_output_format,
+                    nemoretriever_parse_config.yolox_endpoints,
+                    nemoretriever_parse_config.yolox_infer_protocol,
+                    nemoretriever_parse_config.auth_token,
                     execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_yolox)
@@ -289,7 +281,6 @@ def nemoretriever_parse_extractor(
             future_yolox = executor.submit(
                 lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
                 pages_for_tables[:],
-                pdfium_config,
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -297,6 +288,9 @@ def nemoretriever_parse_extractor(
                 extract_charts,
                 extract_infographics,
                 paddle_output_format,
+                nemoretriever_parse_config.yolox_endpoints,
+                nemoretriever_parse_config.yolox_infer_protocol,
+                nemoretriever_parse_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future_yolox)

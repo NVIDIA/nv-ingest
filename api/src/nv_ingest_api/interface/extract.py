@@ -17,9 +17,7 @@ from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitive
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
-from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
 from nv_ingest_api.internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
-from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
@@ -33,6 +31,8 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import (
     IngestTaskChartExtraction,
     IngestTaskTableExtraction,
 )
+from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 
 logger = logging.getLogger(__name__)
 
@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 )
 def extract_primitives_from_pdf(
     *,
-    df_extraction_ledger,  # Ledger (e.g., a pandas DataFrame)
+    df_extraction_ledger: pd.DataFrame,  # Ledger (e.g., a pandas DataFrame)
     extract_method: str = "pdfium",  # Determines which extraction schema to use
     extract_text: bool = True,
     extract_images: bool = True,
@@ -61,72 +61,166 @@ def extract_primitives_from_pdf(
     yolox_auth_token: Optional[str] = None,
     yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
     yolox_infer_protocol: str = "http",
+    # Nemoretriver Parse parameters:
+    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemoretriever_parse_protocol: str = "http",
+    nemoretriever_parse_model_name: str = None,
     # UnstructuredIO parameters:
     unstructured_io_api_key: Optional[str] = None,
     # Tika-specific parameter:
     tika_server_url: Optional[str] = None,
 ):
     """
-    High-level extraction function for PDF primitives.
+    Extract text, images, tables, charts, and infographics from PDF documents.
 
-    This function provides a simplified interface for extracting primitives (such as text,
-    images, tables, and charts) from PDF documents. It dynamically assembles both common
-    task-level configuration and method-specific configuration based on the specified extraction
-    method. The method-specific configuration is validated using a corresponding Pydantic schema
-    (registered in the global CONFIG_SCHEMAS dictionary). The assembled configuration is then
-    passed to the backend extraction function `extract_primitives_from_pdf_internal` via a decorator.
+    This function serves as a unified interface for PDF primitive extraction, supporting multiple
+    extraction engines (pdfium, adobe, llama, nemoretriever_parse, unstructured_io, and tika).
+    It processes a DataFrame containing base64-encoded PDF data and returns a new DataFrame
+    with structured information about the extracted elements.
+
+    The function uses a decorator pattern to dynamically validate configuration parameters
+    and invoke the appropriate extraction pipeline. This design allows for flexible
+    engine-specific configuration while maintaining a consistent interface.
 
     Parameters
     ----------
     df_extraction_ledger : pandas.DataFrame
-        The extraction ledger containing the PDF documents to process.
-        # TODO(Devin): Add more details about the expected structure of the DataFrame.
+        DataFrame containing PDF documents to process. Must include the following columns:
+        - "content" : Base64-encoded PDF data
+        - "source_id" : Unique identifier for the document (optional but recommended)
+        - "source_name" : Name of the document (optional)
+        - "document_type" : Document type (should be "pdf" or related enum value)
+        - "metadata" : Dictionary containing additional metadata (optional)
+
     extract_method : str, default "pdfium"
-        **Required.** Specifies which extraction method to use. This value determines which Pydantic
-        schema is used to validate method-specific configuration options (e.g., "pdfium" or "tika").
+        The extraction engine to use. Valid options:
+        - "pdfium" : PDFium-based extraction (default)
+        - "adobe" : Adobe PDF Services API
+        - "llama" : LlamaParse extraction
+        - "nemoretriever_parse" : NVIDIA NemoRetriever Parse
+        - "unstructured_io" : Unstructured.io extraction
+        - "tika" : Apache Tika extraction
+
     extract_text : bool, default True
-        Flag indicating whether to extract text from the PDFs.
+        Whether to extract text content from the PDFs.
+
     extract_images : bool, default True
-        Flag indicating whether to extract images from the PDFs.
+        Whether to extract embedded images from the PDFs.
+
+    extract_infographics : bool, default True
+        Whether to extract infographics from the PDFs.
+
     extract_tables : bool, default True
-        Flag indicating whether to extract tables from the PDFs.
+        Whether to extract tables from the PDFs.
+
     extract_charts : bool, default True
-        Flag indicating whether to extract charts from the PDFs.
+        Whether to extract charts and graphs from the PDFs.
+
+    text_depth : str, default "page"
+        Level of text granularity to extract. Options:
+        - "page" : Text extracted at page level
+        - "block" : Text extracted at block level
+        - "paragraph" : Text extracted at paragraph level
+        - "line" : Text extracted at line level
+
+    adobe_client_id : str, optional
+        Client ID for Adobe PDF Services API. Required when extract_method="adobe".
+
+    adobe_client_secret : str, optional
+        Client secret for Adobe PDF Services API. Required when extract_method="adobe".
+
+    llama_api_key : str, optional
+        API key for LlamaParse service. Required when extract_method="llama".
+
     yolox_auth_token : str, optional
-        Authentication token required for PDFium extraction (if applicable).
-    yolox_endpoints : tuple of (Optional[str], Optional[str]), optional
-        A tuple specifying the endpoints for PDFium extraction. Typically, the first element is for gRPC
-        and the second for HTTP. At least one endpoint must be provided.
+        Authentication token for YOLOX inference services.
+
+    yolox_endpoints : tuple of (str, str), optional
+        A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
+        At least one endpoint must be non-empty.
+
     yolox_infer_protocol : str, default "http"
-        The inference protocol to use for PDFium extraction.
+        Protocol to use for YOLOX inference. Options: "http" or "grpc".
+
+    nemoretriever_parse_endpoints : tuple of (str, str), optional
+        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
+        Required when extract_method="nemoretriever_parse".
+
+    nemoretriever_parse_protocol : str, default "http"
+        Protocol to use for NemoRetriever Parse. Options: "http" or "grpc".
+
+    nemoretriever_parse_model_name : str, optional
+        Model name for NemoRetriever Parse. Default is "nvidia/nemoretriever-parse".
+
+    unstructured_io_api_key : str, optional
+        API key for Unstructured.io services. Required when extract_method="unstructured_io".
+
     tika_server_url : str, optional
-        URL for Tika extraction (if the "tika" extraction method is used).
-    execution_trace_log : list, optional
-        A list for recording execution trace information during extraction. If None, an empty dictionary
-        is substituted.
+        URL for Apache Tika server. Required when extract_method="tika".
 
     Returns
     -------
-    tuple
-        A tuple containing:
-            - The original extraction ledger.
-            - A task configuration dictionary containing common task parameters.
-            - An extractor configuration dictionary containing method-specific configuration (nested
-              under a key corresponding to the extraction method).
-            - The execution trace log (an empty dictionary if None was provided).
+    pandas.DataFrame
+        A DataFrame containing the extracted primitives with the following columns:
+        - "document_type" : Type of the extracted element (e.g., "text", "image", "table")
+        - "metadata" : Dictionary containing detailed information about the extracted element
+        - "uuid" : Unique identifier for the extracted element
 
     Raises
     ------
     ValueError
-        If the required 'extract_method' parameter is missing, if an unsupported extraction method is
-        specified, or if the backend API function does not conform to the expected signature.
+        If an unsupported extraction method is specified.
+        If required parameters for the specified extraction method are missing.
+        If the input DataFrame does not have the required structure.
+
+    KeyError
+        If required columns are missing from the input DataFrame.
+
+    RuntimeError
+        If extraction fails due to processing errors.
 
     Notes
     -----
-    This function is intended to provide a user-friendly API that abstracts the complexity of
-    configuration assembly. It leverages the `extraction_interface_relay_constructor` decorator to
-    dynamically build and validate configurations, passing the final composite configuration to the
-    backend function `extract_primitives_from_pdf_internal`.
+    The function uses a decorator pattern through `extraction_interface_relay_constructor`
+    which dynamically processes the parameters and validates them against the appropriate
+    configuration schema. The actual extraction work is delegated to the
+    `extract_primitives_from_pdf_internal` function.
+
+    For each extraction method, specific parameters are required:
+    - pdfium: yolox_endpoints
+    - adobe: adobe_client_id, adobe_client_secret
+    - llama: llama_api_key
+    - nemoretriever_parse: nemoretriever_parse_endpoints
+    - unstructured_io: unstructured_io_api_key
+    - tika: tika_server_url
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import base64
+    >>>
+    >>> # Read a PDF file and encode it as base64
+    >>> with open("document.pdf", "rb") as f:
+    >>>     pdf_content = base64.b64encode(f.read()).decode("utf-8")
+    >>>
+    >>> # Create a DataFrame with the PDF content
+    >>> df = pd.DataFrame({
+    >>>     "source_id": ["doc1"],
+    >>>     "source_name": ["document.pdf"],
+    >>>     "content": [pdf_content],
+    >>>     "document_type": ["pdf"],
+    >>>     "metadata": [{"content_metadata": {"type": "document"}}]
+    >>> })
+    >>>
+    >>> # Extract primitives using PDFium
+    >>> result_df = extract_primitives_from_pdf(
+    >>>     df_extraction_ledger=df,
+    >>>     extract_method="pdfium",
+    >>>     yolox_endpoints=(None, "http://localhost:8000/v1/infer")
+    >>> )
+    >>>
+    >>> # Display the types of extracted elements
+    >>> print(result_df["document_type"].value_counts())
     """
     pass
 
