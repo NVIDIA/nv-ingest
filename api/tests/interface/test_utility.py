@@ -10,7 +10,7 @@ from typing import List
 import pandas as pd
 import pytest
 
-from api.tests.utilities_for_test import get_git_root, find_root_by_pattern
+from ..utilities_for_test import get_git_root, find_root_by_pattern
 from nv_ingest_api.interface.utility import (
     read_file_as_base64,
     create_source_metadata,
