@@ -201,7 +201,7 @@ Chart 1
 This chart shows some gadgets, and some very fictitious costs.
 ```
 
-### Step 3: Query Over Ingested Content
+### Step 3: Query Ingested Content
 
 Next you can query for relevant snippets of the ingested content and use it with LLMs to generate answers:
 
