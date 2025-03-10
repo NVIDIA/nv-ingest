@@ -24,7 +24,7 @@ class ParakeetClient:
         endpoint: str,
         auth_token: Optional[str] = None,
         function_id: Optional[str] = None,
-        use_ssl: bool = False,
+        use_ssl: Optional[bool] = None,
         ssl_cert: Optional[str] = None,
     ):
         """
@@ -48,7 +48,10 @@ class ParakeetClient:
         self.endpoint = endpoint
         self.auth_token = auth_token
         self.function_id = function_id
-        self.use_ssl = use_ssl
+        if use_ssl is None:
+            self.use_ssl = True if self.function_id else False
+        else:
+            self.use_ssl = use_ssl
         self.ssl_cert = ssl_cert
 
         self.auth_metadata = []

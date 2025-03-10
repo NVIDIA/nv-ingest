@@ -73,7 +73,7 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
         )
 
         row["document_type"] = ContentTypeEnum.AUDIO
-        audio_metadata = {"audio_transcript": audio_result}
+        audio_metadata = {"audio_transcript": audio_result or ""}
         metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
         row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
     except Exception as e:
