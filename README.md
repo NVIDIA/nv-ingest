@@ -101,7 +101,7 @@ NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvdev/nvidia/n
 NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
 ```
 
-### Step 2: Ingesting Documents
+### Step 2: Ingest Documents
 
 You can submit jobs programmatically in Python.
 
