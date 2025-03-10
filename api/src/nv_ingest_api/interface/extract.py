@@ -17,19 +17,19 @@ from nv_ingest_api.internal.extract.pptx.pptx_extractor import extract_primitive
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
-from ..internal.extract.audio.audio_extraction import extract_text_from_audio_internal
-from ..internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
-from ..internal.schemas.extract.extract_audio_schema import AudioConfigSchema
-from ..internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
-from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
-from ..internal.schemas.extract.extract_image_schema import ImageExtractorSchema
-from ..internal.schemas.extract.extract_infographic_schema import (
+from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
+from nv_ingest_api.internal.extract.image.infographic_extractor import extract_infographic_data_from_image_internal
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
     InfographicExtractorConfigSchema,
     InfographicExtractorSchema,
 )
-from ..internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
-from ..internal.schemas.extract.extract_table_schema import TableExtractorSchema
-from ..internal.schemas.meta.ingest_job_schema import (
+from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import (
     IngestTaskChartExtraction,
     IngestTaskTableExtraction,
 )
@@ -140,9 +140,9 @@ def extract_primitives_from_audio(
     df_ledger: pd.DataFrame,
     audio_endpoints: Tuple[str, str],
     audio_infer_protocol: str = "grpc",
-    auth_token: str = "",
+    auth_token: str = None,
     use_ssl: bool = False,
-    ssl_cert: str = "",
+    ssl_cert: str = None,
 ) -> Any:
     """
     Extract audio primitives from a ledger DataFrame using the specified audio configuration.
@@ -195,13 +195,15 @@ def extract_primitives_from_audio(
     """
     task_config: Dict[str, Any] = {"params": {"extract_audio_params": {}}}
 
-    extraction_config = AudioConfigSchema(
+    extraction_config = AudioExtractorSchema(
         **{
-            "audio_endpoints": audio_endpoints,
-            "audio_infer_protocol": audio_infer_protocol,
-            "auth_token": auth_token,
-            "use_ssl": use_ssl,
-            "ssl_cert": ssl_cert,
+            "audio_extraction_config": {
+                "audio_endpoints": audio_endpoints,
+                "audio_infer_protocol": audio_infer_protocol,
+                "auth_token": auth_token,
+                "ssl_cert": ssl_cert,
+                "use_ssl": use_ssl,
+            }
         }
     )
 

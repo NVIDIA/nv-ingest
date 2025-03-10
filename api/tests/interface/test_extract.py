@@ -18,10 +18,132 @@ from nv_ingest_api.interface.extract import (
     extract_primitives_from_image,
     extract_primitives_from_docx,
     extract_primitives_from_pptx,
+    extract_primitives_from_audio,
 )
 from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum, TableFormatEnum
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.mark.integration
+def test_extract_primitives_from_audio_integration():
+    """
+    Integration test for the extract_primitives_from_audio function.
+
+    This test verifies that the audio primitive extraction pipeline correctly processes
+    an audio file and returns a DataFrame with the extracted transcript. The test checks
+    that the result contains an AUDIO document type and that the transcript meets minimum
+    length requirements.
+    """
+    # Get the test file path using helper functions
+    test_file_rel_path = "./data/harvard.wav"
+
+    # Try to find the file using git root first
+    git_root = get_git_root(__file__)
+    if git_root:
+        test_file_path = os.path.join(git_root, test_file_rel_path)
+
+    # If not found via git, try heuristic approach
+    if not git_root or not os.path.exists(test_file_path):
+        root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
+        if root_dir:
+            test_file_path = os.path.join(root_dir, test_file_rel_path)
+        else:
+            # Fallback to relative path if all else fails
+            test_file_path = test_file_rel_path
+
+    # Ensure the file exists
+    assert os.path.exists(test_file_path), f"Test file not found at {test_file_path}"
+
+    # Read the file and encode it as base64
+    with open(test_file_path, "rb") as f:
+        file_content = f.read()
+        base64_content = base64.b64encode(file_content).decode("utf-8")
+
+    # Build input DataFrame matching the expected structure for audio extraction
+    df_ledger = pd.DataFrame(
+        {
+            "source_name": [test_file_path],
+            "source_id": [test_file_path],
+            "content": [base64_content],
+            "document_type": [DocumentTypeEnum.WAV],
+            "metadata": [
+                {
+                    "content": base64_content,
+                    "content_metadata": {"type": "audio", "subtype": "wav"},
+                    "error_metadata": None,
+                    "audio_metadata": {"audio_type": "wav"},
+                    "image_metadata": None,
+                    "source_metadata": {
+                        "source_id": test_file_path,
+                        "source_name": test_file_path,
+                        "source_type": "wav",
+                    },
+                    "text_metadata": None,
+                }
+            ],
+        }
+    )
+
+    # Pull configuration values from the environment
+    _AUDIO_GRPC_ENDPOINT = os.getenv("INGEST_AUDIO_GRPC_ENDPOINT", "127.0.0.1:8021")
+    _AUDIO_HTTP_ENDPOINT = os.getenv("INGEST_AUDIO_HTTP_ENDPOINT", None)
+    _AUDIO_INFER_PROTOCOL = os.getenv("INGEST_AUDIO_PROTOCOL", "grpc")
+    _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
+    _USE_SSL = os.getenv("INGEST_USE_SSL", False)
+    _SSL_CERT = os.getenv("INGEST_SSL_CERT", None)
+
+    # Construct the endpoint tuple
+    audio_endpoints = (_AUDIO_GRPC_ENDPOINT, _AUDIO_HTTP_ENDPOINT)
+
+    # Call the function under test with the constructed parameters
+    df_result = extract_primitives_from_audio(
+        df_ledger=df_ledger,
+        audio_endpoints=audio_endpoints,
+        audio_infer_protocol=_AUDIO_INFER_PROTOCOL,
+        auth_token=_AUTH_TOKEN,
+        use_ssl=_USE_SSL,
+        ssl_cert=_SSL_CERT,
+    )
+
+    # Assert that the returned DataFrame is not empty
+    assert not df_result.empty, "Resulting DataFrame should not be empty"
+
+    # Check that we have the expected DataFrame structure
+    assert set(df_result.columns) >= {
+        "document_type",
+        "metadata",
+        "uuid",
+    }, "DataFrame should contain at least the expected columns"
+
+    # Verify that the result contains an AUDIO document type
+    assert "AUDIO" in df_result["document_type"].values, "Expected AUDIO document type in results"
+
+    # Get the rows with AUDIO document type
+    audio_rows = df_result[df_result["document_type"] == "AUDIO"]
+    assert not audio_rows.empty, "Expected at least one row with AUDIO document type"
+
+    # Verify audio metadata and transcript for each audio row
+    for idx, row in audio_rows.iterrows():
+        metadata = row["metadata"]
+
+        # Verify metadata exists
+        assert metadata is not None, f"Row {idx} has None metadata"
+
+        # Verify audio_metadata exists
+        assert "audio_metadata" in metadata, f"Row {idx} missing audio_metadata"
+        audio_metadata = metadata["audio_metadata"]
+        assert audio_metadata is not None, f"Row {idx} has None audio_metadata"
+
+        # Verify audio_transcript exists and has sufficient length
+        assert "audio_transcript" in audio_metadata, f"Row {idx} missing audio_transcript in audio_metadata"
+        transcript = audio_metadata["audio_transcript"]
+        assert transcript is not None, f"Row {idx} has None audio_transcript"
+        assert isinstance(transcript, str), f"Row {idx} audio_transcript should be a string"
+
+        # Check that transcript is at least 100 words
+        word_count = len(transcript.split())
+        assert word_count >= 100, f"Row {idx} audio_transcript has only {word_count} words, expected at least 100"
 
 
 @pytest.mark.integration

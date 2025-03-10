@@ -12,7 +12,7 @@ from typing import Tuple
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import create_audio_inference_client
-from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.meta.metadata_schema import MetadataSchema, AudioMetadataSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_api.util.schema.schema_validator import validate_schema
@@ -79,7 +79,7 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
 def extract_text_from_audio_internal(
     df_extraction_ledger: pd.DataFrame,
     task_config: Dict[str, Any],
-    extraction_config: AudioConfigSchema,
+    extraction_config: AudioExtractorSchema,
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
