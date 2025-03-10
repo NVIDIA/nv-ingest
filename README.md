@@ -56,7 +56,7 @@ Library mode deployment of nv-ingest requires:
 - [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
 - Python 3.10
 
-### Step 1: Preparing Your Environment
+### Step 1: Prepare Your Environment
 ```
 conda create -y --name nvingest python=3.10
 conda activate nvingest
