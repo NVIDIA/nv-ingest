@@ -213,8 +213,6 @@ retrieved_docs = nvingest_retrieval(
     milvus_uri=milvus_uri,
     hybrid=sparse,
     top_k=1,
-    #embedding_endpoint=os.environ["EMBEDDING_NIM_ENDPOINT"],
-    #model_name=os.environ["EMBEDDING_NIM_MODEL_NAME"]
 )
 
 # simple generation example
@@ -227,8 +225,6 @@ client = OpenAI(
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"
 print(f"Prompt: {prompt}")
 completion = client.chat.completions.create(
-  #model="nvdev/meta/llama-3.3-70b-instruct",
-  #model="meta/llama-3.3-70b-instruct",
   model="nvidia/llama-3.1-nemotron-70b-instruct",
   messages=[{"role":"user","content": prompt}],
 )
