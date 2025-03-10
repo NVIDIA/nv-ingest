@@ -48,9 +48,9 @@ homepage = "https://github.com/NVIDIA/nv-ingest"
 repository = "https://github.com/NVIDIA/nv-ingest"
 documentation = "https://docs.nvidia.com/nv-ingest"
 
-[project.scripts]
-nv-ingest-cli = "nv_ingest_client.nv_ingest_cli:main"
-process-json-files = "nv_ingest_client.util.process_json_files:main"
+#[project.scripts]
+#nv-ingest-cli = "nv_ingest_client.nv_ingest_cli:main"
+#process-json-files = "nv_ingest_client.util.process_json_files:main"
 
 [tool.setuptools.packages.find]
 where = ["src"]
