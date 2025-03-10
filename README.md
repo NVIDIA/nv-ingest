@@ -26,7 +26,7 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 NV-Ingest is a library and microservice service that does the following:
 
-- Accept a job specification, containing a document payload, and a set of ingestion tasks to perform on that payload.
+- Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Allow the results of a job to be retrieved. The result is a dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
 - Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
