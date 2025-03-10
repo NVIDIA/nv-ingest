@@ -146,10 +146,7 @@ ingestor = (
         #extract_method="nemoretriever_parse",
         text_depth="page"
     ).embed()
-    .caption(           
-        model_name="nvdev/meta/llama-3.2-11b-vision-instruct",
-        endpoint_url="https://ai.api.nvidia.com/v1/gr/nvdev/meta/llama-3.2-11b-vision-instruct/chat/completions"
-    )
+    .caption()
     .vdb_upload(
         collection_name=collection_name,
         milvus_uri=milvus_uri,
