@@ -41,8 +41,9 @@ class PipelineCreationSchema(BaseModel):
     """
 
     # Audio processing settings
-    audio_http_endpoint: str = "unavailable"
-    audio_infer_protocol: str = "http"
+    audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
+    audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "")
+    audio_infer_protocol: str = "grpc"
 
     # Embedding model settings
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
@@ -62,16 +63,17 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse"
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
     nemoretriever_parse_infer_protocol: str = "http"
+    nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
     nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
 
     # Observability settings
-    otel_exporter_otlp_endpoint: str = "localhost:4317"
+    otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 
     # OCR settings
     paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
@@ -84,18 +86,22 @@ class PipelineCreationSchema(BaseModel):
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
     )
+    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     # YOLOX model endpoints for various document processing tasks
-    yolox_graphic_elements_http_endpoint: str = (
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+    yolox_graphic_elements_http_endpoint: str = os.getenv(
+        "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
     )
-    yolox_graphic_elements_inf_protocol: str = "http"
+    yolox_graphic_elements_infer_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
     yolox_infer_protocol: str = "http"
-    yolox_table_structure_http_endpoint: str = "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
-    yolox_table_structure_inf_protocol: str = "http"
+    yolox_table_structure_http_endpoint: str = os.getenv(
+        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+    )
+    yolox_table_structure_infer_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
 

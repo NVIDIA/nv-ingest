@@ -184,6 +184,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
     )
+    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -196,6 +197,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
                 "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
                 "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+                "model_name": model_name,
             },
         },
     )
@@ -363,7 +365,10 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "RIVA_NGC_API_KEY",
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
         "",
     )
     infer_protocol = os.environ.get(
@@ -380,6 +385,7 @@ def get_audio_retrieval_service(env_var_prefix):
 
 def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
+    audio_function_id = os.getenv("AUDIO_FUNCTION_ID", "")
     audio_extractor_config = ingest_config.get(
         "audio_extraction_module",
         {
@@ -387,6 +393,7 @@ def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
                 "audio_endpoints": (audio_grpc, audio_http),
                 "audio_infer_protocol": audio_infer_protocol,
                 "auth_token": audio_auth,
+                "function_id": audio_function_id,
                 # All auth tokens are the same for the moment
             }
         },
@@ -458,7 +465,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
-    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",

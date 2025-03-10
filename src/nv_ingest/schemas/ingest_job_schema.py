@@ -11,11 +11,13 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pydantic import field_validator, model_validator, Field
+from pydantic import Field
+from pydantic import field_validator
+from pydantic import model_validator
+from typing_extensions import Annotated
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from typing_extensions import Annotated
 
 logger = logging.getLogger(__name__)
 
@@ -150,6 +152,7 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
+    function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
 

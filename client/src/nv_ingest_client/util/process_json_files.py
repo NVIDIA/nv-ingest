@@ -16,7 +16,7 @@ def ingest_json_results_to_blob(result_content):
 
         # Smarter sorting: by page, then structured objects by x0, y0
         def sorting_key(entry):
-            page = entry["metadata"]["content_metadata"]["page_number"]
+            page = entry["metadata"]["content_metadata"].get("page_number", -1)
             if entry["document_type"] == "structured":
                 # Use table location's x0 and y0 as secondary keys
                 x0 = entry["metadata"]["table_metadata"]["table_location"][0]
@@ -49,6 +49,10 @@ def ingest_json_results_to_blob(result_content):
                 # Add image caption to the blob
                 caption = entry["metadata"]["image_metadata"].get("caption", "")
                 blob.append(f"image_caption:[{caption}]")
+                blob.append("\n")
+
+            elif document_type == "audio":
+                blob.append(entry["metadata"]["audio_metadata"]["audio_transcript"])
                 blob.append("\n")
 
         # Join all parts of the blob into a single string
