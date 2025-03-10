@@ -29,6 +29,7 @@ dependencies:
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0
   - python>=3.10
+  - python-build>=1.2.2
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
@@ -47,7 +48,7 @@ dependencies:
   - pip
   - pip:
       - llama-index-embeddings-nvidia
-      - nvidia-riva-client
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
+      - nvidia-riva-client>=2.18.0
