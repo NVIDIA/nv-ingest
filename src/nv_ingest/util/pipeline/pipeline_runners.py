@@ -92,7 +92,7 @@ class PipelineCreationSchema(BaseModel):
         "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
         "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
     )
-    yolox_graphic_elements_inf_protocol: str = "http"
+    yolox_graphic_elements_infer_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
@@ -100,7 +100,7 @@ class PipelineCreationSchema(BaseModel):
     yolox_table_structure_http_endpoint: str = os.getenv(
         "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
     )
-    yolox_table_structure_inf_protocol: str = "http"
+    yolox_table_structure_infer_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
 
