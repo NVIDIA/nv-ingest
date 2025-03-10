@@ -33,9 +33,9 @@ NVIDIA Ingest enables parallelization of the process of splitting documents into
 
 NV-Ingest is a library and microservice service that does the following:
 
-- Accept a JSON job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
-- Allow the results of a job to be retrieved. The result is a JSON dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
+- Accept a job specification, containing a document payload, and a set of ingestion tasks to perform on that payload.
+- Allow the results of a job to be retrieved. The result is a dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 NV-Ingest supports the following file types:
@@ -49,20 +49,9 @@ NV-Ingest supports the following file types:
 - `tiff`
 - `txt`
 
-
-## What NVIDIA-Ingest Isn't ✖️
-
-NV-Ingest does not do the following:
-
-- Run a static pipeline or fixed set of operations on every submitted document.
-- Act as a wrapper for any specific document parsing library.
-
-For production level performance and scalability, we recommend deploying the pipeline and supporting NIMs via Docker Compose or Kubernetes (via the [provided helm charts](helm).
-
-
 ## Prerequisites
 
-For hardware and software requirements for container- and Kubernetes-based deployments, refer to [Prerequisites](https://docs.nvidia.com/nv-ingest/user-guide/getting-started/prerequisites).
+For production level performance and scalability, we recommend deploying the pipeline and supporting NIMs via Docker Compose or Kubernetes (via the [provided helm charts](helm). See the hardware and software requirments [here](https://docs.nvidia.com/nv-ingest/user-guide/getting-started/prerequisites).
 
 ## Library Mode Quickstart
 
