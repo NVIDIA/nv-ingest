@@ -468,7 +468,7 @@ def create_nvingest_collection(
         milvus_uri=milvus_uri,
         dense_index=d_idx._index_type,
         dense_dim=dense_dim,
-        sparse_index=s_idx if sparse else None,
+        sparse_index=s_idx._index_type if sparse else None,
         recreate=recreate_meta,
     )
 

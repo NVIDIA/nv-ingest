@@ -121,6 +121,7 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
+    function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
 

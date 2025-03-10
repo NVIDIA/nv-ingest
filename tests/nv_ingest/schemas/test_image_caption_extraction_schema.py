@@ -11,9 +11,9 @@ def test_valid_schema():
     }
     schema = ImageCaptionExtractionSchema(**valid_data)
     assert schema.api_key == "your-api-key-here"
-    assert schema.endpoint_url == "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+    assert schema.endpoint_url == "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
     assert schema.prompt == "Caption the content of this image:"
-    assert schema.model_name == "meta/llama-3.2-90b-vision-instruct"
+    assert schema.model_name == "meta/llama-3.2-11b-vision-instruct"
     assert schema.raise_on_failure is False
 
 
