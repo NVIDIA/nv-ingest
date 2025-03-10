@@ -16,6 +16,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from nv_ingest_api.internal.extract.image.image_helpers.common import unstructured_image_extractor
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)
@@ -25,7 +26,7 @@ logger = logging.getLogger(__name__)
 def _decode_and_extract_from_image(
     base64_row: pd.Series,
     task_config: Dict[str, Any],
-    validated_extraction_config: Any,
+    validated_extraction_config: ImageExtractorSchema,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> Any:
     """
@@ -179,6 +180,7 @@ def extract_primitives_from_image_internal(
         task_config = task_config.model_dump()
 
     try:
+        df_extraction_ledger.to_json("df_extraction_ledger_pre.json")
         # Create a partial function to decode and extract image data for each row.
         _decode_and_extract = functools.partial(
             _decode_and_extract_from_image,
@@ -195,6 +197,7 @@ def extract_primitives_from_image_internal(
         else:
             extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
+        extracted_df.to_json("df_extraction_ledger_post.json")
         return extracted_df, {"trace_info": execution_trace_log}
 
     except Exception as e:

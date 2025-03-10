@@ -22,6 +22,7 @@ from ..internal.extract.image.infographic_extractor import extract_infographic_d
 from ..internal.schemas.extract.extract_audio_schema import AudioConfigSchema
 from ..internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from ..internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from ..internal.schemas.extract.extract_image_schema import ImageExtractorSchema
 from ..internal.schemas.extract.extract_infographic_schema import (
     InfographicExtractorConfigSchema,
     InfographicExtractorSchema,
@@ -281,14 +282,17 @@ def extract_primitives_from_pptx(
             "extract_charts": extract_charts,
             "extract_infographics": extract_infographics,
         },
-        "pptx_extraction_config": {
-            "yolox_endpoints": yolox_endpoints,
-            "yolox_infer_protocol": yolox_infer_protocol,
-            "auth_token": auth_token,
-        },
     }
 
-    extraction_config = PPTXExtractorSchema()  # Assuming PPTXExtractorSchema is defined and imported
+    extraction_config = PPTXExtractorSchema(
+        **{
+            "pptx_extraction_config": {
+                "yolox_endpoints": yolox_endpoints,
+                "yolox_infer_protocol": yolox_infer_protocol,
+                "auth_token": auth_token,
+            },
+        }
+    )  # Assuming PPTXExtractorSchema is defined and imported
 
     return extract_primitives_from_pptx_internal(
         df_extraction_ledger=df_ledger,
@@ -362,15 +366,18 @@ def extract_primitives_from_docx(
             "extract_charts": extract_charts,
             "extract_infographics": extract_infographics,
         },
-        "docx_extraction_config": {
-            "yolox_endpoints": yolox_endpoints,
-            "yolox_infer_protocol": yolox_infer_protocol,
-            "auth_token": auth_token,
-        },
     }
 
     # Create the extraction configuration object (instance of DocxExtractorSchema).
-    extraction_config = DocxExtractorSchema()
+    extraction_config = DocxExtractorSchema(
+        **{
+            "docx_extraction_config": {
+                "yolox_endpoints": yolox_endpoints,
+                "yolox_infer_protocol": yolox_infer_protocol,
+                "auth_token": auth_token,
+            },
+        }
+    )
 
     # Delegate the actual extraction to the internal function.
     return extract_primitives_from_docx_internal(
@@ -402,15 +409,23 @@ def extract_primitives_from_image(
             "extract_charts": extract_charts,
             "extract_infographics": extract_infographics,
         },
-        "image_extraction_config": {
-            "yolox_endpoints": yolox_endpoints,
-            "yolox_infer_protocol": yolox_infer_protocol,
-            "auth_token": auth_token,
-        },
     }
 
+    extraction_config = ImageExtractorSchema(
+        **{
+            "image_extraction_config": {
+                "yolox_endpoints": yolox_endpoints,
+                "yolox_infer_protocol": yolox_infer_protocol,
+                "auth_token": auth_token,
+            },
+        }
+    )
+
     result, _ = extract_primitives_from_image_internal(
-        df_extraction_ledger=df_ledger, task_config=task_config, extraction_config=None, execution_trace_log=None
+        df_extraction_ledger=df_ledger,
+        task_config=task_config,
+        extraction_config=extraction_config,
+        execution_trace_log=None,
     )
 
     return result
