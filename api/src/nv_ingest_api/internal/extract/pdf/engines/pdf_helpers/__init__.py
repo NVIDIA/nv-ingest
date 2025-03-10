@@ -103,8 +103,14 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
-    # Always inject pdfium configuration if it exists.
-    pdfium_config = getattr(extractor_config, "pdfium_config", None)
+    # Handle both object and dictionary cases
+    if hasattr(extractor_config, "pdfium_config"):
+        pdfium_config = extractor_config.pdfium_config
+    elif isinstance(extractor_config, dict) and "pdfium_config" in extractor_config:
+        pdfium_config = extractor_config["pdfium_config"]
+    else:
+        pdfium_config = None
+
     if pdfium_config is not None:
         params["pdfium_config"] = pdfium_config
 

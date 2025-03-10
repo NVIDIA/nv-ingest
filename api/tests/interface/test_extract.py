@@ -19,10 +19,134 @@ from nv_ingest_api.interface.extract import (
     extract_primitives_from_docx,
     extract_primitives_from_pptx,
     extract_primitives_from_audio,
+    extract_primitives_from_pdf,
 )
 from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum, TableFormatEnum
 
 logger = logging.getLogger(__name__)
+
+
+@pytest.mark.integration
+def test_extract_primitives_from_pdf_integration():
+    """
+    Integration test for the extract_primitives_from_pdf function.
+
+    This test verifies that the PDF primitive extraction pipeline correctly processes
+    a test PDF document and returns a DataFrame with extracted primitives.
+    """
+    # Get the test file path using helper functions
+    test_file_rel_path = "./data/multimodal_test.pdf"
+
+    # Try to find the file using git root first
+    git_root = get_git_root(__file__)
+    if git_root:
+        test_file_path = os.path.join(git_root, test_file_rel_path)
+
+    # If not found via git, try heuristic approach
+    if not git_root or not os.path.exists(test_file_path):
+        root_dir = find_root_by_pattern(test_file_rel_path, os.path.dirname(__file__))
+        if root_dir:
+            test_file_path = os.path.join(root_dir, test_file_rel_path)
+        else:
+            # Fallback to relative path if all else fails
+            test_file_path = test_file_rel_path
+
+    # Ensure the file exists
+    assert os.path.exists(test_file_path), f"Test file not found at {test_file_path}"
+
+    # Read the file and encode it as base64
+    with open(test_file_path, "rb") as f:
+        file_content = f.read()
+        base64_content = base64.b64encode(file_content).decode("utf-8")
+
+    # Build input DataFrame matching the expected structure for PDF extraction
+    df_ledger = pd.DataFrame(
+        {
+            "source_name": [test_file_path],
+            "source_id": [test_file_path],
+            "content": [base64_content],
+            "document_type": [DocumentTypeEnum.PDF],
+            "metadata": [
+                {
+                    "content": base64_content,
+                    "content_metadata": {"type": "document", "subtype": "pdf"},
+                    "error_metadata": None,
+                    "audio_metadata": None,
+                    "image_metadata": None,
+                    "source_metadata": {
+                        "source_id": test_file_path,
+                        "source_name": test_file_path,
+                        "source_type": "pdf",
+                    },
+                    "text_metadata": None,
+                }
+            ],
+        }
+    )
+
+    # Ensure at least one valid endpoint is provided for YOLOX
+    # The PDFiumConfigSchema requires at least one non-empty endpoint
+    _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8000/v1/infer")
+
+    # The gRPC endpoint can be None, as long as the HTTP endpoint is valid
+    _YOLOX_GRPC_ENDPOINT = os.getenv("INGEST_YOLOX_GRPC_ENDPOINT", None)
+
+    # Set default protocol to match the available endpoint
+    _YOLOX_INFER_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
+    _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
+
+    # Call the high-level function with appropriate parameters
+    df_result, _ = extract_primitives_from_pdf(
+        df_extraction_ledger=df_ledger,
+        extract_method="pdfium",  # This is required and determines which schema to use
+        extract_text=True,
+        extract_images=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_infographics=True,
+        text_depth="page",
+        # PDFium-specific configuration parameters
+        yolox_endpoints=(_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT),
+        yolox_infer_protocol=_YOLOX_INFER_PROTOCOL,
+        yolox_auth_token=_AUTH_TOKEN,
+    )
+
+    # Assert that the returned DataFrame is not empty
+    assert not df_result.empty, "Resulting DataFrame should not be empty"
+
+    # Check that we have the expected DataFrame structure
+    assert set(df_result.columns) >= {
+        "document_type",
+        "metadata",
+        "uuid",
+    }, "DataFrame should contain at least the expected columns"
+
+    # Basic validation of results
+    # Check that we have at least some rows in the result
+    assert len(df_result) > 0, "Expected at least some rows in the result"
+
+    # Verify that each row has the required fields
+    for idx, row in df_result.iterrows():
+        # Verify document_type is present
+        assert row["document_type"] is not None, f"Row {idx} has None document_type"
+
+        # Verify metadata exists
+        assert row["metadata"] is not None, f"Row {idx} has None metadata"
+
+        # Verify UUID is present
+        assert row["uuid"] is not None, f"Row {idx} has None UUID"
+        assert isinstance(row["uuid"], str), f"Row {idx} UUID should be a string"
+
+    # Verify that at least one expected document type is present
+    expected_doc_types = ["text", "structured", "image"]
+    found_expected_type = False
+
+    for doc_type in df_result["document_type"].unique():
+        if doc_type in expected_doc_types:
+            found_expected_type = True
+            break
+
+    assert found_expected_type, f"Expected at least one of these document types: {expected_doc_types}"
 
 
 @pytest.mark.integration

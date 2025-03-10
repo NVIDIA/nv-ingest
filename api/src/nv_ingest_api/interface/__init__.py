@@ -2,13 +2,17 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import logging
 import functools
 import inspect
+import pprint
 from typing import Dict, Any, Optional, List
 
 from pydantic import BaseModel
 
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
+
+logger = logging.getLogger(__name__)
 
 ## CONFIG_SCHEMAS is a global dictionary that maps extraction methods to Pydantic schemas.
 CONFIG_SCHEMAS: Dict[str, Any] = {"pdfium": PDFiumConfigSchema}
@@ -137,6 +141,20 @@ def extraction_interface_relay_constructor(api_fn, task_keys: Optional[List[str]
             # Build the method-specific configuration.
             extraction_config = _build_config_from_schema(schema_class, bound.arguments)
             extraction_config = {f"{extract_method}_config": extraction_config}
+
+            # Pretty print the task and extractor configurations for debugging
+            logger.debug("\n" + "=" * 80)
+            logger.debug(f"DEBUG - API Function: {api_fn.__name__}")
+            logger.debug(f"DEBUG - Extract Method: {extract_method}")
+            logger.debug("-" * 80)
+
+            logger.debug("DEBUG - Task Config:")
+            pprint.pprint(task_config, width=100, sort_dicts=False)
+            logger.debug("-" * 80)
+
+            logger.debug("DEBUG - Extractor Config:")
+            pprint.pprint(extraction_config, width=100, sort_dicts=False)
+            logger.debug("=" * 80 + "\n")
 
             # Call the backend API function.
             return api_fn(ledger, task_config, extraction_config, execution_trace_log)
