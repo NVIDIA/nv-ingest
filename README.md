@@ -62,12 +62,6 @@ conda create -y --name nvingest python=3.10
 conda activate nvingest
 conda install -y -c rapidsai -c rapidsai-nightly -c conda-forge -c nvidia nvidia/label/dev::nv_ingest nvidia/label/dev::nv_ingest_client nvidia/label/dev::nv_ingest_api
 pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv ffmpeg nvidia-riva-client
-
-# Temporary workaround: remove after conda package fixes in place
-git clone https://github.com/nvidia/nv-ingest
-cd nv-ingest
-pip install -e ./api
-pip install -e ./client
 ```
 
 2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
