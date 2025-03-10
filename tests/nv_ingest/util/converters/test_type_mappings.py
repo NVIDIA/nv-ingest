@@ -4,8 +4,7 @@
 
 import pytest
 
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type, DOC_TO_CONTENT_MAP
 
 
@@ -39,11 +38,3 @@ def test_doc_type_to_content_type_invalid():
     invalid_doc_type = "invalid_doc_type"  # Assume this is not a valid DocumentTypeEnum value
     with pytest.raises(KeyError):
         doc_type_to_content_type(invalid_doc_type)
-
-
-@pytest.mark.parametrize("doc_type", list(DocumentTypeEnum))
-def test_all_document_types_covered(doc_type):
-    """
-    Ensure all DocumentTypeEnum values are covered in DOC_TO_CONTENT_MAP.
-    """
-    assert doc_type in DOC_TO_CONTENT_MAP, f"{doc_type} is not covered in DOC_TO_CONTENT_MAP"

@@ -8,7 +8,8 @@ from datetime import datetime
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import validate_metadata
+from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadata
+
 
 # TODO, add info message
 

@@ -1,9 +1,13 @@
-import pytest
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-from nv_ingest.util.image_processing.clustering import boxes_are_close_or_overlap
-from nv_ingest.util.image_processing.clustering import group_bounding_boxes
-from nv_ingest.util.image_processing.clustering import combine_groups_into_bboxes
-from nv_ingest.util.image_processing.clustering import remove_superset_bboxes
+from nv_ingest_api.util.image_processing.clustering import (
+    boxes_are_close_or_overlap,
+    group_bounding_boxes,
+    combine_groups_into_bboxes,
+    remove_superset_bboxes,
+)
 
 
 def test_boxes_are_close_or_overlap():

@@ -6,7 +6,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas.image_dedup_schema import ImageDedupSchema
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 
 
 def valid_module_config():

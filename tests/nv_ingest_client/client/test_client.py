@@ -9,8 +9,9 @@ from unittest.mock import Mock
 from unittest.mock import patch
 
 import pytest
+
+from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.simple.simple_client import ResponseSchema
 from nv_ingest_client.primitives.jobs import JobSpec
 from nv_ingest_client.primitives.jobs import JobState
 from nv_ingest_client.primitives.jobs import JobStateEnum

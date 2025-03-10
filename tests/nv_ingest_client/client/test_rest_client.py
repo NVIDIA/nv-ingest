@@ -5,7 +5,8 @@
 from unittest.mock import MagicMock
 
 import pytest
-from nv_ingest_client.message_clients.rest.rest_client import RestClient
+
+from nv_ingest_api.util.service_clients.rest.rest_client import RestClient
 
 
 class MockRestClient:

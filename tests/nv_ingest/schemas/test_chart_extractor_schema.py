@@ -1,10 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas.chart_extractor_schema import (
-    ChartExtractorConfigSchema,
-)  # Adjust the import as per your file structure
-from nv_ingest.schemas.chart_extractor_schema import ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema, ChartExtractorSchema
 
 
 # Test cases for ChartExtractorConfigSchema
@@ -69,7 +70,6 @@ def test_chart_extractor_schema_defaults():
     assert config.max_queue_size == 1
     assert config.n_workers == 2
     assert config.raise_on_failure is False
-    assert config.stage_config is None
 
 
 def test_chart_extractor_schema_with_custom_values():
@@ -77,11 +77,10 @@ def test_chart_extractor_schema_with_custom_values():
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
         paddle_endpoints=(None, "http://paddle_service"),
     )
-    config = ChartExtractorSchema(max_queue_size=10, n_workers=5, raise_on_failure=True, stage_config=stage_config)
+    config = ChartExtractorSchema(max_queue_size=10, n_workers=5, raise_on_failure=True)
     assert config.max_queue_size == 10
     assert config.n_workers == 5
     assert config.raise_on_failure is True
-    assert config.stage_config == stage_config
 
 
 def test_chart_extractor_schema_without_stage_config():
@@ -89,7 +88,6 @@ def test_chart_extractor_schema_without_stage_config():
     assert config.max_queue_size == 3
     assert config.n_workers == 1
     assert config.raise_on_failure is False
-    assert config.stage_config is None
 
 
 def test_invalid_chart_extractor_schema_negative_queue_size():

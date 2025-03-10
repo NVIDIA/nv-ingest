@@ -5,8 +5,8 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import MessageBrokerClientSchema
-from nv_ingest.schemas import MessageBrokerTaskSourceSchema
+from nv_ingest.framework.schemas.framework_message_broker_source_schema import MessageBrokerTaskSourceSchema
+from nv_ingest_api.internal.schemas.message_brokers.message_broker_client_schema import MessageBrokerClientSchema
 
 
 def test_redis_task_source_schema_defaults():

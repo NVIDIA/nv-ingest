@@ -5,7 +5,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import MetadataInjectorSchema
+from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 
 
 def test_metadata_injector_schema_default():

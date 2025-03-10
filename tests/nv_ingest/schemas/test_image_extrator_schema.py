@@ -1,8 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
-from nv_ingest.schemas.image_extractor_schema import ImageExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema, ImageExtractorSchema
 
 
 def test_image_config_schema_valid():

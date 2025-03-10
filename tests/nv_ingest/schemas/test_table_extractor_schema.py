@@ -1,8 +1,11 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas.table_extractor_schema import TableExtractorConfigSchema
-from nv_ingest.schemas.table_extractor_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorConfigSchema, TableExtractorSchema
 
 
 # Test cases for TableExtractorConfigSchema

@@ -4,7 +4,7 @@
 
 import uuid
 
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.util.metadata.aggregators import construct_text_metadata
 
 

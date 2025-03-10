@@ -6,8 +6,7 @@ from datetime import datetime
 
 import pytest
 
-from nv_ingest.framework.util.tracing import traceable
-from nv_ingest.framework.util.tracing.tagging import traceable_func
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func, traceable
 
 
 class MockControlMessage:
