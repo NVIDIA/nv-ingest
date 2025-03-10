@@ -62,7 +62,7 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "http://nemoretriever-parse:8000/v1/chat/completions"
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
     nemoretriever_parse_infer_protocol: str = "http"
     nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
