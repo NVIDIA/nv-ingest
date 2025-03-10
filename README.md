@@ -203,7 +203,7 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ### Step 3: Query Ingested Content
 
-Next you can query for relevant snippets of the ingested content and use it with LLMs to generate answers:
+To query for relevant snippets of the ingested content, and use it with LLMs to generate answers, use the following code.
 
 ```python
 from openai import OpenAI
