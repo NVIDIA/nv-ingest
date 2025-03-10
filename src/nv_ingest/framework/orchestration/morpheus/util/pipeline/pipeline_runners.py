@@ -74,7 +74,7 @@ class PipelineCreationSchema(BaseModel):
     nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
 
     # Observability settings
-    otel_exporter_otlp_endpoint: str = "localhost:4317"
+    otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 
     # OCR settings
     paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
@@ -89,15 +89,18 @@ class PipelineCreationSchema(BaseModel):
     )
 
     # YOLOX model endpoints for various document processing tasks
-    yolox_graphic_elements_http_endpoint: str = (
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+    yolox_graphic_elements_http_endpoint: str = os.getenv(
+        "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
     )
     yolox_graphic_elements_inf_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
     yolox_infer_protocol: str = "http"
-    yolox_table_structure_http_endpoint: str = "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+    yolox_table_structure_http_endpoint: str = os.getenv(
+        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+    )
     yolox_table_structure_inf_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")

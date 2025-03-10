@@ -131,11 +131,11 @@ def transform_text_split_and_tokenize_internal(
     if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
         tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
     ):
-        tokenizer_identifier = "/workspace/models/llama-3.2-1b/tokenizer/"
-    elif os.path.exists(os.path.join(model_predownload_path, "e5-unsupervised-large/tokenizer/tokenizer.json")) and (
+        tokenizer_identifier = os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/")
+    elif os.path.exists(os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")) and (
         tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"
     ):
-        tokenizer_identifier = "/workspace/models/e5-large-unsupervised/tokenizer/"
+        tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
 
     tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
 
