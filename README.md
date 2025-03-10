@@ -171,7 +171,7 @@ print(f"Time taken: {t1-t0} seconds")
 print(ingest_json_results_to_blob(results[0]))
 ```
 
-You can see the extracted text representing the content of the ingested test document:
+You can see the extracted text that represents the content of the ingested test document.
 ```shell
 ...
 Chart 2
