@@ -1,10 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 from multiprocessing import Manager
 from multiprocessing import Process
 from multiprocessing import Queue
 
 import pytest
 
-from nv_ingest.util.nim.decorators import multiprocessing_cache
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 
 
 @pytest.fixture

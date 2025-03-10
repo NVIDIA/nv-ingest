@@ -6,9 +6,8 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.schemas import validate_ingest_job
-from nv_ingest.schemas.ingest_job_schema import DocumentTypeEnum
-from nv_ingest.schemas.ingest_job_schema import TaskTypeEnum
+from nv_ingest_api.internal.enums.common import TaskTypeEnum, DocumentTypeEnum
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_ingest_job
 
 
 # Helper Functions
@@ -233,7 +232,7 @@ def test_case_insensitivity():
 
     validated_data = validate_ingest_job(job_data)
     assert validated_data.tasks[0].type == TaskTypeEnum.extract
-    assert validated_data.tasks[0].task_properties.document_type == DocumentTypeEnum.pdf
+    assert validated_data.tasks[0].task_properties.document_type == DocumentTypeEnum.PDF
 
 
 def test_incorrect_property_types():

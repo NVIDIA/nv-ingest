@@ -1,13 +1,11 @@
-import uuid
-from unittest.mock import MagicMock
-from unittest.mock import patch
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 
-import pytest
+import uuid
 
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from nv_ingest.schemas.metadata_schema import StdContentDescEnum
-from nv_ingest.schemas.metadata_schema import validate_metadata
-from nv_ingest.util.pdf.metadata_aggregators import construct_text_metadata
+from nv_ingest_api.util.metadata.aggregators import construct_text_metadata
 
 
 def test_construct_text_metadata_basic():

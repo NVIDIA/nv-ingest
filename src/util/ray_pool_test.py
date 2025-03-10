@@ -11,7 +11,7 @@ import ray
 from tqdm import tqdm
 
 # Import the RayWorkerPoolSingleton and the CPU-intensive task
-from nv_ingest.util.multi_processing.ray_pool_singleton import RayWorkerPoolSingleton
+from nv_ingest_api.util.multi_processing import RayWorkerPoolSingleton
 
 
 # Example CPU-intensive task

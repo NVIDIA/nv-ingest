@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import random
 
 import pytest
@@ -7,7 +11,7 @@ import json
 import time
 from uuid import uuid4
 
-from nv_ingest.util.message_brokers.simple_message_broker import SimpleMessageBroker
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleMessageBroker
 
 # Assuming the SimpleMessageBroker and related classes are imported from the module
 # from your_module import SimpleMessageBroker
