@@ -92,19 +92,21 @@ def test_table_extractor_schema_defaults():
     assert config.max_queue_size == 1
     assert config.n_workers == 2
     assert config.raise_on_failure is False
-    assert config.stage_config is None
+    assert config.endpoint_config is None
 
 
 def test_table_extractor_schema_with_custom_values():
-    stage_config = TableExtractorConfigSchema(
+    endpoint_config = TableExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
         paddle_endpoints=("grpc://paddle_service", "http://paddle_service"),
     )
-    config = TableExtractorSchema(max_queue_size=15, n_workers=12, raise_on_failure=True, stage_config=stage_config)
+    config = TableExtractorSchema(
+        max_queue_size=15, n_workers=12, raise_on_failure=True, endpoint_config=endpoint_config
+    )
     assert config.max_queue_size == 15
     assert config.n_workers == 12
     assert config.raise_on_failure is True
-    assert config.stage_config == stage_config
+    assert config.endpoint_config == endpoint_config
 
 
 def test_table_extractor_schema_without_stage_config():
@@ -112,7 +114,7 @@ def test_table_extractor_schema_without_stage_config():
     assert config.max_queue_size == 20
     assert config.n_workers == 5
     assert config.raise_on_failure is True
-    assert config.stage_config is None
+    assert config.endpoint_config is None
 
 
 def test_invalid_table_extractor_schema_negative_queue_size():
