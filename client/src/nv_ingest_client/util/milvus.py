@@ -1158,7 +1158,7 @@ def nvingest_retrieval(
                     max_batch_size=nv_ranker_max_batch_size,
                 )
             )
-
+        results = rerank_results
     return results
 
 
