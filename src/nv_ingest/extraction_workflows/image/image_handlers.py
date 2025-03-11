@@ -18,6 +18,7 @@
 
 import io
 import logging
+import os
 import traceback
 from datetime import datetime
 from typing import Dict
@@ -295,7 +296,7 @@ def image_data_extractor(
     base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
     current_iso_datetime = datetime.now().isoformat()
     source_metadata = {
-        "source_name": source_id,
+        "source_name": source_id if os.path.splitext(source_id)[1] else f"{source_id}.{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,
