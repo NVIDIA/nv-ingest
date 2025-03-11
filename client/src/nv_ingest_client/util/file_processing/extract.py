@@ -54,7 +54,7 @@ MIME_TO_DOCUMENT_TYPE = {
 EXTENSION_TO_DOCUMENT_TYPE = {
     "bmp": DocumentTypeEnum.bmp,
     "docx": DocumentTypeEnum.docx,
-    "html": DocumentTypeEnum.html,
+    "html": DocumentTypeEnum.txt,
     "jpeg": DocumentTypeEnum.jpeg,
     "jpg": DocumentTypeEnum.jpeg,
     "json": DocumentTypeEnum.txt,
