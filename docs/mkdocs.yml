@@ -51,7 +51,7 @@ extra_css:
 nav:
   - NeMo Retriever: 
     - Overview: 
-      - Overview: index.md
+      - Overview: overview.md
     - NeMo Retriever Extraction:
       - Overview: extraction/overview.md
       - Release Notes: extraction/releasenotes-nv-ingest.md
