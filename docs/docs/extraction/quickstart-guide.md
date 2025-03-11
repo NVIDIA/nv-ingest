@@ -16,7 +16,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](https://
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can also [start services one by one](deployment.md) or run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you want to configure.
+If you prefer, you can also [start services one by one](deployment.md) or run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you may want to configure.
 
 1. Git clone the repo:
 
@@ -34,10 +34,6 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
     Username: $oauthtoken
     Password: <Your Key>
     ```
-
-    !!! note
-   
-        During the early access (EA) phase, you must apply for early access at [https://developer.nvidia.com/nemo-microservices-early-access/join](https://developer.nvidia.com/nemo-microservices-early-access/join). When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
    
 4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](environment-config.md).
 
@@ -47,28 +43,22 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
-    
-    DATASET_ROOT=<PATH_TO_THIS_REPO>/data
-    NV_INGEST_ROOT=<PATH_TO_THIS_REPO>
+    NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors look for this key>
     ```
-
-    !!! note
-
-        As configured by default in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L52), the DePlot NIM is on a dedicated GPU. All other NIMs and the NV-Ingest container itself share a second. This avoids DePlot and other NIMs competing for VRAM on the same device. Change the `CUDA_VISIBLE_DEVICES` pinnings as desired for your system within [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
    
 5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start all services:
+6. Start core services:
 
-    `docker compose --profile retrieval up`
+    `docker compose --profile retrieval --profile table-structure up`
 
-    !!! tip
+  !!! tip
 
-        By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
-   
-7. When all services have fully started, `nvidia-smi` should show processes like the following:
+      By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
+
+7. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -77,37 +67,34 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
     |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
     |        ID   ID                                                             Usage      |
     |=======================================================================================|
-    |    0   N/A  N/A   1352957      C   tritonserver                                762MiB |
-    |    1   N/A  N/A   1322081      C   /opt/nim/llm/.venv/bin/python3            63916MiB |
-    |    2   N/A  N/A   1355175      C   tritonserver                                478MiB |
-    |    2   N/A  N/A   1367569      C   ...s/python/triton_python_backend_stub       12MiB |
-    |    3   N/A  N/A   1321841      C   python                                      414MiB |
-    |    3   N/A  N/A   1352331      C   tritonserver                                478MiB |
-    |    3   N/A  N/A   1355929      C   ...s/python/triton_python_backend_stub      424MiB |
-    |    3   N/A  N/A   1373202      C   tritonserver                                414MiB |
+    |    0   N/A  N/A     80461      C   milvus                                     1438MiB |
+    |    0   N/A  N/A     83791      C   tritonserver                               2492MiB |
+    |    0   N/A  N/A     85605      C   tritonserver                               1896MiB |
+    |    0   N/A  N/A     85889      C   tritonserver                               2824MiB |
+    |    0   N/A  N/A     88253      C   tritonserver                               2824MiB |
+    |    0   N/A  N/A     91194      C   tritonserver                               4546MiB |
     +---------------------------------------------------------------------------------------+
     ```
 
 8. Observe the started containers with `docker ps`:
 
-    ```
-    CONTAINER ID   IMAGE                                                                      COMMAND                  CREATED          STATUS                    PORTS                                                                                                                                                                                                                                                                                NAMES
-    0f2f86615ea5   nvcr.io/nvidia/nemo-microservices/nv-ingest:24.12                       "/opt/conda/bin/tini…"   35 seconds ago   Up 33 seconds             0.0.0.0:7670->7670/tcp, :::7670->7670/tcp                                                                                                                                                                                                                                            nv-ingest-nv-ingest-ms-runtime-1
-    de44122c6ddc   otel/opentelemetry-collector-contrib:0.91.0                                "/otelcol-contrib --…"   14 hours ago     Up 24 seconds             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8888-8889->8888-8889/tcp, :::8888-8889->8888-8889/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:32849->9411/tcp, :::32848->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
-    02c9ab8c6901   nvcr.io/nvidia/nemo-microservices/cached:0.2.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                      nv-ingest-cached-1
-    d49369334398   nvcr.io/nim/nvidia/nv-embedqa-e5-v5:1.1.0                                  "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                      nv-ingest-embedding-1
-    508715a24998   nvcr.io/nvidia/nemo-microservices/nv-yolox-structured-images-v1:0.2.0   "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                        nv-ingest-yolox-1
-    5b7a174a0a85   nvcr.io/nvidia/nemo-microservices/deplot:1.0.0                          "/opt/nvidia/nvidia_…"   14 hours ago     Up 33 seconds             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                      nv-ingest-deplot-1
-    430045f98c02   nvcr.io/nvidia/nemo-microservices/paddleocr:0.2.0                       "/opt/nvidia/nvidia_…"   14 hours ago     Up 24 seconds             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                      nv-ingest-paddle-1
-    8e587b45821b   grafana/grafana                                                            "/run.sh"                14 hours ago     Up 33 seconds             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                            grafana-service
-    aa2c0ec387e2   redis/redis-stack                                                          "/entrypoint.sh"         14 hours ago     Up 33 seconds             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                  nv-ingest-redis-1
-    bda9a2a9c8b5   openzipkin/zipkin                                                          "start-zipkin"           14 hours ago     Up 33 seconds (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                  nv-ingest-zipkin-1
-    ac27e5297d57   prom/prometheus:latest                                                     "/bin/prometheus --w…"   14 hours ago     Up 33 seconds             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                            nv-ingest-prometheus-1
-    ```
-
-    !!! tip
-
-        NV-Ingest is in early access (EA) mode, meaning the codebase gets frequent updates. To build an updated NV-Ingest service container with the latest changes, you can run `docker compose build`. After the image builds, run `docker compose --profile retrieval up` or `docker compose up --build` as explained in the previous step.
+```
+CONTAINER ID   IMAGE                                                                                                  COMMAND                  CREATED          STATUS                   PORTS                                                                                                                                                                                                                                                                                                       NAMES
+1b885f37c991   nvcr.io/nvidia/nemo-microservices/nv-ingest:25.03                                                      "/opt/conda/envs/nv_…"   3 minutes ago    Up 3 minutes (healthy)   0.0.0.0:7670-7671->7670-7671/tcp, :::7670-7671->7670-7671/tcp                                                                                                                                                                                                                                               nv-ingest-nv-ingest-ms-runtime-1
+62c6b999c413   zilliz/attu:v2.3.5                                                                                     "docker-entrypoint.s…"   13 minutes ago   Up 3 minutes             0.0.0.0:3001->3000/tcp, :::3001->3000/tcp                                                                                                                                                                                                                                                                   milvus-attu
+14ef31ed7f49   milvusdb/milvus:v2.5.3-gpu                                                                             "/tini -- milvus run…"   13 minutes ago   Up 3 minutes (healthy)   0.0.0.0:9091->9091/tcp, :::9091->9091/tcp, 0.0.0.0:19530->19530/tcp, :::19530->19530/tcp                                                                                                                                                                                                                    milvus-standalone
+dceaf36cc5df   otel/opentelemetry-collector-contrib:0.91.0                                                            "/otelcol-contrib --…"   13 minutes ago   Up 3 minutes             0.0.0.0:4317-4318->4317-4318/tcp, :::4317-4318->4317-4318/tcp, 0.0.0.0:8889->8889/tcp, :::8889->8889/tcp, 0.0.0.0:9988->9988/tcp, :::9988->9988/tcp, 0.0.0.0:13133->13133/tcp, :::13133->13133/tcp, 55678/tcp, 0.0.0.0:33249->9411/tcp, :::33247->9411/tcp, 0.0.0.0:55680->55679/tcp, :::55680->55679/tcp   nv-ingest-otel-collector-1
+fb252020e4d2   nvcr.io/nvidia/nim/nemoretriever-graphic-elements-v1:1.2.0-rc1-latest-datacenter-release-24734263   "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8003->8000/tcp, :::8003->8000/tcp, 0.0.0.0:8004->8001/tcp, :::8004->8001/tcp, 0.0.0.0:8005->8002/tcp, :::8005->8002/tcp                                                                                                                                                                             nv-ingest-graphic-elements-1
+c944a9d76831   nvcr.io/nvidia/nim/paddleocr:1.2.0-latest-datacenter-release-24685083                               "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8009->8000/tcp, :::8009->8000/tcp, 0.0.0.0:8010->8001/tcp, :::8010->8001/tcp, 0.0.0.0:8011->8002/tcp, :::8011->8002/tcp                                                                                                                                                                             nv-ingest-paddle-1
+5bea344526a2   nvcr.io/nvidia/nim/nemoretriever-page-elements-v2:1.2.0-rc0-latest-datacenter-release-24730057      "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8000-8002->8000-8002/tcp, :::8000-8002->8000-8002/tcp                                                                                                                                                                                                                                               nv-ingest-page-elements-1
+16dc2311a6cc   nvcr.io/nvidia/nim/llama-3.2-nv-embedqa-1b-v2:1.5.0-rc0-latest-datacenter-release-24738403          "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8012->8000/tcp, :::8012->8000/tcp, 0.0.0.0:8013->8001/tcp, :::8013->8001/tcp, 0.0.0.0:8014->8002/tcp, :::8014->8002/tcp                                                                                                                                                                             nv-ingest-embedding-1
+cea3ce001888   nvcr.io/nvidia/nim/nemoretriever-table-structure-v1:1.2.0-rc1-latest-datacenter-release-24826492    "/opt/nim/start_serv…"   13 minutes ago   Up 3 minutes             0.0.0.0:8006->8000/tcp, :::8006->8000/tcp, 0.0.0.0:8007->8001/tcp, :::8007->8001/tcp, 0.0.0.0:8008->8002/tcp, :::8008->8002/tcp                                                                                                                                                                             nv-ingest-table-structure-1
+7ddbf7690036   openzipkin/zipkin                                                                                      "start-zipkin"           13 minutes ago   Up 3 minutes (healthy)   9410/tcp, 0.0.0.0:9411->9411/tcp, :::9411->9411/tcp                                                                                                                                                                                                                                                         nv-ingest-zipkin-1
+b73bbe0c202d   minio/minio:RELEASE.2023-03-20T20-16-18Z                                                               "/usr/bin/docker-ent…"   13 minutes ago   Up 3 minutes (healthy)   0.0.0.0:9000-9001->9000-9001/tcp, :::9000-9001->9000-9001/tcp                                                                                                                                                                                                                                               minio
+97fa798dbe4f   prom/prometheus:latest                                                                                 "/bin/prometheus --w…"   13 minutes ago   Up 3 minutes             0.0.0.0:9090->9090/tcp, :::9090->9090/tcp                                                                                                                                                                                                                                                                   nv-ingest-prometheus-1
+f17cb556b086   grafana/grafana                                                                                        "/run.sh"                13 minutes ago   Up 3 minutes             0.0.0.0:3000->3000/tcp, :::3000->3000/tcp                                                                                                                                                                                                                                                                   grafana-service
+3403c5a0e7be   redis/redis-stack                                                                                      "/entrypoint.sh"         13 minutes ago   Up 3 minutes             0.0.0.0:6379->6379/tcp, :::6379->6379/tcp, 8001/tcp                                                                                                                                                                                                                                                         nv-ingest-redis-1
+```
 
 
 ## Step 2: Install Python Dependencies
@@ -117,15 +104,14 @@ You can interact with the NV-Ingest service from the host or by `docker exec`-in
 To interact from the host, you'll need a Python environment and install the client dependencies:
 ```
 # conda not required but makes it easy to create a fresh Python environment
-conda env create --name nv-ingest-dev python=3.10
+conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
-cd client
-pip install .
+pip install nv-ingest-client==2025.3.10.dev20250310
 ```
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `morpheus` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
 
 
 ## Step 3: Ingesting Documents
@@ -136,13 +122,8 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction.
-- **extract_charts** — (Optional) Enables or disables Deplot and CACHED for chart extraction.
-
-
-!!! tip
-
-    `extract_tables` controls extraction for both tables and charts. You can optionally disable chart extraction by setting `extract_charts` to false.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) for table extraction.
+- **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
 ### In Python
@@ -151,55 +132,116 @@ You can find more documentation and examples in [the client examples folder](htt
 
 
 ```python
-import logging, time
-
-from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.primitives import JobSpec
-from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.util.file_processing.extract import extract_file_content
-
-logger = logging.getLogger("nv_ingest_client")
-
-file_name = "data/multimodal_test.pdf"
-file_content, file_type = extract_file_content(file_name)
-
-# A JobSpec is an object that defines a document and how it should
-# be processed by the nv-ingest service.
-job_spec = JobSpec(
-  document_type=file_type,
-  payload=file_content,
-  source_id=file_name,
-  source_name=file_name,
-  extended_options=
-    {
-      "tracing_options":
-      {
-        "trace": True,
-        "ts_send": time.time_ns()
-      }
-    }
+import logging, os, time
+from nv_ingest_client.client import Ingestor, NvIngestClient
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+client = NvIngestClient(                                                                         
+    message_client_port=7670,                                                               
+    message_client_hostname="localhost"        
+)                                                                 
+# do content extraction from files                               
+ingestor = (
+    Ingestor(client=client)
+    .files("data/multimodal_test.pdf")
+    .extract(             
+        extract_text=True,
+        extract_tables=True,
+        extract_charts=True,
+        extract_images=True,
+        paddle_output_format="markdown",
+        extract_infographics=True,
+        text_depth="page"
+    ).embed()
+    .vdb_upload(
+        collection_name="test",
+        sparse=False,
+        # for llama-3.2 embedder, use 1024 for e5-v5
+        dense_dim=2048
+    )
 )
+print("Starting ingestion..")
+t0 = time.time()
+results = ingestor.ingest()
+t1 = time.time()
+print(f"Time taken: {t1-t0} seconds")
+# results blob is directly inspectable
+print(ingest_json_results_to_blob(results[0]))
+```
 
-# configure desired extraction modes here. Multiple extraction
-# methods can be defined for a single JobSpec
-extract_task = ExtractTask(
-  document_type=file_type,
-  extract_text=True,
-  extract_images=True,
-  extract_tables=True
-)
+```
+Starting ingestion..
+1 records to insert to milvus
+logged 8 records
+Time taken: 5.479151725769043 seconds
+This chart shows some gadgets, and some very fictitious costs. Gadgets and their cost   Chart 1 - Hammer - Powerdrill - Bluetooth speaker - Minifridge - Premium desk fan Dollars $- - $20.00 - $40.00 - $60.00 - $80.00 - $100.00 - $120.00 - $140.00 - $160.00 Cost
+Table 1
+| This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. | This table describes some animals, and some activities they might be doing in specific locations. |
+| Animal | Activity | Place |
+| Giraffe | Driving a car | At the beach |
+| Lion | Putting on sunscreen | At the park |
+| Cat | Jumping onto a laptop | In a home office |
+| Dog | Chasing a squirrel | In the front yard |
+TestingDocument
+A sample document with headings and placeholder text
+Introduction
+This is a placeholder document that can be used for any purpose. It contains some 
+headings and some placeholder text to fill the space. The text is not important and contains 
+no real value, but it is useful for testing. Below, we will have some simple tables and charts 
+that we can use to confirm Ingest is working as expected.
+Table 1
+This table describes some animals, and some activities they might be doing in specific 
+locations.
+Animal Activity Place
+Gira@e Driving a car At the beach
+Lion Putting on sunscreen At the park
+Cat Jumping onto a laptop In a home o@ice
+Dog Chasing a squirrel In the front yard
+Chart 1
+This chart shows some gadgets, and some very fictitious costs.
+image_caption:[]
+image_caption:[]
+Below,is a high-quality picture of some shapes          Picture
+Table 2
+| This table shows some popular colors that cars might come in | This table shows some popular colors that cars might come in | This table shows some popular colors that cars might come in | This table shows some popular colors that cars might come in |
+| Car | Color1 | Color2 | Color3 |
+| Coupe | White | Silver | Flat Gray |
+| Sedan | White | Metallic Gray | Matte Gray |
+| Minivan | Gray | Beige | Black |
+| Truck | Dark Gray | Titanium Gray | Charcoal |
+| Convertible | Light Gray | Graphite | Slate Gray |
+Section One
+This is the first section of the document. It has some more placeholder text to show how 
+the document looks like. The text is not meant to be meaningful or informative, but rather to 
+demonstrate the layout and formatting of the document.
+• This is the first bullet point
+• This is the second bullet point
+• This is the third bullet point
+Section Two
+This is the second section of the document. It is more of the same as we’ve seen in the rest 
+of the document. The content is meaningless, but the intent is to create a very simple 
+smoke test to ensure extraction is working as intended. This will be used in CI as time goes 
+on to ensure that changes we make to the library do not negatively impact our accuracy.
+Table 2
+This table shows some popular colors that cars might come in.
+Car Color1 Color2 Color3
+Coupe White Silver Flat Gray
+Sedan White Metallic Gray Matte Gray
+Minivan Gray Beige Black
+Truck Dark Gray Titanium Gray Charcoal
+Convertible Light Gray Graphite Slate Gray
+Picture
+Below, is a high-quality picture of some shapes.
+image_caption:[]
+image_caption:[]
+This chart shows some average frequency ranges for speaker drivers. Frequency Ranges ofSpeaker Drivers   Tweeter - Midrange - Midwoofer - Subwoofer Chart2 Hertz (log scale) 1 - 10 - 100 - 1000 - 10000 - 100000 FrequencyRange Start (Hz) - Frequency Range End (Hz)
+Chart 2
+This chart shows some average frequency ranges for speaker drivers.
+Conclusion
+This is the conclusion of the document. It has some more placeholder text, but the most 
+important thing is that this is the conclusion. As we end this document, we should have 
+been able to extract 2 tables, 2 charts, and some text including 3 bullet points.
+image_caption:[]
 
-job_spec.add_task(extract_task)
-
-# Create the client and inform it about the JobSpec we want to process.
-client = NvIngestClient(
-  message_client_hostname="localhost", # Host where nv-ingest-ms-runtime is running
-  message_client_port=7670 # REST port, defaults to 7670
-)
-job_id = client.add_job(job_spec)
-client.submit_job(job_id, "morpheus_task_queue")
-result = client.fetch_job_result(job_id, timeout=60)
-print(f"Got {len(result)} results")
 ```
 
 ### Using the `nv-ingest-cli`
@@ -210,38 +252,60 @@ You can find more nv-ingest-cli examples in [the client examples folder](https:/
 nv-ingest-cli \
   --doc ./data/multimodal_test.pdf \
   --output_directory ./processed_docs \
-  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_tables": "true", "extract_images": "true"}' \
+  --task='extract:{"document_type": "pdf", "extract_method": "pdfium", "extract_tables": "true", "extract_images": "true", "extract_charts": "true"}' \
   --client_host=localhost \
   --client_port=7670
 ```
 
 You should notice output indicating document processing status followed by a breakdown of time spent during job execution:
 ```
+None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
+[nltk_data] Downloading package punkt_tab to
+[nltk_data]     /raid/jdyer/miniforge3/envs/nv-ingest-
+[nltk_data]     dev/lib/python3.10/site-
+[nltk_data]     packages/llama_index/core/_static/nltk_cache...
+[nltk_data]   Package punkt_tab is already up-to-date!
 INFO:nv_ingest_client.nv_ingest_cli:Processing 1 documents.
 INFO:nv_ingest_client.nv_ingest_cli:Output will be written to: ./processed_docs
-Processing files: 100%|████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:10<00:00, 10.47s/file, pages_per_sec=0.29]
-INFO:nv_ingest_client.cli.util.processing:dedup_images: Avg: 1.02 ms, Median: 1.02 ms, Total Time: 1.02 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:dedup_images_channel_in: Avg: 1.44 ms, Median: 1.44 ms, Total Time: 1.44 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:docx_content_extractor: Avg: 0.66 ms, Median: 0.66 ms, Total Time: 0.66 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:docx_content_extractor_channel_in: Avg: 1.09 ms, Median: 1.09 ms, Total Time: 1.09 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:filter_images: Avg: 0.84 ms, Median: 0.84 ms, Total Time: 0.84 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:filter_images_channel_in: Avg: 7.75 ms, Median: 7.75 ms, Total Time: 7.75 ms, Total % of Trace Computation: 0.07%
-INFO:nv_ingest_client.cli.util.processing:job_counter: Avg: 2.13 ms, Median: 2.13 ms, Total Time: 2.13 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:job_counter_channel_in: Avg: 2.05 ms, Median: 2.05 ms, Total Time: 2.05 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:metadata_injection: Avg: 14.48 ms, Median: 14.48 ms, Total Time: 14.48 ms, Total % of Trace Computation: 0.14%
-INFO:nv_ingest_client.cli.util.processing:metadata_injection_channel_in: Avg: 0.22 ms, Median: 0.22 ms, Total Time: 0.22 ms, Total % of Trace Computation: 0.00%
-INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor: Avg: 10332.97 ms, Median: 10332.97 ms, Total Time: 10332.97 ms, Total % of Trace Computation: 99.45%
-INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor_channel_in: Avg: 0.44 ms, Median: 0.44 ms, Total Time: 0.44 ms, Total % of Trace Computation: 0.00%
-INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor: Avg: 1.19 ms, Median: 1.19 ms, Total Time: 1.19 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor_channel_in: Avg: 0.98 ms, Median: 0.98 ms, Total Time: 0.98 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:redis_source_network_in: Avg: 12.27 ms, Median: 12.27 ms, Total Time: 12.27 ms, Total % of Trace Computation: 0.12%
-INFO:nv_ingest_client.cli.util.processing:redis_task_sink_channel_in: Avg: 2.16 ms, Median: 2.16 ms, Total Time: 2.16 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:redis_task_source: Avg: 8.00 ms, Median: 8.00 ms, Total Time: 8.00 ms, Total % of Trace Computation: 0.08%
-INFO:nv_ingest_client.cli.util.processing:Unresolved time: 82.82 ms, Percent of Total Elapsed: 0.79%
-INFO:nv_ingest_client.cli.util.processing:Processed 1 files in 10.47 seconds.
+Processing files: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:02<00:00,  2.34s/file, pages_per_sec=1.28]
+INFO:nv_ingest_client.cli.util.processing:message_broker_task_source: Avg: 2.39 ms, Median: 2.39 ms, Total Time: 2.39 ms, Total % of Trace Computation: 0.06%
+INFO:nv_ingest_client.cli.util.processing:broker_source_network_in: Avg: 9.51 ms, Median: 9.51 ms, Total Time: 9.51 ms, Total % of Trace Computation: 0.25%
+INFO:nv_ingest_client.cli.util.processing:job_counter: Avg: 1.47 ms, Median: 1.47 ms, Total Time: 1.47 ms, Total % of Trace Computation: 0.04%
+INFO:nv_ingest_client.cli.util.processing:job_counter_channel_in: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:metadata_injection: Avg: 3.52 ms, Median: 3.52 ms, Total Time: 3.52 ms, Total % of Trace Computation: 0.09%
+INFO:nv_ingest_client.cli.util.processing:metadata_injection_channel_in: Avg: 0.16 ms, Median: 0.16 ms, Total Time: 0.16 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor: Avg: 475.64 ms, Median: 163.77 ms, Total Time: 2378.21 ms, Total % of Trace Computation: 62.73%
+INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor_channel_in: Avg: 0.31 ms, Median: 0.31 ms, Total Time: 0.31 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:image_content_extractor: Avg: 0.67 ms, Median: 0.67 ms, Total Time: 0.67 ms, Total % of Trace Computation: 0.02%
+INFO:nv_ingest_client.cli.util.processing:image_content_extractor_channel_in: Avg: 0.21 ms, Median: 0.21 ms, Total Time: 0.21 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:docx_content_extractor: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:docx_content_extractor_channel_in: Avg: 0.20 ms, Median: 0.20 ms, Total Time: 0.20 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor: Avg: 0.68 ms, Median: 0.68 ms, Total Time: 0.68 ms, Total % of Trace Computation: 0.02%
+INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor_channel_in: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:audio_data_extraction: Avg: 1.08 ms, Median: 1.08 ms, Total Time: 1.08 ms, Total % of Trace Computation: 0.03%
+INFO:nv_ingest_client.cli.util.processing:audio_data_extraction_channel_in: Avg: 0.20 ms, Median: 0.20 ms, Total Time: 0.20 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:dedup_images: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:dedup_images_channel_in: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:filter_images: Avg: 0.59 ms, Median: 0.59 ms, Total Time: 0.59 ms, Total % of Trace Computation: 0.02%
+INFO:nv_ingest_client.cli.util.processing:filter_images_channel_in: Avg: 0.57 ms, Median: 0.57 ms, Total Time: 0.57 ms, Total % of Trace Computation: 0.02%
+INFO:nv_ingest_client.cli.util.processing:table_data_extraction: Avg: 240.75 ms, Median: 240.75 ms, Total Time: 481.49 ms, Total % of Trace Computation: 12.70%
+INFO:nv_ingest_client.cli.util.processing:table_data_extraction_channel_in: Avg: 0.38 ms, Median: 0.38 ms, Total Time: 0.38 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:chart_data_extraction: Avg: 300.54 ms, Median: 299.94 ms, Total Time: 901.62 ms, Total % of Trace Computation: 23.78%
+INFO:nv_ingest_client.cli.util.processing:chart_data_extraction_channel_in: Avg: 0.23 ms, Median: 0.23 ms, Total Time: 0.23 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:infographic_data_extraction: Avg: 0.77 ms, Median: 0.77 ms, Total Time: 0.77 ms, Total % of Trace Computation: 0.02%
+INFO:nv_ingest_client.cli.util.processing:infographic_data_extraction_channel_in: Avg: 0.25 ms, Median: 0.25 ms, Total Time: 0.25 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:caption_ext: Avg: 0.55 ms, Median: 0.55 ms, Total Time: 0.55 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:caption_ext_channel_in: Avg: 0.51 ms, Median: 0.51 ms, Total Time: 0.51 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:embed_text: Avg: 1.21 ms, Median: 1.21 ms, Total Time: 1.21 ms, Total % of Trace Computation: 0.03%
+INFO:nv_ingest_client.cli.util.processing:embed_text_channel_in: Avg: 0.21 ms, Median: 0.21 ms, Total Time: 0.21 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:store_embedding_minio: Avg: 0.32 ms, Median: 0.32 ms, Total Time: 0.32 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:store_embedding_minio_channel_in: Avg: 1.18 ms, Median: 1.18 ms, Total Time: 1.18 ms, Total % of Trace Computation: 0.03%
+INFO:nv_ingest_client.cli.util.processing:message_broker_task_sink_channel_in: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
+INFO:nv_ingest_client.cli.util.processing:No unresolved time detected. Trace times account for the entire elapsed duration.
+INFO:nv_ingest_client.cli.util.processing:Processed 1 files in 2.34 seconds.
 INFO:nv_ingest_client.cli.util.processing:Total pages processed: 3
-INFO:nv_ingest_client.cli.util.processing:Throughput (Pages/sec): 0.29
-INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.10
+INFO:nv_ingest_client.cli.util.processing:Throughput (Pages/sec): 1.28
+INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.43
 ```
 
 ## Step 4: Inspecting and Consuming Results
@@ -300,83 +364,3 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 !!! tip
 
     Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
-
-
-## Repo Structure
-
-Beyond the relevant documentation, examples, and other links above, below is a description of the contents in this repo's folders:
-
-- [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
-- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NV-Ingest container and other packages
-- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the nv-ingest-cli utility
-- [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
-- [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
-- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the nv-ingest docker container
-- [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
-- [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
-- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NV-Ingest to a Kubernetes cluster via Helm chart
-- [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
-- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NV-Ingest pipelines and service
-- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NV-Ingest
-
-## Notices
-
-### Third-Party License Notice:
-
-If configured to do so, this project will download and install additional third-party open-source software projects. Review the license terms of these open-source projects before use:
-
-https://pypi.org/project/pdfservices-sdk/
-
-- **`INSTALL_ADOBE_SDK`**:
-  - **Description**: If set to `true`, the Adobe SDK will be installed in the container at launch time. This is
-    required if you want to use the Adobe extraction service for PDF decomposition. Review the
-    [license agreement](https://github.com/adobe/pdfservices-python-sdk?tab=License-1-ov-file) for the
-    pdfservices-sdk before enabling this option.
-
-
-### Contributing
-
-We require that all contributors "sign off" on their commits. This certifies that the contribution is your original
-work, or you have rights to submit it under the same license or a compatible license.
-
-Any contribution that contains commits that aren't signed off won't be accepted.
-
-To sign off on a commit, use the --signoff (or -s) option when committing your changes:
-
-```
-$ git commit -s -m "Add cool feature."
-```
-
-This appends the following to your commit message:
-
-```
-Signed-off-by: Your Name <your@email.com>
-```
-
-#### Full text of the DCO:
-
-```
-  Developer Certificate of Origin
-  Version 1.1
-
-  Copyright (C) 2004, 2006 The Linux Foundation and its contributors.
-  1 Letterman Drive
-  Suite D4700
-  San Francisco, CA, 94129
-
-  Everyone is permitted to copy and distribute verbatim copies of this license document, but changing it is not allowed.
-```
-
-```
-  Developer's Certificate of Origin 1.1
-
-  By making a contribution to this project, I certify that:
-
-  (a) The contribution was created in whole or in part by me and I have the right to submit it under the open source license indicated in the file; or
-
-  (b) The contribution is based upon previous work that, to the best of my knowledge, is covered under an appropriate open-source license and I have the right under that license to submit that work with modifications, whether created in whole or in part by me, under the same open source license (unless I am permitted to submit under a different license), as indicated in the file; or
-
-  (c) The contribution was provided directly to me by some other person who certified (a), (b) or (c) and I have not modified it.
-
-  (d) I understand and agree that this project and the contribution are public and that a record of the contribution (including all personal information I submit with it, including my sign-off) is maintained indefinitely and may be redistributed consistent with this project or the open source license(s) involved.
-```
