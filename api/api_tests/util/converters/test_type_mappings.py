@@ -5,7 +5,7 @@
 import pytest
 
 from nv_ingest_api.internal.enums.common import ContentTypeEnum, DocumentTypeEnum
-from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type, DOC_TO_CONTENT_MAP
+from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 
 
 @pytest.mark.parametrize(
