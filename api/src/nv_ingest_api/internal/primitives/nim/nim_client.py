@@ -245,6 +245,8 @@ class NimClient:
         response = self.client.infer(model_name=model_name, inputs=input_tensors, outputs=outputs)
         logger.debug(f"gRPC inference response: {response}")
 
+        # TODO(self.client.has_error(response)) => raise error
+
         return response.as_numpy("output")
 
     def _http_infer(self, formatted_input: dict) -> dict:

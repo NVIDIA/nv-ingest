@@ -10,7 +10,6 @@ dependencies:
   - click>=8.1.7
   - fastapi>=0.115.6
   - fastparquet>=2024.11.0
-  - ffmpeg-python>=0.2.0
   - fsspec>=2024.10.0
   - httpx>=0.28.1
   - isodate>=0.7.2

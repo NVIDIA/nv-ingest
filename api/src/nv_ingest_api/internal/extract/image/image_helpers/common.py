@@ -16,6 +16,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import os
 import io
 import logging
 from datetime import datetime
@@ -46,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 YOLOX_MAX_BATCH_SIZE = 8
 
-RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
+RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff", "bmp"]
 PREPROC_FILE_FORMATS = ["svg"]
 
 SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
@@ -269,6 +270,10 @@ def unstructured_image_extractor(
     ----------
     image_stream : IO[bytes]
         A bytestream (e.g. io.BytesIO) containing the image file data.
+    image_stream : io.BytesIO
+        A bytestream for the image file.
+    document_type : str
+        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff', 'bmp').
     extract_text : bool
         Flag specifying whether to extract text (currently not supported for raw images).
     extract_images : bool
@@ -318,7 +323,7 @@ def unstructured_image_extractor(
     base_unified_metadata: Dict[str, Any] = row_data.get(extraction_config.get("metadata_column", "metadata"), {})
     current_iso_datetime: str = datetime.now().isoformat()
     source_metadata: Dict[str, Any] = {
-        "source_name": f"{source_id}_{document_type}",
+        "source_name": source_id if os.path.splitext(source_id)[1] else f"{source_id}.{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,
