@@ -15,7 +15,6 @@ from pydantic import BaseModel
 from nv_ingest_api.internal.extract.docx.engines.docxreader_helpers.docx_helper import python_docx
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
-from nv_ingest_api.util.exception_handlers.pdf import create_exception_tag
 
 logger = logging.getLogger(__name__)
 
@@ -60,6 +59,7 @@ def _prepare_task_props(
     return task_config, source_id
 
 
+@unified_exception_handler
 def _decode_and_extract_from_docx(
     base64_row: pd.Series,
     task_config: Union[Dict[str, Any], BaseModel],
@@ -98,54 +98,46 @@ def _decode_and_extract_from_docx(
     Exception
         If an unhandled exception occurs during extraction, it is logged and a tagged error is returned.
     """
+    # Prepare task properties and extract source_id
+    task_config, source_id = _prepare_task_props(task_config, base64_row)
+
+    # Retrieve base64 content and decode it into a byte stream.
+    base64_content: str = base64_row["content"]
+    doc_bytes: bytes = base64.b64decode(base64_content)
+    doc_stream: io.BytesIO = io.BytesIO(doc_bytes)
+
+    extract_params: Dict[str, Any] = task_config.get("params", {})
+
+    # Extract required boolean flags from params.
     try:
-        # Prepare task properties and extract source_id
-        task_config, source_id = _prepare_task_props(task_config, base64_row)
+        extract_text = extract_params.pop("extract_text", False)
+        extract_images = extract_params.pop("extract_images", False)
+        extract_tables = extract_params.pop("extract_tables", False)
+        extract_charts = extract_params.pop("extract_charts", False)
+        extract_infographics = extract_params.pop("extract_infographics", False)
+    except KeyError as e:
+        raise ValueError(f"Missing required extraction flag: {e}")
 
-        # Retrieve base64 content and decode it into a byte stream.
-        base64_content: str = base64_row["content"]
-        doc_bytes: bytes = base64.b64decode(base64_content)
-        doc_stream: io.BytesIO = io.BytesIO(doc_bytes)
+    # Inject configuration and trace info into extraction parameters.
+    if getattr(extraction_config, "docx_extraction_config", None) is not None:
+        extract_params["docx_extraction_config"] = extraction_config.docx_extraction_config
 
-        extract_params: Dict[str, Any] = task_config.get("params", {})
+    if execution_trace_log is not None:
+        extract_params["trace_info"] = execution_trace_log
 
-        # Extract required boolean flags from params.
-        try:
-            extract_text = extract_params.pop("extract_text", False)
-            extract_images = extract_params.pop("extract_images", False)
-            extract_tables = extract_params.pop("extract_tables", False)
-            extract_charts = extract_params.pop("extract_charts", False)
-            extract_infographics = extract_params.pop("extract_infographics", False)
-        except KeyError as e:
-            raise ValueError(f"Missing required extraction flag: {e}")
+    # extraction_func: Callable = _get_extraction_function(extract_method, default)
+    extracted_data: Any = python_docx(
+        docx_stream=doc_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extraction_config=extract_params,
+        execution_trace_log=None,
+    )
 
-        # Inject configuration and trace info into extraction parameters.
-        if getattr(extraction_config, "docx_extraction_config", None) is not None:
-            extract_params["docx_extraction_config"] = extraction_config.docx_extraction_config
-
-        if execution_trace_log is not None:
-            extract_params["trace_info"] = execution_trace_log
-
-        # extraction_func: Callable = _get_extraction_function(extract_method, default)
-        extracted_data: Any = python_docx(
-            docx_stream=doc_stream,
-            extract_text=extract_text,
-            extract_images=extract_images,
-            extract_infographics=extract_infographics,
-            extract_tables=extract_tables,
-            extract_charts=extract_charts,
-            extraction_config=extract_params,
-            execution_trace_log=None,
-        )
-
-        return extracted_data
-
-    except Exception as error:
-        err_msg = f"decode_and_extract: Error loading extractor for file '{source_id}'. " f"Original error: {error}"
-        logger.error(err_msg, exc_info=True)
-        exception_tag = create_exception_tag(error_message=err_msg, source_id=source_id)
-
-        return exception_tag
+    return extracted_data
 
 
 @unified_exception_handler
