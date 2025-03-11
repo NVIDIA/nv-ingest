@@ -356,7 +356,7 @@ class YoloxModelInterfaceBase(ModelInterface):
                 self.image_preproc_width,
                 self.image_preproc_height,
                 self.class_labels,
-                min_score=self.min_score,
+                conf_thresh=self.conf_threshold,
             )
 
         inference_results = self.postprocess_annotations(results, **kwargs)
@@ -446,8 +446,12 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             )
 
         # Table/chart expansion is "business logic" specific to nv-ingest
-        annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
-        annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        if "infographics" in self.class_labels:  # page-element-v2
+            annotation_dicts = [expand_page_element_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+        else:  # page-elements-v1
+            annotation_dicts = [expand_table_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+            annotation_dicts = [expand_chart_bboxes(annotation_dict) for annotation_dict in annotation_dicts]
+
         inference_results = []
 
         # Filter out bounding boxes below the final threshold
@@ -649,7 +653,7 @@ def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thr
 
 
 def postprocess_results(
-    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, min_score=0.0
+    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, conf_thresh=0.0
 ):
     """
     For each item (==image) in results, computes annotations in the form
@@ -674,7 +678,7 @@ def postprocess_results(
         try:
             result = result.cpu().numpy()
             scores = result[:, 4] * result[:, 5]
-            result = result[scores > min_score]
+            result = result[scores > conf_thresh]
 
             # ratio is used when image was padded
             ratio = min(
@@ -688,7 +692,7 @@ def postprocess_results(
             bboxes = np.clip(bboxes, 0.0, 1.0)
 
             labels = result[:, 6]
-            scores = scores[scores > min_score]
+            scores = scores[scores > conf_thresh]
         except Exception as e:
             raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
 
@@ -719,6 +723,87 @@ def resize_image(image, target_img_size):
         )
 
     return image
+
+
+def expand_page_element_bboxes(annotation_dict, labels=None):
+    """
+    Expand bounding boxes of charts and titles based on the bounding boxes of the other class.
+    Args:
+        annotation_dict: output of postprocess_results, a dictionary with keys
+        "table", "chart", "title", "infographic"
+    Returns:
+        annotation_dict: same as input, with expanded bboxes for page elements
+    """
+    if not labels:
+        labels = list(annotation_dict.keys())
+
+    if not annotation_dict:
+        return annotation_dict
+
+    bboxes = []
+    confidences = []
+    label_idxs = []
+    for i, label in enumerate(labels):
+        label_annotations = np.array(annotation_dict[label])
+
+        if len(label_annotations) > 0:
+            bboxes.append(label_annotations[:, :4])
+            confidences.append(label_annotations[:, 4])
+            label_idxs.append(np.full(len(label_annotations), i))
+
+    if not bboxes:
+        return annotation_dict
+
+    bboxes = np.concatenate(bboxes)
+    confidences = np.concatenate(confidences)
+    label_idxs = np.concatenate(label_idxs)
+
+    pred_wbf, confidences_wbf, labels_wbf = weighted_boxes_fusion(
+        bboxes[:, None],
+        confidences[:, None],
+        label_idxs[:, None],
+        merge_type="biggest",
+        conf_type="max",
+        iou_thr=0.01,
+        class_agnostic=False,
+    )
+    chart_bboxes = pred_wbf[labels_wbf == 1]
+    chart_confidences = confidences_wbf[labels_wbf == 1]
+    title_bboxes = pred_wbf[labels_wbf == 2]
+
+    others = ~np.isin(labels_wbf, [1, 2])
+
+    found_title_idxs, no_found_title_idxs = [], []
+    for i in range(len(chart_bboxes)):
+        match = match_with_title(chart_bboxes[i], title_bboxes, iou_th=0.01)
+        if match is not None:
+            chart_bboxes[i] = match[0]
+            title_bboxes = match[1]
+            found_title_idxs.append(i)
+        else:
+            no_found_title_idxs.append(i)
+
+    pred_wbf = np.concatenate([chart_bboxes, title_bboxes, pred_wbf[others]])
+    confidences_wbf = np.concatenate([chart_confidences, np.ones(len(title_bboxes)), confidences_wbf[others]])
+    labels_wbf = np.concatenate(
+        [
+            np.ones(len(chart_bboxes)),
+            2 * np.ones(len(title_bboxes)),
+            labels_wbf[others],
+        ]
+    )
+
+    pred_wbf[found_title_idxs] = expand_boxes(pred_wbf[found_title_idxs], r_x=1.05, r_y=1.1)
+    pred_wbf[no_found_title_idxs] = expand_boxes(pred_wbf[no_found_title_idxs], r_x=1.1, r_y=1.25)
+    pred_wbf[labels_wbf == 0] = expand_boxes(pred_wbf[labels_wbf == 0], r_y=1.2, only_up=True)
+
+    annotation_dict = {
+        label: np.concatenate(
+            [pred_wbf[labels_wbf == idx], confidences_wbf[labels_wbf == idx][:, None]], axis=1
+        ).tolist()
+        for idx, label in enumerate(labels)
+    }
+    return annotation_dict
 
 
 def expand_table_bboxes(annotation_dict, labels=None):
@@ -1156,14 +1241,29 @@ def merge_boxes(b1, b2):
     return b
 
 
-def expand_boxes(boxes, r_x=1, r_y=1):
+def expand_boxes(boxes, r_x=1, r_y=1, only_up=False):
+    """
+    Expands bounding boxes by a specified ratio.
+    Expected box format is [x_min, y_min, x_max, y_max].
+    Args:
+        boxes (numpy.ndarray): Array of bounding boxes with shape (N, 4).
+        r_x (float, optional): Horizontal expansion ratio. Defaults to 1 (no expansion).
+        r_y (float, optional): Vertical expansion ratio. Defaults to 1 (no expansion).
+        only_up (bool, optional): If True, expand vertically only upwards. Defaults to False.
+    Returns:
+        numpy.ndarray: Adjusted bounding boxes clipped to the [0, 1] range.
+    """
     dw = (boxes[:, 2] - boxes[:, 0]) / 2 * (r_x - 1)
     boxes[:, 0] -= dw
     boxes[:, 2] += dw
 
-    dh = (boxes[:, 3] - boxes[:, 1]) / 2 * (r_y - 1)
-    boxes[:, 1] -= dh
-    boxes[:, 3] += dh
+    if only_up:
+        dh = (boxes[:, 3] - boxes[:, 1]) * (r_y - 1)
+        boxes[:, 1] -= dh
+    else:
+        dh = (boxes[:, 3] - boxes[:, 1]) / 2 * (r_y - 1)
+        boxes[:, 1] -= dh
+        boxes[:, 3] += dh
 
     boxes = np.clip(boxes, 0, 1)
     return boxes
