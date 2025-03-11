@@ -262,20 +262,25 @@ Please keep in mind that this response is light-hearted and intended for enterta
 
 ## Repo Structure
 
-Beyond the relevant documentation, examples, and other links above, below is a description of contents in this repo's folders:
+Beyond the relevant documentation, examples, and other links above, below is a description of the contents in this repo's folders:
 
-1. [.github](.github): GitHub repo configuration files
-2. [ci](ci): scripts used to build the nv-ingest container and other packages
-3. [client](client): docs and source code for the nv-ingest-cli utility
-4. [config](config): various yaml files defining configuration for OTEL, Prometheus
-5. [data](data): Sample PDFs provided for testing convenience
-6. [docker](docker): houses scripts used by the nv-ingest docker container
-7. [docs](docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
-8. [examples](examples): Example notebooks, scripts, and longer form tutorial content
-9. [helm](helm): Documentation for deploying nv-ingest to a Kubernetes cluster via Helm chart
-10. [skaffold](skaffold): Skaffold configuration
-11. [src](src): source code for the nv-ingest pipelines and service
-12. [tests](tests): unit tests for nv-ingest
+- [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
+- [api](https://github.com/NVIDIA/nv-ingest/tree/main/api): Core API python logic shared across python modules
+- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NV-Ingest container and other packages
+- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the nv-ingest-cli utility
+- [conda](https://github.com/NVIDIA/nv-ingest/tree/main/conda): Conda environment and packaging definitions
+- [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
+- [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
+- [deploy](https://github.com/NVIDIA/nv-ingest/tree/main/deploy): Brev.dev hosted launchable
+- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the nv-ingest docker container
+- [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
+- [evaluation](https://github.com/NVIDIA/nv-ingest/tree/main/evaluation): Contains notebooks demonstrating how to test recall accuracy
+- [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
+- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NV-Ingest to a Kubernetes cluster via Helm chart
+- [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
+- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NV-Ingest pipelines and service
+- [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer): VSCode containers for local development
+- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NV-Ingest
 
 ## Notices
 
