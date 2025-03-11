@@ -44,7 +44,7 @@ logger = logging.getLogger(__name__)
 
 YOLOX_MAX_BATCH_SIZE = 8
 
-RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
+RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff", "bmp"]
 PREPROC_FILE_FORMATS = ["svg"]
 
 SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
@@ -264,7 +264,7 @@ def image_data_extractor(
     image_stream : io.BytesIO
         A bytestream for the image file.
     document_type : str
-        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff').
+        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff', 'bmp').
     extract_text : bool
         Specifies whether to extract text.
     extract_images : bool
