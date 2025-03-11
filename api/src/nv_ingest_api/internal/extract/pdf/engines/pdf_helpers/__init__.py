@@ -105,6 +105,8 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
+    params["extract_method"] = task_config.get("method", extract_method)
+
     # Construct the config key based on the extraction method
     config_key = f"{extract_method}_config"
 

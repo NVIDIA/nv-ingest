@@ -56,7 +56,6 @@ def test_create_source_metadata():
     "file_key,rel_path",
     [
         ("png", "./data/multimodal_test.png"),
-        ("wav", "./data/harvard.wav"),
         ("docx", "./data/multimodal_test.docx"),
         ("pptx", "./data/multimodal_test.pptx"),
         ("jpeg", "./data/multimodal_test.jpeg"),

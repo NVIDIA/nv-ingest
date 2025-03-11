@@ -223,6 +223,11 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
+            "pdfium_config": {
+                "yolox_endpoints": (yolox_grpc, yolox_http),
+                "yolox_infer_protocol": yolox_protocol,
+                "auth_token": yolox_auth,  # All auth tokens are the same for the moment
+            },
             "nemoretriever_parse_config": {
                 "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
                 "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
