@@ -70,7 +70,7 @@ nav:
         - Content Metadata: extraction/content-metadata.md
         - Environment Variables: extraction/environment-config.md
         - CLI Reference: extraction/nv-ingest_cli.md
-        - API Reference: extraction/api-docs/index.html
+        - API Reference: extraction/api-docs
 
 plugins:
   - search

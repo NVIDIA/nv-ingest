@@ -31,9 +31,9 @@ The following are some applications that use NVIDIA Nemo Retriever:
 - [Digital Human for Customer Service](https://github.com/NVIDIA-AI-Blueprints/digital-human) (NVIDIA AI Blueprint)
 - [AI Virtual Assistant for Customer Service](https://github.com/NVIDIA-AI-Blueprints/ai-virtual-assistant) (NVIDIA AI Blueprint)
 - [Building Code Documentation Agents with CrewAI](https://github.com/crewAIInc/nvidia-demo) (CrewAI Demo)
+- [Video Search and Summarization](https://github.com/NVIDIA-AI-Blueprints/video-search-and-summarization) (NVIDIA AI Blueprint)
 
 <!-- [Build an Enterprise RAG Pipeline](https://github.com/NVIDIA-AI-Blueprints/rag/tree/v2.0.0) -->
-<!-- [Visual AI Agent for Video Search and Summarization]() -->
 
 
 
