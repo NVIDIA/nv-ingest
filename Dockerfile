@@ -27,7 +27,6 @@ RUN apt-get update && apt-get install -y \
       bzip2 \
       ca-certificates \
       curl \
-      ffmpeg \
       libgl1-mesa-glx \
       software-properties-common \
       wget \

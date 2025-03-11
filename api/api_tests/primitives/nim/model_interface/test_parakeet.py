@@ -308,41 +308,72 @@ class TestParakeetClient(unittest.TestCase):
 class TestAudioProcessingFunctions(unittest.TestCase):
 
     def setUp(self):
-        # Mock ffmpeg
-        self.ffmpeg_patcher = patch(f"{MODULE_UNDER_TEST}.ffmpeg")
-        self.mock_ffmpeg = self.ffmpeg_patcher.start()
-
         # Mock logger
         self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
         self.mock_logger = self.logger_patcher.start()
 
     def tearDown(self):
-        self.ffmpeg_patcher.stop()
         self.logger_patcher.stop()
 
     def test_convert_to_mono_wav(self):
-        """Test the convert_to_mono_wav function."""
-        # Set up mock ffmpeg pipeline
-        mock_input = MagicMock()
-        mock_output = MagicMock()
-        mock_process = MagicMock()
+        """Test the convert_to_mono_wav function that uses librosa and scipy."""
+        # Mock librosa.load
+        with patch(f"{MODULE_UNDER_TEST}.librosa.load") as mock_librosa_load, patch(
+            f"{MODULE_UNDER_TEST}.wavfile.write"
+        ) as mock_wavfile_write, patch(f"{MODULE_UNDER_TEST}.io.BytesIO") as mock_bytesio, patch(
+            f"{MODULE_UNDER_TEST}.np"
+        ) as mock_np:
+            # Set up mock for numpy functions
+            mock_np.max.side_effect = [1.0, 0.8]  # First for checking non-zero, then actual max
+            mock_np.abs.return_value = mock_np  # Allow chaining with max
 
-        self.mock_ffmpeg.input.return_value = mock_input
-        mock_input.output.return_value = mock_output
-        mock_output.run_async.return_value = mock_process
-        mock_process.communicate.return_value = (b"converted_audio_data", None)
+            # Set up mocks for audio data
+            mock_audio_data = MagicMock()
+            mock_normalized_audio = MagicMock()
+            mock_audio_int16 = MagicMock()
 
-        # Call the function
-        result = convert_to_mono_wav(b"test_audio_data")
+            # Set up mock audio loading
+            mock_librosa_load.return_value = (mock_audio_data, 44100)
 
-        # Verify ffmpeg was called with correct parameters
-        self.mock_ffmpeg.input.assert_called_once_with("pipe:")
-        mock_input.output.assert_called_once_with("pipe:", format="wav", acodec="pcm_s16le", ar="44100", ac=1)
-        mock_output.run_async.assert_called_once_with(pipe_stdin=True, pipe_stdout=True)
-        mock_process.communicate.assert_called_once_with(input=b"test_audio_data")
+            # Set up mock for numpy operations
+            mock_np.max.return_value = 0.8  # Non-zero max value
+            mock_audio_data.__truediv__ = MagicMock(return_value=mock_normalized_audio)
+            mock_normalized_audio.__mul__ = MagicMock(return_value=mock_normalized_audio)
+            mock_normalized_audio.astype.return_value = mock_audio_int16
 
-        # Verify the result
-        self.assertEqual(result, b"converted_audio_data")
+            # Set up BytesIO mocks
+            mock_input_bytesio = MagicMock()
+            mock_output_bytesio = MagicMock()
+            mock_bytesio.side_effect = [mock_input_bytesio, mock_output_bytesio]
+
+            # Set up mock for output buffer reading
+            mock_output_bytesio.read.return_value = b"converted_audio_data"
+
+            # Call the function
+            result = convert_to_mono_wav(b"test_audio_data")
+
+            # Verify BytesIO was called for input
+            mock_bytesio.assert_any_call(b"test_audio_data")
+
+            # Verify librosa.load was called with correct parameters
+            mock_librosa_load.assert_called_once_with(mock_input_bytesio, sr=44100, mono=True)
+
+            # Verify numpy operations for normalization
+            mock_np.max.assert_called()
+            mock_np.abs.assert_called_with(mock_audio_data)
+
+            # Verify int16 conversion
+            mock_normalized_audio.astype.assert_called_with(mock_np.int16)
+
+            # Verify wavfile.write was called
+            mock_wavfile_write.assert_called_once_with(mock_output_bytesio, 44100, mock_audio_int16)
+
+            # Verify the output buffer was read
+            mock_output_bytesio.seek.assert_called_once_with(0)
+            mock_output_bytesio.read.assert_called_once()
+
+            # Verify the result
+            self.assertEqual(result, b"converted_audio_data")
 
     def test_process_transcription_response(self):
         """Test the process_transcription_response function."""
