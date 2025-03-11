@@ -295,7 +295,7 @@ def image_data_extractor(
     base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
     current_iso_datetime = datetime.now().isoformat()
     source_metadata = {
-        "source_name": f"{source_id}_{document_type}",
+        "source_name": source_id,
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,
