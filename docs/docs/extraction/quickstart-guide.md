@@ -52,7 +52,7 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start all services:
+6. Start core services:
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -60,7 +60,7 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
    
-7. When all services have fully started, `nvidia-smi` should show processes like the following:
+7. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -69,13 +69,12 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
     |  GPU   GI   CI        PID   Type   Process name                            GPU Memory |
     |        ID   ID                                                             Usage      |
     |=======================================================================================|
-    |    0   N/A  N/A   4135763      C   milvus                                     1438MiB |
-    |    0   N/A  N/A   4137558      C   tritonserver                                478MiB |
-    |    0   N/A  N/A   4140422      C   tritonserver                               2794MiB |
-    |    0   N/A  N/A   4140426      C   tritonserver                               1868MiB |
-    |    0   N/A  N/A   4140432      C   tritonserver                               2796MiB |
-    |    0   N/A  N/A   4140498      C   ...s/python/triton_python_backend_stub      594MiB |
-    |    0   N/A  N/A   4146029      C   tritonserver                               4546MiB |
+    |    0   N/A  N/A     80461      C   milvus                                     1438MiB |
+    |    0   N/A  N/A     83791      C   tritonserver                               2492MiB |
+    |    0   N/A  N/A     85605      C   tritonserver                               1896MiB |
+    |    0   N/A  N/A     85889      C   tritonserver                               2824MiB |
+    |    0   N/A  N/A     88253      C   tritonserver                               2824MiB |
+    |    0   N/A  N/A     91194      C   tritonserver                               4546MiB |
     +---------------------------------------------------------------------------------------+
     ```
 
@@ -126,9 +125,8 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-[TODO]: What to change this to?? vvv
-- **extract_tables** — Uses [YOLOX](https://github.com/Megvii-BaseDetection/YOLOX) to find tables and charts. Uses [PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) for table extraction, and [Deplot](https://huggingface.co/google/deplot) and CACHED for chart extraction.
-- **extract_charts** — (Optional) Enables or disables Deplot and CACHED for chart extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) for table extraction.
+- **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
 !!! tip
