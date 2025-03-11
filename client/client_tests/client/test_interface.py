@@ -21,7 +21,6 @@ from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
-from nv_ingest_client.primitives.tasks import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
@@ -58,6 +57,7 @@ def test_dedup_task_no_args(ingestor):
     ingestor.dedup()
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0], DedupTask
+    _ = task
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[0], DedupTask)
 
 

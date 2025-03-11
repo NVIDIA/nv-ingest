@@ -10,7 +10,7 @@ from io import BytesIO
 import pandas as pd
 import pytest
 
-from ..utilities_for_test import find_root_by_pattern, get_git_root
+from .. import get_git_root, find_root_by_pattern
 from nv_ingest_api.interface.transform import (
     transform_text_create_embeddings,
     transform_text_split_and_tokenize,

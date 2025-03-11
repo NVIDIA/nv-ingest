@@ -10,7 +10,7 @@ import os
 import pandas as pd
 import pytest
 
-from ..utilities_for_test import find_root_by_pattern, get_git_root
+from .. import get_git_root, find_root_by_pattern
 from nv_ingest_api.interface.extract import (
     extract_infographic_data_from_image,
     extract_table_data_from_image,
