@@ -338,7 +338,7 @@ def create_nvingest_index_params(
                 metric_type="L2",
                 params={
                     "intermediate_graph_degree": 128,
-                    "graph_degree": 64,
+                    "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
@@ -1122,7 +1122,7 @@ def nvingest_retrieval(
     client = MilvusClient(milvus_uri)
     nv_ranker_top_k = top_k
     if nv_ranker:
-        top_k = top_k * 2
+        top_k = top_k * 10
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
