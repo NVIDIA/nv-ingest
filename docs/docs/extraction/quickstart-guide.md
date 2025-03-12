@@ -12,7 +12,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](https://
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can also [start services one by one](deployment.md), or run on Kubernetes, by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you might want to configure.
+If you prefer, you can also start services one by one, or run on Kubernetes, by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you might want to configure.
 
 1. Git clone the repo:
 
