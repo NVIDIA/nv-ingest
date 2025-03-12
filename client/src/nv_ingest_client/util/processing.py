@@ -14,6 +14,15 @@ from nv_ingest_client.util.util import check_ingest_result
 logger = logging.getLogger(__name__)
 
 
+class IngestJobFailure(Exception):
+    """Custom exception to handle failed job ingestion results."""
+
+    def __init__(self, message: str, description: str, annotations: Dict[str, Any]):
+        super().__init__(message)
+        self.description = description
+        self.annotations = annotations
+
+
 def handle_future_result(
     future: concurrent.futures.Future,
     timeout: Optional[int] = None,
@@ -41,8 +50,11 @@ def handle_future_result(
 
     Raises
     ------
-    RuntimeError
-        If the job result is invalid, this exception is raised with a description of the failure.
+    IngestJobFailure
+        If the job result is invalid, this exception is raised with the failure description
+        and the full result for further inspection.
+    Exception
+        For all other unexpected errors.
 
     Notes
     -----
@@ -78,7 +90,7 @@ def handle_future_result(
         failed, description = check_ingest_result(result)
 
         if failed:
-            raise RuntimeError(f"{description}")
+            raise IngestJobFailure(f"Ingest job failed: {description}", description, result.get("annotations"))
     except Exception as e:
         logger.debug(f"Error processing future result: {e}")
         raise e
