@@ -41,7 +41,7 @@ d277cf2c2703   redis/redis-stack                           "/entrypoint.sh"     
 ## Launch NV-Ingest Locally Using Library API
 
 ### Prerequisites
-To run the NV-Ingestt service locally, we require [Conda (Mamba) to be installed](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
+To run the NV-Ingest service locally, we require [Conda (Mamba) to be installed](https://mamba.readthedocs.io/en/latest/installation/mamba-installation.html).
 
 From the root of the repository, run the following commands to create a new Conda environment and install the required dependencies:
 

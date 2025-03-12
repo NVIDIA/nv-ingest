@@ -1,11 +1,7 @@
 # Quickstart Guide for NV-Ingest (Self-Hosted)
 
-To get started using NV-Ingest in self-hosted mode, you need to do a few things:
+Use this documentation to get started using NV-Ingest in self-hosted mode.
 
-1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
-2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-install-python-dependencies) 🐍
-3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
-4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 ## Step 1: Starting Containers
 
