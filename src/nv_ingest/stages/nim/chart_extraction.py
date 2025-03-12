@@ -22,6 +22,7 @@ from nv_ingest.util.image_processing.table_and_chart import process_yolox_graphi
 from nv_ingest.util.image_processing.transforms import base64_to_numpy
 from nv_ingest.util.nim.helpers import NimClient
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.helpers import get_version
 from nv_ingest.util.nim.paddle import PaddleOCRModelInterface
 from nv_ingest.util.nim.yolox import YoloxGraphicElementsModelInterface
 
@@ -128,7 +129,22 @@ def _create_clients(
     paddle_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
-    yolox_model_interface = YoloxGraphicElementsModelInterface()
+    # Obtain yolox_version
+    # Assuming that the grpc endpoint is at index 0
+    yolox_http_endpoint = yolox_endpoints[1]
+
+    try:
+        yolox_version = get_version(yolox_http_endpoint)
+        if not yolox_version:
+            logger.warning(
+                "Failed to obtain yolox-page-elements version from the endpoint. Falling back to the latest version."
+            )
+            yolox_version = None  # Default to the latest version
+    except Exception:
+        logger.waring("Failed to get yolox-page-elements version after 30 seconds. Falling back to the latest version.")
+        yolox_version = None  # Default to the latest version
+
+    yolox_model_interface = YoloxGraphicElementsModelInterface(yolox_version=yolox_version)
     paddle_model_interface = PaddleOCRModelInterface()
 
     logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")

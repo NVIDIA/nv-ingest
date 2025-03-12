@@ -2,21 +2,24 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import functools
+import logging
 import traceback
-
-import pandas as pd
 from typing import Any
 from typing import Dict
 from typing import Optional
 from typing import Tuple
 
+import pandas as pd
 from morpheus.config import Config
-from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
-from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 
+from nv_ingest.schemas.audio_extractor_schema import AudioExtractorSchema
+from nv_ingest.schemas.metadata_schema import AudioMetadataSchema
+from nv_ingest.schemas.metadata_schema import ContentTypeEnum
+from nv_ingest.schemas.metadata_schema import MetadataSchema
+from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
 from nv_ingest.util.nim.parakeet import create_audio_inference_client
+from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(f"morpheus.{__name__}")
 
@@ -57,7 +60,7 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
     content_metadata = metadata.get("content_metadata", {})
 
     # Only modify if content type is audio
-    if (content_metadata.get("type") != "audio") and (base64_audio in (None, "")):
+    if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
         return metadata
 
     # Modify audio metadata with the result from the inference model
@@ -68,7 +71,11 @@ def _update_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dic
             trace_info=trace_info,  # traceable_func arg
             stage_name="audio_extraction",
         )
-        metadata["audio_metadata"] = {"audio_transcript": audio_result}
+
+        row["document_type"] = ContentTypeEnum.AUDIO
+        audio_metadata = {"audio_transcript": audio_result or ""}
+        metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+        row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
     except Exception as e:
         logger.error(f"Unhandled error calling audio inference model: {e}", exc_info=True)
         traceback.print_exc()
@@ -109,22 +116,21 @@ def _transcribe_audio(
     """
     logger.debug(f"Entering audio extraction stage with {len(df)} rows.")
 
-    extract_params = task_props.get("params", {}).get("extract_audio_params", {})
     stage_config = validated_config.audio_extraction_config
 
-    grpc_endpoint = extract_params.get("grpc_endpoint") or stage_config.audio_endpoints[0]
-    http_endpoint = extract_params.get("http_endpoint") or stage_config.audio_endpoints[1]
-    infer_protocol = extract_params.get("infer_protocol") or stage_config.audio_infer_protocol
-    auth_token = extract_params.get("auth_token") or stage_config.auth_token
-    auth_metadata = extract_params.get("auth_metadata") or stage_config.auth_metadata
-    use_ssl = extract_params.get("use_ssl") or stage_config.use_ssl
-    ssl_cert = extract_params.get("ssl_cert") or stage_config.ssl_cert
+    grpc_endpoint = task_props.get("grpc_endpoint") or stage_config.audio_endpoints[0]
+    http_endpoint = task_props.get("http_endpoint") or stage_config.audio_endpoints[1]
+    infer_protocol = task_props.get("infer_protocol") or stage_config.audio_infer_protocol
+    auth_token = task_props.get("auth_token") or stage_config.auth_token
+    function_id = task_props.get("function_id") or stage_config.function_id
+    use_ssl = task_props.get("use_ssl") or stage_config.use_ssl
+    ssl_cert = task_props.get("ssl_cert") or stage_config.ssl_cert
 
     parakeet_client = create_audio_inference_client(
         (grpc_endpoint, http_endpoint),
         infer_protocol=infer_protocol,
         auth_token=auth_token,
-        auth_metadata=auth_metadata,
+        function_id=function_id,
         use_ssl=use_ssl,
         ssl_cert=ssl_cert,
     )

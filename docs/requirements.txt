@@ -13,3 +13,4 @@ nvidia-sphinx-theme
 sphinx
 sphinx-markdown-builder
 sphinx-rtd-theme
+swagger-plugin-for-sphinx

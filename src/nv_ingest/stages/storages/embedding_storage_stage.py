@@ -126,7 +126,7 @@ def generate_embedding_storage_stage(
     c: Config,
     task: str = "store_embedding",
     task_desc: str = "Store_embeddings_minio",
-    pe_count: int = 24,
+    pe_count: int = 1,
 ):
     """
     Helper function to generate a multiprocessing stage to perform pdf content extraction.

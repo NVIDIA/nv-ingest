@@ -82,8 +82,8 @@ async def get_ready_state() -> dict:
             ready_statuses = {
                 "ingest_ready": ingest_ready,
                 "morpheus_pipeline_ready": morpheus_pipeline_ready,
-                "yolox_page_elemenst_ready": yolox_page_elements_ready,
-                "yolox_graphic_elements_ready": yolox_graphic_elements_ready,
+                "page_elemenst_ready": yolox_page_elements_ready,
+                "graphic_elements_ready": yolox_graphic_elements_ready,
                 "paddle_ready": paddle_ready,
             }
             logger.debug(f"Ready Statuses: {ready_statuses}")

@@ -176,6 +176,13 @@ def _get_pandas_image_content(row):
     return row["image_metadata"]["caption"]
 
 
+def _get_pandas_audio_content(row):
+    """
+    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
+    """
+    return row["audio_metadata"]["audio_transcript"]
+
+
 def _get_cudf_text_content(df: cudf.DataFrame):
     """
     A cuDF UDF used to select extracted text content to be used to create embeddings.
@@ -284,11 +291,16 @@ def _generate_text_embeddings_df(
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
-        ContentTypeEnum.AUDIO: lambda x: None,  # Not supported yet.
+        ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
-    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
+    endpoint_url = task_props.get("endpoint_url") or validated_config.embedding_nim_endpoint
+    model_name = task_props.get("model_name") or validated_config.embedding_model
+    api_key = task_props.get("api_key") or validated_config.api_key
+    filter_errors = task_props.get("filter_errors", False)
+
+    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE, AUDIO.")
 
     # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
@@ -316,13 +328,13 @@ def _generate_text_embeddings_df(
         # Run asynchronous embedding requests.
         content_embeddings = _async_runner(
             filtered_content_batches,
-            validated_config.api_key,
-            validated_config.embedding_nim_endpoint,
-            validated_config.embedding_model,
+            api_key,
+            endpoint_url,
+            model_name,
             validated_config.encoding_format,
             validated_config.input_type,
             validated_config.truncate,
-            False,  # task_props.get("filter_errors", False),
+            filter_errors,
         )
         # Apply the embeddings (and any error info) to each row.
         df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
