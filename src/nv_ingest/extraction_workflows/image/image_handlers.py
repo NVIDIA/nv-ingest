@@ -18,6 +18,7 @@
 
 import io
 import logging
+import os
 import traceback
 from datetime import datetime
 from typing import Dict
@@ -44,7 +45,7 @@ logger = logging.getLogger(__name__)
 
 YOLOX_MAX_BATCH_SIZE = 8
 
-RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
+RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff", "bmp"]
 PREPROC_FILE_FORMATS = ["svg"]
 
 SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
@@ -264,7 +265,7 @@ def image_data_extractor(
     image_stream : io.BytesIO
         A bytestream for the image file.
     document_type : str
-        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff').
+        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff', 'bmp').
     extract_text : bool
         Specifies whether to extract text.
     extract_images : bool
@@ -295,7 +296,7 @@ def image_data_extractor(
     base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
     current_iso_datetime = datetime.now().isoformat()
     source_metadata = {
-        "source_name": f"{source_id}_{document_type}",
+        "source_name": source_id if os.path.splitext(source_id)[1] else f"{source_id}.{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,

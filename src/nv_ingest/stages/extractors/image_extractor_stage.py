@@ -185,7 +185,7 @@ def generate_image_extractor_stage(
     extractor_config: Dict[str, Any],
     task: str = "extract",
     task_desc: str = "image_content_extractor",
-    pe_count: int = 24,
+    pe_count: int = 1,
 ):
     """
     Helper function to generate a multiprocessing stage to perform image content extraction.
@@ -217,7 +217,7 @@ def generate_image_extractor_stage(
             task=task,
             task_desc=task_desc,
             process_fn=_wrapped_process_fn,
-            document_type="regex:^(png|svg|jpeg|jpg|tiff)$",
+            document_type="regex:^(png|svg|jpeg|jpg|tiff|bmp)$",
         )
     except Exception as e:
         err_msg = f"generate_image_extractor_stage: Error generating image extractor stage. Original error: {e}"

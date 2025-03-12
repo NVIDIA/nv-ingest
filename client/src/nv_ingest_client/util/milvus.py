@@ -458,17 +458,17 @@ def create_nvingest_collection(
     d_idx = None
     s_idx = None
     for k, v in index_params._indexes.items():
-        if k[1] == "dense_index":
-            d_idx = v
-        if sparse and k[1] == "sparse_index":
-            s_idx = v
+        if k[1] == "dense_index" and hasattr(v, "_index_type"):
+            d_idx = v._index_type
+        if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
+            s_idx = v._index_type
     log_new_meta_collection(
         collection_name,
         fields=schema.fields,
         milvus_uri=milvus_uri,
-        dense_index=d_idx._index_type,
+        dense_index=str(d_idx),
         dense_dim=dense_dim,
-        sparse_index=s_idx._index_type if sparse else None,
+        sparse_index=str(s_idx),
         recreate=recreate_meta,
     )
 
@@ -1158,7 +1158,7 @@ def nvingest_retrieval(
                     max_batch_size=nv_ranker_max_batch_size,
                 )
             )
-
+        results = rerank_results
     return results
 
 

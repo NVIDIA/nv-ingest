@@ -59,10 +59,9 @@ nav:
         - Prerequisites: extraction/prerequisites.md
         - Support Matrix: extraction/support-matrix.md
         - Generate Your NGC Keys: extraction/ngc-api-key.md
-        - Quickstart: extraction/quickstart-guide.md
+        - Quickstart (Library Mode): extraction/quickstart-library-mode.md
+        - Quickstart (Self-Hosted): extraction/quickstart-guide.md
       - Developer Guide:
-        - Deploy NV-Ingest: extraction/deployment.md
-        - NV-Ingest on Kubernetes: extraction/kubernetes-dev.md
         - Audio Processing: extraction/audio.md
         - Telemetry: extraction/telemetry.md
         - Contribute: extraction/contributing.md
