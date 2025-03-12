@@ -87,7 +87,7 @@ To get started using NVIDIA Ingest, you need to do a few things:
 4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 Optional:
-1. [Direct Library Deployment](docs/docs/extraction/deployment.md) 📦
+1. [Direct Library Deployment](docs/docs/extraction/quickstart-library-mode.md) 📦
 
 ### Step 1: Starting containers
 
@@ -96,7 +96,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If you prefer, you can also [start services one by one](docs/docs/extraction/deployment.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/extraction/environment-config.md) you may wish to configure.
+If you prefer, you can also [start services one by one](docs/docs/extraction/quickstart-guide.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/extraction/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
