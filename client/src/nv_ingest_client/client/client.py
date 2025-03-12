@@ -634,7 +634,7 @@ class NvIngestClient:
         tasks : Dict[str, Any]
             A dictionary of tasks to be added to each job. The keys represent task names, and the
             values represent task specifications or configurations. Standard tasks include "split",
-            "extract", "store", "caption", "dedup", "filter", "embed", and "vdb_upload".
+            "extract", "store", "caption", "dedup", "filter", "embed".
 
         Returns
         -------

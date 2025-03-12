@@ -60,7 +60,7 @@ def setup_ingestion_pipeline(
     ########################################################################################################
     embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
-    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
+    # vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
@@ -93,8 +93,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_caption_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
     pipe.add_edge(image_storage_stage, embedding_storage_stage)
-    pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
-    pipe.add_edge(vdb_task_sink_stage, sink_stage)
+    pipe.add_edge(embedding_storage_stage, sink_stage)
+    # pipe.add_edge(vdb_task_sink_stage, sink_stage)
 
     if add_meter_stage:
         pipe.add_edge(sink_stage, otel_meter_stage)
