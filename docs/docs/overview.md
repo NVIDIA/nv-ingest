@@ -11,7 +11,7 @@ NeMo Retriever provides the following:
 - **Retrieval** — Leverage semantic + hybrid search for high accuracy retrieval with the embedding + reranking NIM microservice.
 
 
-<img src="extraction/images/overview-retriever.png" alt="Overview diagram" width="800"/>
+![Overview diagram](extraction/images/overview-retriever.png)
 
 
 ## Enterprise-Ready Features
