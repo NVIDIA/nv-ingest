@@ -18,7 +18,6 @@ from .task_base import Task
 from .task_base import TaskType
 from .task_base import is_valid_task_type
 from .task_factory import task_factory
-from .vdb_upload import VdbUploadTask
 
 __all__ = [
     "AudioExtractionTask",
@@ -37,5 +36,4 @@ __all__ = [
     "DedupTask",
     "FilterTask",
     "EmbedTask",
-    "VdbUploadTask",
 ]

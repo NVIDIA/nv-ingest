@@ -336,7 +336,6 @@ class Ingestor:
             .embed() \
             .store_embed()
         # .store() \
-        # .vdb_upload()
         # fmt: on
         return self
 

@@ -158,15 +158,15 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
 
 
 class IngestTaskTableExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskChartExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskSchema(BaseModelNoExt):
