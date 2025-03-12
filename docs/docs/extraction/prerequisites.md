@@ -20,4 +20,5 @@ Before you begin using NV-Ingest, ensure the following software prerequisites ar
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Quickstart Guide](quickstart-guide.md)
+- [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Quickstart (Self-Hosted)](quickstart-guide.md)
