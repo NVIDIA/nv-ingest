@@ -24,7 +24,7 @@ Use the following procedure to prepare your environment.
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv ffmpeg nvidia-riva-client
     ```
 
-2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
+2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](environment-config.md).
 
     ```
     NVIDIA_BUILD_API_KEY=nvapi-<your key>
