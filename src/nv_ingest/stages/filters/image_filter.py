@@ -162,7 +162,7 @@ def generate_image_filter_stage(
     caption_config: Dict[str, Any],
     task: str = "filter",
     task_desc: str = "image_filter",
-    pe_count: int = 8,
+    pe_count: int = 1,
 ):
     """
     Generates a caption extraction stage with the specified configuration.

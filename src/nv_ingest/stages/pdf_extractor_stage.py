@@ -161,7 +161,7 @@ def generate_pdf_extractor_stage(
     extractor_config: Dict[str, Any],
     task: str = "extract",
     task_desc: str = "pdf_content_extractor",
-    pe_count: int = 24,
+    pe_count: int = 1,
 ):
     """
     Helper function to generate a multiprocessing stage to perform PDF content extraction.
