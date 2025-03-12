@@ -32,6 +32,7 @@ from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result
+from nv_ingest_client.util.processing import IngestJobFailure
 from nv_ingest_client.util.util import create_job_specs_for_batch
 
 logger = logging.getLogger(__name__)
@@ -302,7 +303,6 @@ class NvIngestClient:
             TimeoutError: If the fetch operation times out.
             Exception: For all other unexpected issues.
         """
-
         try:
             job_state = self._get_and_check_job_state(
                 job_index, required_state=[JobStateEnum.SUBMITTED, JobStateEnum.SUBMITTED_ASYNC]
@@ -363,7 +363,8 @@ class NvIngestClient:
         retry_delay: float = 1,
         verbose: bool = False,
         completion_callback: Optional[Callable[[Dict, str], None]] = None,
-    ) -> List[Tuple[Optional[Dict], str]]:
+        return_failures: bool = False,
+    ) -> Union[List[Tuple[Optional[Dict], str]], Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]]:
         """
         Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
 
@@ -375,10 +376,15 @@ class NvIngestClient:
             verbose (bool): If True, logs additional information.
             completion_callback (Optional[Callable[[Dict, str], None]]): A callback function that is executed each time
              a job result is successfully fetched. It receives two arguments: the job result (a dict) and the job ID.
+            return_failures (bool): If True, returns a separate list of failed jobs.
 
         Returns:
-            List[Tuple[Optional[Dict], str]]: A list of tuples, each containing the job result (or None on failure) and
-            the job ID.
+          - If `return_failures=False`: List[Tuple[Optional[Dict], str]]
+            - A list of tuples, each containing the job result (or None on failure) and the job ID.
+          - If `return_failures=True`: Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]
+            - A tuple of:
+              - List of successful job results.
+              - List of failures containing job ID and error message.
 
         Raises:
             ValueError: If there is an error in decoding the job result.
@@ -389,6 +395,7 @@ class NvIngestClient:
             job_ids = [job_ids]
 
         results = []
+        failures = []
 
         def fetch_with_retries(job_id: str):
             retries = 0
@@ -420,33 +427,53 @@ class NvIngestClient:
                 job_id = futures[future]
                 try:
                     result, _ = handle_future_result(future, timeout=timeout)
+
                     # Append a tuple of (result data, job_id). (Using result.get("data") if result is valid.)
                     results.append(result.get("data"))
                     # Run the callback if provided and the result is valid
                     if completion_callback and result:
                         completion_callback(result, job_id)
-                    # Clean up the job spec mapping
-                    del self._job_index_to_job_spec[job_id]
-                except concurrent.futures.TimeoutError:
-                    logger.error(
+                except concurrent.futures.TimeoutError as e:
+                    error_msg = (
                         f"Timeout while fetching result for job ID {job_id}: "
                         f"{self._job_index_to_job_spec[job_id].source_id}"
                     )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
                 except json.JSONDecodeError as e:
-                    logger.error(
+                    error_msg = (
                         f"Decoding error while processing job ID {job_id}: "
                         f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
                 except RuntimeError as e:
-                    logger.error(
+                    error_msg = (
                         f"Error while processing job ID {job_id}: "
                         f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                except IngestJobFailure as e:
+                    error_msg = (
+                        f"Error while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e.description}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, e.annotations))
                 except Exception as e:
-                    logger.error(
+                    error_msg = (
                         f"Error while fetching result for job ID {job_id}: "
                         f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
                     )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                finally:
+                    # Clean up the job spec mapping
+                    del self._job_index_to_job_spec[job_id]
+
+        if return_failures:
+            return results, failures
 
         return results
 
