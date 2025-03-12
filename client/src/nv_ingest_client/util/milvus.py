@@ -1062,6 +1062,7 @@ def nvingest_retrieval(
     nv_ranker_truncate: str = "END",
     nv_ranker_top_k: int = 5,
     nv_ranker_max_batch_size: int = 64,
+    nv_ranker_candidate_multiple: int = 10,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -1122,7 +1123,7 @@ def nvingest_retrieval(
     client = MilvusClient(milvus_uri)
     nv_ranker_top_k = top_k
     if nv_ranker:
-        top_k = top_k * 10
+        top_k = top_k * nv_ranker_candidate_multiple
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
