@@ -1,11 +1,7 @@
-# Quickstart Guide for NV-Ingest
+# Quickstart Guide for NV-Ingest (Self-Hosted)
 
-To get started using NV-Ingest, you need to do a few things:
+Use this documentation to get started using NV-Ingest in self-hosted mode.
 
-1. [Start supporting NIM microservices](#step-1-starting-containers) 🏗️
-2. [Install the NVIDIA Ingest client dependencies in a Python environment](#step-2-install-python-dependencies) 🐍
-3. [Submit ingestion job(s)](#step-3-ingesting-documents) 📓
-4. [Inspect and consume results](#step-4-inspecting-and-consuming-results) 🔍
 
 ## Step 1: Starting Containers
 
@@ -16,7 +12,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](https://
     NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
 
-If you prefer, you can also [start services one by one](deployment.md) or run on Kubernetes by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you may want to configure.
+If you prefer, you can also [start services one by one](deployment.md), or run on Kubernetes, by using [our Helm chart](https://github.com/NVIDIA/nv-ingest/blob/main/helm/README.md). Also, there are [additional environment variables](environment-config.md) you might want to configure.
 
 1. Git clone the repo:
 
@@ -43,7 +39,7 @@ If you prefer, you can also [start services one by one](deployment.md) or run on
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
-    NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors look for this key>
+    NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors use this key>
     ```
    
 5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
@@ -364,3 +360,11 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 !!! tip
 
     Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+
+
+
+## Related Topics
+
+- [Prerequisites](prerequisites.md)
+- [Support Matrix](support-matrix.md)
+- [Quickstart (Library Mode)](quickstart-library-mode.md)

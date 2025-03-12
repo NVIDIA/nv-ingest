@@ -34,4 +34,5 @@ Some advanced features require additional GPU support.
 ## Related Topics
 
 - [Prerequisites](prerequisites.md)
-- [Quickstart Guide](quickstart-guide.md)
+- [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Quickstart (Self-Hosted)](quickstart-guide.md)
