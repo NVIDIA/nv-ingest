@@ -354,17 +354,17 @@ def _embed_extractions(builder: mrc.Builder):
             task_props = remove_task_by_type(message, "embed")
             model_dump = task_props.model_dump()
 
-            embedding_nim_endpoint = model_dump.get("embedding_nim_endpoint", validated_config.embedding_nim_endpoint)
-            embedding_model = model_dump.get("embedding_nim_model_name", validated_config.embedding_model)
-            api_key = model_dump.get("nvidia_build_api_key", validated_config.api_key)
+            endpoint_url = task_props.get("endpoint_url") or validated_config.embedding_nim_endpoint
+            model_name = task_props.get("model_name") or validated_config.embedding_model
+            api_key = task_props.get("api_key") or validated_config.api_key
             filter_errors = model_dump.get("filter_errors", False)
 
             return _generate_embeddings(
                 message,
                 validated_config.batch_size,  # This parameter is now ignored in _generate_embeddings.
                 api_key,
-                embedding_nim_endpoint,
-                embedding_model,
+                endpoint_url,
+                model_name,
                 validated_config.encoding_format,
                 validated_config.input_type,
                 validated_config.truncate,

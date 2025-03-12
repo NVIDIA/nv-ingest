@@ -19,7 +19,6 @@ from .store import StoreTask
 from .task_base import Task
 from .task_base import TaskType
 from .task_base import is_valid_task_type
-from .vdb_upload import VdbUploadTask
 
 
 class TaskUnimplemented(Task):
@@ -43,7 +42,6 @@ _TASK_MAP: Dict[TaskType, Callable] = {
     TaskType.STORE_EMBEDDING: StoreEmbedTask,
     TaskType.STORE: StoreTask,
     TaskType.TRANSFORM: TaskUnimplemented,
-    TaskType.VDB_UPLOAD: VdbUploadTask,
 }
 
 

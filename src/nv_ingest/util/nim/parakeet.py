@@ -1,13 +1,21 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import base64
 import logging
+import io
+
 from typing import Any
 from typing import List
 from typing import Optional
 from typing import Tuple
 
-import ffmpeg
 import grpc
+import librosa
+import numpy as np
 import riva.client
+from scipy.io import wavfile
 
 from nv_ingest.util.tracing.tagging import traceable_func
 
@@ -23,8 +31,8 @@ class ParakeetClient:
         self,
         endpoint: str,
         auth_token: Optional[str] = None,
-        auth_metadata: Optional[List[Tuple[str, str]]] = None,
-        use_ssl: bool = False,
+        function_id: Optional[str] = None,
+        use_ssl: Optional[bool] = None,
         ssl_cert: Optional[str] = None,
     ):
         """
@@ -36,6 +44,8 @@ class ParakeetClient:
             The URL of the Parakeet service endpoint.
         auth_token : Optional[str], default=None
             The authentication token for accessing the service.
+        function_id: Optional[str]
+            The NVCF function ID for invoking the service.
         use_ssl : bool, default=False
             Whether to use SSL for the connection.
         ssl_cert : Optional[str], default=None
@@ -45,11 +55,18 @@ class ParakeetClient:
         """
         self.endpoint = endpoint
         self.auth_token = auth_token
-        self.auth_metadata = auth_metadata or []
+        self.function_id = function_id
+        if use_ssl is None:
+            self.use_ssl = True if self.function_id else False
+        else:
+            self.use_ssl = use_ssl
+        self.ssl_cert = ssl_cert
+
+        self.auth_metadata = []
         if self.auth_token:
             self.auth_metadata.append(("authorization", f"Bearer {self.auth_token}"))
-        self.use_ssl = use_ssl
-        self.ssl_cert = ssl_cert
+        if self.function_id:
+            self.auth_metadata.append(("function-id", self.function_id))
 
         # Create authentication and ASR service objects.
         self._auth = riva.client.Auth(self.ssl_cert, self.use_ssl, self.endpoint, self.auth_metadata)
@@ -193,7 +210,7 @@ class ParakeetClient:
 
 def convert_to_mono_wav(audio_bytes):
     """
-    Convert an audio file to mono WAV format using FFmpeg.
+    Convert an audio file to mono WAV format using Librosa and SciPy.
 
     Parameters
     ----------
@@ -205,15 +222,32 @@ def convert_to_mono_wav(audio_bytes):
     bytes
         The processed audio in mono WAV format.
     """
-    process = (
-        ffmpeg.input("pipe:")
-        .output("pipe:", format="wav", acodec="pcm_s16le", ar="44100", ac=1)  # Added ac=1
-        .run_async(pipe_stdin=True, pipe_stdout=True)
-    )
+    # Create a BytesIO object from the audio bytes
+    byte_io = io.BytesIO(audio_bytes)
 
-    out, _ = process.communicate(input=audio_bytes)
+    # Load the audio file with librosa
+    # librosa.load automatically converts to mono by default
+    audio_data, sample_rate = librosa.load(byte_io, sr=44100, mono=True)
 
-    return out
+    # Ensure audio is properly scaled for 16-bit PCM
+    # Librosa normalizes the data between -1 and 1
+    if np.max(np.abs(audio_data)) > 0:
+        audio_data = audio_data / np.max(np.abs(audio_data)) * 0.9
+
+    # Convert to int16 format for 16-bit PCM WAV
+    audio_data_int16 = (audio_data * 32767).astype(np.int16)
+
+    # Create a BytesIO buffer to write the WAV file
+    output_io = io.BytesIO()
+
+    # Write the WAV data using scipy
+    wavfile.write(output_io, sample_rate, audio_data_int16)
+
+    # Reset the file pointer to the beginning and read all contents
+    output_io.seek(0)
+    wav_bytes = output_io.read()
+
+    return wav_bytes
 
 
 def process_transcription_response(response):
@@ -275,7 +309,7 @@ def create_audio_inference_client(
     endpoints: Tuple[str, str],
     infer_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
-    auth_metadata: Optional[Tuple[str, str]] = None,
+    function_id: Optional[str] = None,
     use_ssl: bool = False,
     ssl_cert: Optional[str] = None,
 ):
@@ -292,8 +326,8 @@ def create_audio_inference_client(
         HTTP endpoints are not supported for audio inference.
     auth_token : str, optional
         Authorization token for authentication (default: None).
-    auth_metadata : list of tuples, optional
-        Additional metadata for authentication in the form of a key-value tuple (default: None).
+    function_id : str, optional
+        NVCF function ID of the invocation (default: None)
     use_ssl : bool, optional
         Whether to use SSL for secure communication (default: False).
     ssl_cert : str, optional
@@ -318,5 +352,5 @@ def create_audio_inference_client(
         raise ValueError("`http` endpoints are not supported for audio. Use `grpc`.")
 
     return ParakeetClient(
-        grpc_endpoint, auth_token=auth_token, auth_metadata=auth_metadata, use_ssl=use_ssl, ssl_cert=ssl_cert
+        grpc_endpoint, auth_token=auth_token, function_id=function_id, use_ssl=use_ssl, ssl_cert=ssl_cert
     )

@@ -2,9 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{% set data = load_setup_py_data() %}
-{% set name = data.get('name', 'nv_ingest_client') | lower %}
-{% set version = data.get('version') %}
 {% set py_version = environ['CONDA_PY'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
@@ -12,8 +9,8 @@
 {% set git_root = environ.get('GIT_ROOT', '../../../client') %}
 
 package:
-  name: {{ name }}
-  version: {{ version }}
+  name: nv_ingest_client
+  version: {{ environ.get('NV_INGEST_CLIENT_VERSION', 'Unknown') }}
 
 source:
   path: {{ git_root }}
@@ -22,13 +19,13 @@ build:
   number: 0
   string: py{{ py_version }}_{{ GIT_SHA }}
   script:
-    - {{ PYTHON }} -m pip install ./ --no-deps -vv
+    - {{ PYTHON }} -m pip install . --no-deps -vv
 
 requirements:
   build:
     - pip
     - python==3.10
-    - setuptools>=75.8.0
+    - setuptools>=58.2.0
   run:
     - click>=8.1.7
     - fsspec>=2024.10.0
@@ -57,4 +54,7 @@ extra:
     - drobison@nvidia.com
 
 channels:
+  - nvidia/label/dev
+  - rapidsai
+  - nvidia
   - conda-forge

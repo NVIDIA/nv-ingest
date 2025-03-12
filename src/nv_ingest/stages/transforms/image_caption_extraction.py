@@ -174,7 +174,7 @@ def generate_caption_extraction_stage(
     caption_config: Dict[str, Any],
     task: str = "caption",
     task_desc: str = "caption_extraction",
-    pe_count: int = 8,
+    pe_count: int = 1,
 ):
     """
     Generates a caption extraction stage with the specified configuration.

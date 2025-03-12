@@ -11,11 +11,13 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pydantic import field_validator, model_validator, Field
+from pydantic import Field
+from pydantic import field_validator
+from pydantic import model_validator
+from typing_extensions import Annotated
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from typing_extensions import Annotated
 
 logger = logging.getLogger(__name__)
 
@@ -132,9 +134,9 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
-    embedding_nim_endpoint: str = "http://embedding:8000/v1"
-    embedding_nim_model_name: str = "nvidia/llama-3.2-nv-embedqa-1b-v2"
-    nvidia_build_api_key: Optional[str] = None
+    endpoint_url: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
     filter_errors: bool = False
 
 
@@ -150,20 +152,21 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
     grpc_endpoint: Optional[str] = None
     http_endpoint: Optional[str] = None
     infer_protocol: Optional[str] = None
+    function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
 
 
 class IngestTaskTableExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskChartExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskSchema(BaseModelNoExt):

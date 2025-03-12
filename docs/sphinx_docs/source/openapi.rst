@@ -1,6 +1,6 @@
-===============
+==================================
 NV-Ingest OpenAPI reference
-===============
+==================================
 
 .. swagger-plugin:: openapi.yaml
     :id: nv-ingest-openapi

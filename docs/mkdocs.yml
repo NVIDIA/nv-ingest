@@ -1,4 +1,4 @@
-site_name: NeMo Retriever Extraction (NV-Ingest) Documentation
+site_name: NeMo Retriever Documentation
 # site_url:
 repo_url: https://github.com/NVIDIA/nv-ingest
 # repo_name:
@@ -49,24 +49,27 @@ extra_css:
   - assets/css/jupyter-themes.css
 
 nav:
-  - Home: index.md
-  - User Guide:
-    - What is NVIDIA Ingest?: user-guide/overview.md
-    - Release Notes: user-guide/releasenotes-nv-ingest.md
-    - Get Started:
-      - Prerequisites: user-guide/prerequisites.md
-      - Generate Your NGC Keys: user-guide/ngc-api-key.md
-      - Quickstart: user-guide/quickstart-guide.md
-    - Developer Guide:
-      - Deploy NV-Ingest: user-guide/deployment.md
-      - NV-Ingest on Kubernetes: user-guide/kubernetes-dev.md
-      - Telemetry: user-guide/telemetry.md
-      - Contribute: user-guide/contributing.md
-    - Reference:
-      - Content Metadata: user-guide/content-metadata.md
-      - Environment Variables: user-guide/environment-config.md
-      - CLI Reference: user-guide/nv-ingest_cli.md
-      - API Reference: user-guide/api-docs
+  - NeMo Retriever: 
+    - Overview: 
+      - Overview: overview.md
+    - NeMo Retriever Extraction:
+      - Overview: extraction/overview.md
+      - Release Notes: extraction/releasenotes-nv-ingest.md
+      - Get Started:
+        - Prerequisites: extraction/prerequisites.md
+        - Support Matrix: extraction/support-matrix.md
+        - Generate Your NGC Keys: extraction/ngc-api-key.md
+        - Quickstart (Library Mode): extraction/quickstart-library-mode.md
+        - Quickstart (Self-Hosted): extraction/quickstart-guide.md
+      - Developer Guide:
+        - Audio Processing: extraction/audio.md
+        - Telemetry: extraction/telemetry.md
+        - Contribute: extraction/contributing.md
+      - Reference:
+        - Content Metadata: extraction/content-metadata.md
+        - Environment Variables: extraction/environment-config.md
+        - CLI Reference: extraction/nv-ingest_cli.md
+        - API Reference: extraction/api-docs
 
 plugins:
   - search

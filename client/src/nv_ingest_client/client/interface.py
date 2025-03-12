@@ -236,6 +236,7 @@ class Ingestor:
             pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
 
             def progress_callback(result: Dict, job_id: str) -> None:
+                _, _ = result, job_id
                 pbar.update(1)
 
             fetch_kwargs["completion_callback"] = progress_callback
@@ -335,7 +336,6 @@ class Ingestor:
             .embed() \
             .store_embed()
         # .store() \
-        # .vdb_upload()
         # fmt: on
         return self
 

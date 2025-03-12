@@ -295,14 +295,10 @@ def _generate_text_embeddings_df(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
-    embedding_nim_endpoint = task_props.get("embedding_nim_endpoint", validated_config.embedding_nim_endpoint)
-    embedding_model = task_props.get("embedding_nim_model_name", validated_config.embedding_model)
-    api_key = task_props.get("nvidia_build_api_key", validated_config.api_key)
+    endpoint_url = task_props.get("endpoint_url") or validated_config.embedding_nim_endpoint
+    model_name = task_props.get("model_name") or validated_config.embedding_model
+    api_key = task_props.get("api_key") or validated_config.api_key
     filter_errors = task_props.get("filter_errors", False)
-
-    logger.info(embedding_nim_endpoint)
-    logger.info(embedding_model)
-    logger.info(api_key)
 
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE, AUDIO.")
 
@@ -333,8 +329,8 @@ def _generate_text_embeddings_df(
         content_embeddings = _async_runner(
             filtered_content_batches,
             api_key,
-            embedding_nim_endpoint,
-            embedding_model,
+            endpoint_url,
+            model_name,
             validated_config.encoding_format,
             validated_config.input_type,
             validated_config.truncate,

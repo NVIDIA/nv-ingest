@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{% set data = load_setup_py_data() %}
-{% set version = data.get('version') %}
 {% set py_version = environ['CONDA_PY'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
@@ -12,7 +10,7 @@
 
 package:
   name: nv_ingest_api
-  version: {{ version }}
+  version: {{ environ.get('NV_INGEST_API_VERSION', 'Unknown') }}
 
 source:
   path: {{ git_root }}
