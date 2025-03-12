@@ -121,7 +121,6 @@ Example:
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
   --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
   --task 'embed'
-  --task 'vdb_upload'
   --task 'caption:{}'
 
 \b
@@ -179,8 +178,6 @@ Tasks and Options:
     - images (bool): Flag to write extracted images to object store.
     - structured (bool): Flag to write extracted charts and tables to object store.
     - store_method (str): Storage type ('minio', ). Required.
-\b
-- vdb_upload: Uploads extraction embeddings to vector database.
 \b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
