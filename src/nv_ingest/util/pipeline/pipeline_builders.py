@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 import typing
 
 from morpheus.config import Config
@@ -53,12 +52,16 @@ def setup_ingestion_pipeline(
     ########################################################################################################
     ## Transforms and data synthesis
     ########################################################################################################
-    text_splitter_stage = add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
-    embed_extractions_stage = add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config)
+    text_splitter_stage = add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    embed_extractions_stage = add_embed_extractions_stage(
+        pipe, morpheus_pipeline_config, ingest_config, default_cpu_count
+    )
     ########################################################################################################
     ## Storage and output
     ########################################################################################################
-    embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
+    embedding_storage_stage = add_embedding_storage_stage(
+        pipe, morpheus_pipeline_config, default_cpu_count, default_cpu_count
+    )
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
     vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
