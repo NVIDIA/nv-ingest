@@ -24,6 +24,11 @@ Use the following procedure to prepare your environment.
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv ffmpeg nvidia-riva-client
     ```
 
+    !!! tip
+
+        To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+
+
 2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](environment-config.md).
 
     ```

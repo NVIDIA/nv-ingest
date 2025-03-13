@@ -103,12 +103,18 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
 You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
+
 ```
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 pip install nv-ingest-client==2025.3.10.dev20250310
 ```
+
+!!! tip
+
+    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+
 
 !!! note
 

@@ -201,6 +201,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
+
 ```bash
 # conda not required, but makes it easy to create a fresh python environment
 conda env create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
