@@ -12,12 +12,16 @@ from typing import Optional
 from typing import Tuple
 
 import grpc
-import librosa
 import numpy as np
 import riva.client
 from scipy.io import wavfile
 
 from nv_ingest.util.tracing.tagging import traceable_func
+
+try:
+    import librosa
+except ImportError:
+    librosa = None
 
 logger = logging.getLogger(__name__)
 
@@ -222,6 +226,14 @@ def convert_to_mono_wav(audio_bytes):
     bytes
         The processed audio in mono WAV format.
     """
+
+    if librosa is None:
+        raise ImportError(
+            "Librosa is required for audio processing."
+            "If you are running this code with the ingest container, it can be installed by setting"
+            "the environment variable. INSTALL_AUDIO_EXTRACTION_DEPS=true"
+        )
+
     # Create a BytesIO object from the audio bytes
     byte_io = io.BytesIO(audio_bytes)
 
