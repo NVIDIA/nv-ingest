@@ -18,7 +18,7 @@ if [ "$INSTALL_ADOBE_SDK" = "true" ]; then
 fi
 
 # Check if audio dependencies should be installed
-if [ "$INSTALL_AUDIO_EXTRACTION_DEPPS" = "true" ]; then
+if [ "$INSTALL_AUDIO_EXTRACTION_DEPS" = "true" ]; then
   echo "Checking if librosa is installed..."
 
   # Check if librosa is installed
