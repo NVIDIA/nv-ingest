@@ -55,7 +55,7 @@
     // "postStartCommand": [
     //   "/bin/bash",
     //   "-c",
-    //   "PYTHONPATH=$(pwd)/src:$(pwd)/client/src uvicorn nv_ingest.main:app --host 0.0.0.0 --port 7670 --reload --app-dir /workspace/src/nv_ingest && /workspace/"
+    //   "PYTHONPATH=$(pwd)/src:$(pwd)/client/src uvicorn nv_ingest.api.main:app --host 0.0.0.0 --port 7670 --reload --app-dir /workspace/src/nv_ingest && /workspace/"
     // ],
     "postStartCommand": [
       "/bin/bash",
