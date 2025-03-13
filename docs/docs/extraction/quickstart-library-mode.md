@@ -120,6 +120,10 @@ print(f"Time taken: {t1-t0} seconds")
 print(ingest_json_results_to_blob(results[0]))
 ```
 
+!!! note
+
+    To use library mode with nemoretriever_parse, uncomment the extract_method="nemoretriever_parse" in the snippet above.
+
 You can see the extracted text that represents the content of the ingested test document.
 
 ```shell

@@ -1,24 +1,19 @@
 # Telemetry with NV-Ingest
 
+## OpenTelemetry
 
-## Docker Compose
+After OpenTelemetry and Zipkin are running, you can open your browser to explore traces: 
 
-To run OpenTelemetry locally, run:
-
-```shell
-$ docker compose up otel-collector
-```
-
-Once OpenTelemetry and Zipkin are running, you can open your browser to explore traces: http://$YOUR_DOCKER_HOST:9411/zipkin/.
+- For deployment via docker: http://$YOUR_DOCKER_HOST:9411/zipkin/ 
+- For deployment via k8s: http://$YOUR_K8S_OTEL_POD:9411/zipkin/
 
 ![](images/zipkin.png)
 
-To run Prometheus, run:
+## Prometheus
 
-```shell
-$ docker compose up prometheus
-```
+After Prometheus is running, you can open your browser to explore metrics: 
 
-Once Promethus is running, you can open your browser to explore metrics: [http://$YOUR_DOCKER_HOST:9090/]
+- For deployment via docker: http://$YOUR_DOCKER_HOST:9090/ziplin/
+- For deployment via k8s: http://$YOUR_K8S_OTEL_POD:9090/zipkin/
 
 ![](images/prometheus.png)
