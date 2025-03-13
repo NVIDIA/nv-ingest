@@ -141,7 +141,7 @@ def generate_pptx_extractor_stage(
     extractor_config: dict,
     task: str = "pptx-extract",
     task_desc: str = "pptx_content_extractor",
-    pe_count: int = 24,
+    pe_count: int = 1,
 ):
     """
     Helper function to generate a multiprocessing stage to perform PPTX content extraction.

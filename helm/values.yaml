@@ -299,7 +299,7 @@ redis:
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
-## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
+## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
 ## @skip envVars.REDIS_MORPHEUS_TASK_QUEUE
 ## @skip envVars.CACHED_GRPC_ENDPOINT
 ## @skip envVars.CACHED_HTTP_ENDPOINT
@@ -339,7 +339,8 @@ envVars:
   EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedding:8000/v1"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-90b-vision-instruct/chat/completions"
+  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
+  VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
 
 ## @section Open Telemetry
 ## @descriptionStart

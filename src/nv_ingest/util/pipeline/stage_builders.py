@@ -23,6 +23,7 @@ from nv_ingest.stages.embeddings.text_embeddings import generate_text_embed_extr
 from nv_ingest.stages.extractors.image_extractor_stage import generate_image_extractor_stage
 from nv_ingest.stages.filters import generate_dedup_stage
 from nv_ingest.stages.filters import generate_image_filter_stage
+from nv_ingest.stages.nim.audio_extraction import generate_audio_extractor_stage
 from nv_ingest.stages.nim.chart_extraction import generate_chart_extractor_stage
 from nv_ingest.stages.nim.infographic_extraction import generate_infographic_extractor_stage
 from nv_ingest.stages.nim.table_extraction import generate_table_extractor_stage
@@ -183,6 +184,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
     )
+    model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
     pdf_content_extractor_config = ingest_config.get(
         "pdf_content_extraction_module",
         {
@@ -195,6 +197,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
                 "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
                 "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+                "model_name": model_name,
             },
         },
     )
@@ -202,7 +205,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         generate_pdf_extractor_stage(
             morpheus_pipeline_config,
             pdf_content_extractor_config,
-            pe_count=8,
+            pe_count=max(1, int(default_cpu_count / 2)),
             task="extract",
             task_desc="pdf_content_extractor",
         )
@@ -228,7 +231,9 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     table_extractor_stage = pipe.add_stage(
-        generate_table_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
+        generate_table_extractor_stage(
+            morpheus_pipeline_config, table_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return table_extractor_stage
@@ -252,7 +257,9 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     table_extractor_stage = pipe.add_stage(
-        generate_chart_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
+        generate_chart_extractor_stage(
+            morpheus_pipeline_config, table_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return table_extractor_stage
@@ -273,7 +280,9 @@ def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_confi
     )
 
     infographic_extractor_stage = pipe.add_stage(
-        generate_infographic_extractor_stage(morpheus_pipeline_config, infographic_content_extractor_config, pe_count=5)
+        generate_infographic_extractor_stage(
+            morpheus_pipeline_config, infographic_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return infographic_extractor_stage
@@ -295,7 +304,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
         generate_image_extractor_stage(
             morpheus_pipeline_config,
             extractor_config=image_extractor_config,
-            pe_count=8,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="image_content_extractor",
         )
@@ -319,7 +328,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
         generate_docx_extractor_stage(
             morpheus_pipeline_config,
             extractor_config=docx_extractor_config,
-            pe_count=1,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="docx_content_extractor",
         )
@@ -343,12 +352,66 @@ def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
         generate_pptx_extractor_stage(
             morpheus_pipeline_config,
             extractor_config=pptx_extractor_config,
-            pe_count=1,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="pptx_content_extractor",
         )
     )
     return pptx_extractor_stage
+
+
+def get_audio_retrieval_service(env_var_prefix):
+    prefix = env_var_prefix.upper()
+    grpc_endpoint = os.environ.get(
+        "AUDIO_GRPC_ENDPOINT",
+        "",
+    )
+    http_endpoint = os.environ.get(
+        "AUDIO_HTTP_ENDPOINT",
+        "",
+    )
+    auth_token = os.environ.get(
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
+        "",
+    )
+    infer_protocol = os.environ.get(
+        "AUDIO_INFER_PROTOCOL",
+        "http" if http_endpoint else "grpc" if grpc_endpoint else "",
+    )
+
+    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
+
+    return grpc_endpoint, http_endpoint, auth_token, infer_protocol
+
+
+def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
+    audio_function_id = os.getenv("AUDIO_FUNCTION_ID", "")
+    audio_extractor_config = ingest_config.get(
+        "audio_extraction_module",
+        {
+            "audio_extraction_config": {
+                "audio_endpoints": (audio_grpc, audio_http),
+                "audio_infer_protocol": audio_infer_protocol,
+                "auth_token": audio_auth,
+                "function_id": audio_function_id,
+                # All auth tokens are the same for the moment
+            }
+        },
+    )
+    audio_extractor_stage = pipe.add_stage(
+        generate_audio_extractor_stage(
+            morpheus_pipeline_config,
+            stage_config=audio_extractor_config,
+            pe_count=max(1, int(default_cpu_count / 4)),
+        )
+    )
+    return audio_extractor_stage
 
 
 def add_image_dedup_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
@@ -357,7 +420,7 @@ def add_image_dedup_stage(pipe, morpheus_pipeline_config, ingest_config, default
         generate_dedup_stage(
             morpheus_pipeline_config,
             image_dedup_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="dedup",
             task_desc="dedup_images",
         )
@@ -371,7 +434,7 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
         generate_image_filter_stage(
             morpheus_pipeline_config,
             image_filter_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="filter",
             task_desc="filter_images",
         )
@@ -379,7 +442,9 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
     return image_filter_stage
 
 
-def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
+def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    _ = default_cpu_count
+
     text_splitter_loader = TextSplitterLoaderFactory.get_instance(
         module_name="text_splitter",
         module_config=ingest_config.get("text_splitting_module", {}),
@@ -408,7 +473,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
-    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-90b-vision-instruct")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
@@ -424,7 +489,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         generate_caption_extraction_stage(
             morpheus_pipeline_config,
             image_caption_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="caption",
             task_desc="caption_ext",
         )
@@ -433,7 +498,8 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     return image_caption_stage
 
 
-def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
+def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    _ = ingest_config
     api_key = os.environ.get(
         "NVIDIA_BUILD_API_KEY",
         "",
@@ -454,7 +520,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
         generate_text_embed_extractor_stage(
             morpheus_pipeline_config,
             text_embed_extraction_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="embed",
             task_desc="embed_text",
         )
@@ -463,11 +529,11 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     return embed_extractions_stage
 
 
-def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
+def add_embedding_storage_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     storage_stage = pipe.add_stage(
         generate_embedding_storage_stage(
             morpheus_pipeline_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="store_embedding",
             task_desc="store_embedding_minio",
         )

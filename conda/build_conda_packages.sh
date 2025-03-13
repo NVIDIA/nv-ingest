@@ -49,7 +49,11 @@ GIT_SHA=$(git rev-parse --short HEAD)
 ##############################
 if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
     echo "Building nv_ingest_api..."
-    GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
+    SCRIPT_PATH="$GIT_ROOT/api/src/version.py"
+    echo "SCRIPT_PATH: $SCRIPT_PATH"
+    NV_INGEST_API_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+    echo "NV_INGEST_API_VERSION: $NV_INGEST_API_VERSION"
+    NV_INGEST_API_VERSION="${NV_INGEST_API_VERSION}" GIT_ROOT="${GIT_ROOT}/api" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
@@ -67,8 +71,12 @@ fi
 
 if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
     echo "Building nv_ingest_client..."
-    GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
-        -c conda-forge \
+    SCRIPT_PATH="$GIT_ROOT/client/src/version.py"
+    echo "SCRIPT_PATH: $SCRIPT_PATH"
+    NV_INGEST_CLIENT_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+    echo "NV_INGEST_CLIENT_VERSION: $NV_INGEST_CLIENT_VERSION"
+    NV_INGEST_CLIENT_VERSION="${NV_INGEST_CLIENT_VERSION}" GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
+        -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
     echo "Skipping nv_ingest_client build."

@@ -317,7 +317,7 @@ def generate_dedup_stage(
     dedup_config: Dict[str, Any],
     task: str = "dedup",
     task_desc: str = "dedup_images",
-    pe_count: int = 8,
+    pe_count: int = 1,
 ) -> MultiProcessingBaseStage:
     """
     Generates a deduplication processing stage for images using multiprocessing.

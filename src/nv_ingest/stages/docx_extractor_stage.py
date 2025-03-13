@@ -152,7 +152,7 @@ def generate_docx_extractor_stage(
     extractor_config: dict,
     task: str = "docx-extract",
     task_desc: str = "docx_content_extractor",
-    pe_count: int = 24,
+    pe_count: int = 1,
 ):
     """
     Helper function to generate a multiprocessing stage to perform document content extraction.

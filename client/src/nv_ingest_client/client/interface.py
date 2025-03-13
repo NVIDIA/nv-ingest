@@ -5,16 +5,17 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import glob
+import logging
 import os
 import shutil
 import tempfile
-from tqdm import tqdm
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any, Union
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Union
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
@@ -28,8 +29,11 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
-from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.util import filter_function_kwargs
+from tqdm import tqdm
+
+logger = logging.getLogger(__name__)
 
 DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
 
@@ -202,7 +206,7 @@ class Ingestor:
 
         return self
 
-    def ingest(self, show_progress: bool = False, **kwargs: Any) -> List[Dict[str, Any]]:
+    def ingest(self, show_progress: bool = False, return_failures=False, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Synchronously submits jobs to the NvIngestClient and fetches the results.
 
@@ -232,11 +236,17 @@ class Ingestor:
             pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
 
             def progress_callback(result: Dict, job_id: str) -> None:
+                _, _ = result, job_id
                 pbar.update(1)
 
             fetch_kwargs["completion_callback"] = progress_callback
 
-        result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
+        if return_failures:
+            result, failure = self._client.fetch_job_result(
+                self._job_ids, return_failures=return_failures, **fetch_kwargs
+            )
+        else:
+            result = self._client.fetch_job_result(self._job_ids, return_failures=return_failures, **fetch_kwargs)
 
         if show_progress and pbar:
             pbar.close()
@@ -245,6 +255,9 @@ class Ingestor:
             self._vdb_bulk_upload.run(result)
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
+
+        if return_failures:
+            return result, failure
 
         return result
 
@@ -331,7 +344,6 @@ class Ingestor:
             .embed() \
             .store_embed()
         # .store() \
-        # .vdb_upload()
         # fmt: on
         return self
 
@@ -397,7 +409,17 @@ class Ingestor:
         # Users have to set to True if infographic extraction is required.
         extract_infographics = kwargs.pop("extract_infographics", False)
 
-        for document_type in self._job_specs.file_types:
+        for file_type in self._job_specs.file_types:
+            # Let user override document_type if user explicitly sets document_type.
+            if "document_type" in kwargs:
+                document_type = kwargs.pop("document_type")
+                if document_type != file_type:
+                    logger.warning(
+                        f"User-specified document_type '{document_type}' overrides the inferred type '{file_type}'.",
+                    )
+            else:
+                document_type = file_type
+
             extract_task = ExtractTask(
                 document_type,
                 extract_tables=extract_tables,

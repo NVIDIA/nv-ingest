@@ -14,6 +14,7 @@ dependencies:
   - httpx>=0.28.1
   - isodate>=0.7.2
   - langdetect>=1.0.9
+  - librosa>=0.10.2
   - minio>=7.2.12
   - morpheus-core=25.02.00a
   - morpheus-llm=25.02.00a
@@ -28,12 +29,14 @@ dependencies:
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0
   - python>=3.10
+  - python-build>=1.2.2
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
   - pytorch
   - redis-py>=5.2.1
   - requests>=2.32.3
+  - scipy>=1.15.1
   - setuptools>=58.2.0
   - tabulate>=0.9.0
   - torchvision
@@ -49,3 +52,4 @@ dependencies:
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
+      - nvidia-riva-client>=2.18.0
