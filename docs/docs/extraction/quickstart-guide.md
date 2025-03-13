@@ -31,7 +31,12 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
     Password: <Your Key>
     ```
    
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](environment-config.md).
+4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+
+    !!! note
+
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+
 
     ```
     # Container images must access resources from NGC.
