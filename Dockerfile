@@ -27,6 +27,7 @@ RUN apt-get update && apt-get install -y \
       bzip2 \
       ca-certificates \
       curl \
+      libstdc++6 \
       libgl1-mesa-glx \
       wget \
     && apt-get clean
