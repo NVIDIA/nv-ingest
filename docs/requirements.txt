@@ -8,6 +8,7 @@ mkdocs-jupyter
 mkdocs-include-dir-to-nav
 mkdocs-literate-nav
 mkdocs-site-urls
+mkdocs-redirects
 myst-parser
 nvidia-sphinx-theme
 sphinx
