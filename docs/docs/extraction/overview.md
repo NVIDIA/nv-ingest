@@ -18,7 +18,9 @@ and optionally manage storing into a vector database [Milvus](https://milvus.io/
     Cached and Deplot are deprecated. Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
+
 ## What NeMo Retriever Extraction Is ✔️
+![Overview diagram](images/overview-extraction.png)
 
 NeMo Retriever extraction is a microservice service that does the following:
 
