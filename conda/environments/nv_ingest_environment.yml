@@ -45,7 +45,6 @@ dependencies:
   - tqdm>=4.67.1
   - unstructured-client>=0.25.9
   - uvicorn
-  - wand>=0.6.10
   - pip
   - pip:
       - llama-index-embeddings-nvidia
