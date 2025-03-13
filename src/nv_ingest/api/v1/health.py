@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/health/live",
+    "/live",
     tags=["Health"],
     summary="Check if the service is running.",
     description="""
@@ -31,7 +31,7 @@ async def get_live_state() -> dict:
 
 
 @router.get(
-    "/health/ready",
+    "/ready",
     tags=["Health"],
     summary="Check if the service is ready to receive traffic.",
     description="""
