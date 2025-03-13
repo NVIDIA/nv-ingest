@@ -67,12 +67,6 @@ ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 # Set the working directory in the container
 WORKDIR /workspace
 
-# Copy custom entrypoint script
-COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
-
-# Copy post build triggers script
-COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
-
 FROM base AS nv_ingest_install
 # Copy the module code
 COPY setup.py setup.py
@@ -127,16 +121,23 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./client/dist/*.whl
 
 
-RUN  --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && python3 /workspace/docker/post_build_triggers.py
-
 RUN rm -rf src
 
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
 COPY pyproject.toml ./
+
+# Copy entrypoint script(s)
+COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
+COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_source_ext.sh
+
+# Copy post build triggers script
+COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
+
+RUN  --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && python3 /workspace/docker/post_build_triggers.py
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 
