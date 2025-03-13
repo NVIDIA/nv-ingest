@@ -8,7 +8,7 @@ to find, contextualize, and extract text, tables, charts and images that you can
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NeMo Retriever extraction also enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
