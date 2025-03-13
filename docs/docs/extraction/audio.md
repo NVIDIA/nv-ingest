@@ -1,6 +1,6 @@
-## How to Use the NV-Ingest Service with Riva
+## How to Use the NeMo Retriever Extraction Service with Riva
 
-This guide outlines two methods for running NV-Ingest with Riva for processing audio files:
+This guide outlines two methods for running NeMo Retriever extraction with Riva for processing audio files:
 
 - Run the NIM locally using Docker Compose
 - Use NVCF Endpoints for Cloud-Based Inference

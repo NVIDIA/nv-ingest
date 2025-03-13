@@ -1,6 +1,6 @@
-# Quickstart Guide for NV-Ingest (Self-Hosted)
+# Quickstart Guide for NeMo Retriever Extraction (Self-Hosted)
 
-Use this documentation to get started using NV-Ingest in self-hosted mode.
+Use this documentation to get started using NeMo Retriever extraction in self-hosted mode.
 
 
 ## Step 1: Starting Containers

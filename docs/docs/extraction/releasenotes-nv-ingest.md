@@ -1,4 +1,4 @@
-# Release Notes for NVIDIA Ingest
+# Release Notes for NeMo Retriever Extraction
 
 This documentation contains the release notes for NVIDIA Ingest.
 
@@ -6,13 +6,11 @@ This documentation contains the release notes for NVIDIA Ingest.
 
     NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
 
-
 ## Release 25.03
 
 ### Summary
 
 The NeMo Retriever Extraction 25.03 release includes accuracy improvements, feature expansions, and throughput improvements.
-
 
 ## New Features
 
