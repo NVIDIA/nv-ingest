@@ -28,15 +28,8 @@ RUN apt-get update && apt-get install -y \
       ca-certificates \
       curl \
       libgl1-mesa-glx \
-      software-properties-common \
       wget \
     && apt-get clean
-
-# A workaround for the error (mrc-core): /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
-# Issue: https://github.com/NVIDIA/nv-ingest/issues/474
-RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
-    && apt-get update \
-    && apt-get install -y --only-upgrade libstdc++6
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
@@ -67,6 +60,9 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
     && mamba install -y -c conda-forge tini
+
+# Ensure dynamically linked libraries in the conda environment are found at runtime
+ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 
 # Set the working directory in the container
 WORKDIR /workspace
