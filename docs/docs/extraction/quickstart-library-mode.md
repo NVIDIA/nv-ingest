@@ -1,6 +1,6 @@
 # Quickstart Guide for NeMo Retriever Extraction (Library Mode)
 
-For small-scale workloads, such as workloads of fewer than 100 PDFs, you can use library mode setup. 
+For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
 
 To get started using NeMo Retriever extraction in library mode, you need the following:
@@ -23,6 +23,11 @@ Use the following procedure to prepare your environment.
     conda install -y -c rapidsai -c rapidsai-nightly -c conda-forge -c nvidia nvidia/label/dev::nv_ingest nvidia/label/dev::nv_ingest_client nvidia/label/dev::nv_ingest_api
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv ffmpeg nvidia-riva-client
     ```
+
+    !!! tip
+
+        To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+
 
 2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](environment-config.md).
 
@@ -220,3 +225,4 @@ Please keep in mind that this response is light-hearted and intended for enterta
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

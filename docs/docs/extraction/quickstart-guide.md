@@ -31,7 +31,12 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
     Password: <Your Key>
     ```
    
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](environment-config.md).
+4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+
+    !!! note
+
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+
 
     ```
     # Container images must access resources from NGC.
@@ -98,12 +103,18 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
 You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
+
 ```
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 pip install nv-ingest-client==2025.3.10.dev20250310
 ```
+
+!!! tip
+
+    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+
 
 !!! note
 
@@ -370,3 +381,4 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

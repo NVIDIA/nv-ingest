@@ -11,7 +11,7 @@ NVIDIA-Ingest is a scalable, performance-oriented document content and metadata 
 > [!Note]
 > NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NVIDIA Ingest enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 > [!Note]
 > Cached and Deplot are deprecated.
@@ -115,7 +115,11 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create a .env file that contains your NGC API keys. For more information, refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
+4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+
+> [!NOTE]
+> If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually.
+> In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
 
 ```
 # Container images must access resources from NGC.
@@ -123,6 +127,7 @@ Password: <Your Key>
 NGC_API_KEY=<key to download containers from NGC>
 NIM_NGC_API_KEY=<key to download model files after containers start>
 NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
+NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors use this key>
 ```
 
 > [!NOTE]
@@ -196,6 +201,7 @@ ac27e5297d57   prom/prometheus:latest                                           
 To interact with the nv-ingest service, you can do so from the host, or by `docker exec`-ing into the nv-ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
+
 ```bash
 # conda not required, but makes it easy to create a fresh python environment
 conda env create --name nv-ingest-dev --file ./conda/environments/nv_ingest_environment.yml
