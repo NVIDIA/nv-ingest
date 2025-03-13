@@ -147,6 +147,8 @@ ingestor = (
         paddle_output_format="markdown",
         extract_infographics=True,
         text_depth="page"
+        # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+        # extract_method="nemoretriever_parse",
     ).embed()
     .vdb_upload(
         collection_name="test",
