@@ -18,7 +18,6 @@ The following are the environment configuration variables that you can specify i
 | `DOWNLOAD_LLAMA_TOKENIZER`       | `True` <br/>                                             | If `True`, the [llama-3.2 tokenizer](https://huggingface.co/meta-llama/Llama-3.2-1B) will be pre-dowloaded at build time. If not set to `True`, the (e5-large-unsupervised)[https://huggingface.co/intfloat/e5-large-unsupervised] tokenizer will be pre-downloaded. Note: setting this to `True` requires a HuggingFace access token with access to the gated Llama-3.2 models. See below for more info. |
 | `HF_ACCESS_TOKEN`                | -                                                         | The HuggingFace access token used to pre-downlaod the Llama-3.2 tokenizer from HuggingFace (see above for more info). Llama 3.2 is a gated model, so you must [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) to the Llama-3.2 models and then set this variable to a token that can access gated repositories on your behalf in order to use `DOWNLOAD_LLAMA_TOKENIZER=True`. |
 
----
 
 ## Library Mode Environment Variables
 
