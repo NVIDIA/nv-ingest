@@ -16,10 +16,10 @@ The NeMo Retriever Extraction 25.03 release includes accuracy improvements, feat
 
 ## New Features
 
-- Consolidated NeMo Retriever Extraction to run on a single GPU (H100, A100, L40S, or A10G). For details, refer to [](support-matrix.md).
-- Added Library Mode for a lightweight no-GPU deployment that uses NIM endpoints hosted on build.nvidia.com. For details, refer to [](quickstart-library-mode.md).
+- Consolidated NeMo Retriever Extraction to run on a single GPU (H100, A100, L40S, or A10G). For details, refer to [Support Matrix](support-matrix.md).
+- Added Library Mode for a lightweight no-GPU deployment that uses NIM endpoints hosted on build.nvidia.com. For details, refer to [Quickstart Guide](quickstart-library-mode.md).
 - Added support for infographics extraction.
-- Added support for RIVA NIM for Audio extraction (Early Access). For details, refer to [](audio.md).
+- Added support for RIVA NIM for Audio extraction (Early Access). For details, refer to [Audio Processing](audio.md).
 - Added support for Llama-3.2 VLM for Image Captioning capability.
 - docX, pptx, jpg, png support for image detection & extraction.
 - Deprecated DePlot and CACHED NIMs.
