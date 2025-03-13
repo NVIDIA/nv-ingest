@@ -379,3 +379,4 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

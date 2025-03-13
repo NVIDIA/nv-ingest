@@ -11,7 +11,7 @@ NVIDIA-Ingest is a scalable, performance-oriented document content and metadata 
 > [!Note]
 > NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NVIDIA Ingest enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 > [!Note]
 > Cached and Deplot are deprecated.

@@ -1,6 +1,6 @@
 # Quickstart Guide for NV-Ingest (Library Mode)
 
-For small-scale workloads, such as workloads of fewer than 100 PDFs, you can use library mode setup. 
+For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
 
 To get started using NV-Ingest in library mode, you need the following:
@@ -221,3 +221,4 @@ Please keep in mind that this response is light-hearted and intended for enterta
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
