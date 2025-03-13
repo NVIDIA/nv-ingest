@@ -1,6 +1,6 @@
-# Support Matrix for NV-Ingest
+# Support Matrix for NeMo Retriever Extraction
 
-Before you begin using NV-Ingest, ensure that you have the hardware for your use case.
+Before you begin using NeMo Retriever extraction, ensure that you have the hardware for your use case.
 
 
 ## Hardware

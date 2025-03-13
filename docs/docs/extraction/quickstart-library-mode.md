@@ -1,9 +1,9 @@
-# Quickstart Guide for NV-Ingest (Library Mode)
+# Quickstart Guide for NeMo Retriever Extraction (Library Mode)
 
 For small-scale workloads, such as workloads of fewer than 100 PDFs, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
 
-To get started using NV-Ingest in library mode, you need the following:
+To get started using NeMo Retriever extraction in library mode, you need the following:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
 - [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)

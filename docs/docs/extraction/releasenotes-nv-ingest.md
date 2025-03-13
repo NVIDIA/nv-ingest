@@ -1,11 +1,11 @@
-# Release Notes for NV-Ingest
+# Release Notes for NeMo Retriever Extraction
 
 
 ## Release 25.03
 
 ### Summary
 
-The NV-Ingest 25.03 release includes accuracy improvements, feature expansions, and throughput improvements.
+The NeMo Retriever extraction 25.03 release includes accuracy improvements, feature expansions, and throughput improvements.
 
 
 ## New Features
