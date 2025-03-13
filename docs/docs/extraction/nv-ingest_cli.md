@@ -36,8 +36,6 @@ Options:
                                     --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
                                     --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
                                     --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
-                                    --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
-                                    --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000", "text_depth": "page"}'
                                     --task 'caption:{}'
 
                                   Tasks and Options:
@@ -58,12 +56,6 @@ Options:
                                       - extract_text (bool): Enables text extraction. Default: False.
                                       - extract_images (bool): Enables image extraction. Default: False.
                                       - extract_tables (bool): Enables table extraction. Default: False.
-
-                                  - store: Stores any images extracted from documents.
-                                      Options:
-                                      - structured (bool):  Flag to write extracted charts and tables to object store. Default: True.
-                                      - images (bool): Flag to write extracted images to object store. Default: False.
-                                      - store_method (str): Storage type ('minio', ). Required.
 
                                   - caption: Attempts to extract captions for images extracted from documents. Note: this is not generative, but rather a
                                       simple extraction.
@@ -155,7 +147,6 @@ nv-ingest-cli \
   --doc ./data/test.pdf \
   --output_directory ./processed_docs \
   --task='extract:{"document_type": "pdf", "extract_method": "pdfium"}' \
-  --task='store:{"endpoint":"minio:9000","access_key":"minioadmin","secret_key":"minioadmin"}' \
   --client_host=localhost \
   --client_port=7670
 

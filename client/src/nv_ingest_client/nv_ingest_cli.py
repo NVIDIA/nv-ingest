@@ -119,7 +119,6 @@ Example:
   --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
-  --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
   --task 'embed'
   --task 'caption:{}'
 
@@ -172,12 +171,6 @@ Tasks and Options:
     - split_by (str): Criteria ('page', 'size', 'word', 'sentence'). No default.
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
-\b
-- store: Stores any images extracted from documents.
-    Options:
-    - images (bool): Flag to write extracted images to object store.
-    - structured (bool): Flag to write extracted charts and tables to object store.
-    - store_method (str): Storage type ('minio', ). Required.
 \b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
