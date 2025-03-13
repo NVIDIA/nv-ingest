@@ -6,7 +6,7 @@ to find, contextualize, and extract text, tables, charts and images that you can
 
 !!! note
 
-    NVIDIA Ingest is also known as NV-Ingest and NeMo Retriever Extraction.
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 NeMo Retriever extraction also enables parallelization of the process of splitting documents into pages where contents are classified (such as tables, charts, images, text), 
 extracted into discrete content, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
