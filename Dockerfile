@@ -61,6 +61,9 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     source activate nv_ingest_runtime \
     && mamba install -y -c conda-forge tini
 
+# Ensure dynamically linked libraries in the conda environment are found at runtime
+ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
+
 # Set the working directory in the container
 WORKDIR /workspace
 
