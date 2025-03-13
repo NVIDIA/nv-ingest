@@ -206,7 +206,7 @@ class Ingestor:
 
         return self
 
-    def ingest(self, show_progress: bool = False, **kwargs: Any) -> List[Dict[str, Any]]:
+    def ingest(self, show_progress: bool = False, return_failures=False, **kwargs: Any) -> List[Dict[str, Any]]:
         """
         Synchronously submits jobs to the NvIngestClient and fetches the results.
 
@@ -241,7 +241,12 @@ class Ingestor:
 
             fetch_kwargs["completion_callback"] = progress_callback
 
-        result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
+        if return_failures:
+            result, failure = self._client.fetch_job_result(
+                self._job_ids, return_failures=return_failures, **fetch_kwargs
+            )
+        else:
+            result = self._client.fetch_job_result(self._job_ids, return_failures=return_failures, **fetch_kwargs)
 
         if show_progress and pbar:
             pbar.close()
@@ -250,6 +255,9 @@ class Ingestor:
             self._vdb_bulk_upload.run(result)
             # only upload as part of jobs user specified this action
             self._vdb_bulk_upload = None
+
+        if return_failures:
+            return result, failure
 
         return result
 
