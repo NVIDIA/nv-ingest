@@ -26,7 +26,6 @@ These environment variables apply specifically when running NV-Ingest in library
 | Name                              | Example                                                 | Description |
 |-----------------------------------|---------------------------------------------------------|-------------|
 | `NVIDIA_BUILD_API_KEY`            | `nvapi-...`                                            | API key for NVIDIA-hosted NIM services. |
-| `NVIDIA_API_KEY`                  | `nvapi-...`                                            | Alternative NVIDIA API key (used in specific cases). |
 | `PADDLE_HTTP_ENDPOINT`            | `https://ai.api.nvidia.com/v1/cv/baidu/paddleocr`      | HTTP endpoint for PaddleOCR inference. |
 | `PADDLE_INFER_PROTOCOL`           | `http`                                                 | Protocol used for PaddleOCR requests. |
 | `YOLOX_HTTP_ENDPOINT`             | `https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2` | HTTP endpoint for YOLOX-based page element detection. |
