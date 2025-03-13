@@ -4,6 +4,7 @@
 
 import logging
 import traceback
+from datetime import datetime
 
 import mrc
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -141,7 +142,12 @@ def extract_timestamps_from_message(message):
             dedup_counter[task_name] = 0
 
         ts_entry = message.get_timestamp(entry_key)
-        ts_exit = message.get_timestamp(exit_key)
+        if ts_entry is None:
+            continue
+
+        ts_exit = (
+            message.get_timestamp(exit_key) or datetime.now()
+        )  # When a job fails, it may not have exit time. Default to current time.
         ts_entry_ns = int(ts_entry.timestamp() * 1e9)
         ts_exit_ns = int(ts_exit.timestamp() * 1e9)
 
