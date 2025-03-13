@@ -118,7 +118,7 @@ Password: <Your Key>
 4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
 
 > [!NOTE]
-> If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. 
+> If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually.
 > In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
 
 ```
