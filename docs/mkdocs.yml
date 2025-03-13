@@ -92,6 +92,9 @@ plugins:
       highlight_extra_classes: "jupyter-notebook"
   - include_dir_to_nav:
       file_pattern: '.*\.(md|ipynb)$'
+  - redirects:
+      redirect_maps:
+        'extraction/index.md': 'extraction/overview.md'
   - site-urls
 
 markdown_extensions:
