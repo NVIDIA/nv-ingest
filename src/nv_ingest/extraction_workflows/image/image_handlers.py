@@ -28,7 +28,8 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
-from wand.image import Image as WandImage
+
+# from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
@@ -88,18 +89,20 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     np.ndarray
         Preprocessed image as a numpy array in bitmap format.
     """
+
+    pass
     # Convert SVG to PNG using Wand (ImageMagick)
-    with WandImage(blob=image_stream.read(), format="svg") as img:
-        img.format = "png"
-        png_data = img.make_blob()
+    # with WandImage(blob=image_stream.read(), format="svg") as img:
+    #    img.format = "png"
+    #    png_data = img.make_blob()
 
-    # Reload the PNG as a PIL Image
-    processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
+    ## Reload the PNG as a PIL Image
+    # processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
 
-    # Convert image to numpy array and normalize pixel values
-    image_array = np.asarray(processed_image, dtype=np.float32)
+    ## Convert image to numpy array and normalize pixel values
+    # image_array = np.asarray(processed_image, dtype=np.float32)
 
-    return image_array
+    # return image_array
 
 
 def extract_page_element_images(

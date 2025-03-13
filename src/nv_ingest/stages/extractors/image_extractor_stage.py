@@ -217,7 +217,7 @@ def generate_image_extractor_stage(
             task=task,
             task_desc=task_desc,
             process_fn=_wrapped_process_fn,
-            document_type="regex:^(png|svg|jpeg|jpg|tiff|bmp)$",
+            document_type="regex:^(png|jpeg|jpg|tiff|bmp)$",
         )
     except Exception as e:
         err_msg = f"generate_image_extractor_stage: Error generating image extractor stage. Original error: {e}"
