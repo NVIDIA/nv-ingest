@@ -266,7 +266,6 @@ services:
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
       - NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
-      - PYTHONWARNINGS=ignore,default:::nv_ingest
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       # Self-hosted paddle endpoints.
