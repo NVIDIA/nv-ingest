@@ -60,8 +60,9 @@ nav:
         - Support Matrix: extraction/support-matrix.md
         - Quickstart (Library Mode): extraction/quickstart-library-mode.md
         - Quickstart (Self-Hosted): extraction/quickstart-guide.md
-        - Notebooks: extraction/notebooks.md
+        - Helm Deployment: extraction/helm.md
       - Developer Guide:
+        - Notebooks: extraction/notebooks.md
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
