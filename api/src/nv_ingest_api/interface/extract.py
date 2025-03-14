@@ -247,8 +247,17 @@ def extract_primitives_from_pdf_pdfium(
     Parameters
     ----------
     df_extraction_ledger : pd.DataFrame
-        DataFrame containing PDF documents to process with required columns:
-        content, source_id, document_type, etc.
+        DataFrame containing PDF documents to process. Must include the following columns:
+        - "content" : str
+            Base64-encoded PDF data
+        - "source_id" : str
+            Unique identifier for the document
+        - "source_name" : str
+            Name of the document (filename or descriptive name)
+        - "document_type" : str or enum
+            Document type identifier (should be "pdf" or related enum value)
+        - "metadata" : Dict[str, Any]
+            Dictionary containing additional metadata about the document
     extract_text : bool, default True
         Whether to extract text content
     extract_images : bool, default True
@@ -307,37 +316,143 @@ def extract_primitives_from_pdf_nemoretriever_parse(
     """
     Extract primitives from PDF documents using the NemoRetriever Parse extraction method.
 
-    A simplified wrapper around the general extract_primitives_from_pdf function
-    that defaults to using the NemoRetriever Parse extraction engine.
+    This function serves as a specialized wrapper around the general extract_primitives_from_pdf
+    function, pre-configured to use NemoRetriever Parse as the extraction engine. It processes
+    PDF documents to extract various content types including text, images, tables, charts, and
+    infographics, returning the results in a structured DataFrame.
 
     Parameters
     ----------
     df_extraction_ledger : pd.DataFrame
-        DataFrame containing PDF documents to process with required columns:
-        content, source_id, document_type, etc.
+        DataFrame containing PDF documents to process. Must include the following columns:
+        - "content" : str
+            Base64-encoded PDF data
+        - "source_id" : str
+            Unique identifier for the document
+        - "source_name" : str
+            Name of the document (filename or descriptive name)
+        - "document_type" : str or enum
+            Document type identifier (should be "pdf" or related enum value)
+        - "metadata" : Dict[str, Any]
+            Dictionary containing additional metadata about the document
+
     extract_text : bool, default True
-        Whether to extract text content
+        Whether to extract text content from the PDFs. When True, the function will
+        attempt to extract and structure all textual content according to the
+        granularity specified by `text_depth`.
+
     extract_images : bool, default True
-        Whether to extract embedded images
+        Whether to extract embedded images from the PDFs. When True, the function
+        will identify, extract, and process images embedded within the document.
+
     extract_tables : bool, default True
-        Whether to extract tables
+        Whether to extract tables from the PDFs. When True, the function will
+        detect tabular structures and convert them into structured data.
+
     extract_charts : bool, default True
-        Whether to extract charts
+        Whether to extract charts and graphs from the PDFs. When True, the function
+        will detect and extract visual data representations.
+
     extract_infographics : bool, default True
-        Whether to extract infographics
+        Whether to extract infographics from the PDFs. When True, the function will
+        identify and extract complex visual information displays.
+
     text_depth : str, default "page"
-        Level of text granularity (page, block, paragraph, line)
-    nemoretriever_parse_endpoints : tuple of (str, str), optional
-        Tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse
+        Level of text granularity to extract. Options:
+        - "page" : Text extracted at page level (coarsest granularity)
+        - "block" : Text extracted at block level (groups of paragraphs)
+        - "paragraph" : Text extracted at paragraph level (semantic units)
+        - "line" : Text extracted at line level (finest granularity)
+
+    yolox_auth_token : Optional[str], default None
+        Authentication token for YOLOX inference services used for image processing.
+        Required if the YOLOX services need authentication.
+
+    yolox_endpoints : Optional[Tuple[Optional[str], Optional[str]]], default None
+        A tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services.
+        Used for image processing capabilities within the extraction pipeline.
+        Format: (grpc_endpoint, http_endpoint)
+        Example: (None, "http://localhost:8000/v1/infer")
+
+    yolox_infer_protocol : str, default "http"
+        Protocol to use for YOLOX inference. Options:
+        - "http" : Use HTTP protocol for YOLOX inference services
+        - "grpc" : Use gRPC protocol for YOLOX inference services
+
+    nemoretriever_parse_endpoints : Optional[Tuple[str, str]], default None
+        A tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse.
+        Format: (grpc_endpoint, http_endpoint)
+        Example: (None, "http://localhost:8015/v1/chat/completions")
+        Required for this extraction method.
+
     nemoretriever_parse_protocol : str, default "http"
-        Protocol to use for NemoRetriever Parse ("http" or "grpc")
-    nemoretriever_parse_model_name : str, optional
-        Model name for NemoRetriever Parse
+        Protocol to use for NemoRetriever Parse. Options:
+        - "http" : Use HTTP protocol for NemoRetriever Parse services
+        - "grpc" : Use gRPC protocol for NemoRetriever Parse services
+
+    nemoretriever_parse_model_name : Optional[str], default None
+        Model name for NemoRetriever Parse.
+        Default is typically "nvidia/nemoretriever-parse" if None is provided.
 
     Returns
     -------
     pd.DataFrame
-        DataFrame containing the extracted primitives
+        A DataFrame containing the extracted primitives with the following columns:
+        - "document_type" : str
+            Type of the extracted element (e.g., "text", "image", "structured")
+        - "metadata" : Dict[str, Any]
+            Dictionary containing detailed information about the extracted element
+            including position, content, confidence scores, etc.
+        - "uuid" : str
+            Unique identifier for the extracted element
+
+    Raises
+    ------
+    ValueError
+        If `nemoretriever_parse_endpoints` is None or empty
+        If the input DataFrame does not have the required structure
+
+    KeyError
+        If required columns are missing from the input DataFrame
+
+    RuntimeError
+        If extraction fails due to service unavailability or processing errors
+
+    Examples
+    --------
+    >>> import pandas as pd
+    >>> import base64
+    >>>
+    >>> # Read a PDF file and encode it as base64
+    >>> with open("document.pdf", "rb") as f:
+    >>>     pdf_content = base64.b64encode(f.read()).decode("utf-8")
+    >>>
+    >>> # Create a DataFrame with the PDF content
+    >>> df = pd.DataFrame({
+    >>>     "source_id": ["doc1"],
+    >>>     "source_name": ["document.pdf"],
+    >>>     "content": [pdf_content],
+    >>>     "document_type": ["pdf"],
+    >>>     "metadata": [{"content_metadata": {"type": "document"}}]
+    >>> })
+    >>>
+    >>> # Extract primitives using NemoRetriever Parse
+    >>> result_df = extract_primitives_from_pdf_nemoretriever_parse(
+    >>>     df_extraction_ledger=df,
+    >>>     nemoretriever_parse_endpoints=(None, "http://localhost:8015/v1/chat/completions")
+    >>> )
+    >>>
+    >>> # Display the types of extracted elements
+    >>> print(result_df["document_type"].value_counts())
+
+    Notes
+    -----
+    - NemoRetriever Parse excels at extracting structured data like tables from PDFs
+    - For optimal results, ensure both NemoRetriever Parse and YOLOX services are
+      properly configured and accessible
+    - The extraction quality may vary depending on the complexity and quality of the input PDF
+    - This function wraps the more general `extract_primitives_from_pdf` function with
+      pre-configured parameters for NemoRetriever Parse extraction
     """
     return extract_primitives_from_pdf(
         df_extraction_ledger=df_extraction_ledger,
