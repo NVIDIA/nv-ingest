@@ -420,7 +420,7 @@ def save_response_data(response: Dict[str, Any], output_directory: str, images_t
                 else:
                     image_type = "png"
 
-                if image_content and image_type in {"png", "svg", "jpeg", "jpg", "tiff"}:
+                if image_content and image_type in {"png", "bmp", "jpeg", "jpg", "tiff"}:
                     try:
                         # Decode the base64 content
                         image_data = base64.b64decode(image_content)

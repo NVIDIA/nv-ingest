@@ -76,7 +76,7 @@ _Type_Extract_Method_Map = {
     "pdf": get_args(_Type_Extract_Method_PDF),
     "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
-    "svg": get_args(_Type_Extract_Method_Image),
+    # "svg": get_args(_Type_Extract_Method_Image),
     "tiff": get_args(_Type_Extract_Method_Image),
     "mp3": get_args(_Type_Extract_Method_Audio),
     "wav": get_args(_Type_Extract_Method_Audio),

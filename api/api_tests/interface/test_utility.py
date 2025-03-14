@@ -61,7 +61,7 @@ def test_create_source_metadata():
         ("jpeg", "./data/multimodal_test.jpeg"),
         ("pdf", "./data/multimodal_test.pdf"),
         ("tiff", "./data/multimodal_test.tiff"),
-        ("svg", "./data/multimodal_test.svg"),
+        ("bmp", "./data/multimodal_test.bmp"),
     ],
 )
 def test_read_file_as_base64(file_key, rel_path):
@@ -102,7 +102,7 @@ def test_build_dataframe_from_files():
         (DocumentTypeEnum.JPEG, "./data/multimodal_test.jpeg"),
         (DocumentTypeEnum.PDF, "./data/multimodal_test.pdf"),
         (DocumentTypeEnum.TIFF, "./data/multimodal_test.tiff"),
-        (DocumentTypeEnum.SVG, "./data/multimodal_test.svg"),
+        (DocumentTypeEnum.BMP, "./data/multimodal_test.bmp"),
     ]
     file_paths: List[str] = []
     source_names: List[str] = []

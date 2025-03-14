@@ -90,7 +90,6 @@ declare -A formats=(
     ["pdf"]="pdf"
     ["jpeg"]="jpeg"
     ["png"]="png"
-    ["svg"]="svg"
     ["tiff"]="tiff"
     ["bmp"]="bmp"
     ["wav"]="wav"

@@ -558,7 +558,7 @@ def test_extract_primitives_from_docx_integration():
 
 
 @pytest.mark.integration
-@pytest.mark.parametrize("file_extension", ["png", "svg", "tiff", "jpeg"])
+@pytest.mark.parametrize("file_extension", ["png", "tiff", "jpeg", "bmp"])
 def test_extract_primitives_from_image_integration(file_extension):
     """
     Integration test for the extract_primitives_from_image function.
@@ -570,7 +570,7 @@ def test_extract_primitives_from_image_integration(file_extension):
     Parameters
     ----------
     file_extension : str
-        The file extension to test (png, svg, tiff, jpeg, or jpg)
+        The file extension to test (png, bmp, tiff, jpeg, or jpg)
     """
     # Get the test file path using helper functions
     test_file_rel_path = f"./data/multimodal_test.{file_extension}"
@@ -601,7 +601,7 @@ def test_extract_primitives_from_image_integration(file_extension):
     # Map file extension to document type enum
     extension_to_doctype = {
         "png": DocumentTypeEnum.PNG,
-        "svg": DocumentTypeEnum.SVG,
+        "bmp": DocumentTypeEnum.BMP,
         "tiff": DocumentTypeEnum.TIFF,
         "jpeg": DocumentTypeEnum.JPEG,
         "jpg": DocumentTypeEnum.JPEG,

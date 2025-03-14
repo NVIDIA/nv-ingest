@@ -149,7 +149,7 @@ Tasks and Options:
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.
     Options:
-    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
+    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `bmp`, `tiff`, `txt`). Required.
     - extract_charts (bool): Enables chart extraction. Default: False.
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
