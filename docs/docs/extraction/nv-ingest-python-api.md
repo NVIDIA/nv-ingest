@@ -53,7 +53,7 @@ for doc in result:
     print(doc)
 ```
 
-### Extracting Specific Elements from PDFs
+### Extract Specific Elements from PDFs
 
 By default, the `extract` method extracts all supported content types. 
 You can customize the extraction behavior by using the following code.
