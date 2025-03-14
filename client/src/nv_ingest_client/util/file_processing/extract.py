@@ -107,12 +107,11 @@ def serialize_to_base64(file_stream: BytesIO) -> str:
 def detect_encoding_and_read_text_file(file_stream: BytesIO) -> str:
     """Detects encoding and reads a text file from a BytesIO object accordingly."""
     try:
-        raw_data = file_stream.read(50000)
-        file_stream.seek(0)  # Reset stream position after reading
+        raw_data = file_stream.read()
         result = charset_normalizer.detect(raw_data)
         encoding = result.get("encoding", "utf-8")  # Fallback to utf-8 if undetected
 
-        content = file_stream.read().decode(encoding)
+        content = raw_data.decode(encoding)
         return content
     except IOError:
         logger.error("Failed to read text file from BytesIO object")

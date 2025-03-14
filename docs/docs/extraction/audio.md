@@ -1,6 +1,6 @@
-## How to Use the NV-Ingest Service with Riva
+## How to Use the NeMo Retriever Extraction Service with Riva
 
-This guide outlines two methods for running NV-Ingest with Riva for processing audio files:
+This guide outlines two methods for running NeMo Retriever extraction with Riva for processing audio files:
 
 - Run the NIM locally using Docker Compose
 - Use NVCF Endpoints for Cloud-Based Inference
@@ -20,7 +20,6 @@ Password: <your-ngc-key>
 ```
 - Replace `<your-ngc-key>` with your actual NGC API key.
 - The username should always be `$oauthtoken`.
-- Ensure that your NGC key belongs to the `nvidia/riva` org/team.
 
 2. Store the NGC API Key in an Environment File
 
@@ -29,7 +28,7 @@ This allows services to access it without needing to enter the key manually each
 
 Create a .env file in your working directory and add the following line:
 ```ini
-RIVA_NGC_API_KEY=<your-ngc-key>
+NGC_API_KEY=<your-ngc-key>
 ```
 Again, replace <your-ngc-key> with your actual API key.
 
@@ -53,7 +52,8 @@ ingestor = (
     Ingestor()
     .files("./data/*.wav")
     .extract(
-        document_type="wav"  # Optional, Ingestor should detect automatically in most cases
+        document_type="wav",  # Optional, Ingestor should detect automatically in most cases
+        extract_method="audio",
     )
 )
 ```
@@ -82,10 +82,11 @@ ingestor = (
     .files("./data/*.mp3")
     .extract(
         document_type="mp3",
+        extract_method="audio",
         extract_audio_params={
             "grpc_endpoint": "grpc.nvcf.nvidia.com:443",
             "auth_token": "<API key>",
-            "auth_metadata": [("function-id", "<function ID>")],
+            "function_id": "<function ID>",
             "use_ssl": True,
         },
     )

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import atexit
+import socket
 import os
 import json
 import logging
@@ -357,6 +358,25 @@ def _terminate_subprocess(process: Optional["subprocess.Popen"] = None) -> None:
             logger.error(f"Failed to terminate process group: {e}")
 
 
+def is_port_in_use(port, host="127.0.0.1"):
+    """
+    Checks if a given port is in use on the specified host.
+
+    Parameters:
+        port (int): The port number to check.
+        host (str): The host to check on. Default is '127.0.0.1'.
+
+    Returns:
+        bool: True if the port is in use, False otherwise.
+    """
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        try:
+            sock.bind((host, port))
+            return False
+        except socket.error:
+            return True
+
+
 def start_pipeline_subprocess(
     config: PipelineCreationSchema, stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = None
 ) -> "subprocess.Popen":
@@ -381,6 +401,13 @@ def start_pipeline_subprocess(
     subprocess.Popen
         The subprocess object for the launched pipeline.
     """
+
+    if is_port_in_use(7671):
+        err_msg = "Port 7671 is already in use. Please stop the service running on this port and try again."
+        logger.error(err_msg)
+
+        raise Exception(err_msg)
+
     # Define the command to invoke the subprocess_entrypoint API function
     subprocess_command = [
         sys.executable,

@@ -90,6 +90,8 @@ def test_milvus_meta_collection(tmp_path, sparse):
     env_schema = ClientConfigSchema()
     assert entity["collection_name"] == collection_name
     assert entity["models"]["embedding_model"] == env_schema.embedding_nim_model_name
+    assert entity["indexes"]["dense_index"] == "FLAT"
+    assert entity["indexes"]["sparse_index"] == "SPARSE_INVERTED_INDEX" if sparse else "None"
 
 
 def test_milvus_meta_multiple_coll(tmp_path):

@@ -246,8 +246,23 @@ def test_ingest(ingestor, mock_client):
     mock_client.add_job.assert_called_once_with(ingestor._job_specs)
     mock_client.submit_job.assert_called_once_with(mock_client.add_job.return_value, ingestor._job_queue_id)
 
-    mock_client.fetch_job_result.assert_called_once_with(mock_client.add_job.return_value)
+    mock_client.fetch_job_result.assert_called_once_with(mock_client.add_job.return_value, return_failures=False)
     assert result == [{"result": "success"}]
+
+
+def test_ingest_return_failures(ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+    mock_client.submit_job.return_value = ["job_state_1", "job_state_2"]
+    mock_client.fetch_job_result.return_value = [{"result": "success"}], [(0, {"status": "FAILED"})]
+
+    results, failures = ingestor.ingest(timeout=30, return_failures=True)
+
+    mock_client.add_job.assert_called_once_with(ingestor._job_specs)
+    mock_client.submit_job.assert_called_once_with(mock_client.add_job.return_value, ingestor._job_queue_id)
+
+    mock_client.fetch_job_result.assert_called_once_with(mock_client.add_job.return_value, return_failures=True)
+    assert results == [{"result": "success"}]
+    assert failures == [(0, {"status": "FAILED"})]
 
 
 def test_ingest_async(ingestor, mock_client):

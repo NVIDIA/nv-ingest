@@ -35,18 +35,12 @@ def run_ingestor():
         .files("./data/multimodal_test.pdf")
         .extract(
             extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
+            extract_tables=False,
+            extract_charts=False,
             extract_images=False,
         )
-        .split(
-            split_by="word",
-            split_length=300,
-            split_overlap=10,
-            max_character_length=5000,
-            sentence_window_size=0,
-        )
-        .embed(text=True, tables=True)
+        # .split()
+        # .embed()
     )
 
     try:

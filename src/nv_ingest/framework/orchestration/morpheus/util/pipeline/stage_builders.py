@@ -242,7 +242,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         generate_pdf_extractor_stage(
             morpheus_pipeline_config,
             pdf_content_extractor_config,
-            pe_count=8,
+            pe_count=max(1, int(default_cpu_count / 2)),
             task="extract",
             task_desc="pdf_content_extractor",
         )
@@ -268,7 +268,9 @@ def add_table_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     table_extractor_stage = pipe.add_stage(
-        generate_table_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
+        generate_table_extractor_stage(
+            morpheus_pipeline_config, table_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return table_extractor_stage
@@ -292,7 +294,9 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
     )
 
     table_extractor_stage = pipe.add_stage(
-        generate_chart_extractor_stage(morpheus_pipeline_config, table_content_extractor_config, pe_count=5)
+        generate_chart_extractor_stage(
+            morpheus_pipeline_config, table_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return table_extractor_stage
@@ -313,7 +317,9 @@ def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_confi
     )
 
     infographic_extractor_stage = pipe.add_stage(
-        generate_infographic_extractor_stage(morpheus_pipeline_config, infographic_content_extractor_config, pe_count=5)
+        generate_infographic_extractor_stage(
+            morpheus_pipeline_config, infographic_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
+        )
     )
 
     return infographic_extractor_stage
@@ -335,7 +341,7 @@ def add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
         generate_image_extractor_stage(
             morpheus_pipeline_config,
             extraction_config=image_extractor_config,
-            pe_count=8,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="image_content_extractor",
         )
@@ -359,7 +365,7 @@ def add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
         generate_docx_extractor_stage(
             morpheus_pipeline_config,
             extraction_config=docx_extractor_config,
-            pe_count=1,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="docx_content_extractor",
         )
@@ -383,7 +389,7 @@ def add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defa
         generate_pptx_extractor_stage(
             morpheus_pipeline_config,
             extraction_config=pptx_extractor_config,
-            pe_count=1,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="extract",
             task_desc="pptx_content_extractor",
         )
@@ -434,7 +440,7 @@ def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
         generate_audio_extractor_stage(
             morpheus_pipeline_config,
             stage_config=audio_extractor_config,
-            pe_count=8,
+            pe_count=max(1, int(default_cpu_count / 4)),
         )
     )
     return audio_extractor_stage
@@ -446,7 +452,7 @@ def add_image_dedup_stage(pipe, morpheus_pipeline_config, ingest_config, default
         generate_dedup_stage(
             morpheus_pipeline_config,
             image_dedup_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="dedup",
             task_desc="dedup_images",
         )
@@ -460,7 +466,7 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
         generate_image_filter_stage(
             morpheus_pipeline_config,
             image_filter_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="filter",
             task_desc="filter_images",
         )
@@ -468,7 +474,9 @@ def add_image_filter_stage(pipe, morpheus_pipeline_config, ingest_config, defaul
     return image_filter_stage
 
 
-def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config):
+def add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    _ = default_cpu_count
+
     text_splitter_loader = TextSplitterLoaderFactory.get_instance(
         module_name="text_splitter",
         module_config=ingest_config.get("text_splitting_module", {}),
@@ -497,7 +505,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
-    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/nv-llama-3.2-11b-vision-instruct")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     image_caption_config = ingest_config.get(
         "image_caption_extraction_module",
@@ -513,7 +521,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         generate_caption_extraction_stage(
             morpheus_pipeline_config,
             image_caption_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="caption",
             task_desc="caption_ext",
         )
@@ -522,7 +530,8 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
     return image_caption_stage
 
 
-def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
+def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
+    _ = ingest_config
     api_key = os.environ.get(
         "NVIDIA_BUILD_API_KEY",
         "",
@@ -543,7 +552,7 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
         generate_text_embed_extractor_stage(
             morpheus_pipeline_config,
             text_embed_extraction_config,
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="embed",
             task_desc="embed_text",
         )
@@ -552,12 +561,12 @@ def add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config):
     return embed_extractions_stage
 
 
-def add_embedding_storage_stage(pipe, morpheus_pipeline_config):
+def add_embedding_storage_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
     storage_stage = pipe.add_stage(
         generate_embedding_storage_stage(
             morpheus_pipeline_config,
             store_config={},
-            pe_count=2,
+            pe_count=max(1, int(default_cpu_count / 4)),
             task="store_embedding",
             task_desc="store_embedding_minio",
         )

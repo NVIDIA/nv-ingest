@@ -338,7 +338,7 @@ def create_nvingest_index_params(
                 metric_type="L2",
                 params={
                     "intermediate_graph_degree": 128,
-                    "graph_degree": 64,
+                    "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
@@ -458,17 +458,17 @@ def create_nvingest_collection(
     d_idx = None
     s_idx = None
     for k, v in index_params._indexes.items():
-        if k[1] == "dense_index":
-            d_idx = v
-        if sparse and k[1] == "sparse_index":
-            s_idx = v
+        if k[1] == "dense_index" and hasattr(v, "_index_type"):
+            d_idx = v._index_type
+        if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
+            s_idx = v._index_type
     log_new_meta_collection(
         collection_name,
         fields=schema.fields,
         milvus_uri=milvus_uri,
-        dense_index=d_idx._index_type,
+        dense_index=str(d_idx),
         dense_dim=dense_dim,
-        sparse_index=s_idx._index_type if sparse else None,
+        sparse_index=str(s_idx),
         recreate=recreate_meta,
     )
 
@@ -1062,6 +1062,7 @@ def nvingest_retrieval(
     nv_ranker_truncate: str = "END",
     nv_ranker_top_k: int = 5,
     nv_ranker_max_batch_size: int = 64,
+    nv_ranker_candidate_multiple: int = 10,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -1122,7 +1123,7 @@ def nvingest_retrieval(
     client = MilvusClient(milvus_uri)
     nv_ranker_top_k = top_k
     if nv_ranker:
-        top_k = top_k * 2
+        top_k = top_k * nv_ranker_candidate_multiple
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:

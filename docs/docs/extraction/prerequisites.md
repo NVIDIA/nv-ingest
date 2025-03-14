@@ -1,6 +1,6 @@
-# Prerequisites for NV-Ingest
+# Prerequisites for NeMo Retriever Extraction
 
-Before you begin using NV-Ingest, ensure the following software prerequisites are met.
+Before you begin using NeMo Retriever extraction, ensure the following software prerequisites are met.
 
 
 ## Software
@@ -10,6 +10,7 @@ Before you begin using NV-Ingest, ensure the following software prerequisites ar
 - [Docker Compose](https://docs.docker.com/compose/install/)
 - [CUDA Toolkit](https://developer.nvidia.com/cuda-downloads) (NVIDIA Driver >= `535`, CUDA >= `12.2`)
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
+- [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
 
 
 !!! note
@@ -20,4 +21,5 @@ Before you begin using NV-Ingest, ensure the following software prerequisites ar
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Quickstart Guide](quickstart-guide.md)
+- [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Quickstart (Self-Hosted)](quickstart-guide.md)

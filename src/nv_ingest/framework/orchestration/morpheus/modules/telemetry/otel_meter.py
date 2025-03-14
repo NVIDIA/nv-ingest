@@ -106,12 +106,15 @@ def _metrics_aggregation(builder: mrc.Builder) -> None:
         gauges["failed_jobs_total"].set(failed_jobs)
 
     def update_job_latency(message):
-        for key, val in message.filter_timestamp("trace::exit::").items():
-            exit_key = key
-            entry_key = exit_key.replace("trace::exit::", "trace::entry::")
-            ts_exit = val
-            ts_entry = message.get_timestamp(entry_key)
-            job_name = key.replace("trace::exit::", "")
+        for key, val in message.filter_timestamp("trace::entry::").items():
+            entry_key = key
+            exit_key = entry_key.replace("trace::entry::", "trace::exit::")
+            ts_entry = val
+            ts_exit = (
+                message.get_timestamp(exit_key) or datetime.now()
+            )  # When a job fails, it may not have exit time. Default to current time.
+
+            job_name = key.replace("trace::entry::", "")
 
             # Sanitize job name
             sanitized_job_name = sanitize_name(job_name)
