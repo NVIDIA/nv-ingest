@@ -84,13 +84,18 @@ def extract_primitives_from_pdf(
 
     Parameters
     ----------
-    df_extraction_ledger : pandas.DataFrame
+    df_extraction_ledger : pd.DataFrame
         DataFrame containing PDF documents to process. Must include the following columns:
-        - "content" : Base64-encoded PDF data
-        - "source_id" : Unique identifier for the document (optional but recommended)
-        - "source_name" : Name of the document (optional)
-        - "document_type" : Document type (should be "pdf" or related enum value)
-        - "metadata" : Dictionary containing additional metadata (optional)
+        - "content" : str
+            Base64-encoded PDF data
+        - "source_id" : str
+            Unique identifier for the document
+        - "source_name" : str
+            Name of the document (filename or descriptive name)
+        - "document_type" : str or enum
+            Document type identifier (should be "pdf" or related enum value)
+        - "metadata" : Dict[str, Any]
+            Dictionary containing additional metadata about the document
 
     extract_method : str, default "pdfium"
         The extraction engine to use. Valid options:
