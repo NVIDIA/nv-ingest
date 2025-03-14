@@ -225,6 +225,138 @@ def extract_primitives_from_pdf(
     pass
 
 
+def extract_primitives_from_pdf_pdfium(
+    df_extraction_ledger: pd.DataFrame,
+    *,
+    extract_text: bool = True,
+    extract_images: bool = True,
+    extract_tables: bool = True,
+    extract_charts: bool = True,
+    extract_infographics: bool = True,
+    text_depth: str = "page",
+    yolox_auth_token: Optional[str] = None,
+    yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
+    yolox_infer_protocol: str = "http",
+) -> pd.DataFrame:
+    """
+    Extract primitives from PDF documents using the PDFium extraction method.
+
+    A simplified wrapper around the general extract_primitives_from_pdf function
+    that defaults to using the PDFium extraction engine.
+
+    Parameters
+    ----------
+    df_extraction_ledger : pd.DataFrame
+        DataFrame containing PDF documents to process with required columns:
+        content, source_id, document_type, etc.
+    extract_text : bool, default True
+        Whether to extract text content
+    extract_images : bool, default True
+        Whether to extract embedded images
+    extract_tables : bool, default True
+        Whether to extract tables
+    extract_charts : bool, default True
+        Whether to extract charts
+    extract_infographics : bool, default True
+        Whether to extract infographics
+    text_depth : str, default "page"
+        Level of text granularity (page, block, paragraph, line)
+    yolox_auth_token : str, optional
+        Authentication token for YOLOX inference services
+    yolox_endpoints : tuple of (str, str), optional
+        Tuple containing (gRPC endpoint, HTTP endpoint) for YOLOX services
+    yolox_infer_protocol : str, default "http"
+        Protocol to use for YOLOX inference ("http" or "grpc")
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing the extracted primitives
+    """
+    return extract_primitives_from_pdf(
+        df_extraction_ledger=df_extraction_ledger,
+        extract_method="pdfium",
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
+        text_depth=text_depth,
+        yolox_auth_token=yolox_auth_token,
+        yolox_endpoints=yolox_endpoints,
+        yolox_infer_protocol=yolox_infer_protocol,
+    )
+
+
+def extract_primitives_from_pdf_nemoretriever_parse(
+    df_extraction_ledger: pd.DataFrame,
+    *,
+    extract_text: bool = True,
+    extract_images: bool = True,
+    extract_tables: bool = True,
+    extract_charts: bool = True,
+    extract_infographics: bool = True,
+    text_depth: str = "page",
+    yolox_auth_token: Optional[str] = None,
+    yolox_endpoints: Optional[Tuple[Optional[str], Optional[str]]] = None,
+    yolox_infer_protocol: str = "http",
+    nemoretriever_parse_endpoints: Optional[Tuple[str, str]] = None,
+    nemoretriever_parse_protocol: str = "http",
+    nemoretriever_parse_model_name: Optional[str] = None,
+) -> pd.DataFrame:
+    """
+    Extract primitives from PDF documents using the NemoRetriever Parse extraction method.
+
+    A simplified wrapper around the general extract_primitives_from_pdf function
+    that defaults to using the NemoRetriever Parse extraction engine.
+
+    Parameters
+    ----------
+    df_extraction_ledger : pd.DataFrame
+        DataFrame containing PDF documents to process with required columns:
+        content, source_id, document_type, etc.
+    extract_text : bool, default True
+        Whether to extract text content
+    extract_images : bool, default True
+        Whether to extract embedded images
+    extract_tables : bool, default True
+        Whether to extract tables
+    extract_charts : bool, default True
+        Whether to extract charts
+    extract_infographics : bool, default True
+        Whether to extract infographics
+    text_depth : str, default "page"
+        Level of text granularity (page, block, paragraph, line)
+    nemoretriever_parse_endpoints : tuple of (str, str), optional
+        Tuple containing (gRPC endpoint, HTTP endpoint) for NemoRetriever Parse
+    nemoretriever_parse_protocol : str, default "http"
+        Protocol to use for NemoRetriever Parse ("http" or "grpc")
+    nemoretriever_parse_model_name : str, optional
+        Model name for NemoRetriever Parse
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame containing the extracted primitives
+    """
+    return extract_primitives_from_pdf(
+        df_extraction_ledger=df_extraction_ledger,
+        extract_method="nemoretriever_parse",
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_infographics=extract_infographics,
+        text_depth=text_depth,
+        yolox_endpoints=yolox_endpoints,
+        yolox_auth_token=yolox_auth_token,
+        yolox_infer_protocol=yolox_infer_protocol,
+        nemoretriever_parse_endpoints=nemoretriever_parse_endpoints,
+        nemoretriever_parse_protocol=nemoretriever_parse_protocol,
+        nemoretriever_parse_model_name=nemoretriever_parse_model_name,
+    )
+
+
 @unified_exception_handler
 def extract_primitives_from_audio(
     *,
