@@ -104,7 +104,8 @@ ingestor = ingestor.split(
   The default tokenizer (`"meta-llama/Llama-3.2-1B"`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens).
   You must set `"hf_access_token": "hf_***"` to authenticate.
 
-If you prefer to use a different tokenizer, such as `"intfloat/e5-large-unsupervised"`, you can modify the `split()` call.
+If you prefer to use a different tokenizer, such as `"intfloat/e5-large-unsupervised"`, you can modify the `split` call as shown following.
+
 ```python
 ingestor = ingestor.split(
     tokenizer="intfloat/e5-large-unsupervised",
