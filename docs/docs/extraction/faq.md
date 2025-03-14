@@ -18,4 +18,3 @@ For more information, refer to [Use Nemo Retriever Extraction with nemoretriever
 ## Does NeMo Retriever extraction support any data connectors? 
 
 No, NeMo Retriever extraction does not have connections to data sources. 
-
