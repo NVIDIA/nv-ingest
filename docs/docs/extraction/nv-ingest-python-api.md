@@ -78,7 +78,9 @@ ingestor = ingestor.extract(document_type="pdf")
 
 ### Tracking Job Progress
 
-For large document batches, you can enable a progress bar using `show_progress=True`:
+For large document batches, you can enable a progress bar by setting `show_progress` to true. 
+Use the following code.
+
 ```python
 result = ingestor.extract().ingest(show_progress=True)
 ```
