@@ -139,7 +139,8 @@ ingestor = ingestor.caption(
 
 ## Extract Embeddings with NV-Ingest
 
-The `.embed()` method in NV-Ingest generates text embeddings for document content.
+The `embed` method in NV-Ingest generates text embeddings for document content.
+
 ```python
 ingestor = ingestor.embed()
 ```
