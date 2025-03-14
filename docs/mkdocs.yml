@@ -63,6 +63,7 @@ nav:
         - Quickstart (Self-Hosted): extraction/quickstart-guide.md
       - Developer Guide:
         - Use the CLI: extraction/nv-ingest_cli.md
+        - Use NeMo Retriever Parse: nemoretriever-parse.md
         - Audio Processing: extraction/audio.md
         - Telemetry: extraction/telemetry.md
         - Contribute: extraction/contributing.md

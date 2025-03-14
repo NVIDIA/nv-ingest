@@ -1,80 +1,79 @@
-## How to Use the NeMo Retriever Extraction Service with Riva
+## Use NeMo Retriever Extraction with Riva
 
-This guide outlines two methods for running NeMo Retriever extraction with Riva for processing audio files:
+This documentation describes two methods to run NeMo Retriever extraction 
+with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
 
-- Run the NIM locally using Docker Compose
-- Use NVCF Endpoints for Cloud-Based Inference
+- Run the NIM locally by using Docker Compose
+- Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
+
+!!! note
+
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 
-## Run the NIM Locally Using Docker Compose
 
-1. Log in to nvcr.io.
+## Run the NIM Locally by Using Docker Compose
 
-To access the required container images, log in to the NVIDIA Container Registry (nvcr.io). Use your NGC API key as the password.
+Use the following procedure to run the NIM locally.
 
-Run the following command in your terminal:
-```shell
-$ docker login nvcr.io
-Username: $oauthtoken
-Password: <your-ngc-key>
-```
-- Replace `<your-ngc-key>` with your actual NGC API key.
-- The username should always be `$oauthtoken`.
+1. To access the required container images, log in to the NVIDIA Container Registry (nvcr.io). Use [your NGC key](ngc-api-key.md) as the password. Run the following command in your terminal.
 
-2. Store the NGC API Key in an Environment File
+    - Replace `<your-ngc-key>` with your actual NGC API key.
+    - The username is always `$oauthtoken`.
 
-For convenience and security, store your NGC API key in a .env file.
-This allows services to access it without needing to enter the key manually each time.
+    ```shell
+    $ docker login nvcr.io
+    Username: $oauthtoken
+    Password: <your-ngc-key>
+    ```
+
+2. Store [your NGC key](ngc-api-key.md) in an environment variable file.
+
+For convenience and security, store your NGC key in a .env file.
+This enables services to access it without needing to enter the key manually each time.
 
 Create a .env file in your working directory and add the following line:
 ```ini
 NGC_API_KEY=<your-ngc-key>
 ```
-Again, replace <your-ngc-key> with your actual API key.
+Again, replace <your-ngc-key> with your actual NGC key.
 
-3. Start the Services with the audio Profile
+3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
 
-When starting the NV-Ingest services, ensure that you enable the audio profile. This profile includes the necessary components for audio processing.
+    - The `--profile audio` flag ensures that audio-specific services are launched.
+    - The `--build` flag ensures that any changes to the container images are applied before starting.
 
-Use the following command:
-```shell
-docker compose --profile audio up --build
-```
-- The `--profile audio` flag ensures that audio-specific services are launched.
-- The `--build` flag ensures that any changes to the container images are applied before starting.
+    ```shell
+    docker compose --profile audio up --build
+    ```
 
-4. Using the NV-Ingest API
+4. After the services are running, you can interact with nv-ingest by using Python.
 
-After the services are running, you can interact with NV-Ingest using the Python API.
+    - The `Ingestor` object initializes the ingestion process.
+    - The `files` method specifies the input files to process.
+    - The `extract` method tells nv-ingest to extract information from WAV audio files.
+    - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
-```python
-ingestor = (
-    Ingestor()
-    .files("./data/*.wav")
-    .extract(
-        document_type="wav",  # Optional, Ingestor should detect automatically in most cases
-        extract_method="audio",
+    ```python
+    ingestor = (
+        Ingestor()
+        .files("./data/*.wav")
+        .extract(
+            document_type="wav",  # Ingestor should detect type automatically in most cases
+            extract_method="audio",
+        )
     )
-)
-```
-- The `Ingestor()` object initializes the ingestion process.
-- The `.files("./data/*.wav")` method specifies the input files to process.
-- The `.extract(document_type="wav")` method tells NV-Ingest to extract information from WAV audio files.
-- Note: The `document_type` parameter is optional, as Ingestor should detect the file type automatically.
+    ```
 
 
 
 ## Use NVCF Endpoints for Cloud-Based Inference
 
-Instead of running NV-Ingest locally, you can use NVIDIA Cloud Functions (NVCF) to perform inference via remote endpoints.
+Instead of running NV-Ingest locally, you can use NVCF to perform inference by using remote endpoints.
 
-1. Authenticate with NVCF
+1. NVCF requires an authentication token and a function ID for access. Ensure you have these credentials ready before making API calls.
 
-NVCF requires an authentication token and a function ID for access. Ensure you have these credentials ready before making API calls.
-
-2. Running Inference Using NVCF Endpoints
-
-Instead of running NV-Ingest locally, you provide an NVCF endpoint along with authentication details.
+2. Run inference by using Python. Provide an NVCF endpoint along with authentication details.
 
 ```python
 ingestor = (

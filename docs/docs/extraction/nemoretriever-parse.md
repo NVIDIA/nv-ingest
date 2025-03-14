@@ -1,79 +1,82 @@
-## How to Use the NV-Ingest Service with nemoretriever-parse
+## Use Nemo Retriever Extraction with nemoretriever-parse
 
-This guide outlines two methods for running NV-Ingest with nemoretriever-parse:
+This documentation describes two methods to run NeMo Retriever Extraction 
+with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
 
-1. **Running the NIM locally using Docker Compose**
-2. **Using NVCF Endpoints for Cloud-Based Inference**
+- Run the NIM locally by using Docker Compose
+- Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
 
----
+!!! note
 
-## 1. Running the NIM Locally Using Docker Compose
+    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-### Step 1. Start the Services with the nemoretriever-parse Profile
 
-When starting the NV-Ingest services, ensure that you enable the `nemoretriever-parse` profile. This profile includes the necessary components for extracting text and metadata from images.
 
-Use the following command:
+## Run the NIM Locally by Using Docker Compose
 
-```shell
-docker compose --profile nemoretriever-parse up --build
-```
+Use the following procedure to run the NIM locally.
 
-- The --profile nemoretriever-parse flag ensures that vision-language retrieval services are launched.
-- The --build flag ensures that any changes to the container images are applied before starting.
+1. Start the nv-ingest services with the `nemoretriever-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
 
-### Step 2. Using the NV-Ingest API
+    - The --profile nemoretriever-parse flag ensures that vision-language retrieval services are launched.
+    - The --build flag ensures that any changes to the container images are applied before starting.
 
-Once the services are running, you can interact with NV-Ingest using the Python API.
+    ```shell
+    docker compose --profile nemoretriever-parse up --build
+    ```
 
-```python
-ingestor = (
-    Ingestor()
-    .files("./data/*.pdf")
-    .extract(
-        document_type="pdf",  # Optional, Ingestor should detect automatically in most cases
-        extract_method="nemoretriever_parse"
+2. After the services are running, you can interact with nv-ingest by using Python.
+
+    - The `Ingestor` object initializes the ingestion process.
+    - The `files` method specifies the input files to process.
+    - The `extract` method tells nv-ingest to use `nemoretriever-parse` for extracting text and metadata from images.
+    - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
+
+    ```python
+    ingestor = (
+        Ingestor()
+        .files("./data/*.pdf")
+        .extract(
+            document_type="pdf",  # Ingestor should detect type automatically in most cases
+            extract_method="nemoretriever_parse"
+        )
     )
-)
-```
-- The `Ingestor()` object initializes the ingestion process.
-- The `.files("./data/*.pdf")` method specifies the input files to process.
-- The `.extract(document_type="image", extract_method="nemoretriever_parse")` method tells NV-Ingest to use nemoretriever-parse for extracting text and metadata from images.
-- Note: The `document_type` parameter is optional, as Ingestor should detect the file type automatically.
+    ```
 
-## 2. Using NVCF Endpoints for Cloud-Based Inference
 
-Instead of running NV-Ingest locally, you can use NVIDIA Cloud Functions (NVCF) to perform inference via remote endpoints.
 
-### Step 1: Configure Authentication
+## Using NVCF Endpoints for Cloud-Based Inference
 
-Set the authentication token in the `.env` file:
+Instead of running NV-Ingest locally, you can use NVCF to perform inference by using remote endpoints.
 
-```
-NVIDIA_BUILD_API_KEY=nvapi-...
-```
+1. Set the authentication token in the `.env` file.
 
-### Step 2: Configure the Endpoint in `docker-compose.yaml`
+    ```
+    NVIDIA_BUILD_API_KEY=nvapi-...
+    ```
 
-Modify `docker-compose.yaml` to use the hosted `nemoretriever-parse` service:
+2. Modify `docker-compose.yaml` to use the hosted `nemoretriever-parse` service.
 
-```yaml
-  # build.nvidia.com hosted nemoretriever-parse
-  - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-  #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
-```
+    ```yaml
+    # build.nvidia.com hosted nemoretriever-parse
+    - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+    #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
+    ```
 
-### Step 3: Running Inference Using NVCF Endpoints
+3. Run inference by using Python.
 
-Once authentication and endpoint configuration are set, you can run inference via the Python API:
+    - The `Ingestor` object initializes the ingestion process.
+    - The `files` method specifies the input files to process.
+    - The `extract` method tells nv-ingest to use `nemoretriever-parse` for extracting text and metadata from images.
+    - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
 
-```python
-ingestor = ( 
-    Ingestor()
-    .files("./data/*.pdf")
-    .extract(
-        document_type="pdf",
-        extract_method="nemoretriever_parse"
+    ```python
+    ingestor = (
+        Ingestor()
+        .files("./data/*.pdf")
+        .extract(
+            document_type="pdf",  # Ingestor should detect type automatically in most cases
+            extract_method="nemoretriever_parse"
+        )
     )
-)
-```
+    ```
