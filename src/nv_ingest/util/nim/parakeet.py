@@ -209,7 +209,7 @@ class ParakeetClient:
             return response
         except grpc.RpcError as e:
             logger.error(f"Error transcribing audio file: {e.details()}")
-            return None
+            raise
 
 
 def convert_to_mono_wav(audio_bytes):
