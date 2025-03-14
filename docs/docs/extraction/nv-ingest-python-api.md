@@ -110,7 +110,7 @@ If you prefer to use a different tokenizer, such as `"intfloat/e5-large-unsuperv
 ingestor = ingestor.split(
     tokenizer="intfloat/e5-large-unsupervised",
     chunk_size=1024,
-    chunk_overlap=150,
+    chunk_overlap=150
 )
 ```
 
