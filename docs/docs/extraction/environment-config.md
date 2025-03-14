@@ -25,18 +25,5 @@ These environment variables apply specifically when running NV-Ingest in library
 
 | Name                              | Example                                                 | Description |
 |-----------------------------------|---------------------------------------------------------|-------------|
-| `NVIDIA_BUILD_API_KEY`            | `nvapi-...`                                            | API key for NVIDIA-hosted NIM services. |
-| `PADDLE_HTTP_ENDPOINT`            | `https://ai.api.nvidia.com/v1/cv/baidu/paddleocr`      | HTTP endpoint for PaddleOCR inference. |
-| `PADDLE_INFER_PROTOCOL`           | `http`                                                 | Protocol used for PaddleOCR requests. |
-| `YOLOX_HTTP_ENDPOINT`             | `https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2` | HTTP endpoint for YOLOX-based page element detection. |
-| `YOLOX_INFER_PROTOCOL`            | `http`                                                 | Protocol used for YOLOX-based inference. |
-| `YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT` | `https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1` | HTTP endpoint for detecting graphical elements. |
-| `YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL` | `http`                                               | Protocol used for graphical elements inference. |
-| `YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT` | `https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1` | HTTP endpoint for table structure analysis. |
-| `YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL` | `http`                                               | Protocol used for table structure inference. |
-| `EMBEDDING_NIM_ENDPOINT`          | `https://integrate.api.nvidia.com/v1`                  | The endpoint for NV-Ingest's embedding NIM. |
-| `EMBEDDING_NIM_MODEL_NAME`        | `nvidia/llama-3.2-nv-embedqa-1b-v2`              | The model name used for embedding generation. |
-| `VLM_CAPTION_ENDPOINT`            | `https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions` | Endpoint for vision-language caption generation. |
-| `VLM_CAPTION_MODEL_NAME`          | `meta/llama-3.2-11b-vision-instruct`                   | The model name for vision-language caption generation. |
-| `NEMORETRIEVER_PARSE_HTTP_ENDPOINT` | `https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-parse` | Endpoint for image-to-text retrieval using NemoRetriever. |
-| `NEMORETRIEVER_PARSE_INFER_PROTOCOL` | `http`                                              | Protocol for NemoRetriever Parse requests. |
+| `NVIDIA_BUILD_API_KEY`            | `nvapi-*************` <br/>                             | API key for NVIDIA-hosted NIM services. |
+| `NVIDIA_API_KEY`                  | `nvapi-*************` <br/>                             | copy of `NVIDIA_BUILD_API_KEY`, llama-index connectors use this key |
