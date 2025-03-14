@@ -152,6 +152,6 @@ If you prefer to use a different embedding model, such as [nv-embedqa-e5-v5](htt
 ingestor = ingestor.embed(
     endpoint_url="https://integrate.api.nvidia.com/v1",
     model_name="nvidia/nv-embedqa-e5-v5",
-    api_key="nvapi-",
+    api_key="nvapi-"
 )
 ```
