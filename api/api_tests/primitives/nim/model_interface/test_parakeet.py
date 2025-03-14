@@ -6,6 +6,7 @@ import unittest
 from unittest.mock import patch, MagicMock, ANY
 import base64
 import grpc
+import pytest
 
 # Import the modules under test
 import nv_ingest_api.internal.primitives.nim.model_interface.parakeet as parakeet_module
@@ -16,6 +17,11 @@ from nv_ingest_api.internal.primitives.nim.model_interface.parakeet import (
     process_transcription_response,
     create_audio_inference_client,
 )
+
+try:
+    import librosa
+except ImportError:
+    librosa = None
 
 # Define the module path for patching
 MODULE_UNDER_TEST = f"{parakeet_module.__name__}"
@@ -315,6 +321,7 @@ class TestAudioProcessingFunctions(unittest.TestCase):
     def tearDown(self):
         self.logger_patcher.stop()
 
+    @pytest.mark.skipif(librosa is None, reason="librosa is not installed")
     def test_convert_to_mono_wav(self):
         """Test the convert_to_mono_wav function that uses librosa and scipy."""
         # Mock librosa.load
