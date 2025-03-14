@@ -23,7 +23,10 @@ The [NV-Ingest](overview.md) Python API provides a simple and flexible interface
 The following example demonstrates how to initialize `Ingestor`, load a PDF file, and extract its contents.
 The `extract` method enables different types of data to be extracted.
 
-### Basic Extraction of a Single PDF
+### Extraction of a Single PDF
+
+Use the following code to extract a single PDF file.
+
 ```python
 from nv_ingest_client.client.interface import Ingestor
 
