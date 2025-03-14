@@ -1,6 +1,6 @@
 # Use the NV-Ingest Command Line Interface
 
-After you install the Python dependencies, you can use the NV-Ingest command line interface (CLI). 
+After you install the Python dependencies, you can use the [NV-Ingest](overview.md) command line interface (CLI). 
 To use the CLI, use the `nv-ingest-cli` command.
 
 To check the version of the CLI that you have installed, run the following command.
@@ -15,6 +15,9 @@ To get a list of the current CLI commands and their options, run the following c
 nv-ingest-cli --help
 ```
 
+!!! tip
+
+    There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
 
 ## Examples

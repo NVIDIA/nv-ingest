@@ -55,4 +55,5 @@ NeMo Retriever extraction does not do the following:
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Library Mode)](quickstart-library-mode.md)
 - [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
