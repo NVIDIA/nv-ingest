@@ -1,4 +1,4 @@
-site_name: NV-Ingest Documentation
+site_name: NeMo Retriever Documentation
 # site_url:
 repo_url: https://github.com/NVIDIA/nv-ingest
 # repo_name:
@@ -15,6 +15,7 @@ theme:
     - navigation.instant.prefetch
     - navigation.top
     - navigation.footer
+    - navigation.expand
     - search.suggest
     - search.highlight
     - content.code.copy
@@ -47,6 +48,32 @@ extra_css:
   - assets/css/custom-material.css
   - assets/css/jupyter-themes.css
 
+nav:
+  - NeMo Retriever: 
+    - Overview: 
+      - Overview: overview.md
+    - NeMo Retriever Extraction:
+      - Overview: extraction/overview.md
+      - Release Notes: extraction/releasenotes-nv-ingest.md
+      - Get Started:
+        - Prerequisites: extraction/prerequisites.md
+        - Support Matrix: extraction/support-matrix.md
+        - Quickstart (Library Mode): extraction/quickstart-library-mode.md
+        - Quickstart (Self-Hosted): extraction/quickstart-guide.md
+        - Notebooks: extraction/notebooks.md
+      - Developer Guide:
+        - Use the CLI: extraction/nv-ingest_cli.md
+        - Use the API: extraction/nv-ingest-python-api.md
+        - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
+        - Audio Processing: extraction/audio.md
+        - Telemetry: extraction/telemetry.md
+        - Contribute: extraction/contributing.md
+      - Reference:
+        - Generate Your NGC Keys: extraction/ngc-api-key.md
+        - Content Metadata: extraction/content-metadata.md
+        - Environment Variables: extraction/environment-config.md
+        - API Reference: extraction/api-docs
+
 plugins:
   - search
   # uncomment below to grab api
@@ -68,8 +95,9 @@ plugins:
       highlight_extra_classes: "jupyter-notebook"
   - include_dir_to_nav:
       file_pattern: '.*\.(md|ipynb)$'
-  - literate-nav:
-      nav_file: SUMMARY.md
+  - redirects:
+      redirect_maps:
+        'extraction/index.md': 'extraction/overview.md'
   - site-urls
 
 markdown_extensions:
@@ -104,4 +132,4 @@ markdown_extensions:
 #   github_url:
 
 copyright: |
-  &copy; Copyright 2023-2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
+  &copy; Copyright 2023-2025 NVIDIA CORPORATION & AFFILIATES. All rights reserved.

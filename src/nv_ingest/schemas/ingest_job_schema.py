@@ -11,11 +11,13 @@ from typing import List
 from typing import Optional
 from typing import Union
 
-from pydantic import field_validator, model_validator, Field
+from pydantic import Field
+from pydantic import field_validator
+from pydantic import model_validator
+from typing_extensions import Annotated
 
 from nv_ingest.schemas.base_model_noext import BaseModelNoExt
 from nv_ingest.schemas.metadata_schema import ContentTypeEnum
-from typing_extensions import Annotated
 
 logger = logging.getLogger(__name__)
 
@@ -32,6 +34,8 @@ class DocumentTypeEnum(str, Enum):
     svg = "svg"
     tiff = "tiff"
     txt = "text"
+    mp3 = "mp3"
+    wav = "wav"
 
 
 class TaskTypeEnum(str, Enum):
@@ -44,6 +48,7 @@ class TaskTypeEnum(str, Enum):
     store = "store"
     store_embedding = "store_embedding"
     vdb_upload = "vdb_upload"
+    audio_data_extract = "audio_data_extract"
     table_data_extract = "table_data_extract"
     chart_data_extract = "chart_data_extract"
     infographic_data_extract = "infographic_data_extract"
@@ -129,6 +134,9 @@ class IngestTaskDedupSchema(BaseModelNoExt):
 
 
 class IngestTaskEmbedSchema(BaseModelNoExt):
+    endpoint_url: Optional[str] = None
+    model_name: Optional[str] = None
+    api_key: Optional[str] = None
     filter_errors: bool = False
 
 
@@ -139,16 +147,26 @@ class IngestTaskVdbUploadSchema(BaseModelNoExt):
     filter_errors: bool = True
 
 
+class IngestTaskAudioExtraction(BaseModelNoExt):
+    auth_token: Optional[str] = None
+    grpc_endpoint: Optional[str] = None
+    http_endpoint: Optional[str] = None
+    infer_protocol: Optional[str] = None
+    function_id: Optional[str] = None
+    use_ssl: Optional[bool] = None
+    ssl_cert: Optional[str] = None
+
+
 class IngestTaskTableExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskChartExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskInfographicExtraction(BaseModelNoExt):
-    params: Dict = {}
+    params: Dict = Field(default_factory=dict)
 
 
 class IngestTaskSchema(BaseModelNoExt):
@@ -163,6 +181,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskDedupSchema,
         IngestTaskFilterSchema,
         IngestTaskVdbUploadSchema,
+        IngestTaskAudioExtraction,
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
@@ -184,6 +203,7 @@ class IngestTaskSchema(BaseModelNoExt):
                 TaskTypeEnum.store_embedding: IngestTaskStoreEmbedSchema,
                 TaskTypeEnum.store: IngestTaskStoreSchema,
                 TaskTypeEnum.vdb_upload: IngestTaskVdbUploadSchema,
+                TaskTypeEnum.audio_data_extract: IngestTaskAudioExtraction,
                 TaskTypeEnum.table_data_extract: IngestTaskTableExtraction,
                 TaskTypeEnum.chart_data_extract: IngestTaskChartExtraction,
                 TaskTypeEnum.infographic_data_extract: IngestTaskInfographicExtraction,

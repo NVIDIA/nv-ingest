@@ -4,6 +4,7 @@
 
 import logging
 import traceback
+from datetime import datetime
 
 import mrc
 from morpheus.utils.module_utils import ModuleLoaderFactory
@@ -63,12 +64,12 @@ def _trace(builder: mrc.Builder) -> None:
 
     def collect_timestamps(message):
         job_id = message.get_metadata("job_id")
-
-        trace_id = message.get_metadata("trace_id")
-        if trace_id is None:
+        if isinstance(job_id, str) and len(job_id) == 36:
+            job_id = uuid_to_trace_id(job_id)
+        if job_id is None:
             trace_id = RandomIdGenerator().generate_trace_id()
-        elif isinstance(trace_id, str):
-            trace_id = int(trace_id, 16)
+        elif isinstance(job_id, str):
+            trace_id = int(job_id, 16)
         span_id = RandomIdGenerator().generate_span_id()
 
         timestamps = extract_timestamps_from_message(message)
@@ -141,7 +142,12 @@ def extract_timestamps_from_message(message):
             dedup_counter[task_name] = 0
 
         ts_entry = message.get_timestamp(entry_key)
-        ts_exit = message.get_timestamp(exit_key)
+        if ts_entry is None:
+            continue
+
+        ts_exit = (
+            message.get_timestamp(exit_key) or datetime.now()
+        )  # When a job fails, it may not have exit time. Default to current time.
         ts_entry_ns = int(ts_entry.timestamp() * 1e9)
         ts_exit_ns = int(ts_exit.timestamp() * 1e9)
 
@@ -203,3 +209,11 @@ def create_span_with_timestamps(tracer, parent_span, message):
 
     for _, (span, ts_exit) in ctx_store.items():
         span.end(end_time=ts_exit)
+
+
+def uuid_to_trace_id(uuid_str: str) -> str:
+    """Convert a UUID-like format back to a 32-character OpenTelemetry trace ID."""
+    if not isinstance(uuid_str, str) or len(uuid_str) != 36:
+        raise ValueError("UUID must be a 36-character string with hyphens")
+
+    return uuid_str.replace("-", "")

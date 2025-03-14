@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import os
 import typing
 
 from morpheus.config import Config
@@ -34,6 +33,7 @@ def setup_ingestion_pipeline(
     image_extractor_stage = add_image_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     docx_extractor_stage = add_docx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     pptx_extractor_stage = add_pptx_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    audio_extractor_stage = add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
@@ -52,14 +52,18 @@ def setup_ingestion_pipeline(
     ########################################################################################################
     ## Transforms and data synthesis
     ########################################################################################################
-    text_splitter_stage = add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config)
-    embed_extractions_stage = add_embed_extractions_stage(pipe, morpheus_pipeline_config, ingest_config)
+    text_splitter_stage = add_text_splitter_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count)
+    embed_extractions_stage = add_embed_extractions_stage(
+        pipe, morpheus_pipeline_config, ingest_config, default_cpu_count
+    )
     ########################################################################################################
     ## Storage and output
     ########################################################################################################
-    embedding_storage_stage = add_embedding_storage_stage(pipe, morpheus_pipeline_config)
+    embedding_storage_stage = add_embedding_storage_stage(
+        pipe, morpheus_pipeline_config, default_cpu_count, default_cpu_count
+    )
     image_storage_stage = add_image_storage_stage(pipe, morpheus_pipeline_config)
-    vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
+    # vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     sink_stage = add_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
@@ -81,7 +85,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(pdf_extractor_stage, image_extractor_stage)
     pipe.add_edge(image_extractor_stage, docx_extractor_stage)
     pipe.add_edge(docx_extractor_stage, pptx_extractor_stage)
-    pipe.add_edge(pptx_extractor_stage, image_dedup_stage)
+    pipe.add_edge(pptx_extractor_stage, audio_extractor_stage)
+    pipe.add_edge(audio_extractor_stage, image_dedup_stage)
     pipe.add_edge(image_dedup_stage, image_filter_stage)
     pipe.add_edge(image_filter_stage, table_extraction_stage)
     pipe.add_edge(table_extraction_stage, chart_extraction_stage)
@@ -91,8 +96,8 @@ def setup_ingestion_pipeline(
     pipe.add_edge(image_caption_stage, embed_extractions_stage)
     pipe.add_edge(embed_extractions_stage, image_storage_stage)
     pipe.add_edge(image_storage_stage, embedding_storage_stage)
-    pipe.add_edge(embedding_storage_stage, vdb_task_sink_stage)
-    pipe.add_edge(vdb_task_sink_stage, sink_stage)
+    pipe.add_edge(embedding_storage_stage, sink_stage)
+    # pipe.add_edge(vdb_task_sink_stage, sink_stage)
 
     if add_meter_stage:
         pipe.add_edge(sink_stage, otel_meter_stage)

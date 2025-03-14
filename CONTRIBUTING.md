@@ -80,7 +80,7 @@ git submodule update --init --recursive
    ** [Create a pull request](https://github.com/NVIDIA/nv-ingest/pulls) once your
    code is ready.
 5. **Code Review:** Wait for the review by other developers and make necessary updates.
-6. **Merge:** Once approved, an NV-Ingest developer will approve your pull request.
+6. **Merge:** After approval, an NVIDIA developer will approve your pull request.
 
 ### Seasoned Developers
 
@@ -110,7 +110,7 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
          0             pdf         somefile  1234  { ... }
      ```
    - The `metadata` column contents correspond to
-     the [schema-enforced metadata format of returned data](docs/content-metadata.md).
+     the [schema-enforced metadata format of returned data](docs/docs/extraction/content-metadata.md).
 
 5. **Pipeline Processing**:
 

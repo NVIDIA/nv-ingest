@@ -34,10 +34,7 @@ configure_local_logging(logger, local_log_level)
     help="Path to the JSON configuration file.",
     hidden=True,
 )
-@click.option("--use_cpp", is_flag=True, help="Use C++ backend.")
-@click.option("--pipeline_batch_size", default=256, type=int, help="Batch size for the pipeline.")
-@click.option("--enable_monitor", is_flag=True, help="Enable monitoring.")
-@click.option("--feature_length", default=512, type=int, help="Feature length.")
+@click.option("--edge_buffer_size", default=32, type=int, help="Size of the edge buffer between stages.")
 @click.option("--num_threads", default=get_default_cpu_count(), type=int, help="Number of threads.")
 @click.option("--model_max_batch_size", default=256, type=int, help="Model max batch size.")
 @click.option(
@@ -55,10 +52,7 @@ configure_local_logging(logger, local_log_level)
 )
 def cli(
     ingest_config_path,
-    use_cpp,
-    pipeline_batch_size,
-    enable_monitor,
-    feature_length,
+    edge_buffer_size,
     num_threads,
     model_max_batch_size,
     mode,
@@ -92,11 +86,9 @@ def cli(
 
     morpheus_pipeline_config = Config()
     morpheus_pipeline_config.execution_mode = ExecutionMode.CPU
+    morpheus_pipeline_config.edge_buffer_size = edge_buffer_size
     morpheus_pipeline_config.debug = True if log_level == "DEBUG" else False
     morpheus_pipeline_config.log_level = log_level
-    morpheus_pipeline_config.pipeline_batch_size = pipeline_batch_size
-    morpheus_pipeline_config.enable_monitor = enable_monitor
-    morpheus_pipeline_config.feature_length = feature_length
     morpheus_pipeline_config.num_threads = num_threads
     morpheus_pipeline_config.model_max_batch_size = model_max_batch_size
     morpheus_pipeline_config.mode = PipelineModes[mode.upper()]

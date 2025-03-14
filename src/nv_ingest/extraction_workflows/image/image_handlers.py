@@ -18,6 +18,7 @@
 
 import io
 import logging
+import os
 import traceback
 from datetime import datetime
 from typing import Dict
@@ -27,7 +28,8 @@ from typing import Tuple
 
 import numpy as np
 from PIL import Image
-from wand.image import Image as WandImage
+
+# from wand.image import Image as WandImage
 
 import nv_ingest.util.nim.yolox as yolox_utils
 from nv_ingest.schemas.image_extractor_schema import ImageConfigSchema
@@ -35,6 +37,7 @@ from nv_ingest.schemas.metadata_schema import AccessLevelEnum
 from nv_ingest.util.image_processing.transforms import crop_image
 from nv_ingest.util.image_processing.transforms import numpy_to_base64
 from nv_ingest.util.nim.helpers import create_inference_client
+from nv_ingest.util.nim.yolox import get_yolox_model_name
 from nv_ingest.util.pdf.metadata_aggregators import CroppedImageWithContent
 from nv_ingest.util.pdf.metadata_aggregators import construct_image_metadata_from_base64
 from nv_ingest.util.pdf.metadata_aggregators import construct_page_element_metadata
@@ -43,7 +46,7 @@ logger = logging.getLogger(__name__)
 
 YOLOX_MAX_BATCH_SIZE = 8
 
-RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff"]
+RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff", "bmp"]
 PREPROC_FILE_FORMATS = ["svg"]
 
 SUPPORTED_FILE_TYPES = RAW_FILE_FORMATS + ["svg"]
@@ -86,18 +89,20 @@ def convert_svg_to_bitmap(image_stream: io.BytesIO) -> np.ndarray:
     np.ndarray
         Preprocessed image as a numpy array in bitmap format.
     """
+
+    pass
     # Convert SVG to PNG using Wand (ImageMagick)
-    with WandImage(blob=image_stream.read(), format="svg") as img:
-        img.format = "png"
-        png_data = img.make_blob()
+    # with WandImage(blob=image_stream.read(), format="svg") as img:
+    #    img.format = "png"
+    #    png_data = img.make_blob()
 
-    # Reload the PNG as a PIL Image
-    processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
+    ## Reload the PNG as a PIL Image
+    # processed_image = Image.open(io.BytesIO(png_data)).convert("RGB")
 
-    # Convert image to numpy array and normalize pixel values
-    image_array = np.asarray(processed_image, dtype=np.float32)
+    ## Convert image to numpy array and normalize pixel values
+    # image_array = np.asarray(processed_image, dtype=np.float32)
 
-    return image_array
+    # return image_array
 
 
 def extract_page_element_images(
@@ -193,8 +198,13 @@ def extract_page_elements_from_images(
     page_elements = []
     yolox_client = None
 
+    # Obtain yolox_version
+    # Assuming that the http endpoint is at index 1
+    yolox_http_endpoint = config.yolox_endpoints[1]
+    yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
+
     try:
-        model_interface = yolox_utils.YoloxPageElementsModelInterface()
+        model_interface = yolox_utils.YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
         yolox_client = create_inference_client(
             config.yolox_endpoints,
             model_interface,
@@ -258,7 +268,7 @@ def image_data_extractor(
     image_stream : io.BytesIO
         A bytestream for the image file.
     document_type : str
-        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff').
+        Specifies the type of the image document ('png', 'jpeg', 'jpg', 'svg', 'tiff', 'bmp').
     extract_text : bool
         Specifies whether to extract text.
     extract_images : bool
@@ -289,7 +299,7 @@ def image_data_extractor(
     base_unified_metadata = row_data.get(kwargs.get("metadata_column", "metadata"), {})
     current_iso_datetime = datetime.now().isoformat()
     source_metadata = {
-        "source_name": f"{source_id}_{document_type}",
+        "source_name": source_id if os.path.splitext(source_id)[1] else f"{source_id}.{document_type}",
         "source_id": source_id,
         "source_location": row_data.get("source_location", ""),
         "source_type": document_type,

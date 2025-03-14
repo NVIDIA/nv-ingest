@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/health/live",
+    "/live",
     tags=["Health"],
     summary="Check if the service is running.",
     description="""
@@ -31,7 +31,7 @@ async def get_live_state() -> dict:
 
 
 @router.get(
-    "/health/ready",
+    "/ready",
     tags=["Health"],
     summary="Check if the service is ready to receive traffic.",
     description="""
@@ -82,8 +82,8 @@ async def get_ready_state() -> dict:
             ready_statuses = {
                 "ingest_ready": ingest_ready,
                 "morpheus_pipeline_ready": morpheus_pipeline_ready,
-                "yolox_page_elemenst_ready": yolox_page_elements_ready,
-                "yolox_graphic_elements_ready": yolox_graphic_elements_ready,
+                "page_elemenst_ready": yolox_page_elements_ready,
+                "graphic_elements_ready": yolox_graphic_elements_ready,
                 "paddle_ready": paddle_ready,
             }
             logger.debug(f"Ready Statuses: {ready_statuses}")

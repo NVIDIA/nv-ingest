@@ -16,6 +16,7 @@ from typing import Tuple
 
 import cv2
 import numpy as np
+import packaging
 import pandas as pd
 import torch
 import torchvision
@@ -63,8 +64,10 @@ YOLOX_GRAPHIC_MIN_SCORE = 0.1
 YOLOX_GRAPHIC_FINAL_SCORE = 0.0
 YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
 
-YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 768
-YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 768
+LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 768
+LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 768
+YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
+YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
 
 YOLOX_GRAPHIC_CLASS_LABELS = [
     "chart_title",
@@ -476,13 +479,22 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, yolox_version: Optional[str] = None):
         """
         Initialize the yolox-graphic-elements model interface.
         """
+        if yolox_version and (
+            packaging.version.Version(yolox_version) >= packaging.version.Version("1.2.0-rc5")  # gtc release
+        ):
+            image_preproc_width = YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
+            image_preproc_height = YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
+        else:
+            image_preproc_width = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
+            image_preproc_height = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
+
         super().__init__(
-            image_preproc_width=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
-            image_preproc_height=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
+            image_preproc_width=image_preproc_width,
+            image_preproc_height=image_preproc_height,
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
             num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,

@@ -5,6 +5,7 @@ on:
   schedule:
     # Runs every day at 11:30PM (UTC)
     - cron: "30 23 * * *"
+  workflow_dispatch:
 
 jobs:
   build:

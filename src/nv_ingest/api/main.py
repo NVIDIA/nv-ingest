@@ -18,10 +18,19 @@ from .v1.ingest import router as IngestApiRouter
 logger = logging.getLogger(__name__)
 
 # nv-ingest FastAPI app declaration
-app = FastAPI()
+app = FastAPI(
+    title="NV-Ingest Microservice",
+    description="Service for ingesting heterogenous datatypes",
+    version="25.3.0",
+    contact={
+        "name": "NVIDIA Corporation",
+        "url": "https://nvidia.com",
+    },
+    docs_url="/docs",
+)
 
-app.include_router(IngestApiRouter)
-app.include_router(HealthApiRouter)
+app.include_router(IngestApiRouter, prefix="/v1")
+app.include_router(HealthApiRouter, prefix="/v1/health")
 
 # Set up the tracer provider and add a processor for exporting traces
 resource = Resource(attributes={"service.name": "nv-ingest"})

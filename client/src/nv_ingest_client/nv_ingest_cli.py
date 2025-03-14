@@ -119,9 +119,7 @@ Example:
   --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
-  --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
   --task 'embed'
-  --task 'vdb_upload'
   --task 'caption:{}'
 
 \b
@@ -131,7 +129,7 @@ Tasks and Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_BUILD_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/meta/llama-3.2-90b-vision-instruct'.
+      Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b
@@ -173,14 +171,6 @@ Tasks and Options:
     - split_by (str): Criteria ('page', 'size', 'word', 'sentence'). No default.
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
-\b
-- store: Stores any images extracted from documents.
-    Options:
-    - images (bool): Flag to write extracted images to object store.
-    - structured (bool): Flag to write extracted charts and tables to object store.
-    - store_method (str): Storage type ('minio', ). Required.
-\b
-- vdb_upload: Uploads extraction embeddings to vector database.
 \b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,

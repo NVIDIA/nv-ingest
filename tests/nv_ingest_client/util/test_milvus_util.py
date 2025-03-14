@@ -1,5 +1,12 @@
 import pytest
-from nv_ingest_client.util.milvus import MilvusOperator, _dict_to_params
+from nv_ingest_client.util.milvus import (
+    MilvusOperator,
+    _dict_to_params,
+    create_nvingest_collection,
+    grab_meta_collection_info,
+    reconstruct_pages,
+)
+from nv_ingest_client.util.util import ClientConfigSchema
 
 
 @pytest.fixture
@@ -65,3 +72,140 @@ def test_op_dict_to_params(collection_name, expected_results):
         for k, v in expected_results.items():
             assert write_params[k] == v
         coll_name in collection_name.keys()
+
+
+@pytest.mark.parametrize("sparse", [True, False])
+def test_milvus_meta_collection(tmp_path, sparse):
+    collection_name = "collection"
+    milvus_uri = f"{tmp_path}/test.db"
+    create_nvingest_collection(collection_name, milvus_uri=milvus_uri, sparse=sparse)
+    results = grab_meta_collection_info(collection_name, milvus_uri=milvus_uri)
+    keys = list(results[0].keys())
+    assert ["pk", "collection_name", "indexes", "models", "timestamp", "user_fields"] == keys
+    entity = results[0]
+    env_schema = ClientConfigSchema()
+    assert entity["collection_name"] == collection_name
+    assert entity["models"]["embedding_model"] == env_schema.embedding_nim_model_name
+    assert entity["indexes"]["dense_index"] == "FLAT"
+    assert entity["indexes"]["sparse_index"] == "SPARSE_INVERTED_INDEX" if sparse else "None"
+
+
+def test_milvus_meta_multiple_coll(tmp_path):
+    collection_name = "collection"
+    milvus_uri = f"{tmp_path}/test.db"
+    for i in range(0, 3):
+        create_nvingest_collection(f"{collection_name}{i}", milvus_uri=milvus_uri)
+
+    results = grab_meta_collection_info(f"{collection_name}2", milvus_uri=milvus_uri)
+    entity = results[0]
+    assert len(results) == 1
+    assert entity["collection_name"] == f"{collection_name}2"
+
+
+def test_page_reconstruction():
+    records = [
+        [
+            {
+                "document_type": "text",
+                "metadata": {
+                    "content": "roses are red.",
+                    "source_metadata": {
+                        "source_name": "file_1.pdf",
+                    },
+                    "content_metadata": {
+                        "type": "text",
+                        "page_number": 0,
+                    },
+                },
+            },
+            {
+                "document_type": "text",
+                "metadata": {
+                    "content": "violets are blue.",
+                    "source_metadata": {
+                        "source_name": "file_1.pdf",
+                    },
+                    "content_metadata": {
+                        "type": "text",
+                        "page_number": 0,
+                    },
+                },
+            },
+            {
+                "document_type": "text",
+                "metadata": {
+                    "content": "sunflowers are yellow.",
+                    "source_metadata": {
+                        "source_name": "file_1.pdf",
+                    },
+                    "content_metadata": {
+                        "type": "text",
+                        "page_number": 0,
+                    },
+                },
+            },
+        ],
+        [
+            {
+                "document_type": "text",
+                "metadata": {
+                    "content": "two time two is four.",
+                    "source_metadata": {
+                        "source_name": "file_2.pdf",
+                    },
+                    "content_metadata": {
+                        "type": "text",
+                        "page_number": 0,
+                    },
+                },
+            },
+            {
+                "document_type": "text",
+                "metadata": {
+                    "content": "four times four is sixteen.",
+                    "source_metadata": {
+                        "source_name": "file_2.pdf",
+                    },
+                    "content_metadata": {
+                        "type": "text",
+                        "page_number": 1,
+                    },
+                },
+            },
+        ],
+    ]
+    candidates = [
+        {
+            "id": 456331433807935937,
+            "distance": 0.016393441706895828,
+            "entity": {
+                "text": "roses are red.",
+                "source": {
+                    "source_name": "file_1.pdf",
+                },
+                "content_metadata": {
+                    "type": "text",
+                    "page_number": 0,
+                },
+            },
+        },
+        {
+            "id": 456331433807935937,
+            "distance": 0.016393441706895828,
+            "entity": {
+                "text": "two time two is four.",
+                "source": {
+                    "source_name": "file_2.pdf",
+                },
+                "content_metadata": {
+                    "type": "text",
+                    "page_number": 0,
+                },
+            },
+        },
+    ]
+    pages = []
+    pages.append(reconstruct_pages(candidates[0], records))
+    pages.append(reconstruct_pages(candidates[1], records, page_signum=1))
+    assert pages[0] == "roses are red.\nviolets are blue.\nsunflowers are yellow.\n"
+    assert pages[1] == "two time two is four.\nfour times four is sixteen.\n"

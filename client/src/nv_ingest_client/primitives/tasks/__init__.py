@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from .audio_extraction import AudioExtractionTask
 from .caption import CaptionTask
 from .chart_extraction import ChartExtractionTask
 from .dedup import DedupTask
@@ -17,9 +18,9 @@ from .task_base import Task
 from .task_base import TaskType
 from .task_base import is_valid_task_type
 from .task_factory import task_factory
-from .vdb_upload import VdbUploadTask
 
 __all__ = [
+    "AudioExtractionTask",
     "CaptionTask",
     "ChartExtractionTask",
     "ExtractTask",
@@ -35,5 +36,4 @@ __all__ = [
     "DedupTask",
     "FilterTask",
     "EmbedTask",
-    "VdbUploadTask",
 ]
