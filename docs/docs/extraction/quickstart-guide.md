@@ -31,20 +31,17 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
     Password: <Your Key>
     ```
    
-4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+4. Create a .env file that contains your NVIDIA Build API key.
 
     !!! note
 
-        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
-
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md) and [Environment Configuration Variables](environment-config.md).
 
     ```
     # Container images must access resources from NGC.
 
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
-    NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
-    NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors use this key>
     ```
    
 5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
