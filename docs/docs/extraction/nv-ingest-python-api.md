@@ -4,9 +4,13 @@ The [NV-Ingest](overview.md) Python API provides a simple and flexible interface
 
 !!! tip
 
-    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+    There is a Jupyter notebook available to help you get started with the Python API. For more information, refer to [Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 ## Summary of Key Methods
+
+The main class in the nv-ingest API is `Ingestor`. 
+The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
+The following table describes methods of the `Ingestor` class.
 
 | Method | Description |
 | ------ | ----------- |
@@ -23,7 +27,7 @@ The [NV-Ingest](overview.md) Python API provides a simple and flexible interface
 The following example demonstrates how to initialize `Ingestor`, load a PDF file, and extract its contents.
 The `extract` method enables different types of data to be extracted.
 
-### Extraction of a Single PDF
+### Extract a Single PDF
 
 Use the following code to extract a single PDF file.
 
@@ -39,7 +43,7 @@ result = ingestor.extract().ingest()
 print(result)
 ```
 
-### Use the Python API to Extract PDFs
+### Extract Multiple PDFs
 
 Use the following code to process multiple PDFs at one time.
 
@@ -76,7 +80,9 @@ Use the following code to specify a custom document type for extraction.
 ingestor = ingestor.extract(document_type="pdf")
 ```
 
-### Track Job Progress
+
+
+## Track Job Progress
 
 For large document batches, you can enable a progress bar by setting `show_progress` to true. 
 Use the following code.
@@ -85,10 +91,16 @@ Use the following code.
 result = ingestor.extract().ingest(show_progress=True)
 ```
 
-## Use the Python API to Split Documents
+
+
+## Split Documents
 
 Splitting, also known as chunking, breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
 Use the `split` method to chunk large documents into smaller sections before processing as shown in the following code.
+
+!!! note
+
+    The default tokenizer (`"meta-llama/Llama-3.2-1B"`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `"hf_access_token": "hf_***"` to authenticate.
 
 ```python
 ingestor = ingestor.split(
@@ -99,12 +111,7 @@ ingestor = ingestor.split(
 )
 ```
 
-!!! note
-
-  The default tokenizer (`"meta-llama/Llama-3.2-1B"`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens).
-  You must set `"hf_access_token": "hf_***"` to authenticate.
-
-If you prefer to use a different tokenizer, such as `"intfloat/e5-large-unsupervised"`, you can modify the `split` call as shown following.
+To use a different tokenizer, such as `"intfloat/e5-large-unsupervised"`, you can modify the `split` call as shown following.
 
 ```python
 ingestor = ingestor.split(
@@ -113,6 +120,8 @@ ingestor = ingestor.split(
     chunk_overlap=150
 )
 ```
+
+
 
 ## Extract Captions from Images
 
@@ -137,7 +146,9 @@ ingestor = ingestor.caption(
 )
 ```
 
-## Extract Embeddings with NV-Ingest
+
+
+## Extract Embeddings
 
 The `embed` method in NV-Ingest generates text embeddings for document content.
 
@@ -149,7 +160,7 @@ ingestor = ingestor.embed()
 
     By default, `embed` uses the [llama-3.2-nv-embedqa-1b-v2](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2) model.
 
-If you prefer to use a different embedding model, such as [nv-embedqa-e5-v5](https://build.nvidia.com/nvidia/nv-embedqa-e5-v5), specify a different `model_name` and `endpoint_url`.
+To use a different embedding model, such as [nv-embedqa-e5-v5](https://build.nvidia.com/nvidia/nv-embedqa-e5-v5), specify a different `model_name` and `endpoint_url`.
 
 ```python
 ingestor = ingestor.embed(
