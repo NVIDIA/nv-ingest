@@ -69,6 +69,9 @@ ingestor = ingestor.extract(
 ```
 
 ### Extracting with Custom Document Type
+
+Use the following code to specify a custom document type for extraction.
+
 ```python
 ingestor = ingestor.extract(document_type="pdf")
 ```
