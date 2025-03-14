@@ -16,6 +16,11 @@ with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html
 
 Use the following procedure to run the NIM locally.
 
+!!! important
+
+    Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the audio service's device_id to a dedicated GPU: device_ids: ["1"] or higher.
+
+
 1. To access the required container images, log in to the NVIDIA Container Registry (nvcr.io). Use [your NGC key](ngc-api-key.md) as the password. Run the following command in your terminal.
 
     - Replace `<your-ngc-key>` with your actual NGC API key.
@@ -40,7 +45,7 @@ Again, replace <your-ngc-key> with your actual NGC key.
 
 3. Start the nv-ingest services with the `audio` profile. This profile includes the necessary components for audio processing. Use the following command.
 
-    - The `--profile audio` flag ensures that audio-specific services are launched.
+    - The `--profile audio` flag ensures that audio-specific services are launched. For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
     - The `--build` flag ensures that any changes to the container images are applied before starting.
 
     ```shell
@@ -75,19 +80,24 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 
 2. Run inference by using Python. Provide an NVCF endpoint along with authentication details.
 
-```python
-ingestor = (
-    Ingestor()
-    .files("./data/*.mp3")
-    .extract(
-        document_type="mp3",
-        extract_method="audio",
-        extract_audio_params={
-            "grpc_endpoint": "grpc.nvcf.nvidia.com:443",
-            "auth_token": "<API key>",
-            "function_id": "<function ID>",
-            "use_ssl": True,
-        },
+    - The `Ingestor` object initializes the ingestion process.
+    - The `files` method specifies the input files to process.
+    - The `extract` method tells nv-ingest to extract information from WAV audio files.
+    - The `document_type` parameter is optional, because `Ingestor` should detect the file type automatically.
+
+    ```python
+    ingestor = (
+        Ingestor()
+        .files("./data/*.mp3")
+        .extract(
+            document_type="mp3",
+            extract_method="audio",
+            extract_audio_params={
+                "grpc_endpoint": "grpc.nvcf.nvidia.com:443",
+                "auth_token": "<API key>",
+                "function_id": "<function ID>",
+                "use_ssl": True,
+            },
+        )
     )
-)
-```
+    ```

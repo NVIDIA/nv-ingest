@@ -16,9 +16,14 @@ with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
 
 Use the following procedure to run the NIM locally.
 
+!!! important
+
+    Due to limitations in available VRAM controls in the current release of nemoretriever_parse, it must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set nemoretriever_parse's device_id to a dedicated GPU: device_ids: ["1"] or higher.
+
+
 1. Start the nv-ingest services with the `nemoretriever-parse` profile. This profile includes the necessary components for extracting text and metadata from images. Use the following command.
 
-    - The --profile nemoretriever-parse flag ensures that vision-language retrieval services are launched.
+    - The --profile nemoretriever-parse flag ensures that vision-language retrieval services are launched.  For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
     - The --build flag ensures that any changes to the container images are applied before starting.
 
     ```shell

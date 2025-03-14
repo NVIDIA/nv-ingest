@@ -16,7 +16,8 @@ Before you begin using NeMo Retriever extraction, ensure that you have the hardw
 
 ## Advanced Feature Support
 
-Some advanced features require additional GPU support.
+Some advanced features, such as VLM integrations and audio extraction, require additional GPU support. 
+For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
 
 ### VLM Integrations

@@ -51,7 +51,7 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services:
+6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -157,9 +157,8 @@ ingestor = (
         extract_images=True,
         paddle_output_format="markdown",
         extract_infographics=True,
+        # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
-        # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        # extract_method="nemoretriever_parse",
     ).embed()
     .vdb_upload(
         collection_name="test",
@@ -176,6 +175,11 @@ print(f"Time taken: {t1-t0} seconds")
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
 ```
+
+!!! note
+
+    To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+
 
 ```
 Starting ingestion..
@@ -373,6 +377,28 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 !!! tip
 
     Beyond inspecting the results, you can read them into things like [llama-index](https://github.com/NVIDIA/nv-ingest/blob/main/examples/llama_index_multimodal_rag.ipynb) or [langchain](https://github.com/NVIDIA/nv-ingest/blob/main/examples/langchain_multimodal_rag.ipynb) retrieval pipelines. Also, checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted with NV-Ingest.
+
+
+
+## Profile Information
+
+The Nemo Retriever extraction core pipeline profiles run on a single A10G or better GPU. 
+This includes text, table, chart, infographic extraction, embedding and indexing into Milvus. 
+The advanced profiles require additional GPU support. 
+This includes audio extraction and VLM integrations. 
+For more information, refer to [Support Matrix](support-matrix.md).
+
+The values that you specify in the `--profile` option of your `docker compose up` command are explained in the following table. 
+You can specify multiple `--profile` options.
+
+
+| Name                  | Type     | Description                                                       | GPU Requirements | 
+|-----------------------|----------|-------------------------------------------------------------------|-----------------------| 
+| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus. | [1 GPU](support-matrix.md) total for all core profiles. | 
+| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | [1 GPU](support-matrix.md) total for all core profiles. | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) |
+| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) |
+| `vlm`                 | Advanced | Uses llama 3.2 11B VLM for experimental image captioning of unstructured images. | [1 additional dedicated GPU](support-matrix.md) |
 
 
 
