@@ -132,7 +132,7 @@ To specify a different API endpoint, pass additional parameters to `.caption()`.
 ingestor = ingestor.caption(
     endpoint_url="https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
     model_name="meta/llama-3.2-11b-vision-instruct",
-    api_key="nvapi-",
+    api_key="nvapi-"
 )
 ```
 
