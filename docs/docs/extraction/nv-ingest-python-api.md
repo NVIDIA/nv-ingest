@@ -68,7 +68,7 @@ ingestor = ingestor.extract(
 )
 ```
 
-### Extracting with Custom Document Type
+### Extract with Custom Document Type
 
 Use the following code to specify a custom document type for extraction.
 
