@@ -64,7 +64,7 @@ ingestor = ingestor.extract(
     extract_tables=False,  # Skip table extraction
     extract_charts=True,  # Extract charts
     extract_infographics=True,  # Extract infographic images
-    extract_images=False,  # Skip image extraction
+    extract_images=False  # Skip image extraction
 )
 ```
 
