@@ -110,7 +110,7 @@ issues. Look for unassigned issues and follow the steps starting from **Claim an
          0             pdf         somefile  1234  { ... }
      ```
    - The `metadata` column contents correspond to
-     the [schema-enforced metadata format of returned data](docs/content-metadata.md).
+     the [schema-enforced metadata format of returned data](docs/docs/extraction/content-metadata.md).
 
 5. **Pipeline Processing**:
 

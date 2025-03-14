@@ -49,7 +49,7 @@ Again, replace <your-ngc-key> with your actual NGC key.
     - The `--build` flag ensures that any changes to the container images are applied before starting.
 
     ```shell
-    docker compose --profile audio up --build
+    docker compose --profile retrieval --profile audio up --build
     ```
 
 4. After the services are running, you can interact with nv-ingest by using Python.
