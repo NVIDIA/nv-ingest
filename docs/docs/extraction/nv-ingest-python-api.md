@@ -121,7 +121,7 @@ This can be used to describe images extracted from documents.
 
 !!! note
 
-    The default captioning model used by `.caption()` is `"meta/llama-3.2-11b-vision-instruct"`.
+    The default model used by `caption` is `meta/llama-3.2-11b-vision-instruct`.
 
 ```python
 ingestor = ingestor.caption()
