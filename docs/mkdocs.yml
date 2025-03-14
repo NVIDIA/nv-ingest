@@ -63,7 +63,7 @@ nav:
         - Notebooks: extraction/notebooks.md
       - Developer Guide:
         - Use the CLI: extraction/nv-ingest_cli.md
-        - Use NeMo Retriever Parse: nemoretriever-parse.md
+        - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Audio Processing: extraction/audio.md
         - Telemetry: extraction/telemetry.md
         - Contribute: extraction/contributing.md
