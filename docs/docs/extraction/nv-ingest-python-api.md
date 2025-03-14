@@ -41,7 +41,8 @@ print(result)
 
 ### Using the Python API to Extract PDFs
 
-To process multiple PDFs at once:
+Use the following code to process multiple PDFs at one time.
+
 ```python
 ingestor = Ingestor().files(["path/to/doc1.pdf", "path/to/doc2.pdf"])
 
