@@ -51,7 +51,6 @@ requirements:
     - torchvision
     - transformers>=4.47.0
     - unstructured-client>=0.25.9
-    - wand>=0.6.10
 
   test:
     commands:

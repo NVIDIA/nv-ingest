@@ -1,6 +1,6 @@
-# Quickstart Guide for NV-Ingest (Self-Hosted)
+# Quickstart Guide for NeMo Retriever Extraction (Self-Hosted)
 
-Use this documentation to get started using NV-Ingest in self-hosted mode.
+Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
 
 ## Step 1: Starting Containers
@@ -31,7 +31,12 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
     Password: <Your Key>
     ```
    
-4. Create a .env file containing your NGC API key and the following paths. For more information, refer to [Environment Configuration Variables](environment-config.md).
+4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+
+    !!! note
+
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+
 
     ```
     # Container images must access resources from NGC.
@@ -46,7 +51,7 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
 
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
-6. Start core services:
+6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
 
@@ -98,12 +103,18 @@ If you prefer, you can also start services one by one, or run on Kubernetes, by 
 You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
+
 ```
 # conda not required but makes it easy to create a fresh Python environment
 conda create --name nv-ingest-dev python=3.10
 conda activate nv-ingest-dev
 pip install nv-ingest-client==2025.3.10.dev20250310
 ```
+
+!!! tip
+
+    To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
+
 
 !!! note
 
@@ -124,7 +135,9 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 ### In Python
 
-You can find more documentation and examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+!!! tip
+
+    For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ```python
@@ -146,6 +159,7 @@ ingestor = (
         extract_images=True,
         paddle_output_format="markdown",
         extract_infographics=True,
+        # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
     ).embed()
     .vdb_upload(
@@ -163,6 +177,11 @@ print(f"Time taken: {t1-t0} seconds")
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
 ```
+
+!!! note
+
+    To use library mode with nemoretriever_parse, uncomment `extract_method="nemoretriever_parse"` in the previous code. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+
 
 ```
 Starting ingestion..
@@ -242,7 +261,9 @@ image_caption:[]
 
 ### Using the `nv-ingest-cli`
 
-You can find more nv-ingest-cli examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+!!! tip
+
+    There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
 ```shell
 nv-ingest-cli \
@@ -363,8 +384,32 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 
 
+## Profile Information
+
+The Nemo Retriever extraction core pipeline profiles run on a single A10G or better GPU. 
+This includes text, table, chart, infographic extraction, embedding and indexing into Milvus. 
+The advanced profiles require additional GPU support. 
+This includes audio extraction and VLM integrations. 
+For more information, refer to [Support Matrix](support-matrix.md).
+
+The values that you specify in the `--profile` option of your `docker compose up` command are explained in the following table. 
+You can specify multiple `--profile` options.
+
+
+| Name                  | Type     | Description                                                       | GPU Requirements | 
+|-----------------------|----------|-------------------------------------------------------------------|-----------------------| 
+| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus. | [1 GPU](support-matrix.md) total for all core profiles. | 
+| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | [1 GPU](support-matrix.md) total for all core profiles. | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) |
+| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) |
+| `vlm`                 | Advanced | Uses llama 3.2 11B VLM for experimental image captioning of unstructured images. | [1 additional dedicated GPU](support-matrix.md) |
+
+
+
 ## Related Topics
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Notebooks](notebooks.md)
+- [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

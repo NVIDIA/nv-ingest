@@ -28,15 +28,8 @@ RUN apt-get update && apt-get install -y \
       ca-certificates \
       curl \
       libgl1-mesa-glx \
-      software-properties-common \
       wget \
     && apt-get clean
-
-# A workaround for the error (mrc-core): /usr/lib/x86_64-linux-gnu/libstdc++.so.6: version `GLIBCXX_3.4.32' not found
-# Issue: https://github.com/NVIDIA/nv-ingest/issues/474
-RUN add-apt-repository -y ppa:ubuntu-toolchain-r/test \
-    && apt-get update \
-    && apt-get install -y --only-upgrade libstdc++6
 
 RUN wget -O Miniforge3.sh "https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-$(uname)-$(uname -m).sh" -O /tmp/miniforge.sh \
     && bash /tmp/miniforge.sh -b -p /opt/conda \
@@ -68,14 +61,11 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     source activate nv_ingest_runtime \
     && mamba install -y -c conda-forge tini
 
+# Ensure dynamically linked libraries in the conda environment are found at runtime
+ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
+
 # Set the working directory in the container
 WORKDIR /workspace
-
-# Copy custom entrypoint script
-COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
-
-# Copy post build triggers script
-COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
 
 FROM base AS nv_ingest_install
 # Copy the module code
@@ -131,16 +121,23 @@ RUN --mount=type=cache,target=/opt/conda/pkgs\
     && pip install ./client/dist/*.whl
 
 
-RUN  --mount=type=cache,target=/root/.cache/pip \
-    source activate nv_ingest_runtime \
-    && python3 /workspace/docker/post_build_triggers.py
-
 RUN rm -rf src
 
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
 COPY pyproject.toml ./
+
+# Copy entrypoint script(s)
+COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
+COPY ./docker/scripts/entrypoint_source_ext.sh /workspace/docker/entrypoint_source_ext.sh
+
+# Copy post build triggers script
+COPY ./docker/scripts/post_build_triggers.py /workspace/docker/post_build_triggers.py
+
+RUN  --mount=type=cache,target=/root/.cache/pip \
+    source activate nv_ingest_runtime \
+    && python3 /workspace/docker/post_build_triggers.py
 
 RUN chmod +x /workspace/docker/entrypoint.sh
 

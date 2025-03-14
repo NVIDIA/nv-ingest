@@ -2,6 +2,7 @@ import io
 from typing import Tuple
 
 import numpy as np
+import pytest
 from PIL import Image
 
 from nv_ingest.extraction_workflows.image.image_handlers import convert_svg_to_bitmap
@@ -74,6 +75,7 @@ def test_load_and_preprocess_image_corrupt_image():
         assert "cannot identify image file" in str(e)
 
 
+@pytest.mark.xfail
 def test_convert_svg_to_bitmap_basic_svg():
     """Test converting a simple SVG to a bitmap image."""
     # Sample SVG image data (a small red square)
@@ -96,6 +98,7 @@ def test_convert_svg_to_bitmap_basic_svg():
     assert np.all(result[:, :, 2] == 0)  # Blue channel off
 
 
+@pytest.mark.xfail
 def test_convert_svg_to_bitmap_large_svg():
     """Test converting a larger SVG to ensure scalability."""
     # Large SVG image data (blue rectangle 100x100)

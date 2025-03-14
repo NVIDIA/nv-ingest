@@ -1,6 +1,6 @@
-# Prerequisites for NV-Ingest
+# Prerequisites for NeMo Retriever Extraction
 
-Before you begin using NV-Ingest, ensure the following software prerequisites are met.
+Before you begin using [NeMo Retriever extraction](overview.md), ensure the following software prerequisites are met.
 
 
 ## Software

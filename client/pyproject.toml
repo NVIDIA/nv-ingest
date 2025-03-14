@@ -5,15 +5,15 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "nv-ingest-client"
 description = "Python client for the nv-ingest service"
-dynamic = ["version"]  # Declare attrs that will be generated at build time
+dynamic = ["version"]
 readme = "README.md"
 authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
 ]
 license = {file = "LICENSE"}
+requires-python = ">=3.10"
 classifiers = [
-    "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -39,7 +39,7 @@ dependencies = [
     "python-pptx==0.6.23",
     "redis==5.0.8",
     "requests>=2.32.3",
-    "setuptools>=75.8.0",
+    "setuptools>=58.2.0",
     "tqdm>=4.67.1",
 ]
 
@@ -51,6 +51,9 @@ documentation = "https://docs.nvidia.com/nv-ingest"
 [project.scripts]
 nv-ingest-cli = "nv_ingest_client.nv_ingest_cli:main"
 process-json-files = "nv_ingest_client.util.process_json_files:main"
+
+[tool.setuptools]
+py-modules = ["nv_ingest_client"]
 
 [tool.setuptools.packages.find]
 where = ["src"]

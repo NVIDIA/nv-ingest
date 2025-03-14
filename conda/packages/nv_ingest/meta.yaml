@@ -38,7 +38,6 @@ requirements:
     - httpx>=0.28.1
     - isodate>=0.7.2
     - langdetect>=1.0.9
-    - librosa>=0.10.2
     - minio>=7.2.12
     - morpheus-core=25.02.00a
     - morpheus-llm=25.02.00a
@@ -67,7 +66,6 @@ requirements:
     - transformers>=4.47.0
     - unstructured-client>=0.25.9
     - uvicorn
-    - wand>=0.6.10
   pip:
     - nvidia-riva-client>=2.18.0
 

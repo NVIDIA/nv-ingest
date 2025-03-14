@@ -1,6 +1,6 @@
-# Support Matrix for NV-Ingest
+# Support Matrix for NeMo Retriever Extraction
 
-Before you begin using NV-Ingest, ensure that you have the hardware for your use case.
+Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
 
 
 ## Hardware
@@ -16,7 +16,8 @@ Before you begin using NV-Ingest, ensure that you have the hardware for your use
 
 ## Advanced Feature Support
 
-Some advanced features require additional GPU support.
+Some advanced features, such as VLM integrations and audio extraction, require additional GPU support. 
+For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
 
 
 ### VLM Integrations
