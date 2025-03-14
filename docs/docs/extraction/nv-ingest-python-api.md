@@ -39,7 +39,7 @@ result = ingestor.extract().ingest()
 print(result)
 ```
 
-### Using the Python API to Extract PDFs
+### Use the Python API to Extract PDFs
 
 Use the following code to process multiple PDFs at one time.
 
