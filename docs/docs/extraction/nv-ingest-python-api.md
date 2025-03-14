@@ -95,7 +95,7 @@ ingestor = ingestor.split(
     tokenizer="meta-llama/Llama-3.2-1B",
     chunk_size=16,
     chunk_overlap=1,
-    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"},
+    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"}
 )
 ```
 
