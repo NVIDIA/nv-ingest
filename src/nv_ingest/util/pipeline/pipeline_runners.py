@@ -360,7 +360,7 @@ def _terminate_subprocess(process: Optional["subprocess.Popen"] = None) -> None:
 
 def is_port_in_use(port, host="127.0.0.1"):
     """
-    Checks if a given port is in use on the specified host.
+    Checks if a given port is in use on the specified host with socket reuse settings.
 
     Parameters:
         port (int): The port number to check.
@@ -370,6 +370,7 @@ def is_port_in_use(port, host="127.0.0.1"):
         bool: True if the port is in use, False otherwise.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind((host, port))
             return False
