@@ -1,4 +1,4 @@
-# NV-Ingest Python API
+# Use the NV-Ingest Python API
 
 The NV-Ingest Python API provides a simple and flexible interface for processing and extracting information from various document types, including PDFs.
 
