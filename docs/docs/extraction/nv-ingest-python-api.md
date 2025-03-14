@@ -127,7 +127,8 @@ This can be used to describe images extracted from documents.
 ingestor = ingestor.caption()
 ```
 
-To specify a different API endpoint, pass additional parameters to `.caption()`.
+To specify a different API endpoint, pass additional parameters to `caption`.
+
 ```python
 ingestor = ingestor.caption(
     endpoint_url="https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
