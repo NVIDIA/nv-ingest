@@ -76,7 +76,7 @@ Use the following code to specify a custom document type for extraction.
 ingestor = ingestor.extract(document_type="pdf")
 ```
 
-### Tracking Job Progress
+### Track Job Progress
 
 For large document batches, you can enable a progress bar by setting `show_progress` to true. 
 Use the following code.
