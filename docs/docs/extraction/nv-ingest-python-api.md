@@ -72,7 +72,7 @@ ingestor = ingestor.extract(
 )
 ```
 
-### Extract non standard document types
+### Extract Non-standard Document Types
 
 NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
 
