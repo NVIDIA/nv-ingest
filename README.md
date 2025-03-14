@@ -67,6 +67,7 @@ pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_
 2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
 
 ```
+#Note: these should be the same value
 NVIDIA_BUILD_API_KEY=nvapi-...
 NVIDIA_API_KEY=nvapi-...
 
@@ -99,6 +100,18 @@ NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
 
 You can submit jobs programmatically in Python.
 
+Note: Make sure your conda environment is activated. `which python` should indicate that you're using the conda provided python installation, and not the OS provided python.
+```
+which python
+/home/dev/miniforge3/envs/nvingest/bin/python
+```
+
+If you have a very high number of CPUs and see the process hang without progress, we recommend using taskset to limit the number of CPUs visible to the process:
+```
+taskset -c 0-3 python your_ingestion_script.py
+```
+
+On a 4 CPU core low end laptop, the following should take about 10 seconds:
 ```python
 # must be first: pipeline subprocesses pickup config from env variables
 from dotenv import load_dotenv
@@ -146,7 +159,6 @@ ingestor = (
         #extract_method="nemoretriever_parse",
         text_depth="page"
     ).embed()
-    .caption()
     .vdb_upload(
         collection_name=collection_name,
         milvus_uri=milvus_uri,
