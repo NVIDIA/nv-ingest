@@ -19,8 +19,6 @@ NV-Ingest Microservice
 | alias:nemo-microservices | yolox-nim | 0.2.0 |
 | alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.3.0 |
 | alias:nvidia-nim | text-embedding-nim | 1.1.0 |
-| alias:nvstaging-nim | nim-vlm | 1.2.0-ea-v4 |
-| alias:nvstaging-nim | nvidia-nim-nemoretriever-table-structure-v1 | 1.1.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
 | https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
