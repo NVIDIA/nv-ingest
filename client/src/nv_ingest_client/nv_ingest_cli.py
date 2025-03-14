@@ -10,7 +10,15 @@ from io import BytesIO
 from typing import List
 
 import click
-import pkg_resources
+
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:
+    # For Python versions < 3.8, use the importlib_metadata backport.
+    from importlib_metadata import version, PackageNotFoundError
+
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
+from nv_ingest_api.util.service_clients.rest.rest_client import RestClient
 from nv_ingest_client.util.zipkin import collect_traces_from_zipkin, write_results_to_output_directory
 from nv_ingest_client.cli.util.click import LogLevel
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
@@ -22,21 +30,17 @@ from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.rest.rest_client import RestClient
-from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
-from pkg_resources import DistributionNotFound
-from pkg_resources import VersionConflict
 
 try:
-    NV_INGEST_VERSION = pkg_resources.get_distribution("nv_ingest").version
-except (DistributionNotFound, VersionConflict):
+    NV_INGEST_VERSION = version("nv_ingest")
+except PackageNotFoundError:
     NV_INGEST_VERSION = "Unknown -- No Distribution found or Version conflict."
 
 try:
-    NV_INGEST_CLIENT_VERSION = pkg_resources.get_distribution("nv_ingest_client").version
-except (DistributionNotFound, VersionConflict):
+    NV_INGEST_CLIENT_VERSION = version("nv_ingest_client")
+except PackageNotFoundError:
     NV_INGEST_CLIENT_VERSION = "Unknown -- No Distribution found or Version conflict."
 
 logger = logging.getLogger(__name__)
@@ -145,7 +149,7 @@ Tasks and Options:
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.
     Options:
-    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
+    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `bmp`, `tiff`, `txt`). Required.
     - extract_charts (bool): Enables chart extraction. Default: False.
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
