@@ -72,6 +72,25 @@ ingestor = ingestor.extract(
 )
 ```
 
+### Extract Non-standard Document Types
+
+NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
+
+```python
+ingestor = Ingestor().files(["path/to/doc1.md", "path/to/doc2.html"])
+
+ingestor = ingestor.extract(
+    extract_text=True,  # Only extract text
+    extract_tables=False,
+    extract_charts=False,
+    extract_infographics=False,
+    extract_images=False
+)
+
+result = ingestor.ingest()
+```
+
+
 ### Extract with Custom Document Type
 
 Use the following code to specify a custom document type for extraction.
