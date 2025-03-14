@@ -55,8 +55,9 @@ for doc in result:
 
 ### Extracting Specific Elements from PDFs
 
-The `.extract()` method extracts all supported content types by default.
-You can customize extraction behavior as follows:
+By default, the `extract` method extracts all supported content types. 
+You can customize the extraction behavior by using the following code.
+
 ```python
 ingestor = ingestor.extract(
     extract_text=True,  # Extract text
