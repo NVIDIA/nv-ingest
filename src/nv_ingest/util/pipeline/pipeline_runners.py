@@ -423,6 +423,33 @@ def start_pipeline_subprocess(
     logger.info("Starting pipeline subprocess...")
 
     try:
+        # Get current CPU affinity information to respect container limits
+        # but we'll only apply it to the child process
+        try:
+            # Get the current process's CPU affinity - we only need this to know what's available
+            current_affinity = os.sched_getaffinity(0)  # 0 means current process
+            # Limit to min(available CPUs from affinity, 8)
+            max_cpus = min(len(current_affinity), 8)
+            # Take the first max_cpus from the current affinity set
+            cpu_set = set(sorted(list(current_affinity))[:max_cpus])
+            logger.info(f"Current process has access to CPU cores: {current_affinity}")
+            logger.info(f"Child process will be limited to {max_cpus} cores: {cpu_set}")
+        except AttributeError:
+            # sched_getaffinity not available on all platforms
+            logger.warning("os.sched_getaffinity not available, falling back to cpu_count")
+            try:
+                import multiprocessing
+
+                total_cpus = multiprocessing.cpu_count()
+                max_cpus = min(total_cpus, 8)
+                cpu_set = set(range(max_cpus))
+                logger.info(f"Child process will be limited to cores 0-{max_cpus-1}")
+            except Exception as e:
+                logger.warning(f"Failed to determine CPU count: {e}. Will not set CPU affinity.")
+                cpu_set = None
+        except Exception as e:
+            logger.warning(f"Failed to get current CPU affinity: {e}. Will not set CPU affinity.")
+            cpu_set = None
 
         def combined_preexec_fn():
             """Setup function to run in the child process before exec()."""
@@ -431,9 +458,44 @@ def start_pipeline_subprocess(
             # Set the parent death signal to SIGTERM
             _set_pdeathsig(signal.SIGTERM)
 
+            # Set CPU affinity ONLY for the child process
+            if cpu_set is not None:
+                try:
+                    # Apply to current process (which becomes the child)
+                    # This doesn't affect the parent because we're in the fork+exec
+                    # stage and changes here only affect the child
+                    os.sched_setaffinity(0, cpu_set)
+                    logger.debug(f"Set CPU affinity for subprocess to {cpu_set}")
+                except AttributeError:
+                    logger.warning("os.sched_setaffinity not available, using taskset as fallback")
+                    # Note: We can't use taskset here as it would need to be applied before Popen
+                except Exception as e:
+                    logger.warning(f"Failed to set CPU affinity: {e}")
+
         # Configure output redirection
         stdout_stream = subprocess.DEVNULL if stdout is None else subprocess.PIPE
         stderr_stream = subprocess.DEVNULL if stderr is None else subprocess.PIPE
+
+        # Apply taskset as fallback if sched_setaffinity is not available but taskset exists
+        has_taskset = False
+        if cpu_set is not None and not hasattr(os, "sched_setaffinity"):
+            try:
+                # Check if taskset is available on the system
+                taskset_check = subprocess.run(
+                    ["which", "taskset"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                has_taskset = taskset_check.returncode == 0
+
+                if has_taskset:
+                    # Create CPU mask from the specific cores in cpu_set
+                    cpu_mask = ",".join(str(cpu) for cpu in sorted(cpu_set))
+                    subprocess_command = ["taskset", "-c", cpu_mask] + subprocess_command
+                    logger.info(f"Using taskset to limit to CPU cores {cpu_mask}")
+                else:
+                    logger.warning("Neither sched_setaffinity nor taskset are available. CPU affinity will not be set.")
+            except Exception as e:
+                logger.warning(f"Failed to check for taskset: {e}. CPU affinity will not be set.")
+                has_taskset = False
 
         # Start the subprocess
         process = subprocess.Popen(
