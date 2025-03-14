@@ -1,6 +1,6 @@
-# Release Notes for NeMo Retriever Extraction
+# Frequently Asked Questions for NeMo Retriever Extraction
 
-This documentation contains the release notes for [NeMo Retriever extraction](overview.md).
+This documentation contains the Frequently Asked Questions (FAQ) for [NeMo Retriever extraction](overview.md).
 
 !!! note
 
