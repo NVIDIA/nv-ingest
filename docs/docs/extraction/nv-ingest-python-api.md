@@ -114,7 +114,7 @@ ingestor = ingestor.split(
 )
 ```
 
-## Extracting Image Captions from Images
+## Extract Captions from Images
 
 The `.caption()` method generates image captions using a vision-language model.
 This can be used to describe images extracted from documents.
