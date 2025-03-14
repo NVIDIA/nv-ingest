@@ -3,7 +3,7 @@
 For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
 
-To get started using NeMo Retriever extraction in library mode, you need the following:
+To get started using [NeMo Retriever extraction](overview.md) in library mode, you need the following:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
 - [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
@@ -57,6 +57,10 @@ Use the following procedure to prepare your environment.
 ## Step 2: Ingest Documents
 
 You can submit jobs programmatically by using Python.
+
+!!! tip
+
+    For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 ```python
 # must be first: pipeline subprocesses pickup config from env variables
@@ -224,4 +228,5 @@ Please keep in mind that this response is light-hearted and intended for enterta
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

@@ -1,6 +1,6 @@
 # Telemetry with NeMo Retriever Extraction
 
-You can view telemetry data for NeMo Retriever extraction.
+You can view telemetry data for [NeMo Retriever extraction](overview.md).
 
 !!! note
 

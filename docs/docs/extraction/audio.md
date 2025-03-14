@@ -1,6 +1,6 @@
 ## Use NeMo Retriever Extraction with Riva
 
-This documentation describes two methods to run NeMo Retriever extraction 
+This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
 
 - Run the NIM locally by using Docker Compose
@@ -71,6 +71,10 @@ Again, replace <your-ngc-key> with your actual NGC key.
     ```
 
 
+    !!! tip
+
+        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
+
 
 ## Use NVCF Endpoints for Cloud-Based Inference
 
@@ -101,3 +105,7 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
         )
     )
     ```
+
+    !!! tip
+
+        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).

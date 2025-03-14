@@ -1,6 +1,6 @@
 # Release Notes for NeMo Retriever Extraction
 
-This documentation contains the release notes for NVIDIA Ingest.
+This documentation contains the release notes for [NeMo Retriever extraction](overview.md).
 
 !!! note
 

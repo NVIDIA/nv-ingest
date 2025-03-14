@@ -58,9 +58,9 @@ nav:
       - Get Started:
         - Prerequisites: extraction/prerequisites.md
         - Support Matrix: extraction/support-matrix.md
-        - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Quickstart (Library Mode): extraction/quickstart-library-mode.md
         - Quickstart (Self-Hosted): extraction/quickstart-guide.md
+        - Notebooks: extraction/notebooks.md
       - Developer Guide:
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use NeMo Retriever Parse: nemoretriever-parse.md
@@ -68,6 +68,7 @@ nav:
         - Telemetry: extraction/telemetry.md
         - Contribute: extraction/contributing.md
       - Reference:
+        - Generate Your NGC Keys: extraction/ngc-api-key.md
         - Content Metadata: extraction/content-metadata.md
         - Environment Variables: extraction/environment-config.md
         - API Reference: extraction/api-docs

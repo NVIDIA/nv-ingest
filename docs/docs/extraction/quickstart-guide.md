@@ -1,6 +1,6 @@
 # Quickstart Guide for NeMo Retriever Extraction (Self-Hosted)
 
-Use this documentation to get started using NeMo Retriever extraction in self-hosted mode.
+Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
 
 ## Step 1: Starting Containers
@@ -135,7 +135,9 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 ### In Python
 
-You can find more documentation and examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+!!! tip
+
+    For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ```python
@@ -259,7 +261,9 @@ image_caption:[]
 
 ### Using the `nv-ingest-cli`
 
-You can find more nv-ingest-cli examples in [the client examples folder](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/).
+!!! tip
+
+    There is a Jupyter notebook available to help you get started with the CLI. For more information, refer to [CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb).
 
 ```shell
 nv-ingest-cli \
@@ -407,4 +411,5 @@ You can specify multiple `--profile` options.
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

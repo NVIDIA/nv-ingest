@@ -1,6 +1,6 @@
 ## Use Nemo Retriever Extraction with nemoretriever-parse
 
-This documentation describes two methods to run NeMo Retriever Extraction 
+This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
 with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
 
 - Run the NIM locally by using Docker Compose
@@ -48,6 +48,9 @@ Use the following procedure to run the NIM locally.
     )
     ```
 
+    !!! tip
+
+        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
 ## Using NVCF Endpoints for Cloud-Based Inference
@@ -85,3 +88,7 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
         )
     )
     ```
+
+    !!! tip
+
+        For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
