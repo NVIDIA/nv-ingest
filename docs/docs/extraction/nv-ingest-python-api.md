@@ -10,13 +10,13 @@ The [NV-Ingest](overview.md) Python API provides a simple and flexible interface
 
 | Method | Description |
 | ------ | ----------- |
-| `files([...])` | Add document paths for processing. |
-| `load()` | Ensure files are locally accessible (downloads if needed). |
-| `extract()` | Adds an extraction task (text, tables, charts). |
-| `split()` | Splits documents into smaller sections for processing.
-| `embed()` | Generates embeddings from extracted content. |
-| `caption()` | Extracts captions from images within the document. |
-| `ingest()` | Submits jobs and retrieves results synchronously. |
+| `files` | Add document paths for processing. |
+| `load` | Ensure files are locally accessible (downloads if needed). |
+| `extract` | Add an extraction task (text, tables, charts). |
+| `split` | Split documents into smaller sections for processing.
+| `embed` | Generate embeddings from extracted content. |
+| `caption` | Extract captions from images within the document. |
+| `ingest` | Submit jobs and retrieve results synchronously. |
 
 ## Quick Start: Extracting PDFs
 
