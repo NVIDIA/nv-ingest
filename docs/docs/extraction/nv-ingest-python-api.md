@@ -85,7 +85,7 @@ Use the following code.
 result = ingestor.extract().ingest(show_progress=True)
 ```
 
-## Using the Python API to Split Documents
+## Use the Python API to Split Documents
 
 Splitting, also known as chunking, breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
 Use the `split` method to chunk large documents into smaller sections before processing as shown in the following code.
