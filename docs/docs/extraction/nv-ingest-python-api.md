@@ -85,6 +85,24 @@ Use the following code.
 result = ingestor.extract().ingest(show_progress=True)
 ```
 
+### Extract non standard document types
+
+NV-Ingest also supports extracting text from `.md`, `.sh`, and `.html` files
+
+```python
+ingestor = Ingestor().files(["path/to/doc1.md", "path/to/doc2.html"])
+
+ingestor = ingestor.extract(
+    extract_text=True,  # Only extract text
+    extract_tables=False,
+    extract_charts=False,
+    extract_infographics=False,
+    extract_images=False
+)
+
+result = ingestor.ingest()
+```
+
 ## Use the Python API to Split Documents
 
 Splitting, also known as chunking, breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
