@@ -1,7 +1,7 @@
 ## Use NeMo Retriever Extraction with Riva
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
-with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
+with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
@@ -9,6 +9,19 @@ with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html
 !!! note
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+
+
+
+## Overview
+
+[NeMo Retriever extraction](overview.md) now supports the processing and retrieval of audio files for Retrieval Augmented Generation (RAG) applications. 
+Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
+NeMo Retriever leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
+to transcribe audio files to text, which is then embedded by using the NeMo Retriever embedding NIM. 
+
+This Early Access pipeline enables users to now retrieve audio files at the segment level. 
+
+![Overview diagram](images/audio.png)
 
 
 
