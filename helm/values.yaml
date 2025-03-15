@@ -99,7 +99,7 @@ tmpDirSize: 16Gi
 nemoretriever-page-elements-v2:
   deployed: true
   image:
-    repository: nvcr.io/nvidia/nim/nemoretriever-page-elements-v2
+    repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
     tag: "1.2.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
@@ -139,7 +139,7 @@ nemoretriever-graphic-elements-v1:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nim/nemoretriever-graphic-elements-v1
+    repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
     tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
@@ -179,7 +179,7 @@ nemoretriever-table-structure-v1:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nim/nemoretriever-table-structure-v1
+    repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
     tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
@@ -279,7 +279,7 @@ paddleocr-nim:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nim/paddleocr
+    repository: nvcr.io/nim/baidu/paddleocr
     tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
@@ -509,6 +509,8 @@ redis:
         memory: "6Gi"
       limits:
         memory: "12Gi"
+    configmap: |-
+      protected-mode no
 
 ## @section Environment Variables
 ## @descriptionStart
@@ -543,6 +545,7 @@ redis:
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"]
 envVars:
+  INGEST_EDGE_BUFFER_SIZE: 64
   MAX_INGEST_PROCESS_WORKERS: 16
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
@@ -574,6 +577,13 @@ envVars:
 
   VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
   VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
+
+  AUDIO_GRPC_ENDPOINT: "audio:50051"
+  AUDIO_INFER_PROTOCOL: "grpc"
+
+  MRC_IGNORE_NUMA_CHECK: 1
+  READY_CHECK_ALL_COMPONENTS: "true"
+  MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
 
 ## @section Open Telemetry
 ## @descriptionStart

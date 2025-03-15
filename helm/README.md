@@ -28,6 +28,9 @@ helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microse
 
 # Nvidia NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# Nvidia NIM baidu NGC repository
+helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
 - Install the chart
