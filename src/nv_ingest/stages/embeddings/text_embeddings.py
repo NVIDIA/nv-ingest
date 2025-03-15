@@ -45,11 +45,7 @@ def _make_async_request(
         response["info_msg"] = None
 
     except Exception as err:
-
-        with open("prompts.txt", "w") as f:
-            for prompt in prompts:
-                f.write(prompt + "\n")
-        raise RuntimeError(f"Embedding error occurred. Info message: {str(err)[:1000]}")
+        raise RuntimeError(f"Embedding error occurred. Info message: {err}")
 
     return response
 
