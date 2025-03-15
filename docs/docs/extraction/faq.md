@@ -19,10 +19,10 @@ and [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/mai
 
 ## Where does NeMo Retriever extraction (nv-ingest) ingest to?
 
-NeMo Retriever extraction supports extracting text representations of various forms of content, and ingesting to the [Milvus vector database](https://milvus.io/). 
-NeMo Retriever extraction does not store data on disk except through Milvus and its underlying Minio object store.
-You can ingest to other data stores by using the `Ingestor.vdb_upload` method. 
-However, you must configure other data stores yourself. 
+NeMo Retriever extraction supports extracting text representations of various forms of content, 
+and ingesting to the [Milvus vector database](https://milvus.io/). 
+NeMo Retriever extraction does not store data on disk except through Milvus and its underlying Minio object store. 
+You can ingest to other data stores; however, you must configure other data stores yourself. 
 For more information, refer to [Data Upload](data-store.md).
 
 
