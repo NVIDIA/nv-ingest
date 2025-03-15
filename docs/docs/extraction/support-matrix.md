@@ -13,7 +13,8 @@ Before you begin using [NeMo Retriever extraction](overview.md), ensure that you
 | L40S   | —           | 48GB   | 1            |
 
 
-The core pipeline requires approximately 150GB disk space.
+The core pipeline requires approximately 150GB disk space. 
+To run the core pipeline and all optional features, you need approximately 210GB disk space.
 
 
 ## Advanced Feature Support
