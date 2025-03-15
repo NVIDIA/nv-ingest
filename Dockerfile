@@ -139,6 +139,11 @@ RUN  --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
     && python3 /workspace/docker/post_build_triggers.py
 
+# Remove graphviz and its dependencies to reduce image size
+RUN source activate nv_ingest_runtime && \
+    mamba remove graphviz python-graphviz --force -y && \
+    mamba uninstall gtk3 pango cairo fonts-conda-ecosystem -y
+
 RUN chmod +x /workspace/docker/entrypoint.sh
 
 # Set entrypoint to tini with a custom entrypoint script
