@@ -19,19 +19,11 @@ and [Multimodal RAG with LangChain](https://github.com/NVIDIA/nv-ingest/blob/mai
 
 ## Where does NeMo Retriever extraction (nv-ingest) ingest to?
 
-NeMo Retriever extraction supports extracting text representations of various forms of content, and ingesting to the Milvus vector database. 
+NeMo Retriever extraction supports extracting text representations of various forms of content, and ingesting to the [Milvus vector database](https://milvus.io/). 
 NeMo Retriever extraction does not store data on disk except through Milvus and its underlying Minio object store.
 You can ingest to other data stores by using the `Ingestor.vdb_upload` method. 
 However, you must configure other data stores yourself. 
-For more information, refer to [this FAQ](#what-parameters-or-settings-can-i-adjust-to-optimize-extraction-from-my-documents-or-data).
-
-
-
-
-## Does NeMo Retriever extraction support any data connectors? 
-
-No, NeMo Retriever extraction does not have connections to data sources. 
-
+For more information, refer to [Data Upload](data-store.md).
 
 
 
@@ -53,12 +45,37 @@ For more information, refer to [Use Nemo Retriever Extraction with nemoretriever
 
 
 
+## Why are the environment variables different between library mode and self-hosted mode?
+
+### Self-Hosted Deployments
+
+For [self-hosted deployments](quickstart-guide.md), you should set the environment variables `NGC_API_KEY` and `NIM_NGC_API_KEY`.
+For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+
+For advanced usage, you might want to set `docker-compose` environment variables for NIM container paths, tags, and batch sizes. 
+You can set those directly in `docker-compose.yaml`, or in an [environment variable file](environment-config.md) that docker compose uses.
+
+### Library Mode
+
+For [library mode](quickstart-library-mode.md), you should set the environment variables `NVIDIA_BUILD_API_KEY` and `NVIDIA_API_KEY`. 
+For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+
+For advanced usage, you might want to use library mode with self-hosted NIM instances. 
+You can set custom endpoints for each NIM. 
+<!-- See the nv-ingest-ms-runtime service environment variables for a full list of *_ENDPOINT variables. -->
+
+
+
+
+
+
+
 ## What parameters or settings can I adjust to optimize extraction from my documents or data? 
 
 See the [Profile Information](quickstart-guide.md#profile-information) section 
 for information about the optional NIM components of the pipeline.
 
-You can configure the `extract`, `caption`, `vdb_upload`, and other tasks by using the `Ingestor` API.
+You can configure the `extract`, `caption`, and other tasks by using the [Ingestor API](nv-ingest-python-api.md).
 
 To choose what types of content to extract, use code similar to the following. 
 For more information, refer to [Extract Specific Elements from PDFs](nv-ingest-python-api.md#extract-specific-elements-from-pdfs).
@@ -87,21 +104,4 @@ Ingestor(client=client)
     .embed()
     .caption()
 )
-```
-
-To upload to Milvus, use code similar to the following.
-
-```python
-Ingestor(client=client)
-    .files("data/multimodal_test.pdf")
-    .extract()
-    .embed()
-    .caption()
-    .vdb_upload(
-        collection_name=collection_name,
-        milvus_uri=milvus_uri,
-        sparse=sparse,
-        # for llama-3.2 embedder, use 1024 for e5-v5
-        dense_dim=2048
-    )
 ```
