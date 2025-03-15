@@ -27,7 +27,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "24.12"
+  tag: "25.3.0"
 
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
 podAnnotations:
@@ -95,12 +95,12 @@ tmpDirSize: 16Gi
 ## @param nemoretriever-page-elements-v2.deployed [default: true] true if the Yolox NIM should be deployed and false otherwise
 ## @param nemoretriever-page-elements-v2.image.repository The repository to override the location of the YOLOX
 ## @param nemoretriever-page-elements-v2.image.tag The tag override for YOLOX
+## @param nemoretriever-page-elements-v2.image.pullPolicy [default: IfNotPresent]
 nemoretriever-page-elements-v2:
   deployed: true
-  # fullnameOverride: nemoretriever-page-elements-v2
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nv-yolox-page-elements-v2
-    tag: "1.0.0"
+    repository: nvcr.io/nvidia/nim/nemoretriever-page-elements-v2
+    tag: "1.2.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -136,11 +136,10 @@ nemoretriever-page-elements-v2:
 ## @param nemoretriever-graphic-elements-v1.image.tag The tag override for nemoretriever-graphic-elements
 nemoretriever-graphic-elements-v1:
   deployed: true
-  # fullnameOverride: nemoretriever-graphic-elements-v1
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-graphic-elements-v1
+    repository: nvcr.io/nvidia/nim/nemoretriever-graphic-elements-v1
     tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
@@ -180,7 +179,7 @@ nemoretriever-table-structure-v1:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/nemoretriever-table-structure-v1
+    repository: nvcr.io/nvidia/nim/nemoretriever-table-structure-v1
     tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
@@ -280,8 +279,8 @@ paddleocr-nim:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nvidia/nemo-microservices/paddleocr
-    tag: "1.0.0"
+    repository: nvcr.io/nvidia/nim/paddleocr
+    tag: "1.2.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -322,7 +321,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.1.0"
+    tag: "1.5.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -362,7 +361,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: "1.3.1"
+    tag: "1.5.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -402,7 +401,7 @@ llama-32-nv-rerankqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-    tag: "1.3.0"
+    tag: "1.3.1"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -516,26 +515,33 @@ redis:
 ## Define environment variables as key/value dictionary pairs
 ## @descriptionEnd
 ## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
+## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
 ## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-ms-runtime"] Override this value to specify a differeing REST endpoint host.
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "7670"] Override this value to specify a differing REST endpoint port.
+## @param envVars.REDIS_MORPHEUS_TASK_QUEUE [default: "morpheus_task_queue"]
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
+## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"]
+## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"]
+## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint
+## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"]
+## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"]
+## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"]
+## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"]
+## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"]
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"]
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"]
+## @param envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"]
+## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"]
+## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"]
+## @param envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"]
+## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"]
+## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"]
+## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"]
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
-## @skip envVars.REDIS_MORPHEUS_TASK_QUEUE
-## @skip envVars.CACHED_GRPC_ENDPOINT
-## @skip envVars.CACHED_HTTP_ENDPOINT
-## @skip envVars.CACHED_INFER_ENDPOINT
-## @skip envVars.PADDLE_GRPC_ENDPOINT
-## @skip envVars.PADDLE_HTTP_ENDPOINT
-## @skip envVars.PADDLE_INFER_ENDPOINT
-## @skip envVars.YOLOX_GRPC_ENDPOINT
-## @skip envVars.YOLOX_HTTP_ENDPOINT
-## @skip envVars.YOLOX_INFER_ENDPOINT
-## @skip envVars.DEPLOT_GRPC_ENDPOINT
-## @skip envVars.DEPLOT_HTTP_ENDPOINT
-## @skip envVars.DEPLOT_INFER_ENDPOINT
+## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"]
 envVars:
   MAX_INGEST_PROCESS_WORKERS: 16
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
@@ -792,8 +798,6 @@ ngcImagePullSecret:
 
   username: '$oauthtoken'
   password: ""
-
-
 
 ## @skip nemo
 nemo:
