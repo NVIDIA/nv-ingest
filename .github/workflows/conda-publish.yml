@@ -17,6 +17,9 @@ on:
         options:
           - dev
           - main
+      VERSION:
+        description: 'Version string for the release (e.g., 1.0.0)'
+        required: true
 
 jobs:
   build:
@@ -38,7 +41,11 @@ jobs:
       # Build the Conda packages
       - name: Build Conda Packages
         run: |
-          ./conda/build_conda_packages.sh
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            RELEASE_VERSION=${{ github.event.inputs.VERSION }} ./conda/build_conda_packages.sh
+          else
+            ./conda/build_conda_packages.sh
+          fi
 
       # Publish nv-ingest conda packages
       - name: Publish conda package
