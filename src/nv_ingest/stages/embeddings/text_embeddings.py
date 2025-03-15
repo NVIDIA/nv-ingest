@@ -7,9 +7,8 @@ import pandas as pd
 from openai import OpenAI
 
 from nv_ingest.schemas.embed_extractions_schema import EmbedExtractionsSchema
-from nv_ingest.schemas.metadata_schema import ContentTypeEnum, TaskTypeEnum, StatusEnum, InfoMessageMetadataSchema
+from nv_ingest.schemas.metadata_schema import ContentTypeEnum
 from nv_ingest.stages.multiprocessing_stage import MultiProcessingBaseStage
-from nv_ingest.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -46,19 +45,7 @@ def _make_async_request(
         response["info_msg"] = None
 
     except Exception as err:
-        info_msg = {
-            "task": TaskTypeEnum.EMBED.value,
-            "status": StatusEnum.ERROR.value,
-            "message": f"Embedding error: {err}",
-            "filter": filter_errors,
-        }
-
-        validated_info_msg = validate_schema(info_msg, InfoMessageMetadataSchema).model_dump()
-
-        response["embedding"] = [None] * len(prompts)
-        response["info_msg"] = validated_info_msg
-
-        raise RuntimeError(f"Embedding error occurred. Info message: {validated_info_msg}") from err
+        raise RuntimeError(f"Embedding error occurred. Info message: {err}")
 
     return response
 
@@ -78,7 +65,7 @@ def _async_request_handler(
     """
     from concurrent.futures import ThreadPoolExecutor
 
-    with ThreadPoolExecutor() as executor:
+    with ThreadPoolExecutor(max_workers=5) as executor:
         futures = [
             executor.submit(
                 _make_async_request,
@@ -336,6 +323,7 @@ def _generate_text_embeddings_df(
             validated_config.truncate,
             filter_errors,
         )
+
         # Apply the embeddings (and any error info) to each row.
         df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
             _add_embeddings, **content_embeddings, axis=1

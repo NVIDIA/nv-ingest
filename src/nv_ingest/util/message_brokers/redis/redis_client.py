@@ -184,14 +184,13 @@ class RedisClient(MessageBrokerClientBase):
         ----------
         channel_name: str
             Channel to fetch the message from.
-
         timeout : float
-            The timeout in seconds for blocking until a message is available. If we receive a multi-part message, this
-            value will be temporarily extended in order to collect all fragments.
+            The timeout in seconds for blocking until a message is available. If we receive a multi-part message,
+            this value will be temporarily extended in order to collect all fragments.
 
         Returns
         -------
-        Optional[str]
+        Optional[str or Dict]
             The full fetched message, or None if no message could be fetched after retries.
 
         Raises
@@ -204,37 +203,41 @@ class RedisClient(MessageBrokerClientBase):
         fragment_count = None
         retries = 0
 
+        logger.debug(f"Starting fetch_message on channel '{channel_name}' with timeout {timeout}s.")
+
         while True:
             try:
                 # Attempt to fetch a message from the Redis queue
                 message, fragment, fragment_count = self._check_response(channel_name, timeout)
+                logger.debug(f"Fetched fragment: {fragment} (fragment_count: {fragment_count}).")
 
                 if message is not None:
                     if fragment_count == 1:
-                        # No fragmentation, return the message as is
                         return message
 
                     collected_fragments.append(message)
+                    logger.debug(f"Collected {len(collected_fragments)} of {fragment_count} fragments so far.")
 
                     # If we have collected all fragments, combine and return
                     if len(collected_fragments) == fragment_count:
+                        logger.debug("All fragments received. Sorting and combining fragments.")
                         # Sort fragments by the 'fragment' field to ensure correct order
                         collected_fragments.sort(key=lambda x: x["fragment"])
-
-                        # Combine fragments (assuming they are part of a larger payload)
                         reconstructed_message = self._combine_fragments(collected_fragments)
-
+                        logger.debug("Message reconstructed successfully. Returning combined message.")
                         return reconstructed_message
-
                 else:
-                    # Return None if the response is empty
+                    logger.debug("Received empty response; returning None.")
                     return message
 
             except TimeoutError:
-                # TODO(Devin) Once we start accumulating fragments, we can no longer fully recover from a timeout, so
-                #  we should consider this a failure. Look into caching partial results for retries in the future.
+                # When fragments are expected but not all received before timeout
                 if fragment_count and fragment_count > 1:
                     accumulated_time += timeout
+                    logger.debug(
+                        f"Timeout occurred waiting for fragments. "
+                        f"Accumulated timeout: {accumulated_time}s (Threshold: {timeout * fragment_count}s)."
+                    )
                     if accumulated_time >= (timeout * fragment_count):
                         err_msg = f"Failed to reconstruct message from {channel_name} after {accumulated_time} sec."
                         logger.error(err_msg)
