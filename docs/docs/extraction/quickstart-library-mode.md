@@ -95,7 +95,7 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 config = PipelineCreationSchema()                                                  
 print(config)
 
-pipeline_process = start_pipeline_subprocess(config)         
+pipeline_process = start_pipeline_subprocess(config,stderr=sys.stderr,stdout=sys.stdout)
 
 client = NvIngestClient(                                                                          
     message_client_allocator=SimpleClient,                                           
