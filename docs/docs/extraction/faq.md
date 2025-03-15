@@ -52,7 +52,7 @@ For more information, refer to [Use Nemo Retriever Extraction with nemoretriever
 For [self-hosted deployments](quickstart-guide.md), you should set the environment variables `NGC_API_KEY` and `NIM_NGC_API_KEY`.
 For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
 
-For advanced usage, you might want to set `docker-compose` environment variables for NIM container paths, tags, and batch sizes. 
+For advanced scenarios, you might want to set `docker-compose` environment variables for NIM container paths, tags, and batch sizes. 
 You can set those directly in `docker-compose.yaml`, or in an [environment variable file](environment-config.md) that docker compose uses.
 
 ### Library Mode
@@ -60,9 +60,9 @@ You can set those directly in `docker-compose.yaml`, or in an [environment varia
 For [library mode](quickstart-library-mode.md), you should set the environment variables `NVIDIA_BUILD_API_KEY` and `NVIDIA_API_KEY`. 
 For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
 
-For advanced usage, you might want to use library mode with self-hosted NIM instances. 
+For advanced scenarios, you might want to use library mode with self-hosted NIM instances. 
 You can set custom endpoints for each NIM. 
-<!-- See the nv-ingest-ms-runtime service environment variables for a full list of *_ENDPOINT variables. -->
+For examples of `*_ENDPOINT` variables, refer to [nv-ingest/docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
 
 
