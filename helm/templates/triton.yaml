@@ -1,3 +1,0 @@
-{{- if .Values.triton.enabled }}
-{{ include "nv-ingest.triton-statefulset" . }}
-{{- end }}
