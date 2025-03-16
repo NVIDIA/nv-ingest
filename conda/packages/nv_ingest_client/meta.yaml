@@ -24,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python==3.10
+    - python=3.10
     - setuptools>=58.2.0
   run:
     - click>=8.1.7
