@@ -227,7 +227,6 @@ class RedisClient(MessageBrokerClientBase):
                         return reconstructed_message
 
                 else:
-                    # Return None if the response is empty
                     return message
 
             except TimeoutError:
