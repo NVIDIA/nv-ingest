@@ -96,7 +96,7 @@ This example demonstrates how to use the provided [docker-compose.yaml](docker-c
 > [!IMPORTANT]
 > NIM containers on their first startup can take 10-15 minutes to pull and fully load models.
 
-If you prefer, you can also [start services one by one](docs/docs/extraction/quickstart-guide.md), or run on Kubernetes via [our Helm chart](helm/README.md). Also of note are [additional environment variables](docs/docs/extraction/environment-config.md) you may wish to configure.
+If you prefer, you can run on Kubernetes by using [our Helm chart](helm/README.md). Also, there are [additional environment variables](docs/docs/extraction/environment-config.md) you may wish to configure.
 
 1. Git clone the repo:
 `git clone https://github.com/nvidia/nv-ingest`
@@ -115,17 +115,16 @@ Password: <Your Key>
 > During the early access (EA) phase, you must apply for early access here: https://developer.nvidia.com/nemo-microservices-early-access/join.
 > When your early access is approved, follow the instructions in the email to create an organization and team, link your profile, and generate your NGC API key.
 
-4. Create an [environment variable](environment-config.md) file that contains your NGC and NVIDA keys.
+4. Create a .env file that contains your NVIDIA Build API key and other environment variables.
 
 > [!NOTE]
 > If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually.
-> In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+> In the past, you could create an API key. If you have an API key, you can still use that.
+> For more information, refer to [Generate Your NGC Keys](docs/docs/extraction/ngc-api-key.md) and [Environment Configuration Variables](docs/docs/extraction/environment-config.md).
 
 ```
 # Container images must access resources from NGC.
 
-NGC_API_KEY=<key to download containers from NGC>
-NIM_NGC_API_KEY=<key to download model files after containers start>
 NVIDIA_BUILD_API_KEY=<key to use NIMs that are hosted on build.nvidia.com>
 NVIDIA_API_KEY=<copy of NVIDIA_BUILD_API_KEY, llama-index connectors use this key>
 ```

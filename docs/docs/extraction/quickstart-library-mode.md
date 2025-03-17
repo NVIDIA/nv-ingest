@@ -29,7 +29,11 @@ Use the following procedure to prepare your environment.
         To confirm that you have activated your Conda environment, run `which pip` and `which python`, and confirm that you see `nvingest` in the result. You can do this before any pip or python command that you run.
 
 
-2. Create a .env file that contains your NVIDIA Build API key. For more information, refer to [Environment Configuration Variables](environment-config.md).
+2. Create a .env file that contains your NVIDIA Build API key and other environment variables.
+
+    !!! note
+
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md) and [Environment Configuration Variables](environment-config.md).
 
     ```
     NVIDIA_BUILD_API_KEY=nvapi-<your key>
@@ -62,6 +66,17 @@ You can submit jobs programmatically by using Python.
 
     For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
+
+If you have a very high number of CPUs and see the process hang without progress, 
+we recommend using `taskset` to limit the number of CPUs visible to the process. 
+Use the following code.
+
+```
+taskset -c 0-3 python your_ingestion_script.py
+```
+
+On a 4 CPU core low end laptop, the following code should take about 10 seconds.
+
 ```python
 # must be first: pipeline subprocesses pickup config from env variables
 from dotenv import load_dotenv
@@ -80,7 +95,7 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 config = PipelineCreationSchema()                                                  
 print(config)
 
-pipeline_process = start_pipeline_subprocess(config)         
+pipeline_process = start_pipeline_subprocess(config,stderr=sys.stderr,stdout=sys.stdout)
 
 client = NvIngestClient(                                                                          
     message_client_allocator=SimpleClient,                                           

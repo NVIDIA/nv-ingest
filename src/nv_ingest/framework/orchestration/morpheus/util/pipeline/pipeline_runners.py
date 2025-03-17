@@ -45,8 +45,9 @@ class PipelineCreationSchema(BaseModel):
     """
 
     # Audio processing settings
-    audio_http_endpoint: str = "unavailable"
-    audio_infer_protocol: str = "http"
+    audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
+    audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
+    audio_infer_protocol: str = "grpc"
 
     # Embedding model settings
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
@@ -66,9 +67,10 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/vlm/nvidia/nemoretriever-parse"
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
     nemoretriever_parse_infer_protocol: str = "http"
+    nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
@@ -88,13 +90,14 @@ class PipelineCreationSchema(BaseModel):
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
     )
+    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
     # YOLOX model endpoints for various document processing tasks
     yolox_graphic_elements_http_endpoint: str = os.getenv(
         "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
         "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
     )
-    yolox_graphic_elements_inf_protocol: str = "http"
+    yolox_graphic_elements_infer_protocol: str = "http"
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
@@ -102,7 +105,7 @@ class PipelineCreationSchema(BaseModel):
     yolox_table_structure_http_endpoint: str = os.getenv(
         "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
     )
-    yolox_table_structure_inf_protocol: str = "http"
+    yolox_table_structure_infer_protocol: str = "http"
 
     model_config = ConfigDict(extra="forbid")
 
@@ -360,7 +363,7 @@ def _terminate_subprocess(process: Optional["subprocess.Popen"] = None) -> None:
 
 def is_port_in_use(port, host="127.0.0.1"):
     """
-    Checks if a given port is in use on the specified host.
+    Checks if a given port is in use on the specified host with socket reuse settings.
 
     Parameters:
         port (int): The port number to check.
@@ -370,6 +373,7 @@ def is_port_in_use(port, host="127.0.0.1"):
         bool: True if the port is in use, False otherwise.
     """
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         try:
             sock.bind((host, port))
             return False
@@ -423,6 +427,33 @@ def start_pipeline_subprocess(
     logger.info("Starting pipeline subprocess...")
 
     try:
+        # Get current CPU affinity information to respect container limits
+        # but we'll only apply it to the child process
+        try:
+            # Get the current process's CPU affinity - we only need this to know what's available
+            current_affinity = os.sched_getaffinity(0)  # 0 means current process
+            # Limit to min(available CPUs from affinity, 8)
+            max_cpus = min(len(current_affinity), 8)
+            # Take the first max_cpus from the current affinity set
+            cpu_set = set(sorted(list(current_affinity))[:max_cpus])
+            logger.info(f"Current process has access to CPU cores: {current_affinity}")
+            logger.info(f"Child process will be limited to {max_cpus} cores: {cpu_set}")
+        except AttributeError:
+            # sched_getaffinity not available on all platforms
+            logger.warning("os.sched_getaffinity not available, falling back to cpu_count")
+            try:
+                import multiprocessing
+
+                total_cpus = multiprocessing.cpu_count()
+                max_cpus = min(total_cpus, 8)
+                cpu_set = set(range(max_cpus))
+                logger.info(f"Child process will be limited to cores 0-{max_cpus-1}")
+            except Exception as e:
+                logger.warning(f"Failed to determine CPU count: {e}. Will not set CPU affinity.")
+                cpu_set = None
+        except Exception as e:
+            logger.warning(f"Failed to get current CPU affinity: {e}. Will not set CPU affinity.")
+            cpu_set = None
 
         def combined_preexec_fn():
             """Setup function to run in the child process before exec()."""
@@ -431,9 +462,44 @@ def start_pipeline_subprocess(
             # Set the parent death signal to SIGTERM
             _set_pdeathsig(signal.SIGTERM)
 
+            # Set CPU affinity ONLY for the child process
+            if cpu_set is not None:
+                try:
+                    # Apply to current process (which becomes the child)
+                    # This doesn't affect the parent because we're in the fork+exec
+                    # stage and changes here only affect the child
+                    os.sched_setaffinity(0, cpu_set)
+                    logger.debug(f"Set CPU affinity for subprocess to {cpu_set}")
+                except AttributeError:
+                    logger.warning("os.sched_setaffinity not available, using taskset as fallback")
+                    # Note: We can't use taskset here as it would need to be applied before Popen
+                except Exception as e:
+                    logger.warning(f"Failed to set CPU affinity: {e}")
+
         # Configure output redirection
         stdout_stream = subprocess.DEVNULL if stdout is None else subprocess.PIPE
         stderr_stream = subprocess.DEVNULL if stderr is None else subprocess.PIPE
+
+        # Apply taskset as fallback if sched_setaffinity is not available but taskset exists
+        has_taskset = False
+        if cpu_set is not None and not hasattr(os, "sched_setaffinity"):
+            try:
+                # Check if taskset is available on the system
+                taskset_check = subprocess.run(
+                    ["which", "taskset"], stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True
+                )
+                has_taskset = taskset_check.returncode == 0
+
+                if has_taskset:
+                    # Create CPU mask from the specific cores in cpu_set
+                    cpu_mask = ",".join(str(cpu) for cpu in sorted(cpu_set))
+                    subprocess_command = ["taskset", "-c", cpu_mask] + subprocess_command
+                    logger.info(f"Using taskset to limit to CPU cores {cpu_mask}")
+                else:
+                    logger.warning("Neither sched_setaffinity nor taskset are available. CPU affinity will not be set.")
+            except Exception as e:
+                logger.warning(f"Failed to check for taskset: {e}. CPU affinity will not be set.")
+                has_taskset = False
 
         # Start the subprocess
         process = subprocess.Popen(
