@@ -28,10 +28,12 @@ CONDA_CHANNEL=${2:-""}
 BUILD_NV_INGEST=${BUILD_NV_INGEST:-1} # 1 = build by default, 0 = skip
 BUILD_NV_INGEST_API=${BUILD_NV_INGEST_API:-1} # 1 = build by default, 0 = skip
 BUILD_NV_INGEST_CLIENT=${BUILD_NV_INGEST_CLIENT:-1} # 1 = build by default, 0 = skip
-RELEASE_VERSION="${RELEASE_VERSION:-}" # Version to override output name for release
+RELEASE_VERSION=${RELEASE_VERSION:-} # Version to override output name for release
+
+echo "RELEASE_VERSION: ${RELEASE_VERSION}"
 
 ##############################
-# Package Directories
+# Package Directories"
 ##############################
 NV_INGEST_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest"
 NV_INGEST_API_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_api"

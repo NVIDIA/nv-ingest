@@ -46,7 +46,7 @@ jobs:
           echo "Github event_name: ${{ github.event_name }}"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
             echo "Building conda package for ${{ github.event.inputs.VERSION }}"
-            RELEASE_VERSION=${{ github.event.inputs.VERSION }} ./conda/build_conda_packages.sh
+            RELEASE_VERSION="${{ github.event.inputs.VERSION }}" ./conda/build_conda_packages.sh
           else
             ./conda/build_conda_packages.sh
           fi
