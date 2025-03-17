@@ -33,7 +33,7 @@ RELEASE_VERSION=${RELEASE_VERSION:-} # Version to override output name for relea
 echo "RELEASE_VERSION: ${RELEASE_VERSION}"
 
 ##############################
-# Package Directories"
+# Package Directories
 ##############################
 NV_INGEST_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest"
 NV_INGEST_API_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_api"
