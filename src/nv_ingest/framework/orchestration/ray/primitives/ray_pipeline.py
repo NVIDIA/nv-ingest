@@ -106,7 +106,8 @@ class RayPipeline:
                     async def run(self, queue, destination):
                         while True:
                             try:
-                                control_message = ray.get(queue.get.remote())
+                                # Await the message asynchronously.
+                                control_message = await queue.get.remote()
                                 if control_message is None:
                                     await asyncio.sleep(0.1)
                                     continue
