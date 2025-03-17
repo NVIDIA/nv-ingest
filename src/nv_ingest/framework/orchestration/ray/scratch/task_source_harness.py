@@ -5,10 +5,6 @@ import time
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import MessageBrokerTaskSource
 
 
-# Ensure you import MessageBrokerTaskSource from your module
-# from your_module import MessageBrokerTaskSource
-
-
 def main():
     # Initialize Ray
     ray.init(ignore_reinit_error=True)

@@ -24,19 +24,23 @@ class StageInfo:
 
 class RayPipeline:
     """
-    A simplified pipeline that supports a source and sink stage,
-    connected via a fixed-size edge queue and a consumer.
+    A simplified pipeline supporting a source, intermediate processing stages, and a sink.
+    Stages are connected via fixed-size queues and dedicated consumer actors.
     """
 
     def __init__(self):
         self.stages: List[StageInfo] = []
-        self.connections: Dict[str, List[tuple]] = {}  # from_stage -> list of (to_stage, queue_size) tuples
+        self.connections: Dict[str, List[tuple]] = {}  # from_stage -> list of (to_stage, queue_size)
         self.stage_actors: Dict[str, List[Any]] = {}
         self.edge_queues: Dict[str, Any] = {}  # queue_name -> FixedSizeQueue actor
         self.consumers: Dict[str, List[Any]] = {}  # to_stage -> list of consumer actors
 
     def add_source(self, name: str, source_actor: Any, **config) -> "RayPipeline":
         self.stages.append(StageInfo(name=name, callable=source_actor, config=config, is_source=True))
+        return self
+
+    def add_stage(self, name: str, stage_actor: Any, **config) -> "RayPipeline":
+        self.stages.append(StageInfo(name=name, callable=stage_actor, config=config))
         return self
 
     def add_sink(self, name: str, sink_actor: Any, **config) -> "RayPipeline":
@@ -66,16 +70,13 @@ class RayPipeline:
                 class FixedSizeQueue:
                     def __init__(self, max_size):
                         self.queue = asyncio.Queue(maxsize=max_size)
-                        self.stats = {
-                            "put_count": 0,
-                            "get_count": 0,
-                            "queue_full_count": 0,
-                        }
+                        self.stats = {"put_count": 0, "get_count": 0, "queue_full_count": 0}
 
                     async def put(self, item):
                         import time
 
-                        _ = time.time()
+                        start_time = time.time()
+                        _ = start_time
                         if self.queue.full():
                             self.stats["queue_full_count"] += 1
                         await self.queue.put(item)
@@ -94,17 +95,17 @@ class RayPipeline:
                 queue_actor = FixedSizeQueue.options(name=queue_name).remote(queue_size)
                 self.edge_queues[queue_name] = queue_actor
 
-                # Connect source actors to this queue.
+                # For each upstream actor, set its downstream queue for THIS edge.
                 for actor in self.stage_actors[from_stage]:
+                    # Instead of overwriting a shared attribute, you could have a mapping of edges if needed.
                     ray.get(actor.set_output_queue.remote(queue_actor))
 
-                # Create a consumer actor for the destination stage.
+                # Create a consumer actor for this edge.
                 @ray.remote
                 class QueueConsumer:
                     async def run(self, queue, destination):
                         while True:
                             try:
-                                # Use ray.get to synchronously obtain the control message.
                                 control_message = ray.get(queue.get.remote())
                                 if control_message is None:
                                     await asyncio.sleep(0.1)
@@ -116,7 +117,6 @@ class RayPipeline:
 
                 consumer = QueueConsumer.remote()
                 self.consumers.setdefault(to_stage, []).append(consumer)
-                # Start the consumer against the first destination actor.
                 consumer.run.remote(queue_actor, self.stage_actors[to_stage][0])
         return self.stage_actors
 
