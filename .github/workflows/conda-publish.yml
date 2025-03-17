@@ -53,4 +53,4 @@ jobs:
 
       # Publish nv-ingest conda packages
       - name: Publish conda package
-        run: anaconda -t "${{ secrets.NVIDIA_CONDA_TOKEN }}" upload --label $CONDA_CHANNEL ./conda/output_conda_channel/linux-64/*.conda
+        run: anaconda -t "${{ secrets.NVIDIA_CONDA_TOKEN }}" upload --force --force-metadata-update --label $CONDA_CHANNEL ./conda/output_conda_channel/linux-64/*.conda
