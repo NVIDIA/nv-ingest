@@ -32,7 +32,9 @@ jobs:
 
       - name: Determine CONDA_CHANNEL
         run: |
+          echo "Github event_name: ${{ github.event_name }}"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Setting Conda channel to ${{ github.event.inputs.CONDA_CHANNEL }}"
             echo "CONDA_CHANNEL=${{ github.event.inputs.CONDA_CHANNEL }}" >> $GITHUB_ENV
           else
             echo "CONDA_CHANNEL=dev" >> $GITHUB_ENV
@@ -41,7 +43,9 @@ jobs:
       # Build the Conda packages
       - name: Build Conda Packages
         run: |
+          echo "Github event_name: ${{ github.event_name }}"
           if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            echo "Building conda package for ${{ github.event.inputs.VERSION }}"
             RELEASE_VERSION=${{ github.event.inputs.VERSION }} ./conda/build_conda_packages.sh
           else
             ./conda/build_conda_packages.sh
