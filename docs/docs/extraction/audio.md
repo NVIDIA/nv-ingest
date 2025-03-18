@@ -1,7 +1,7 @@
 ## Use NeMo Retriever Extraction with Riva
 
 This documentation describes two methods to run [NeMo Retriever extraction](overview.md) 
-with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
+with the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files.
 
 - Run the NIM locally by using Docker Compose
 - Use NVIDIA Cloud Functions (NVCF) endpoints for cloud-based inference
@@ -12,14 +12,32 @@ with [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html
 
 
 
+## Overview
+
+[NeMo Retriever extraction](overview.md) now supports the processing and retrieval of audio files for Retrieval Augmented Generation (RAG) applications. 
+Similar to how the multimodal document extraction pipeline leverages object detection and image OCR microservices, 
+NeMo Retriever leverages the [RIVA ASR NIM microservice](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) 
+to transcribe audio files to text, which is then embedded by using the NeMo Retriever embedding NIM. 
+
+!!! important
+
+    Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). For the full list of requirements to run RIVA NIM, refer to [Support Matrix](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/support-matrix.html).
+
+This Early Access pipeline enables users to now retrieve audio files at the segment level. 
+
+
+
+![Overview diagram](images/audio.png)
+
+
+
 ## Run the NIM Locally by Using Docker Compose
 
 Use the following procedure to run the NIM locally.
 
 !!! important
 
-    Due to limitations in available VRAM controls in the current release of audio NIMs, it must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the audio service's device_id to a dedicated GPU: device_ids: ["1"] or higher.
-
+    RIVA NIM must run on a [dedicated additional GPU](support-matrix.md). Edit docker-compose.yaml to set the audio service's device_id to a dedicated GPU: device_ids: ["1"] or higher.
 
 1. To access the required container images, log in to the NVIDIA Container Registry (nvcr.io). Use [your NGC key](ngc-api-key.md) as the password. Run the following command in your terminal.
 

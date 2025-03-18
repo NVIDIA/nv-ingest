@@ -82,7 +82,7 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 from dotenv import load_dotenv
 load_dotenv(".env")
 
-import logging, os, time
+import logging, os, time, sys
 from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
 
 from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
@@ -95,7 +95,7 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 config = PipelineCreationSchema()                                                  
 print(config)
 
-pipeline_process = start_pipeline_subprocess(config)         
+pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
 
 client = NvIngestClient(                                                                          
     message_client_allocator=SimpleClient,                                           
