@@ -64,10 +64,10 @@ Library mode deployment of nv-ingest requires:
 Create a fresh conda environment in which to install nv-ingest and dependencies.
 
 ```shell
-conda create -y --name nvingest python=3.10
-conda activate nvingest
-conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0
-pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
+conda create -y --name nvingest python=3.10 && \
+    conda activate nvingest && \
+    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0 && \
+    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
 ```
 
 Make sure to set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have one, you can get one on [build.nvidia.com](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2?snippet_tab=Python&signin=true&api_key=true).
