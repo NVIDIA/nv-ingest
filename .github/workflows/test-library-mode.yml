@@ -41,6 +41,8 @@ jobs:
 
       - name: Download Conda packages
         uses: actions/download-artifact@v4
+
+      - name: Display structure of downloaded files
         run: ls -R
 
       - uses: conda-incubator/setup-miniconda@v3
