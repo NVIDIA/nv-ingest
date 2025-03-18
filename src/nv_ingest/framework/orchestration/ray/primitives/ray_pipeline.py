@@ -125,6 +125,7 @@ class QueueConsumer:
             try:
                 # Await the queue's get() call asynchronously.
                 control_message = await queue.get.remote()
+                logger.warning("[QUEUE CONSUMER CM]", control_message)
                 if control_message is None:
                     await asyncio.sleep(0.1)
                     continue

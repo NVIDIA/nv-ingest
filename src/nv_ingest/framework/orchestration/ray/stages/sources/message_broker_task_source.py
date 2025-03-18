@@ -222,6 +222,8 @@ class MessageBrokerTaskSource:
             else:
                 raise
 
+        logger.warning(f"[SOURCE CM]: {control_message.payload()}\n")
+
         return control_message
 
     def fetch_message(self, timeout=100):
