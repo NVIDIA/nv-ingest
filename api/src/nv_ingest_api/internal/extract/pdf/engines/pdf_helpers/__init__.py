@@ -130,7 +130,7 @@ def _orchestrate_row_extraction(
 
     # The resulting parameters constitute the complete extractor_config
     extractor_config = params
-    logger.warning(f"Final extractor_config: {extractor_config}")
+    logger.debug(f"Final extractor_config: {extractor_config}")
 
     result = _work_extract_pdf(
         pdf_stream=pdf_stream,
