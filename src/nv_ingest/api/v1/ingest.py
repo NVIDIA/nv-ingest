@@ -1,7 +1,6 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
 # pylint: skip-file
 
 from io import BytesIO
@@ -16,6 +15,7 @@ from fastapi import APIRouter, Request, Response
 from fastapi import Depends
 from fastapi import File, UploadFile, Form
 from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
 from fastapi.responses import JSONResponse
 
 from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
@@ -169,17 +169,16 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
 )
 async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
     try:
-        # Attempt to fetch the job from the ingest service
         job_response = await ingest_service.fetch_job(job_id)
-        return job_response
+        json_bytes = json.dumps(job_response).encode("utf-8")
+
+        return StreamingResponse(iter([json_bytes]), media_type="application/json")
+
     except TimeoutError:
-        # Return a 202 Accepted if the job is not ready yet
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
     except RedisError:
-        # Return a 202 Accepted if the job could not be fetched due to Redis error, indicating a retry might succeed
         raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
     except ValueError as ve:
-        # Return a 500 Internal Server Error for ValueErrors
         raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
     except Exception as ex:
         # Catch-all for other exceptions, returning a 500 Internal Server Error
