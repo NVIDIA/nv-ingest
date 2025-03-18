@@ -67,7 +67,6 @@ extra:
     - jdyer@nvidia.com
 
 channels:
-  - nvidia/label/dev
   - rapidsai
   - nvidia
   - conda-forge

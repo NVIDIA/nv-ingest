@@ -44,8 +44,8 @@ requirements:
     - isodate>=0.7.2
     - langdetect>=1.0.9
     - minio>=7.2.12
-    - morpheus-core=25.02
-    - morpheus-llm=25.02
+    - morpheus-core==25.02.01
+    - morpheus-llm==25.02.01
     - openai>=1.57.1
     - opentelemetry-api>=1.27.0
     - opentelemetry-exporter-otlp>=1.27.0
@@ -89,7 +89,6 @@ extra:
     - drobison@nvidia.com
 
 channels:
-  - nvidia/label/dev
   - rapidsai
   - nvidia
   - conda-forge
