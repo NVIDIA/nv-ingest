@@ -13,6 +13,8 @@ NVIDIA-Ingest is a scalable, performance-oriented content and metadata extractio
 
 NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
+![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
+
 ### Table of Contents
 1. [Introduction](#introduction)
 2. [Prerequisites](#prerequisites)
@@ -30,6 +32,7 @@ NV-Ingest is a library and microservice service that does the following:
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
 - Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents nv-ingest supports extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of before and after processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
+
 
 NV-Ingest supports the following file types:
 
@@ -57,7 +60,10 @@ Library mode deployment of nv-ingest requires:
 - Python 3.10
 
 ### Step 1: Prepare Your Environment
-```
+
+Create a fresh conda environment in which to install nv-ingest and dependencies.
+
+```shell
 conda create -y --name nvingest python=3.10
 conda activate nvingest
 conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0
@@ -262,6 +268,8 @@ In the table, the Cat's activity is listed as "Jumping onto a laptop" while bein
 
 **Please note:** This response is an educated guess, and without direct information about typos in the original content, the answer is subjective and intended to be light-hearted.
 ```
+
+For more information, please check out the [official documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
 > [!TIP]
 > Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
