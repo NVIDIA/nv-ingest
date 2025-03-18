@@ -183,7 +183,7 @@ This table describes some animals, and some activities they might be doing in sp
 
 ### Step 3: Query Ingested Content
 
-To query for relevant snippets of the ingested content, and use it with LLMs to generate answers, use the following code.
+Below is an example snippet demonstrating how to query for relevant snippets of the ingested content and insert them into a basic prompt for use with an LLM to generate answers.
 
 ```python
 from openai import OpenAI
