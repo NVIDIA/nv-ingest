@@ -61,10 +61,10 @@ Library mode deployment of nv-ingest requires:
 conda create -y --name nvingest python=3.10
 conda activate nvingest
 conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0
-pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv nvidia-riva-client unstructured-client
+pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
 ```
 
-Make sure to set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY (or create a .env file that contains them for use with [dotenv](https://pypi.org/project/python-dotenv/)). If you don't have one, you can get one on [build.nvidia.com](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2?snippet_tab=Python&signin=true&api_key=true).
+Make sure to set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have one, you can get one on [build.nvidia.com](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2?snippet_tab=Python&signin=true&api_key=true).
 ```
 #Note: these should be the same value
 export NVIDIA_BUILD_API_KEY=nvapi-...
@@ -75,7 +75,7 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-Note: Make sure your conda environment is activated. `which python` should indicate that you're using the conda provided python installation, and not the OS provided python.
+Note: Make sure your conda environment is activated. `which python` should indicate that you're using the conda provided python installation (not an OS provided python).
 ```
 which python
 /home/dev/miniforge3/envs/nvingest/bin/python
@@ -88,10 +88,6 @@ taskset -c 0-3 python your_ingestion_script.py
 
 On a 4 CPU core low end laptop, the following should take about 10 seconds:
 ```python
-# must be first if using a .env file for keys: pipeline subprocesses pickup config from env variables
-from dotenv import load_dotenv
-load_dotenv(".env")
-
 import logging, os, time, sys
                
 from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
