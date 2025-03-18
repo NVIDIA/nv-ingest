@@ -53,7 +53,7 @@ else
     # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
         # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
-        uvicorn nv_ingest.api.main:app --workers 32 --host 0.0.0.0 --port 7670 &
+        gunicorn nv_ingest.api.main:app -w 32 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:7670 --timeout 300 &
     fi
 
     if [ "${MEM_TRACE}" = true ]; then
