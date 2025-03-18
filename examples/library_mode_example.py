@@ -11,12 +11,6 @@ from nv_ingest.util.logging.configuration import configure_logging as configure_
 from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
 
-# from dotenv import load_dotenv
-
-# load_dotenv(".env")
-
-
-# Configure the logger
 logger = logging.getLogger(__name__)
 
 local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
@@ -36,7 +30,7 @@ def run_ingestor():
         Ingestor(
             message_client_allocator=SimpleClient,
             message_client_port=7671,
-            message_client_hostname=os.getenv("MESSAGE_CLIENT_HOSTNAME", "localhost"),
+            message_client_hostname="localhost",
         )
         .files("data/multimodal_test.pdf")
         .extract(
@@ -50,13 +44,12 @@ def run_ingestor():
         )
         .embed()
         .caption()
-        # .vdb_upload(
-        #   collection_name=collection_name,
-        #   milvus_uri=milvus_uri,
-        #   sparse=sparse,
-        #   # for llama-3.2 embedder, use 1024 for e5-v5
-        #   dense_dim=2048
-        # )
+        .vdb_upload(
+            collection_name="test",
+            milvus_uri="milvus.db",
+            sparse=False,
+            dense_dim=2048,
+        )
     )
 
     try:
@@ -85,6 +78,7 @@ def main():
     # Optionally, wait a bit before starting the ingestor to ensure the pipeline is ready
     time.sleep(10)
 
+    # If the pipeline is not running, exit immediately
     if pipeline_process.poll() is not None:
         logger.error("Error running pipeline subprocess.")
         sys.exit(1)
