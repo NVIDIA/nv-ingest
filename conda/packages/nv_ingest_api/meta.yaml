@@ -50,7 +50,7 @@ requirements:
     - torchaudio
     - torchvision
     - transformers>=4.47.0
-    - unstructured-client>=0.25.9
+    # - unstructured-client>=0.25.9
 
   test:
     commands:
