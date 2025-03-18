@@ -295,11 +295,24 @@ def process_and_forward(message: IngestControlMessage, broker_client: MessageBro
         else:
             json_result_fragments = create_json_payload(message, None)
 
-        json_payloads = [json.dumps(fragment) for fragment in json_result_fragments]
+        # Convert each fragment to a JSON string and log its size in MB while accumulating the total size.
+        total_payload_size = 0
+        json_payloads = []
+        for i, fragment in enumerate(json_result_fragments, start=1):
+            payload = json.dumps(fragment)
+            size_bytes = len(payload.encode("utf-8"))
+            total_payload_size += size_bytes
+            size_mb = size_bytes / (1024 * 1024)
+            logger.debug(f"Fragment {i} size: {size_mb:.2f} MB")
+            json_payloads.append(payload)
+
+        total_size_mb = total_payload_size / (1024 * 1024)
+        logger.debug(f"Total JSON payload size: {total_size_mb:.2f} MB")
+
         annotate_cm(message, message="Pushed")
         push_to_broker(broker_client, response_channel, json_payloads)
     except ValueError as e:
-        mdf_size = len(mdf) if not mdf.empty else 0
+        mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
         handle_failure(broker_client, response_channel, json_result_fragments, e, mdf_size)
     except Exception as e:
         err_msg = f"Critical error processing message: {e}"

@@ -177,9 +177,9 @@ class RestClient(MessageBrokerClientBase):
             user_provided_url = f"{user_provided_url}:{user_provided_port}"
         return user_provided_url
 
-    def fetch_message(self, job_id: str, timeout: float = 10) -> ResponseSchema:
+    def fetch_message(self, job_id: str, timeout: float = (10, 600)) -> ResponseSchema:
         """
-        Fetches a message from the specified queue with retries on failure.
+        Fetches a message from the specified queue with retries on failure, handling streaming HTTP responses.
 
         Parameters
         ----------
@@ -196,38 +196,47 @@ class RestClient(MessageBrokerClientBase):
         retries = 0
         while True:
             try:
-                # Fetch via HTTP
                 url = f"{self.generate_url(self._host, self._port)}{self._fetch_endpoint}/{job_id}"
                 logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
-                result = requests.get(url, timeout=self._connection_timeout)
 
-                response_code = result.status_code
-                if response_code in _TERMINAL_RESPONSE_STATUSES:
-                    # If we get a 404, throttle retries by sleeping 10 seconds.
-                    if response_code == 404:
-                        logger.debug("Received 404 - throttling fetch_message retries by sleeping for 10 seconds.")
-                        time.sleep(10)
-                    return ResponseSchema(
-                        response_code=1,
-                        response_reason=(
-                            f"Terminal response code {response_code} received when fetching JobSpec: {job_id}"
-                        ),
-                        response=result.text,
-                    )
-                else:
+                # Fetch using streaming response
+                with requests.get(url, timeout=(30, 600), stream=True) as result:
+                    response_code = result.status_code
+
+                    if response_code in _TERMINAL_RESPONSE_STATUSES:
+                        # Terminal response code; return error ResponseSchema
+                        return ResponseSchema(
+                            response_code=1,
+                            response_reason=(
+                                f"Terminal response code {response_code} received when fetching JobSpec: {job_id}"
+                            ),
+                            response=result.text,
+                        )
+
                     if response_code == 200:
+                        # Handle streaming response, reconstructing payload incrementally
+                        response_chunks = []
+                        for chunk in result.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
+                            if chunk:
+                                response_chunks.append(chunk)
+                        full_response = b"".join(response_chunks).decode("utf-8")
+
                         return ResponseSchema(
                             response_code=0,
                             response_reason="OK",
-                            response=result.text,
+                            response=full_response,
                         )
+
                     elif response_code == 202:
+                        # Job is not ready yet
                         return ResponseSchema(
                             response_code=1,
                             response_reason="Job is not ready yet. Retry later.",
                         )
+
                     else:
                         try:
+                            # Retry the operation
                             retries = self.perform_retry_backoff(retries)
                         except RuntimeError as rte:
                             raise rte
@@ -243,10 +252,12 @@ class RestClient(MessageBrokerClientBase):
                 try:
                     retries = self.perform_retry_backoff(retries)
                 except RuntimeError as rte:
+                    # Max retries reached
                     return ResponseSchema(response_code=1, response_reason=str(rte), response=str(err))
                 except TimeoutError:
                     raise
             except Exception as e:
+                # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during fetch from {url}: {e}")
                 return ResponseSchema(
                     response_code=1, response_reason=f"Unexpected error during fetch: {e}", response=None
@@ -279,14 +290,17 @@ class RestClient(MessageBrokerClientBase):
 
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
+                    # Terminal response code; return error ResponseSchema
                     return ResponseSchema(
                         response_code=1,
                         response_reason=f"Terminal response code {response_code} received when submitting JobSpec",
                         trace_id=result.headers.get("x-trace-id"),
                     )
                 else:
+                    # If 200 we are good, otherwise let's try again
                     if response_code == 200:
                         logger.debug(f"JobSpec successfully submitted to http endpoint {self._submit_endpoint}")
+                        # The REST interface returns a JobId, so we capture that here
                         x_trace_id = result.headers.get("x-trace-id")
                         return ResponseSchema(
                             response_code=0,
@@ -296,6 +310,7 @@ class RestClient(MessageBrokerClientBase):
                             trace_id=x_trace_id,
                         )
                     else:
+                        # Retry the operation
                         retries = self.perform_retry_backoff(retries)
             except requests.RequestException as e:
                 logger.error(f"Failed to submit job, retrying... Error: {e}")
@@ -308,8 +323,10 @@ class RestClient(MessageBrokerClientBase):
                 try:
                     retries = self.perform_retry_backoff(retries)
                 except RuntimeError as rte:
+                    # Max retries reached
                     return ResponseSchema(response_code=1, response_reason=str(rte), response=str(e))
             except Exception as e:
+                # Handle non-http specific exceptions
                 logger.error(f"Unexpected error during submission of JobSpec to {url}: {e}")
                 return ResponseSchema(
                     response_code=1, response_reason=f"Unexpected error during JobSpec submission: {e}", response=None
