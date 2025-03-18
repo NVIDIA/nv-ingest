@@ -13,21 +13,48 @@ on:
 
 jobs:
   build:
+    runs-on: linux-large-disk
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Conda Packages
+        run: |
+          ./conda/build_conda_packages.sh
+
+      - name: Store Conda packages
+        uses: actions/upload-artifact@v4
+        with:
+          name: conda-packages
+          path: ./conda/output_conda_channel
+          retention-days: 1
+
+  test:
+    needs: build
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Download Conda packages
+        uses: actions/download-artifact@v4
+        run: ls -R
+
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
-          python-version: ${{ matrix.python-version }}
 
       - name: Install Conda and run script
         env:
+          AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
           EMBEDDING_NIM_ENDPOINT: ${{ secrets.EMBEDDING_NIM_ENDPOINT }}
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
+          NEMORETRIEVER_PARSE_HTTP_ENDPOINT: ${{ secrets.NEMORETRIEVER_PARSE_HTTP_ENDPOINT }}
+          NEMORETRIEVER_PARSE_MODEL_NAME: ${{ secrets.NEMORETRIEVER_PARSE_MODEL_NAME }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_BUILD_API_KEY: ${{ secrets.NVIDIA_BUILD_API_KEY }}
           PADDLE_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
           VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
@@ -39,7 +66,8 @@ jobs:
         run: |
           conda create -y --name nvingest python=3.10
           conda activate nvingest
-          conda install -y -c rapidsai -c rapidsai-nightly -c conda-forge -c nvidia nvidia/label/dev::nv_ingest nvidia/label/dev::nv_ingest_client nvidia/label/dev::nv_ingest_api
-          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv nvidia-riva-client
-          echo 'Running script: examples/library_mode.py'
-          $CONDA/envs/nvingest/bin/python -m pytest tests/integration
+          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest_api-*.conda nv_ingest_api
+          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest_client-*.conda nv_ingest_client
+          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest-*.conda nv_ingest
+          echo 'Running tests...'
+          $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
