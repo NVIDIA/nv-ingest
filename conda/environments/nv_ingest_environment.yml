@@ -43,7 +43,6 @@ dependencies:
   - torchaudio
   - transformers>=4.47.0
   - tqdm>=4.67.1
-  # - unstructured-client>=0.25.9
   - uvicorn
   - pip
   - pip:
@@ -52,3 +51,4 @@ dependencies:
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
       - nvidia-riva-client>=2.18.0
+      - unstructured-client
