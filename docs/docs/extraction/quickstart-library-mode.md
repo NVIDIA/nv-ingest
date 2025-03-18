@@ -108,7 +108,7 @@ ingestor = (
 
 print("Starting ingestion..")
 t0 = time.time()
-results = ingestor.ingest()
+results = ingestor.ingest(show_progress=True)
 t1 = time.time()
 print(f"Time taken: {t1-t0} seconds")
 
