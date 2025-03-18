@@ -68,6 +68,6 @@ jobs:
         run: |
           conda create -y --name nvingest python=3.10
           conda activate nvingest
-          conda install -y -c ./conda_packages_for_testing/linux-64 nv_ingest nv_ingest_api nv_ingest_client
+          conda install -y -c rapidsai -c conda-forge -c ./conda_packages_for_testing/linux-64 nv_ingest nv_ingest_api nv_ingest_client
           echo 'Running tests...'
           $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
