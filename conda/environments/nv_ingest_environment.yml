@@ -11,6 +11,7 @@ dependencies:
   - fastapi>=0.115.6
   - fastparquet>=2024.11.0
   - fsspec>=2024.10.0
+  - gunicorn
   - httpx>=0.28.1
   - isodate>=0.7.2
   - langdetect>=1.0.9
@@ -50,4 +51,4 @@ dependencies:
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
       - nvidia-riva-client>=2.18.0
-      - unstructured-client>=0.25.9
+      - unstructured-client
