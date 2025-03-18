@@ -27,7 +27,7 @@ jobs:
       - name: Store Conda packages
         uses: actions/upload-artifact@v4
         with:
-          name: conda-packages
+          name: conda_packages_for_testing
           path: ./conda/output_conda_channel
           retention-days: 1
 
@@ -68,8 +68,8 @@ jobs:
         run: |
           conda create -y --name nvingest python=3.10
           conda activate nvingest
-          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest_api-*.conda nv_ingest_api
-          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest_client-*.conda nv_ingest_client
-          conda install -y -c ./conda/output_conda_channel/linux-64/nv_ingest-*.conda nv_ingest
+          conda install -y -c ./conda_packages_for_testing/linux-64/nv_ingest_api-*.conda nv_ingest_api
+          conda install -y -c ./conda_packages_for_testing/linux-64/nv_ingest_client-*.conda nv_ingest_client
+          conda install -y -c ./conda_packages_for_testing/linux-64/nv_ingest-*.conda nv_ingest
           echo 'Running tests...'
           $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
