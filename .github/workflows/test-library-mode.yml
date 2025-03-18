@@ -69,5 +69,6 @@ jobs:
           conda create -y --name nvingest python=3.10
           conda activate nvingest
           conda install -y -c ./conda_packages_for_testing/linux-64 -c rapidsai -c conda-forge -c nvidia -c nvidia/label/dev nv_ingest nv_ingest_api nv_ingest_client
+          $CONDA/envs/nvingest/bin/python -m pip install opencv-pyton llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv nvidia-riva-client
           echo 'Running tests...'
           $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
