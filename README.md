@@ -99,7 +99,9 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 # Start the pipeline subprocess for library mode                       
 config = PipelineCreationSchema()                                                  
 
-pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
+pipeline_process = start_pipeline_subprocess(config)
+# you can configure the subprocesses to log stderr to stdout for debugging purposes
+#pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
                                                                           
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
@@ -186,6 +188,11 @@ To query for relevant snippets of the ingested content, and use it with LLMs to 
 ```python
 from openai import OpenAI
 from nv_ingest_client.util.milvus import nvingest_retrieval
+import os
+
+milvus_uri = "milvus.db"
+collection_name = "test"
+sparse=False
 
 queries = ["Which animal is responsible for the typos?"]
 
