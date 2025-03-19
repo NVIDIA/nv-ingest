@@ -17,7 +17,6 @@ from nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector im
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import MessageBrokerTaskSource
 
-
 logger = logging.getLogger(__name__)
 
 
@@ -88,19 +87,6 @@ class OutputValidator:
         self.downstream_queue: Any = None
 
     async def process(self, control_message: IngestControlMessage) -> IngestControlMessage:
-        """
-        Validate the structure of the control message.
-
-        Parameters
-        ----------
-        control_message : IngestControlMessage
-            The control message to validate.
-
-        Returns
-        -------
-        IngestControlMessage
-            The original control message, potentially modified with a validation flag.
-        """
         self.count += 1
         try:
             df = control_message.payload()
@@ -140,7 +126,6 @@ class OutputValidator:
         return True
 
 
-# Define a simple sink actor that tracks throughput.
 @ray.remote
 class ThroughputSink:
     def __init__(self, **config):
@@ -204,16 +189,19 @@ if __name__ == "__main__":
         sink_actor=ThroughputSink,
         progress_engines=1,
     )
-    # Wire the stages: source → metadata_injection → processor2 → sink.
+    # Wire the stages: source → metadata_injection → validator → processor2 → sink.
     pipeline.make_edge("source", "metadata_injection", queue_size=100)
     pipeline.make_edge("metadata_injection", "validator", queue_size=100)
     pipeline.make_edge("validator", "processor2", queue_size=100)
     pipeline.make_edge("processor2", "sink", queue_size=100)
 
     pipeline.build()
+
+    # Visualize the pipeline as a text graph.
+    pipeline.visualize(mode="text", verbose=True, max_width=120)
+
     pipeline.start()
 
-    logger.info("Multi-stage pipeline started. Flow: Source -> MetadataInjection -> Processor2 -> Sink.")
     try:
         while True:
             time.sleep(5)

@@ -3,13 +3,26 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import asyncio
+from nv_ingest.framework.orchestration.ray.util.pipeline.vis_tools import (
+    wrap_lines,
+    render_stage_box,
+    render_compound_node,
+    join_three_boxes_vertical,
+)
+
 import logging
-import time
 from dataclasses import dataclass
 from typing import Any, Dict, List
 
 import ray
+
+# For image visualization (optional)
+try:
+    import networkx as nx
+    import matplotlib.pyplot as plt
+except ImportError:
+    nx = None
+    plt = None
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +37,7 @@ class StageInfo:
     name : str
         Name of the stage.
     callable : Any
-        A callable (typically a Ray remote actor class) that implements the stage.
+        A Ray remote actor class that implements the stage.
     config : Dict[str, Any]
         Configuration parameters for the stage.
     is_source : bool, optional
@@ -38,101 +51,6 @@ class StageInfo:
     config: Dict[str, Any]
     is_source: bool = False
     is_sink: bool = False
-
-
-@ray.remote
-class FixedSizeQueue:
-    """
-    A fixed-size queue actor that uses an asyncio.Queue internally.
-
-    Parameters
-    ----------
-    max_size : int
-        The maximum size of the queue.
-    """
-
-    def __init__(self, max_size: int) -> None:
-        self.queue: asyncio.Queue = asyncio.Queue(maxsize=max_size)
-        self.stats: Dict[str, int] = {"put_count": 0, "get_count": 0, "queue_full_count": 0}
-
-    async def put(self, item: Any) -> bool:
-        """
-        Put an item into the queue.
-
-        Parameters
-        ----------
-        item : Any
-            The item to enqueue.
-
-        Returns
-        -------
-        bool
-            True if the item was enqueued successfully.
-        """
-        start_time = time.time()
-        _ = start_time
-        if self.queue.full():
-            self.stats["queue_full_count"] += 1
-        await self.queue.put(item)
-        self.stats["put_count"] += 1
-        return True
-
-    async def get(self) -> Any:
-        """
-        Retrieve an item from the queue.
-
-        Returns
-        -------
-        Any
-            The next item in the queue.
-        """
-        item = await self.queue.get()
-        self.stats["get_count"] += 1
-        return item
-
-    def get_stats(self) -> Dict[str, int]:
-        """
-        Get current statistics for the queue.
-
-        Returns
-        -------
-        Dict[str, int]
-            A dictionary with statistics (put_count, get_count, queue_full_count, current_size).
-        """
-        self.stats["current_size"] = self.queue.qsize()
-        return self.stats
-
-
-@ray.remote
-class QueueConsumer:
-    """
-    A consumer actor that continuously pulls messages from a fixed-size queue and forwards
-    them to a destination stage.
-    """
-
-    async def run(self, queue: Any, destination: Any) -> None:
-        """
-        Continuously retrieve messages from the queue and forward them to the destination.
-
-        Parameters
-        ----------
-        queue : Any
-            The fixed-size queue actor from which to retrieve messages.
-        destination : Any
-            The destination stage actor to which messages will be forwarded.
-        """
-        while True:
-            try:
-                # Await the queue's get() call asynchronously.
-                control_message = await queue.get.remote()
-                logger.warning("[QUEUE CONSUMER CM]", control_message)
-                if control_message is None:
-                    await asyncio.sleep(0.1)
-                    continue
-                await destination.process.remote(control_message)
-            except Exception as e:
-                logger.exception(f"Error in consumer: {e}")
-                await asyncio.sleep(0.1)
 
 
 class RayPipeline:
@@ -161,7 +79,7 @@ class RayPipeline:
         self.stages: List[StageInfo] = []
         self.connections: Dict[str, List[tuple]] = {}  # from_stage -> list of (to_stage, queue_size)
         self.stage_actors: Dict[str, List[Any]] = {}
-        self.edge_queues: Dict[str, Any] = {}  # queue_name -> FixedSizeQueue actor
+        self.edge_queues: Dict[str, Any] = {}  # queue_name -> FixedSizeQueue actor # noqa
         self.consumers: Dict[str, List[Any]] = {}  # to_stage -> list of consumer actors
 
     def add_source(self, name: str, source_actor: Any, **config: Any) -> "RayPipeline":
@@ -275,7 +193,7 @@ class RayPipeline:
         for from_stage, conns in self.connections.items():
             for to_stage, queue_size in conns:
                 queue_name = f"{from_stage}_to_{to_stage}"
-                queue_actor = FixedSizeQueue.options(name=queue_name).remote(queue_size)
+                queue_actor = FixedSizeQueue.options(name=queue_name).remote(queue_size)  # noqa
                 self.edge_queues[queue_name] = queue_actor
 
                 # For each upstream actor, set its downstream queue for this edge.
@@ -283,7 +201,7 @@ class RayPipeline:
                     ray.get(actor.set_output_queue.remote(queue_actor))
 
                 # Create a consumer actor for this edge.
-                consumer = QueueConsumer.remote()
+                consumer = QueueConsumer.remote()  # noqa
                 self.consumers.setdefault(to_stage, []).append(consumer)
                 consumer.run.remote(queue_actor, self.stage_actors[to_stage][0])
         return self.stage_actors
@@ -315,3 +233,77 @@ class RayPipeline:
                 for actor in self.stage_actors.get(stage.name, []):
                     if hasattr(actor, "stop"):
                         ray.get(actor.stop.remote())
+
+    def visualize(self, mode: str = "text", verbose: bool = False, max_width: int = 120) -> None:
+        """
+        Visualize the pipeline graph.
+
+        Parameters
+        ----------
+        mode : str, optional
+            The visualization mode. "text" prints an ASCII diagram;
+            "image" displays a graphical image (requires networkx and matplotlib).
+            Default is "text".
+        verbose : bool, optional
+            If True, include internal nodes as compound nodes (showing queue and consumer details);
+            otherwise, only high-level stages and direct edges are shown.
+            Default is False.
+        max_width : int, optional
+            The maximum horizontal space (in characters) before wrapping. Default is 120.
+
+        Returns
+        -------
+        None
+        """
+        if mode == "text":
+            if not verbose:
+                print("\nPipeline Graph:")
+                for from_stage, conns in self.connections.items():
+                    for to_stage, queue_size in conns:
+                        print(f"{from_stage} --({queue_size})--> {to_stage}")
+            else:
+                print("\nPipeline Graph (verbose):")
+                stage_width = 20
+                compound_width = 28
+                all_output = []
+                for from_stage, conns in self.connections.items():
+                    for to_stage, queue_size in conns:
+                        top_box = render_stage_box(from_stage, stage_width)
+                        compound_box = render_compound_node(f"Queue: {queue_size}", "Consumer", compound_width)
+                        bottom_box = render_stage_box(to_stage, stage_width)
+
+                        # Join them vertically with arrows in between
+                        joined = join_three_boxes_vertical(
+                            top_box, compound_box, bottom_box, arrow_symbol="│", arrow_down="▼", gap=0
+                        )
+                        wrapped = wrap_lines(joined, max_width)
+                        all_output.extend(wrapped)
+                        all_output.append("")  # blank line between edges
+                print("\n".join(all_output))
+        elif mode == "image":
+            try:
+                import networkx as nx
+                import matplotlib.pyplot as plt
+            except ImportError:
+                print("NetworkX and Matplotlib are required for image visualization.")
+                return
+            G = nx.DiGraph()
+            for stage in self.stages:
+                G.add_node(stage.name)
+            if not verbose:
+                for from_stage, conns in self.connections.items():
+                    for to_stage, queue_size in conns:
+                        G.add_edge(from_stage, to_stage, label=f"Queue: {queue_size}")
+            else:
+                for from_stage, conns in self.connections.items():
+                    for to_stage, queue_size in conns:
+                        compound_label = f"Queue: {queue_size}\nConsumer"
+                        G.add_edge(from_stage, to_stage, label=compound_label)
+            pos = nx.spring_layout(G)
+            edge_labels = nx.get_edge_attributes(G, "label")
+            nx.draw(G, pos, with_labels=True, node_color="lightblue", node_size=1500, arrows=True)
+            nx.draw_networkx_edge_labels(G, pos, edge_labels=edge_labels)
+            plt.title("RayPipeline Graph")
+            plt.show()
+        else:
+            print(f"Unknown mode: {mode}. Supported modes are 'text' and 'image'.")
