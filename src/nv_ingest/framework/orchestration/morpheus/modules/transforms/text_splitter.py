@@ -6,7 +6,6 @@
 import logging
 
 import mrc
-from morpheus.utils.control_message_utils import cm_skip_processing_if_failed
 from morpheus.utils.module_utils import ModuleLoaderFactory
 from morpheus.utils.module_utils import register_module
 from mrc.core import operators as ops
@@ -36,7 +35,6 @@ def _text_splitter(builder: mrc.Builder):
 
     @filter_by_task(["split"])
     @traceable(MODULE_NAME)
-    @cm_skip_processing_if_failed
     @nv_ingest_node_failure_context_manager(
         annotation_id=MODULE_NAME,
         raise_on_failure=validated_config.raise_on_failure,

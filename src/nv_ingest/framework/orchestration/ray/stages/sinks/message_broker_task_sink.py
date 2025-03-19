@@ -84,7 +84,8 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
         else:
             raise ValueError(f"Unsupported client_type: {client_type}")
 
-    def _extract_data_frame(self, message: Any) -> Tuple[Any, Any]:
+    @staticmethod
+    def _extract_data_frame(message: Any) -> Tuple[Any, Any]:
         """
         Extracts a DataFrame from a message payload and returns it along with selected columns.
         """
@@ -97,7 +98,8 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
             logger.warning(f"Failed to extract DataFrame: {err}")
             return None, None
 
-    def _split_large_dict(self, json_data: List[Dict[str, Any]], size_limit: int) -> List[List[Dict[str, Any]]]:
+    @staticmethod
+    def _split_large_dict(json_data: List[Dict[str, Any]], size_limit: int) -> List[List[Dict[str, Any]]]:
         fragments = []
         current_fragment = []
         current_size = sys.getsizeof(json.dumps(current_fragment))

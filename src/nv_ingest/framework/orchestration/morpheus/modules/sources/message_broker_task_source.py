@@ -92,7 +92,6 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
     Process a job and return an IngestControlMessage.
     """
 
-    logger.info(f"Processing job: {job}")
     control_message = IngestControlMessage()
     job_id = None
     try:

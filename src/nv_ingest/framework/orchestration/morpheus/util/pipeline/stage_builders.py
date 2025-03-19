@@ -512,7 +512,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         {
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
-            "caption_model_name": model_name,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         },
     )
