@@ -36,6 +36,7 @@ EXTRACTOR_LOOKUP = {
 
 
 def _work_extract_pdf(
+    *,
     pdf_stream: io.BytesIO,
     extract_text: bool,
     extract_images: bool,
@@ -104,7 +105,8 @@ def _orchestrate_row_extraction(
     row_metadata = row.drop("content")
     params["row_data"] = row_metadata
 
-    params["extract_method"] = task_config.get("method", extract_method)
+    extract_method = task_config.get("method", extract_method)
+    params["extract_method"] = extract_method
 
     # Construct the config key based on the extraction method
     config_key = f"{extract_method}_config"
@@ -128,19 +130,17 @@ def _orchestrate_row_extraction(
 
     # The resulting parameters constitute the complete extractor_config
     extractor_config = params
-
-    # Log the final extractor configuration for debugging
     logger.debug(f"Final extractor_config: {extractor_config}")
 
     result = _work_extract_pdf(
-        pdf_stream,
-        extract_text,
-        extract_images,
-        extract_infographics,
-        extract_tables,
-        extract_charts,
-        extractor_config,
-        execution_trace_log,
+        pdf_stream=pdf_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extractor_config=extractor_config,
+        execution_trace_log=execution_trace_log,
     )
 
     return result
