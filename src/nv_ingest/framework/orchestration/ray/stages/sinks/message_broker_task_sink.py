@@ -4,7 +4,6 @@
 
 import sys
 import json
-import threading
 import logging
 from typing import Any, Dict, List, Tuple
 from pydantic import BaseModel
@@ -12,7 +11,7 @@ import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient, SimpleMessageBroker
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
@@ -61,19 +60,10 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
                 use_ssl=broker_params.get("use_ssl", False),
             )
         elif client_type == "simple":
-            max_queue_size = broker_params.get("max_queue_size", 10000)
             server_host = self.broker_client["host"]
             server_port = self.broker_client["port"]
             server_host = "0.0.0.0"
-            server = SimpleMessageBroker(server_host, server_port, max_queue_size)
-            if not hasattr(server, "server_thread") or not server.server_thread.is_alive():
-                server_thread = threading.Thread(target=server.serve_forever)
-                server_thread.daemon = True
-                server.server_thread = server_thread
-                server_thread.start()
-                logger.info(f"Started SimpleMessageBroker server on {server_host}:{server_port}")
-            else:
-                logger.info(f"SimpleMessageBroker server already running on {server_host}:{server_port}")
+
             return SimpleClient(
                 host=server_host,
                 port=server_port,

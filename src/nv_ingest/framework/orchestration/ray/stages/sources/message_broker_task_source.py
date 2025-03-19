@@ -5,7 +5,10 @@
 
 import asyncio
 import logging
+import multiprocessing
 import uuid
+import socket
+
 import ray
 import json
 import copy
@@ -28,7 +31,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 
 # Import clients
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
-from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
@@ -65,7 +67,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def _create_client(self):
         client_type = self.broker_client["client_type"].lower()
         broker_params = self.broker_client.get("broker_params", {})
-
         if client_type == "redis":
             return RedisClient(
                 host=self.broker_client["host"],
@@ -77,26 +78,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 use_ssl=broker_params.get("use_ssl", False),
             )
         elif client_type == "simple":
-            max_queue_size = broker_params.get("max_queue_size", 10000)
-            server_host = self.broker_client["host"]
-            server_port = self.broker_client["port"]
-
-            # Bind to all interfaces.
-            server_host = "0.0.0.0"
-            server = SimpleMessageBroker(server_host, server_port, max_queue_size)
-
-            if not hasattr(server, "server_thread") or not server.server_thread.is_alive():
-                server_thread = threading.Thread(target=server.serve_forever)
-                server_thread.daemon = True
-                server.server_thread = server_thread
-                server_thread.start()
-                logger.info(f"Started SimpleMessageBroker server on {server_host}:{server_port}")
-            else:
-                logger.info(f"SimpleMessageBroker server already running on {server_host}:{server_port}")
-
+            # Create a SimpleClient to connect to the simple broker.
+            # Do NOT start a server here.
             return SimpleClient(
-                host=server_host,
-                port=server_port,
+                host=self.broker_client["host"],
+                port=self.broker_client["port"],
                 max_retries=self.broker_client["max_retries"],
                 max_backoff=self.broker_client["max_backoff"],
                 connection_timeout=self.broker_client["connection_timeout"],
@@ -215,7 +201,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             return None
         ts_fetched = datetime.now()
         control_message = self._process_message(job, ts_fetched)
-
         return control_message
 
     async def on_data(self, control_message: Any) -> Any:
@@ -254,3 +239,42 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def set_output_edge(self, edge_handle: Any) -> bool:
         self.output_edge = edge_handle
         return True
+
+
+def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
+    """
+    Starts a SimpleMessageBroker server in a separate process.
+
+    Parameters
+    ----------
+    broker_client : dict
+        Broker configuration. Expected keys include:
+          - "port": the port to bind the server to,
+          - "broker_params": optionally including "max_queue_size",
+          - and any other parameters required by SimpleMessageBroker.
+
+    Returns
+    -------
+    multiprocessing.Process
+        The process running the SimpleMessageBroker server.
+    """
+
+    def broker_server():
+        from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
+
+        # Use max_queue_size from broker_params or default to 10000.
+        broker_params = broker_client.get("broker_params", {})
+        max_queue_size = broker_params.get("max_queue_size", 10000)
+        server_host = broker_client.get("host", "0.0.0.0")
+        server_port = broker_client.get("port", 7671)
+        # Optionally, set socket options here for reuse.
+        server = SimpleMessageBroker(server_host, server_port, max_queue_size)
+        # Enable address reuse on the server socket.
+        server.socket.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+        server.serve_forever()
+
+    p = multiprocessing.Process(target=broker_server)
+    p.daemon = True
+    p.start()
+    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client['port']}")
+    return p

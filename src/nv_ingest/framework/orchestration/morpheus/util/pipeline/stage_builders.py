@@ -293,13 +293,13 @@ def add_chart_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, def
         },
     )
 
-    table_extractor_stage = pipe.add_stage(
+    chart_extractor_stage = pipe.add_stage(
         generate_chart_extractor_stage(
             morpheus_pipeline_config, table_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
         )
     )
 
-    return table_extractor_stage
+    return chart_extractor_stage
 
 
 def add_infographic_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
