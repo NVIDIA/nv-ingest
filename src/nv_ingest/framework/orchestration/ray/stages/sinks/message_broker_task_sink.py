@@ -225,7 +225,6 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
 
             total_size_mb = total_payload_size / (1024 * 1024)
             logger.debug(f"Sink Total JSON payload size: {total_size_mb:.2f} MB")
-            logger.warning("Pushing message to broker")
             annotate_cm(control_message, message="Pushed")
             self._push_to_broker(json_payloads, response_channel)
         except ValueError as e:

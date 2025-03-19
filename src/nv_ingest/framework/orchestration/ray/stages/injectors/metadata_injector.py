@@ -43,7 +43,6 @@ class MetadataInjectionStage(RayActorStage):
         IngestControlMessage
             The message with updated metadata if injection was required.
         """
-        logger.warning("MetadataInjectionStage.on_data: Processing message")
         try:
             df = message.payload()
             update_required = False

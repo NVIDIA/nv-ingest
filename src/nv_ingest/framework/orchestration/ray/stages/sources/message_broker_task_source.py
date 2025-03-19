@@ -177,7 +177,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             else:
                 raise
 
-        logger.warning(f"[SOURCE CM]: {control_message.payload()}\n")
         return control_message
 
     def _fetch_message(self, timeout=100):
@@ -217,7 +216,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         ts_fetched = datetime.now()
         control_message = self._process_message(job, ts_fetched)
 
-        logger.warning(f"[SOURCE CM]: {control_message.payload()}\n")
         return control_message
 
     async def on_data(self, control_message: Any) -> Any:

@@ -20,6 +20,7 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
     MessageBrokerTaskSourceStage,
     MessageBrokerTaskSourceConfig,
 )
+from nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor import ThroughputMonitorStage
 
 redis_config: Dict[str, Any] = {
     "client_type": "redis",
@@ -66,7 +67,14 @@ if __name__ == "__main__":
         config={},  # Pass an empty config or a config specific to metadata injection if needed.
         progress_engine_count=1,
     )
-    # 3. Sink stage.
+    # 3. Throughput Monitor
+    pipeline.add_stage(
+        name="throughput_monitor",
+        stage_actor=ThroughputMonitorStage,
+        config={},
+        progress_engine_count=1,
+    )
+    # 4. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
@@ -77,7 +85,8 @@ if __name__ == "__main__":
     # Wire the stages together via AsyncQueueEdges.
     # The intended flow is: source → metadata_injection → sink.
     pipeline.make_edge("source", "metadata_injection", queue_size=100)
-    pipeline.make_edge("metadata_injection", "sink", queue_size=100)
+    pipeline.make_edge("metadata_injection", "throughput_monitor", queue_size=100)
+    pipeline.make_edge("throughput_monitor", "sink", queue_size=100)
 
     # Build the pipeline (this instantiates actors and wires edges).
     pipeline.build()
