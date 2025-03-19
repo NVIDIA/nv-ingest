@@ -9,6 +9,8 @@ import logging
 import time
 from typing import Dict, Any
 
+from openai import BaseModel
+
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_nim_service
 
 # Import our new pipeline class.
@@ -31,6 +33,7 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
 from nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor import ThroughputMonitorStage
+from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
@@ -163,36 +166,36 @@ if __name__ == "__main__":
     pipeline.add_stage(
         name="metadata_injection",
         stage_actor=MetadataInjectionStage,
-        config={},  # Use stage-specific config if needed.
-        progress_engine_count=1,
+        config=MetadataInjectorSchema(),  # Use stage-specific config if needed.
+        progress_engine_count=2,
     )
     # 3. PDF extractor stage.
     pipeline.add_stage(
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
         config=PDFExtractorSchema(**pdf_extractor_config),
-        progress_engine_count=1,
+        progress_engine_count=16,
     )
     # 4. Table extractor stage.
     pipeline.add_stage(
         name="table_extractor",
         stage_actor=TableExtractorStage,
         config=TableExtractorSchema(**table_extractor_config),
-        progress_engine_count=1,
+        progress_engine_count=8,
     )
     # 5. Chart extractor stage.
     pipeline.add_stage(
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
         config=ChartExtractorSchema(**chart_extractor_config),
-        progress_engine_count=1,
+        progress_engine_count=8,
     )
     # 6. Text embedding stage.
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
-        progress_engine_count=1,
+        progress_engine_count=4,
     )
     # 7. Image caption stage.
     pipeline.add_stage(
@@ -205,7 +208,7 @@ if __name__ == "__main__":
     pipeline.add_stage(
         name="throughput_monitor",
         stage_actor=ThroughputMonitorStage,
-        config={},
+        config=BaseModel(),
         progress_engine_count=1,
     )
     # 9. Sink stage.

@@ -104,6 +104,7 @@ def _extract_page_elements_using_image_ensemble(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            force_max_batch_size=True,
             trace_info=execution_trace_log,
             stage_name="pdf_content_extractor",
         )

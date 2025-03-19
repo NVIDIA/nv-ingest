@@ -4,6 +4,8 @@
 
 from dataclasses import dataclass
 
+from pydantic import BaseModel
+
 from nv_ingest.framework.orchestration.ray.edges.async_queue_edge import AsyncQueueEdge
 
 from typing import Any, Dict, List
@@ -27,13 +29,16 @@ class StageInfo:
         Whether the stage is a source.
     is_sink : bool, optional
         Whether the stage is a sink.
+    progress_engine_count : int, optional
+        The number of actor replicas to deploy for this stage.
     """
 
     name: str
     callable: Any  # Already a remote actor class
-    config: Dict[str, Any]
+    config: BaseModel
     is_source: bool = False
     is_sink: bool = False
+    progress_engine_count: int = 1  # default to 1 replica
 
 
 class RayPipeline:
@@ -48,7 +53,7 @@ class RayPipeline:
     connections : Dict[str, List[tuple]]
         Mapping from stage name to a list of tuples (destination stage name, queue size).
     stage_actors : Dict[str, List[Any]]
-        Mapping from stage name to a list of instantiated Ray actor handles.
+        Mapping from stage name to lists of instantiated Ray actor handles.
     edge_queues : Dict[str, Any]
         Mapping from edge name to an AsyncQueueEdge actor.
     """
@@ -59,16 +64,41 @@ class RayPipeline:
         self.stage_actors: Dict[str, List[Any]] = {}
         self.edge_queues: Dict[str, Any] = {}  # edge_name -> AsyncQueueEdge actor
 
-    def add_source(self, name: str, source_actor: Any, **config: Any) -> "RayPipeline":
-        self.stages.append(StageInfo(name=name, callable=source_actor, config=config, is_source=True))
+    def add_source(
+        self,
+        *,
+        name: str,
+        source_actor: Any,
+        config: BaseModel,
+        progress_engine_count: int = 1,
+    ) -> "RayPipeline":
+        self.stages.append(
+            StageInfo(
+                name=name,
+                callable=source_actor,
+                config=config,
+                is_source=True,
+                progress_engine_count=progress_engine_count,
+            )
+        )
         return self
 
-    def add_stage(self, name: str, stage_actor: Any, **config: Any) -> "RayPipeline":
-        self.stages.append(StageInfo(name=name, callable=stage_actor, config=config))
+    def add_stage(
+        self, *, name: str, stage_actor: Any, config: BaseModel, progress_engine_count: int = 1
+    ) -> "RayPipeline":
+        self.stages.append(
+            StageInfo(name=name, callable=stage_actor, config=config, progress_engine_count=progress_engine_count)
+        )
         return self
 
-    def add_sink(self, name: str, sink_actor: Any, **config: Any) -> "RayPipeline":
-        self.stages.append(StageInfo(name=name, callable=sink_actor, config=config, is_sink=True))
+    def add_sink(
+        self, *, name: str, sink_actor: Any, config: BaseModel, progress_engine_count: int = 1
+    ) -> "RayPipeline":
+        self.stages.append(
+            StageInfo(
+                name=name, callable=sink_actor, config=config, is_sink=True, progress_engine_count=progress_engine_count
+            )
+        )
         return self
 
     def make_edge(self, from_stage: str, to_stage: str, queue_size: int = 100) -> "RayPipeline":
@@ -80,10 +110,18 @@ class RayPipeline:
         return self
 
     def build(self) -> Dict[str, List[Any]]:
-        # Instantiate stage actors.
+        # Instantiate stage actors with replication.
         for stage in self.stages:
-            actor = stage.callable.options(name=stage.name).remote(**stage.config)
-            self.stage_actors[stage.name] = [actor]
+            replicas = []
+            for i in range(stage.progress_engine_count):
+                # Append an index to the name if more than one replica.
+                actor_name = f"{stage.name}_{i}" if stage.progress_engine_count > 1 else stage.name
+                # Pass both the configuration and the progress_engine_count explicitly.
+                actor = stage.callable.options(name=actor_name).remote(
+                    config=stage.config, progress_engine_count=stage.progress_engine_count
+                )
+                replicas.append(actor)
+            self.stage_actors[stage.name] = replicas
 
         # Wire up edges using AsyncQueueEdge actors.
         for from_stage, conns in self.connections.items():
@@ -105,7 +143,7 @@ class RayPipeline:
 
     def start(self) -> None:
         """
-        Start the pipeline by starting all stage actors.
+        Start the pipeline by invoking the start() method on all stage actors.
         """
         for stage in self.stages:
             for actor in self.stage_actors.get(stage.name, []):
@@ -114,7 +152,7 @@ class RayPipeline:
 
     def stop(self) -> None:
         """
-        Stop the pipeline by stopping all stage actors.
+        Stop the pipeline by invoking the stop() method on all stage actors.
         """
         for stage in self.stages:
             for actor in self.stage_actors.get(stage.name, []):
