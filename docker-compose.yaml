@@ -132,7 +132,7 @@ services:
 
   reranker:
     # NIM ON
-    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-latest}
+    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-1.3.0}
     shm_size: 16gb
     ports:
       - "8020:8000"
