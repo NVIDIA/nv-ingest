@@ -19,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 
 class RayActorStage(ABC):
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: BaseModel, progress_engine_count: int = 1) -> None:
         self.config = config
         self.progress_engine_count = progress_engine_count
         self.input_edge = None  # Used for non-source stages.

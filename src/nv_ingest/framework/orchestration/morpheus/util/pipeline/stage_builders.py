@@ -234,7 +234,7 @@ def add_pdf_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, defau
                 "yolox_endpoints": (yolox_grpc, yolox_http),
                 "yolox_infer_protocol": yolox_protocol,
                 "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
-                "model_name": model_name,
+                "nemoretriever_parse_model_name": model_name,
             },
         },
     )
@@ -512,7 +512,7 @@ def add_image_caption_stage(pipe, morpheus_pipeline_config, ingest_config, defau
         {
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
-            "model_name": model_name,
+            "image_caption_model_name": model_name,
             "prompt": "Caption the content of this image:",
         },
     )

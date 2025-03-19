@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import pprint
 from typing import Any
 
 import ray
@@ -35,6 +36,7 @@ class ChartExtractorStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         try:
             self.validated_config = config
+            logger.warning(pprint.pformat(self.validated_config.model_dump()))
         except Exception as e:
             logger.exception("Error validating chart extractor config")
             raise e

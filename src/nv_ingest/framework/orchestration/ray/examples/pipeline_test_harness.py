@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import os
 
 import ray
@@ -27,10 +28,14 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
     MessageBrokerTaskSourceConfig,
     start_simple_message_broker,
 )
+from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
 from nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor import ThroughputMonitorStage
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 
 # Import external function to start the SimpleMessageBroker server.
 
@@ -69,13 +74,19 @@ if __name__ == "__main__":
     )
     os.environ["YOLOX_GRPC_ENDPOINT"] = "localhost:8001"
     os.environ["YOLOX_INFER_PROTOCOL"] = "grpc"
-    os.environ["YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT"] = "localhost:8007"
+    os.environ["YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT"] = "127.0.0.1:8007"
     os.environ["YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL"] = "grpc"
-    os.environ["YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT"] = "localhost:8004"
-    os.environ["YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL"] = "grpc"
+    os.environ["YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT"] = "127.0.0.1:8004"
+    os.environ["YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT"] = "http://localhost:8003/v1/infer"
+    os.environ["YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL"] = "http"
     os.environ["PADDLE_GRPC_ENDPOINT"] = "localhost:8010"
     os.environ["PADDLE_INFER_PROTOCOL"] = "grpc"
     os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
+    os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
+    os.environ["VLM_CAPTION_MODEL_NAME"] = "meta/llama-3.2-11b-vision-instruct"
+
+    image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
+    image_caption_model_name = "meta/llama-3.2-11b-vision-instruct"
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     (
         yolox_table_structure_grpc,
@@ -128,6 +139,17 @@ if __name__ == "__main__":
             "auth_token": yolox_auth,
         }
     }
+    text_embedding_config = {
+        "api_key": yolox_auth,
+        "embedding_nim_endpoint": "http://localhost:8012/v1",
+        "embedding_model": "nvidia/llama-3.2-nv-embedqa-1b-v2",
+    }
+    image_caption_config = {
+        "api_key": yolox_auth,
+        "endpoint_url": image_caption_endpoint_url,
+        "image_caption_model_name": image_caption_model_name,
+        "prompt": "Caption the content of this image:",
+    }
 
     # Add stages:
     # 1. Source stage.
@@ -165,14 +187,28 @@ if __name__ == "__main__":
         config=ChartExtractorSchema(**chart_extractor_config),
         progress_engine_count=1,
     )
-    # 6. Throughput monitor stage.
+    # 6. Text embedding stage.
+    pipeline.add_stage(
+        name="text_embedding",
+        stage_actor=TextEmbeddingTransformStage,
+        config=TextEmbeddingSchema(**text_embedding_config),
+        progress_engine_count=1,
+    )
+    # 7. Image caption stage.
+    pipeline.add_stage(
+        name="image_caption",
+        stage_actor=ImageCaptionTransformStage,
+        config=ImageCaptionExtractionSchema(**image_caption_config),
+        progress_engine_count=1,
+    )
+    # 8. Throughput monitor stage.
     pipeline.add_stage(
         name="throughput_monitor",
         stage_actor=ThroughputMonitorStage,
         config={},
         progress_engine_count=1,
     )
-    # 7. Sink stage.
+    # 9. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
@@ -185,7 +221,9 @@ if __name__ == "__main__":
     pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)
     pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=100)
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=100)
-    pipeline.make_edge("chart_extractor", "throughput_monitor", queue_size=100)
+    pipeline.make_edge("chart_extractor", "text_embedding", queue_size=100)
+    pipeline.make_edge("text_embedding", "image_caption", queue_size=100)
+    pipeline.make_edge("image_caption", "throughput_monitor", queue_size=100)
     pipeline.make_edge("throughput_monitor", "sink", queue_size=100)
 
     # Build the pipeline (this instantiates actors and wires edges).
