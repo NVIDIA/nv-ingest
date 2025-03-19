@@ -95,7 +95,7 @@ taskset -c 0-3 python your_ingestion_script.py
 On a 4 CPU core low end laptop, the following should take about 10 seconds:
 ```python
 import logging, os, time, sys
-               
+
 from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
@@ -114,7 +114,7 @@ client = NvIngestClient(
     message_client_port=7671,
     message_client_hostname="localhost"
 )
-                                            
+
 # Note: gpu_cagra accelerated indexing is not yet available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
@@ -163,12 +163,12 @@ Time taken: 9.243880033493042 seconds
 TestingDocument
 A sample document with headings and placeholder text
 Introduction
-This is a placeholder document that can be used for any purpose. It contains some 
-headings and some placeholder text to fill the space. The text is not important and contains 
-no real value, but it is useful for testing. Below, we will have some simple tables and charts 
+This is a placeholder document that can be used for any purpose. It contains some
+headings and some placeholder text to fill the space. The text is not important and contains
+no real value, but it is useful for testing. Below, we will have some simple tables and charts
 that we can use to confirm Ingest is working as expected.
 Table 1
-This table describes some animals, and some activities they might be doing in specific 
+This table describes some animals, and some activities they might be doing in specific
 locations.
 Animal Activity Place
 Gira@e Driving a car At the beach
@@ -225,12 +225,12 @@ print(f"Answer: {response}")
 Prompt: Using the following content: TestingDocument
 A sample document with headings and placeholder text
 Introduction
-This is a placeholder document that can be used for any purpose. It contains some 
-headings and some placeholder text to fill the space. The text is not important and contains 
-no real value, but it is useful for testing. Below, we will have some simple tables and charts 
+This is a placeholder document that can be used for any purpose. It contains some
+headings and some placeholder text to fill the space. The text is not important and contains
+no real value, but it is useful for testing. Below, we will have some simple tables and charts
 that we can use to confirm Ingest is working as expected.
 Table 1
-This table describes some animals, and some activities they might be doing in specific 
+This table describes some animals, and some activities they might be doing in specific
 locations.
 Animal Activity Place
 Gira@e Driving a car At the beach
