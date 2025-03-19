@@ -4,6 +4,7 @@ repos:
     hooks:
     -   id: trailing-whitespace
         exclude: '^(docs|data)'
+        exclude: \.(md|markdown)$
     -   id: end-of-file-fixer
     -   id: check-added-large-files
         args: [-- maxkb=1500]
