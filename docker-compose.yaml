@@ -153,7 +153,7 @@ services:
       - reranker
 
   nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0}
+    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0}
     ports:
       - "8015:8000"
       - "8016:8001"
