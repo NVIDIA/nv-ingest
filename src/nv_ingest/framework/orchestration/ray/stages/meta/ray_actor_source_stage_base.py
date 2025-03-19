@@ -20,7 +20,7 @@ class RayActorSourceStage(RayActorStage, ABC):
         raise NotImplementedError("Source stages do not support an input edge.")
 
     @abstractmethod
-    async def get_input(self) -> Any:
+    async def read_input(self) -> Any:
         """
         Source stages must implement get_input() to fetch control messages from an external source.
         """

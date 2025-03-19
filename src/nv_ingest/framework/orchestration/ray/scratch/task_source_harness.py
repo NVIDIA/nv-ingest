@@ -6,7 +6,11 @@ import ray
 import logging
 import time
 
-from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import MessageBrokerTaskSource
+# Import the new source stage and its configuration
+from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import (
+    MessageBrokerTaskSourceStage,
+    MessageBrokerTaskSourceConfig,
+)
 
 
 def main():
@@ -28,21 +32,22 @@ def main():
         "broker_params": {"db": 0, "use_ssl": False},
     }
 
-    # Create an instance of the MessageBrokerTaskSource actor with the Redis configuration
-    message_broker_actor = MessageBrokerTaskSource.remote(
+    # Create an instance of the configuration for the source stage.
+    config = MessageBrokerTaskSourceConfig(
         broker_client=redis_config,
         task_queue="morpheus_task_queue",
-        progress_engines=1,
         poll_interval=0.1,
-        batch_size=10,
     )
 
-    # Start the actor to begin fetching messages
+    # Create an instance of the MessageBrokerTaskSource actor with the configuration and a progress_engine_count of 1.
+    message_broker_actor = MessageBrokerTaskSourceStage.remote(config, 1)
+
+    # Start the actor to begin fetching messages.
     ray.get(message_broker_actor.start.remote())
     logger.info("MessageBrokerTaskSource actor started. Listening for messages...")
 
     try:
-        # Run indefinitely until a KeyboardInterrupt (Ctrl+C) is received
+        # Run indefinitely until a KeyboardInterrupt (Ctrl+C) is received.
         while True:
             time.sleep(1)
     except KeyboardInterrupt:

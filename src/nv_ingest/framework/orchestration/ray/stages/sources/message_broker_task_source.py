@@ -57,7 +57,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self.broker_client = self.config.broker_client
         self.task_queue = self.config.task_queue
         self.poll_interval = self.config.poll_interval
-        self.batch_size = self.config.batch_size
         self.client = self._create_client()
         self.message_count = 0
         self.start_time = None
@@ -206,7 +205,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             logger.exception(f"Error during message fetching: {err}")
             return None
 
-    async def get_input(self) -> Any:
+    async def read_input(self) -> Any:
         """
         Source stage's implementation of get_input.
         Instead of reading from an input edge, fetch a message from the broker.
