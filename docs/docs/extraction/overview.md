@@ -1,20 +1,20 @@
 # What is NeMo Retriever Extraction?
 
-NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
-NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
+NeMo Retriever Extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
+NeMo Retriever Extraction uses specialized NVIDIA NIM microservices 
 to find, contextualize, and extract text, tables, charts and images that you can use in downstream generative applications.
 
 !!! note
 
-    NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
+    NeMo Retriever Extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+NeMo Retriever Extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 !!! note
 
-    Cached and Deplot are deprecated. Instead, docker-compose now uses a beta version of the yolox-graphic-elements container. With this change, you should now be able to run nv-ingest on a single 80GB A100 or H100 GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+    Cached and Deplot are deprecated. Instead, NeMo Retriever Extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 
