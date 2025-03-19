@@ -216,6 +216,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             return None
         ts_fetched = datetime.now()
         control_message = self._process_message(job, ts_fetched)
+
+        logger.warning(f"[SOURCE CM]: {control_message.payload()}\n")
         return control_message
 
     async def on_data(self, control_message: Any) -> Any:
