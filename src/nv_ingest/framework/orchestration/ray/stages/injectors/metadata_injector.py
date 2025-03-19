@@ -49,57 +49,46 @@ class MetadataInjectionStage(RayActorStage):
         IngestControlMessage
             The message with updated metadata if injection was required.
         """
-        try:
-            df = message.payload()
-            update_required = False
-            rows = []
-            logger.debug("Starting metadata injection on DataFrame with %d rows", len(df))
+        df = message.payload()
+        update_required = False
+        rows = []
+        logger.debug("Starting metadata injection on DataFrame with %d rows", len(df))
 
-            for _, row in df.iterrows():
-                try:
-                    # Convert document type to content type using enums.
-                    content_type = doc_type_to_content_type(DocumentTypeEnum(row["document_type"]))
-                    # Check if metadata is missing or doesn't contain 'content'
-                    if (
-                        "metadata" not in row
-                        or not isinstance(row["metadata"], dict)
-                        or "content" not in row["metadata"]
-                    ):
-                        update_required = True
-                        row["metadata"] = {
-                            "content": row.get("content"),
-                            "content_metadata": {
-                                "type": content_type.name.lower(),
-                            },
-                            "error_metadata": None,
-                            "audio_metadata": (
-                                None if content_type != ContentTypeEnum.AUDIO else {"audio_type": row["document_type"]}
-                            ),
-                            "image_metadata": (
-                                None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
-                            ),
-                            "source_metadata": {
-                                "source_id": row.get("source_id"),
-                                "source_name": row.get("source_name"),
-                                "source_type": row["document_type"],
-                            },
-                            "text_metadata": (
-                                None if content_type != ContentTypeEnum.TEXT else {"text_type": "document"}
-                            ),
-                        }
-                except Exception as inner_e:
-                    logger.exception("Failed to process row during metadata injection")
-                    raise inner_e
-                rows.append(row)
+        for _, row in df.iterrows():
+            try:
+                # Convert document type to content type using enums.
+                content_type = doc_type_to_content_type(DocumentTypeEnum(row["document_type"]))
+                # Check if metadata is missing or doesn't contain 'content'
+                if "metadata" not in row or not isinstance(row["metadata"], dict) or "content" not in row["metadata"]:
+                    update_required = True
+                    row["metadata"] = {
+                        "content": row.get("content"),
+                        "content_metadata": {
+                            "type": content_type.name.lower(),
+                        },
+                        "error_metadata": None,
+                        "audio_metadata": (
+                            None if content_type != ContentTypeEnum.AUDIO else {"audio_type": row["document_type"]}
+                        ),
+                        "image_metadata": (
+                            None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
+                        ),
+                        "source_metadata": {
+                            "source_id": row.get("source_id"),
+                            "source_name": row.get("source_name"),
+                            "source_type": row["document_type"],
+                        },
+                        "text_metadata": (None if content_type != ContentTypeEnum.TEXT else {"text_type": "document"}),
+                    }
+            except Exception as inner_e:
+                logger.exception("Failed to process row during metadata injection")
+                raise inner_e
+            rows.append(row)
 
-            if update_required:
-                docs = pd.DataFrame(rows)
-                message.payload(docs)
-                logger.debug("Metadata injection updated payload with %d rows", len(docs))
-            else:
-                logger.debug("No metadata update was necessary during metadata injection")
-            return message
-        except Exception as e:
-            new_message = f"on_data: Failed to process IngestControlMessage. Original error: {str(e)}"
-            logger.exception(new_message)
-            raise type(e)(new_message) from e
+        if update_required:
+            docs = pd.DataFrame(rows)
+            message.payload(docs)
+            logger.debug("Metadata injection updated payload with %d rows", len(docs))
+        else:
+            logger.debug("No metadata update was necessary during metadata injection")
+        return message
