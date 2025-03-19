@@ -157,33 +157,26 @@ print(ingest_json_results_to_blob(results[0]))
 
 You can see the extracted text that represents the content of the ingested test document.
 ```shell
-Testing Document
+Starting ingestion..
+Time taken: 9.243880033493042 seconds
 
+TestingDocument
 A sample document with headings and placeholder text
-
 Introduction
-
-This is a placeholder document that can be used for any purpose. It contains some headings and some placeholder text to fill the space. The text is not important and contains no real value, but it is useful for testing. Below, we will have some simple tables and charts that we can use to confirm Ingest is working as expected.
-
-Chart 1
-
-This chart shows some gadgets, and some very fictitious costs.
-
-
-
-\begin{tabular}{ccc}
-**Animal** & **Activity** & **Place**\\
-Giraffe & Driving a car & At the beach\\
-Lion & Putting on sunscreen & At the park\\
-Cat & Jumping onto a laptop & In a home office\\
-Dog & Chasing a squirrel & In the front yard\\
-\end{tabular}
-
-
+This is a placeholder document that can be used for any purpose. It contains some 
+headings and some placeholder text to fill the space. The text is not important and contains 
+no real value, but it is useful for testing. Below, we will have some simple tables and charts 
+that we can use to confirm Ingest is working as expected.
 Table 1
-
-This table describes some animals, and some activities they might be doing in specific locations.
-
+This table describes some animals, and some activities they might be doing in specific 
+locations.
+Animal Activity Place
+Gira@e Driving a car At the beach
+Lion Putting on sunscreen At the park
+Cat Jumping onto a laptop In a home o@ice
+Dog Chasing a squirrel In the front yard
+Chart 1
+This chart shows some gadgets, and some very fictitious costs.
 ... document extract continues ...
 ```
 
@@ -229,44 +222,35 @@ print(f"Answer: {response}")
 ```
 
 ```shell
-Prompt: Using the following content: Testing Document
-
+Prompt: Using the following content: TestingDocument
 A sample document with headings and placeholder text
-
 Introduction
-
-This is a placeholder document that can be used for any purpose. It contains some headings and some placeholder text to fill the space. The text is not important and contains no real value, but it is useful for testing. Below, we will have some simple tables and charts that we can use to confirm Ingest is working as expected.
-
-Chart 1
-
-This chart shows some gadgets, and some very fictitious costs.
-
-
-
-\begin{tabular}{ccc}
-**Animal** & **Activity** & **Place**\\
-Giraffe & Driving a car & At the beach\\
-Lion & Putting on sunscreen & At the park\\
-Cat & Jumping onto a laptop & In a home office\\
-Dog & Chasing a squirrel & In the front yard\\
-\end{tabular}
-
-
+This is a placeholder document that can be used for any purpose. It contains some 
+headings and some placeholder text to fill the space. The text is not important and contains 
+no real value, but it is useful for testing. Below, we will have some simple tables and charts 
+that we can use to confirm Ingest is working as expected.
 Table 1
-
-This table describes some animals, and some activities they might be doing in specific locations.
+This table describes some animals, and some activities they might be doing in specific 
+locations.
+Animal Activity Place
+Gira@e Driving a car At the beach
+Lion Putting on sunscreen At the park
+Cat Jumping onto a laptop In a home o@ice
+Dog Chasing a squirrel In the front yard
+Chart 1
+This chart shows some gadgets, and some very fictitious costs.
 
  Answer the user query: Which animal is responsible for the typos?
 Answer: A clever query!
 
-Based on the provided content, I'd argue that the answer is implied, but not directly stated, as there's no explicit mention of "typos" or an animal responsible for them. However, given the context, I'll provide a humorous, interpretative response:
+After carefully examining the provided content, I'd like to point out the potential "typos" (assuming you're referring to the unusual or intentionally incorrect text) and attempt to playfully "assign blame" to an animal based on the context:
 
-**Answer:** The **Cat** is likely responsible for the typos.
+1. **Gira@e** (instead of Giraffe) - **Animal blamed: Giraffe** (Table 1, first row)
+	* The "@" symbol in "Gira@e" suggests a possible typo or placeholder character, which we'll humorously attribute to the Giraffe's alleged carelessness.
+2. **o@ice** (instead of Office) - **Animal blamed: Cat**
+	* The same "@" symbol appears in "o@ice", which is related to the Cat's activity in the same table. Perhaps the Cat was in a hurry while typing and introduced the error?
 
-**Rationale:**
-In the table, the Cat's activity is listed as "Jumping onto a laptop" while being "In a home office". It's a common meme and relatable scenario where a cat jumps onto a keyboard, inadvertently causing typos. This connection, although not explicitly stated in the document, provides a plausible (and amusing) inference. 
-
-**Please note:** This response is an educated guess, and without direct information about typos in the original content, the answer is subjective and intended to be light-hearted.
+So, according to this whimsical analysis, both the **Giraffe** and the **Cat** are "responsible" for the typos, with the Giraffe possibly being the more egregious offender given the more blatant character substitution in its name.
 ```
 
 For more information, please check out the [official documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
