@@ -76,7 +76,7 @@ NV-Ingest does not do the following:
 - [NVIDIA Container Toolkit](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html)
 
 > [!Note]
-> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.10](https://www.python.org/downloads/release/python-3100/).
+> You install Python in a later step. NVIDIA-Ingest only supports [Python version 3.12](https://www.python.org/downloads/release/python-3120/).
 
 ## Quickstart
 

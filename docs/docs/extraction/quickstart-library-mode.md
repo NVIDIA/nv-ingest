@@ -7,7 +7,7 @@ To get started using [NeMo Retriever extraction](overview.md) in library mode, y
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
 - [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
-- [Python version 3.10](https://www.python.org/downloads/release/python-3100/)
+- [Python version 3.12](https://www.python.org/downloads/release/python-3120/)
 
 
 
@@ -18,7 +18,7 @@ Use the following procedure to prepare your environment.
 1. Run the following code to create your NVIDIA Ingest Conda environment.
 
     ```
-    conda create -y --name nvingest python=3.10
+    conda create -y --name nvingest python=3.12
     conda activate nvingest
     conda install -y -c rapidsai -c rapidsai-nightly -c conda-forge -c nvidia nvidia/label/dev::nv_ingest nvidia/label/dev::nv_ingest_client nvidia/label/dev::nv_ingest_api
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite dotenv ffmpeg nvidia-riva-client
