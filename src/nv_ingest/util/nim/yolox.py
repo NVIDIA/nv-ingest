@@ -235,8 +235,11 @@ class YoloxModelInterfaceBase(ModelInterface):
             logger.debug("Formatting input for HTTP Yolox model")
             content_list: List[Dict[str, Any]] = []
             for image in data["images"]:
-                # Convert the numpy array to a PIL Image. Assume images are in [0,1].
-                image_pil = Image.fromarray((image * 255).astype(np.uint8))
+                # Convert to uint8 if needed.
+                if image.dtype != np.uint8:
+                    image = (image * 255).astype(np.uint8)
+                # Convert the numpy array to a PIL Image.
+                image_pil = Image.fromarray(image)
                 original_size = image_pil.size
 
                 # Save the image to a buffer and encode to base64.
