@@ -1,6 +1,5 @@
 name: nv_ingest_client
 channels:
-  - nvidia/label/dev
   - rapidsai
   - nvidia
   - conda-forge
@@ -13,11 +12,11 @@ dependencies:
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0
-  - python>=3.10
+  - python>=3.12
   - python-build>=1.2.2
   - python-docx>=1.1.2
   - python-pptx>=1.0.2
   - requests>=2.28.2
-  - setuptools>=58.2.0
+  - setuptools>=75.8.2
   - tqdm>=4.67.1
   - pip
