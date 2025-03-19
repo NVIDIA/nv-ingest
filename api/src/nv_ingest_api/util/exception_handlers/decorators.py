@@ -7,7 +7,7 @@ import logging
 import functools
 import inspect
 import re
-from typing import Any, Optional, Callable
+from typing import Any, Optional, Callable, Tuple
 from functools import wraps
 
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
@@ -26,24 +26,47 @@ def nv_ingest_node_failure_context_manager(
 ) -> Callable:
     """
     Decorator that applies a failure context manager around a function processing an IngestControlMessage.
-    Works with both synchronous and asynchronous functions.
+    Works with both synchronous and asynchronous functions, and supports class methods (with 'self').
 
-    Parameters:
-      - annotation_id: A unique identifier used for annotating the task's result.
-      - payload_can_be_empty: If False, ensures the message payload is not null.
-      - raise_on_failure: If True, exceptions are raised; otherwise, they are annotated.
-      - skip_processing_if_failed: If True, the function is skipped if the message is already marked as failed.
-      - forward_func: If provided, a function to forward the message when skipped.
+    Parameters
+    ----------
+    annotation_id : str
+        A unique identifier for annotation.
+    payload_can_be_empty : bool, optional
+        If False, the message payload must not be null.
+    raise_on_failure : bool, optional
+        If True, exceptions are raised; otherwise, they are annotated.
+    skip_processing_if_failed : bool, optional
+        If True, skip processing if the message is already marked as failed.
+    forward_func : Optional[Callable[[Any], Any]]
+        If provided, a function to forward the message when processing is skipped.
 
-    Returns:
-      A decorator that wraps the given function with failure handling logic.
+    Returns
+    -------
+    Callable
+        The decorated function.
     """
+
+    def extract_message_and_prefix(args: Tuple) -> Tuple[Any, Tuple]:
+        """
+        Determines if the function is a method (first argument is self) or a standalone function.
+        Returns a tuple (control_message, prefix) where prefix is a tuple of preceding arguments to be preserved.
+        """
+        if args and hasattr(args[0], "get_metadata"):
+            # Standalone function: first argument is the message.
+            return args[0], ()
+        elif len(args) >= 2 and hasattr(args[1], "get_metadata"):
+            # Method: first argument is self, second is the message.
+            return args[1], (args[0],)
+        else:
+            raise ValueError("No IngestControlMessage found in the first or second argument.")
 
     def decorator(func: Callable) -> Callable:
         if asyncio.iscoroutinefunction(func):
 
             @functools.wraps(func)
-            async def async_wrapper(control_message: Any, *args: Any, **kwargs: Any) -> Any:
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                control_message, prefix = extract_message_and_prefix(args)
                 is_failed = control_message.get_metadata("cm_failed", False)
                 if not is_failed or not skip_processing_if_failed:
                     ctx_mgr = CMNVIngestFailureContextManager(
@@ -56,7 +79,9 @@ def nv_ingest_node_failure_context_manager(
                         ctx_mgr.__enter__()
                         if not payload_can_be_empty:
                             cm_ensure_payload_not_null(control_message)
-                        result = await func(ctx_mgr.control_message, *args, **kwargs)
+                        # Rebuild argument list preserving any prefix (e.g. self).
+                        new_args = prefix + (ctx_mgr.control_message,) + args[len(prefix) + 1 :]
+                        result = await func(*new_args, **kwargs)
                     except Exception as e:
                         ctx_mgr.__exit__(type(e), e, e.__traceback__)
                         raise
@@ -73,7 +98,8 @@ def nv_ingest_node_failure_context_manager(
         else:
 
             @functools.wraps(func)
-            def sync_wrapper(control_message: Any, *args: Any, **kwargs: Any) -> Any:
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                control_message, prefix = extract_message_and_prefix(args)
                 is_failed = control_message.get_metadata("cm_failed", False)
                 if not is_failed or not skip_processing_if_failed:
                     with CMNVIngestFailureContextManager(
@@ -84,7 +110,8 @@ def nv_ingest_node_failure_context_manager(
                     ) as ctx_mgr:
                         if not payload_can_be_empty:
                             cm_ensure_payload_not_null(control_message)
-                        return func(ctx_mgr.control_message, *args, **kwargs)
+                        new_args = prefix + (ctx_mgr.control_message,) + args[len(prefix) + 1 :]
+                        return func(*new_args, **kwargs)
                 else:
                     if forward_func:
                         return forward_func(control_message)
@@ -228,15 +255,29 @@ class CMNVIngestFailureContextManager:
 
 
 def unified_exception_handler(func):
-    @functools.wraps(func)
-    def wrapper(*args, **kwargs):
-        try:
-            return func(*args, **kwargs)
-        except Exception as e:
-            # Use the function's name in the error message
-            func_name = func.__name__
-            err_msg = f"{func_name}: error: {e}"
-            logger.exception(err_msg, exc_info=True)
-            raise type(e)(err_msg) from e
+    if asyncio.iscoroutinefunction(func):
 
-    return wrapper
+        @functools.wraps(func)
+        async def async_wrapper(*args, **kwargs):
+            try:
+                return await func(*args, **kwargs)
+            except Exception as e:
+                func_name = func.__name__
+                err_msg = f"{func_name}: error: {e}"
+                logger.exception(err_msg, exc_info=True)
+                raise type(e)(err_msg) from e
+
+        return async_wrapper
+    else:
+
+        @functools.wraps(func)
+        def sync_wrapper(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except Exception as e:
+                func_name = func.__name__
+                err_msg = f"{func_name}: error: {e}"
+                logger.exception(err_msg, exc_info=True)
+                raise type(e)(err_msg) from e
+
+        return sync_wrapper

@@ -11,6 +11,10 @@ import ray
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest_api.internal.enums.common import DocumentTypeEnum, ContentTypeEnum
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_context_manager,
+    unified_exception_handler,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -29,6 +33,8 @@ class MetadataInjectionStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         # Additional initialization can be added here if necessary.
 
+    @nv_ingest_node_failure_context_manager(annotation_id="metadata_injector", raise_on_failure=False)
+    @unified_exception_handler
     async def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by injecting metadata into its DataFrame payload.
