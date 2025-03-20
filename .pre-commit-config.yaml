@@ -2,13 +2,13 @@ repos:
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v5.0.0
     hooks:
-      -   id: trailing-whitespace
-          exclude: '^(docs|data)'
-      -   id: end-of-file-fixer
-      -   id: check-added-large-files
-          args: ['--maxkb=1550']
-      -   id: check-ast
-      -   id: debug-statements
+    -   id: trailing-whitespace
+        exclude: '(^(docs|data)/|\.md$)'
+    -   id: end-of-file-fixer
+    -   id: check-added-large-files
+        args: [-- maxkb=1500]
+    -   id: check-ast
+    -   id: debug-statements
 
   - repo: https://github.com/psf/black
     rev: 24.10.0
