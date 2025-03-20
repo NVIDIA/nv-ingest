@@ -2,19 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-import json
-import time
-
-import pytest
-from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.primitives import JobSpec
-from nv_ingest_client.primitives.tasks import EmbedTask
-from nv_ingest_client.primitives.tasks import ExtractTask
-from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.util.file_processing.extract import extract_file_content
-from sklearn.metrics.pairwise import cosine_similarity
-
 # redis config
 _DEFAULT_REDIS_HOST = "redis"
 _DEFAULT_REDIS_PORT = 6379
