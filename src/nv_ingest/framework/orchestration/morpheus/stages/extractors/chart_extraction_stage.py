@@ -4,7 +4,6 @@
 
 import functools
 import logging
-import pprint
 from typing import Any
 from typing import Dict
 
@@ -56,7 +55,6 @@ def generate_chart_extractor_stage(
     """
     try:
         validated_config = ChartExtractorSchema(**extractor_config)
-        logger.warning(pprint.pformat(validated_config.model_dump()))
 
         _wrapped_process_fn = functools.partial(
             extract_chart_data_from_image_internal, extraction_config=validated_config
