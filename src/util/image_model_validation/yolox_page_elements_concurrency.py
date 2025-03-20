@@ -1,39 +1,107 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import base64
 import json
 import time
 import requests
+import csv
 import click
+import signal
+import os
+import pandas as pd
+import plotly.express as px
+import plotly.graph_objects as go
 from concurrent.futures import ThreadPoolExecutor, as_completed
+from collections import defaultdict
+
+# Global variable to track if the test is running
+running = True
+
+
+def signal_handler(sig, frame):
+    """Handle Ctrl+C to gracefully exit the running tests"""
+    global running
+    print("\nGracefully stopping... (This may take a few seconds)")
+    running = False
+
+
+# Register the signal handler
+signal.signal(signal.SIGINT, signal_handler)
 
 
 @click.command()
 @click.option(
-    "--image-path", required=True, type=click.Path(exists=True), help="Path to the image file to be encoded and sent."
+    "--image-path", required=False, type=click.Path(exists=True), help="Path to the image file to be encoded and sent."
 )
 @click.option("--url", default="http://localhost:8000/v1/infer", help="Endpoint URL to send the POST request.")
-@click.option("--start", default=1, help="Starting number of concurrent calls.", type=int)
-@click.option("--max-concurrency", default=1024, help="Maximum number of concurrent calls to test.", type=int)
+@click.option("--min-concurrency", default=1, help="Minimum number of concurrent connections to test.", type=int)
+@click.option("--max-concurrency", default=64, help="Maximum number of concurrent connections to test.", type=int)
+@click.option("--concurrency-step", default=2, help="Step size for concurrency values (multiplier).", type=float)
+@click.option("--start-batch", default=1, help="Starting batch size.", type=int)
+@click.option("--max-batch", default=128, help="Maximum batch size to test.", type=int)
+@click.option("--batch-step", default=2, help="Step size for batch size values (multiplier).", type=float)
 @click.option("--timeout", default=5, help="Timeout (in seconds) for each request.", type=int)
 @click.option(
-    "--start-batch", default=2, help="Starting number of times to include the image in each payload.", type=int
+    "--stability-duration", default=60, help="Duration (in seconds) to test each configuration for stability.", type=int
 )
-@click.option("--max-batch", default=16, help="Maximum number of times to include the image in each payload.", type=int)
 @click.option("--auth-token", default=None, help="Authentication token for the Authorization header (Bearer token).")
 @click.option(
     "--custom-headers", default="", help='Additional headers as a JSON string, e.g. \'{"X-Custom": "value"}\'.'
 )
-def test_concurrency(
-    image_path, url, start, max_concurrency, timeout, start_batch, max_batch, auth_token, custom_headers
+@click.option("--output-file", default="yolox_throughput_results.csv", help="CSV file to write results to.", type=str)
+@click.option("--visualize", is_flag=True, help="Generate Plotly visualizations of the results.")
+@click.option(
+    "--visualize-only", type=click.Path(exists=False), help="Visualize an existing CSV file without running tests."
+)
+def optimize_throughput(
+    image_path,
+    url,
+    min_concurrency,
+    max_concurrency,
+    concurrency_step,
+    start_batch,
+    max_batch,
+    batch_step,
+    timeout,
+    stability_duration,
+    auth_token,
+    custom_headers,
+    output_file,
+    visualize,
+    visualize_only,
 ):
     """
-    Tests the YOLOX page elements service with varying concurrency and batch sizes.
+    Tests the YOLOX page elements service to find the optimal throughput configuration.
 
-    This script performs two tests:
-    1. Batch size scaling: Increases batch size while keeping concurrency constant
-    2. Concurrency scaling: Increases concurrent calls while keeping batch size constant
+    For each concurrency level from min to max, this script finds the maximum stable batch size.
+    A configuration is considered 'stable' if the service can run at that concurrency/batch size
+    for at least the specified stability duration without receiving any 429 or 5xx responses.
 
-    Both tests analyze performance and identify limits of the service.
+    The script records response times and calculates throughput (images/second) for each
+    configuration and writes all results to a CSV file.
+
+    If --visualize-only is specified with a CSV file path, it will skip testing and only
+    generate visualizations from the existing CSV file.
     """
+    global running
+
+    # Check if we're only visualizing an existing CSV file
+    if visualize_only:
+        if os.path.exists(visualize_only):
+            click.echo(f"Visualizing existing CSV file: {visualize_only}")
+            generate_visualizations(visualize_only)
+            return
+        else:
+            click.echo(f"CSV file not found: {visualize_only}")
+            return
+
+    # Verify required parameters for testing
+    if not image_path:
+        click.echo("Error: --image-path is required when running tests.")
+        return
+
     # Read and encode the image file once (store the raw base64 string)
     with open(image_path, "rb") as image_file:
         encoded_image = base64.b64encode(image_file.read()).decode("utf-8")
@@ -50,334 +118,234 @@ def test_concurrency(
             click.echo(f"Error parsing custom headers: {e}. Please provide a valid JSON string.")
             return
 
-    throttling_logs = []
-    all_results = {}
+    # Prepare results array for CSV output
+    results_data = []
 
-    # PART 1: Batch Size Scaling Test
-    current_concurrency = start
-    current_batch = start_batch
+    # CSV header
+    csv_header = [
+        "concurrency",
+        "batch_size",
+        "total_requests",
+        "successful_requests",
+        "avg_response_time",
+        "min_response_time",
+        "max_response_time",
+        "throughput_images_per_sec",
+        "throughput_requests_per_sec",
+        "is_stable",
+        "200s",
+        "400s",
+        "429s",
+        "500s",
+        "timeouts",
+        "errors",
+    ]
 
-    click.echo(f"\n=== Testing batch size scaling with fixed concurrency {current_concurrency} ===")
-    while current_batch <= max_batch:
-        click.echo(f"\nTesting with batch size of {current_batch}...")
-        start_time = time.time()
-        results = []
+    # Initialize the CSV file with the header
+    with open(output_file, "w", newline="") as csvfile:
+        writer = csv.writer(csvfile)
+        writer.writerow(csv_header)
 
-        # Launch concurrent requests using a thread pool
-        with ThreadPoolExecutor(max_workers=current_concurrency) as executor:
-            futures = [
-                executor.submit(send_yolox_request, url, encoded_image, current_batch, timeout, headers)
-                for _ in range(current_concurrency)
-            ]
-            for future in as_completed(futures):
-                results.append(future.result())
+    # Test each concurrency level
+    current_concurrency = min_concurrency
+    max_throughput = 0
+    optimal_config = {"concurrency": 0, "batch_size": 0, "throughput": 0}
 
-        elapsed = time.time() - start_time
+    click.echo("\n=== Finding optimal throughput configuration ===")
 
-        # Calculate success rate
-        success_count = sum(1 for r in results if isinstance(r, int) and r >= 200 and r < 500)
-        success_rate = (success_count / current_concurrency) * 100 if current_concurrency > 0 else 0
+    while current_concurrency <= max_concurrency and running:
+        click.echo(f"\n=== Testing with concurrency: {current_concurrency} ===")
 
-        click.echo(f"Elapsed time for batch size {current_batch}: {elapsed:.2f} seconds")
-        click.echo(f"Success rate: {success_rate:.2f}%")
+        # For each concurrency, find the maximum stable batch size
+        current_batch = start_batch
+        max_stable_batch = 0
+        batch_found = False
 
-        # Tally response types
-        timeouts = results.count("timeout")
-        errors = results.count("error")
-        code_500 = results.count(500)
-        code_429 = results.count(429)
+        while current_batch <= max_batch and running and not batch_found:
+            click.echo(f"  Testing batch size: {current_batch}")
 
-        click.echo(
-            f"Response summary: 200s: {results.count(200)}, 429s: {code_429}, 500s: {code_500},"
-            f"timeouts: {timeouts}, errors: {errors}"
-        )
-
-        # Store results for this batch size
-        all_results[f"batch_{current_batch}_concurrency_{current_concurrency}"] = {
-            "elapsed_time": elapsed,
-            "success_rate": success_rate,
-            "results": {
-                "200s": results.count(200),
-                "429s": code_429,
-                "500s": code_500,
-                "timeouts": timeouts,
-                "errors": errors,
-            },
-        }
-
-        # Stop batch testing if any timeout, error, or 500 is encountered
-        if timeouts > 0 or errors > 0 or code_500 > 0:
-            click.echo(f"Stopping batch size test: encountered errors at batch size {current_batch}.")
-            break
-
-        # Increase batch size (doubling for this example)
-        current_batch *= 2
-
-    # Store the optimal batch size for the concurrency test
-    optimal_batch = max(start_batch, current_batch // 2)
-    if timeouts > 0 or errors > 0 or code_500 > 0 and current_batch > start_batch:
-        optimal_batch = current_batch // 2
-
-    # PART 2: Concurrency Scaling Test
-    click.echo(f"\n=== Testing concurrency scaling with fixed batch size {optimal_batch} ===")
-    current_concurrency = start
-    while current_concurrency <= max_concurrency:
-        click.echo(f"\nTesting with {current_concurrency} concurrent calls...")
-        start_time = time.time()
-        results = []
-
-        # Launch concurrent requests using a thread pool
-        with ThreadPoolExecutor(max_workers=current_concurrency) as executor:
-            futures = [
-                executor.submit(send_yolox_request, url, encoded_image, optimal_batch, timeout, headers)
-                for _ in range(current_concurrency)
-            ]
-            for future in as_completed(futures):
-                results.append(future.result())
-
-        elapsed = time.time() - start_time
-
-        # Calculate success rate
-        success_count = sum(1 for r in results if isinstance(r, int) and r >= 200 and r < 500)
-        success_rate = (success_count / current_concurrency) * 100 if current_concurrency > 0 else 0
-
-        click.echo(f"Elapsed time for {current_concurrency} concurrent calls: {elapsed:.2f} seconds")
-        click.echo(f"Success rate: {success_rate:.2f}%")
-
-        # Tally response types
-        timeouts = results.count("timeout")
-        errors = results.count("error")
-        code_500 = results.count(500)
-        code_429 = results.count(429)
-
-        click.echo(
-            f"Response summary: 200s: {results.count(200)}, 429s: {code_429}, 500s: {code_500}, "
-            f"timeouts: {timeouts}, errors: {errors}"
-        )
-
-        if code_429:
-            throttling_logs.append((current_concurrency, code_429))
-            click.echo(f"Throttling: {code_429} responses with 429 status at {current_concurrency} concurrent calls.")
-
-        # Store results for this concurrency level
-        all_results[f"batch_{optimal_batch}_concurrency_{current_concurrency}"] = {
-            "elapsed_time": elapsed,
-            "success_rate": success_rate,
-            "results": {
-                "200s": results.count(200),
-                "429s": code_429,
-                "500s": code_500,
-                "timeouts": timeouts,
-                "errors": errors,
-            },
-        }
-
-        # Stop if any timeout, error, or 500 is encountered
-        if timeouts > 0 or errors > 0 or code_500 > 0:
-            click.echo(
-                f"Stopping test: encountered {timeouts} timeouts, {errors} errors, "
-                f"{code_500} 500s at {current_concurrency} concurrent calls."
+            # Test this configuration for stability
+            stability_result = test_configuration_stability(
+                url, encoded_image, current_concurrency, current_batch, timeout, stability_duration, headers
             )
+
+            # Extract results
+            is_stable = stability_result["is_stable"]
+            response_times = stability_result["response_times"]
+            status_counts = stability_result["status_counts"]
+            total_requests = stability_result["total_requests"]
+            successful_requests = stability_result["successful_requests"]
+
+            # Calculate metrics
+            avg_response_time = sum(response_times) / len(response_times) if response_times else 0
+            min_response_time = min(response_times) if response_times else 0
+            max_response_time = max(response_times) if response_times else 0
+
+            # Calculate throughput
+            elapsed_time = stability_result["elapsed_time"]
+            throughput_requests = total_requests / elapsed_time if elapsed_time > 0 else 0
+            throughput_images = (total_requests * current_batch) / elapsed_time if elapsed_time > 0 else 0
+
+            # Log results for this configuration
+            result_row = [
+                current_concurrency,
+                current_batch,
+                total_requests,
+                successful_requests,
+                avg_response_time,
+                min_response_time,
+                max_response_time,
+                throughput_images,
+                throughput_requests,
+                is_stable,
+                status_counts.get(200, 0),
+                status_counts.get(400, 0) + status_counts.get(401, 0) + status_counts.get(403, 0),
+                status_counts.get(429, 0),
+                status_counts.get(500, 0) + status_counts.get(502, 0) + status_counts.get(503, 0),
+                status_counts.get("timeout", 0),
+                status_counts.get("error", 0),
+            ]
+
+            # Append to CSV
+            with open(output_file, "a", newline="") as csvfile:
+                writer = csv.writer(csvfile)
+                writer.writerow(result_row)
+
+            results_data.append(result_row)
+
+            # Update the optimal configuration if this is stable and has better throughput
+            if is_stable and throughput_images > max_throughput:
+                max_throughput = throughput_images
+                optimal_config = {
+                    "concurrency": current_concurrency,
+                    "batch_size": current_batch,
+                    "throughput": throughput_images,
+                }
+
+            # If stable, continue to next batch size, otherwise we've found the limit
+            if is_stable:
+                # Calculate success rate
+                success_rate = (successful_requests / total_requests) * 100 if total_requests > 0 else 0
+
+                # Display success rate and average response time
+                click.echo(f"    Success Rate: {success_rate:.2f}%, Avg Response Time: {avg_response_time:.4f}s")
+
+                max_stable_batch = current_batch
+                current_batch = int(current_batch * batch_step)
+                if current_batch > max_batch:
+                    batch_found = True
+            else:
+                # If the first batch size isn't stable, record it but continue with concurrency
+                if current_batch == start_batch:
+                    max_stable_batch = 0
+                    batch_found = True
+                else:
+                    # We found our limit for this concurrency
+                    click.echo(f"  Maximum stable batch size at concurrency {current_concurrency}: {max_stable_batch}")
+                    batch_found = True
+
+        # Print summary for this concurrency level
+        click.echo(f"  Concurrency {current_concurrency}: Maximum stable batch size: {max_stable_batch}")
+        if max_stable_batch > 0:
+            click.echo(f"  Estimated throughput at this configuration: {throughput_images:.2f} images/sec")
+
+        # Move to next concurrency
+        current_concurrency = int(current_concurrency * concurrency_step)
+        if current_concurrency > max_concurrency:
             break
 
-        # Increase concurrency (doubling for this example)
-        current_concurrency *= 2
+    # Print final results
+    click.echo("\n=== Testing Complete ===")
+    click.echo(f"Results saved to: {output_file}")
 
-    # Generate summary and recommendations
-    click.echo("\n=== Test Summary ===")
-    max_successful_batch = optimal_batch
-    max_successful_concurrency = max(start, current_concurrency // 2) if current_concurrency > start else start
+    if optimal_config["throughput"] > 0:
+        click.echo("\n=== Optimal Configuration ===")
+        click.echo(f"Concurrency: {optimal_config['concurrency']}")
+        click.echo(f"Batch Size: {optimal_config['batch_size']}")
+        click.echo(f"Throughput: {optimal_config['throughput']:.2f} images/second")
+    else:
+        click.echo("\nNo stable configuration found. Try increasing timeout or adjusting other parameters.")
 
-    click.echo(f"Maximum successful batch size: {max_successful_batch}")
-    click.echo(f"Maximum successful concurrency: {max_successful_concurrency}")
+    # Generate visualizations if requested
+    if visualize and os.path.exists(output_file) and len(results_data) > 0:
+        generate_visualizations(output_file)
 
-    # Calculate optimal throughput configuration
-    click.echo("\n=== Recommendations ===")
-    click.echo("Recommended configuration for optimal throughput:")
-    click.echo(f"- Batch size: {max_successful_batch}")
-    click.echo(f"- Concurrency: {max_successful_concurrency}")
 
-    # Save all results to a file
-    save_results_to_file(all_results)
+def test_configuration_stability(url, encoded_image, concurrency, batch_size, timeout, stability_duration, headers):
+    """
+    Tests a specific concurrency/batch size configuration for stability.
 
-    # Report throttling events if any were logged
-    if throttling_logs:
-        click.echo("\nThrottling Log (429 responses):")
-        for concurrency, count in throttling_logs:
-            click.echo(f"Concurrent calls: {concurrency} -> 429 responses: {count}")
+    Returns a dictionary with test results including stability status, response times, and status counts.
+    """
+    global running
 
-    # PART 3: Sustained Load Test at Optimal Settings
-    click.echo("\n=== Starting Sustained Load Test at Optimal Settings ===")
-    click.echo(f"Running with batch size {max_successful_batch} and concurrency {max_successful_concurrency}")
-    click.echo("Press Ctrl+C to stop the test")
-
-    sustained_results = {
+    # Initialize counters for this test
+    start_time = time.time()
+    end_time = start_time + stability_duration
+    results = {
+        "is_stable": True,
+        "response_times": [],
+        "status_counts": defaultdict(int),
         "total_requests": 0,
         "successful_requests": 0,
-        "failed_requests": 0,
-        "avg_response_time": 0,
-        "start_time": time.time(),
-        "intervals": [],
+        "elapsed_time": 0,
     }
 
-    interval_count = 0
-    interval_duration = 120  # seconds
-    last_report_time = time.time()
+    # Continue testing until stability duration is reached or an issue is found
+    while time.time() < end_time and results["is_stable"] and running:
+        batch_results = []
 
-    try:
-        while True:
-            interval_start_time = time.time()
-            _ = interval_start_time
-            interval_results = []
-
-            # Launch concurrent requests using a thread pool
-            with ThreadPoolExecutor(max_workers=max_successful_concurrency) as executor:
-                futures = [
-                    executor.submit(
-                        send_yolox_request_with_timing, url, encoded_image, max_successful_batch, timeout, headers
-                    )
-                    for _ in range(max_successful_concurrency)
-                ]
-                for future in as_completed(futures):
-                    status, response_time = future.result()
-                    interval_results.append((status, response_time))
-
-            # Process interval results
-            success_count = sum(
-                1 for status, _ in interval_results if isinstance(status, int) and status >= 200 and status < 500
-            )
-            total_count = len(interval_results)
-
-            # Update sustained results
-            sustained_results["total_requests"] += total_count
-            sustained_results["successful_requests"] += success_count
-            sustained_results["failed_requests"] += total_count - success_count
-
-            # Calculate average response time for successful requests in this interval
-            successful_times = [
-                t for status, t in interval_results if isinstance(status, int) and status >= 200 and status < 500
+        # Launch concurrent requests using a thread pool
+        with ThreadPoolExecutor(max_workers=concurrency) as executor:
+            futures = [
+                executor.submit(send_yolox_request_with_timing, url, encoded_image, batch_size, timeout, headers)
+                for _ in range(concurrency)
             ]
-            avg_time = sum(successful_times) / len(successful_times) if successful_times else 0
+            for future in as_completed(futures):
+                status, response_time = future.result()
+                batch_results.append((status, response_time))
 
-            # Update rolling average response time
-            if sustained_results["avg_response_time"] == 0:
-                sustained_results["avg_response_time"] = avg_time
-            else:
-                sustained_results["avg_response_time"] = (
-                    sustained_results["avg_response_time"] * interval_count + avg_time
-                ) / (interval_count + 1)
+                # Count status codes
+                results["status_counts"][status] += 1
 
-            # Store interval data
-            interval_data = {
-                "interval": interval_count,
-                "requests": total_count,
-                "successes": success_count,
-                "failures": total_count - success_count,
-                "avg_response_time": avg_time,
-                "response_codes": {
-                    "200": sum(1 for status, _ in interval_results if status == 200),
-                    "429": sum(1 for status, _ in interval_results if status == 429),
-                    "500": sum(1 for status, _ in interval_results if status == 500),
-                    "timeout": sum(1 for status, _ in interval_results if status == "timeout"),
-                    "error": sum(1 for status, _ in interval_results if status == "error"),
-                },
-            }
-            sustained_results["intervals"].append(interval_data)
+                # Track response times for successful requests
+                if isinstance(status, int) and 200 <= status < 300:
+                    results["response_times"].append(response_time)
+                    results["successful_requests"] += 1
 
-            # Report every 10 seconds
-            current_time = time.time()
-            if current_time - last_report_time >= interval_duration:
-                elapsed_total = current_time - sustained_results["start_time"]
-                success_rate = (
-                    (sustained_results["successful_requests"] / sustained_results["total_requests"]) * 100
-                    if sustained_results["total_requests"] > 0
-                    else 0
-                )
-                requests_per_second = sustained_results["total_requests"] / elapsed_total if elapsed_total > 0 else 0
+                # Check for error conditions that indicate instability
+                if (
+                    (isinstance(status, int) and (status == 429 or status >= 500))
+                    or status == "timeout"
+                    or status == "error"
+                ):
+                    results["is_stable"] = False
 
-                click.echo(f"\nInterval {interval_count} summary:")
-                click.echo(f"Success rate: {success_rate:.2f}%")
-                click.echo(f"Requests per second: {requests_per_second:.2f}")
-                click.echo(f"Average response time: {sustained_results['avg_response_time']:.4f} seconds")
-                click.echo(f"Total requests: {sustained_results['total_requests']}")
+                results["total_requests"] += 1
 
-                # Save progress periodically
-                save_results_to_file(sustained_results, filename="yolox_sustained_results.json")
-                last_report_time = current_time
+    # Calculate final elapsed time
+    results["elapsed_time"] = time.time() - start_time
 
-            interval_count += 1
-
-    except KeyboardInterrupt:
-        click.echo("\n\n=== Sustained Load Test Stopped ===")
-        elapsed_total = time.time() - sustained_results["start_time"]
-        success_rate = (
-            (sustained_results["successful_requests"] / sustained_results["total_requests"]) * 100
-            if sustained_results["total_requests"] > 0
-            else 0
-        )
-        requests_per_second = sustained_results["total_requests"] / elapsed_total if elapsed_total > 0 else 0
-
-        click.echo("\nFinal Results:")
-        click.echo(f"Total run time: {elapsed_total:.2f} seconds")
-        click.echo(f"Total requests: {sustained_results['total_requests']}")
-        click.echo(f"Successful requests: {sustained_results['successful_requests']}")
-        click.echo(f"Failed requests: {sustained_results['failed_requests']}")
-        click.echo(f"Success rate: {success_rate:.2f}%")
-        click.echo(f"Requests per second: {requests_per_second:.2f}")
-        click.echo(f"Average response time: {sustained_results['avg_response_time']:.4f} seconds")
-
-        # Save final results
-        save_results_to_file(sustained_results, filename="yolox_sustained_results.json")
-        click.echo("Final results saved to yolox_sustained_results.json")
-
-
-def send_yolox_request(url, encoded_image, batch_size, timeout, headers):
-    """
-    Constructs the payload using the provided base64 image data and sends a POST request.
-
-    Payload construction follows the YOLOX page elements service format:
-      - The image data is prefixed with "data:image/png;base64,".
-      - Each payload contains an "input" key whose value is a list of image objects.
-
-    Returns:
-        - The status code if the request is successful.
-        - "timeout" if the request times out.
-        - "error" for any other exception.
-    """
-    # Build the input list by repeating the image (with prefix) for the specified batch size
-    input_list = []
-    for _ in range(batch_size):
-        image_url = f"data:image/png;base64,{encoded_image}"
-        image_obj = {"type": "image_url", "url": image_url}
-        input_list.append(image_obj)
-
-    # Construct the payload with the "input" key
-    payload = {"input": input_list}
-
-    try:
-        response = requests.post(url, json=payload, timeout=timeout, headers=headers)
-        return response.status_code
-    except requests.exceptions.Timeout:
-        return "timeout"
-    except Exception as e:
-        return e
+    return results
 
 
 def send_yolox_request_with_timing(url, encoded_image, batch_size, timeout, headers):
     """
-    Similar to send_yolox_request but also returns the response time.
+    Sends a request to the YOLOX service and measures response time.
 
     Returns:
         - A tuple of (status_code, response_time) where:
           - status_code is the HTTP status code, "timeout", or "error"
           - response_time is the time taken for the request in seconds
     """
+    # Build the input list with the specified batch size
     input_list = []
     for _ in range(batch_size):
         image_url = f"data:image/png;base64,{encoded_image}"
         image_obj = {"type": "image_url", "url": image_url}
         input_list.append(image_obj)
 
+    # Construct the payload
     payload = {"input": input_list}
 
     start_time = time.time()
@@ -393,15 +361,136 @@ def send_yolox_request_with_timing(url, encoded_image, batch_size, timeout, head
         return "error", response_time
 
 
-def save_results_to_file(results, filename="yolox_concurrency_results.json"):
+def generate_visualizations(csv_file):
     """
-    Saves the test results to a JSON file.
-    """
-    with open(filename, "w") as f:
-        json.dump(results, f, indent=2)
+    Generate Plotly visualizations from the CSV results file.
 
-    click.echo(f"Results saved to {filename}")
+    Creates two graphs:
+    1. Response time vs batch size for each concurrency level
+    2. Response time vs concurrency for each batch size
+
+    Both graphs include tooltips showing throughput when hovering over data points.
+    """
+    try:
+        # Load the data from CSV
+        df = pd.read_csv(csv_file)
+
+        # Filter only stable configurations
+        stable_df = df[df["is_stable"] == True].copy()  # noqa: E712
+
+        if len(stable_df) == 0:
+            click.echo("No stable configurations found for visualization.")
+            return
+
+        # Add custom hover text for the graphs
+        stable_df["hover_text"] = stable_df.apply(
+            lambda row: f"Concurrency: {row['concurrency']}<br>"
+            + f"Batch Size: {row['batch_size']}<br>"
+            + f"Response Time: {row['avg_response_time']:.4f}s<br>"
+            + f"Throughput: {row['throughput_images_per_sec']:.2f} img/s",
+            axis=1,
+        )
+
+        # Create output directory if it doesn't exist
+        output_dir = "visualizations"
+        os.makedirs(output_dir, exist_ok=True)
+
+        # 1. Response time vs batch size for each concurrency level
+        fig1 = px.line(
+            stable_df,
+            x="batch_size",
+            y="avg_response_time",
+            color="concurrency",
+            markers=True,
+            title="Response Time vs Batch Size by Concurrency Level",
+            labels={
+                "batch_size": "Batch Size",
+                "avg_response_time": "Average Response Time (s)",
+                "concurrency": "Concurrency",
+            },
+            hover_data=["throughput_images_per_sec"],
+        )
+
+        # Add tooltips via custom hovertext
+        fig1.update_traces(hovertext=stable_df["hover_text"])
+
+        # Adjust layout
+        fig1.update_layout(
+            xaxis_title="Batch Size",
+            yaxis_title="Response Time (seconds)",
+            legend_title="Concurrency",
+            hovermode="closest",
+        )
+
+        # Save the figure
+        fig1.write_html(os.path.join(output_dir, "response_time_vs_batch_size.html"))
+        click.echo(f"Created visualization: {os.path.join(output_dir, 'response_time_vs_batch_size.html')}")
+
+        # 2. Response time vs concurrency for each batch size
+        # Pivot to get distinct batch size curves
+        batch_sizes = stable_df["batch_size"].unique()  # noqa
+
+        fig2 = px.line(
+            stable_df,
+            x="concurrency",
+            y="avg_response_time",
+            color="batch_size",
+            markers=True,
+            title="Response Time vs Concurrency by Batch Size",
+            labels={
+                "concurrency": "Concurrency",
+                "avg_response_time": "Average Response Time (s)",
+                "batch_size": "Batch Size",
+            },
+            hover_data=["throughput_images_per_sec"],
+        )
+
+        # Add tooltips via custom hovertext
+        fig2.update_traces(hovertext=stable_df["hover_text"])
+
+        # Adjust layout
+        fig2.update_layout(
+            xaxis_title="Concurrency",
+            yaxis_title="Response Time (seconds)",
+            legend_title="Batch Size",
+            hovermode="closest",
+        )
+
+        # Save the figure
+        fig2.write_html(os.path.join(output_dir, "response_time_vs_concurrency.html"))
+        click.echo(f"Created visualization: {os.path.join(output_dir, 'response_time_vs_concurrency.html')}")
+
+        # 3. Bonus visualization: Throughput heatmap
+        # Create a pivot table for the heatmap
+        pivot_df = stable_df.pivot_table(
+            values="throughput_images_per_sec", index="concurrency", columns="batch_size", aggfunc="mean"
+        )
+
+        # Create the heatmap
+        fig3 = go.Figure(
+            data=go.Heatmap(
+                z=pivot_df.values,
+                x=pivot_df.columns,
+                y=pivot_df.index,
+                hoverongaps=False,
+                colorscale="Viridis",
+                colorbar=dict(title="Images/second"),
+            )
+        )
+
+        fig3.update_layout(
+            title="Throughput Heatmap (Images/second)",
+            xaxis_title="Batch Size",
+            yaxis_title="Concurrency",
+        )
+
+        # Save the heatmap
+        fig3.write_html(os.path.join(output_dir, "throughput_heatmap.html"))
+        click.echo(f"Created visualization: {os.path.join(output_dir, 'throughput_heatmap.html')}")
+
+    except Exception as e:
+        click.echo(f"Error generating visualizations: {e}")
 
 
 if __name__ == "__main__":
-    test_concurrency()
+    optimize_throughput()

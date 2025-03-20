@@ -221,7 +221,7 @@ if __name__ == "__main__":
 
     # Wire the stages together via AsyncQueueEdge actors.
     pipeline.make_edge("source", "metadata_injection", queue_size=100)
-    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)
+    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)  # to limit memory pressure
     pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=100)
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=100)
     pipeline.make_edge("chart_extractor", "text_embedding", queue_size=100)
