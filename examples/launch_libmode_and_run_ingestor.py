@@ -81,6 +81,10 @@ def main():
         # Optionally, wait a bit before starting the ingestor to ensure the pipeline is ready
         time.sleep(10)
 
+        # If the pipeline is not running, exit immediately
+        if pipeline_process.poll() is not None:
+            raise RuntimeError("Error running pipeline subprocess.")
+
         # Run ingestion after starting the pipeline
         run_ingestor()
 
