@@ -6,6 +6,7 @@
 set -e
 
 # Run preparation tasks here
+
 if [ "$INSTALL_ADOBE_SDK" = "true" ]; then
   echo "Checking if Adobe PDF Services SDK is installed..."
 

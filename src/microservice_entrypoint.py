@@ -3,20 +3,23 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import json
+import logging
+import os
 
+import click
 from morpheus.config import Config, ExecutionMode
 from morpheus.config import CppConfig
 from morpheus.config import PipelineModes
 from morpheus.utils.logger import configure_logging
 from pydantic import ValidationError
 
-from nv_ingest.schemas.ingest_pipeline_config_schema import PipelineConfigSchema
-from nv_ingest.util.converters.containers import merge_dict
-from nv_ingest.util.logging.configuration import LogLevel
-from nv_ingest.util.logging.configuration import configure_logging as configure_local_logging
-from nv_ingest.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.util.schema.schema_validator import validate_schema
-from nv_ingest.util.pipeline.stage_builders import *
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_default_cpu_count
+from nv_ingest.framework.schemas.framework_ingest_config_schema import PipelineConfigSchema
+from nv_ingest_api.util.converters.containers import merge_dict
+from nv_ingest_api.util.logging.configuration import LogLevel
+from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+from nv_ingest_api.util.schema.schema_validator import validate_schema
 
 logger = logging.getLogger(__name__)
 
@@ -34,9 +37,8 @@ configure_local_logging(logger, local_log_level)
     help="Path to the JSON configuration file.",
     hidden=True,
 )
-@click.option("--edge_buffer_size", default=32, type=int, help="Size of the edge buffer between stages.")
+@click.option("--edge_buffer_size", default=32, type=int, help="Batch size for the pipeline.")
 @click.option("--num_threads", default=get_default_cpu_count(), type=int, help="Number of threads.")
-@click.option("--model_max_batch_size", default=256, type=int, help="Model max batch size.")
 @click.option(
     "--mode",
     type=click.Choice([mode.value for mode in PipelineModes], case_sensitive=False),
@@ -54,7 +56,6 @@ def cli(
     ingest_config_path,
     edge_buffer_size,
     num_threads,
-    model_max_batch_size,
     mode,
     log_level,
 ):
@@ -86,11 +87,10 @@ def cli(
 
     morpheus_pipeline_config = Config()
     morpheus_pipeline_config.execution_mode = ExecutionMode.CPU
-    morpheus_pipeline_config.edge_buffer_size = edge_buffer_size
     morpheus_pipeline_config.debug = True if log_level == "DEBUG" else False
     morpheus_pipeline_config.log_level = log_level
+    morpheus_pipeline_config.edge_buffer_size = edge_buffer_size
     morpheus_pipeline_config.num_threads = num_threads
-    morpheus_pipeline_config.model_max_batch_size = model_max_batch_size
     morpheus_pipeline_config.mode = PipelineModes[mode.upper()]
 
     cli_ingest_config = {}  # TODO: Create a config for CLI overrides -- not necessary yet.
@@ -116,5 +116,6 @@ def cli(
     run_pipeline(morpheus_pipeline_config, final_ingest_config)
 
 
+# TODO: Decouple this from Morpheus
 if __name__ == "__main__":
     cli()

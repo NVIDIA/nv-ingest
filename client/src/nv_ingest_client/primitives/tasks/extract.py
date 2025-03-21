@@ -32,6 +32,7 @@ ADOBE_CLIENT_ID = os.environ.get("ADOBE_CLIENT_ID", None)
 ADOBE_CLIENT_SECRET = os.environ.get("ADOBE_CLIENT_SECRET", None)
 
 _DEFAULT_EXTRACTOR_MAP = {
+    "bmp": "image",
     "csv": "pandas",
     "docx": "python_docx",
     "excel": "openpyxl",
@@ -68,13 +69,14 @@ _Type_Extract_Method_Image = Literal["image"]
 _Type_Extract_Method_Audio = Literal["audio"]
 
 _Type_Extract_Method_Map = {
+    "bmp": get_args(_Type_Extract_Method_Image),
     "docx": get_args(_Type_Extract_Method_DOCX),
     "jpeg": get_args(_Type_Extract_Method_Image),
     "jpg": get_args(_Type_Extract_Method_Image),
     "pdf": get_args(_Type_Extract_Method_PDF),
     "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
-    "svg": get_args(_Type_Extract_Method_Image),
+    # "svg": get_args(_Type_Extract_Method_Image),
     "tiff": get_args(_Type_Extract_Method_Image),
     "mp3": get_args(_Type_Extract_Method_Audio),
     "wav": get_args(_Type_Extract_Method_Audio),

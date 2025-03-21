@@ -13,6 +13,8 @@ def configure_logging(logger, log_level: str):
 
     Parameters
     ----------
+    logger: logging.Logger
+        The logger to configure.
     log_level : str
         The logging level as a string, expected to be one of
         'DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL'.
