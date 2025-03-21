@@ -35,12 +35,21 @@ def run_ingestor():
         .files("./data/multimodal_test.pdf")
         .extract(
             extract_text=True,
-            extract_tables=False,
-            extract_charts=False,
-            extract_images=False,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            paddle_output_format="markdown",
+            extract_infographics=True,
+            text_depth="page",
         )
-        # .split()
-        # .embed()
+        .embed()
+        .caption()
+        .vdb_upload(
+            collection_name="test",
+            milvus_uri="milvus.db",
+            sparse=False,
+            dense_dim=2048,
+        )
     )
 
     try:
@@ -70,10 +79,12 @@ def main():
         # Optionally, wait a bit before starting the ingestor to ensure the pipeline is ready
         time.sleep(10)
 
+        # If the pipeline is not running, exit immediately
+        if pipeline_process.poll() is not None:
+            raise RuntimeError("Error running pipeline subprocess.")
+
         # Run ingestion after starting the pipeline
         run_ingestor()
-
-        pipeline_process.wait()
 
         # The main program will exit, and the atexit handler will terminate the subprocess group
 
