@@ -25,14 +25,14 @@ class TextSplitterStage(RayActorStage):
     """
 
     def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
-        # Initialize the base class so that attributes like self.running are properly set.
         super().__init__(config, progress_engine_count)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
+        logger.info("TextSplitterStage initialized with config: %s", config)
 
     @filter_by_task(["split"])
     @nv_ingest_node_failure_context_manager(annotation_id="text_splitter", raise_on_failure=False)
-    async def on_data(self, message: Any) -> Any:
+    def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by splitting and tokenizing its text.
 
@@ -47,10 +47,14 @@ class TextSplitterStage(RayActorStage):
             The updated message with its payload transformed.
         """
         try:
+            logger.info("TextSplitterStage.on_data: Starting processing.")
             # Extract the DataFrame payload.
             df_payload = message.payload()
+            logger.debug("Extracted payload with %d rows.", len(df_payload))
+
             # Remove the "split" task to obtain task-specific configuration.
             task_config = remove_task_by_type(message, "split")
+            logger.debug("Extracted task config: %s", task_config)
 
             # Transform the DataFrame (split text and tokenize).
             df_updated = transform_text_split_and_tokenize_internal(
@@ -59,9 +63,13 @@ class TextSplitterStage(RayActorStage):
                 transform_config=self.validated_config,
                 execution_trace_log=None,
             )
+            logger.info(
+                "TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated)
+            )
 
             # Update the message payload.
             message.payload(df_updated)
+            logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
             return message
         except Exception as e:
             logger.exception("TextSplitterStage failed to process IngestControlMessage")
