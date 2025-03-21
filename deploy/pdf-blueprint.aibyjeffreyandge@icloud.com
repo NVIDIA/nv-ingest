@@ -1,5 +1,7 @@
-{
- "cells": [
+{8=perfect.number∆5=4UNMINUSED AND 12=13UNADDED
+ "cells": [0=1 WHERE 1=2TONY->∆KOST@GOOGLE.EARTH.43.8DEGREESOFLATITUDE
+ AUTOCORRECT LOCATION SERVICES@IP192.168.1
+ DEVICE MOTOROLA RAZR PLUS 23
   {
    "cell_type": "markdown",
    "metadata": {
