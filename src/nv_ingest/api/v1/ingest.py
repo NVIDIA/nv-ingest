@@ -9,7 +9,6 @@ import base64
 import json
 import logging
 import time
-import traceback
 import uuid
 
 from fastapi import APIRouter, Request, Response
@@ -18,17 +17,18 @@ from fastapi import File, UploadFile, Form
 from fastapi import HTTPException
 from fastapi.responses import StreamingResponse
 from fastapi.responses import JSONResponse
+
+from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
+from nv_ingest.framework.schemas.framework_processing_job_schema import ProcessingJob, ConversionStatus
+from nv_ingest.framework.util.service.impl.ingest.redis_ingest_service import RedisIngestService
+from nv_ingest.framework.util.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
 from redis import RedisError
 
-from nv_ingest.util.converters.formats import ingest_json_results_to_blob
+from nv_ingest_api.util.converters.formats import ingest_json_results_to_blob
 
-from nv_ingest.schemas.message_wrapper_schema import MessageWrapper
-from nv_ingest.schemas.processing_job_schema import ConversionStatus, ProcessingJob
-from nv_ingest.service.impl.ingest.redis_ingest_service import RedisIngestService
-from nv_ingest.service.meta.ingest.ingest_service_meta import IngestServiceMeta
 from nv_ingest_client.primitives.tasks.table_extraction import TableExtractionTask
 from nv_ingest_client.primitives.tasks.chart_extraction import ChartExtractionTask
 from nv_ingest_client.primitives.tasks.infographic_extraction import InfographicExtractionTask
@@ -95,7 +95,7 @@ async def submit_job_curl_friendly(ingest_service: INGEST_SERVICE_T, file: Uploa
         submitted_job_id = await ingest_service.submit_job(MessageWrapper(payload=json.dumps(job_spec.to_dict())))
         return submitted_job_id
     except Exception as ex:
-        traceback.print_exc()
+        logger.exception(f"Error submitting job: {str(ex)}")
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
@@ -150,7 +150,7 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             return job_id
 
         except Exception as ex:
-            traceback.print_exc()
+            logger.exception(f"Error submitting job: {str(ex)}")
             raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
 
@@ -181,6 +181,7 @@ async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
     except ValueError as ve:
         raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
     except Exception as ex:
+        # Catch-all for other exceptions, returning a 500 Internal Server Error
         logger.exception(f"Error fetching job: {str(ex)}")
         raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
 
