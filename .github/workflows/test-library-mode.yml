@@ -49,9 +49,7 @@ jobs:
       - name: Install Conda and run script
         env:
           AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
-          EMBEDDING_NIM_ENDPOINT: ${{ secrets.EMBEDDING_NIM_ENDPOINT }}
           EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
-          NEMORETRIEVER_PARSE_HTTP_ENDPOINT: ${{ secrets.NEMORETRIEVER_PARSE_HTTP_ENDPOINT }}
           NEMORETRIEVER_PARSE_MODEL_NAME: ${{ secrets.NEMORETRIEVER_PARSE_MODEL_NAME }}
           NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
           NVIDIA_BUILD_API_KEY: ${{ secrets.NVIDIA_BUILD_API_KEY }}
