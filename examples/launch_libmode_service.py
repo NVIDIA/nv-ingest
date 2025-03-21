@@ -36,8 +36,6 @@ def main():
         # Start the pipeline subprocess
         pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
 
-        pipeline_process.wait()
-
         # The main program will exit, and the atexit handler will terminate the subprocess group
 
     except Exception as e:
