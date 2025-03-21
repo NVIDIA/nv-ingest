@@ -76,12 +76,19 @@ class DocxProperties:
         self.document = document
         self.source_metadata = source_metadata
 
+        # Extract core properties with None checks
         core_properties = self.document.core_properties
+
+        # Get properties with None handling
         self.title = core_properties.title
-        self.author = core_properties.author if core_properties.author else core_properties.last_modified_by
+
+        # Author with fallback to last_modified_by if author is None
+        self.author = core_properties.author if core_properties.author is not None else core_properties.last_modified_by
+
         self.created = core_properties.created
         self.modified = core_properties.modified
         self.keywords = core_properties.keywords
+
         self._update_source_meta_data()
 
     def __str__(self):
@@ -89,11 +96,21 @@ class DocxProperties:
         Print properties
         """
         info = "Document Properties:\n"
-        info += f"title {self.title}\n"
-        info += f"author {self.author}\n"
-        info += f"created {self.created.isoformat()}\n"
-        info += f"modified {self.modified.isoformat()}\n"
-        info += f"keywords {self.keywords}\n"
+        info += f"title: {self.title}\n"
+        info += f"author: {self.author}\n"
+
+        # Handle date formatting safely
+        if self.created is not None:
+            info += f"created: {self.created.isoformat()}\n"
+        else:
+            info += "created: None\n"
+
+        if self.modified is not None:
+            info += f"modified: {self.modified.isoformat()}\n"
+        else:
+            info += "modified: None\n"
+
+        info += f"keywords: {self.keywords}\n"
 
         return info
 
@@ -101,12 +118,17 @@ class DocxProperties:
         """
         Update the source metadata with the document's core properties
         """
-        self.source_metadata.update(
-            {
-                "date_created": self.created.isoformat(),
-                "last_modified": self.modified.isoformat(),
-            }
-        )
+        # Only update metadata if dates are available
+        metadata_updates = {}
+
+        if self.created is not None:
+            metadata_updates["date_created"] = self.created.isoformat()
+
+        if self.modified is not None:
+            metadata_updates["last_modified"] = self.modified.isoformat()
+
+        if metadata_updates:
+            self.source_metadata.update(metadata_updates)
 
 
 class DocxReader:
