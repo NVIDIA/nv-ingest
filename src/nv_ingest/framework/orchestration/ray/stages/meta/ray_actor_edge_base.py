@@ -26,7 +26,7 @@ class RayActorEdge(ABC):
         self.multi_writer = multi_writer
 
     @abstractmethod
-    async def write(self, item: Any) -> bool:
+    def write(self, item: Any) -> bool:
         """
         Write an item into the edge.
 
@@ -43,7 +43,7 @@ class RayActorEdge(ABC):
         pass
 
     @abstractmethod
-    async def read(self) -> Any:
+    def read(self) -> Any:
         """
         Read an item from the edge.
 

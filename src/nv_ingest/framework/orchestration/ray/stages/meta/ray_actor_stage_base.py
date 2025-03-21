@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import asyncio
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -15,10 +14,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-###############################################################################
-# Abstract base class for Ray actor stages
-
-
 class RayActorStage(ABC):
     def __init__(self, config: BaseModel, progress_engine_count: int = 1) -> None:
         self.config = config
@@ -29,33 +24,35 @@ class RayActorStage(ABC):
         self.stats = {"processed": 0}
         self.start_time = None
 
-    async def read_input(self) -> Any:
+    def read_input(self) -> Any:
         if self.input_edge is None:
             raise ValueError("Input edge not set")
-        return await self.input_edge.read.remote()
+        # Call the remote method synchronously.
+        return ray.get(self.input_edge.read.remote())
 
     @abstractmethod
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
         """
         Process an incoming control message and return an updated control message.
         Must be implemented by subclasses.
         """
         pass
 
-    async def _processing_loop(self) -> None:
+    def _processing_loop(self) -> None:
         while self.running:
             try:
-                control_message = await self.read_input()
+                control_message = self.read_input()
                 if control_message is None:
-                    await asyncio.sleep(self.config.poll_interval)
+                    time.sleep(self.config.poll_interval)
                     continue
-                updated_cm = await self.on_data(control_message)
+                updated_cm = self.on_data(control_message)
                 if updated_cm and self.output_edge:
-                    await self.output_edge.write.remote(updated_cm)
+                    # Synchronously call write on the output edge.
+                    ray.get(self.output_edge.write.remote(updated_cm))
                 self.stats["processed"] += 1
             except Exception as e:
                 logger.exception(f"Error in processing loop: {e}")
-                await asyncio.sleep(self.config.poll_interval)
+                time.sleep(self.config.poll_interval)
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
@@ -63,7 +60,7 @@ class RayActorStage(ABC):
             return False
         self.running = True
         self.start_time = time.time()
-        threading.Thread(target=lambda: asyncio.run(self._processing_loop()), daemon=True).start()
+        threading.Thread(target=self._processing_loop, daemon=True).start()
         return True
 
     @ray.method(num_returns=1)

@@ -3,7 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import asyncio
 import logging
 import multiprocessing
 import uuid
@@ -33,6 +32,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
+logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -50,11 +50,12 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     This stage fetches messages from a message broker (via Redis or a simple broker),
     processes them into control messages, and writes them to the output edge.
 
-    As a source stage, it overrides get_input() to use its own message-fetching logic.
+    As a source stage, it overrides read_input() to use its own message-fetching logic.
     """
 
     def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
         super().__init__(config, progress_engine_count)
+        logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config)
         # Configuration specific to message broker task source.
         self.broker_client = self.config.broker_client
         self.task_queue = self.config.task_queue
@@ -62,13 +63,15 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self.client = self._create_client()
         self.message_count = 0
         self.start_time = None
+        logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
     def _create_client(self):
         client_type = self.broker_client["client_type"].lower()
         broker_params = self.broker_client.get("broker_params", {})
+        logger.debug("Creating client of type: %s", client_type)
         if client_type == "redis":
-            return RedisClient(
+            client = RedisClient(
                 host=self.broker_client["host"],
                 port=self.broker_client["port"],
                 db=broker_params.get("db", 0),
@@ -77,17 +80,20 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 connection_timeout=self.broker_client["connection_timeout"],
                 use_ssl=broker_params.get("use_ssl", False),
             )
+            logger.debug("RedisClient created: %s", client)
+            return client
         elif client_type == "simple":
-            # Create a SimpleClient to connect to the simple broker.
-            # Do NOT start a server here.
-            return SimpleClient(
+            client = SimpleClient(
                 host=self.broker_client["host"],
                 port=self.broker_client["port"],
                 max_retries=self.broker_client["max_retries"],
                 max_backoff=self.broker_client["max_backoff"],
                 connection_timeout=self.broker_client["connection_timeout"],
             )
+            logger.debug("SimpleClient created: %s", client)
+            return client
         else:
+            logger.error("Unsupported client_type: %s", client_type)
             raise ValueError(f"Unsupported client_type: {client_type}")
 
     @staticmethod
@@ -95,6 +101,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         """
         Process a raw job fetched from the message broker into an IngestControlMessage.
         """
+        logger.debug("Processing job: %s", json.dumps(job, indent=2))
         control_message = IngestControlMessage()
         job_id = None
         try:
@@ -102,7 +109,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 no_payload = copy.deepcopy(job)
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]
-                logger.debug("Job: %s", json.dumps(no_payload, indent=2))
+                logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
 
             validate_ingest_job(job)
             ts_entry = datetime.now()
@@ -151,9 +158,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                         trace_id = format_trace_id(trace_id)
                     control_message.set_metadata("trace_id", trace_id)
                 control_message.set_timestamp("latency::ts_send", datetime.now())
-
+            logger.debug("Message processed successfully with job_id: %s", job_id)
         except Exception as e:
-            logger.exception(f"Failed to process job submission: {e}")
+            logger.exception("Failed to process job submission: %s", e)
             if job_id is not None:
                 response_channel = f"{job_id}"
                 control_message.set_metadata("job_id", job_id)
@@ -169,75 +176,115 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         """
         Fetch a message from the message broker.
         """
+        logger.info("Attempting to fetch message from queue '%s'", self.task_queue)
         try:
-            logger.info(f"Attempting to fetch message from queue '{self.task_queue}'")
             job = self.client.fetch_message(self.task_queue, timeout)
             if job is None:
-                logger.debug(f"No message received from '{self.task_queue}'")
+                logger.debug("No message received from '%s'", self.task_queue)
                 return None
-            logger.info(f"Received message type: {type(job)}")
+            logger.info("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
-                logger.info(f"Message is a BaseModel with response_code: {job.response_code}")
+                logger.info("Message is a BaseModel with response_code: %s", job.response_code)
                 if job.response_code != 0:
+                    logger.debug("Message response_code != 0, returning None")
                     return None
                 job = json.loads(job.response)
-            logger.info(f"Successfully fetched message with job_id: {job.get('job_id', 'unknown')}")
+            logger.info("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
             return job
         except TimeoutError:
             logger.debug("Timeout waiting for message")
             return None
         except Exception as err:
-            logger.exception(f"Error during message fetching: {err}")
+            logger.exception("Error during message fetching: %s", err)
             return None
 
-    async def read_input(self) -> Any:
+    def read_input(self) -> Any:
         """
         Source stage's implementation of get_input.
         Instead of reading from an input edge, fetch a message from the broker.
         """
+        logger.debug("read_input: calling _fetch_message()")
         job = self._fetch_message(timeout=100)
         if job is None:
-            await asyncio.sleep(self.config.poll_interval)
+            logger.debug("read_input: No job received, sleeping for poll_interval: %s", self.config.poll_interval)
+            time.sleep(self.config.poll_interval)
             return None
         ts_fetched = datetime.now()
+        logger.debug("read_input: Job fetched, processing message")
         control_message = self._process_message(job, ts_fetched)
+        logger.debug("read_input: Message processed, returning control message")
         return control_message
 
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
         """
         Process the control message.
         For this source stage, no additional processing is done, so simply return it.
         """
+        logger.debug("on_data: Received control message for processing")
         return control_message
+
+    def _processing_loop(self) -> None:
+        logger.info("Processing loop started")
+        iteration = 0
+        while self.running:
+            iteration += 1
+            try:
+                logger.debug("Processing loop iteration: %s", iteration)
+                control_message = self.read_input()
+                if control_message is None:
+                    logger.debug(
+                        "No control message received; sleeping for poll_interval: %s", self.config.poll_interval
+                    )
+                    time.sleep(self.config.poll_interval)
+                    continue
+                logger.debug("Control message received; processing data")
+                updated_cm = self.on_data(control_message)
+                if updated_cm and self.output_edge:
+                    logger.debug("Sending updated control message to output edge")
+                    ray.get(self.output_edge.write.remote(updated_cm))
+                self.stats["processed"] += 1
+                self.message_count += 1
+                logger.debug(
+                    "Processing loop iteration %s complete. Total processed: %s", iteration, self.stats["processed"]
+                )
+            except Exception as e:
+                logger.exception("Error in processing loop at iteration %s: %s", iteration, e)
+                time.sleep(self.config.poll_interval)
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
         if self.running:
+            logger.info("Start called but stage is already running.")
             return False
         self.running = True
         self.start_time = time.time()
         self.message_count = 0
-        threading.Thread(target=lambda: asyncio.run(self._processing_loop()), daemon=True).start()
+        logger.info("Starting processing loop thread.")
+        threading.Thread(target=self._processing_loop, daemon=True).start()
         logger.info("Message broker task source stage started")
         return True
 
     @ray.method(num_returns=1)
     def stop(self) -> bool:
         self.running = False
+        logger.info("Stop called on MessageBrokerTaskSourceStage")
         return True
 
     @ray.method(num_returns=1)
     def get_stats(self) -> dict:
         elapsed = time.time() - self.start_time if self.start_time else 0
-        return {
+        stats = {
             "message_count": self.message_count,
             "elapsed_seconds": elapsed,
             "messages_per_second": self.message_count / elapsed if elapsed > 0 else 0,
         }
+        logger.info("get_stats: %s", stats)
+        return stats
 
     @ray.method(num_returns=1)
     def set_output_edge(self, edge_handle: Any) -> bool:
         self.output_edge = edge_handle
+        logger.info("Output edge set: %s", edge_handle)
         return True
 
 

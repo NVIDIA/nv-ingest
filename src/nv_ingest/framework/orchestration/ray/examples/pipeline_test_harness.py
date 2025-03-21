@@ -3,13 +3,10 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-
 import ray
 import logging
 import time
 from typing import Dict, Any
-
-from openai import BaseModel
 
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_nim_service
 
@@ -32,15 +29,12 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
 )
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
-from nv_ingest.framework.orchestration.ray.stages.utility.throughput_monitor import ThroughputMonitorStage
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
-
-# Import external function to start the SimpleMessageBroker server.
 
 # Broker configuration – using a simple client on a fixed port.
 simple_config: Dict[str, Any] = {
@@ -60,10 +54,13 @@ if __name__ == "__main__":
     logger.info("Starting multi-stage pipeline test.")
 
     # Start the SimpleMessageBroker server externally.
+    logger.info("Starting SimpleMessageBroker server.")
     broker_process = start_simple_message_broker(simple_config)
+    logger.info("SimpleMessageBroker server started.")
 
     # Build the pipeline.
     pipeline = RayPipeline()
+    logger.info("Created RayPipeline instance.")
 
     # Create configuration instances for the source and sink stages.
     source_config = MessageBrokerTaskSourceConfig(
@@ -75,6 +72,9 @@ if __name__ == "__main__":
         broker_client=simple_config,
         poll_interval=0.1,
     )
+    logger.info("Source and sink configurations created.")
+
+    # Set environment variables for various services.
     os.environ["YOLOX_GRPC_ENDPOINT"] = "localhost:8001"
     os.environ["YOLOX_INFER_PROTOCOL"] = "grpc"
     os.environ["YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT"] = "127.0.0.1:8007"
@@ -87,6 +87,7 @@ if __name__ == "__main__":
     os.environ["NEMORETRIEVER_PARSE_HTTP_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_ENDPOINT"] = "https://integrate.api.nvidia.com/v1/chat/completions"
     os.environ["VLM_CAPTION_MODEL_NAME"] = "meta/llama-3.2-11b-vision-instruct"
+    logger.info("Environment variables set.")
 
     image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
     image_caption_model_name = "meta/llama-3.2-11b-vision-instruct"
@@ -116,7 +117,7 @@ if __name__ == "__main__":
             "yolox_infer_protocol": yolox_protocol,
         },
         "nemoretriever_parse_config": {
-            "auth_token": nemoretriever_parse_auth,  # All auth tokens are the same for the moment
+            "auth_token": nemoretriever_parse_auth,
             "nemoretriever_parse_endpoints": (nemoretriever_parse_grpc, nemoretriever_parse_http),
             "nemoretriever_parse_infer_protocol": nemoretriever_parse_protocol,
             "nemoretriever_parse_model_name": model_name,
@@ -153,6 +154,7 @@ if __name__ == "__main__":
         "image_caption_model_name": image_caption_model_name,
         "prompt": "Caption the content of this image:",
     }
+    logger.info("Service configuration retrieved from get_nim_service and environment variables.")
 
     # Add stages:
     # 1. Source stage.
@@ -162,6 +164,8 @@ if __name__ == "__main__":
         config=source_config,
         progress_engine_count=1,
     )
+    logger.info("Added source stage to pipeline.")
+
     # 2. Metadata injection stage.
     pipeline.add_stage(
         name="metadata_injection",
@@ -204,43 +208,42 @@ if __name__ == "__main__":
         config=ImageCaptionExtractionSchema(**image_caption_config),
         progress_engine_count=1,
     )
-    # 8. Throughput monitor stage.
-    pipeline.add_stage(
-        name="throughput_monitor",
-        stage_actor=ThroughputMonitorStage,
-        config=BaseModel(),
-        progress_engine_count=1,
-    )
-    # 9. Sink stage.
+    # 8. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
         progress_engine_count=1,
     )
+    logger.info("Added sink stage to pipeline.")
 
-    # Wire the stages together via AsyncQueueEdge actors.
+    # Wire the stages together via ThreadedQueueEdge actors.
     pipeline.make_edge("source", "metadata_injection", queue_size=100)
     pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)  # to limit memory pressure
     pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=100)
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=100)
     pipeline.make_edge("chart_extractor", "text_embedding", queue_size=100)
     pipeline.make_edge("text_embedding", "image_caption", queue_size=100)
-    pipeline.make_edge("image_caption", "throughput_monitor", queue_size=100)
-    pipeline.make_edge("throughput_monitor", "sink", queue_size=100)
+    pipeline.make_edge("image_caption", "sink", queue_size=100)
+    logger.info("Completed wiring of pipeline edges.")
 
     # Build the pipeline (this instantiates actors and wires edges).
+    logger.info("Building pipeline...")
     pipeline.build()
+    logger.info("Pipeline build complete.")
 
     # Optionally, visualize the pipeline graph.
     # pipeline.visualize(mode="text", verbose=True, max_width=120)
 
     # Start the pipeline.
+    logger.info("Starting pipeline...")
     pipeline.start()
+    logger.info("Pipeline started successfully.")
 
     try:
         while True:
             time.sleep(5)
+            logger.info("Pipeline running...")
     except KeyboardInterrupt:
         logger.info("Interrupt received, shutting down pipeline.")
         pipeline.stop()

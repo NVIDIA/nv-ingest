@@ -36,7 +36,9 @@ class ChartExtractorStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         try:
             self.validated_config = config
-            logger.warning(pprint.pformat(self.validated_config.model_dump()))
+            logger.warning(
+                "ChartExtractorStage validated config:\n%s", pprint.pformat(self.validated_config.model_dump())
+            )
         except Exception as e:
             logger.exception("Error validating chart extractor config")
             raise e
@@ -44,11 +46,29 @@ class ChartExtractorStage(RayActorStage):
     @filter_by_task(required_tasks=["chart_data_extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="chart_extraction", raise_on_failure=False)
     @unified_exception_handler
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
+        """
+        Process the control message by extracting chart data.
+
+        Parameters
+        ----------
+        control_message : IngestControlMessage
+            The incoming message containing the PDF payload.
+
+        Returns
+        -------
+        IngestControlMessage
+            The updated message with the extracted chart data and extraction info in metadata.
+        """
+        logger.info("ChartExtractorStage.on_data: Starting chart extraction.")
         # Extract the DataFrame payload.
         df_payload = control_message.payload()
+        logger.debug("ChartExtractorStage: Extracted payload with %d rows.", len(df_payload))
+
         # Remove the "chart_data_extract" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "chart_data_extract")
+        logger.debug("ChartExtractorStage: Task config extracted: %s", task_config)
+
         # Perform chart data extraction.
         new_df, extraction_info = extract_chart_data_from_image_internal(
             df_extraction_ledger=df_payload,
@@ -56,8 +76,11 @@ class ChartExtractorStage(RayActorStage):
             extraction_config=self.validated_config,
             execution_trace_log=None,
         )
+        logger.info("ChartExtractorStage: Chart extraction completed. New payload has %d rows.", len(new_df))
+
         # Update the control message with the new DataFrame.
         control_message.payload(new_df)
         # Annotate the message with extraction info.
         control_message.set_metadata("chart_extraction_info", extraction_info)
+        logger.info("ChartExtractorStage: Metadata injection complete. Returning updated control message.")
         return control_message

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import pprint
 from typing import Any
 import ray
 
@@ -34,6 +35,7 @@ class TextEmbeddingTransformStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         try:
             self.validated_config = config
+            logger.info("TextEmbeddingTransformStage configuration validated successfully.")
         except Exception as e:
             logger.exception("Error validating text embedding extractor config")
             raise e
@@ -41,16 +43,39 @@ class TextEmbeddingTransformStage(RayActorStage):
     @filter_by_task(required_tasks=["embed"])
     @nv_ingest_node_failure_context_manager(annotation_id="text_embedding", raise_on_failure=False)
     @unified_exception_handler
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
+        """
+        Process the control message by generating text embeddings.
+
+        Parameters
+        ----------
+        control_message : IngestControlMessage
+            The incoming message containing the DataFrame payload.
+
+        Returns
+        -------
+        IngestControlMessage
+            The updated message with text embeddings and trace info added.
+        """
+        logger.info("TextEmbeddingTransformStage.on_data: Starting text embedding transformation.")
+
         # Get the DataFrame payload.
         df_payload = control_message.payload()
-        # Call the text embedding extraction function.
+        logger.debug("TextEmbeddingTransformStage: Extracted payload with %d rows.", len(df_payload))
+
+        # Remove the "embed" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "embed")
+        logger.debug("TextEmbeddingTransformStage: Task configuration extracted: %s", pprint.pformat(task_config))
+
+        # Call the text embedding extraction function.
         new_df, execution_trace_log = transform_create_text_embeddings_internal(
             df_payload, task_config=task_config, transform_config=self.validated_config
         )
+        logger.info("Text embedding transformation completed. New payload has %d rows.", len(new_df))
+
         # Update the control message payload.
         control_message.payload(new_df)
         # Annotate the message metadata with trace info.
         control_message.set_metadata("text_embedding_trace", execution_trace_log)
+        logger.info("Text embedding trace metadata added.")
         return control_message

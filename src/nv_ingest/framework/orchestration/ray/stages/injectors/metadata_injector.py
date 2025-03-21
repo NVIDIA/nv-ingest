@@ -32,10 +32,11 @@ class MetadataInjectionStage(RayActorStage):
         # Call the base initializer to set attributes like self.running.
         super().__init__(config, progress_engine_count)
         # Additional initialization can be added here if necessary.
+        logger.info("MetadataInjectionStage initialized with config: %s", config)
 
     @nv_ingest_node_failure_context_manager(annotation_id="metadata_injector", raise_on_failure=False)
     @unified_exception_handler
-    async def on_data(self, message: Any) -> Any:
+    def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by injecting metadata into its DataFrame payload.
 
@@ -52,7 +53,7 @@ class MetadataInjectionStage(RayActorStage):
         df = message.payload()
         update_required = False
         rows = []
-        logger.debug("Starting metadata injection on DataFrame with %d rows", len(df))
+        logger.info("Starting metadata injection on DataFrame with %d rows", len(df))
 
         for _, row in df.iterrows():
             try:
@@ -88,7 +89,7 @@ class MetadataInjectionStage(RayActorStage):
         if update_required:
             docs = pd.DataFrame(rows)
             message.payload(docs)
-            logger.debug("Metadata injection updated payload with %d rows", len(docs))
+            logger.info("Metadata injection updated payload with %d rows", len(docs))
         else:
-            logger.debug("No metadata update was necessary during metadata injection")
+            logger.info("No metadata update was necessary during metadata injection")
         return message

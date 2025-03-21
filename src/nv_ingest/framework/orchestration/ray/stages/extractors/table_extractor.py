@@ -35,6 +35,7 @@ class TableExtractorStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         try:
             self.validated_config = config
+            logger.info("TableExtractorStage configuration validated successfully.")
         except Exception as e:
             logger.exception("Error validating table extractor config")
             raise e
@@ -42,11 +43,29 @@ class TableExtractorStage(RayActorStage):
     @filter_by_task(required_tasks=["table_data_extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="table_extraction", raise_on_failure=False)
     @unified_exception_handler
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
+        """
+        Process the control message by extracting table data from the PDF payload.
+
+        Parameters
+        ----------
+        control_message : IngestControlMessage
+            The incoming message containing the PDF payload.
+
+        Returns
+        -------
+        IngestControlMessage
+            The updated message with the extracted table data and extraction info in metadata.
+        """
+        logger.info("TableExtractorStage.on_data: Starting table extraction.")
         # Extract the DataFrame payload.
         df_payload = control_message.payload()
+        logger.debug("Extracted payload with %d rows.", len(df_payload))
+
         # Remove the "table_data_extract" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "table_data_extract")
+        logger.debug("Extracted task configuration: %s", task_config)
+
         # Perform table data extraction.
         new_df, extraction_info = extract_table_data_from_image_internal(
             df_extraction_ledger=df_payload,
@@ -54,8 +73,11 @@ class TableExtractorStage(RayActorStage):
             extraction_config=self.validated_config,
             execution_trace_log=None,
         )
+        logger.info("Table extraction completed. Extracted %d rows.", len(new_df))
+
         # Update the control message with the new DataFrame.
         control_message.payload(new_df)
         # Annotate the message with extraction info.
         control_message.set_metadata("table_extraction_info", extraction_info)
+        logger.info("Table extraction metadata injected successfully.")
         return control_message

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import pprint
 from typing import Any
 
 import ray
@@ -34,6 +35,7 @@ class ImageCaptionTransformStage(RayActorStage):
         super().__init__(config, progress_engine_count)
         try:
             self.validated_config = config
+            logger.info("ImageCaptionTransformStage configuration validated.")
         except Exception as e:
             logger.exception("Error validating caption extraction config")
             raise e
@@ -41,16 +43,39 @@ class ImageCaptionTransformStage(RayActorStage):
     @filter_by_task(required_tasks=["caption"])
     @nv_ingest_node_failure_context_manager(annotation_id="image_captioning", raise_on_failure=False)
     @unified_exception_handler
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
+        """
+        Process the control message by extracting image captions.
+
+        Parameters
+        ----------
+        control_message : IngestControlMessage
+            The incoming message containing the DataFrame payload.
+
+        Returns
+        -------
+        IngestControlMessage
+            The updated message with the extracted captions.
+        """
+        logger.info("ImageCaptionTransformStage.on_data: Starting image caption extraction.")
+
         # Retrieve the DataFrame payload.
         df_payload = control_message.payload()
-        # Call the caption extraction function.
+        logger.debug("ImageCaptionTransformStage: Payload extracted with %d rows.", len(df_payload))
+
+        # Remove the "caption" task to obtain task-specific configuration.
         task_config = remove_task_by_type(control_message, "caption")
+        logger.debug("ImageCaptionTransformStage: Task configuration extracted: %s", pprint.pformat(task_config))
+
+        # Call the caption extraction function.
         new_df = transform_image_create_vlm_caption_internal(
             df_payload, task_config=task_config, transform_config=self.validated_config
         )
+        logger.info("Image caption extraction completed. New payload has %d rows.", len(new_df))
+
         # Update the control message with the new DataFrame.
         control_message.payload(new_df)
-        # Annotate the control message with extraction trace info.
+        # Optionally, annotate the control message with extraction trace info.
         # control_message.set_metadata("caption_extraction_trace", execution_trace_log)
+        logger.info("ImageCaptionTransformStage.on_data: Updated control message and returning.")
         return control_message

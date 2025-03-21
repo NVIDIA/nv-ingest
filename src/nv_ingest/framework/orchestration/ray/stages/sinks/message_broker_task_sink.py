@@ -63,7 +63,6 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
             server_host = self.broker_client["host"]
             server_port = self.broker_client["port"]
             server_host = "0.0.0.0"
-
             return SimpleClient(
                 host=server_host,
                 port=server_port,
@@ -183,14 +182,13 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
         self.client.submit_message(response_channel, json.dumps(fail_msg))
 
     # --- Public API Methods for Sink Stage ---
-    async def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
         """
         For this sink stage, no additional transformation is performed.
         """
-
         return control_message
 
-    async def write_output(self, control_message: Any) -> Any:
+    def write_output(self, control_message: Any) -> Any:
         """
         Processes the control message and pushes the resulting JSON payloads to the broker.
         """
