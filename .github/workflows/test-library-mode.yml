@@ -7,10 +7,13 @@ on:
       - opened
       - synchronize
       - reopened
+    branches:
+      - main
+      - 'release/**'
   push:
     branches:
       - main
-      - edwardk/ci-integ-libmode  # TODO: remove
+      - 'release/**'
 
 jobs:
   build:
@@ -37,6 +40,9 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
+      - name: Get user permission
+
+
       - name: Checkout code
         uses: actions/checkout@v4
 
