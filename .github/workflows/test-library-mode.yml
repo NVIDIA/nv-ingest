@@ -2,18 +2,17 @@ name: Test Nv-Ingest Library Mode
 
 # Trigger for pull requests and pushing to main
 on:
-  pull_request_target:
+  #pull_request_target:
+  pull_request:
     types:
       - opened
       - synchronize
       - reopened
     branches:
       - main
-      - 'release/**'
   push:
     branches:
       - main
-      - 'release/**'
 
 jobs:
   build:
