@@ -164,7 +164,6 @@ if __name__ == "__main__":
         name="source",
         source_actor=MessageBrokerTaskSourceStage,
         config=source_config,
-        progress_engine_count=1,
     )
     logger.info("Added source stage to pipeline.")
 
@@ -173,55 +172,61 @@ if __name__ == "__main__":
         name="metadata_injection",
         stage_actor=MetadataInjectionStage,
         config=MetadataInjectorSchema(),  # Use stage-specific config if needed.
-        progress_engine_count=2,
+        min_replicas=0,
+        max_replicas=2,
     )
     # 3. PDF extractor stage.
     pipeline.add_stage(
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
         config=PDFExtractorSchema(**pdf_extractor_config),
-        progress_engine_count=16,
+        min_replicas=0,
+        max_replicas=16,
     )
     # 4. Table extractor stage.
     pipeline.add_stage(
         name="table_extractor",
         stage_actor=TableExtractorStage,
         config=TableExtractorSchema(**table_extractor_config),
-        progress_engine_count=8,
+        min_replicas=0,
+        max_replicas=16,
     )
     # 5. Chart extractor stage.
     pipeline.add_stage(
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
         config=ChartExtractorSchema(**chart_extractor_config),
-        progress_engine_count=8,
+        min_replicas=0,
+        max_replicas=16,
     )
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
-        progress_engine_count=2,
+        min_replicas=0,
+        max_replicas=16,
     )
     # 6. Text embedding stage.
     pipeline.add_stage(
         name="text_splitter",
         stage_actor=TextSplitterStage,
         config=TextSplitterSchema(),
-        progress_engine_count=4,
+        min_replicas=0,
+        max_replicas=16,
     )
     # 7. Image caption stage.
     pipeline.add_stage(
         name="image_caption",
         stage_actor=ImageCaptionTransformStage,
         config=ImageCaptionExtractionSchema(**image_caption_config),
-        progress_engine_count=1,
+        min_replicas=0,
+        max_replicas=16,
     )
     # 8. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
-        progress_engine_count=1,
     )
     logger.info("Added sink stage to pipeline.")
 
