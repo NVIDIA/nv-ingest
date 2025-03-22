@@ -302,10 +302,12 @@ class RayPipeline:
     def _perform_scaling(self) -> None:
         """
         Check the current utilization of input queues for each stage and decide
-        whether to scale up or down. Scaling up is triggered if the maximum occupancy
-        among the input edges exceeds the scaling_threshold. If idle is True at the first scale-up event,
-        immediately scale all stages to half their max_replicas (but not below min_replicas) and set idle to False.
-        Scaling down is triggered only after 15 consecutive cycles with zero utilization.
+        whether to scale up or down.
+          - Scale up: if any stage's maximum input occupancy exceeds scaling_threshold,
+            and if idle is True, immediately trigger a bulk idle scale-up via _idle_scale_all_stages().
+            Otherwise, scale up by doubling the current replica count (up to max_replicas).
+          - Scale down: if maximum occupancy is exactly zero for scaling_cooldown cycles,
+            scale down by halving the current replica count (not below min_replicas).
         """
         for stage in self.stages:
             stage_name = stage.name
@@ -320,8 +322,8 @@ class RayPipeline:
                 if self.queue_stats.get(edge_name):
                     last_util = self.queue_stats[edge_name][-1]["utilization"]
                     logger.debug(
-                        f"[Perform Scaling] Stage '{stage_name}',"
-                        f" edge '{edge_name}': last utilization = {last_util:.1f}%"
+                        f"[Perform Scaling] Stage '{stage_name}', edge '{edge_name}':"
+                        f" last utilization = {last_util:.1f}%"
                     )
                     if last_util > max_util:
                         max_util = last_util
@@ -330,27 +332,17 @@ class RayPipeline:
             )
             current_count = len(self.stage_actors.get(stage_name, []))
             logger.debug(
-                f"[Perform Scaling] Stage '{stage_name}':"
-                f" current replica count = {current_count}, scaling threshold = {self.scaling_threshold}%"
+                f"[Perform Scaling] Stage '{stage_name}': current replica count = {current_count},"
+                f" scaling threshold = {self.scaling_threshold}%"
             )
 
             # Check for scale-up conditions.
             if max_util > self.scaling_threshold:
-                # If idle is True and this is the first scale-up event, scale all stages immediately.
                 if self.idle:
-                    logger.info("[Perform Scaling] Idle flag set. Scaling all stages to half their max_replicas.")
-                    for s in self.stages:
-                        target = max(s.min_replicas, s.max_replicas // 2)
-                        logger.info(
-                            f"[Perform Scaling] Scaling stage '{s.name}' to {target} replicas due to idle trigger."
-                        )
-                        self._scale_stage(s.name, target)
+                    logger.info("[Perform Scaling] Idle flag set. Triggering bulk idle scale-up.")
+                    self._idle_scale_all_stages()
                     self.idle = False
-                    # Reset under_threshold_cycles for all stages.
-                    for s in self.stages:
-                        self.under_threshold_cycles[s.name] = 0
                 else:
-                    # Regular scale-up for the stage.
                     if current_count < stage.max_replicas:
                         new_count = min(current_count * 2 if current_count > 0 else 1, stage.max_replicas)
                         logger.info(
@@ -365,7 +357,7 @@ class RayPipeline:
                             f"[Perform Scaling] Stage '{stage_name}' is already at maximum replicas ({current_count})."
                         )
             else:
-                # Only scale down if the maximum utilization is exactly zero.
+                # Only scale down if occupancy is exactly zero.
                 if max_util == 0:
                     self.under_threshold_cycles[stage_name] = self.under_threshold_cycles.get(stage_name, 0) + 1
                     logger.debug(
@@ -388,8 +380,101 @@ class RayPipeline:
                                 f" already at or below minimum replicas ({current_count})."
                             )
                 else:
-                    # If utilization is nonzero but below threshold, reset the counter.
+                    # Reset the counter if nonzero occupancy.
                     self.under_threshold_cycles[stage_name] = 0
+
+    def _idle_scale_all_stages(self) -> None:
+        """
+        For an idle-triggered scale-up, create all missing replicas for every stage at once.
+        For each stage, target replica count = max(min_replicas, max_replicas // 2).
+        Create all new replicas concurrently, wait for them, then wire them up and start them.
+        Finally, reset the under_threshold_cycles counters.
+        """
+        logger.info("[Idle Scale] Starting idle scale-up for all stages.")
+        new_actor_dict = {}  # stage_name -> list of newly created actors
+        # Create new replicas for each stage if needed.
+        for stage in self.stages:
+            stage_name = stage.name
+            current_replicas = self.stage_actors.get(stage_name, [])
+            current_count = len(current_replicas)
+            target_count = max(stage.min_replicas, stage.max_replicas // 2)
+            logger.debug(
+                f"[Idle Scale] Stage '{stage_name}': current_count = {current_count}, target_count = {target_count}"
+            )
+            new_replicas = []
+            if target_count > current_count:
+                for i in range(current_count, target_count):
+                    actor_name = f"{stage_name}_{i}"
+                    logger.info(f"[Idle Scale] Creating new replica '{actor_name}' for stage '{stage_name}'")
+                    new_actor = stage.callable.options(name=actor_name, max_concurrency=10).remote(
+                        config=stage.config, progress_engine_count=-1
+                    )
+                    new_replicas.append(new_actor)
+            new_actor_dict[stage_name] = new_replicas
+
+        # Update stage_actors for each stage.
+        for stage in self.stages:
+            stage_name = stage.name
+            self.stage_actors[stage_name] = self.stage_actors.get(stage_name, []) + new_actor_dict.get(stage_name, [])
+            logger.debug(f"[Idle Scale] Stage '{stage_name}' new replica count: {len(self.stage_actors[stage_name])}")
+
+        # Now wire up all new replicas.
+        wiring_refs = []
+        for stage in self.stages:
+            stage_name = stage.name
+            for new_actor in new_actor_dict.get(stage_name, []):
+                # Wire output edges for stages where this stage is the source.
+                if stage_name in self.connections:
+                    for to_stage, _ in self.connections[stage_name]:
+                        queue_name = f"{stage_name}_to_{to_stage}"
+                        if queue_name in self.edge_queues:
+                            edge_actor, _ = self.edge_queues[queue_name]
+                            logger.debug(f"[Idle Scale] Wiring new actor '{new_actor}' output to edge '{queue_name}'")
+                            wiring_refs.append(new_actor.set_output_edge.remote(edge_actor))
+                        else:
+                            logger.error(f"[Idle Scale] Output edge '{queue_name}' not found for stage '{stage_name}'")
+                # Wire input edges for stages where this stage is the destination.
+                for from_stage, conns in self.connections.items():
+                    for to_stage, _ in conns:
+                        if to_stage == stage_name:
+                            queue_name = f"{from_stage}_to_{stage_name}"
+                            if queue_name in self.edge_queues:
+                                edge_actor, _ = self.edge_queues[queue_name]
+                                logger.debug(
+                                    f"[Idle Scale] Wiring new actor '{new_actor}' input to edge '{queue_name}'"
+                                )
+                                wiring_refs.append(new_actor.set_input_edge.remote(edge_actor))
+                            else:
+                                logger.error(
+                                    f"[Idle Scale] Input edge '{queue_name}' not found for stage '{stage_name}'"
+                                )
+        if wiring_refs:
+            ray.get(wiring_refs)
+            logger.debug("[Idle Scale] Wiring complete for all new actors.")
+
+        # Start all new replicas.
+        start_refs = []
+        for stage in self.stages:
+            for new_actor in new_actor_dict.get(stage.name, []):
+                try:
+                    if hasattr(new_actor, "start"):
+                        logger.debug(f"[Idle Scale] Starting new actor '{new_actor}' for stage '{stage.name}'")
+                        start_refs.append(new_actor.start.remote())
+                    else:
+                        logger.warning(
+                            f"[Idle Scale] New actor '{new_actor}' for stage '{stage.name}' has no start() method."
+                        )
+                except Exception as e:
+                    logger.error(f"[Idle Scale] Error starting new actor '{new_actor}' for stage '{stage.name}': {e}")
+        if start_refs:
+            ray.get(start_refs)
+            logger.debug("[Idle Scale] All new actors started.")
+
+        # Reset the cooldown counters.
+        for s in self.stages:
+            self.under_threshold_cycles[s.name] = 0
+
+        logger.info("[Idle Scale] Idle scale-up complete; all stages scaled to target replica counts.")
 
     def _monitor_queue_utilization(self, poll_interval: float = 10.0) -> None:
         """
