@@ -189,7 +189,7 @@ if __name__ == "__main__":
         stage_actor=TableExtractorStage,
         config=TableExtractorSchema(**table_extractor_config),
         min_replicas=0,
-        max_replicas=16,
+        max_replicas=8,
     )
     # 5. Chart extractor stage.
     pipeline.add_stage(
@@ -197,14 +197,14 @@ if __name__ == "__main__":
         stage_actor=ChartExtractorStage,
         config=ChartExtractorSchema(**chart_extractor_config),
         min_replicas=0,
-        max_replicas=16,
+        max_replicas=8,
     )
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
         min_replicas=0,
-        max_replicas=16,
+        max_replicas=8,
     )
     # 6. Text embedding stage.
     pipeline.add_stage(
@@ -212,7 +212,7 @@ if __name__ == "__main__":
         stage_actor=TextSplitterStage,
         config=TextSplitterSchema(),
         min_replicas=0,
-        max_replicas=16,
+        max_replicas=4,
     )
     # 7. Image caption stage.
     pipeline.add_stage(
@@ -220,13 +220,15 @@ if __name__ == "__main__":
         stage_actor=ImageCaptionTransformStage,
         config=ImageCaptionExtractionSchema(**image_caption_config),
         min_replicas=0,
-        max_replicas=16,
+        max_replicas=4,
     )
     # 8. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
+        min_replicas=2,
+        max_replicas=2,
     )
     logger.info("Added sink stage to pipeline.")
 
