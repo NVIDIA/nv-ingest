@@ -16,6 +16,7 @@ from nv_ingest_api.util.exception_handlers.decorators import (
     unified_exception_handler,
 )
 
+# logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
