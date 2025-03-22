@@ -1,6 +1,5 @@
 import logging
 from typing import Any
-from pydantic import BaseModel
 import ray
 
 # Assume these imports come from your project:
@@ -24,7 +23,7 @@ class TextSplitterStage(RayActorStage):
     and tokenization logic. The updated DataFrame is then set back into the message.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: TextSplitterSchema, progress_engine_count: int) -> None:
         super().__init__(config, progress_engine_count)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
@@ -47,7 +46,6 @@ class TextSplitterStage(RayActorStage):
             The updated message with its payload transformed.
         """
         try:
-            logger.info("TextSplitterStage.on_data: Starting processing.")
             # Extract the DataFrame payload.
             df_payload = message.payload()
             logger.debug("Extracted payload with %d rows.", len(df_payload))

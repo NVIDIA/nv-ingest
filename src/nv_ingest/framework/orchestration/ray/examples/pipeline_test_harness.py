@@ -29,12 +29,14 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
 )
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
+from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 
 # Broker configuration – using a simple client on a fixed port.
 simple_config: Dict[str, Any] = {
@@ -194,11 +196,17 @@ if __name__ == "__main__":
         config=ChartExtractorSchema(**chart_extractor_config),
         progress_engine_count=8,
     )
-    # 6. Text embedding stage.
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
+        progress_engine_count=2,
+    )
+    # 6. Text embedding stage.
+    pipeline.add_stage(
+        name="text_splitter",
+        stage_actor=TextSplitterStage,
+        config=TextSplitterSchema(),
         progress_engine_count=4,
     )
     # 7. Image caption stage.
@@ -222,7 +230,8 @@ if __name__ == "__main__":
     pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)  # to limit memory pressure
     pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=100)
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=100)
-    pipeline.make_edge("chart_extractor", "text_embedding", queue_size=100)
+    pipeline.make_edge("chart_extractor", "text_splitter", queue_size=100)
+    pipeline.make_edge("text_splitter", "text_embedding", queue_size=100)
     pipeline.make_edge("text_embedding", "image_caption", queue_size=100)
     pipeline.make_edge("image_caption", "sink", queue_size=100)
     logger.info("Completed wiring of pipeline edges.")
