@@ -88,6 +88,8 @@ def main():
         # Run ingestion after starting the pipeline
         run_ingestor()
 
+        pipeline_process.wait()
+
         # The main program will exit, and the atexit handler will terminate the subprocess group
 
     except Exception as e:
