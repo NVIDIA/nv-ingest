@@ -61,7 +61,7 @@ if __name__ == "__main__":
     logger.info("SimpleMessageBroker server started.")
 
     # Build the pipeline.
-    pipeline = RayPipeline(dynamic_memory_scaling=True, dynamic_memory_threshold=0.75)
+    pipeline = RayPipeline(dynamic_memory_scaling=True, dynamic_memory_threshold=0.50)
     logger.info("Created RayPipeline instance.")
 
     # Create configuration instances for the source and sink stages.
@@ -172,7 +172,7 @@ if __name__ == "__main__":
         name="metadata_injection",
         stage_actor=MetadataInjectionStage,
         config=MetadataInjectorSchema(),  # Use stage-specific config if needed.
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=2,
     )
     # 3. PDF extractor stage.
@@ -180,7 +180,7 @@ if __name__ == "__main__":
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
         config=PDFExtractorSchema(**pdf_extractor_config),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=16,
     )
     # 4. Table extractor stage.
@@ -188,7 +188,7 @@ if __name__ == "__main__":
         name="table_extractor",
         stage_actor=TableExtractorStage,
         config=TableExtractorSchema(**table_extractor_config),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=8,
     )
     # 5. Chart extractor stage.
@@ -196,14 +196,14 @@ if __name__ == "__main__":
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
         config=ChartExtractorSchema(**chart_extractor_config),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=8,
     )
     # 6. Text embedding stage.
@@ -211,7 +211,7 @@ if __name__ == "__main__":
         name="text_splitter",
         stage_actor=TextSplitterStage,
         config=TextSplitterSchema(),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=4,
     )
     # 7. Image caption stage.
@@ -219,7 +219,7 @@ if __name__ == "__main__":
         name="image_caption",
         stage_actor=ImageCaptionTransformStage,
         config=ImageCaptionExtractionSchema(**image_caption_config),
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=4,
     )
     # 8. Sink stage.
@@ -227,7 +227,7 @@ if __name__ == "__main__":
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
-        min_replicas=0,
+        min_replicas=1,
         max_replicas=2,
     )
     logger.info("Added sink stage to pipeline.")

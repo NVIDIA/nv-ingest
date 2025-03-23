@@ -8,7 +8,6 @@ from abc import ABC, abstractmethod
 
 import ray
 from pydantic import BaseModel
-from typing import Any
 import logging
 
 logger = logging.getLogger(__name__)
@@ -22,20 +21,24 @@ class RayActorStage(ABC):
         self.output_edge = None
         self.running = False
         self.processing_complete = False  # Indicates processing is complete.
+        self.active_processing = False  # New: Indicates if currently processing a job.
         self.stats = {"processed": 0}
         self.start_time = None
 
-    def read_input(self) -> Any:
+    def read_input(self) -> any:
+        if not self.running:
+            return None
+
         if self.input_edge is None:
             raise ValueError("Input edge not set")
 
         try:
-            return ray.get(self.input_edge.read.remote(), timeout=60.0)
+            return ray.get(self.input_edge.read.remote(), timeout=600.0)
         except ray.exceptions.GetTimeoutError:
             return None
 
     @abstractmethod
-    def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: any) -> any:
         pass
 
     def _processing_loop(self) -> None:
@@ -45,6 +48,8 @@ class RayActorStage(ABC):
                     control_message = self.read_input()
                     if control_message is None:
                         continue
+                    # Mark that we are actively processing this job.
+                    self.active_processing = True
                     updated_cm = self.on_data(control_message)
                     if updated_cm and self.output_edge:
                         ray.get(self.output_edge.write.remote(updated_cm))
@@ -52,6 +57,9 @@ class RayActorStage(ABC):
                 except Exception as e:
                     logger.exception(f"Error in processing loop: {e}")
                     time.sleep(1.0)
+                finally:
+                    # Reset active_processing after each job, regardless of success.
+                    self.active_processing = False
         finally:
             if not self.running:
                 logger.warning("Processing loop detected self.running is False; exiting loop.")
@@ -79,14 +87,14 @@ class RayActorStage(ABC):
     @ray.method(num_returns=1)
     def get_stats(self) -> dict:
         elapsed = time.time() - self.start_time if self.start_time else 0
-        return {"processed": self.stats["processed"], "elapsed": elapsed}
+        return {"processed": self.stats["processed"], "elapsed": elapsed, "active_processing": self.active_processing}
 
     @ray.method(num_returns=1)
-    def set_input_edge(self, edge_handle: Any) -> bool:
+    def set_input_edge(self, edge_handle: any) -> bool:
         self.input_edge = edge_handle
         return True
 
     @ray.method(num_returns=1)
-    def set_output_edge(self, edge_handle: Any) -> bool:
+    def set_output_edge(self, edge_handle: any) -> bool:
         self.output_edge = edge_handle
         return True

@@ -541,12 +541,15 @@ class RayPipeline:
 
     def _monitor_queue_utilization(self, poll_interval: float = 10.0) -> None:
         """
-        Monitor the percent utilization of each edge queue and update display.
+        Monitor the percent utilization of each edge queue, the active processing tasks per stage,
+        and update display. Also computes total tasks in flight (processing + queued) for each stage,
+        and a global summary.
         """
         display = UtilizationDisplay(refresh_rate=2)
         logger.debug("Queue monitoring thread started.")
         while self._monitoring:
             current_time = time.time()
+            # Update queue stats.
             futures = {
                 edge_name: edge_actor.get_stats.remote() for edge_name, (edge_actor, _) in self.edge_queues.items()
             }
@@ -559,26 +562,60 @@ class RayPipeline:
                 self.queue_stats[edge_name].append({"timestamp": current_time, "utilization": utilization})
 
             output_rows = []
+            global_processing = 0
+            global_queued = 0
+            # For each stage, compute per-stage processing and queued tasks.
             for stage in self.stages:
                 stage_name = stage.name
-                current_replica_count = len(self.stage_actors.get(stage_name, []))
-                replicas_str = f"{current_replica_count}/{stage.max_replicas}"
+                # Replicas info.
+                current_replicas = self.stage_actors.get(stage_name, [])
+                replicas_str = f"{len(current_replicas)}/{stage.max_replicas}"
+
+                # Get total queued tasks from input edges.
                 input_edges = [
                     edge_name for edge_name in self.edge_queues.keys() if edge_name.endswith(f"_to_{stage_name}")
                 ]
                 occupancy_list = []
+                total_queued = 0
                 for edge_name in input_edges:
                     stats_list = self.queue_stats.get(edge_name, [])
                     if stats_list:
                         last_util = stats_list[-1]["utilization"]
                         _, max_size = self.edge_queues[edge_name]
                         occupancy = int((last_util / 100) * max_size)
+                        total_queued += occupancy
                         occupancy_list.append(f"{occupancy}/{max_size}")
                     else:
                         occupancy_list.append("0/0")
                 occupancy_str = ", ".join(occupancy_list) if occupancy_list else "N/A"
+
+                # Get processing count across stage replicas.
+                processing_count = 0
+                if current_replicas:
+                    actor_futures = [actor.get_stats.remote() for actor in current_replicas]
+                    actor_stats = ray.get(actor_futures)
+                    for stat in actor_stats:
+                        processing_count += int(stat.get("active_processing", False))
+                stage_in_flight = processing_count + total_queued
+
+                global_processing += processing_count
+                global_queued += total_queued
+
                 scaling_state = self.scaling_state.get(stage_name, "Pending")
-                output_rows.append((stage_name, replicas_str, occupancy_str, scaling_state))
+                output_rows.append(
+                    (
+                        stage_name,
+                        replicas_str,
+                        occupancy_str,
+                        scaling_state,
+                        str(processing_count),
+                        str(stage_in_flight),
+                    )
+                )
+
+            # Append a final row with global totals.
+            global_total = global_processing + global_queued
+            output_rows.append(("[bold]Total Pipeline[/bold]", "", "", "", str(global_processing), str(global_total)))
 
             display.update(output_rows)
             time.sleep(poll_interval)
@@ -674,8 +711,10 @@ class UtilizationDisplay:
         table.add_column("Replicas (current/max)", justify="left", style="magenta")
         table.add_column("Input Queue (occupancy/max)", justify="left", style="green")
         table.add_column("Scaling State", justify="left", style="yellow")
+        table.add_column("Processing", justify="right", style="red")
+        table.add_column("In Flight", justify="right", style="bright_blue")
         for row in output_rows:
-            table.add_row(row[0], row[1], row[2], row[3])
+            table.add_row(*row)
         self.live.update(table)
 
     def stop(self):
