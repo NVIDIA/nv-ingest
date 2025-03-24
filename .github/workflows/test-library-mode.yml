@@ -6,31 +6,13 @@ on:
   #    - Build Conda Packages
   #  types:
   #    - completed
-  #workflow_dispatch:  # remove later
-  push:
-    branches:
-      - edwardk/ci-integ-libmode  # remove later
+  workflow_dispatch:  # remove later
 
 jobs:
   test:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - name: Get User Permission
-        id: checkAccess
-        uses: actions-cool/check-user-permission@v2
-        with:
-          require: write
-          username: ${{ github.triggering_actor }}
-
-      - name: Check User Permission
-        if: steps.checkAccess.outputs.require-result == 'false'
-        run: |
-          echo "${{ github.triggering_actor }} does not have permissions on this repo."
-          echo "Current permission level is ${{ steps.checkAccess.outputs.user-permission }}"
-          echo "Job originally triggered by ${{ github.actor }}"
-          exit 1
-
       - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
