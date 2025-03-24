@@ -1,0 +1,12 @@
+name: Library Mode Integration Test
+
+on:
+  #workflow_run:
+  #  workflows:
+  #    - Build Conda Packages
+  #  types:
+  #    - completed
+  push:
+    branches:
+      - edwardk/ci-integ-libmode  # remove later
+  #workflow_dispatch:
