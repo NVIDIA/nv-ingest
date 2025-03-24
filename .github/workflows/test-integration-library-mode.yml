@@ -9,7 +9,7 @@ on:
   push:
     branches:
       - edwardk/ci-integ-libmode  # remove later
-  #workflow_dispatch:
+  workflow_dispatch:
 
 jobs:
   test:
