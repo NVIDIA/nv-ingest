@@ -18,6 +18,8 @@ from nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor imp
 
 # Import stage implementations and configuration models.
 from nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector import MetadataInjectionStage
+from nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup import ImageDedupStage
+from nv_ingest.framework.orchestration.ray.stages.mutate.image_filter import ImageFilterStage
 from nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink import (
     MessageBrokerTaskSinkStage,
     MessageBrokerTaskSinkConfig,
@@ -27,6 +29,8 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
     MessageBrokerTaskSourceConfig,
     start_simple_message_broker,
 )
+from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import ImageStorageStage
+from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
@@ -34,7 +38,11 @@ from nv_ingest.framework.schemas.framework_metadata_injector_schema import Metad
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
+from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
+from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
+from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 
@@ -159,15 +167,19 @@ if __name__ == "__main__":
     logger.info("Service configuration retrieved from get_nim_service and environment variables.")
 
     # Add stages:
-    # 1. Source stage.
     pipeline.add_source(
         name="source",
         source_actor=MessageBrokerTaskSourceStage,
         config=source_config,
     )
-    logger.info("Added source stage to pipeline.")
-
-    # 2. Metadata injection stage.
+    # TODO(Job_Counter): Utilizes a global that isn't compatible with Ray, will need to make it a shared object
+    # pipeline.add_stage(
+    #    name="job_counter",
+    #    stage_actor=JobCounterStage,
+    #    config=JobCounterSchema(),
+    #    min_replicas=1,
+    #    max_replicas=1,
+    # )
     pipeline.add_stage(
         name="metadata_injection",
         stage_actor=MetadataInjectionStage,
@@ -175,7 +187,6 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=2,
     )
-    # 3. PDF extractor stage.
     pipeline.add_stage(
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
@@ -183,7 +194,6 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=16,
     )
-    # 4. Table extractor stage.
     pipeline.add_stage(
         name="table_extractor",
         stage_actor=TableExtractorStage,
@@ -191,7 +201,6 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=8,
     )
-    # 5. Chart extractor stage.
     pipeline.add_stage(
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
@@ -206,7 +215,34 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=8,
     )
-    # 6. Text embedding stage.
+    pipeline.add_stage(
+        name="image_filter",
+        stage_actor=ImageFilterStage,
+        config=ImageFilterSchema(),
+        min_replicas=1,
+        max_replicas=4,
+    )
+    pipeline.add_stage(
+        name="image_dedup",
+        stage_actor=ImageDedupStage,
+        config=ImageDedupSchema(),
+        min_replicas=1,
+        max_replicas=4,
+    )
+    pipeline.add_stage(
+        name="image_storage",
+        stage_actor=ImageStorageStage,
+        config=ImageStorageModuleSchema(),
+        min_replicas=1,
+        max_replicas=4,
+    )
+    pipeline.add_stage(
+        name="embedding_storage",
+        stage_actor=EmbeddingStorageStage,
+        config=EmbeddingStorageSchema(),
+        min_replicas=1,
+        max_replicas=4,
+    )
     pipeline.add_stage(
         name="text_splitter",
         stage_actor=TextSplitterStage,
@@ -214,7 +250,6 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=4,
     )
-    # 7. Image caption stage.
     pipeline.add_stage(
         name="image_caption",
         stage_actor=ImageCaptionTransformStage,
@@ -222,7 +257,6 @@ if __name__ == "__main__":
         min_replicas=1,
         max_replicas=4,
     )
-    # 8. Sink stage.
     pipeline.add_sink(
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
@@ -233,14 +267,19 @@ if __name__ == "__main__":
     logger.info("Added sink stage to pipeline.")
 
     # Wire the stages together via ThreadedQueueEdge actors.
-    pipeline.make_edge("source", "metadata_injection", queue_size=100)
-    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=100)  # to limit memory pressure
-    pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=100)
-    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=100)
-    pipeline.make_edge("chart_extractor", "text_splitter", queue_size=100)
-    pipeline.make_edge("text_splitter", "text_embedding", queue_size=100)
-    pipeline.make_edge("text_embedding", "image_caption", queue_size=100)
-    pipeline.make_edge("image_caption", "sink", queue_size=100)
+    pipeline.make_edge("source", "metadata_injection", queue_size=64)
+    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=64)
+    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=64)  # to limit memory pressure
+    pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=64)
+    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=64)
+    pipeline.make_edge("chart_extractor", "image_filter", queue_size=64)
+    pipeline.make_edge("image_filter", "image_dedup", queue_size=64)
+    pipeline.make_edge("image_dedup", "image_storage", queue_size=64)
+    pipeline.make_edge("image_storage", "text_splitter", queue_size=64)
+    pipeline.make_edge("text_splitter", "text_embedding", queue_size=64)
+    pipeline.make_edge("text_embedding", "embedding_storage", queue_size=64)
+    pipeline.make_edge("embedding_storage", "image_caption", queue_size=64)
+    pipeline.make_edge("image_caption", "sink", queue_size=64)
     logger.info("Completed wiring of pipeline edges.")
 
     # Build the pipeline (this instantiates actors and wires edges).
