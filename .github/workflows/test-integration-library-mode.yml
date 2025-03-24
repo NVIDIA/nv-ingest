@@ -6,9 +6,6 @@ on:
   #    - Build Conda Packages
   #  types:
   #    - completed
-  push:
-    branches:
-      - edwardk/ci-integ-libmode  # remove later
   workflow_dispatch:
 
 jobs:
