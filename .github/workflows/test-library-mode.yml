@@ -47,6 +47,8 @@ jobs:
           name: test_artifacts
           path: |
             ./conda/output_conda_channel
+            ./data
+            ./examples
             ./tests/integration
           retention-days: 1
 
