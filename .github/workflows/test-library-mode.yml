@@ -6,6 +6,7 @@ on:
       - Build Conda Packages
     types:
       - completed
+  workflow_dispatch:
 
 jobs:
   test:
