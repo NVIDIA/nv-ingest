@@ -21,8 +21,21 @@ jobs:
     container:
       image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
     steps:
+      - name: Check access
+        if:
+          ${{
+            github.event.pull_request.author_association != 'COLLABORATOR' &&
+            github.event.pull_request.author_association != 'OWNER' &&
+            !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+          }}
+        run: |
+          echo "Event not triggered by a collaborator. Add 'ok-to-test' label to trigger tests."
+          exit 1
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{  github.event.pull_request.head.sha }}
 
       - name: Build Conda Packages
         run: |
