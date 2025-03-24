@@ -12,7 +12,10 @@ from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders imp
 
 # Import our new pipeline class.
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
+from nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor import AudioExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor import ChartExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor import DocxExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor import ImageExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor import PDFExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor import TableExtractorStage
 
@@ -35,7 +38,10 @@ from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption impor
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
+from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
@@ -135,6 +141,13 @@ if __name__ == "__main__":
             "yolox_infer_protocol": yolox_protocol,
         },
     }
+    docx_extractor_config = {
+        "docx_extraction_config": {
+            "yolox_endpoints": (yolox_grpc, yolox_http),
+            "yolox_infer_protocol": yolox_protocol,
+            "auth_token": yolox_auth,
+        }
+    }
     chart_extractor_config = {
         "endpoint_config": {
             "yolox_endpoints": (yolox_graphic_elements_grpc, yolox_graphic_elements_http),
@@ -193,6 +206,27 @@ if __name__ == "__main__":
         config=PDFExtractorSchema(**pdf_extractor_config),
         min_replicas=1,
         max_replicas=16,
+    )
+    pipeline.add_stage(
+        name="docx_extractor",
+        stage_actor=DocxExtractorStage,
+        config=DocxExtractorSchema(**docx_extractor_config),
+        min_replicas=1,
+        max_replicas=8,
+    )
+    pipeline.add_stage(
+        name="audio_extractor",
+        stage_actor=AudioExtractorStage,
+        config=AudioExtractorSchema(),
+        min_replicas=1,
+        max_replicas=8,
+    )
+    pipeline.add_stage(
+        name="image_extractor",
+        stage_actor=ImageExtractorStage,
+        config=ImageExtractorSchema(),
+        min_replicas=1,
+        max_replicas=8,
     )
     pipeline.add_stage(
         name="table_extractor",
@@ -267,19 +301,34 @@ if __name__ == "__main__":
     logger.info("Added sink stage to pipeline.")
 
     # Wire the stages together via ThreadedQueueEdge actors.
+    ###### INTAKE STAGES ########
     pipeline.make_edge("source", "metadata_injection", queue_size=64)
     # pipeline.make_edge("job_counter", "metadata_injection", queue_size=64)
     pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=64)  # to limit memory pressure
-    pipeline.make_edge("pdf_extractor", "table_extractor", queue_size=64)
+
+    ###### Document Extractors ########
+    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=64)
+    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=64)
+    pipeline.make_edge("docx_extractor", "image_extractor", queue_size=64)
+    pipeline.make_edge("image_extractor", "table_extractor", queue_size=64)
+
+    ###### Primitive Extractors ########
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=64)
     pipeline.make_edge("chart_extractor", "image_filter", queue_size=64)
+
+    ###### Primitive Mutators ########
     pipeline.make_edge("image_filter", "image_dedup", queue_size=64)
-    pipeline.make_edge("image_dedup", "image_storage", queue_size=64)
-    pipeline.make_edge("image_storage", "text_splitter", queue_size=64)
+    pipeline.make_edge("image_dedup", "text_splitter", queue_size=64)
+
+    ###### Primitive Transforms ########
     pipeline.make_edge("text_splitter", "text_embedding", queue_size=64)
-    pipeline.make_edge("text_embedding", "embedding_storage", queue_size=64)
-    pipeline.make_edge("embedding_storage", "image_caption", queue_size=64)
-    pipeline.make_edge("image_caption", "sink", queue_size=64)
+    pipeline.make_edge("text_embedding", "image_caption", queue_size=64)
+    pipeline.make_edge("image_caption", "image_storage", queue_size=64)
+
+    ###### Primitive Storage ########
+    pipeline.make_edge("image_storage", "embedding_storage", queue_size=64)
+    pipeline.make_edge("embedding_storage", "sink", queue_size=64)
+
     logger.info("Completed wiring of pipeline edges.")
 
     # Build the pipeline (this instantiates actors and wires edges).
