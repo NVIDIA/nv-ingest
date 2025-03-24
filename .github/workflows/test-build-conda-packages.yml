@@ -1,0 +1,35 @@
+name: Build Conda Packages
+
+on:
+  pull_request:
+    types:
+      - opened
+      - synchronize
+      - reopened
+    branches:
+      - main
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: linux-large-disk
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Conda Packages
+        run: |
+          ./conda/build_conda_packages.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: output_conda_channel
+          path: |
+            ./conda/output_conda_channel
+            ./tests/integration
+          retention-days: 1
