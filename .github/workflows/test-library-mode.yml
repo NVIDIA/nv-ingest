@@ -98,4 +98,4 @@ jobs:
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
-          $CONDA/envs/nvingest/bin/python -m pytest -rsx test_artifacts/tests/integration
+          cd test_artifacts/ && $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
