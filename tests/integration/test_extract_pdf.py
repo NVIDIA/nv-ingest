@@ -6,9 +6,10 @@ import pytest
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.util.milvus import nvingest_retrieval
 
 
-def test_pdfium_extract_pdf(pipeline_process):
+def test_pdfium_extract_only(pipeline_process):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -46,7 +47,7 @@ def test_pdfium_extract_pdf(pipeline_process):
     assert len(infographics) == 0
 
 
-def test_nemoretriever_parse_extract_pdf(pipeline_process):
+def test_nemoretriever_parse_extract_only(pipeline_process):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -83,3 +84,53 @@ def test_nemoretriever_parse_extract_pdf(pipeline_process):
     assert len(tables) == 2
     assert len(charts) == 3
     assert len(infographics) == 0
+
+
+def test_pdfium_extract_embed_upload_query(pipeline_process):
+    client = NvIngestClient(
+        message_client_allocator=SimpleClient,
+        message_client_port=7671,
+        message_client_hostname="localhost",
+    )
+
+    milvus_uri = "milvus.db"
+    collection_name = "test"
+    sparse = False
+
+    ingestor = (
+        Ingestor(client=client)
+        .files("./data/multimodal_test.pdf")
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            paddle_output_format="markdown",
+            extract_infographics=True,
+            text_depth="page",
+        )
+        .embed()
+        .vdb_upload(
+            collection_name=collection_name,
+            milvus_uri=milvus_uri,
+            dense_dim=2048,
+            sparse=sparse,
+        )
+    )
+
+    results = ingestor.ingest()
+    assert len(results) == 1
+
+    queries = ["Which animal is responsible for the typos?"]
+
+    retrieved_docs = nvingest_retrieval(
+        queries,
+        collection_name,
+        milvus_uri=milvus_uri,
+        hybrid=sparse,
+        top_k=1,
+    )
+    extracted_content = retrieved_docs[0][0]["entity"]["text"]
+
+    assert len(retrieved_docs) == 1
+    assert "This table describes some animals" in extracted_content
