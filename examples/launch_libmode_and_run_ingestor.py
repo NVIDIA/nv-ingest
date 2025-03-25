@@ -3,13 +3,14 @@ import os
 import sys
 import time
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
-    PipelineCreationSchema,
-    start_pipeline_subprocess,
-)
-from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
+from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client import NvIngestClient
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -47,13 +48,14 @@ def run_ingestor():
     )
 
     try:
-        _ = ingestor.ingest()
+        results = ingestor.ingest()
         logger.info("Ingestion completed successfully.")
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")
         raise
 
     print("\nIngest done.")
+    print(ingest_json_results_to_blob(results[0]))
 
 
 def main():
