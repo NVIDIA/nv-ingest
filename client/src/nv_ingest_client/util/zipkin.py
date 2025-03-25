@@ -6,7 +6,7 @@ import asyncio
 import json
 import logging
 import os
-from typing import Dict
+from typing import Dict, Any
 from typing import List
 from typing import Optional
 
@@ -74,7 +74,7 @@ class AsyncZipkinClient:
 
 def collect_traces_from_zipkin(
     zipkin_host: str, zipkin_port: int, trace_id_map: Dict[str, str], concurrent_requests: Optional[int] = 1
-) -> Dict[str, str]:
+) -> list[Any]:
     zipkin_client = AsyncZipkinClient(zipkin_host, zipkin_port, concurrent_requests)
 
     # Take the Dictionary of filenames -> trace_ids and build just a list of trace_ids to send to Zipkin
@@ -83,6 +83,7 @@ def collect_traces_from_zipkin(
         trace_ids.append(trace_id_map[filename])
 
     traces = asyncio.run(zipkin_client.get_metrics(trace_ids=trace_ids))
+
     return traces
 
 

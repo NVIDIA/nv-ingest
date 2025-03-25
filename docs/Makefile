@@ -9,7 +9,7 @@ SPHINX_OUTPUT_DIR=docs/extraction/api-docs
 
 # Check for the nv_ingest module
 INGEST_PYTHON_MODULE_EXISTS := $(shell python -c "import importlib.util; exit(0 if importlib.util.find_spec('nv_ingest') else 1)" && echo 1 || echo 0)
-PYTHONPATH=$(CURDIR)/../src:$(CURDIR)/../api:$(CURDIR)/../client/src
+PYTHONPATH=$(CURDIR)/../src:$(CURDIR)/../api/src:$(CURDIR)/../client/src
 
 
 # Default target

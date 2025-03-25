@@ -14,13 +14,21 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+
+#!/bin/bash
+
 # Activate the `nv_ingest_runtime` conda environment
+
+set -e
 . /opt/conda/etc/profile.d/conda.sh
 conda activate nv_ingest_runtime
 
 # Source "source" file if it exists
 SRC_FILE="/opt/docker/bin/entrypoint_source"
-[ -f "${SRC_FILE}" ] && source "${SRC_FILE}"
+[ -f "${SRC_FILE}" ] && . "${SRC_FILE}"
+
+SRC_EXT="/workspace/docker/entrypoint_source_ext.sh"
+[ -f "${SRC_EXT}" ] && . "${SRC_EXT}"
 
 # Determine edge buffer size (default: 32)
 EDGE_BUFFER_SIZE="${INGEST_EDGE_BUFFER_SIZE:-32}"
@@ -50,7 +58,7 @@ else
     # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
         # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
-        uvicorn nv_ingest.main:app --workers 32 --host 0.0.0.0 --port 7670 &
+        gunicorn nv_ingest.api.main:app -w 32 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:7670 --timeout 300 &
     fi
 
     if [ "${MEM_TRACE}" = true ]; then

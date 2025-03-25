@@ -1,0 +1,101 @@
+name: Test Nv-Ingest Library Mode
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - synchronize
+      - reopened
+      # Adding 'labeled' to the list of activity types that trigger this event
+      # (default: opened, synchronize, reopened) so that we can run this
+      # workflow when the 'ok-to-test' label is added.
+      # Reference: https://docs.github.com/en/actions/using-workflows/events-that-trigger-workflows#pull_request_target
+      - labeled
+  push:
+    branches:
+      - main
+
+jobs:
+  build:
+    runs-on: linux-large-disk
+    container:
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+    steps:
+      - name: Check access
+        if:
+          ${{
+            github.event.pull_request.author_association != 'COLLABORATOR' &&
+            github.event.pull_request.author_association != 'OWNER' &&
+            !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+          }}
+        run: |
+          echo "Event not triggered by a collaborator. Add 'ok-to-test' label to trigger tests."
+          exit 1
+
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{  github.event.pull_request.head.sha }}
+
+      - name: Build Conda Packages
+        run: |
+          ./conda/build_conda_packages.sh
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: test_artifacts
+          path: |
+            ./conda/output_conda_channel
+            ./data
+            ./examples
+            ./tests/integration
+          retention-days: 1
+
+  test:
+    runs-on: ubuntu-latest
+    needs: build
+    timeout-minutes: 60
+    steps:
+      - name: Check access
+        if:
+          ${{
+            github.event.pull_request.author_association != 'COLLABORATOR' &&
+            github.event.pull_request.author_association != 'OWNER' &&
+            !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
+          }}
+        run: |
+          echo "Event not triggered by a collaborator. Add 'ok-to-test' label to trigger tests."
+          exit 1
+
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - uses: conda-incubator/setup-miniconda@v3
+        with:
+          auto-update-conda: true
+
+      - name: Install Conda
+        shell: bash -el {0}
+        run: |
+          conda create -y --name nvingest python=3.10
+          conda activate nvingest
+          conda install -y -c ./test_artifacts/conda/output_conda_channel -c rapidsai -c conda-forge -c nvidia nv_ingest nv_ingest_api nv_ingest_client
+          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
+      - name: Run integration test
+        env:
+          AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
+          EMBEDDING_NIM_MODEL_NAME: ${{ secrets.EMBEDDING_NIM_MODEL_NAME }}
+          NEMORETRIEVER_PARSE_MODEL_NAME: ${{ secrets.NEMORETRIEVER_PARSE_MODEL_NAME }}
+          NVIDIA_API_KEY: ${{ secrets.NVIDIA_API_KEY }}
+          NVIDIA_BUILD_API_KEY: ${{ secrets.NVIDIA_BUILD_API_KEY }}
+          PADDLE_HTTP_ENDPOINT: ${{ secrets.PADDLE_HTTP_ENDPOINT }}
+          VLM_CAPTION_ENDPOINT: ${{ secrets.VLM_CAPTION_ENDPOINT }}
+          VLM_CAPTION_MODEL_NAME: ${{ secrets.VLM_CAPTION_MODEL_NAME }}
+          YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: ${{ secrets.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT }}
+          YOLOX_HTTP_ENDPOINT: ${{ secrets.YOLOX_HTTP_ENDPOINT }}
+          YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: ${{ secrets.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT }}
+        shell: bash -el {0}
+        run: |
+          echo 'Running tests...'
+          cd test_artifacts/ && $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration

@@ -9,7 +9,7 @@ from fastapi import APIRouter
 from fastapi import status
 from fastapi.responses import JSONResponse
 
-from nv_ingest.util.nim.helpers import is_ready
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import is_ready
 
 logger = logging.getLogger("uvicorn")
 
@@ -17,7 +17,7 @@ router = APIRouter()
 
 
 @router.get(
-    "/health/live",
+    "/live",
     tags=["Health"],
     summary="Check if the service is running.",
     description="""
@@ -31,7 +31,7 @@ async def get_live_state() -> dict:
 
 
 @router.get(
-    "/health/ready",
+    "/ready",
     tags=["Health"],
     summary="Check if the service is ready to receive traffic.",
     description="""

@@ -28,9 +28,12 @@ CONDA_CHANNEL=${2:-""}
 BUILD_NV_INGEST=${BUILD_NV_INGEST:-1} # 1 = build by default, 0 = skip
 BUILD_NV_INGEST_API=${BUILD_NV_INGEST_API:-1} # 1 = build by default, 0 = skip
 BUILD_NV_INGEST_CLIENT=${BUILD_NV_INGEST_CLIENT:-1} # 1 = build by default, 0 = skip
+RELEASE_VERSION=${RELEASE_VERSION:-} # Version to override output name for release
+
+echo "RELEASE_VERSION: ${RELEASE_VERSION}"
 
 ##############################
-# Package Directories
+# Package Directories"
 ##############################
 NV_INGEST_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest"
 NV_INGEST_API_DIR="${BUILD_SCRIPT_BASE}/packages/nv_ingest_api"
@@ -51,7 +54,14 @@ if [[ "${BUILD_NV_INGEST_API}" -eq 1 ]]; then
     echo "Building nv_ingest_api..."
     SCRIPT_PATH="$GIT_ROOT/api/src/version.py"
     echo "SCRIPT_PATH: $SCRIPT_PATH"
-    NV_INGEST_API_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+
+    # Generate the version if not specified
+    if [ -z "$RELEASE_VERSION" ]; then
+        NV_INGEST_API_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+    else
+        NV_INGEST_API_VERSION=$RELEASE_VERSION
+    fi
+
     echo "NV_INGEST_API_VERSION: $NV_INGEST_API_VERSION"
     NV_INGEST_API_VERSION="${NV_INGEST_API_VERSION}" GIT_ROOT="${GIT_ROOT}/api" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_API_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
@@ -62,7 +72,17 @@ fi
 
 if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
-    GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
+
+    # Generate the version if not specified
+    if [ -z "$RELEASE_VERSION" ]; then
+        # Setting to Unknown will cause the version to be pulled from the nv-ingest setup.py file at conda build time
+        NV_INGEST_RELEASE_VERSION="Unknown"
+    else
+        NV_INGEST_RELEASE_VERSION=$RELEASE_VERSION
+    fi
+
+    echo "NV_INGEST_VERSION: $NV_INGEST_RELEASE_VERSION"
+    NV_INGEST_RELEASE_VERSION="${NV_INGEST_RELEASE_VERSION}" GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
@@ -73,7 +93,14 @@ if [[ "${BUILD_NV_INGEST_CLIENT}" -eq 1 ]]; then
     echo "Building nv_ingest_client..."
     SCRIPT_PATH="$GIT_ROOT/client/src/version.py"
     echo "SCRIPT_PATH: $SCRIPT_PATH"
-    NV_INGEST_CLIENT_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+
+    # Generate the version if not specified
+    if [ -z "$RELEASE_VERSION" ]; then
+        NV_INGEST_CLIENT_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
+    else
+        NV_INGEST_CLIENT_VERSION=$RELEASE_VERSION
+    fi
+
     echo "NV_INGEST_CLIENT_VERSION: $NV_INGEST_CLIENT_VERSION"
     NV_INGEST_CLIENT_VERSION="${NV_INGEST_CLIENT_VERSION}" GIT_ROOT="${GIT_ROOT}/client" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_CLIENT_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
