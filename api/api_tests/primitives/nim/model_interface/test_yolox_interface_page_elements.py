@@ -82,7 +82,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
 
     def test_initialization_v2(self):
         """Test initialization with v2 model name."""
-        model = YoloxPageElementsModelInterface("nv-yolox-page-elements-v2")
+        model = YoloxPageElementsModelInterface("nemoretriever-page-elements-v2")
 
         # Check parent class initialization with v2 parameters
         self.assertEqual(model.num_classes, 4)
@@ -90,12 +90,12 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
         self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
 
     def test_default_initialization(self):
-        """Test default initialization (should use v1 parameters)."""
+        """Test default initialization (should use v2 parameters)."""
         model = YoloxPageElementsModelInterface()
 
-        # Check that v1 parameters are used by default
+        # Check that v2 parameters are used by default
         self.assertEqual(model.num_classes, 4)
-        self.assertEqual(model.final_score, {"table": 0.4, "chart": 0.4, "infographic": 0.4})
+        self.assertEqual(model.final_score, {"table": 0.5, "chart": 0.5, "infographic": 0.5})
         self.assertEqual(model.class_labels, ["table", "chart", "infographic", "title"])
 
     def test_inheritance(self):
@@ -285,7 +285,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_invalid_final_score(self):
         """Test postprocess_annotations with invalid final_score."""
         # Create an instance with an invalid final_score (not a dictionary)
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V1_FINAL_SCORE", 0.4):
+        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", 0.5):
             model = YoloxPageElementsModelInterface()
 
             # Create mock annotations
@@ -300,7 +300,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
     def test_postprocess_annotations_missing_class_in_final_score(self):
         """Test postprocess_annotations with final_score missing a required class."""
         # Create an instance with final_score missing a required class
-        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V1_FINAL_SCORE", {"table": 0.4, "chart": 0.4}):
+        with patch(f"{MODULE_UNDER_TEST}.YOLOX_PAGE_V2_FINAL_SCORE", {"table": 0.5, "chart": 0.5}):
             model = YoloxPageElementsModelInterface()
 
             # Create mock annotations
