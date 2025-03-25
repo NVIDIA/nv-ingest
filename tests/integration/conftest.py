@@ -25,5 +25,3 @@ def pipeline_process():
 
     process.kill()
     process.wait()
-
-
