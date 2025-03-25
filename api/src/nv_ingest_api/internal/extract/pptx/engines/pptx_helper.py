@@ -627,6 +627,7 @@ def _construct_table_metadata(
             "line": -1,
             "span": -1,
         },
+        "subtype": ContentTypeEnum.TABLE,
     }
     table_metadata = {
         "caption": "",
