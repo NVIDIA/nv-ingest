@@ -1,21 +1,14 @@
+import subprocess
 import sys
 import time
 
+import pytest
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess
 
-
-def test_pdfium_extract_pdf():
-    config = PipelineCreationSchema()
-    pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
-    time.sleep(10)
-
-    assert pipeline_process.poll() is None, "Error running pipeline subprocess."
-
+def test_pdfium_extract_pdf(pipeline_process):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -38,16 +31,22 @@ def test_pdfium_extract_pdf():
 
     results = ingestor.ingest()
     assert len(results) == 1
-    assert len(results[0]) == 3
+
+    texts = [x for x in results[0] if x["metadata"]["content_metadata"]["type"] == "text"]
+    assert len(texts) == 3
+
+    structured = [x for x in results[0] if x["metadata"]["content_metadata"]["type"] == "structured"]
+    assert len(structured) == 5
+
+    tables = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "table"]
+    charts = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "chart"]
+    infographics = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "infographic"]
+    assert len(tables) == 2
+    assert len(charts) == 3
+    assert len(infographics) == 0
 
 
-def test_nemoretriever_parse_extract_pdf():
-    config = PipelineCreationSchema()
-    pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
-    time.sleep(10)
-
-    assert pipeline_process.poll() is None, "Error running pipeline subprocess."
-
+def test_nemoretriever_parse_extract_pdf(pipeline_process):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -71,4 +70,16 @@ def test_nemoretriever_parse_extract_pdf():
 
     results = ingestor.ingest()
     assert len(results) == 1
-    assert len(results[0]) == 3
+
+    texts = [x for x in results[0] if x["metadata"]["content_metadata"]["type"] == "text"]
+    assert len(texts) == 3
+
+    structured = [x for x in results[0] if x["metadata"]["content_metadata"]["type"] == "structured"]
+    assert len(structured) == 5
+
+    tables = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "table"]
+    charts = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "chart"]
+    infographics = [x for x in structured if x["metadata"]["content_metadata"]["subtype"] == "infographic"]
+    assert len(tables) == 2
+    assert len(charts) == 3
+    assert len(infographics) == 0
