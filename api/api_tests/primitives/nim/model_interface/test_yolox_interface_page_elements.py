@@ -82,7 +82,7 @@ class TestYoloxPageElementsModelInterface(unittest.TestCase):
 
     def test_initialization_v2(self):
         """Test initialization with v2 model name."""
-        model = YoloxPageElementsModelInterface("nv-yolox-page-elements-v2")
+        model = YoloxPageElementsModelInterface("nemoretriever-page-elements-v2")
 
         # Check parent class initialization with v2 parameters
         self.assertEqual(model.num_classes, 4)
