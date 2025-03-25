@@ -3,7 +3,9 @@ import sys
 
 
 def test_launch_libmode_and_run_ingestor():
-    process = subprocess.run([sys.executable, "./examples/launch_libmode_and_run_ingestor.py"], capture_output=True, text=True)
+    process = subprocess.run(
+        [sys.executable, "./examples/launch_libmode_and_run_ingestor.py"], capture_output=True, text=True
+    )
 
     try:
         assert process.returncode == 0
