@@ -15,7 +15,7 @@ from nv_ingest_client.client import NvIngestClient
         "./data/multimodal_test.jpeg",
         "./data/multimodal_test.png",
         "./data/multimodal_test.tiff",
-    ]
+    ],
 )
 def test_images_extract_only(pipeline_process, image_file):
     client = NvIngestClient(
