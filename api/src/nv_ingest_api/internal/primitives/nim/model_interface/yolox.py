@@ -236,8 +236,11 @@ class YoloxModelInterfaceBase(ModelInterface):
             logger.debug("Formatting input for HTTP Yolox model")
             content_list: List[Dict[str, Any]] = []
             for image in data["images"]:
-                # Convert the numpy array to a PIL Image. Assume images are in [0,1].
-                image_pil = Image.fromarray((image * 255).astype(np.uint8))
+                # Convert to uint8 if needed.
+                if image.dtype != np.uint8:
+                    image = (image * 255).astype(np.uint8)
+                # Convert the numpy array to a PIL Image.
+                image_pil = Image.fromarray(image)
                 original_size = image_pil.size
 
                 # Save the image to a buffer and encode to base64.
@@ -398,7 +401,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_model_name: str = "nv-yolox-page-elements-v1"):
+    def __init__(self, yolox_model_name: str = "nemoretriever-page-elements-v2"):
         """
         Initialize the yolox-page-elements model interface.
         """
@@ -1379,7 +1382,7 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-elements-v1"):
+def get_yolox_model_name(yolox_http_endpoint, default_model_name="nemoretriever-page-elements-v2"):
     try:
         yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
         if not yolox_model_name:
@@ -1387,11 +1390,11 @@ def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-
                 "Failed to obtain yolox-page-elements model name from the endpoint. "
                 f"Falling back to '{default_model_name}'."
             )
-            yolox_model_name = default_model_name  # Default to v1 until gtc release
+            yolox_model_name = default_model_name
     except Exception:
         logger.warning(
             "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
         )
-        yolox_model_name = default_model_name  # Default to v1 until gtc release
+        yolox_model_name = default_model_name
 
     return yolox_model_name
