@@ -302,32 +302,32 @@ if __name__ == "__main__":
 
     # Wire the stages together via ThreadedQueueEdge actors.
     ###### INTAKE STAGES ########
-    pipeline.make_edge("source", "metadata_injection", queue_size=64)
-    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=64)
-    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=64)  # to limit memory pressure
+    pipeline.make_edge("source", "metadata_injection", queue_size=4)
+    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=4)
+    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=4)  # to limit memory pressure
 
     ###### Document Extractors ########
-    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=64)
-    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=64)
-    pipeline.make_edge("docx_extractor", "image_extractor", queue_size=64)
-    pipeline.make_edge("image_extractor", "table_extractor", queue_size=64)
+    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=4)
+    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=4)
+    pipeline.make_edge("docx_extractor", "image_extractor", queue_size=4)
+    pipeline.make_edge("image_extractor", "table_extractor", queue_size=4)
 
     ###### Primitive Extractors ########
-    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=64)
-    pipeline.make_edge("chart_extractor", "image_filter", queue_size=64)
+    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=4)
+    pipeline.make_edge("chart_extractor", "image_filter", queue_size=4)
 
     ###### Primitive Mutators ########
-    pipeline.make_edge("image_filter", "image_dedup", queue_size=64)
-    pipeline.make_edge("image_dedup", "text_splitter", queue_size=64)
+    pipeline.make_edge("image_filter", "image_dedup", queue_size=4)
+    pipeline.make_edge("image_dedup", "text_splitter", queue_size=4)
 
     ###### Primitive Transforms ########
-    pipeline.make_edge("text_splitter", "text_embedding", queue_size=64)
-    pipeline.make_edge("text_embedding", "image_caption", queue_size=64)
-    pipeline.make_edge("image_caption", "image_storage", queue_size=64)
+    pipeline.make_edge("text_splitter", "text_embedding", queue_size=4)
+    pipeline.make_edge("text_embedding", "image_caption", queue_size=4)
+    pipeline.make_edge("image_caption", "image_storage", queue_size=4)
 
     ###### Primitive Storage ########
-    pipeline.make_edge("image_storage", "embedding_storage", queue_size=64)
-    pipeline.make_edge("embedding_storage", "sink", queue_size=64)
+    pipeline.make_edge("image_storage", "embedding_storage", queue_size=4)
+    pipeline.make_edge("embedding_storage", "sink", queue_size=4)
 
     logger.info("Completed wiring of pipeline edges.")
 

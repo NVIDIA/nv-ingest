@@ -2,49 +2,50 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+# TODO(Devin): Early prototype. Not currently used anywhere
+
 import logging
 from typing import Any, Dict
-from queue import Queue
 from threading import Lock
 
 import ray
+from ray.util.queue import Queue
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_edge_base import RayActorEdge
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Set logger level to INFO
-
-
-# TODO(Devin): Early prototype. Not currently used anywhere
+logger.setLevel(logging.INFO)
 
 
 @ray.remote
-class ThreadedQueueEdge(RayActorEdge):
+class RayQueueEdge(RayActorEdge):
     """
-    A threaded implementation of RayActorEdge using queue.Queue for thread safety.
+    A RayActorEdge implementation using ray.util.queue.Queue for improved efficiency.
     """
 
     def __init__(self, max_size: int, multi_reader: bool = False, multi_writer: bool = False) -> None:
         super().__init__(max_size, multi_reader, multi_writer)
+        # Use Ray's distributed queue
         self.queue = Queue(maxsize=max_size)
         self.stats = {"write_count": 0, "read_count": 0, "queue_full_count": 0}
-        # Use a dedicated lock for updating stats only.
+        # Dedicated lock for stats updates
         self.stats_lock = Lock()
         logger.info(
-            f"ThreadedQueueEdge initialized with max_size={max_size},"
+            f"ThreadedQueueEdge initialized with max_size={max_size}, "
             f"multi_reader={multi_reader}, multi_writer={multi_writer}"
         )
 
+    # TODO(Devin): Think about adding timeouts to queue read/writes here. Stage loops already have timeouts, but
+    # adding timeouts here would allow for more graceful handling of queue issues.
     def write(self, item: Any) -> bool:
         """
-        Write an item into the edge synchronously.
+        Write an item into the queue synchronously.
         """
         if self.queue.full():
             with self.stats_lock:
                 self.stats["queue_full_count"] += 1
             logger.info("Queue is full. Incrementing queue_full_count.")
         logger.info("Attempting to put item into the queue.")
-        # Queue operations are thread-safe; no additional lock is needed.
         self.queue.put(item)
         with self.stats_lock:
             self.stats["write_count"] += 1
@@ -53,7 +54,7 @@ class ThreadedQueueEdge(RayActorEdge):
 
     def read(self) -> Any:
         """
-        Read an item from the edge synchronously.
+        Read an item from the queue synchronously.
         """
         logger.info("Attempting to get item from the queue.")
         item = self.queue.get()

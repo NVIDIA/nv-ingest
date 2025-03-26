@@ -17,10 +17,9 @@ from rich.console import Console
 from rich.table import Table
 from rich.live import Live
 
-from nv_ingest.framework.orchestration.ray.edges.threaded_queue_edge import ThreadedQueueEdge
+from ray.util.queue import Queue
 from nv_ingest.framework.orchestration.ray.util.system_tools.memory import estimate_actor_memory_overhead
 
-# Assume logger is already configured
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -43,7 +42,7 @@ class StageInfo:
 class RayPipeline:
     """
     A structured pipeline that supports source, intermediate, and sink stages.
-    Stages are connected using ThreadedQueueEdge actors.
+    Stages are connected using Ray distributed queues directly.
     """
 
     def __init__(
@@ -53,20 +52,66 @@ class RayPipeline:
         dynamic_memory_scaling: bool = False,
         dynamic_memory_threshold: float = 0.9,
     ) -> None:
+        """
+        Initialize the RayPipeline instance.
+
+        Parameters
+        ----------
+        scaling_threshold : float, optional
+            Threshold for scaling decisions (as a percentage), by default 10.0.
+        scaling_cooldown : int, optional
+            Number of cycles to wait before scaling down, by default 20.
+        dynamic_memory_scaling : bool, optional
+            Flag indicating whether dynamic memory scaling is enabled, by default False.
+        dynamic_memory_threshold : float, optional
+            Fraction of system memory to use as the threshold for scaling, by default 0.9.
+
+        Attributes
+        ----------
+        stages : list of StageInfo
+            List of stages added to the pipeline.
+        connections : dict
+            Mapping from source stage names to lists of tuples (to_stage, queue_size).
+        stage_actors : dict
+            Mapping from stage names to lists of actor handles.
+        edge_queues : dict
+            Mapping from edge names to (queue, max_size) pairs.
+        queue_stats : dict
+            Mapping from edge names to lists of queue utilization statistics.
+        under_threshold_cycles : dict
+            Mapping from stage names to cycle counts under threshold.
+        dynamic_memory_scaling : bool
+            Whether dynamic memory scaling is enabled.
+        dynamic_memory_threshold : float
+            Memory threshold for dynamic scaling (in bytes).
+        stage_memory_overhead : dict
+            Estimated memory overhead per stage.
+        idle : bool
+            Flag indicating if the pipeline is in an idle state.
+        scaling_state : dict
+            Current scaling state per stage.
+        _monitoring : bool
+            Flag indicating if queue monitoring is active.
+        _monitor_thread : threading.Thread
+            Thread used for queue monitoring.
+        _scaling_monitoring : bool
+            Flag indicating if scaling monitoring is active.
+        _scaling_thread : threading.Thread
+            Thread used for scaling.
+        """
+
         self.stages: List[StageInfo] = []
         self.connections: Dict[str, List[tuple]] = {}  # from_stage -> list of (to_stage, queue_size)
         self.stage_actors: Dict[str, List[Any]] = {}
-        self.edge_queues: Dict[str, Any] = {}  # edge name -> (edge_actor, max_size)
+        # Instead of edge actors, we'll store (queue, max_size)
+        self.edge_queues: Dict[str, Any] = {}
         self.queue_stats: Dict[str, List[Dict[str, float]]] = {}
         self.scaling_threshold: float = scaling_threshold
         self.scaling_cooldown: int = scaling_cooldown
         self.under_threshold_cycles: Dict[str, int] = {}  # stage name -> cycle count
 
-        # New flags for dynamic memory scaling.
         self.dynamic_memory_scaling = dynamic_memory_scaling
         self.dynamic_memory_threshold = dynamic_memory_threshold  # In bytes
-
-        # Will hold estimated memory overhead for each stage (in bytes).
         self.stage_memory_overhead: Dict[str, float] = {}
 
         self.idle: bool = True
@@ -86,6 +131,27 @@ class RayPipeline:
     def add_source(
         self, *, name: str, source_actor: Any, config: BaseModel, min_replicas: int = 1, max_replicas: int = 1
     ) -> "RayPipeline":
+        """
+        Add a source stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the source stage.
+        source_actor : Any
+            The Ray remote actor class for the source stage.
+        config : BaseModel
+            Configuration for the source stage.
+        min_replicas : int, optional
+            Minimum number of replicas for the source stage, by default 1.
+        max_replicas : int, optional
+            Maximum number of replicas for the source stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance with the source stage added.
+        """
         if min_replicas < 1:
             logger.warning(f"Source stage '{name}': min_replicas must be at least 1. Overriding to 1.")
             min_replicas = 1
@@ -104,6 +170,27 @@ class RayPipeline:
     def add_stage(
         self, *, name: str, stage_actor: Any, config: BaseModel, min_replicas: int = 0, max_replicas: int = 1
     ) -> "RayPipeline":
+        """
+        Add an intermediate stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the intermediate stage.
+        stage_actor : Any
+            The Ray remote actor class for the stage.
+        config : BaseModel
+            Configuration for the stage.
+        min_replicas : int, optional
+            Minimum number of replicas for the stage, by default 0.
+        max_replicas : int, optional
+            Maximum number of replicas for the stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance with the intermediate stage added.
+        """
         if min_replicas < 0:
             logger.warning(f"Stage '{name}': min_replicas cannot be negative. Overriding to 0.")
             min_replicas = 0
@@ -117,6 +204,27 @@ class RayPipeline:
     def add_sink(
         self, *, name: str, sink_actor: Any, config: BaseModel, min_replicas: int = 1, max_replicas: int = 1
     ) -> "RayPipeline":
+        """
+        Add a sink stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the sink stage.
+        sink_actor : Any
+            The Ray remote actor class for the sink stage.
+        config : BaseModel
+            Configuration for the sink stage.
+        min_replicas : int, optional
+            Minimum number of replicas for the sink stage, by default 1.
+        max_replicas : int, optional
+            Maximum number of replicas for the sink stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance with the sink stage added.
+        """
         if min_replicas < 1:
             logger.warning(f"Sink stage '{name}': min_replicas must be at least 1. Overriding to 1.")
             min_replicas = 1
@@ -133,6 +241,28 @@ class RayPipeline:
         return self
 
     def make_edge(self, from_stage: str, to_stage: str, queue_size: int = 100) -> "RayPipeline":
+        """
+        Create an edge (connection) between two stages in the pipeline.
+
+        Parameters
+        ----------
+        from_stage : str
+            The name of the source stage.
+        to_stage : str
+            The name of the destination stage.
+        queue_size : int, optional
+            The maximum size of the distributed queue for the edge, by default 100.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance with the new edge added.
+
+        Raises
+        ------
+        ValueError
+            If either the from_stage or to_stage is not found in the pipeline.
+        """
         if from_stage not in [s.name for s in self.stages]:
             logger.error(f"make_edge: Stage {from_stage} not found")
             raise ValueError(f"Stage {from_stage} not found")
@@ -144,25 +274,30 @@ class RayPipeline:
         return self
 
     def build(self) -> Dict[str, List[Any]]:
+        """
+        Build the pipeline by instantiating stage actors and wiring up the connections using
+        Ray distributed queues.
+
+        Returns
+        -------
+        dict
+            A dictionary mapping stage names to lists of actor handles.
+        """
         logger.debug("Building pipeline: Instantiating stage actors...")
 
-        # If dynamic memory scaling is enabled, estimate the memory overhead per stage.
         if self.dynamic_memory_scaling:
             logger.info("Dynamic memory scaling enabled. Estimating per-stage memory overhead...")
             total_overhead = 0.0
             for stage in self.stages:
                 logger.info("Estimating overhead for stage '%s'...", stage.name)
-                # Pass stage.config and progress_engine_count=-1 to the actor.
                 overhead = estimate_actor_memory_overhead(
                     stage.callable, actor_kwargs={"config": stage.config, "progress_engine_count": -1}
                 )
                 self.stage_memory_overhead[stage.name] = overhead
                 total_overhead += overhead
                 logger.info("Stage '%s' overhead: %.2f MB", stage.name, overhead / (1024 * 1024))
-
             avg_overhead = total_overhead / len(self.stages) if self.stages else 0.0
             logger.info("Average overhead per stage: %.2f MB", avg_overhead / (1024 * 1024))
-
             total_system_memory = psutil.virtual_memory().total
             threshold_bytes = self.dynamic_memory_threshold * total_system_memory
             logger.info(
@@ -171,7 +306,6 @@ class RayPipeline:
                 threshold_bytes / (1024 * 1024),
                 self.dynamic_memory_threshold * 100,
             )
-
             required_total_replicas = int(threshold_bytes / avg_overhead) if avg_overhead > 0 else 0
             current_total_replicas = sum(stage.max_replicas for stage in self.stages)
             logger.info(
@@ -179,7 +313,6 @@ class RayPipeline:
                 current_total_replicas,
                 required_total_replicas,
             )
-
             if required_total_replicas and current_total_replicas != required_total_replicas:
                 ratio = required_total_replicas / current_total_replicas
                 logger.info("Adjusting max_replicas by scaling factor: %.2f", ratio)
@@ -192,7 +325,7 @@ class RayPipeline:
             else:
                 logger.info("No adjustment needed: current max replicas align with memory threshold.")
 
-        # Instantiate actors per stage using their min_replicas.
+        # Instantiate stage actors.
         for stage in self.stages:
             replicas = []
             for _ in range(stage.min_replicas):
@@ -208,22 +341,21 @@ class RayPipeline:
 
         logger.debug("Wiring up edges between stages...")
         wiring_refs = []
+        # For each connection, create a Ray distributed queue and wire it to the stages.
         for from_stage, conns in self.connections.items():
             for to_stage, queue_size in conns:
                 queue_name = f"{from_stage}_to_{to_stage}"
-                logger.debug(f"Creating edge actor {queue_name} with queue_size {queue_size}")
-                edge_actor = ThreadedQueueEdge.options(name=queue_name, max_concurrency=100).remote(
-                    max_size=queue_size, multi_reader=True, multi_writer=True
-                )
-                self.edge_queues[queue_name] = (edge_actor, queue_size)
+                logger.debug(f"Creating distributed queue {queue_name} with queue_size {queue_size}")
+                edge_queue = Queue(maxsize=queue_size)
+                self.edge_queues[queue_name] = (edge_queue, queue_size)
                 self.queue_stats[queue_name] = []
 
                 for actor in self.stage_actors.get(from_stage, []):
-                    logger.debug(f"Wiring output edge for actor {actor} in stage {from_stage} to edge {queue_name}")
-                    wiring_refs.append(actor.set_output_edge.remote(edge_actor))
+                    logger.debug(f"Wiring output queue for actor {actor} in stage {from_stage} to queue {queue_name}")
+                    wiring_refs.append(actor.set_output_queue.remote(edge_queue))
                 for actor in self.stage_actors.get(to_stage, []):
-                    logger.debug(f"Wiring input edge for actor {actor} in stage {to_stage} to edge {queue_name}")
-                    wiring_refs.append(actor.set_input_edge.remote(edge_actor))
+                    logger.debug(f"Wiring input queue for actor {actor} in stage {to_stage} to queue {queue_name}")
+                    wiring_refs.append(actor.set_input_queue.remote(edge_queue))
         logger.debug("Waiting for all wiring calls to complete...")
         ray.get(wiring_refs)
         logger.debug("Pipeline build complete.")
@@ -231,11 +363,14 @@ class RayPipeline:
 
     def _scale_stage(self, stage_name: str, new_replica_count: int) -> None:
         """
-        Dynamically scale the given stage to new_replica_count.
-        For scaling up, ensure that the total does not exceed max_replicas.
-        Allow scaling down regardless of the current count.
-        If dynamic memory scaling is enabled, refuse to scale up if the predicted extra
-        memory usage would exceed 90% of system memory.
+        Dynamically scale the specified stage to a new replica count.
+
+        Parameters
+        ----------
+        stage_name : str
+            The name of the stage to scale.
+        new_replica_count : int
+            The target number of replicas for the stage.
         """
         current_replicas = self.stage_actors.get(stage_name, [])
         current_count = len(current_replicas)
@@ -245,7 +380,6 @@ class RayPipeline:
             return
 
         if new_replica_count > current_count:
-            # Scaling UP: cap at max_replicas.
             if current_count >= stage_info.max_replicas:
                 logger.debug(
                     f"[Scale Stage] Stage '{stage_name}' already at max replicas ({current_count}). Skipping scale-up."
@@ -253,11 +387,8 @@ class RayPipeline:
                 return
             target_count = min(new_replica_count, stage_info.max_replicas)
             logger.debug(
-                f"[Scale Stage] Request to scale UP stage '{stage_name}'"
-                f" from {current_count} to {target_count} replicas."
+                f"[Scale Stage] Scaling UP stage '{stage_name}' from {current_count} to {target_count} replicas."
             )
-
-            # If dynamic memory scaling is enabled, check the predicted extra memory usage.
             if self.dynamic_memory_scaling:
                 stage_overhead = self.stage_memory_overhead.get(stage_name, 0)
                 additional_replicas = target_count - current_count
@@ -278,7 +409,6 @@ class RayPipeline:
                     )
                     return
 
-            # Create new replicas.
             for _ in range(target_count - current_count):
                 actor_name = f"{stage_name}_{uuid.uuid4()}"
                 logger.debug(f"[Scale Stage] Creating new replica '{actor_name}' for stage '{stage_name}'")
@@ -290,24 +420,28 @@ class RayPipeline:
                     for to_stage, _ in self.connections[stage_name]:
                         queue_name = f"{stage_name}_to_{to_stage}"
                         if queue_name in self.edge_queues:
-                            edge_actor, _ = self.edge_queues[queue_name]
-                            logger.debug(f"[Scale Stage] Wiring new actor '{actor_name}' output to edge '{queue_name}'")
-                            wiring_refs.append(new_actor.set_output_edge.remote(edge_actor))
+                            edge_queue, _ = self.edge_queues[queue_name]
+                            logger.debug(
+                                f"[Scale Stage] Wiring new actor '{actor_name}' output to queue '{queue_name}'"
+                            )
+                            wiring_refs.append(new_actor.set_output_queue.remote(edge_queue))
                         else:
-                            logger.error(f"[Scale Stage] Output edge '{queue_name}' not found for stage '{stage_name}'")
+                            logger.error(
+                                f"[Scale Stage] Output queue '{queue_name}' not found for stage '{stage_name}'"
+                            )
                 for from_stage, conns in self.connections.items():
                     for to_stage, _ in conns:
                         if to_stage == stage_name:
                             queue_name = f"{from_stage}_to_{stage_name}"
                             if queue_name in self.edge_queues:
-                                edge_actor, _ = self.edge_queues[queue_name]
+                                edge_queue, _ = self.edge_queues[queue_name]
                                 logger.debug(
-                                    f"[Scale Stage] Wiring new actor '{actor_name}' input to edge '{queue_name}'"
+                                    f"[Scale Stage] Wiring new actor '{actor_name}' input to queue '{queue_name}'"
                                 )
-                                wiring_refs.append(new_actor.set_input_edge.remote(edge_actor))
+                                wiring_refs.append(new_actor.set_input_queue.remote(edge_queue))
                             else:
                                 logger.error(
-                                    f"[Scale Stage] Input edge '{queue_name}' not found for stage '{stage_name}'"
+                                    f"[Scale Stage] Input queue '{queue_name}' not found for stage '{stage_name}'"
                                 )
                 if wiring_refs:
                     ray.get(wiring_refs)
@@ -331,7 +465,6 @@ class RayPipeline:
                 f" New replica count: {len(current_replicas)}"
             )
         elif new_replica_count < current_count:
-            # Scaling DOWN: always allow scaling down.
             logger.debug(
                 f"[Scale Stage] Scaling DOWN stage '{stage_name}' from {current_count} to {new_replica_count} replicas."
             )
@@ -363,8 +496,8 @@ class RayPipeline:
 
     def _idle_scale_all_stages(self) -> None:
         """
-        For idle-triggered scale-up, create missing replicas for every stage, capped at max_replicas.
-        For each stage, target replica count = min(max(min_replicas, max_replicas // 2), max_replicas).
+        Perform idle scaling by creating missing replicas for every stage, ensuring that
+        each stage has replicas up to an idle target (capped by the maximum replicas).
         """
         logger.debug("[Idle Scale] Starting idle scale-up for all stages.")
         new_actor_dict = {}
@@ -403,24 +536,24 @@ class RayPipeline:
                     for to_stage, _ in self.connections[stage_name]:
                         queue_name = f"{stage_name}_to_{to_stage}"
                         if queue_name in self.edge_queues:
-                            edge_actor, _ = self.edge_queues[queue_name]
-                            logger.debug(f"[Idle Scale] Wiring new actor '{new_actor}' output to edge '{queue_name}'")
-                            wiring_refs.append(new_actor.set_output_edge.remote(edge_actor))
+                            edge_queue, _ = self.edge_queues[queue_name]
+                            logger.debug(f"[Idle Scale] Wiring new actor '{new_actor}' output to queue '{queue_name}'")
+                            wiring_refs.append(new_actor.set_output_queue.remote(edge_queue))
                         else:
-                            logger.error(f"[Idle Scale] Output edge '{queue_name}' not found for stage '{stage_name}'")
+                            logger.error(f"[Idle Scale] Output queue '{queue_name}' not found for stage '{stage_name}'")
                 for from_stage, conns in self.connections.items():
                     for to_stage, _ in conns:
                         if to_stage == stage_name:
                             queue_name = f"{from_stage}_to_{stage_name}"
                             if queue_name in self.edge_queues:
-                                edge_actor, _ = self.edge_queues[queue_name]
+                                edge_queue, _ = self.edge_queues[queue_name]
                                 logger.debug(
-                                    f"[Idle Scale] Wiring new actor '{new_actor}' input to edge '{queue_name}'"
+                                    f"[Idle Scale] Wiring new actor '{new_actor}' input to queue '{queue_name}'"
                                 )
-                                wiring_refs.append(new_actor.set_input_edge.remote(edge_actor))
+                                wiring_refs.append(new_actor.set_input_queue.remote(edge_queue))
                             else:
                                 logger.error(
-                                    f"[Idle Scale] Input edge '{queue_name}' not found for stage '{stage_name}'"
+                                    f"[Idle Scale] Input queue '{queue_name}' not found for stage '{stage_name}'"
                                 )
         if wiring_refs:
             ray.get(wiring_refs)
@@ -450,11 +583,8 @@ class RayPipeline:
 
     def _perform_scaling(self) -> None:
         """
-        Check the current utilization of input queues for each stage and decide whether
-        to scale up or down. If a stage's input exceeds the threshold, we scale that stage
-        (or trigger idle scale-up if idle). However, if any stage is scaled up on this pass,
-        then downstream stages are allowed to scale up but are prevented from scaling down,
-        in order to avoid 'sloshing'.
+        Evaluate the current utilization of input queues for each stage and determine whether
+        to scale up or scale down. Scaling decisions are based on thresholds and cycle counts.
         """
         upscale_triggered = False
         for stage in self.stages:
@@ -470,18 +600,18 @@ class RayPipeline:
                 if self.queue_stats.get(edge_name):
                     last_util = self.queue_stats[edge_name][-1]["utilization"]
                     logger.debug(
-                        f"[Perform Scaling] Stage '{stage_name}', edge '{edge_name}':"
+                        f"[Perform Scaling] Stage '{stage_name}', queue '{edge_name}':"
                         f" last utilization = {last_util:.1f}%"
                     )
                     if last_util > max_util:
                         max_util = last_util
             logger.debug(
-                f"[Perform Scaling] Stage '{stage_name}': maximum utilization among input edges = {max_util:.1f}%"
+                f"[Perform Scaling] Stage '{stage_name}': maximum utilization among input queues = {max_util:.1f}%"
             )
             current_count = len(self.stage_actors.get(stage_name, []))
             logger.debug(
-                f"[Perform Scaling] Stage '{stage_name}': current replica count = {current_count},"
-                f" threshold = {self.scaling_threshold}%"
+                f"[Perform Scaling] Stage '{stage_name}':"
+                f" current replica count = {current_count}, threshold = {self.scaling_threshold}%"
             )
 
             if max_util > self.scaling_threshold:
@@ -494,8 +624,8 @@ class RayPipeline:
                         new_count = min(current_count * 2 if current_count > 0 else 1, stage.max_replicas)
                         logger.debug(
                             f"[Perform Scaling] Scaling UP stage '{stage_name}':"
-                            f" occupancy {max_util:.1f}% exceeds threshold "
-                            f"{self.scaling_threshold}%. Replicas {current_count} -> {new_count}"
+                            f" occupancy {max_util:.1f}% exceeds threshold {self.scaling_threshold}%."
+                            f" Replicas {current_count} -> {new_count}"
                         )
                         self._scale_stage(stage_name, new_count)
                         upscale_triggered = True
@@ -504,7 +634,6 @@ class RayPipeline:
                             f"[Perform Scaling] Stage '{stage_name}' is already at maximum replicas ({current_count})."
                         )
                 self.under_threshold_cycles[stage_name] = 0
-                # Do not block downstream stages entirely; allow them to scale up.
             else:
                 if max_util == 0:
                     self.under_threshold_cycles[stage_name] = self.under_threshold_cycles.get(stage_name, 0) + 1
@@ -515,7 +644,6 @@ class RayPipeline:
                     if self.under_threshold_cycles[stage_name] >= self.scaling_cooldown:
                         if current_count > stage.min_replicas:
                             new_count = max(current_count // 2, stage.min_replicas)
-                            # Only perform a scale-down if no upstream stage was scaled up this pass.
                             if not upscale_triggered:
                                 logger.debug(
                                     f"[Perform Scaling] Scaling DOWN stage '{stage_name}':"
@@ -525,8 +653,8 @@ class RayPipeline:
                                 self._scale_stage(stage_name, new_count)
                             else:
                                 logger.debug(
-                                    "[Perform Scaling] Skipping scale down for stage"
-                                    f" '{stage_name}' due to upstream upscale."
+                                    f"[Perform Scaling] Skipping scale down for stage '{stage_name}'"
+                                    f" due to upstream upscale."
                                 )
                         else:
                             logger.debug(
@@ -541,37 +669,31 @@ class RayPipeline:
 
     def _monitor_queue_utilization(self, poll_interval: float = 10.0) -> None:
         """
-        Monitor the percent utilization of each edge queue, the active processing tasks per stage,
-        and update display. Also computes total tasks in flight (processing + queued) for each stage,
-        and a global summary.
+        Monitor the utilization of each distributed queue and update the display with
+        real-time statistics.
+
+        Parameters
+        ----------
+        poll_interval : float, optional
+            The time interval (in seconds) between successive polls, by default 10.0.
         """
         display = UtilizationDisplay(refresh_rate=2)
         logger.debug("Queue monitoring thread started.")
         while self._monitoring:
             current_time = time.time()
-            # Update queue stats.
-            futures = {
-                edge_name: edge_actor.get_stats.remote() for edge_name, (edge_actor, _) in self.edge_queues.items()
-            }
-            stats_results = ray.get(list(futures.values()))
-            for edge_name, stats in zip(futures.keys(), stats_results):
-                _, max_size = self.edge_queues[edge_name]
-                current_size = stats.get("current_size", 0)
+            for edge_name, (edge_queue, max_size) in self.edge_queues.items():
+                current_size = edge_queue.qsize()
                 utilization = (current_size / max_size) * 100 if max_size > 0 else 0
-                logger.debug(f"[Monitor] Edge '{edge_name}': {current_size}/{max_size} ({utilization:.1f}%) utilized.")
+                logger.debug(f"[Monitor] Queue '{edge_name}': {current_size}/{max_size} ({utilization:.1f}%) utilized.")
                 self.queue_stats[edge_name].append({"timestamp": current_time, "utilization": utilization})
 
             output_rows = []
             global_processing = 0
             global_queued = 0
-            # For each stage, compute per-stage processing and queued tasks.
             for stage in self.stages:
                 stage_name = stage.name
-                # Replicas info.
                 current_replicas = self.stage_actors.get(stage_name, [])
                 replicas_str = f"{len(current_replicas)}/{stage.max_replicas}"
-
-                # Get total queued tasks from input edges.
                 input_edges = [
                     edge_name for edge_name in self.edge_queues.keys() if edge_name.endswith(f"_to_{stage_name}")
                 ]
@@ -589,7 +711,6 @@ class RayPipeline:
                         occupancy_list.append("0/0")
                 occupancy_str = ", ".join(occupancy_list) if occupancy_list else "N/A"
 
-                # Get processing count across stage replicas.
                 processing_count = 0
                 if current_replicas:
                     actor_futures = [actor.get_stats.remote() for actor in current_replicas]
@@ -597,7 +718,6 @@ class RayPipeline:
                     for stat in actor_stats:
                         processing_count += int(stat.get("active_processing", False))
                 stage_in_flight = processing_count + total_queued
-
                 global_processing += processing_count
                 global_queued += total_queued
 
@@ -613,16 +733,17 @@ class RayPipeline:
                     )
                 )
 
-            # Append a final row with global totals.
             global_total = global_processing + global_queued
             output_rows.append(("[bold]Total Pipeline[/bold]", "", "", "", str(global_processing), str(global_total)))
-
             display.update(output_rows)
             time.sleep(poll_interval)
         display.stop()
         logger.debug("Queue monitoring thread stopped.")
 
     def _start_queue_monitoring(self) -> None:
+        """
+        Start the thread responsible for monitoring queue utilization.
+        """
         if not self._monitoring:
             self._monitoring = True
             self._monitor_thread = threading.Thread(target=self._monitor_queue_utilization, daemon=True)
@@ -630,6 +751,9 @@ class RayPipeline:
             logger.debug("Queue monitoring thread launched.")
 
     def _stop_queue_monitoring(self) -> None:
+        """
+        Stop the queue monitoring thread and wait for its termination.
+        """
         if self._monitoring:
             self._monitoring = False
             if self._monitor_thread is not None:
@@ -637,9 +761,6 @@ class RayPipeline:
             logger.debug("Queue monitoring thread stopped.")
 
     def _scaling_loop(self, poll_interval: float = 10.0) -> None:
-        """
-        Dedicated scaling loop that continuously calls _perform_scaling.
-        """
         logger.debug("Scaling thread started.")
         while self._scaling_monitoring:
             self._perform_scaling()
@@ -647,6 +768,15 @@ class RayPipeline:
         logger.debug("Scaling thread stopped.")
 
     def _start_scaling(self) -> None:
+        """
+        Run a continuous loop that periodically evaluates scaling conditions and adjusts
+        the number of stage replicas accordingly.
+
+        Parameters
+        ----------
+        poll_interval : float, optional
+            The time interval (in seconds) between scaling evaluations, by default 10.0.
+        """
         if not self._scaling_monitoring:
             self._scaling_monitoring = True
             self._scaling_thread = threading.Thread(target=self._scaling_loop, daemon=True)
@@ -654,6 +784,9 @@ class RayPipeline:
             logger.debug("Scaling thread launched.")
 
     def _stop_scaling(self) -> None:
+        """
+        Stop the scaling thread and wait for it to finish.
+        """
         if self._scaling_monitoring:
             self._scaling_monitoring = False
             if self._scaling_thread is not None:
@@ -701,11 +834,27 @@ class UtilizationDisplay:
     """
 
     def __init__(self, refresh_rate: float = 2):
+        """
+        Initialize the UtilizationDisplay with a given refresh rate for updating the live display.
+
+        Parameters
+        ----------
+        refresh_rate : float, optional
+            The number of times per second to refresh the display, by default 2.
+        """
         self.console = Console()
         self.live = Live(console=self.console, refresh_per_second=refresh_rate, transient=False)
         self.live.start()
 
     def update(self, output_rows):
+        """
+        Update the live display with the latest queue utilization statistics.
+
+        Parameters
+        ----------
+        output_rows : list of tuple
+            A list of tuples containing utilization data for each stage.
+        """
         table = Table(title="Queue Utilization Snapshot")
         table.add_column("Stage", justify="left", style="cyan", no_wrap=True)
         table.add_column("Replicas (current/max)", justify="left", style="magenta")
@@ -718,4 +867,7 @@ class UtilizationDisplay:
         self.live.update(table)
 
     def stop(self):
+        """
+        Stop and close the live display.
+        """
         self.live.stop()

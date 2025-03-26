@@ -14,7 +14,6 @@ import copy
 import threading
 import time
 from datetime import datetime
-from typing import Any
 
 import pandas as pd
 from opentelemetry.trace.span import format_trace_id
@@ -48,7 +47,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     Ray actor source stage for a message broker task source.
 
     This stage fetches messages from a message broker (via Redis or a simple broker),
-    processes them into control messages, and writes them to the output edge.
+    processes them into control messages, and writes them to the output queue.
 
     As a source stage, it overrides read_input() to use its own message-fetching logic.
     """
@@ -63,6 +62,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self.client = self._create_client()
         self.message_count = 0
         self.start_time = None
+        # For source stages, output is provided via a direct queue.
+        self.output_queue = None
         logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
@@ -97,11 +98,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             raise ValueError(f"Unsupported client_type: {client_type}")
 
     @staticmethod
-    def _process_message(job: dict, ts_fetched: datetime) -> Any:
+    def _process_message(job: dict, ts_fetched: datetime) -> any:
         """
         Process a raw job fetched from the message broker into an IngestControlMessage.
         """
-        logger.debug("Processing job: %s", json.dumps(job, indent=2))
         control_message = IngestControlMessage()
         job_id = None
         try:
@@ -198,7 +198,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             logger.exception("Error during message fetching: %s", err)
             return None
 
-    def read_input(self) -> Any:
+    def read_input(self) -> any:
         """
         Source stage's implementation of get_input.
         Instead of reading from an input edge, fetch a message from the broker.
@@ -215,7 +215,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         logger.debug("read_input: Message processed, returning control message")
         return control_message
 
-    def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: any) -> any:
         """
         Process the control message.
         For this source stage, no additional processing is done, so simply return it.
@@ -239,9 +239,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     continue
                 logger.debug("Control message received; processing data")
                 updated_cm = self.on_data(control_message)
-                if updated_cm and self.output_edge:
-                    logger.debug("Sending updated control message to output edge")
-                    ray.get(self.output_edge.write.remote(updated_cm))
+                if (updated_cm is not None) and (self.output_queue is not None):
+                    self.output_queue.put(updated_cm)
                 self.stats["processed"] += 1
                 self.message_count += 1
                 logger.debug(
@@ -282,9 +281,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         return stats
 
     @ray.method(num_returns=1)
-    def set_output_edge(self, edge_handle: Any) -> bool:
-        self.output_edge = edge_handle
-        logger.info("Output edge set: %s", edge_handle)
+    def set_output_queue(self, queue_handle: any) -> bool:
+        self.output_queue = queue_handle
+        logger.info("Output queue set: %s", queue_handle)
         return True
 
 

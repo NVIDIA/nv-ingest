@@ -6,6 +6,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict
 
 
+# TODO(Devin): Early prototype. Not currently used anywhere
+
+
 class RayActorEdge(ABC):
     """
     Abstract base class for a Ray actor edge used in a RayPipeline.
