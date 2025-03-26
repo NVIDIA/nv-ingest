@@ -8,8 +8,6 @@ import logging
 import time
 from typing import Dict, Any
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.stage_builders import get_nim_service
-
 # Import our new pipeline class.
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
 from nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor import AudioExtractorStage
@@ -51,6 +49,37 @@ from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema imp
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+
+
+def get_nim_service(env_var_prefix):
+    prefix = env_var_prefix.upper()
+    grpc_endpoint = os.environ.get(
+        f"{prefix}_GRPC_ENDPOINT",
+        "",
+    )
+    http_endpoint = os.environ.get(
+        f"{prefix}_HTTP_ENDPOINT",
+        "",
+    )
+    auth_token = os.environ.get(
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
+        "",
+    )
+
+    infer_protocol = os.environ.get(
+        f"{prefix}_INFER_PROTOCOL",
+        "http" if http_endpoint else "grpc" if grpc_endpoint else "",
+    )
+
+    logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
+    logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
+
+    return grpc_endpoint, http_endpoint, auth_token, infer_protocol
+
 
 # Broker configuration – using a simple client on a fixed port.
 simple_config: Dict[str, Any] = {
