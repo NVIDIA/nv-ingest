@@ -1,32 +1,33 @@
-from pymilvus import (
-    MilvusClient,
-    Collection,
-    DataType,
-    CollectionSchema,
-    connections,
-    Function,
-    FunctionType,
-    utility,
-    BulkInsertState,
-    AnnSearchRequest,
-    RRFRanker,
-)
-from pymilvus.milvus_client.index import IndexParams
-from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
-from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus.model.sparse import BM25EmbeddingFunction
-from llama_index.embeddings.nvidia import NVIDIAEmbedding
-from scipy.sparse import csr_array
-from typing import List
 import datetime
-import time
-from urllib.parse import urlparse
-from typing import Union, Dict
-import requests
-from nv_ingest_client.util.util import ClientConfigSchema
-from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 import logging
+import time
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from urllib.parse import urlparse
 
+import requests
+from llama_index.embeddings.nvidia import NVIDIAEmbedding
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+from nv_ingest_client.util.util import ClientConfigSchema
+from pymilvus import AnnSearchRequest
+from pymilvus import BulkInsertState
+from pymilvus import Collection
+from pymilvus import CollectionSchema
+from pymilvus import DataType
+from pymilvus import Function
+from pymilvus import FunctionType
+from pymilvus import MilvusClient
+from pymilvus import RRFRanker
+from pymilvus import connections
+from pymilvus import utility
+from pymilvus.bulk_writer import BulkFileType
+from pymilvus.bulk_writer import RemoteBulkWriter
+from pymilvus.milvus_client.index import IndexParams
+from pymilvus.model.sparse import BM25EmbeddingFunction
+from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
+from scipy.sparse import csr_array
 
 logger = logging.getLogger(__name__)
 
@@ -455,13 +456,7 @@ def create_nvingest_collection(
         sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
-    d_idx = None
-    s_idx = None
-    for k, v in index_params._indexes.items():
-        if k[1] == "dense_index" and hasattr(v, "_index_type"):
-            d_idx = v._index_type
-        if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
-            s_idx = v._index_type
+    d_idx, s_idx = _get_index_types(index_params, sparse=sparse)
     log_new_meta_collection(
         collection_name,
         fields=schema.fields,
@@ -471,6 +466,48 @@ def create_nvingest_collection(
         sparse_index=str(s_idx),
         recreate=recreate_meta,
     )
+
+
+def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[str, str]:
+    """
+    Returns the dense and optional sparse index types from Milvus index_params,
+    handling both old (dict) and new (list) formats.
+
+    Parameters:
+        index_params: The index parameters object with a _indexes attribute.
+        sparse (bool): Whether to look for sparse_index as well.
+
+    Returns:
+        tuple: (dense_index_type, sparse_index_type or None)
+    """
+    d_idx = None
+    s_idx = None
+
+    indexes = getattr(index_params, "_indexes", None)
+
+    if isinstance(indexes, dict):
+        # Old Milvus behavior (< 2.5.6)
+        for k, v in indexes.items():
+            if k[1] == "dense_index" and hasattr(v, "_index_type"):
+                d_idx = v._index_type
+            if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
+                s_idx = v._index_type
+
+    elif isinstance(indexes, list):
+        # New Milvus behavior (>= 2.5.6)
+        for idx in indexes:
+            index_name = getattr(idx, "index_name", None)
+            index_type = getattr(idx, "index_type", None)
+
+            if index_name == "dense_index":
+                d_idx = index_type
+            if sparse and index_name == "sparse_index":
+                s_idx = index_type
+
+    else:
+        raise TypeError(f"Unexpected type for index_params._indexes: {type(indexes)}")
+
+    return str(d_idx), str(s_idx)
 
 
 def _format_sparse_embedding(sparse_vector: csr_array):
