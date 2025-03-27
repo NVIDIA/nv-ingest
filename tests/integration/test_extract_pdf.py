@@ -160,7 +160,7 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
         milvus_uri=milvus_uri,
         top_k=10,
     )
-    assert len(retrieved_docs) == 8
+    assert len(retrieved_docs[0]) == 8
 
     extracted_content = retrieved_docs[0][0]["entity"]["text"]
     assert "This table shows some popular colors that cars might come in" in extracted_content
