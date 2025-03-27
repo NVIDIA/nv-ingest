@@ -711,8 +711,8 @@ def postprocess_results(
         for box, score, label in zip(bboxes, scores, labels):
             # TODO(Devin): Sometimes we get back unexpected class labels?
             if (label < 0) or (label >= len(class_labels)):
-                warnings.warn(f"Invalid class label {label} found in postprocessing")
-                class_name = "unknown"
+                logger.warning(f"Invalid class label {label} found in postprocessing")
+                continue
             else:
                 class_name = class_labels[int(label)]
 
