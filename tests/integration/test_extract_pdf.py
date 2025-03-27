@@ -138,9 +138,7 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
             extract_text=True,
             extract_tables=True,
             extract_charts=True,
-            extract_images=True,
-            paddle_output_format="markdown",
-            extract_infographics=True,
+            extract_images=False,
             text_depth="page",
         )
         .embed()
@@ -154,8 +152,9 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
 
     results = ingestor.ingest()
     assert len(results) == 1
+    assert len([x for x in results[0] if x["metadata"]["embedding"]]) == 8
 
-    queries = ["Which animal is responsible for the typos?"]
+    queries = ["Which animal is chasing a squirrel?"]
 
     retrieved_docs = nvingest_retrieval(
         queries,
