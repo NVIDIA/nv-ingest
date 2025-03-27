@@ -600,10 +600,10 @@ class RayPipeline:
 
             stage_metrics[stage_name] = {
                 "queue_depth": queue_depth,
-                "throughput": throughput,
+                "throughput": throughput,  # Currently unused
                 "replicas": replicas,
-                "memory_usage": 5_000,  # Hard-coded for this example; adjust as needed.
-                "target_queue_depth": 0,  # This can be tuned per stage if needed.
+                "memory_usage": 5_000,  # Hard-coded this is approximately what stages seem to allocate.
+                "target_queue_depth": max(1, replicas),  # This can be tuned per stage if needed.
             }
 
         # Get global memory usage in MB.

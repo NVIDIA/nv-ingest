@@ -100,7 +100,7 @@ class PIDController:
 
         for stage, metrics in stage_metrics.items():
             queue_depth = metrics["queue_depth"]
-            throughput = metrics["throughput"]
+            throughput = metrics["throughput"]  # Currently unused
             replicas = metrics["replicas"]
             memory_usage = metrics["memory_usage"]
             target_queue_depth = metrics.get("target_queue_depth", 10)
