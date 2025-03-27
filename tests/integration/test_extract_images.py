@@ -17,7 +17,16 @@ from nv_ingest_client.client import NvIngestClient
         "./data/multimodal_test.tiff",
     ],
 )
-def test_images_extract_only(pipeline_process, image_file):
+def test_images_extract_only(
+    pipeline_process,
+    multimodal_first_table_markdown,
+    multimodal_second_table_markdown,
+    multimodal_first_chart_xaxis,
+    multimodal_first_chart_yaxis,
+    multimodal_second_chart_xaxis,
+    multimodal_second_chart_yaxis,
+    image_file,
+):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -54,3 +63,9 @@ def test_images_extract_only(pipeline_process, image_file):
     assert len(tables) == 1
     assert len(charts) == 1
     assert len(infographics) == 0
+
+    table_contents = [x["metadata"]["table_metadata"]["table_content"] for x in tables]
+    assert multimodal_first_table_markdown in " ".join(table_contents)
+
+    chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
+    assert multimodal_first_chart_yaxis in " ".join(chart_contents)

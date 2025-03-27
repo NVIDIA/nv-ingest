@@ -9,7 +9,15 @@ from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.milvus import nvingest_retrieval
 
 
-def test_pdfium_extract_only(pipeline_process):
+def test_pdfium_extract_only(
+    pipeline_process,
+    multimodal_first_table_markdown,
+    multimodal_second_table_markdown,
+    multimodal_first_chart_xaxis,
+    multimodal_first_chart_yaxis,
+    multimodal_second_chart_xaxis,
+    multimodal_second_chart_yaxis,
+):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -46,8 +54,26 @@ def test_pdfium_extract_only(pipeline_process):
     assert len(charts) == 3
     assert len(infographics) == 0
 
+    table_contents = [x["metadata"]["table_metadata"]["table_content"] for x in tables]
+    assert multimodal_first_table_markdown in " ".join(table_contents)
+    assert multimodal_second_table_markdown in " ".join(table_contents)
 
-def test_nemoretriever_parse_extract_only(pipeline_process):
+    chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
+    assert multimodal_first_chart_xaxis in " ".join(chart_contents)
+    assert multimodal_first_chart_yaxis in " ".join(chart_contents)
+    assert multimodal_second_chart_xaxis in " ".join(chart_contents)
+    assert multimodal_second_chart_yaxis in " ".join(chart_contents)
+
+
+def test_nemoretriever_parse_extract_only(
+    pipeline_process,
+    multimodal_first_table_markdown,
+    multimodal_second_table_markdown,
+    multimodal_first_chart_xaxis,
+    multimodal_first_chart_yaxis,
+    multimodal_second_chart_xaxis,
+    multimodal_second_chart_yaxis,
+):
     client = NvIngestClient(
         message_client_allocator=SimpleClient,
         message_client_port=7671,
@@ -84,6 +110,16 @@ def test_nemoretriever_parse_extract_only(pipeline_process):
     assert len(tables) == 2
     assert len(charts) == 3
     assert len(infographics) == 0
+
+    table_contents = [x["metadata"]["table_metadata"]["table_content"] for x in tables]
+    assert multimodal_first_table_markdown in " ".join(table_contents)
+    assert multimodal_second_table_markdown in " ".join(table_contents)
+
+    chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
+    assert multimodal_first_chart_xaxis in " ".join(chart_contents)
+    assert multimodal_first_chart_yaxis in " ".join(chart_contents)
+    assert multimodal_second_chart_xaxis in " ".join(chart_contents)
+    assert multimodal_second_chart_yaxis in " ".join(chart_contents)
 
 
 def test_pdfium_extract_embed_upload_query(pipeline_process):
