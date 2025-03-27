@@ -135,6 +135,7 @@ class RayActorStage(ABC):
                 pass
             self.processing_complete = True
             # logger.debug("Processing loop has set processing_complete to True.")
+            ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
