@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import concurrent
 import threading
 import time
 import uuid  # For generating unique actor names
@@ -18,6 +18,8 @@ from rich.table import Table
 from rich.live import Live
 
 from ray.util.queue import Queue
+
+from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController
 from nv_ingest.framework.orchestration.ray.util.system_tools.memory import estimate_actor_memory_overhead
 
 logging.basicConfig(level=logging.INFO)
@@ -51,6 +53,9 @@ class RayPipeline:
         scaling_cooldown: int = 20,
         dynamic_memory_scaling: bool = False,
         dynamic_memory_threshold: float = 0.9,
+        pid_kp: float = 0.1,
+        pid_ki: float = 0.01,
+        pid_kd: float = 0.0,
     ) -> None:
         """
         Initialize the RayPipeline instance.
@@ -121,6 +126,26 @@ class RayPipeline:
         self._monitor_thread: threading.Thread = None
         self._scaling_monitoring: bool = False
         self._scaling_thread: threading.Thread = None
+
+        # Create a PIDController instance.
+        total_system_memory = psutil.virtual_memory().total
+        memory_threshold_mb = int(dynamic_memory_threshold * total_system_memory / (1024 * 1024))
+        # For now we initialize stage_cost_estimates as empty; it will be populated in build().
+        self.pid_controller = PIDController(
+            kp=pid_kp,
+            ki=pid_ki,
+            kd=pid_kd,
+            max_replicas=100,  # This will be updated later based on the stages.
+            memory_threshold=memory_threshold_mb,
+            stage_cost_estimates={},
+        )
+        logger.info(
+            "RayPipeline initialized with PID scaling: kp=%s, ki=%s, kd=%s, memory_threshold=%s MB",
+            pid_kp,
+            pid_ki,
+            pid_kd,
+            memory_threshold_mb,
+        )
 
         logger.info(
             "RayPipeline initialized with idle=True, dynamic_memory_scaling=%s, dynamic_memory_threshold=%s",
@@ -274,15 +299,6 @@ class RayPipeline:
         return self
 
     def build(self) -> Dict[str, List[Any]]:
-        """
-        Build the pipeline by instantiating stage actors and wiring up the connections using
-        Ray distributed queues.
-
-        Returns
-        -------
-        dict
-            A dictionary mapping stage names to lists of actor handles.
-        """
         logger.debug("Building pipeline: Instantiating stage actors...")
 
         if self.dynamic_memory_scaling:
@@ -325,6 +341,16 @@ class RayPipeline:
             else:
                 logger.info("No adjustment needed: current max replicas align with memory threshold.")
 
+        # Update PID controller’s stage_cost_estimates and overall max_replicas based on the stages.
+        total_max_replicas = 0
+        for stage in self.stages:
+            total_max_replicas += stage.max_replicas
+            # Use the estimated overhead (in MB) or default to a value (e.g., 100 MB).
+            overhead = self.stage_memory_overhead.get(stage.name, 100 * 1024 * 1024)
+            self.pid_controller.stage_cost_estimates[stage.name] = int(overhead / (1024 * 1024))
+            self.pid_controller.initialize_stage(stage.name)
+        self.pid_controller.max_replicas = total_max_replicas
+
         # Instantiate stage actors.
         for stage in self.stages:
             replicas = []
@@ -339,9 +365,8 @@ class RayPipeline:
             self.under_threshold_cycles[stage.name] = 0
             logger.debug(f"Stage {stage.name} actors: {replicas}")
 
-        logger.debug("Wiring up edges between stages...")
+        # Wire up edges between stages.
         wiring_refs = []
-        # For each connection, create a Ray distributed queue and wire it to the stages.
         for from_stage, conns in self.connections.items():
             for to_stage, queue_size in conns:
                 queue_name = f"{from_stage}_to_{to_stage}"
@@ -349,7 +374,6 @@ class RayPipeline:
                 edge_queue = Queue(maxsize=queue_size)
                 self.edge_queues[queue_name] = (edge_queue, queue_size)
                 self.queue_stats[queue_name] = []
-
                 for actor in self.stage_actors.get(from_stage, []):
                     logger.debug(f"Wiring output queue for actor {actor} in stage {from_stage} to queue {queue_name}")
                     wiring_refs.append(actor.set_output_queue.remote(edge_queue))
@@ -583,89 +607,66 @@ class RayPipeline:
 
     def _perform_scaling(self) -> None:
         """
-        Evaluate the current utilization of input queues for each stage and determine whether
-        to scale up or scale down. Scaling decisions are based on thresholds and cycle counts.
+        Use the PID controller to evaluate current metrics for each stage and
+        adjust the replica counts accordingly. This updated implementation gathers
+        scaling adjustments for all stages, then concurrently executes the scaling operations,
+        and finally waits until all scaling requests complete.
         """
-        upscale_triggered = False
+        stage_metrics: Dict[str, Dict[str, Any]] = {}
+
         for stage in self.stages:
             stage_name = stage.name
+
+            # Compute queue_depth from all input edges.
             input_edges = [edge for edge in self.edge_queues.keys() if edge.endswith(f"_to_{stage_name}")]
-            logger.debug(f"[Perform Scaling] Stage '{stage_name}': input_edges = {input_edges}")
-            if not input_edges:
-                logger.debug(f"[Perform Scaling] No input edges for stage '{stage_name}'; skipping scaling decision.")
-                continue
+            queue_depth = sum(self.edge_queues[edge][0].qsize() for edge in input_edges) if input_edges else 0
 
-            max_util = 0.0
-            for edge_name in input_edges:
-                if self.queue_stats.get(edge_name):
-                    last_util = self.queue_stats[edge_name][-1]["utilization"]
-                    logger.debug(
-                        f"[Perform Scaling] Stage '{stage_name}', queue '{edge_name}':"
-                        f" last utilization = {last_util:.1f}%"
-                    )
-                    if last_util > max_util:
-                        max_util = last_util
-            logger.debug(
-                f"[Perform Scaling] Stage '{stage_name}': maximum utilization among input queues = {max_util:.1f}%"
-            )
-            current_count = len(self.stage_actors.get(stage_name, []))
-            logger.debug(
-                f"[Perform Scaling] Stage '{stage_name}':"
-                f" current replica count = {current_count}, threshold = {self.scaling_threshold}%"
-            )
+            # Throughput is not measured in this example; set to 0.
+            throughput = 0
 
-            if max_util > self.scaling_threshold:
-                if self.idle:
-                    logger.debug("[Perform Scaling] Idle flag set. Triggering bulk idle scale-up.")
-                    self._idle_scale_all_stages()
-                    self.idle = False
-                else:
-                    if current_count < stage.max_replicas:
-                        new_count = min(current_count * 2 if current_count > 0 else 1, stage.max_replicas)
-                        logger.debug(
-                            f"[Perform Scaling] Scaling UP stage '{stage_name}':"
-                            f" occupancy {max_util:.1f}% exceeds threshold {self.scaling_threshold}%."
-                            f" Replicas {current_count} -> {new_count}"
-                        )
-                        self._scale_stage(stage_name, new_count)
-                        upscale_triggered = True
-                    else:
-                        logger.debug(
-                            f"[Perform Scaling] Stage '{stage_name}' is already at maximum replicas ({current_count})."
-                        )
-                self.under_threshold_cycles[stage_name] = 0
-            else:
-                if max_util == 0:
-                    self.under_threshold_cycles[stage_name] = self.under_threshold_cycles.get(stage_name, 0) + 1
-                    logger.debug(
-                        f"[Perform Scaling] Stage '{stage_name}'"
-                        f" under zero utilization for {self.under_threshold_cycles[stage_name]} cycles."
+            replicas = len(self.stage_actors.get(stage_name, []))
+
+            # Gather memory usage from each actor (if available).
+            memory_usage = 0
+            for actor in self.stage_actors.get(stage_name, []):
+                try:
+                    stats = ray.get(actor.get_stats.remote())
+                    mem = stats.get("memory_usage", 0)
+                    memory_usage += mem
+                except Exception as e:
+                    logger.error(f"Error fetching stats for actor {actor} in stage {stage_name}: {e}")
+
+            stage_metrics[stage_name] = {
+                "queue_depth": queue_depth,
+                "throughput": throughput,
+                "replicas": replicas,
+                "memory_usage": 5_000,  # Hard-coded for this example; adjust as needed.
+                "target_queue_depth": 0,  # This can be tuned per stage if needed.
+            }
+
+        # Get global memory usage in MB.
+        current_memory_usage_bytes = psutil.virtual_memory().used
+        current_memory_usage_mb = current_memory_usage_bytes / (1024 * 1024)
+
+        # Ask the PID controller for new replica counts.
+        adjustments = self.pid_controller.update(stage_metrics, current_memory_usage_mb)
+
+        # Launch scaling operations concurrently for all stages needing adjustment.
+        scaling_futures = []
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            for stage_name, new_replica_count in adjustments.items():
+                current_count = len(self.stage_actors.get(stage_name, []))
+                if new_replica_count != current_count:
+                    logger.info(
+                        f"PID scaling adjustment for stage {stage_name}: from {current_count} to {new_replica_count}"
                     )
-                    if self.under_threshold_cycles[stage_name] >= self.scaling_cooldown:
-                        if current_count > stage.min_replicas:
-                            new_count = max(current_count // 2, stage.min_replicas)
-                            if not upscale_triggered:
-                                logger.debug(
-                                    f"[Perform Scaling] Scaling DOWN stage '{stage_name}':"
-                                    f" zero occupancy for {self.scaling_cooldown} cycles."
-                                    f" Replicas {current_count} -> {new_count}"
-                                )
-                                self._scale_stage(stage_name, new_count)
-                            else:
-                                logger.debug(
-                                    f"[Perform Scaling] Skipping scale down for stage '{stage_name}'"
-                                    f" due to upstream upscale."
-                                )
-                        else:
-                            logger.debug(
-                                f"[Perform Scaling] Stage '{stage_name}'"
-                                f" already at or below minimum replicas ({current_count})."
-                            )
-                        self.under_threshold_cycles[stage_name] = 0
-                        self.scaling_state[stage_name] = "Scaling Down"
+                    scaling_futures.append(executor.submit(self._scale_stage, stage_name, new_replica_count))
                 else:
-                    self.under_threshold_cycles[stage_name] = 0
-                    self.scaling_state[stage_name] = "Stable"
+                    logger.debug(
+                        f"No scaling action needed for stage {stage_name}: replica count remains {current_count}"
+                    )
+            # Wait for all scaling operations to complete.
+            concurrent.futures.wait(scaling_futures)
 
     def _monitor_queue_utilization(self, poll_interval: float = 10.0) -> None:
         """
@@ -721,7 +722,7 @@ class RayPipeline:
                 global_processing += processing_count
                 global_queued += total_queued
 
-                scaling_state = self.scaling_state.get(stage_name, "Pending")
+                scaling_state = self.scaling_state.get(stage_name, "---")
                 output_rows.append(
                     (
                         stage_name,
@@ -737,6 +738,7 @@ class RayPipeline:
             output_rows.append(("[bold]Total Pipeline[/bold]", "", "", "", str(global_processing), str(global_total)))
             display.update(output_rows)
             time.sleep(poll_interval)
+
         display.stop()
         logger.debug("Queue monitoring thread stopped.")
 

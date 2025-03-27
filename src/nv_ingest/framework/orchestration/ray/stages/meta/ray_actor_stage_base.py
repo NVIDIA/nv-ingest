@@ -81,9 +81,9 @@ class RayActorStage(ABC):
             raise ValueError("Input queue not set")
         try:
             # Directly get from the queue with a timeout.
-            return self.input_queue.get(timeout=600.0)
-        except Exception as e:
-            logger.exception("Timeout or error reading from input queue: %s", e)
+            return self.input_queue.get(timeout=10.0)
+        except Exception:
+            # logger.exception("Timeout or error reading from input queue: %s", e)
             return None
 
     @abstractmethod
@@ -131,9 +131,10 @@ class RayActorStage(ABC):
                     self.active_processing = False
         finally:
             if not self.running:
-                logger.debug("Processing loop detected self.running is False; exiting loop.")
+                # logger.debug("Processing loop detected self.running is False; exiting loop.")
+                pass
             self.processing_complete = True
-            logger.debug("Processing loop has set processing_complete to True.")
+            # logger.debug("Processing loop has set processing_complete to True.")
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
@@ -168,7 +169,7 @@ class RayActorStage(ABC):
         """
         self.running = False
         while not self.processing_complete:
-            logger.debug("Waiting for processing loop to complete...")
+            # logger.debug("Waiting for processing loop to complete...")
             time.sleep(2.0)
         return True
 
