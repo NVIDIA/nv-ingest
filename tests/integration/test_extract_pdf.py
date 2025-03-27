@@ -129,7 +129,6 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
 
     milvus_uri = "milvus.db"
     collection_name = "test"
-    sparse = False
 
     ingestor = (
         Ingestor(client=client)
@@ -146,7 +145,6 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
             collection_name=collection_name,
             milvus_uri=milvus_uri,
             dense_dim=2048,
-            sparse=sparse,
         )
     )
 
@@ -154,13 +152,12 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
     assert len(results) == 1
     assert len([x for x in results[0] if x["metadata"]["embedding"]]) == 8
 
-    queries = ["Which animal is chasing a squirrel?"]
+    queries = ["Which table describes animals?"]
 
     retrieved_docs = nvingest_retrieval(
         queries,
         collection_name,
         milvus_uri=milvus_uri,
-        hybrid=sparse,
         top_k=1,
     )
     extracted_content = retrieved_docs[0][0]["entity"]["text"]
