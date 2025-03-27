@@ -152,15 +152,15 @@ def test_pdfium_extract_embed_upload_query(pipeline_process):
     assert len(results) == 1
     assert len([x for x in results[0] if x["metadata"]["embedding"]]) == 8
 
-    queries = ["Which table describes animals?"]
+    queries = ["Which table shows some popular colors that cars might come in?"]
 
     retrieved_docs = nvingest_retrieval(
         queries,
         collection_name,
         milvus_uri=milvus_uri,
-        top_k=1,
+        top_k=10,
     )
-    extracted_content = retrieved_docs[0][0]["entity"]["text"]
+    assert len(retrieved_docs) == 8
 
-    assert len(retrieved_docs) == 1
-    assert "This table describes some animals" in extracted_content
+    extracted_content = retrieved_docs[0][0]["entity"]["text"]
+    assert "This table shows some popular colors that cars might come in" in extracted_content
