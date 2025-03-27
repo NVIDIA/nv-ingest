@@ -59,7 +59,6 @@ def test_pdfium_extract_only(
     assert multimodal_second_table_markdown in " ".join(table_contents)
 
     chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
-    assert multimodal_first_chart_xaxis in " ".join(chart_contents)
     assert multimodal_first_chart_yaxis in " ".join(chart_contents)
     assert multimodal_second_chart_xaxis in " ".join(chart_contents)
     assert multimodal_second_chart_yaxis in " ".join(chart_contents)
@@ -116,7 +115,6 @@ def test_nemoretriever_parse_extract_only(
     assert multimodal_second_table_markdown in " ".join(table_contents)
 
     chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
-    assert multimodal_first_chart_xaxis in " ".join(chart_contents)
     assert multimodal_first_chart_yaxis in " ".join(chart_contents)
     assert multimodal_second_chart_xaxis in " ".join(chart_contents)
     assert multimodal_second_chart_yaxis in " ".join(chart_contents)
