@@ -226,98 +226,98 @@ if __name__ == "__main__":
         name="metadata_injection",
         stage_actor=MetadataInjectionStage,
         config=MetadataInjectorSchema(),  # Use stage-specific config if needed.
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=2,
     )
     pipeline.add_stage(
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
         config=PDFExtractorSchema(**pdf_extractor_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=16,
     )
     pipeline.add_stage(
         name="docx_extractor",
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="audio_extractor",
         stage_actor=AudioExtractorStage,
         config=AudioExtractorSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="image_extractor",
         stage_actor=ImageExtractorStage,
         config=ImageExtractorSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="table_extractor",
         stage_actor=TableExtractorStage,
         config=TableExtractorSchema(**table_extractor_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
         config=ChartExtractorSchema(**chart_extractor_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=TextEmbeddingSchema(**text_embedding_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=8,
     )
     pipeline.add_stage(
         name="image_filter",
         stage_actor=ImageFilterStage,
         config=ImageFilterSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_stage(
         name="image_dedup",
         stage_actor=ImageDedupStage,
         config=ImageDedupSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_stage(
         name="image_storage",
         stage_actor=ImageStorageStage,
         config=ImageStorageModuleSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_stage(
         name="embedding_storage",
         stage_actor=EmbeddingStorageStage,
         config=EmbeddingStorageSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_stage(
         name="text_splitter",
         stage_actor=TextSplitterStage,
         config=TextSplitterSchema(),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_stage(
         name="image_caption",
         stage_actor=ImageCaptionTransformStage,
         config=ImageCaptionExtractionSchema(**image_caption_config),
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=4,
     )
     pipeline.add_sink(
@@ -376,7 +376,6 @@ if __name__ == "__main__":
     try:
         while True:
             time.sleep(5)
-            logger.info("Pipeline running...")
     except KeyboardInterrupt:
         logger.info("Interrupt received, shutting down pipeline.")
         pipeline.stop()
