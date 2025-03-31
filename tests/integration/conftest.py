@@ -16,7 +16,7 @@ def pipeline_process():
         stderr=sys.stderr,
     )
 
-    time.sleep(10)
+    time.sleep(5)
 
     if process.poll() is not None:
         raise RuntimeError("Error running pipeline subprocess.")

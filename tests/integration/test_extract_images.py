@@ -64,8 +64,10 @@ def test_images_extract_only(
     assert len(charts) == 1
     assert len(infographics) == 0
 
-    table_contents = [x["metadata"]["table_metadata"]["table_content"] for x in tables]
-    assert multimodal_first_table_markdown in " ".join(table_contents)
+    table_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in tables)
+    assert multimodal_first_table_markdown in table_contents
 
-    chart_contents = [x["metadata"]["table_metadata"]["table_content"] for x in charts]
-    assert multimodal_first_chart_yaxis in " ".join(chart_contents)
+    chart_contents = " ".join(x["metadata"]["table_metadata"]["table_content"] for x in charts)
+    multimodal_first_chart_xaxis_alt = multimodal_first_chart_xaxis.replace("Bluetooth speaker", "Bluetoothspeaker")
+    assert (multimodal_first_chart_xaxis in chart_contents) or (multimodal_first_chart_xaxis_alt in chart_contents)
+    assert multimodal_first_chart_yaxis in chart_contents
