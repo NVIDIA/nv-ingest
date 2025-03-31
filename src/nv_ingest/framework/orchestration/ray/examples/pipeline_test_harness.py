@@ -1,7 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import json
 import os
 import ray
 import logging
@@ -93,7 +93,26 @@ simple_config: Dict[str, Any] = {
 }
 
 if __name__ == "__main__":
-    ray.init(ignore_reinit_error=True)
+    ray.init(
+        ignore_reinit_error=True,
+        _system_config={
+            "local_fs_capacity_threshold": 0.9,
+            "object_spilling_config": json.dumps(
+                {
+                    "type": "filesystem",
+                    "params": {
+                        "directory_path": [
+                            "/tmp/ray_spill_testing_0",
+                            "/tmp/ray_spill_testing_1",
+                            "/tmp/ray_spill_testing_2",
+                            "/tmp/ray_spill_testing_3",
+                        ],
+                        "buffer_size": 100_000_000,
+                    },
+                },
+            ),
+        },
+    )
     logging.basicConfig(level=logging.INFO)
     logger = logging.getLogger("RayPipelineHarness")
     logger.info("Starting multi-stage pipeline test.")

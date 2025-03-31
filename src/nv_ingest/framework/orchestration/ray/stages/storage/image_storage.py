@@ -12,6 +12,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 from nv_ingest_api.internal.store.image_upload import store_images_to_minio_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
@@ -40,6 +41,7 @@ class ImageStorageStage(RayActorStage):
             logger.exception("Error validating image storage config")
             raise e
 
+    @traceable("image_storage")
     @filter_by_task(required_tasks=["store"])
     @nv_ingest_node_failure_context_manager(annotation_id="image_storage", raise_on_failure=False)
     @unified_exception_handler

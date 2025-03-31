@@ -48,7 +48,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
     This stage fetches messages from a message broker (via Redis or a simple broker),
     processes them into control messages, and writes them to the output queue.
-
     As a source stage, it overrides read_input() to use its own message-fetching logic.
     """
 
@@ -57,13 +56,15 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config)
         # Configuration specific to message broker task source.
         self.broker_client = self.config.broker_client
-        self.task_queue = self.config.task_queue
-        self.poll_interval = self.config.poll_interval
         self.client = self._create_client()
         self.message_count = 0
-        self.start_time = None
-        # For source stages, output is provided via a direct queue.
         self.output_queue = None
+        self.poll_interval = self.config.poll_interval
+        self.start_time = None
+        self.task_queue = self.config.task_queue
+
+        self._pause_event = threading.Event()
+        self._pause_event.set()  # Initially not paused
         logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
@@ -110,10 +111,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]
                 logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
-
             validate_ingest_job(job)
             ts_entry = datetime.now()
-
             job_id = job.pop("job_id")
             job_payload = job.get("job_payload", {})
             job_tasks = job.get("tasks", [])
@@ -124,14 +123,12 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 ts_send = datetime.fromtimestamp(ts_send / 1e9)
             trace_id = tracing_options.get("trace_id", None)
             response_channel = f"{job_id}"
-
             df = pd.DataFrame(job_payload)
             control_message.payload(df)
             annotate_cm(control_message, message="Created")
             control_message.set_metadata("response_channel", response_channel)
             control_message.set_metadata("job_id", job_id)
             control_message.set_metadata("timestamp", datetime.now().timestamp())
-
             for task in job_tasks:
                 task_id = task.get("id", str(uuid.uuid4()))
                 task_type = task.get("type", "unknown")
@@ -144,7 +141,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     properties=task_props,
                 )
                 control_message.add_task(task_obj)
-
             if do_trace_tagging:
                 ts_exit = datetime.now()
                 control_message.set_metadata("config::add_trace_tagging", do_trace_tagging)
@@ -169,7 +165,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 annotate_cm(control_message, message="Failed to process job submission", error=str(e))
             else:
                 raise
-
         return control_message
 
     def _fetch_message(self, timeout=100):
@@ -223,7 +218,13 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         logger.debug("on_data: Received control message for processing")
         return control_message
 
+    # In the processing loop, instead of checking a boolean, we wait on the event.
     def _processing_loop(self) -> None:
+        """
+        Custom processing loop for a source stage.
+        This loop fetches messages from the broker and writes them to the output queue,
+        but blocks on the pause event when the stage is paused.
+        """
         logger.info("Processing loop started")
         iteration = 0
         while self.running:
@@ -239,16 +240,19 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     continue
                 logger.debug("Control message received; processing data")
                 updated_cm = self.on_data(control_message)
+                # Block until not paused using the pause event.
                 if (updated_cm is not None) and (self.output_queue is not None):
+                    logger.debug("Waiting for stage to resume if paused...")
+                    self._pause_event.wait()  # This will block if the event is cleared.
                     self.output_queue.put(updated_cm)
                 self.stats["processed"] += 1
                 self.message_count += 1
-                logger.debug(
-                    "Processing loop iteration %s complete. Total processed: %s", iteration, self.stats["processed"]
-                )
+                logger.debug("Iteration %s complete. Total processed: %s", iteration, self.stats["processed"])
             except Exception as e:
                 logger.exception("Error in processing loop at iteration %s: %s", iteration, e)
                 time.sleep(self.config.poll_interval)
+        logger.info("Processing loop ending")
+        ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
@@ -260,7 +264,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self.message_count = 0
         logger.info("Starting processing loop thread.")
         threading.Thread(target=self._processing_loop, daemon=True).start()
-        logger.info("Message broker task source stage started")
+        logger.info("MessageBrokerTaskSourceStage started.")
         return True
 
     @ray.method(num_returns=1)
@@ -284,6 +288,50 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def set_output_queue(self, queue_handle: any) -> bool:
         self.output_queue = queue_handle
         logger.info("Output queue set: %s", queue_handle)
+        return True
+
+    @ray.method(num_returns=1)
+    def pause(self) -> bool:
+        """
+        Pause the stage. This clears the pause event, causing the processing loop
+        to block before writing to the output queue.
+
+        Returns
+        -------
+        bool
+            True after the stage is paused.
+        """
+        self._pause_event.clear()
+        logger.info("Stage paused.")
+        return True
+
+    @ray.method(num_returns=1)
+    def resume(self) -> bool:
+        """
+        Resume the stage. This sets the pause event, allowing the processing loop
+        to proceed with writing to the output queue.
+
+        Returns
+        -------
+        bool
+            True after the stage is resumed.
+        """
+        self._pause_event.set()
+        logger.info("Stage resumed.")
+        return True
+
+    @ray.method(num_returns=1)
+    def swap_queues(self, new_queue: any) -> bool:
+        """
+        Swap in a new output queue for this stage.
+        This method pauses the stage, waits for any current processing to finish,
+        replaces the output queue, and then resumes the stage.
+        """
+        logger.info("Swapping output queue: pausing stage first.")
+        self.pause()
+        self.set_output_queue(new_queue)
+        logger.info("Output queue swapped. Resuming stage.")
+        self.resume()
         return True
 
 

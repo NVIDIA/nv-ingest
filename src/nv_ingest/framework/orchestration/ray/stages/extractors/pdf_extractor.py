@@ -12,6 +12,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -61,6 +62,7 @@ class PDFExtractorStage(RayActorStage):
             logger.exception(f"Error validating PDF extractor config: {e}")
             raise
 
+    @traceable("pdf_extraction")
     @filter_by_task(required_tasks=["extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="pdf_extractor", raise_on_failure=False)
     @unified_exception_handler

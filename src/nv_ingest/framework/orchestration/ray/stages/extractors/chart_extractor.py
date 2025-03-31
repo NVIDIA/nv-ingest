@@ -11,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.image.chart_extractor import extract_chart_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -42,6 +43,7 @@ class ChartExtractorStage(RayActorStage):
             logger.exception("Error validating chart extractor config")
             raise e
 
+    @traceable("chart_extraction")
     @filter_by_task(required_tasks=["chart_data_extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="chart_extraction", raise_on_failure=False)
     @unified_exception_handler

@@ -10,6 +10,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.image.image_extractor import extract_primitives_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -39,6 +40,7 @@ class ImageExtractorStage(RayActorStage):
             logger.exception(f"Error validating Image Extractor config: {e}")
             raise
 
+    @traceable("image_extraction")
     @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(png|jpeg|jpg|tiff|bmp)$"})])
     @nv_ingest_node_failure_context_manager(annotation_id="image_extractor", raise_on_failure=False)
     @unified_exception_handler

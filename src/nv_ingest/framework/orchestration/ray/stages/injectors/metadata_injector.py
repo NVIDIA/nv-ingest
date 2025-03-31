@@ -10,6 +10,7 @@ import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest_api.internal.enums.common import DocumentTypeEnum, ContentTypeEnum
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -35,6 +36,7 @@ class MetadataInjectionStage(RayActorStage):
         # Additional initialization can be added here if necessary.
         logger.info("MetadataInjectionStage initialized with config: %s", config)
 
+    @traceable("metadata_injector")
     @nv_ingest_node_failure_context_manager(annotation_id="metadata_injector", raise_on_failure=False)
     @unified_exception_handler
     def on_data(self, message: Any) -> Any:

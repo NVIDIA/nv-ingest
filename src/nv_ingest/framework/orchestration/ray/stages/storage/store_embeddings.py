@@ -9,6 +9,7 @@ import ray
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
@@ -39,6 +40,7 @@ class EmbeddingStorageStage(RayActorStage):
             logger.exception(f"Error validating Embedding Storage config: {e}")
             raise
 
+    @traceable("embedding_storage")
     @filter_by_task(required_tasks=["store_embedding"])
     @nv_ingest_node_failure_context_manager(annotation_id="embedding_storage", raise_on_failure=False)
     @unified_exception_handler

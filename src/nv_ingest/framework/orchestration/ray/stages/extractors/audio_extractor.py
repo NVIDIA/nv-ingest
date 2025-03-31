@@ -11,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.audio.audio_extraction import extract_text_from_audio_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type, IngestControlMessage
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -40,6 +41,7 @@ class AudioExtractorStage(RayActorStage):
             logger.exception(f"Error validating Audio Extractor config: {e}")
             raise
 
+    @traceable("audio_extractor")
     @filter_by_task(required_tasks=[("audio_data_extract", {"document_type": "regex:^(mp3|wav)$"})])
     @nv_ingest_node_failure_context_manager(annotation_id="audio_extractor", raise_on_failure=False)
     @unified_exception_handler

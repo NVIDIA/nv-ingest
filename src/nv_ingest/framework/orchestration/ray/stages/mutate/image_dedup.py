@@ -11,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.mutate.deduplicate import deduplicate_images_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -40,6 +41,7 @@ class ImageDedupStage(RayActorStage):
             logger.exception(f"Error validating Image Deduplication config: {e}")
             raise
 
+    @traceable("image_deduplication")
     @filter_by_task(required_tasks=["dedup"])
     @nv_ingest_node_failure_context_manager(annotation_id="image_dedup", raise_on_failure=False)
     @unified_exception_handler

@@ -11,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.mutate.filter import filter_images_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -40,6 +41,7 @@ class ImageFilterStage(RayActorStage):
             logger.exception(f"Error validating Image Filter config: {e}")
             raise
 
+    @traceable("image_filter")
     @filter_by_task(required_tasks=["filter"])
     @nv_ingest_node_failure_context_manager(annotation_id="image_filter", raise_on_failure=False)
     @unified_exception_handler

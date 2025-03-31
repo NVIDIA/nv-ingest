@@ -54,7 +54,7 @@ class RayPipeline:
         scaling_cooldown: int = 20,
         dynamic_memory_scaling: bool = False,
         dynamic_memory_threshold: float = 0.9,
-        pid_kp: float = 0.05,
+        pid_kp: float = 0.1,
         pid_ki: float = 0.0075,
         pid_kd: float = 0.05,
     ) -> None:
@@ -82,6 +82,8 @@ class RayPipeline:
         self._monitor_thread: threading.Thread = None
         self._scaling_monitoring: bool = False
         self._scaling_thread: threading.Thread = None
+
+        self._last_queue_flush = time.time()
 
         # New: store per-stage processing and in-flight statistics.
         self.stage_stats: Dict[str, Dict[str, int]] = {}
@@ -439,11 +441,69 @@ class RayPipeline:
     def _perform_scaling(self) -> None:
         """
         Use the PID controller to evaluate current metrics and adjust replica counts.
+
+        Before evaluating PID scaling, if there is no in-flight traffic (global_in_flight == 0)
+        and if at least 10 minutes have elapsed since the last queue flush, pause all source stages,
+        swap in new queues for all pipeline stages (thereby resetting any accumulated overhead in
+        the queue actors), and then resume the source stages.
         """
-        stage_metrics: Dict[str, Dict[str, Any]] = {}
+
         # Compute global pipeline in-flight: sum of in_flight across all stages.
         global_in_flight = sum(self.stage_stats.get(s.name, {}).get("in_flight", 0) for s in self.stages)
+        logger.debug(f"Global in-flight count: {global_in_flight}")
 
+        # TODO(Devin): Implement dynamic queue cycling for memory management.
+        # current_time = time.time()
+
+        # Only perform a queue flush if there is no in-flight work and at least 10 minutes have passed.
+        # if global_in_flight == 0 and (current_time - self._last_queue_flush >= 600) and False:
+        #     logger.info("No in-flight tasks detected globally; initiating queue swap procedure.")
+
+        #     # Pause all source stage actors.
+        #     for stage in self.stages:
+        #         if getattr(stage, "is_source", False):  # Assuming StageInfo has an 'is_source' flag.
+        #             for actor in self.stage_actors.get(stage.name, []):
+        #                 logger.info(f"Pausing source stage actor: {actor}")
+        #                 ray.get(actor.pause.remote())
+
+        #     # Create new queues and wire them in.
+        #     wiring_refs = []
+        #     for from_stage, conns in self.connections.items():
+        #         for to_stage, queue_size in conns:
+        #             queue_name = f"{from_stage}_to_{to_stage}"
+        #             logger.debug(f"Creating new queue '{queue_name}' with size {queue_size}")
+        #             new_queue = Queue(maxsize=queue_size)
+        #             self.edge_queues[queue_name] = (new_queue, queue_size)
+        #             self.queue_stats[queue_name] = []
+        #             # Re-wire output for the from_stage.
+        #             for actor in self.stage_actors.get(from_stage, []):
+        #                 logger.debug(f"Setting new output queue for actor {actor} in stage {from_stage}")
+        #                 wiring_refs.append(actor.set_output_queue.remote(new_queue))
+        #             # Re-wire input for the to_stage.
+        #             for actor in self.stage_actors.get(to_stage, []):
+        #                 logger.debug(f"Setting new input queue for actor {actor} in stage {to_stage}")
+        #                 wiring_refs.append(actor.set_input_queue.remote(new_queue))
+        #     ray.get(wiring_refs)
+        #     logger.info("Queue swap complete: new queues have been wired in.")
+
+        #     # Update the last flush time.
+        #     self._last_queue_flush = current_time
+
+        #     # Resume all source stage actors.
+        #     for stage in self.stages:
+        #         if getattr(stage, "is_source", False):
+        #             for actor in self.stage_actors.get(stage.name, []):
+        #                 logger.info(f"Resuming source stage actor: {actor}")
+        #                 ray.get(actor.resume.remote())
+        #     logger.info("Source stages resumed after queue swap.")
+        # else:
+        #     if global_in_flight != 0:
+        #         logger.debug("In-flight tasks detected; skipping queue flush.")
+        #     else:
+        #         logger.debug("Queue flush skipped; last flush occurred less than 10 minutes ago.")
+
+        # Now, proceed with normal scaling calculations.
+        stage_metrics: Dict[str, Dict[str, Any]] = {}
         for stage in self.stages:
             stage_name = stage.name
             # Compute queue depth from all input edges.

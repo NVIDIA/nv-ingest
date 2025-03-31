@@ -10,6 +10,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.docx.docx_extractor import extract_primitives_from_docx_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -39,6 +40,7 @@ class DocxExtractorStage(RayActorStage):
             logger.exception(f"Error validating DOCX Extractor config: {e}")
             raise
 
+    @traceable("docx_extractor")
     @filter_by_task(required_tasks=["docx-extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="docx_extractor", raise_on_failure=True)
     @unified_exception_handler

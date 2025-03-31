@@ -11,6 +11,7 @@ import ray
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type, IngestControlMessage
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
@@ -40,6 +41,7 @@ class TextEmbeddingTransformStage(RayActorStage):
             logger.exception("Error validating text embedding extractor config")
             raise e
 
+    @traceable("text_embedding")
     @filter_by_task(required_tasks=["embed"])
     @nv_ingest_node_failure_context_manager(annotation_id="text_embedding", raise_on_failure=False)
     @unified_exception_handler

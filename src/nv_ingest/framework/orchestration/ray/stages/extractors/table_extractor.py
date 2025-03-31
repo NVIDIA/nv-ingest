@@ -11,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.image.table_extractor import extract_table_data_from_image_internal
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_context_manager,
@@ -40,6 +41,7 @@ class TableExtractorStage(RayActorStage):
             logger.exception("Error validating table extractor config")
             raise e
 
+    @traceable("table_extraction")
     @filter_by_task(required_tasks=["table_data_extract"])
     @nv_ingest_node_failure_context_manager(annotation_id="table_extraction", raise_on_failure=False)
     @unified_exception_handler

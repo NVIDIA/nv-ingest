@@ -11,6 +11,7 @@ import ray
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
@@ -40,6 +41,7 @@ class ImageCaptionTransformStage(RayActorStage):
             logger.exception("Error validating caption extraction config")
             raise e
 
+    @traceable("image_captioning")
     @filter_by_task(required_tasks=["caption"])
     @nv_ingest_node_failure_context_manager(annotation_id="image_captioning", raise_on_failure=False)
     @unified_exception_handler
