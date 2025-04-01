@@ -71,7 +71,7 @@ def load_and_preprocess_image(image_stream: io.BytesIO) -> np.ndarray:
     # Load image from the byte stream
     processed_image = Image.open(image_stream).convert("RGB")
 
-    # Convert image to numpy array and normalize pixel values
+    # Convert image to numpy uint8 array
     image_array = np.asarray(processed_image)
 
     return image_array

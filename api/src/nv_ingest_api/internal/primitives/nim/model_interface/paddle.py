@@ -273,6 +273,8 @@ class PaddleOCRModelInterface(ModelInterface):
             The JSON response returned by the PaddleOCR endpoint.
         table_content_format : str or None
             The specified format for table content (e.g., 'simple' or 'pseudo_markdown').
+        dimensions : list of dict, optional
+            A list of dict for each corresponding image, used for bounding box scaling.
 
         Returns
         -------
