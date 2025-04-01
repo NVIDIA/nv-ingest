@@ -8,7 +8,8 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
 
 
-def test_images_extract_only(
+@pytest.mark.integration
+def test_audio_extract_only(
     pipeline_process,
 ):
     client = NvIngestClient(
