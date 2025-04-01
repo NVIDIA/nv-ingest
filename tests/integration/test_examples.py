@@ -1,7 +1,10 @@
 import subprocess
 import sys
 
+import pytest
 
+
+@pytest.mark.integration
 def test_launch_libmode_and_run_ingestor():
     process = subprocess.run(
         [sys.executable, "./examples/launch_libmode_and_run_ingestor.py"], capture_output=True, text=True

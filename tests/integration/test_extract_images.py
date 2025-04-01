@@ -8,6 +8,7 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize(
     "image_file",
     [

@@ -17,6 +17,7 @@ def create_client():
     )
 
 
+@pytest.mark.integration
 def run_basic_extract_test(
     extract_method=None,
     expected_text_count=3,
@@ -70,6 +71,7 @@ def run_basic_extract_test(
         assert (phrase in chart_contents) or (alt_phrase in chart_contents)
 
 
+@pytest.mark.integration
 @pytest.mark.parametrize("extract_method", [None, "nemoretriever_parse"])
 def test_extract_only(
     extract_method,
@@ -96,6 +98,7 @@ def test_extract_only(
     )
 
 
+@pytest.mark.integration
 def test_pdfium_extract_embed_upload_query(pipeline_process):
     client = create_client()
 
