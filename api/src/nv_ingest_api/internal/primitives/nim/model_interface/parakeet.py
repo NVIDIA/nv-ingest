@@ -60,7 +60,7 @@ class ParakeetClient:
         self.auth_token = auth_token
         self.function_id = function_id
         if use_ssl is None:
-            self.use_ssl = True if self.function_id else False
+            self.use_ssl = True if ("grpc.nvcf.nvidia.com" in self.endpoint) and self.function_id else False
         else:
             self.use_ssl = use_ssl
         self.ssl_cert = ssl_cert
