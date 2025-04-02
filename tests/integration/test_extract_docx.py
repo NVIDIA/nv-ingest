@@ -9,6 +9,7 @@ from nv_ingest_client.client import NvIngestClient
 from tests.utilities_for_test import canonicalize_markdown_table
 
 
+@pytest.mark.integration
 def test_docx_extract_only(
     pipeline_process,
     multimodal_first_table_markdown,
