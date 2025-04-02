@@ -62,11 +62,11 @@ def test_dedup_task_no_args(ingestor):
 
 
 def test_dedup_task_some_args(ingestor):
-    ingestor.dedup(content_type="foo", filter=True)
+    ingestor.dedup(content_type="image", filter=True)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, DedupTask)
-    assert task._content_type == "foo"
+    assert task._content_type == "image"
     assert task._filter is True
 
 
@@ -145,11 +145,11 @@ def test_filter_task_no_args(ingestor):
 
 
 def test_filter_task_some_args(ingestor):
-    ingestor.filter(content_type="foo", min_size=42)
+    ingestor.filter(content_type="image", min_size=42)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, FilterTask)
-    assert task._content_type == "foo"
+    assert task._content_type == "image"
     assert task._min_size == 42
 
 

@@ -12,7 +12,7 @@ from pprint import pprint
 from typing import Union, List, Any, Dict
 
 import click
-from nv_ingest_client.cli.util.processing import check_schema
+from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
