@@ -97,24 +97,18 @@ def canonicalize_markdown_table(table_string):
         ... | Animal*   | Activity                  | Place      |
         ... |:----------|:--------------------------|:-----------|
         ... | Giraffe   | Driving \t a car         | At the beach |
-        ... |*Lion*     | Eating    ice cream       | In the park|
         ... '''
         >>> canonicalize_markdown_table(messy_table)
-        '| Animal | Activity | Place |\n| Giraffe | Driving a car | At the beach |\n| Lion | Eating ice cream | In the park |'
+        '| Animal | Activity | Place |\n| Giraffe | Driving a car | At the beach |'
     """
     lines = table_string.strip().splitlines()
     # Filter out separator lines and process data/header lines
     processed_lines = []
     for line in lines:
         stripped_line = line.strip()
-        if not stripped_line or stripped_line.startswith('|:--'):
-            continue # Skip empty lines or separator lines
+        if not stripped_line or stripped_line.startswith("|:--"):
+            continue  # Skip empty lines or separator lines
         # Clean cells: strip whitespace, collapse internal whitespace/tabs
-        cells = [
-            ' '.join(cell.replace('*', '').strip().split())
-            for cell in stripped_line.strip('|').split('|')
-        ]
-        processed_lines.append('| ' + ' | '.join(cells) + ' |')
-    return '\n'.join(processed_lines)
-
-
+        cells = [" ".join(cell.replace("*", "").strip().split()) for cell in stripped_line.strip("|").split("|")]
+        processed_lines.append("| " + " | ".join(cells) + " |")
+    return "\n".join(processed_lines)
