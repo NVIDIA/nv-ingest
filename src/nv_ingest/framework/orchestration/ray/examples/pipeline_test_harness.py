@@ -123,7 +123,7 @@ if __name__ == "__main__":
     logger.info("SimpleMessageBroker server started.")
 
     # Build the pipeline.
-    pipeline = RayPipeline(dynamic_memory_scaling=True)
+    pipeline = RayPipeline(dynamic_memory_scaling=True, dynamic_memory_threshold=0.75, gui=True)
     logger.info("Created RayPipeline instance.")
 
     # Create configuration instances for the source and sink stages.
@@ -343,7 +343,7 @@ if __name__ == "__main__":
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
-        min_replicas=1,
+        min_replicas=0,
         max_replicas=2,
     )
     logger.info("Added sink stage to pipeline.")
