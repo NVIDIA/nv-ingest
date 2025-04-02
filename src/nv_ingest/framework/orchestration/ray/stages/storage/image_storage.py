@@ -16,8 +16,7 @@ from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
 from nv_ingest_api.internal.store.image_upload import store_images_to_minio_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class ImageStorageStage(RayActorStage):
 
     @traceable("image_storage")
     @filter_by_task(required_tasks=["store"])
-    @nv_ingest_node_failure_context_manager(annotation_id="image_storage", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="image_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by storing images or structured content.

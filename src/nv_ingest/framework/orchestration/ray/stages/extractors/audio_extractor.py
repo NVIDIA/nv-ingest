@@ -14,8 +14,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import remove_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class AudioExtractorStage(RayActorStage):
 
     @traceable("audio_extractor")
     @filter_by_task(required_tasks=[("audio_data_extract", {"document_type": "regex:^(mp3|wav)$"})])
-    @nv_ingest_node_failure_context_manager(annotation_id="audio_extractor", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="audio_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting text from audio.
@@ -60,29 +58,26 @@ class AudioExtractorStage(RayActorStage):
             The updated message with extracted text data.
         """
         logger.info("AudioExtractorStage.on_data: Starting audio extraction process.")
-        try:
-            # Extract the DataFrame payload.
-            df_ledger = control_message.payload()
-            logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-            # Remove the "audio_data_extract" task from the message to obtain task-specific configuration.
-            task_config = remove_task_by_type(control_message, "audio_data_extract")
-            logger.debug("Extracted task config: %s", task_config)
+        # Extract the DataFrame payload.
+        df_ledger = control_message.payload()
+        logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-            # Perform audio text extraction.
-            new_df, extraction_info = extract_text_from_audio_internal(
-                df_extraction_ledger=df_ledger,
-                task_config=task_config,
-                extraction_config=self.validated_config,
-                execution_trace_log=None,
-            )
-            logger.info("Audio extraction completed. Resulting DataFrame has %d rows.", len(new_df))
+        # Remove the "audio_data_extract" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(control_message, "audio_data_extract")
+        logger.debug("Extracted task config: %s", task_config)
 
-            # Update the message payload with the extracted text DataFrame.
-            control_message.payload(new_df)
-            control_message.set_metadata("audio_extraction_info", extraction_info)
+        # Perform audio text extraction.
+        new_df, extraction_info = extract_text_from_audio_internal(
+            df_extraction_ledger=df_ledger,
+            task_config=task_config,
+            extraction_config=self.validated_config,
+            execution_trace_log=None,
+        )
+        logger.info("Audio extraction completed. Resulting DataFrame has %d rows.", len(new_df))
 
-            return control_message
-        except Exception as e:
-            logger.exception(f"AudioExtractorStage failed processing control message: {e}")
-            raise
+        # Update the message payload with the extracted text DataFrame.
+        control_message.payload(new_df)
+        control_message.set_metadata("audio_extraction_info", extraction_info)
+
+        return control_message

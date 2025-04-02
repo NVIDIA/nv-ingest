@@ -14,8 +14,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import remove_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -45,8 +44,7 @@ class ChartExtractorStage(RayActorStage):
 
     @traceable("chart_extraction")
     @filter_by_task(required_tasks=["chart_data_extract"])
-    @nv_ingest_node_failure_context_manager(annotation_id="chart_extraction", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="chart_extraction", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting chart data.

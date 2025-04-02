@@ -9,7 +9,9 @@ from nv_ingest_api.internal.primitives.ingest_control_message import remove_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal
-from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_context_manager
+from nv_ingest_api.util.exception_handlers.decorators import (
+    nv_ingest_node_failure_try_except,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -32,7 +34,7 @@ class TextSplitterStage(RayActorStage):
 
     @traceable("text_splitter")
     @filter_by_task(["split"])
-    @nv_ingest_node_failure_context_manager(annotation_id="text_splitter", raise_on_failure=False)
+    @nv_ingest_node_failure_try_except(annotation_id="text_splitter", raise_on_failure=False)
     def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by splitting and tokenizing its text.

@@ -12,8 +12,7 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.schemas.framework_job_counter_schema import JobCounterSchema
 from nv_ingest.framework.util.telemetry.global_stats import GlobalStats
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 # Import the JobCounter schema and global stats singleton.
@@ -39,8 +38,7 @@ class JobCounterStage(RayActorStage):
         # Obtain the global stats' singleton.
         self.stats = GlobalStats.get_instance()
 
-    @nv_ingest_node_failure_context_manager(annotation_id="job_counter", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="job_counter", raise_on_failure=False)
     async def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by counting jobs.

@@ -13,8 +13,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import IngestContr
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +41,7 @@ class DocxExtractorStage(RayActorStage):
 
     @traceable("docx_extractor")
     @filter_by_task(required_tasks=["docx-extract"])
-    @nv_ingest_node_failure_context_manager(annotation_id="docx_extractor", raise_on_failure=True)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="docx_extractor", raise_on_failure=True)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting content from DOCX documents.

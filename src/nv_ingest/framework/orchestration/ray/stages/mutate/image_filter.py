@@ -14,8 +14,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import IngestContr
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class ImageFilterStage(RayActorStage):
 
     @traceable("image_filter")
     @filter_by_task(required_tasks=["filter"])
-    @nv_ingest_node_failure_context_manager(annotation_id="image_filter", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="image_filter", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by filtering images.

@@ -14,8 +14,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import IngestContr
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class ImageDedupStage(RayActorStage):
 
     @traceable("image_deduplication")
     @filter_by_task(required_tasks=["dedup"])
-    @nv_ingest_node_failure_context_manager(annotation_id="image_dedup", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="image_dedup", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by deduplicating images.

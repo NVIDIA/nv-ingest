@@ -15,8 +15,7 @@ from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class ImageCaptionTransformStage(RayActorStage):
 
     @traceable("image_captioning")
     @filter_by_task(required_tasks=["caption"])
-    @nv_ingest_node_failure_context_manager(annotation_id="image_captioning", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="image_captioning", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting image captions.

@@ -15,8 +15,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import remove_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -64,8 +63,7 @@ class PDFExtractorStage(RayActorStage):
 
     @traceable("pdf_extraction")
     @filter_by_task(required_tasks=["extract"])
-    @nv_ingest_node_failure_context_manager(annotation_id="pdf_extractor", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="pdf_extractor", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting PDF content.
@@ -80,31 +78,30 @@ class PDFExtractorStage(RayActorStage):
         IngestControlMessage
             The updated message with the extracted DataFrame and extraction info in metadata.
         """
+
         logger.info("PDFExtractorStage.on_data: Starting PDF extraction process.")
-        try:
-            # Extract the DataFrame payload.
-            df_extraction_ledger = control_message.payload()
-            logger.debug("Extracted payload with %d rows.", len(df_extraction_ledger))
 
-            # Remove the "extract" task from the message to obtain task-specific configuration.
-            task_config = remove_task_by_type(control_message, "extract")
-            logger.debug("Extracted task config: %s", task_config)
+        # Extract the DataFrame payload.
+        df_extraction_ledger = control_message.payload()
+        logger.debug("Extracted payload with %d rows.", len(df_extraction_ledger))
 
-            # Perform PDF extraction.
-            new_df, extraction_info = _inject_validated_config(
-                df_extraction_ledger,
-                task_config,
-                execution_trace_log=None,
-                validated_config=self.validated_config,
-            )
-            logger.info("PDF extraction completed. Extracted %d rows.", len(new_df))
+        # Remove the "extract" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(control_message, "extract")
+        logger.debug("Extracted task config: %s", task_config)
 
-            # Update the message payload with the extracted DataFrame.
-            control_message.payload(new_df)
-            # Optionally, annotate the message with extraction info.
-            control_message.set_metadata("pdf_extraction_info", extraction_info)
-            logger.info("PDF extraction metadata injected successfully.")
-            return control_message
-        except Exception as e:
-            logger.exception(f"PDFExtractorStage failed processing control message: {e}")
-            raise
+        # Perform PDF extraction.
+        new_df, extraction_info = _inject_validated_config(
+            df_extraction_ledger,
+            task_config,
+            execution_trace_log=None,
+            validated_config=self.validated_config,
+        )
+        logger.info("PDF extraction completed. Extracted %d rows.", len(new_df))
+
+        # Update the message payload with the extracted DataFrame.
+        control_message.payload(new_df)
+        # Optionally, annotate the message with extraction info.
+        control_message.set_metadata("pdf_extraction_info", extraction_info)
+        logger.info("PDF extraction metadata injected successfully.")
+
+        return control_message

@@ -15,8 +15,7 @@ from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class TextEmbeddingTransformStage(RayActorStage):
 
     @traceable("text_embedding")
     @filter_by_task(required_tasks=["embed"])
-    @nv_ingest_node_failure_context_manager(annotation_id="text_embedding", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="text_embedding", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> Any:
         """
         Process the control message by generating text embeddings.

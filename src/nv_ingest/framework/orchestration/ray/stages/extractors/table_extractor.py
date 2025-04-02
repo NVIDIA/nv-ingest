@@ -14,8 +14,7 @@ from nv_ingest_api.internal.primitives.ingest_control_message import remove_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -43,8 +42,7 @@ class TableExtractorStage(RayActorStage):
 
     @traceable("table_extraction")
     @filter_by_task(required_tasks=["table_data_extract"])
-    @nv_ingest_node_failure_context_manager(annotation_id="table_extraction", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="table_extraction", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting table data from the PDF payload.

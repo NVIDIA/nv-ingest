@@ -13,8 +13,7 @@ from nv_ingest_api.internal.enums.common import DocumentTypeEnum, ContentTypeEnu
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 # logging.basicConfig(level=logging.DEBUG)
@@ -37,8 +36,7 @@ class MetadataInjectionStage(RayActorStage):
         logger.info("MetadataInjectionStage initialized with config: %s", config)
 
     @traceable("metadata_injector")
-    @nv_ingest_node_failure_context_manager(annotation_id="metadata_injector", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="metadata_injector", raise_on_failure=False)
     def on_data(self, message: Any) -> Any:
         """
         Process an incoming IngestControlMessage by injecting metadata into its DataFrame payload.

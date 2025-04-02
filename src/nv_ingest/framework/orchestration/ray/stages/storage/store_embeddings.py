@@ -13,8 +13,7 @@ from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 from nv_ingest_api.internal.store.embed_text_upload import store_text_embeddings_internal
 from nv_ingest_api.util.exception_handlers.decorators import (
-    nv_ingest_node_failure_context_manager,
-    unified_exception_handler,
+    nv_ingest_node_failure_try_except,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,8 +41,7 @@ class EmbeddingStorageStage(RayActorStage):
 
     @traceable("embedding_storage")
     @filter_by_task(required_tasks=["store_embedding"])
-    @nv_ingest_node_failure_context_manager(annotation_id="embedding_storage", raise_on_failure=False)
-    @unified_exception_handler
+    @nv_ingest_node_failure_try_except(annotation_id="embedding_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by storing embeddings.
