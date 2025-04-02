@@ -8,7 +8,6 @@ from typing import Union
 from urllib.parse import urlparse
 
 import requests
-from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 from nv_ingest_client.util.util import ClientConfigSchema
 from pymilvus import AnnSearchRequest
@@ -1150,6 +1149,8 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
+    from llama_index.embeddings.nvidia import NVIDIAEmbedding
+
     client_config = ClientConfigSchema()
     nvidia_api_key = client_config.nvidia_build_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
