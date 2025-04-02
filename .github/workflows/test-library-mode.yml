@@ -24,18 +24,21 @@ jobs:
       - name: Check access
         if:
           ${{
+            github.event_name == 'pull_request_target' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
             !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
           }}
         run: |
-          echo "Event not triggered by a collaborator. Add 'ok-to-test' label to trigger tests."
+          echo "Pull request author is not a collaborator or owner. Add the 'ok-to-test' label to allow tests to run."
           exit 1
 
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: ${{  github.event.pull_request.head.sha }}
+          # For pull_request_target, checkout the PR head SHA.
+          # For push, checkout the pushed commit SHA.
+          ref: ${{ github.event_name == 'pull_request_target' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Build Conda Packages
         run: |
@@ -60,28 +63,36 @@ jobs:
       - name: Check access
         if:
           ${{
+            github.event_name == 'pull_request_target' &&
             github.event.pull_request.author_association != 'COLLABORATOR' &&
             github.event.pull_request.author_association != 'OWNER' &&
             !contains(github.event.pull_request.labels.*.name, 'ok-to-test')
           }}
         run: |
-          echo "Event not triggered by a collaborator. Add 'ok-to-test' label to trigger tests."
+          echo "Pull request author is not a collaborator or owner. Add the 'ok-to-test' label to allow tests to run."
           exit 1
 
       - name: Download artifacts
         uses: actions/download-artifact@v4
+        with:
+          name: test_artifacts # Match the upload name
 
       - uses: conda-incubator/setup-miniconda@v3
         with:
           auto-update-conda: true
 
-      - name: Install Conda
+      - name: Install Conda Packages & Dependencies
         shell: bash -el {0}
         run: |
           conda create -y --name nvingest python=3.10
           conda activate nvingest
-          conda install -y -c ./test_artifacts/conda/output_conda_channel -c rapidsai -c conda-forge -c nvidia nv_ingest nv_ingest_api nv_ingest_client
+          # Install from the downloaded local channel first
+          conda install -y -c ./conda/output_conda_channel -c rapidsai -c conda-forge -c nvidia nv_ingest nv_ingest_api nv_ingest_client
+          # Install other dependencies
+          conda install -y -c conda-forge librosa
+          # Install pip dependencies
           $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
+
       - name: Run integration test
         env:
           AUDIO_FUNCTION_ID: ${{ secrets.AUDIO_FUNCTION_ID }}
@@ -98,4 +109,4 @@ jobs:
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
-          cd test_artifacts/ && $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
+          $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration

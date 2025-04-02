@@ -89,7 +89,7 @@ class TestParakeetClient(unittest.TestCase):
     def test_initialization_auto_ssl(self):
         """Test automatic SSL detection based on function_id."""
         # With function_id but no explicit use_ssl
-        client = ParakeetClient(endpoint="test.endpoint:50051", function_id="test_function_id")
+        client = ParakeetClient(endpoint="grpc.nvcf.nvidia.com:443", function_id="test_function_id")
         self.assertTrue(client.use_ssl)
 
         # Without function_id and no explicit use_ssl
