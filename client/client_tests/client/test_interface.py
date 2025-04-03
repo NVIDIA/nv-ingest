@@ -4,7 +4,9 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import io
 import logging
+import os
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import MagicMock
@@ -368,3 +370,65 @@ def test_all_tasks_adds_default_tasks(ingestor):
     }
 
     assert task_classes.issubset(added_tasks), "Not all default tasks were added"
+
+
+def test_load_with_existing_local_files(tmp_path):
+    doc1_path = tmp_path / "doc1.txt"
+    doc1_path.write_text("content1")
+    doc2_path = tmp_path / "subdir" / "doc2.pdf"
+    doc2_path.parent.mkdir()
+    doc2_path.write_text("content2")
+
+    initial_doc_paths = [str(doc1_path), str(doc2_path)]
+    ingestor = Ingestor().files(initial_doc_paths)
+
+    _ = ingestor.load()
+
+    assert ingestor._all_local is True
+    assert ingestor._documents == initial_doc_paths
+
+
+@patch("fsspec.open")
+def test_load_downloads_remote_file(mock_fsspec_open):
+    remote_file = "https://aws-s3-presigned-url/remote.txt" + "?" + "x" * 1708
+
+    fake_file_content = b"fake data from remote"
+    mock_file_obj = io.BytesIO(fake_file_content)
+    mock_file_obj.path = remote_file
+
+    mock_fsspec_open.return_value.__enter__.return_value = mock_file_obj
+
+    ingestor = Ingestor().files(remote_file)
+    assert ingestor._all_local is False
+
+    _ = ingestor.load()
+
+    assert ingestor._all_local is True
+
+    assert os.path.exists(ingestor._documents[0])
+    assert "remote.txt" in ingestor._documents[0]
+    with open(ingestor._documents[0], "rb") as f:
+        assert f.read() == fake_file_content
+
+
+@patch("fsspec.open")
+def test_load_mixed_local_and_remote(mock_fsspec_open, tmp_path):
+    local_file = tmp_path / "local.txt"
+    local_file.write_text("Local content.")
+
+    remote_file = "https://aws-s3-presigned-url/remote.txt" + "?" + "x" * 1708
+    ingestor = Ingestor().files([str(local_file), remote_file])
+    assert ingestor._all_local is False
+
+    fake_file_content = b"fake data from remote"
+
+    mock_file_obj = io.BytesIO(fake_file_content)
+    mock_file_obj.path = remote_file
+
+    mock_fsspec_open.return_value.__enter__.return_value = mock_file_obj
+
+    _ = ingestor.load()
+
+    assert ingestor._all_local is True
+    assert any("local.txt" in path for path in ingestor._documents)
+    assert any("remote.txt" in path for path in ingestor._documents)
