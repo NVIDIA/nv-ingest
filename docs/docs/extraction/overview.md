@@ -20,6 +20,8 @@ and optionally manage storing into a vector database [Milvus](https://milvus.io/
 
 ## What NeMo Retriever Extraction Is ✔️
 
+The following diagram shows the Nemo Retriever extraction pipeline.
+
 ![Overview diagram](images/overview-extraction.png)
 
 NeMo Retriever extraction is a microservice service that does the following:

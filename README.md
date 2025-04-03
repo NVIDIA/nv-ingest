@@ -87,7 +87,7 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-Make sure that your Conda environment is activated. `which python` should indicate that you're using the Conda-provided python installation (not an OS-provided python).
+To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
 ```
 which python
@@ -191,7 +191,7 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ### Step 3: Query Ingested Content
 
-The following example demonstrates how to query for relevant snippets of the ingested content, and insert the snippets into a prompt for an LLM to generate answers.
+To query for relevant snippets of the ingested content, and use it with an LLM to generate answers, use the following code.
 
 ```python
 from openai import OpenAI
