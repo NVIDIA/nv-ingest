@@ -4,27 +4,28 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-## NVIDIA-Ingest: Multi-modal data extraction
+# NVIDIA Ingest: Multi-modal data extraction
 
 NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, text files, Microsoft Word and PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts, and unstructured images that you can use in downstream generative applications.
 
 > [!Note]
 > NVIDIA Ingest is also known as NV-Ingest and [NeMo Retriever Extraction](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database [Milvus](https://milvus.io/).
+NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database, such as [Milvus](https://milvus.io/).
+
+The following diagram shows the Nemo Retriever extraction pipeline.
 
 ![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
 
-### Table of Contents
-1. [Introduction](#introduction)
+## Table of Contents
+1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#quickstart)
-4. [Repo Structure](#repo-structure)
+4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
-## Introduction
 
-## What NVIDIA-Ingest Is ✔️
+## What NVIDIA-Ingest Is
 
 NV-Ingest is a library and microservice service that does the following:
 
@@ -45,9 +46,13 @@ NV-Ingest supports the following file types:
 - `tiff`
 - `txt`
 
+For more information, see the [full NV Ingest documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+
+
 ## Prerequisites
 
 For production-level performance and scalability, we recommend that you deploy the pipeline and supporting NIMs by using Docker Compose or Kubernetes ([helm charts](helm)). For more information, refer to [prerequisites](https://docs.nvidia.com/nv-ingest/user-guide/getting-started/prerequisites).
+
 
 ## Library Mode Quickstart
 
@@ -61,7 +66,7 @@ Library mode deployment of nv-ingest requires:
 
 ### Step 1: Prepare Your Environment
 
-Create a fresh conda environment in which to install nv-ingest and dependencies.
+Create a fresh Conda environment to install nv-ingest and dependencies.
 
 ```shell
 conda create -y --name nvingest python=3.10 && \
@@ -70,7 +75,8 @@ conda create -y --name nvingest python=3.10 && \
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
 ```
 
-Make sure to set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have one, you can get one on [build.nvidia.com](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2?snippet_tab=Python&signin=true&api_key=true).
+Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
+
 ```
 #Note: these should be the same value
 export NVIDIA_BUILD_API_KEY=nvapi-...
@@ -81,18 +87,21 @@ export NVIDIA_API_KEY=nvapi-...
 
 You can submit jobs programmatically in Python.
 
-Note: Make sure your conda environment is activated. `which python` should indicate that you're using the conda provided python installation (not an OS provided python).
+Make sure that your Conda environment is activated. `which python` should indicate that you're using the Conda-provided python installation (not an OS-provided python).
+
 ```
 which python
 /home/dev/miniforge3/envs/nvingest/bin/python
 ```
 
-If you have a very high number of CPUs and see the process hang without progress, we recommend using taskset to limit the number of CPUs visible to the process:
+If you have a very high number of CPUs, and see the process hang without progress, we recommend that you use `taskset` to limit the number of CPUs visible to the process. Use the following code.
+
 ```
 taskset -c 0-3 python your_ingestion_script.py
 ```
 
-On a 4 CPU core low end laptop, the following should take about 10 seconds:
+On a 4 CPU core low end laptop, the following code should take about 10 seconds.
+
 ```python
 import logging, os, time, sys
                
@@ -115,7 +124,7 @@ client = NvIngestClient(
     message_client_hostname="localhost"
 )
                                             
-# Note: gpu_cagra accelerated indexing is not yet available in milvus-lite
+# Currently, gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -132,8 +141,7 @@ ingestor = (
         extract_images=True,
         paddle_output_format="markdown",
         extract_infographics=True,
-        # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        #extract_method="nemoretriever_parse",
+        #extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
     ).embed()
     .vdb_upload(
@@ -156,6 +164,7 @@ print(ingest_json_results_to_blob(results[0]))
 ```
 
 You can see the extracted text that represents the content of the ingested test document.
+
 ```shell
 Starting ingestion..
 Time taken: 9.243880033493042 seconds
@@ -182,7 +191,7 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ### Step 3: Query Ingested Content
 
-Below is an example snippet demonstrating how to query for relevant snippets of the ingested content and insert them into a basic prompt for use with an LLM to generate answers.
+The following example demonstrates how to query for relevant snippets of the ingested content, and insert the snippets into a prompt for an LLM to generate answers.
 
 ```python
 from openai import OpenAI
@@ -253,34 +262,34 @@ After carefully examining the provided content, I'd like to point out the potent
 So, according to this whimsical analysis, both the **Giraffe** and the **Cat** are "responsible" for the typos, with the Giraffe possibly being the more egregious offender given the more blatant character substitution in its name.
 ```
 
-For more information, please check out the [official documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
-
 > [!TIP]
 > Beyond inspecting the results, you can read them into things like [llama-index](examples/llama_index_multimodal_rag.ipynb) or [langchain](examples/langchain_multimodal_rag.ipynb) retrieval pipelines.
 >
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
-## Repo Structure
 
-Beyond the relevant documentation, examples, and other links above, below is a description of the contents in this repo's folders:
+## NV Ingest Repository Structure
 
-- [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github): GitHub repo configuration files
-- [api](https://github.com/NVIDIA/nv-ingest/tree/main/api): Core API python logic shared across python modules
-- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci): Scripts used to build the NV-Ingest container and other packages
-- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client): Docs and source code for the nv-ingest-cli utility
-- [conda](https://github.com/NVIDIA/nv-ingest/tree/main/conda): Conda environment and packaging definitions
-- [config](https://github.com/NVIDIA/nv-ingest/tree/main/config): Various .yaml files defining configuration for OTEL, Prometheus
-- [data](https://github.com/NVIDIA/nv-ingest/tree/main/data): Sample PDFs provided for testing convenience
-- [deploy](https://github.com/NVIDIA/nv-ingest/tree/main/deploy): Brev.dev hosted launchable
-- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker): Houses scripts used by the nv-ingest docker container
-- [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs): Various READMEs describing deployment, metadata schemas, auth and telemetry setup
-- [evaluation](https://github.com/NVIDIA/nv-ingest/tree/main/evaluation): Contains notebooks demonstrating how to test recall accuracy
-- [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples): Example notebooks, scripts, and longer-form tutorial content
-- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm): Documentation for deploying NV-Ingest to a Kubernetes cluster via Helm chart
-- [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold): Skaffold configuration
-- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src): Source code for the NV-Ingest pipelines and service
-- [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer): VSCode containers for local development
-- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests): Unit tests for NV-Ingest
+The following is a description of the folders in the nv-ingest repository.
+
+- [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer) — VSCode containers for local development
+- [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github) — GitHub repo configuration files
+- [api](https://github.com/NVIDIA/nv-ingest/tree/main/api) — Core API logic shared across python modules
+- [ci](https://github.com/NVIDIA/nv-ingest/tree/main/ci) — Scripts used to build the nv-ingest container and other packages
+- [client](https://github.com/NVIDIA/nv-ingest/tree/main/client) — Readme, examples, and source code for the nv-ingest-cli utility
+- [conda](https://github.com/NVIDIA/nv-ingest/tree/main/conda) — Conda environment and packaging definitions
+- [config](https://github.com/NVIDIA/nv-ingest/tree/main/config) — Various .yaml files defining configuration for OTEL, Prometheus
+- [data](https://github.com/NVIDIA/nv-ingest/tree/main/data) — Sample PDFs for testing
+- [deploy](https://github.com/NVIDIA/nv-ingest/tree/main/deploy) — Brev.dev-hosted launchable
+- [docker](https://github.com/NVIDIA/nv-ingest/tree/main/docker) — Scripts used by the nv-ingest docker container
+- [docs](https://github.com/NVIDIA/nv-ingest/tree/main/docs/docs) — Documentation for NV Ingest
+- [evaluation](https://github.com/NVIDIA/nv-ingest/tree/main/evaluation) — Notebooks that demonstrate how to test recall accuracy
+- [examples](https://github.com/NVIDIA/nv-ingest/tree/main/examples) — Notebooks, scripts, and tutorial content
+- [helm](https://github.com/NVIDIA/nv-ingest/tree/main/helm) — Documentation for deploying nv-ingest to a Kubernetes cluster via Helm chart
+- [skaffold](https://github.com/NVIDIA/nv-ingest/tree/main/skaffold) — Skaffold configuration
+- [src](https://github.com/NVIDIA/nv-ingest/tree/main/src) — Source code for the nv-ingest pipelines and service
+- [tests](https://github.com/NVIDIA/nv-ingest/tree/main/tests) — Unit tests for nv-ingest
+
 
 ## Notices
 
@@ -309,21 +318,23 @@ https://pypi.org/project/pdfservices-sdk/
 We require that all contributors "sign-off" on their commits. This certifies that the contribution is your original
 work, or you have rights to submit it under the same license, or a compatible license.
 
-Any contribution which contains commits that are not Signed-Off will not be accepted.
+Any contribution which contains commits that are not signed off are not accepted.
 
-To sign off on a commit you simply use the --signoff (or -s) option when committing your changes:
+To sign off on a commit, use the --signoff (or -s) option when you commit your changes as shown following.
 
 ```
-$ git commit -s -m "Add cool feature."
+$ git commit --signoff --message "Add cool feature."
 ```
 
-This will append the following to your commit message:
+This appends the following text to your commit message.
 
 ```
 Signed-off-by: Your Name <your@email.com>
 ```
 
-#### Full text of the DCO:
+#### Developer Certificate of Origin (DCO)
+
+The following is the full text of the Developer Certificate of Origin (DCO)
 
 ```
   Developer Certificate of Origin
