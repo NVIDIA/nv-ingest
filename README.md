@@ -124,7 +124,7 @@ client = NvIngestClient(
     message_client_hostname="localhost"
 )
                                             
-# Currently, gpu_cagra accelerated indexing is not available in milvus-lite
+# gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -191,7 +191,7 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ### Step 3: Query Ingested Content
 
-To query for relevant snippets of the ingested content, and use it with an LLM to generate answers, use the following code.
+To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
 
 ```python
 from openai import OpenAI

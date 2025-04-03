@@ -57,8 +57,8 @@ You can submit jobs programmatically by using Python.
     For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
-If you have a very high number of CPUs and see the process hang without progress, 
-we recommend using `taskset` to limit the number of CPUs visible to the process. 
+If you have a very high number of CPUs, and see the process hang without progress, 
+we recommend that you use `taskset` to limit the number of CPUs visible to the process. 
 Use the following code.
 
 ```
@@ -89,7 +89,7 @@ client = NvIngestClient(
     message_client_hostname="localhost"
 )
                                             
-# Note: gpu_cagra accelerated indexing is not yet available in milvus-lite
+# gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -162,7 +162,7 @@ This chart shows some gadgets, and some very fictitious costs.
 
 ## Step 3: Query Ingested Content
 
-To query for relevant snippets of the ingested content, and use it with an LLM to generate answers, use the following code.
+To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
 
 ```python
 from openai import OpenAI
