@@ -16,6 +16,7 @@ from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
+from urllib.parse import urlparse
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
@@ -194,7 +195,8 @@ class Ingestor:
                     local_files.append(local_path)
             else:
                 with fsspec.open(pattern_or_path, **kwargs) as f:
-                    original_name = os.path.basename(f.path)
+                    parsed_url = urlparse(f.path)
+                    original_name = os.path.basename(parsed_url.path)
                     local_path = os.path.join(temp_dir, original_name)
                     with open(local_path, "wb") as local_file:
                         shutil.copyfileobj(f, local_file)
