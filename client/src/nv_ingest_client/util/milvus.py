@@ -1098,7 +1098,6 @@ def nvingest_retrieval(
     nv_ranker_truncate: str = "END",
     nv_ranker_top_k: int = 5,
     nv_ranker_max_batch_size: int = 64,
-    nv_ranker_candidate_multiple: int = 10,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -1159,9 +1158,9 @@ def nvingest_retrieval(
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
-    nv_ranker_top_k = top_k
+    final_top_k = top_k
     if nv_ranker:
-        top_k = top_k * nv_ranker_candidate_multiple
+        top_k = nv_ranker_top_k
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
@@ -1193,7 +1192,7 @@ def nvingest_retrieval(
                     model_name=nv_ranker_model_name,
                     nvidia_api_key=nv_ranker_nvidia_api_key,
                     truncate=nv_ranker_truncate,
-                    topk=nv_ranker_top_k,
+                    topk=final_top_k,
                     max_batch_size=nv_ranker_max_batch_size,
                 )
             )
@@ -1282,7 +1281,9 @@ def nv_rerank(
         map_candidates[idx] = candidate
         texts.append({"text": candidate["entity"]["text"]})
     payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
+    start = time.time()
     response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
+    logger.debug(f"RERANKER time: {time.time() - start}")
     if response.status_code != 200:
         raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []
