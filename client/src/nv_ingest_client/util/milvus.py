@@ -1096,7 +1096,7 @@ def nvingest_retrieval(
     nv_ranker_model_name: str = None,
     nv_ranker_nvidia_api_key: str = None,
     nv_ranker_truncate: str = "END",
-    nv_ranker_top_k: int = 5,
+    nv_ranker_top_k: int = 50,
     nv_ranker_max_batch_size: int = 64,
 ):
     """
