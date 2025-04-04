@@ -508,7 +508,9 @@ class TestMetadataQueryFunctions(unittest.TestCase):
         self.assertEqual(result, "model1")
         mock_query.assert_not_called()
 
-        result = get_model_name("https://api.nvcf.nvidia.com/chat/completions/model2/", "default_model")
+        result = get_model_name(
+            "https://api.nvcf.nvidia.com/v2/nvcf/pexec/functions/12345678-1234-5678-1234-567812345678", "model2"
+        )
 
         self.assertEqual(result, "model2")
         mock_query.assert_not_called()
