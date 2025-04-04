@@ -59,7 +59,6 @@ class RayPipeline:
         pid_penalty_factor: float = 0.1,
         pid_error_boost_factor: float = 1.5,
         pid_window_size: int = 10,
-        pid_stage_memory_rate_threshold: float = 2000,
         # --- Resource Constraint Manager Config ---
         rcm_estimated_edge_cost_mb: int = 5000,
         rcm_memory_safety_buffer_fraction: float = 0.15,
