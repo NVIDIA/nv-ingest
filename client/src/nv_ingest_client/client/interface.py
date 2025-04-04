@@ -5,6 +5,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import glob
+import json
 import logging
 import os
 import shutil
@@ -30,8 +31,17 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
+from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
+from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
+from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
+from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.milvus import MilvusOperator
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.processing import check_schema
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -364,7 +374,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        dedup_task = DedupTask(**kwargs)
+        task_options = check_schema(DedupTaskSchema, kwargs, "dedup", json.dumps(kwargs))
+        dedup_task = DedupTask(**task_options.model_dump())
         self._job_specs.add_task(dedup_task)
 
         return self
@@ -384,7 +395,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        embed_task = EmbedTask(**kwargs)
+        task_options = check_schema(EmbedTaskSchema, kwargs, "embed", json.dumps(kwargs))
+        embed_task = EmbedTask(**task_options.model_dump())
         self._job_specs.add_task(embed_task)
 
         return self
@@ -422,13 +434,16 @@ class Ingestor:
             else:
                 document_type = file_type
 
-            extract_task = ExtractTask(
-                document_type,
+            task_options = dict(
+                document_type=document_type,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
                 **kwargs,
             )
+            task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))
+
+            extract_task = ExtractTask(**task_options.model_dump())
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
@@ -448,7 +463,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        filter_task = FilterTask(**kwargs)
+        task_options = check_schema(FilterTaskSchema, kwargs, "filter", json.dumps(kwargs))
+        filter_task = FilterTask(**task_options.model_dump())
         self._job_specs.add_task(filter_task)
 
         return self
@@ -468,7 +484,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        extract_task = SplitTask(**kwargs)
+        task_options = check_schema(SplitTaskSchema, kwargs, "split", json.dumps(kwargs))
+        extract_task = SplitTask(**task_options.model_dump())
         self._job_specs.add_task(extract_task)
 
         return self
@@ -488,7 +505,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        store_task = StoreTask(**kwargs)
+        task_options = check_schema(StoreTaskSchema, kwargs, "store", json.dumps(kwargs))
+        store_task = StoreTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
         return self
@@ -508,7 +526,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        store_task = StoreEmbedTask(**kwargs)
+        task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
+        store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
         return self
@@ -546,7 +565,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        caption_task = CaptionTask(**kwargs)
+        task_options = check_schema(CaptionTaskSchema, kwargs, "caption", json.dumps(kwargs))
+        caption_task = CaptionTask(**task_options.model_dump())
         self._job_specs.add_task(caption_task)
 
         return self
