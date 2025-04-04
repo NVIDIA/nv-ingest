@@ -49,7 +49,7 @@ class PIDController:
         stage_cost_estimates: Dict[str, int],  # Static estimates (MB)
         target_queue_depth: int = 0,
         window_size: int = 10,
-        penalty_factor: float = 0.5,
+        penalty_factor: float = 0.1,
         error_boost_factor: float = 1.5,
     ):
         """
@@ -210,9 +210,7 @@ class PIDController:
                 self.idle_cycles[stage] = 0
 
             # Limit how much penalty can reduce the effective target below zero
-            # Example: If target is 5, penalty shouldn't effectively make it < -2.5
-            max_penalty_contribution = target_queue_depth + max(1, 0.5 * abs(target_queue_depth))
-            penalty = min(self.penalty_factor * self.idle_cycles[stage], max_penalty_contribution)
+            penalty = self.penalty_factor * (self.idle_cycles[stage] ** 2)
 
             # Error calculation (Queue deviation from target, adjusted by idle penalty)
             error = (queue_depth - target_queue_depth) - penalty
