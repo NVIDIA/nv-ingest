@@ -10,6 +10,7 @@ import numpy as np
 from collections import deque
 from typing import Dict, Any, Deque, List, Tuple
 
+logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Constants ---

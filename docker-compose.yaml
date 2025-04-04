@@ -225,6 +225,7 @@ services:
 
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.3.0
+    shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
@@ -240,6 +241,8 @@ services:
       - "7670:7670"
       # Simple Broker
       - "7671:7671"
+      # Ray Dashboards
+      - "8265:8265"
     cap_add:
       - sys_nice
     environment:

@@ -7,6 +7,7 @@ import logging
 import multiprocessing
 import uuid
 import socket
+from typing import Optional, Literal, Dict, Any, Union
 
 import ray
 import json
@@ -17,7 +18,7 @@ from datetime import datetime
 
 import pandas as pd
 from opentelemetry.trace.span import format_trace_id
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 
@@ -35,10 +36,63 @@ logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
+class BrokerParamsRedis(BaseModel):
+    """Specific parameters for Redis broker_params."""
+
+    db: int = 0
+    use_ssl: bool = False
+
+
+class BaseBrokerClientConfig(BaseModel):
+    """Base configuration common to all broker clients."""
+
+    host: str = Field(..., description="Hostname or IP address of the message broker.")
+    port: int = Field(..., description="Port number of the message broker.")
+    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
+    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
+    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
+
+
+class RedisClientConfig(BaseBrokerClientConfig):
+    """Configuration specific to the Redis client."""
+
+    client_type: Literal["redis"] = Field(..., description="Specifies the client type as Redis.")
+    broker_params: BrokerParamsRedis = Field(
+        default_factory=BrokerParamsRedis, description="Redis-specific parameters like db and ssl."
+    )
+
+
+class SimpleClientConfig(BaseBrokerClientConfig):
+    """Configuration specific to the Simple client."""
+
+    client_type: Literal["simple"] = Field(..., description="Specifies the client type as Simple.")
+    broker_params: Optional[Dict[str, Any]] = Field(
+        default={}, description="Optional parameters for Simple client (currently unused)."
+    )
+
+
+# --- Define Updated Source Configuration ---
+
+
 class MessageBrokerTaskSourceConfig(BaseModel):
-    broker_client: dict
-    task_queue: str
-    poll_interval: float = 0.1
+    """
+    Configuration for the MessageBrokerTaskSourceStage.
+
+    Attributes
+    ----------
+    broker_client : Union[RedisClientConfig, SimpleClientConfig]
+        Configuration parameters for connecting to the message broker.
+        The specific schema is determined by the 'client_type' field.
+    task_queue : str
+        The name of the queue to fetch tasks from.
+    poll_interval : float, optional
+        The polling interval (in seconds) for fetching messages. Defaults to 0.1.
+    """
+
+    # Use the discriminated union for broker_client
+    broker_client: Union[RedisClientConfig, SimpleClientConfig] = Field(..., discriminator="client_type")
+    task_queue: str = Field(..., description="The name of the queue to fetch tasks from.")
+    poll_interval: float = Field(default=0.1, gt=0, description="Polling interval in seconds.")
 
 
 @ray.remote
@@ -46,57 +100,62 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
     Ray actor source stage for a message broker task source.
 
-    This stage fetches messages from a message broker (via Redis or a simple broker),
-    processes them into control messages, and writes them to the output queue.
-    As a source stage, it overrides read_input() to use its own message-fetching logic.
+    Fetches messages from a broker, processes them, and writes to the output queue.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    # Use the updated config type hint
+    def __init__(self, config: MessageBrokerTaskSourceConfig, progress_engine_count: int) -> None:
         super().__init__(config, progress_engine_count)
-        logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config)
-        # Configuration specific to message broker task source.
-        self.broker_client = self.config.broker_client
-        self.client = self._create_client()
-        self.message_count = 0
-        self.output_queue = None
+        self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
+        logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config.dict())  # Log validated config
+
+        # Access validated configuration directly via self.config
         self.poll_interval = self.config.poll_interval
-        self.start_time = None
         self.task_queue = self.config.task_queue
 
+        # Create the client using validated config
+        self.client = self._create_client()
+
+        # Other initializations
+        self.message_count = 0
+        self.output_queue = None  # Presumably set later or via base class
+        self.start_time = None
+
+        # Threading event remains the same
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
         logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
     def _create_client(self):
-        client_type = self.broker_client["client_type"].lower()
-        broker_params = self.broker_client.get("broker_params", {})
-        logger.debug("Creating client of type: %s", client_type)
-        if client_type == "redis":
+        # Access broker config via self.config.broker_client
+        broker_config = self.config.broker_client
+        logger.debug("Creating client of type: %s", broker_config.client_type)
+
+        if broker_config.client_type == "redis":
             client = RedisClient(
-                host=self.broker_client["host"],
-                port=self.broker_client["port"],
-                db=broker_params.get("db", 0),
-                max_retries=self.broker_client["max_retries"],
-                max_backoff=self.broker_client["max_backoff"],
-                connection_timeout=self.broker_client["connection_timeout"],
-                use_ssl=broker_params.get("use_ssl", False),
+                host=broker_config.host,
+                port=broker_config.port,
+                db=broker_config.broker_params.db,  # Use nested model attribute access
+                max_retries=broker_config.max_retries,
+                max_backoff=broker_config.max_backoff,
+                connection_timeout=broker_config.connection_timeout,
+                use_ssl=broker_config.broker_params.use_ssl,  # Use nested model attribute access
             )
-            logger.debug("RedisClient created: %s", client)
+            logger.debug("RedisClient created: %s", client)  # Consider logging non-sensitive parts if needed
             return client
-        elif client_type == "simple":
+        elif broker_config.client_type == "simple":
+            server_host = broker_config.host
+            server_host = "0.0.0.0"
             client = SimpleClient(
-                host=self.broker_client["host"],
-                port=self.broker_client["port"],
-                max_retries=self.broker_client["max_retries"],
-                max_backoff=self.broker_client["max_backoff"],
-                connection_timeout=self.broker_client["connection_timeout"],
+                host=server_host,  # Using configured host
+                port=broker_config.port,
+                max_retries=broker_config.max_retries,
+                max_backoff=broker_config.max_backoff,
+                connection_timeout=broker_config.connection_timeout,
             )
             logger.debug("SimpleClient created: %s", client)
             return client
-        else:
-            logger.error("Unsupported client_type: %s", client_type)
-            raise ValueError(f"Unsupported client_type: {client_type}")
 
     @staticmethod
     def _process_message(job: dict, ts_fetched: datetime) -> any:

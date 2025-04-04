@@ -5,8 +5,8 @@
 import sys
 import json
 import logging
-from typing import Any, Dict, List, Tuple
-from pydantic import BaseModel
+from typing import Any, Dict, List, Tuple, Literal, Optional, Union
+from pydantic import BaseModel, Field
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
@@ -17,29 +17,71 @@ from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 logger = logging.getLogger(__name__)
 
 
+class BrokerParamsRedis(BaseModel):
+    """Specific parameters for Redis broker_params."""
+
+    db: int = 0
+    use_ssl: bool = False
+
+
+class BaseBrokerClientConfig(BaseModel):
+    """Base configuration common to all broker clients."""
+
+    host: str = Field(..., description="Hostname or IP address of the message broker.")
+    port: int = Field(..., description="Port number of the message broker.")
+    max_retries: int = Field(default=5, ge=0, description="Maximum number of connection retries.")
+    max_backoff: float = Field(default=5.0, gt=0, description="Maximum backoff delay in seconds between retries.")
+    connection_timeout: float = Field(default=30.0, gt=0, description="Connection timeout in seconds.")
+
+
+class RedisClientConfig(BaseBrokerClientConfig):
+    """Configuration specific to the Redis client."""
+
+    client_type: Literal["redis"] = Field(..., description="Specifies the client type as Redis.")
+    broker_params: BrokerParamsRedis = Field(
+        default_factory=BrokerParamsRedis, description="Redis-specific parameters like db and ssl."
+    )
+
+
+class SimpleClientConfig(BaseBrokerClientConfig):
+    """Configuration specific to the Simple client."""
+
+    client_type: Literal["simple"] = Field(..., description="Specifies the client type as Simple.")
+    broker_params: Optional[Dict[str, Any]] = Field(
+        default={}, description="Optional parameters for Simple client (currently unused)."
+    )
+
+
+# --- Update the Main Sink Configuration ---
+
+
 class MessageBrokerTaskSinkConfig(BaseModel):
     """
     Configuration for the MessageBrokerTaskSinkStage.
 
     Attributes
     ----------
-    broker_client : dict
+    broker_client : Union[RedisClientConfig, SimpleClientConfig]
         Configuration parameters for connecting to the message broker.
+        The specific schema is determined by the 'client_type' field.
     poll_interval : float, optional
-        The polling interval (in seconds) for processing messages.
+        The polling interval (in seconds) for processing messages. Defaults to 0.1.
     """
 
-    broker_client: dict
-    poll_interval: float = 0.1
+    # Use the discriminated union for broker_client
+    broker_client: Union[RedisClientConfig, SimpleClientConfig] = Field(..., discriminator="client_type")
+    poll_interval: float = Field(default=0.1, gt=0)
 
 
 @ray.remote
 class MessageBrokerTaskSinkStage(RayActorSinkStage):
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: MessageBrokerTaskSinkConfig, progress_engine_count: int) -> None:
         super().__init__(config, progress_engine_count)
-        # Configuration specific to the message broker sink.
-        self.broker_client = self.config.broker_client
+
+        self.config: MessageBrokerTaskSinkConfig  # Add type hint for self.config
+
         self.poll_interval = self.config.poll_interval
+
         # Create the appropriate broker client (e.g., Redis or Simple).
         self.client = self._create_client()
         self.start_time = None
@@ -47,31 +89,29 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
 
     # --- Private Helper Methods ---
     def _create_client(self):
-        client_type = self.broker_client["client_type"].lower()
-        broker_params = self.broker_client.get("broker_params", {})
-        if client_type == "redis":
+        broker_config = self.config.broker_client
+
+        if broker_config.client_type == "redis":
             return RedisClient(
-                host=self.broker_client["host"],
-                port=self.broker_client["port"],
-                db=broker_params.get("db", 0),
-                max_retries=self.broker_client["max_retries"],
-                max_backoff=self.broker_client["max_backoff"],
-                connection_timeout=self.broker_client["connection_timeout"],
-                use_ssl=broker_params.get("use_ssl", False),
+                host=broker_config.host,
+                port=broker_config.port,
+                db=broker_config.broker_params.db,  # Access nested Pydantic model
+                max_retries=broker_config.max_retries,
+                max_backoff=broker_config.max_backoff,
+                connection_timeout=broker_config.connection_timeout,
+                use_ssl=broker_config.broker_params.use_ssl,  # Access nested Pydantic model
             )
-        elif client_type == "simple":
-            server_host = self.broker_client["host"]
-            server_port = self.broker_client["port"]
+        elif broker_config.client_type == "simple":
+            server_host = broker_config.host
             server_host = "0.0.0.0"
             return SimpleClient(
-                host=server_host,
-                port=server_port,
-                max_retries=self.broker_client["max_retries"],
-                max_backoff=self.broker_client["max_backoff"],
-                connection_timeout=self.broker_client["connection_timeout"],
+                host=server_host,  # Using the potentially overridden host
+                port=broker_config.port,
+                max_retries=broker_config.max_retries,
+                max_backoff=broker_config.max_backoff,
+                connection_timeout=broker_config.connection_timeout,
+                # broker_params is available via broker_config.broker_params if needed
             )
-        else:
-            raise ValueError(f"Unsupported client_type: {client_type}")
 
     @staticmethod
     def _extract_data_frame(message: Any) -> Tuple[Any, Any]:

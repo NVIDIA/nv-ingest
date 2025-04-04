@@ -219,6 +219,11 @@ if __name__ == "__main__":
         "embedding_nim_endpoint": "http://localhost:8012/v1",
         "embedding_model": "nvidia/llama-3.2-nv-embedqa-1b-v2",
     }
+    image_extraction_config = {
+        "yolox_endpoints": (yolox_grpc, yolox_http),
+        "yolox_infer_protocol": yolox_protocol,
+        "auth_token": yolox_auth,  # All auth tokens are the same for the moment
+    }
     image_caption_config = {
         "api_key": yolox_auth,
         "endpoint_url": image_caption_endpoint_url,
@@ -272,7 +277,7 @@ if __name__ == "__main__":
     pipeline.add_stage(
         name="image_extractor",
         stage_actor=ImageExtractorStage,
-        config=ImageExtractorSchema(),
+        config=ImageExtractorSchema(**image_extraction_config),
         min_replicas=0,
         max_replicas=8,
     )
@@ -352,7 +357,7 @@ if __name__ == "__main__":
     ###### INTAKE STAGES ########
     pipeline.make_edge("source", "metadata_injection", queue_size=16)
     # pipeline.make_edge("job_counter", "metadata_injection", queue_size=16)
-    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=16)  # to limit memory pressure
+    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=128)  # to limit memory pressure
 
     ###### Document Extractors ########
     pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=16)
