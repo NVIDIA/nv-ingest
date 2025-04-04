@@ -36,6 +36,8 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
 def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any]):
     ray.init(
         ignore_reinit_error=True,
+        dashboard_host="0.0.0.0",
+        dashboard_port=8265,
         _system_config={
             "local_fs_capacity_threshold": 0.9,
             "object_spilling_config": json.dumps(

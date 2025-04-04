@@ -12,6 +12,8 @@ import numpy as np
 from collections import deque
 from typing import Dict, Any, Deque, List, Tuple
 
+import psutil
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -330,14 +332,28 @@ class ResourceConstraintManager:
 
         # Determine available cores based on process affinity
         self.available_cores = None
+
         try:
+            # Get physical and logical core counts
+            physical = psutil.cpu_count(logical=False)
+            logical = psutil.cpu_count(logical=True)
+
+            # Calculate adjusted core estimate
+            estimated_cores = (physical + logical) / 2 if physical and logical else None
+
             # Use sched_getaffinity if available (Linux/POSIX)
-            self.available_cores = len(os.sched_getaffinity(0))
-            if self.available_cores <= 0:
+            affinity_count = len(os.sched_getaffinity(0))
+            if affinity_count <= 0:
                 logger.warning(
                     "[ConstraintMgr] sched_getaffinity(0) returned 0 or negative cores. Disabling core limit."
                 )
                 self.available_cores = None
+            else:
+                if estimated_cores:
+                    self.available_cores = min(affinity_count, estimated_cores)
+                else:
+                    self.available_cores = affinity_count
+
         except AttributeError:
             # Fallback for systems without sched_getaffinity (e.g., Windows, some macOS)
             cpu_count = os.cpu_count()
@@ -358,7 +374,6 @@ class ResourceConstraintManager:
                 f"[ConstraintMgr] Error determining available cores: {e}. Disabling core limit.", exc_info=True
             )
             self.available_cores = None
-
         logger.info(
             f"[ConstraintMgr] Initialized. MaxReplicas={max_replicas}, "
             f"AvailableCoresLimit={'None' if self.available_cores is None else self.available_cores}, "
