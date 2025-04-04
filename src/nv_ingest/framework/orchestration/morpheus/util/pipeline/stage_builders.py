@@ -408,29 +408,38 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "RIVA_NGC_API_KEY",
+        "NVIDIA_BUILD_API_KEY",
+        "",
+    ) or os.environ.get(
+        "NGC_API_KEY",
         "",
     )
     infer_protocol = os.environ.get(
         "AUDIO_INFER_PROTOCOL",
         "http" if http_endpoint else "grpc" if grpc_endpoint else "",
     )
+    function_id = os.environ.get(
+        "AUDIO_FUNCTION_ID",
+        "",
+    )
 
-    logger.info(f"{prefix}_GRPC_TRITON: {grpc_endpoint}")
-    logger.info(f"{prefix}_HTTP_TRITON: {http_endpoint}")
+    logger.info(f"{prefix}_GRPC_ENDPOINT: {grpc_endpoint}")
+    logger.info(f"{prefix}_HTTP_ENDPOINT: {http_endpoint}")
     logger.info(f"{prefix}_INFER_PROTOCOL: {infer_protocol}")
+    logger.info(f"{prefix}_FUNCTION_ID: {function_id}")
 
-    return grpc_endpoint, http_endpoint, auth_token, infer_protocol
+    return grpc_endpoint, http_endpoint, auth_token, infer_protocol, function_id
 
 
 def add_audio_extractor_stage(pipe, morpheus_pipeline_config, ingest_config, default_cpu_count):
-    audio_grpc, audio_http, audio_auth, audio_infer_protocol = get_audio_retrieval_service("audio")
+    audio_grpc, audio_http, audio_auth, audio_infer_protocol, audio_function_id = get_audio_retrieval_service("audio")
     audio_extractor_config = ingest_config.get(
         "audio_extraction_module",
         {
             "audio_extraction_config": {
                 "audio_endpoints": (audio_grpc, audio_http),
                 "audio_infer_protocol": audio_infer_protocol,
+                "function_id": audio_function_id,
                 "auth_token": audio_auth,
                 # All auth tokens are the same for the moment
             }

@@ -405,14 +405,14 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if yolox_model_name.endswith("-v2"):
-            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-            final_score = YOLOX_PAGE_V2_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
-        else:
+        if yolox_model_name.endswith("-v1"):
             num_classes = YOLOX_PAGE_V1_NUM_CLASSES
             final_score = YOLOX_PAGE_V1_FINAL_SCORE
             class_labels = YOLOX_PAGE_V1_CLASS_LABELS
+        else:
+            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+            final_score = YOLOX_PAGE_V2_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
             image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,

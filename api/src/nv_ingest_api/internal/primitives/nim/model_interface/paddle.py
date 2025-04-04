@@ -160,7 +160,7 @@ class PaddleOCRModelInterface(ModelInterface):
                 image_url = f"data:image/png;base64,{b64}"
                 image_obj = {"type": "image_url", "url": image_url}
                 input_list.append(image_obj)
-                _dims = {"new_width": img.shape[0], "new_height": img.shape[1]}
+                _dims = {"new_width": img.shape[1], "new_height": img.shape[0]}
                 dims.append(_dims)
 
             batches = []
@@ -214,7 +214,7 @@ class PaddleOCRModelInterface(ModelInterface):
 
         elif protocol == "http":
             logger.debug("Parsing output from HTTP PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_http_response(response)
+            return self._extract_content_from_paddle_http_response(response, dims)
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
@@ -262,6 +262,7 @@ class PaddleOCRModelInterface(ModelInterface):
     def _extract_content_from_paddle_http_response(
         self,
         json_response: Dict[str, Any],
+        dimensions: List[Dict[str, Any]],
     ) -> List[Tuple[str, str]]:
         """
         Extract content from the JSON response of a PaddleOCR HTTP API request.
@@ -272,6 +273,8 @@ class PaddleOCRModelInterface(ModelInterface):
             The JSON response returned by the PaddleOCR endpoint.
         table_content_format : str or None
             The specified format for table content (e.g., 'simple' or 'pseudo_markdown').
+        dimensions : list of dict, optional
+            A list of dict for each corresponding image, used for bounding box scaling.
 
         Returns
         -------
@@ -296,6 +299,13 @@ class PaddleOCRModelInterface(ModelInterface):
             for td in text_detections:
                 text_predictions.append(td["text_prediction"]["text"])
                 bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
+
+            bounding_boxes, text_predictions = self._postprocess_paddle_response(
+                bounding_boxes,
+                text_predictions,
+                dimensions,
+                img_index=item_idx,
+            )
 
             results.append([bounding_boxes, text_predictions])
 
