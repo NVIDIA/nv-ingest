@@ -53,7 +53,7 @@ class RayPipeline:
         quiet_period_threshold: int = 5,
         # --- PID Controller Config ---
         pid_kp: float = 0.1,
-        pid_ki: float = 0.0075,
+        pid_ki: float = 0.001,
         pid_kd: float = 0.0,
         pid_target_queue_depth: int = 0,
         pid_penalty_factor: float = 0.1,
