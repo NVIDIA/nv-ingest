@@ -743,41 +743,86 @@ class RayPipeline:
             global_in_flight += self.stage_stats[stage_name].get("in_flight", 0)
         return global_in_flight
 
-    def _update_stage_stats(self) -> None:
-        """Fetches stats from actors and updates self.stage_stats. (FIXED QSIZE CALL)"""
+    def _update_stage_stats(self) -> bool:
+        """
+        Fetches stats from actors and updates self.stage_stats.
+        Returns True if stats were fetched without timeouts or critical errors, False otherwise.
+        """
+        stats_fully_updated = True  # Assume success initially
         stage_stats_updates: Dict[str, Dict[str, int]] = {}
         stat_futures = {}
+        actors_to_query = {}  # Store {actor_handle: stage_name} for logging
+
         # Launch get_stats calls in parallel
-        for stage_name, actors in self.stage_actors.items():
+        for stage_name, actors in list(self.stage_actors.items()):  # Iterate over copy in case actors are removed
             stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0}  # Initialize
+            valid_actors_in_stage = []  # Keep track of actors we successfully query
             for actor in actors:
                 if hasattr(actor, "get_stats"):
-                    stat_futures[actor] = actor.get_stats.remote()
+                    try:
+                        # Quick check if actor is likely alive (optional, can be removed if causing issues)
+                        # ray.get_actor(actor._actor_id.hex()) # This might raise if actor terminated
+                        stat_futures[actor] = actor.get_stats.remote()
+                        actors_to_query[actor] = stage_name  # Store for potential error logging
+                        valid_actors_in_stage.append(actor)
+                    except Exception as actor_check_e:
+                        logger.warning(
+                            f"Actor {actor} for stage {stage_name} seems unavailable before get_stats:"
+                            f" {actor_check_e}. Skipping stats for this actor."
+                        )
+                        # Consider this a failure for flush safety? Arguably yes.
+                        stats_fully_updated = False
+                        # NOTE: Actor might need removal from self.stage_actors in a separate cleanup step
+                else:
+                    valid_actors_in_stage.append(actor)  # Actor exists but has no get_stats
+
+            # Update the list for this stage if any actors were deemed unavailable
+            # This check ensures we don't query dead actors repeatedly in subsequent calls.
+            # Be cautious if actors might recover or if this check is too aggressive.
+            # if len(valid_actors_in_stage) != len(actors):
+            #    logger.debug(f"Updating active actor list for stage '{stage_name}' due to unavailable actors.")
+            #    self.stage_actors[stage_name] = valid_actors_in_stage
 
         # Collect actor stats results
         actor_stats_results = {}
         future_to_actor = {v: k for k, v in stat_futures.items()}
-        ready, not_ready = ray.wait(list(stat_futures.values()), num_returns=len(stat_futures), timeout=2.0)
+        stats_timeout_seconds = 10.0
+        ready, not_ready = ray.wait(
+            list(stat_futures.values()), num_returns=len(stat_futures), timeout=stats_timeout_seconds
+        )
 
+        # Process successful results
         for future in ready:
             actor = future_to_actor[future]
+            stage_name = actors_to_query.get(actor, "Unknown Stage")
             try:
-                actor_stats_results[actor] = ray.get(future)
+                stats = ray.get(future)
+                actor_stats_results[actor] = stats if isinstance(stats, dict) else {"active_processing": 0}
             except Exception as e:
-                logger.error(f"Error fetching stats result for actor {actor}: {e}")
+                logger.error(f"Error getting ready stats result for actor {actor} (Stage: {stage_name}): {e}")
                 actor_stats_results[actor] = {"active_processing": 0}  # Default on error
+                # Treat failure to get a 'ready' result as a critical error impacting quiet check
+                stats_fully_updated = False
+
+        # Handle timeouts
         if not_ready:
-            logger.warning(f"Timeout fetching stats for {len(not_ready)} actors.")
+            logger.warning(f"Timeout ({stats_timeout_seconds}s) fetching stats for {len(not_ready)} actors.")
+            stats_fully_updated = False  # <<< SIGNAL TIMEOUT/FAILURE OCCURRED
             for future in not_ready:
                 actor = future_to_actor[future]
+                stage_name = actors_to_query.get(actor, "Unknown Stage")
+                logger.debug(f"Timeout details: Actor {actor} (Stage: {stage_name}) did not respond.")
                 actor_stats_results[actor] = {"active_processing": 0}  # Default on timeout
 
         # Aggregate stats per stage AND get queue sizes directly
+        queue_fetch_errors = False
         for stage in self.stages:
             stage_name = stage.name
+            # Use the potentially updated list of actors we know are still valid
             current_replicas = self.stage_actors.get(stage_name, [])
             processing_count = 0
             for actor in current_replicas:
+                # Use results if actor was queried, otherwise assume 0 processing if it had no get_stats
                 stats = actor_stats_results.get(actor, {"active_processing": 0})
                 processing_count += int(stats.get("active_processing", 0))
 
@@ -787,10 +832,12 @@ class RayPipeline:
                 try:
                     # Access queue size safely and directly
                     queue_actor, _ = self.edge_queues[ename]
-                    total_queued += queue_actor.qsize()
+                    q_size = queue_actor.qsize()
+                    total_queued += q_size
                 except Exception as q_e:
                     # Log error but continue, maybe queue is terminating
                     logger.error(f"Error getting qsize for {ename}: {q_e}")
+                    queue_fetch_errors = True  # Signal issue occurred
 
             # Recalculate in_flight based on actual processing and directly measured queue size
             stage_in_flight = processing_count + total_queued
@@ -800,16 +847,50 @@ class RayPipeline:
         # Update the main stats dictionary
         self.stage_stats = stage_stats_updates
 
+        # Final check: also consider queue errors as reason to not declare 'quiet'
+        if queue_fetch_errors:
+            stats_fully_updated = False
+
+        if not stats_fully_updated:
+            logger.warning("_update_stage_stats returning False due to actor/queue stat retrieval issues.")
+
+        return stats_fully_updated
+
     def _is_pipeline_quiet(self) -> bool:
         if self._is_flushing:
-            return False
+            return False  # Already flushing
+
         time_since_last_flush = time.time() - self._last_queue_flush_time
         if time_since_last_flush < self.queue_flush_interval_seconds:
-            return False
+            logger.debug(
+                f"Skipping quiet check: Too soon since last flush ({time_since_last_flush:.1f}s"
+                f" < {self.queue_flush_interval_seconds}s)"
+            )
+            return False  # Too soon
 
-        self._update_stage_stats()  # Ensure fresh stats
+        logger.debug("Calling _update_stage_stats for quiet check...")
+        stats_updated_successfully = self._update_stage_stats()
+
+        if not stats_updated_successfully:
+            logger.warning("Pipeline NOT considered quiet because stats update timed out or failed.")
+            return False  # Treat timeout/error as "not quiet"
+
+        # If stats were updated successfully, proceed with the check
         current_global_in_flight = self._get_global_in_flight()
-        return current_global_in_flight <= self.quiet_period_threshold
+        is_quiet = current_global_in_flight <= self.quiet_period_threshold
+
+        if is_quiet:
+            logger.info(
+                f"Pipeline IS considered quiet. Global In-Flight: {current_global_in_flight}"
+                f" <= Threshold: {self.quiet_period_threshold}"
+            )
+        else:
+            logger.debug(
+                f"Pipeline NOT quiet. Global In-Flight: {current_global_in_flight}"
+                f" > Threshold: {self.quiet_period_threshold}"
+            )
+
+        return is_quiet
 
     def _wait_for_pipeline_drain(self, timeout_seconds: int) -> bool:
         start_time = time.time()
@@ -991,7 +1072,7 @@ class RayPipeline:
             return current_global_memory_mb
         except Exception as e:
             logger.error(
-                f"[ScalingMemCheck] Failed to get current system memory: {e}. Using previous value.", exc_info=False
+                f"[ScalingMemCheck] Failed to get current system memory: {e}." f" Using previous value.", exc_info=False
             )
             # Use previous value if available, otherwise default to 0 (less ideal)
             return self.prev_global_memory_usage or 0
@@ -1113,31 +1194,44 @@ class RayPipeline:
             logger.debug("Skipping scaling cycle: Queue flush in progress.")
             return
 
-        # Step 0: If the pipeline is quiet, and we've exceeded the interval, flush the queues
+        # Step 0: Check if pipeline is quiet (this now includes the stats update & timeout check)
+        # If it is quiet AND stats were fetched ok, flush and exit cycle.
         if self._is_pipeline_quiet():
-            self._execute_queue_flush()
-            return
+            logger.info("Pipeline detected as quiet, initiating queue flush.")
+            self._execute_queue_flush()  # Assumes _is_pipeline_quiet was True
+            return  # Skip scaling for this cycle after flush attempt
 
-        # Step 1: Update stage statistics (processing, in_flight)
+        # --- If not quiet OR if stats failed, proceed with scaling ---
+        logger.debug("Pipeline not quiet or stats failed; proceeding with scaling logic.")
+
+        # Step 1: Ensure stage statistics are up-to-date for scaling calculations.
+        # We might have already called this inside _is_pipeline_quiet, but call again
+        # to ensure freshness right before scaling calculations, especially if the
+        # quiet check returned False due to activity (not timeout).
+        # The return value isn't strictly needed here for scaling decisions.
         try:
-            self._update_stage_stats()
-            logger.debug("Stage statistics updated.")
+            stats_update_success = self._update_stage_stats()  # Call reflects new signature
+            if not stats_update_success:
+                logger.warning(
+                    "Continuing scaling cycle despite stats update issues (timeouts/errors)."
+                    " Scaling decisions might be based on stale/incomplete data."
+                )
+            logger.debug("Stage statistics updated/attempted for scaling.")
         except Exception as e:
-            logger.error(f"Failed to update stage stats, skipping scaling cycle: {e}", exc_info=True)
-            return  # Cannot proceed without fresh stats
+            # This catch block might be redundant if _update_stage_stats handles its own errors
+            logger.error(f"Failed to update stage stats for scaling, skipping cycle: {e}", exc_info=True)
+            return  # Cannot proceed without attempting stats update
 
-        # Step 2: Gather metrics needed for controllers
+        # Step 2: Gather metrics needed for controllers (uses self.stage_stats)
         current_stage_metrics = self._gather_controller_metrics()
 
         # Step 3: Get current global memory usage
         current_global_memory_mb = self._get_current_global_memory()
 
         # Step 4: Calculate final scaling adjustments using controllers
-        # Pass the metrics, current memory, and the *previous* cycle's memory
         final_adjustments = self._calculate_scaling_adjustments(current_stage_metrics, current_global_memory_mb)
 
-        # Step 5: IMPORTANT - Update previous memory *after* controllers have used it
-        # Store the value we just measured for the *next* cycle's RCM calculation
+        # Step 5: Update previous memory *after* controllers have used it
         self.prev_global_memory_usage = current_global_memory_mb
 
         # Step 6: Apply the calculated scaling actions concurrently
@@ -1146,47 +1240,61 @@ class RayPipeline:
         logger.debug("--- Scaling & Maintenance Cycle Complete ---")
 
     # --- Monitoring Thread ---
+
     def _get_monitor_data(self) -> List[Tuple]:
         """Helper function to fetch and format data for display."""
-        # Update stats (might be redundant if scaling loop also calls it, but ensures freshness for display)
-        # Consider potential race conditions if scaling modifies actors while stats are fetched.
-        # Locking might be needed in a complex scenario, but keep it simple for now.
+        # Update stats - the return value isn't strictly used for display,
+        # but we call the modified function. Display will show latest available stats,
+        # even if there were timeouts fetching some.
         try:
-            self._update_stage_stats()
+            stats_updated_successfully = self._update_stage_stats()  # Call reflects new signature
+            if not stats_updated_successfully:
+                logger.debug("Monitor data based on potentially incomplete stats update.")
         except Exception as e:
             logger.error(f"Error updating stats in _get_monitor_data: {e}", exc_info=True)
             # Return empty data or last known good? Empty seems safer.
-            return []
+            return [("Error updating stats", "", "", "", "", "")]  # Indicate error in display
 
         output_rows = []
+        # ... rest of the function remains the same ...
+
+        # Example of accessing potentially incomplete stats:
         for stage in self.stages:
             stage_name = stage.name
             replicas = self.stage_actors.get(stage_name, [])
+            # Use the stats fetched by _update_stage_stats, even if incomplete
             stats = self.stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
 
+            # ... formatting logic using stats ...
             replicas_str = f"{len(replicas)}/{stage.max_replicas}"
             if stage.min_replicas > 0:
                 replicas_str += f" (min {stage.min_replicas})"
 
             input_edges = [ename for ename in self.edge_queues if ename.endswith(f"_to_{stage_name}")]
             occupancy_parts = []
+            stage_queue_depth = 0  # Calculate from updated stats
+
             if input_edges:
+                # Use the in_flight - processing from stats as the queue depth here
+                stage_queue_depth = max(0, stats.get("in_flight", 0) - stats.get("processing", 0))
                 for ename in input_edges:
                     try:
                         q, max_q = self.edge_queues[ename]
-                        # qsize might require remote call, assume _update_stage_stats handled errors
-                        # We use the in_flight - processing from stats as the queue depth here
-                        q_depth = stats.get("in_flight", 0) - stats.get("processing", 0)
-                        occupancy_parts.append(f"{q_depth}/{max_q}")
+                        # Display the calculated aggregate depth for the stage's inputs
+                        occupancy_parts.append(
+                            f"{stage_queue_depth}/{max_q}"
+                        )  # Show aggregate depth vs max size of one queue (approximation)
                     except Exception:
                         occupancy_parts.append("ERR/ERR")
-                occupancy_str = ", ".join(occupancy_parts) if occupancy_parts else "N/A"
+                # Avoid duplicating queue depth display if multiple input queues
+                occupancy_str = ", ".join(list(set(occupancy_parts))) if occupancy_parts else "N/A"
+
             else:
                 occupancy_str = "(Source)" if stage.is_source else "N/A"
 
             scaling_state = self.scaling_state.get(stage_name, "Unknown")
             processing_count = stats.get("processing", 0)
-            stage_in_flight = stats.get("in_flight", 0)
+            stage_in_flight = stats.get("in_flight", 0)  # Total including processing + queues
 
             output_rows.append(
                 (stage_name, replicas_str, occupancy_str, scaling_state, str(processing_count), str(stage_in_flight))
