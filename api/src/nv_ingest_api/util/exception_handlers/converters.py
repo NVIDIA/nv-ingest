@@ -66,7 +66,7 @@ def datetools_exception_handler(func: Callable, **kwargs: Dict[str, Any]) -> Cal
             return func(*args, **kwargs)
         except Exception as e:
             log_error_message = f"Invalid date format: {e}"
-            logger.warning(log_error_message)
+            logger.debug(log_error_message)
             return datetools.remove_tz(datetime.now(timezone.utc)).isoformat()
 
     return inner_function

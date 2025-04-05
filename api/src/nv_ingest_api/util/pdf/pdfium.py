@@ -122,7 +122,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 @traceable_func(trace_name="pdf_content_extractor::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
-    render_dpi: int = 300,
+    render_dpi: int = 72,
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
