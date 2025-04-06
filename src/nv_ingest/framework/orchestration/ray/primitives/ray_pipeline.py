@@ -50,7 +50,7 @@ class RayPipeline:
         dynamic_memory_threshold: float = 0.75,
         queue_flush_interval_seconds: int = 600,
         queue_flush_drain_timeout_seconds: int = 300,
-        quiet_period_threshold: int = 5,
+        quiet_period_threshold: int = 0,
         pid_kp: float = 0.1,
         pid_ki: float = 0.001,
         pid_kd: float = 0.0,
@@ -61,7 +61,7 @@ class RayPipeline:
         rcm_estimated_edge_cost_mb: int = 5000,
         rcm_memory_safety_buffer_fraction: float = 0.15,
         # --- Stats Collector Config ---
-        stats_collection_interval_seconds: float = 5.0,
+        stats_collection_interval_seconds: float = 10.0,
         stats_actor_timeout_seconds: float = 5.0,
         stats_queue_timeout_seconds: float = 2.0,
     ) -> None:
@@ -1400,7 +1400,7 @@ class RayPipeline:
         last_update_age = time.time() - last_update_time
 
         # --- Validate Stats for Scaling ---
-        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds * 3.0)
+        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds * 2)
 
         if not current_stage_stats:
             logger.error("[Scaling] Cannot scale: No statistics available from collector. Skipping cycle.")
@@ -1674,14 +1674,12 @@ class RayPipeline:
         """Main loop for the scaling thread."""
         logger.info(f"Scaling loop started. Interval: {interval}s")
         while self._scaling_monitoring:
-            start_time = time.time()
             try:
                 self._perform_scaling_and_maintenance()
             except Exception as e:
                 logger.error(f"Error in scaling loop: {e}", exc_info=True)
 
-            elapsed = time.time() - start_time
-            sleep_time = max(0.1, interval - elapsed)
+            sleep_time = interval
             if not self._scaling_monitoring:
                 break
             time.sleep(sleep_time)
@@ -1706,7 +1704,7 @@ class RayPipeline:
             logger.info("Scaling/Maintenance stopped.")
 
     # --- Pipeline Start/Stop ---
-    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 10.0) -> None:
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
         """
         Start the pipeline: start actors, monitoring, and scaling.
         """

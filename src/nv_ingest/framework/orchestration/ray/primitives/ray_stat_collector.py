@@ -23,7 +23,7 @@ class RayStatsCollector:
     def __init__(
         self,
         pipeline_accessor: Any,  # Object providing access to pipeline structure
-        interval: float = 5.0,
+        interval: float = 30.0,
         actor_timeout: float = 5.0,
         queue_timeout: float = 2.0,
     ):
