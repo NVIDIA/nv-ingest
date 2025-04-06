@@ -20,9 +20,8 @@ class RayActorStage(ABC):
     """
     Abstract base class for a Ray actor stage in a pipeline.
 
-    Utilizes a background thread for processing and ensures actor exit
-    is called safely from the main Ray thread context upon completion,
-    using the runtime context to get the actor handle.
+    Utilizes a background thread for processing, calculates processing rate,
+    and ensures actor exit is called safely from the main Ray thread context.
     """
 
     def __init__(self, config: BaseModel, progress_engine_count: int = 1) -> None:
@@ -36,27 +35,22 @@ class RayActorStage(ABC):
         progress_engine_count : int, optional
             Number of progress engine threads to run, by default 1
         """
-        # Actor name is no longer needed here
         self.config: BaseModel = config
         self.progress_engine_count: int = progress_engine_count
         self.input_queue: Optional[Any] = None
         self.output_queue: Optional[Any] = None
         self.running: bool = False
         self.active_processing: bool = False
+        # Core stats
         self.stats: Dict[str, int] = {"processed": 0}
         self.start_time: Optional[float] = None
+        # Rate calculation state
+        self._last_processed_count: int = 0
+        self._last_stats_time: Optional[float] = None
+        # Threading and shutdown state
         self._processing_thread: Optional[threading.Thread] = None
-        self._shutting_down: bool = False  # Flag to prevent multiple exit calls
-        self._lock = threading.Lock()  # Lock for thread-safe access to _shutting_down
-        # Store actor ID upon init for clearer logging, obtained from runtime context
-        try:
-            # Get context once during init if possible (might not be fully set yet)
-            # It's safer to get it dynamically in logs/methods when needed.
-            # self._actor_id_str = f"Actor {get_runtime_context().get_actor_id()}"
-            pass  # Decide if storing ID is useful or just get dynamically
-        except Exception:
-            # self._actor_id_str = "Actor (ID unavailable at init)"
-            pass
+        self._shutting_down: bool = False
+        self._lock = threading.Lock()
 
     def _get_actor_id_str(self) -> str:
         """Helper to safely get actor ID string for logging."""
@@ -113,6 +107,7 @@ class RayActorStage(ABC):
                             self.output_queue.put(updated_cm)
                         else:
                             logger.warning(f"{actor_id_str}: Suppressed output write after stop signal.")
+                    # Use atomic increment or ensure thread safety if stats are accessed elsewhere
                     self.stats["processed"] += 1
                 except Exception as e:
                     cm_info = f" (message type: {type(control_message).__name__})" if control_message else ""
@@ -128,19 +123,13 @@ class RayActorStage(ABC):
             logger.debug(f"{actor_id_str}: Processing loop finished.")
             # --- Trigger exit from the main thread using runtime context ---
             try:
-                # Get a handle to this actor using the runtime context
                 logger.debug(f"{actor_id_str}: Requesting actor exit via runtime context handle.")
-                # This works even when called from the background thread
                 self_handle = get_runtime_context().current_actor
                 if self_handle:
-                    # Schedule the _request_actor_exit method to run on the main thread
                     self_handle._request_actor_exit.remote()
                 else:
-                    # This case should be rare within an actor context
                     logger.error(f"{actor_id_str}: Could not get current_actor handle from runtime context.")
-
             except Exception as e:
-                # Catch potential errors getting context or scheduling the call
                 logger.exception(f"{actor_id_str}: Error requesting actor exit via runtime context: {e}")
 
     @ray.method(num_returns=1)
@@ -151,8 +140,7 @@ class RayActorStage(ABC):
         actor_id_str = self._get_actor_id_str()
         with self._lock:
             if self._shutting_down:
-                # logger.warning(f"{actor_id_str}: Exit already requested, ignoring duplicate call.")
-                return  # Reduce noise, just return if already shutting down
+                return
             self._shutting_down = True
 
         logger.info(f"{actor_id_str}: Exit requested by internal call. Shutting down actor.")
@@ -165,6 +153,7 @@ class RayActorStage(ABC):
     def start(self) -> bool:
         """
         Start the processing loop in a separate daemon thread.
+        Initializes rate calculation state.
         """
         actor_id_str = self._get_actor_id_str()
         if self.running:
@@ -174,6 +163,11 @@ class RayActorStage(ABC):
         self.running = True
         self._shutting_down = False  # Reset flag
         self.start_time = time.time()
+        # Initialize rate calculation state for the first interval
+        self._last_stats_time = self.start_time
+        self._last_processed_count = 0  # Reset processed count reference
+        self.stats["processed"] = 0  # Reset total processed count
+
         self._processing_thread = threading.Thread(target=self._processing_loop, daemon=True)
         self._processing_thread.start()
         logger.info(f"{actor_id_str}: Started.")
@@ -195,13 +189,54 @@ class RayActorStage(ABC):
         logger.info(f"{actor_id_str}: Stop signal sent to processing loop.")
         return True
 
-    # --- Other methods (get_stats, set_input_queue, set_output_queue) ---
+    # --- get_stats ---
 
     @ray.method(num_returns=1)
     def get_stats(self) -> Dict[str, Any]:
-        """Retrieve processing statistics."""
+        """
+        Retrieve processing statistics including the current processing rate.
+
+        Calculates the processing rate based on the change in processed items
+        and time since the last call to get_stats.
+
+        Returns
+        -------
+        dict
+            A dictionary containing:
+              - 'processed': Total items processed since start.
+              - 'elapsed': Total time elapsed since start.
+              - 'active_processing': Boolean indicating if processing an item.
+              - 'processing_rate_cps': Calculated items processed per second
+                                       over the last interval.
+        """
+        current_time = time.time()
+        # Make a local copy in case the background thread modifies it during calculation
+        current_processed = self.stats["processed"]
+        processing_rate_cps = 0.0  # Default rate is 0
+
+        # Ensure start has been called and we have a previous time point
+        if self._last_stats_time is not None and self.start_time is not None:
+            delta_time = current_time - self._last_stats_time
+            # Use the count captured at the start of this method
+            delta_processed = current_processed - self._last_processed_count
+
+            # Avoid division by zero or nonsensical rates for very short intervals
+            if delta_time > 0.001:  # Use a small epsilon
+                processing_rate_cps = max(0.0, delta_processed / delta_time)  # Rate cannot be negative
+            # else: rate remains 0.0 if interval is too short or time hasn't passed
+
+        # Always update the state for the *next* call AFTER calculating the current rate
+        self._last_stats_time = current_time
+        self._last_processed_count = current_processed
+
         elapsed: float = time.time() - self.start_time if self.start_time else 0
-        return {"processed": self.stats["processed"], "elapsed": elapsed, "active_processing": self.active_processing}
+
+        return {
+            "processed": current_processed,
+            "elapsed": elapsed,
+            "active_processing": self.active_processing,
+            "processing_rate_cps": processing_rate_cps,  # Add the calculated rate
+        }
 
     @ray.method(num_returns=1)
     def set_input_queue(self, queue_handle: Any) -> bool:

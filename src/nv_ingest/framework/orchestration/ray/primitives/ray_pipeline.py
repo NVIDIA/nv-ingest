@@ -6,6 +6,7 @@ import threading
 import psutil
 import uuid
 import ray
+from ray.exceptions import GetTimeoutError
 from ray.util.queue import Queue
 from typing import Dict, Optional, List, Tuple, Any
 from pydantic import BaseModel
@@ -13,6 +14,7 @@ import concurrent.futures
 import logging
 import time
 
+from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.system_tools.memory import estimate_actor_memory_overhead
 from nv_ingest.framework.orchestration.ray.util.system_tools.visualizers import (
@@ -23,7 +25,6 @@ from nv_ingest.framework.orchestration.ray.util.system_tools.visualizers import 
 logger = logging.getLogger(__name__)
 
 
-# Placeholder for StageInfo if not defined
 class StageInfo:
     def __init__(self, name, callable, config, is_source=False, is_sink=False, min_replicas=0, max_replicas=1):
         self.name = name
@@ -39,19 +40,17 @@ class RayPipeline:
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
     Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
+    Delegates statistics collection to RayStatsCollector.
     """
 
     def __init__(
         self,
-        # --- ADD GUI FLAG ---
         gui: bool = False,
-        # --- General Pipeline Config ---
         dynamic_memory_scaling: bool = False,
         dynamic_memory_threshold: float = 0.75,
         queue_flush_interval_seconds: int = 600,
         queue_flush_drain_timeout_seconds: int = 300,
         quiet_period_threshold: int = 5,
-        # --- PID Controller Config ---
         pid_kp: float = 0.1,
         pid_ki: float = 0.001,
         pid_kd: float = 0.0,
@@ -59,32 +58,27 @@ class RayPipeline:
         pid_penalty_factor: float = 0.1,
         pid_error_boost_factor: float = 1.5,
         pid_window_size: int = 10,
-        # --- Resource Constraint Manager Config ---
         rcm_estimated_edge_cost_mb: int = 5000,
         rcm_memory_safety_buffer_fraction: float = 0.15,
+        # --- Stats Collector Config ---
+        stats_collection_interval_seconds: float = 5.0,
+        stats_actor_timeout_seconds: float = 5.0,
+        stats_queue_timeout_seconds: float = 2.0,
     ) -> None:
-        """
-        Initializes the RayPipeline instance.
-
-        Parameters
-        ----------
-        gui : bool, optional
-            If True, attempts to launch a Tkinter GUI window for monitoring instead
-            of using the console, by default False. Requires a display environment.
-        # ... other parameters remain the same ...
-        """
-        self.use_gui = gui  # Store the flag
+        self.use_gui = gui
 
         # --- Core Pipeline Structure ---
         self.stages: List[StageInfo] = []
         self.connections: Dict[str, List[Tuple[str, int]]] = {}
-        self.stage_actors: Dict[str, List[Any]] = {}
-        self.edge_queues: Dict[str, Tuple[Queue, int]] = {}
-        self.queue_stats: Dict[str, List[Dict[str, float]]] = {}
+        self.stage_actors: Dict[str, List[Any]] = {}  # Map: stage_name -> List[ActorHandle]
+        self.edge_queues: Dict[str, Tuple[Any, int]] = {}  # Map: q_name -> Tuple[QueueHandle, Capacity]
+
+        # --- Structure Lock ---
+        # Protects stages, stage_actors, edge_queues during modification and access
+        self._structure_lock: threading.Lock = threading.Lock()
 
         # --- State ---
         self.scaling_state: Dict[str, str] = {}
-        self.stage_stats: Dict[str, Dict[str, int]] = {}
         self.prev_global_memory_usage: Optional[int] = None
 
         # --- Build Time Config & State ---
@@ -92,12 +86,12 @@ class RayPipeline:
         self.dynamic_memory_threshold = dynamic_memory_threshold
         self.stage_memory_overhead: Dict[str, float] = {}
 
-        # --- Background Threads ---
-        self._monitoring: bool = False
-        self._monitor_thread: Optional[threading.Thread] = None
-        self._scaling_monitoring: bool = False
-        self._scaling_thread: Optional[threading.Thread] = None
-        self._display_instance: Optional[Any] = None  # Holds Rich or GUI display instance
+        # --- Background Threads (Keep monitoring/scaling threads if separate) ---
+        self._queue_monitoring_thread: Optional[threading.Thread] = None  # Example
+        self._scaling_thread: Optional[threading.Thread] = None  # Example
+        self._display_instance: Optional[Any] = None
+        self._monitoring = False
+        self._scaling_monitoring = False
 
         # --- Queue Flushing ---
         self._is_flushing: bool = False
@@ -117,30 +111,52 @@ class RayPipeline:
             penalty_factor=pid_penalty_factor,
             error_boost_factor=pid_error_boost_factor,
         )
-        logger.info(
-            f"PIDController initialized (kp={pid_kp}, ki={pid_ki}, kd={pid_kd}, targetQ={pid_target_queue_depth})"
-        )
+        logger.info("PIDController initialized...")
         try:
             total_system_memory_bytes = psutil.virtual_memory().total
             absolute_memory_threshold_mb = int(
                 self.dynamic_memory_threshold * total_system_memory_bytes / (1024 * 1024)
             )
         except Exception as e:
-            logger.error(f"Failed to get system memory: {e}. Using arbitrary high limit for memory threshold.")
+            logger.error(f"Failed to get system memory: {e}. Using high limit.")
             absolute_memory_threshold_mb = 1_000_000
         self.constraint_manager = ResourceConstraintManager(
             max_replicas=1,
             memory_threshold=absolute_memory_threshold_mb,
             estimated_edge_cost_mb=rcm_estimated_edge_cost_mb,
             memory_safety_buffer_fraction=rcm_memory_safety_buffer_fraction,
-        )
-        logger.info(
-            f"ResourceConstraintManager initialized (MemThreshold={absolute_memory_threshold_mb}MB,"
-            f" Buffer={rcm_memory_safety_buffer_fraction * 100:.1f}%)"
+        )  # Add real controller import/init
+        logger.info("ResourceConstraintManager initialized...")
+
+        # --- Instantiate Stats Collector ---
+        # Store config values needed for staleness checks later
+        self._stats_collection_interval_seconds = stats_collection_interval_seconds
+        self.stats_collector = RayStatsCollector(
+            pipeline_accessor=self,
+            interval=stats_collection_interval_seconds,
+            actor_timeout=stats_actor_timeout_seconds,
+            queue_timeout=stats_queue_timeout_seconds,
         )
 
         logger.info(f"GUI Mode Requested: {self.use_gui}")
-        # Other logging remains the same
+        logger.info("RayPipeline initialized.")
+
+    # --- Accessor Methods for Stats Collector (and internal use) ---
+
+    def get_stages_info(self) -> List[StageInfo]:
+        """Returns a snapshot of the current stage information."""
+        with self._structure_lock:
+            return self.stages[:]  # Return a copy
+
+    def get_stage_actors(self) -> Dict[str, List[Any]]:
+        """Returns a snapshot of the current actors per stage."""
+        with self._structure_lock:
+            return {name: list(actors) for name, actors in self.stage_actors.items()}
+
+    def get_edge_queues(self) -> Dict[str, Tuple[Any, int]]:
+        """Returns a snapshot of the current edge queues."""
+        with self._structure_lock:
+            return self.edge_queues.copy()
 
     def _perform_dynamic_memory_scaling(self) -> None:
         """
@@ -250,15 +266,32 @@ class RayPipeline:
     def _instantiate_initial_actors(self) -> Dict[str, List[Any]]:
         """
         Instantiates the initial set of Ray actors for each stage based on min_replicas.
-        Populates self.stage_actors, self.scaling_state, self.stage_stats.
+        Populates self.stage_actors and self.scaling_state. Stats are handled by
+        the separate RayStatsCollector.
+
+        Requires self._structure_lock if called concurrently with other structure modifications.
 
         Returns:
             Dict[str, List[Any]]: The dictionary of created stage actors.
         """
         logger.info("[Build-Actors] Instantiating initial stage actors (min_replicas)...")
         created_actors: Dict[str, List[Any]] = {}
+        new_scaling_state: Dict[str, str] = {}
 
-        for stage in self.stages:
+        # Assume self.stages is populated correctly before this call
+        current_stages = self.stages[:]  # Work on a copy if needed
+
+        for stage in current_stages:
+            # Check if stage has required attributes (adjust as needed)
+            if not all(
+                hasattr(stage, attr) for attr in ["name", "min_replicas", "is_source", "is_sink", "callable", "config"]
+            ):
+                logger.error(
+                    f"[Build-Actors] Stage '{getattr(stage, 'name', 'Unknown')}' is missing required attributes."
+                    f" Skipping actor creation."
+                )
+                continue  # Or raise an error
+
             replicas = []
             # Determine initial count: min_replicas, but at least 1 for source/sink
             num_initial_actors = stage.min_replicas
@@ -272,17 +305,21 @@ class RayPipeline:
 
             # Create actors
             for i in range(num_initial_actors):
-                # Generate unique actor name
+                # Generate unique actor name (assuming ray allows this naming scheme)
                 actor_name = f"{stage.name}_{uuid.uuid4()}"
                 logger.debug(
                     f"[Build-Actors] Creating actor '{actor_name}' ({i + 1}/{num_initial_actors})"
                     f" for stage '{stage.name}'"
                 )
                 try:
+                    # Make sure stage.callable is actually a Ray remote class/function
+                    if not hasattr(stage.callable, "options") or not hasattr(stage.callable, "remote"):
+                        raise TypeError(f"Stage '{stage.name}' callable is not a Ray remote function/class.")
+
                     # Assume actor takes 'config' and 'progress_engine_count'
-                    # Adjust .options() as needed (e.g., resource requests)
+                    # Pass necessary options like name, concurrency
                     actor = stage.callable.options(name=actor_name, max_concurrency=100).remote(
-                        config=stage.config, progress_engine_count=-1
+                        config=stage.config, progress_engine_count=-1  # Adjust args as per actor's __init__
                     )
                     replicas.append(actor)
                 except Exception as e:
@@ -295,70 +332,87 @@ class RayPipeline:
                         f"Failed to build pipeline: actor creation error for stage '{stage.name}'"
                     ) from e
 
-            # Store actors and initialize state for the stage
+            # Store actors and initialize scaling state for the stage
             created_actors[stage.name] = replicas
-            self.scaling_state[stage.name] = "Idle"
-            self.stage_stats[stage.name] = {"processing": 0, "in_flight": 0}
+            new_scaling_state[stage.name] = "Idle"
+
             logger.debug(f"[Build-Actors] Stage '{stage.name}' initial actors created: count={len(replicas)}")
 
-        self.stage_actors = created_actors  # Update the instance variable
-        return created_actors  # Return for consistency
+        # --- Update instance variables under lock ---
+        with self._structure_lock:
+            self.stage_actors = created_actors
+            self.scaling_state = new_scaling_state
+
+        logger.info("[Build-Actors] Initial actor instantiation complete.")
+        return created_actors
 
     def _create_and_wire_edges(self) -> List[ray.ObjectRef]:
         """
         Creates distributed queues for pipeline edges and wires up actor inputs/outputs.
-        Populates self.edge_queues and self.queue_stats.
+        Populates self.edge_queues. Requires structure lock.
 
         Returns:
             List[ray.ObjectRef]: A list of Ray futures for the wiring calls.
         """
         logger.info("[Build-Wiring] Creating and wiring edges between stages...")
-        wiring_refs = []  # Collect futures for wiring calls
+        wiring_refs = []
+        new_edge_queues: Dict[str, Tuple[Any, int]] = {}  # Build locally first
 
-        for from_stage_name, connections_list in self.connections.items():
-            for to_stage_name, queue_size in connections_list:
-                queue_name = f"{from_stage_name}_to_{to_stage_name}"
-                logger.debug(f"[Build-Wiring] Creating queue '{queue_name}' (size {queue_size}) and wiring actors.")
+        # --- Acquire Lock for Reading structure and Writing edge_queues ---
+        with self._structure_lock:
+            # Read snapshots of structures needed
+            current_connections = self.connections.copy()  # Assuming shallow copy is ok
+            current_stage_actors = {name: list(actors) for name, actors in self.stage_actors.items()}
 
-                try:
-                    # Create the distributed queue
-                    edge_queue = Queue(maxsize=queue_size)
-                    self.edge_queues[queue_name] = (edge_queue, queue_size)
-                    self.queue_stats[queue_name] = []  # Initialize stats tracking
-
-                    # Wire output from source stage actors to this queue
-                    source_actors = self.stage_actors.get(from_stage_name, [])
-                    for actor in source_actors:
-                        if hasattr(actor, "set_output_queue"):
-                            # Call the remote method, store the future
-                            wiring_refs.append(actor.set_output_queue.remote(edge_queue))
-                        else:
-                            logger.warning(
-                                f"[Build-Wiring] Actor in stage '{from_stage_name}' missing set_output_queue method."
-                            )
-
-                    # Wire input to destination stage actors from this queue
-                    dest_actors = self.stage_actors.get(to_stage_name, [])
-                    for actor in dest_actors:
-                        if hasattr(actor, "set_input_queue"):
-                            # Call the remote method, store the future
-                            wiring_refs.append(actor.set_input_queue.remote(edge_queue))
-                        else:
-                            logger.warning(
-                                f"[Build-Wiring] Actor in stage '{to_stage_name}' missing set_input_queue method."
-                            )
-
-                except Exception as e:
-                    logger.error(
-                        f"[Build-Wiring] Failed to create or wire queue '{queue_name}':" f" {e}", exc_info=True
+            for from_stage_name, connections_list in current_connections.items():
+                for to_stage_name, queue_size in connections_list:
+                    queue_name = f"{from_stage_name}_to_{to_stage_name}"
+                    logger.debug(
+                        f"[Build-Wiring] Creating queue '{queue_name}' (size {queue_size}) and preparing wiring."
                     )
-                    # Propagate error to halt the build
-                    raise RuntimeError(f"Failed to build pipeline: queue wiring error for '{queue_name}'") from e
+
+                    try:
+                        # Create the distributed queue
+                        edge_queue = Queue(maxsize=queue_size)
+                        new_edge_queues[queue_name] = (edge_queue, queue_size)
+
+                        # Prepare wiring refs using the snapshots
+                        source_actors = current_stage_actors.get(from_stage_name, [])
+                        for actor in source_actors:
+                            if hasattr(actor, "set_output_queue") and hasattr(actor.set_output_queue, "remote"):
+                                wiring_refs.append(actor.set_output_queue.remote(edge_queue))
+                            else:
+                                logger.warning(
+                                    f"[Build-Wiring] Actor in stage '{from_stage_name}'"
+                                    f" missing remote set_output_queue method."
+                                )
+
+                        dest_actors = current_stage_actors.get(to_stage_name, [])
+                        for actor in dest_actors:
+                            if hasattr(actor, "set_input_queue") and hasattr(actor.set_input_queue, "remote"):
+                                wiring_refs.append(actor.set_input_queue.remote(edge_queue))
+                            else:
+                                logger.warning(
+                                    f"[Build-Wiring] Actor in stage '{to_stage_name}'"
+                                    f" missing remote set_input_queue method."
+                                )
+
+                    except Exception as e:
+                        logger.error(
+                            f"[Build-Wiring] Failed to create or wire queue '{queue_name}': {e}", exc_info=True
+                        )
+                        raise RuntimeError(f"Failed to build pipeline: queue wiring error for '{queue_name}'") from e
+
+            # --- Commit the new queues to the instance variable ---
+            self.edge_queues = new_edge_queues
+        # --- RELEASE LOCK ---
 
         logger.debug(f"[Build-Wiring] Submitted {len(wiring_refs)} wiring calls.")
+        # Note: We return the refs, caller should wait on them if build needs to be synchronous.
         return wiring_refs
 
-    def _wait_for_wiring(self, wiring_refs: List[ray.ObjectRef]) -> None:
+    @staticmethod
+    def _wait_for_wiring(wiring_refs: List[ray.ObjectRef]) -> None:
         """
         Waits for the remote wiring calls (set_input/output_queue) to complete.
         """
@@ -470,10 +524,7 @@ class RayPipeline:
 
         except RuntimeError as e:
             # Catch errors raised explicitly by helper methods
-            logger.critical(f"Pipeline build failed: {e}", exc_info=False)  # Log critical, don't need full
-            # trace again
-            # Optionally clean up partially created resources? Difficult with Ray actors.
-            # Return empty dict or re-raise? Returning empty might be safer downstream.
+            logger.critical(f"Pipeline build failed: {e}", exc_info=False)
             return {}
         except Exception as e:
             # Catch unexpected errors
@@ -681,7 +732,6 @@ class RayPipeline:
         # Set state to Idle optimistically, assuming stop/kill initiated successfully
         self.scaling_state[stage_name] = "Idle"
 
-    # --- Refactored _scale_stage Method ---
     def _scale_stage(self, stage_name: str, new_replica_count: int) -> None:
         """
         Orchestrates scaling a stage up or down to the target replica count.
@@ -737,271 +787,355 @@ class RayPipeline:
             )
             self.scaling_state[stage_name] = "Error"
 
-    def _get_global_in_flight(self) -> int:
-        global_in_flight = 0
-        for stage_name in self.stage_stats:
-            global_in_flight += self.stage_stats[stage_name].get("in_flight", 0)
-        return global_in_flight
-
-    def _update_stage_stats(self) -> bool:
-        """
-        Fetches stats from actors and updates self.stage_stats.
-        Returns True if stats were fetched without timeouts or critical errors, False otherwise.
-        """
-        stats_fully_updated = True  # Assume success initially
-        stage_stats_updates: Dict[str, Dict[str, int]] = {}
-        stat_futures = {}
-        actors_to_query = {}  # Store {actor_handle: stage_name} for logging
-
-        # Launch get_stats calls in parallel
-        for stage_name, actors in list(self.stage_actors.items()):  # Iterate over copy in case actors are removed
-            stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0}  # Initialize
-            valid_actors_in_stage = []  # Keep track of actors we successfully query
-            for actor in actors:
-                if hasattr(actor, "get_stats"):
-                    try:
-                        # Quick check if actor is likely alive (optional, can be removed if causing issues)
-                        # ray.get_actor(actor._actor_id.hex()) # This might raise if actor terminated
-                        stat_futures[actor] = actor.get_stats.remote()
-                        actors_to_query[actor] = stage_name  # Store for potential error logging
-                        valid_actors_in_stage.append(actor)
-                    except Exception as actor_check_e:
-                        logger.warning(
-                            f"Actor {actor} for stage {stage_name} seems unavailable before get_stats:"
-                            f" {actor_check_e}. Skipping stats for this actor."
-                        )
-                        # Consider this a failure for flush safety? Arguably yes.
-                        stats_fully_updated = False
-                        # NOTE: Actor might need removal from self.stage_actors in a separate cleanup step
-                else:
-                    valid_actors_in_stage.append(actor)  # Actor exists but has no get_stats
-
-            # Update the list for this stage if any actors were deemed unavailable
-            # This check ensures we don't query dead actors repeatedly in subsequent calls.
-            # Be cautious if actors might recover or if this check is too aggressive.
-            # if len(valid_actors_in_stage) != len(actors):
-            #    logger.debug(f"Updating active actor list for stage '{stage_name}' due to unavailable actors.")
-            #    self.stage_actors[stage_name] = valid_actors_in_stage
-
-        # Collect actor stats results
-        actor_stats_results = {}
-        future_to_actor = {v: k for k, v in stat_futures.items()}
-        stats_timeout_seconds = 10.0
-        ready, not_ready = ray.wait(
-            list(stat_futures.values()), num_returns=len(stat_futures), timeout=stats_timeout_seconds
-        )
-
-        # Process successful results
-        for future in ready:
-            actor = future_to_actor[future]
-            stage_name = actors_to_query.get(actor, "Unknown Stage")
-            try:
-                stats = ray.get(future)
-                actor_stats_results[actor] = stats if isinstance(stats, dict) else {"active_processing": 0}
-            except Exception as e:
-                logger.error(f"Error getting ready stats result for actor {actor} (Stage: {stage_name}): {e}")
-                actor_stats_results[actor] = {"active_processing": 0}  # Default on error
-                # Treat failure to get a 'ready' result as a critical error impacting quiet check
-                stats_fully_updated = False
-
-        # Handle timeouts
-        if not_ready:
-            logger.warning(f"Timeout ({stats_timeout_seconds}s) fetching stats for {len(not_ready)} actors.")
-            stats_fully_updated = False  # <<< SIGNAL TIMEOUT/FAILURE OCCURRED
-            for future in not_ready:
-                actor = future_to_actor[future]
-                stage_name = actors_to_query.get(actor, "Unknown Stage")
-                logger.debug(f"Timeout details: Actor {actor} (Stage: {stage_name}) did not respond.")
-                actor_stats_results[actor] = {"active_processing": 0}  # Default on timeout
-
-        # Aggregate stats per stage AND get queue sizes directly
-        queue_fetch_errors = False
-        for stage in self.stages:
-            stage_name = stage.name
-            # Use the potentially updated list of actors we know are still valid
-            current_replicas = self.stage_actors.get(stage_name, [])
-            processing_count = 0
-            for actor in current_replicas:
-                # Use results if actor was queried, otherwise assume 0 processing if it had no get_stats
-                stats = actor_stats_results.get(actor, {"active_processing": 0})
-                processing_count += int(stats.get("active_processing", 0))
-
-            input_edges = [ename for ename in self.edge_queues if ename.endswith(f"_to_{stage_name}")]
-            total_queued = 0
-            for ename in input_edges:
-                try:
-                    # Access queue size safely and directly
-                    queue_actor, _ = self.edge_queues[ename]
-                    q_size = queue_actor.qsize()
-                    total_queued += q_size
-                except Exception as q_e:
-                    # Log error but continue, maybe queue is terminating
-                    logger.error(f"Error getting qsize for {ename}: {q_e}")
-                    queue_fetch_errors = True  # Signal issue occurred
-
-            # Recalculate in_flight based on actual processing and directly measured queue size
-            stage_in_flight = processing_count + total_queued
-            stage_stats_updates[stage_name]["processing"] = processing_count
-            stage_stats_updates[stage_name]["in_flight"] = stage_in_flight
-
-        # Update the main stats dictionary
-        self.stage_stats = stage_stats_updates
-
-        # Final check: also consider queue errors as reason to not declare 'quiet'
-        if queue_fetch_errors:
-            stats_fully_updated = False
-
-        if not stats_fully_updated:
-            logger.warning("_update_stage_stats returning False due to actor/queue stat retrieval issues.")
-
-        return stats_fully_updated
+    def _get_global_in_flight(self, stage_stats: Dict[str, Dict[str, int]]) -> int:
+        """Calculates total in-flight items across all stages from a stats dict."""
+        if not stage_stats:
+            return 0
+        return sum(data.get("in_flight", 0) for data in stage_stats.values())
 
     def _is_pipeline_quiet(self) -> bool:
+        """
+        Checks if the pipeline is considered "quiet" for potential queue flushing.
+        Uses the RayStatsCollector for recent stats.
+        """
+
         if self._is_flushing:
-            return False  # Already flushing
+            logger.debug("Pipeline quiet check: False (Flush already in progress)")
+            return False
 
         time_since_last_flush = time.time() - self._last_queue_flush_time
         if time_since_last_flush < self.queue_flush_interval_seconds:
-            logger.debug(
-                f"Skipping quiet check: Too soon since last flush ({time_since_last_flush:.1f}s"
-                f" < {self.queue_flush_interval_seconds}s)"
+            # logger.debug(f"Pipeline quiet check: False (Too soon since last flush)")  # Frequent log
+            return False
+
+        # --- Get latest stats from the collector ---
+        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
+        last_update_age = time.time() - last_update_time
+
+        # --- Check 1: Were the last stats collected successfully? ---
+        if not stats_were_successful:
+            logger.warning(f"Pipeline quiet check: False (Stats collection failed {last_update_age:.1f}s ago).")
+            return False
+
+        # --- Check 2: Are the stats recent enough? ---
+        # Use the interval configured in the pipeline __init__
+        max_stats_age_for_quiet = max(10.0, self._stats_collection_interval_seconds * 2.5)
+        if last_update_age > max_stats_age_for_quiet:
+            logger.warning(
+                f"Pipeline quiet check: False (Stats too old: {last_update_age:.1f}s > {max_stats_age_for_quiet:.1f}s)."
             )
-            return False  # Too soon
+            return False
 
-        logger.debug("Calling _update_stage_stats for quiet check...")
-        stats_updated_successfully = self._update_stage_stats()
+        # --- Check 3: Is the activity level low enough? ---
+        if not current_stage_stats:
+            # This might happen briefly after start/stop or if collection consistently fails
+            logger.warning("Pipeline quiet check: False (No stats currently available from collector).")
+            return False
 
-        if not stats_updated_successfully:
-            logger.warning("Pipeline NOT considered quiet because stats update timed out or failed.")
-            return False  # Treat timeout/error as "not quiet"
-
-        # If stats were updated successfully, proceed with the check
-        current_global_in_flight = self._get_global_in_flight()
-        is_quiet = current_global_in_flight <= self.quiet_period_threshold
+        global_in_flight = self._get_global_in_flight(current_stage_stats)
+        is_quiet = global_in_flight <= self.quiet_period_threshold
 
         if is_quiet:
             logger.info(
-                f"Pipeline IS considered quiet. Global In-Flight: {current_global_in_flight}"
-                f" <= Threshold: {self.quiet_period_threshold}"
+                f"Pipeline IS quiet (Stats age: {last_update_age:.1f}s). In-Flight: {global_in_flight} <= "
+                f"Threshold: {self.quiet_period_threshold}"
             )
         else:
             logger.debug(
-                f"Pipeline NOT quiet. Global In-Flight: {current_global_in_flight}"
-                f" > Threshold: {self.quiet_period_threshold}"
+                f"Pipeline quiet check: False (Activity: InFlight={global_in_flight} > "
+                f"Threshold={self.quiet_period_threshold})"
             )
 
         return is_quiet
 
     def _wait_for_pipeline_drain(self, timeout_seconds: int) -> bool:
+        """
+        Actively monitors pipeline drain using direct calls to the stats collector.
+        """
         start_time = time.time()
-        logger.info(f"Waiting for pipeline drain (timeout: {timeout_seconds}s)...")
-        while time.time() - start_time < timeout_seconds:
-            self._update_stage_stats()
-            if self._get_global_in_flight() == 0:
-                logger.info(f"Pipeline drained in {time.time() - start_time:.1f}s.")
+        logger.info(f"Waiting for pipeline drain (Timeout: {timeout_seconds}s)...")
+        last_in_flight = -1
+        drain_check_interval = 1.0  # Check every second
+
+        while True:
+            current_time = time.time()
+            elapsed_time = current_time - start_time
+
+            if elapsed_time >= timeout_seconds:
+                logger.warning(f"Pipeline drain timed out after {elapsed_time:.1f}s. Last In-Flight: {last_in_flight}")
+                return False
+
+            # --- Trigger immediate stats collection via the collector instance ---
+            drain_stats = {}
+            drain_success = False
+            collection_error = None
+            try:
+                # Use the collector's method for a one-off, blocking collection
+                drain_stats, drain_success = self.stats_collector.collect_stats_now()
+            except Exception as e:
+                logger.error(f"[DrainWait] Critical error during direct stats collection call: {e}.", exc_info=True)
+                collection_error = e  # Indicate failure to even run collection
+
+            # --- Process collection results ---
+            global_in_flight = -1  # Default to unknown
+            if not collection_error:
+                # Use helper, works even if drain_success is False (partial stats)
+                global_in_flight = self._get_global_in_flight(drain_stats)
+
+            if global_in_flight != last_in_flight:
+                status_msg = (
+                    f"Collection Success: {drain_success}"
+                    if not collection_error
+                    else f"Collection Error: {type(collection_error).__name__}"
+                )
+                logger.info(
+                    f"[DrainWait] Check at {elapsed_time:.1f}s: Global In-Flight={global_in_flight} ({status_msg})"
+                )
+                last_in_flight = global_in_flight
+
+            # --- Check for successful drain ---
+            # Requires BOTH in-flight=0 AND the collection reporting it was successful
+            if global_in_flight == 0 and drain_success and not collection_error:
+                logger.info(f"Pipeline confirmed drained (In-Flight=0) in {elapsed_time:.1f}s.")
                 return True
-            time.sleep(2)
-        logger.warning(f"Pipeline drain timed out after {timeout_seconds}s.")
-        return False
+            elif global_in_flight == 0:  # Saw zero, but collection wasn't fully successful
+                logger.warning(
+                    "[DrainWait] In-Flight reached 0, but stats collection had errors/timeouts."
+                    " Cannot confirm drain yet."
+                )
+
+            # --- Wait ---
+            remaining_time = timeout_seconds - elapsed_time
+            sleep_duration = min(drain_check_interval, remaining_time, 1.0)  # Ensure positive sleep
+            if sleep_duration > 0:
+                time.sleep(sleep_duration)
 
     def _execute_queue_flush(self) -> bool:
+        """
+        Executes the queue flush procedure: pauses sources, waits for drain,
+        creates new queues, re-wires actors, and resumes sources.
+        Uses structure lock for safe access/modification of pipeline components.
+
+        Returns
+        -------
+        bool
+            True if flush completed successfully, False otherwise.
+        """
+        # Acquire lock early to prevent concurrent flushes? Or rely on _is_flushing flag?
+        # Using the flag is simpler for now.
         if self._is_flushing:
+            logger.warning("Queue flush requested but already in progress. Ignoring.")
             return False
-        self._is_flushing = True
+
+        self._is_flushing = True  # Set flag immediately
         logger.info("--- Starting Queue Flush ---")
-        success = False
+        overall_success = False
         source_actors_paused = []
-        resume_refs = []  # Define here for potential use in finally/except
+        pause_refs = []
+        resume_refs = []
+        new_edge_queues: Optional[Dict[str, Tuple[Any, int]]] = None
 
+        # --- Read initial pipeline structure under lock ---
+        # Get consistent snapshots of what needs pausing/re-wiring
+        current_stages: List[StageInfo] = []
+        current_stage_actors: Dict[str, List[Any]] = {}
+        current_edge_queues: Dict[str, Tuple[Any, int]] = {}
+        current_connections: Dict[str, List[Tuple[str, int]]] = {}
         try:
-            # 1. Pause sources
+            with self._structure_lock:
+                current_stages = self.stages[:]
+                current_stage_actors = {name: list(actors) for name, actors in self.stage_actors.items()}
+                current_edge_queues = self.edge_queues.copy()
+                current_connections = (
+                    self.connections.copy()
+                )  # Assuming connections dict structure is safe to copy shallowly
+
+            # --- 1. Pause Source Stages ---
             logger.info("Pausing source stages...")
-            pause_refs = []
-            for stage in self.stages:
+            pause_timeout = 60.0
+            for stage in current_stages:  # Use the snapshot
                 if stage.is_source:
-                    actors = self.stage_actors.get(stage.name, [])
+                    # Use the snapshot of actors for this stage
+                    actors = current_stage_actors.get(stage.name, [])
                     for actor in actors:
-                        if hasattr(actor, "pause"):
-                            pause_refs.append(actor.pause.remote())
-                            source_actors_paused.append(actor)
+                        actor_repr = repr(actor)
+                        if (
+                            hasattr(actor, "pause")
+                            and callable(getattr(actor, "pause"))
+                            and hasattr(actor.pause, "remote")
+                        ):
+                            try:
+                                pause_refs.append(actor.pause.remote())
+                                source_actors_paused.append(actor)
+                                logger.debug(f"Pause signal sent to source actor {actor_repr} for stage {stage.name}")
+                            except Exception as e:
+                                logger.error(f"Failed sending pause signal to {actor_repr}: {e}")
+                        else:
+                            logger.warning(f"Source actor {actor_repr} lacks remote 'pause' method. Skipping.")
+
             if pause_refs:
-                ray.get(pause_refs)
-                logger.info(f"{len(pause_refs)} source actors paused.")
+                logger.info(f"Waiting up to {pause_timeout}s for {len(pause_refs)} source actors to pause...")
+                try:
+                    # Use ray.get with timeout for simplicity if individual failures are acceptable to log
+                    ray.get(pause_refs, timeout=pause_timeout)
+                    logger.info(f"{len(pause_refs)} source actors acknowledged pause (or call completed).")
+                except GetTimeoutError:
+                    logger.warning(f"Timeout waiting for {len(pause_refs)} source actors to pause.")
+                    # Proceed cautiously
+                except Exception as e:
+                    logger.error(f"Error waiting for source actors to pause: {e}. Proceeding cautiously.")
 
-            # 2. Wait for drain
-            if not self._wait_for_pipeline_drain(self.queue_flush_drain_timeout_seconds):
-                logger.error("Drain failed. Aborting flush.")
-                # Rollback: Resume sources
-                for actor in source_actors_paused:
-                    if hasattr(actor, "resume"):
-                        resume_refs.append(actor.resume.remote())
-                if resume_refs:
-                    ray.get(resume_refs)
-                return False  # Use finally for self._is_flushing = False
+            # --- 2. Wait for Pipeline Drain ---
+            # This method uses self.stats_collector.collect_stats_now() internally
+            logger.info("Waiting for pipeline to drain...")
+            drain_successful = self._wait_for_pipeline_drain(self.queue_flush_drain_timeout_seconds)
 
-            # 3. Create new queues
-            logger.info("Creating new queues...")
-            new_edge_queues: Dict[str, Tuple[Queue, int]] = {}
-            for queue_name, (_, queue_size) in self.edge_queues.items():
-                new_queue = Queue(maxsize=queue_size)
-                new_edge_queues[queue_name] = (new_queue, queue_size)
+            if not drain_successful:
+                logger.error("Pipeline drain failed or timed out. ABORTING queue flush.")
+                raise RuntimeError("Pipeline drain failed, aborting flush.")  # Triggers finally block
 
-            # 4. Re-wire actors
-            logger.info("Re-wiring actors...")
+            logger.info("Pipeline drain successful.")
+
+            # --- 3. Create New Queues ---
+            logger.info("Creating new replacement queues...")
+            new_edge_queues = {}
+            # Use the snapshot of edge queues from the beginning
+            for queue_name, (_, queue_size) in current_edge_queues.items():
+                try:
+                    # Ensure Queue is the correct Ray type
+                    new_queue = Queue(maxsize=queue_size)
+                    new_edge_queues[queue_name] = (new_queue, queue_size)
+                    logger.debug(f"Created new queue: {queue_name} (size: {queue_size})")
+                except Exception as e:
+                    logger.error(f"Failed to create new queue '{queue_name}': {e}. ABORTING queue flush.")
+                    raise RuntimeError(f"Failed to create new queue '{queue_name}'.") from e
+
+            # --- 4. Re-wire Actors to New Queues ---
+            logger.info("Re-wiring actors to new queues...")
             wiring_refs = []
-            for from_stage_name, conns in self.connections.items():
+            wiring_timeout = 120.0
+            # Use the snapshot of connections and actors
+            for from_stage_name, conns in current_connections.items():
                 for to_stage_name, _ in conns:
                     queue_name = f"{from_stage_name}_to_{to_stage_name}"
                     if queue_name not in new_edge_queues:
-                        continue  # Should not happen
-                    new_queue, _ = new_edge_queues[queue_name]
-                    # Re-wire outputs
-                    for actor in self.stage_actors.get(from_stage_name, []):
-                        if hasattr(actor, "set_output_queue"):
-                            wiring_refs.append(actor.set_output_queue.remote(new_queue))
-                    # Re-wire inputs
-                    for actor in self.stage_actors.get(to_stage_name, []):
-                        if hasattr(actor, "set_input_queue"):
-                            wiring_refs.append(actor.set_input_queue.remote(new_queue))
+                        logger.error(f"Logic error: New queue missing for connection {queue_name}. ABORTING.")
+                        raise RuntimeError(f"New queue missing for {queue_name}")
+
+                    new_queue_actor, _ = new_edge_queues[queue_name]
+
+                    # Re-wire source stage outputs (using actor snapshot)
+                    for actor in current_stage_actors.get(from_stage_name, []):
+                        actor_repr = repr(actor)
+                        if (
+                            hasattr(actor, "set_output_queue")
+                            and callable(getattr(actor, "set_output_queue"))
+                            and hasattr(actor.set_output_queue, "remote")
+                        ):
+                            try:
+                                wiring_refs.append(actor.set_output_queue.remote(new_queue_actor))
+                                logger.debug(f"Sent set_output_queue({queue_name}) to {actor_repr}")
+                            except Exception as e:
+                                logger.error(f"Failed sending set_output_queue to {actor_repr}: {e}")
+                        else:
+                            logger.warning(f"Actor {actor_repr} lacks remote set_output_queue method.")
+
+                    # Re-wire destination stage inputs (using actor snapshot)
+                    for actor in current_stage_actors.get(to_stage_name, []):
+                        actor_repr = repr(actor)
+                        if (
+                            hasattr(actor, "set_input_queue")
+                            and callable(getattr(actor, "set_input_queue"))
+                            and hasattr(actor.set_input_queue, "remote")
+                        ):
+                            try:
+                                wiring_refs.append(actor.set_input_queue.remote(new_queue_actor))
+                                logger.debug(f"Sent set_input_queue({queue_name}) to {actor_repr}")
+                            except Exception as e:
+                                logger.error(f"Failed sending set_input_queue to {actor_repr}: {e}")
+                        else:
+                            logger.warning(f"Actor {actor_repr} lacks remote set_input_queue method.")
+
             if wiring_refs:
-                ray.get(wiring_refs)
+                logger.info(f"Waiting up to {wiring_timeout}s for {len(wiring_refs)} actors to re-wire...")
+                try:
+                    ready, not_ready = ray.wait(wiring_refs, num_returns=len(wiring_refs), timeout=wiring_timeout)
+                    if not_ready:
+                        logger.error(f"{len(not_ready)} actors failed re-wiring within {wiring_timeout}s. ABORTING.")
+                        raise RuntimeError("Actor re-wiring timed out or failed.")
+                    ray.get(ready)  # Check for exceptions within set_input/output
+                    logger.info(f"{len(ready)} actors re-wired successfully.")
+                except Exception as e:
+                    logger.error(f"Error waiting for actors to re-wire: {e}. ABORTING.")
+                    raise RuntimeError("Actor re-wiring failed.") from e
 
-            # 5. Update internal state
-            self.edge_queues = new_edge_queues
-            for queue_name in self.queue_stats:
-                self.queue_stats[queue_name] = []
-
-            # 6. Resume sources
-            logger.info("Resuming source stages...")
-            resume_refs = []  # Reset resume_refs
-            for actor in source_actors_paused:
-                if hasattr(actor, "resume"):
-                    resume_refs.append(actor.resume.remote())
-            if resume_refs:
-                ray.get(resume_refs)
-
-            self._last_queue_flush_time = time.time()
-            logger.info("--- Queue Flush Completed Successfully ---")
-            success = True
+            # --- 5. Update Internal State (Commit Point) ---
+            logger.info("Committing new queues to pipeline state.")
+            # --- ACQUIRE LOCK for WRITE ---
+            with self._structure_lock:
+                logger.debug(f"Replacing {len(self.edge_queues)} old queues with {len(new_edge_queues)} new queues.")
+                self.edge_queues = new_edge_queues  # Commit the change
+                # Reset queue stats history if applicable (check if self.queue_stats exists)
+                if hasattr(self, "queue_stats") and isinstance(self.queue_stats, dict):
+                    for queue_name in list(self.queue_stats.keys()):
+                        if queue_name not in self.edge_queues:
+                            logger.debug(f"Removing old queue stats history for {queue_name}")
+                            del self.queue_stats[queue_name]
+                        else:
+                            logger.debug(f"Resetting queue stats history for {queue_name}")
+                            self.queue_stats[queue_name] = []
+                else:
+                    logger.debug("Skipping queue_stats reset (attribute not found or not a dict).")
+            # --- RELEASE LOCK ---
+            overall_success = True  # Mark success *after* commit
 
         except Exception as e:
-            logger.error(f"Error during queue flush: {e}", exc_info=True)
-            # Attempt emergency resume if sources were paused
-            if source_actors_paused:
-                logger.info("Attempting emergency resume of sources...")
-                resume_refs = []
-                for actor in source_actors_paused:
-                    if hasattr(actor, "resume"):
-                        resume_refs.append(actor.resume.remote())
-                if resume_refs:
-                    try:
-                        ray.get(resume_refs)
-                    except Exception as resume_e:
-                        logger.error(f"Error during emergency resume: {resume_e}")
-            success = False
+            # Catch errors from Drain, Queue creation, Wiring
+            logger.error(f"Error during queue flush procedure: {e}", exc_info=True)
+            overall_success = False  # Ensure success is false if any step failed
+
         finally:
-            self._is_flushing = False
-        return success
+            # --- 6. Resume Source Stages (Always attempt) ---
+            if source_actors_paused:
+                logger.info(f"Attempting to resume {len(source_actors_paused)} source actors...")
+                resume_timeout = 30.0
+                resume_refs = []
+                for actor in source_actors_paused:  # Use list of actors we actually paused
+                    actor_repr = repr(actor)
+                    if (
+                        hasattr(actor, "resume")
+                        and callable(getattr(actor, "resume"))
+                        and hasattr(actor.resume, "remote")
+                    ):
+                        try:
+                            resume_refs.append(actor.resume.remote())
+                            logger.debug(f"Sent resume signal to {actor_repr}")
+                        except Exception as e:
+                            logger.error(f"Failed sending resume signal to {actor_repr}: {e}")
+                    else:
+                        logger.warning(f"Paused source actor {actor_repr} lacks remote 'resume' method.")
+
+                if resume_refs:
+                    logger.info(f"Waiting up to {resume_timeout}s for {len(resume_refs)} actors to resume...")
+                    try:
+                        # Don't need ready/not_ready separation as much here, just log errors
+                        ray.get(resume_refs, timeout=resume_timeout)
+                        logger.info(f"{len(resume_refs)} source actors resumed successfully (or call completed).")
+                    except GetTimeoutError:
+                        logger.warning(f"Timeout waiting for {len(resume_refs)} source actors to resume.")
+                    except Exception as e:
+                        logger.error(f"Error occurred while waiting for source actors to resume: {e}")
+
+            # Update flush timestamp only if the core operation succeeded
+            if overall_success:
+                self._last_queue_flush_time = time.time()
+                logger.info("--- Queue Flush Completed Successfully ---")
+            else:
+                logger.error("--- Queue Flush Failed ---")
+
+            self._is_flushing = False  # Release the logical flush lock
+
+        return overall_success
 
     def request_queue_flush(self, force: bool = False) -> None:
         logger.info(f"Manual queue flush requested (force={force}).")
@@ -1013,357 +1147,494 @@ class RayPipeline:
         else:
             logger.info("Manual flush denied: pipeline not quiet or interval not met.")
 
-    def _gather_controller_metrics(self) -> Dict[str, Dict[str, Any]]:
+    def _gather_controller_metrics(self, current_stage_stats: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, Any]]:
         """
-        Gathers current metrics for each stage required by the autoscaling controllers.
-        Relies on self.stage_stats being recently updated.
-
-        Returns:
-            Dict[str, Dict[str, Any]]: Mapping from stage name to its metrics dictionary.
+        Gathers current metrics for autoscaling controllers using provided stats.
+        Requires locking for accessing pipeline structure (actors, stage info).
         """
         logger.debug("[ScalingMetrics] Gathering metrics for controllers...")
         current_stage_metrics: Dict[str, Dict[str, Any]] = {}
-        # Get global state once, used by all stages
-        global_in_flight = self._get_global_in_flight()
+        global_in_flight = self._get_global_in_flight(current_stage_stats)
+        logger.debug(f"[ScalingMetrics] Using Global In-Flight: {global_in_flight}")
 
-        for stage in self.stages:
+        # Lock structure while accessing stages and actors
+        with self._structure_lock:
+            current_stages = self.stages[:]  # Copy list
+            current_actors = {name: list(actors) for name, actors in self.stage_actors.items()}  # Copy dict and lists
+
+        for stage in current_stages:
             stage_name = stage.name
-            replicas = len(self.stage_actors.get(stage_name, []))
-            # Use the freshly updated stats, default if missing
-            stats = self.stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
+            replicas = len(current_actors.get(stage_name, []))  # Use locked snapshot
+            stats = current_stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
+            if stage_name not in current_stage_stats:
+                logger.warning(f"[ScalingMetrics] Stage '{stage_name}' missing from stats. Using defaults.")
 
-            # Calculate queue depth based on stats
             processing_count = stats.get("processing", 0)
             stage_in_flight = stats.get("in_flight", 0)
-            queue_depth = max(0, stage_in_flight - processing_count)  # Ensure non-negative
+            queue_depth = max(0, stage_in_flight - processing_count)
 
-            # Assemble metrics dictionary for this stage
             current_stage_metrics[stage_name] = {
                 "replicas": replicas,
                 "queue_depth": queue_depth,
                 "processing": processing_count,
                 "in_flight": stage_in_flight,
-                # Pass config limits needed by controllers/bounds checks
                 "min_replicas": stage.min_replicas,
                 "max_replicas": stage.max_replicas,
-                # Pass global state if needed (e.g., for RCM bounds)
                 "pipeline_in_flight": global_in_flight,
-                # memory_usage could be added here if reliably measured per stage
             }
-            logger.debug(
-                f"[ScalingMetrics-{stage_name}] R={replicas}, Q={queue_depth}, Proc={processing_count},"
-                f" InF={stage_in_flight}"
-            )
 
+        logger.debug(f"[ScalingMetrics] Gathered metrics for {len(current_stage_metrics)} stages.")
         return current_stage_metrics
 
     def _get_current_global_memory(self) -> int:
         """
-        Safely retrieves the current global memory usage in MB.
-        Uses the previous measurement as a fallback on error.
+        Safely retrieves the current global system memory usage (used, not free) in MB.
+        Uses the previous measurement as a fallback only if the current read fails.
 
         Returns:
-            int: Current global memory usage in MB.
+            int: Current global memory usage (RSS/used) in MB. Returns previous value
+                 or 0 if the read fails and no previous value exists.
         """
         try:
+            # psutil.virtual_memory().used provides total RAM used by processes
             current_global_memory_bytes = psutil.virtual_memory().used
             current_global_memory_mb = int(current_global_memory_bytes / (1024 * 1024))
-            logger.debug(f"[ScalingMemCheck] Current global memory usage: {current_global_memory_mb} MB")
+            logger.debug(f"[ScalingMemCheck] Current global memory usage (used): {current_global_memory_mb} MB")
             return current_global_memory_mb
         except Exception as e:
             logger.error(
-                f"[ScalingMemCheck] Failed to get current system memory: {e}." f" Using previous value.", exc_info=False
+                f"[ScalingMemCheck] Failed to get current system memory usage: {e}. "
+                f"Attempting to use previous value ({self.prev_global_memory_usage} MB).",
+                exc_info=False,
             )
-            # Use previous value if available, otherwise default to 0 (less ideal)
-            return self.prev_global_memory_usage or 0
+            # Use previous value if available, otherwise default to 0 (less ideal, but avoids None)
+            # Returning 0 might incorrectly signal low memory usage if it's the first read that fails.
+            return self.prev_global_memory_usage if self.prev_global_memory_usage is not None else 0
 
     def _calculate_scaling_adjustments(
         self, current_stage_metrics: Dict[str, Dict[str, Any]], current_global_memory_mb: int
     ) -> Dict[str, int]:
         """
-        Runs the PID and ResourceConstraintManager to determine final replica adjustments.
+        Runs the PID controller and Resource Constraint Manager (RCM) to determine
+        the final target replica count for each stage based on current metrics and memory.
 
         Parameters:
             current_stage_metrics: Metrics gathered by _gather_controller_metrics.
-            current_global_memory_mb: Memory usage from _get_current_global_memory.
+            current_global_memory_mb: Current system memory usage from _get_current_global_memory.
 
         Returns:
-            Dict[str, int]: Dictionary mapping stage name to final target replica count.
+            Dict[str, int]: Dictionary mapping stage name to its final target replica count
+                            after applying PID logic and RCM constraints. Returns current
+                            replica counts as targets if controllers fail.
         """
         logger.debug("[ScalingCalc] Calculating adjustments via PID and RCM...")
-        num_edges = len(self.edge_queues)  # Get current edge count
+        num_edges = len(self.edge_queues)  # Get current edge count for RCM cost estimation
 
         try:
-            # 1. Get initial proposals from PID controller
+            # --- 1. Get Initial Proposals from PID Controller ---
+            # PID controller uses queue depth, processing count etc. per stage
             initial_proposals = self.pid_controller.calculate_initial_proposals(current_stage_metrics)
-            logger.debug(
-                f"[ScalingCalc] PID Initial Proposals: "
-                f"{ {n: p.proposed_replicas for n, p in initial_proposals.items()} }"  # noqa
-            )
+            # Log the raw proposals from the PID before constraints
+            proposed_counts = {name: proposal.proposed_replicas for name, proposal in initial_proposals.items()}
+            logger.debug(f"[ScalingCalc] PID Initial Proposals (Target Replicas): {proposed_counts}")
 
-            # 2. Apply constraints using Resource Constraint Manager
-            # Requires initial proposals, current memory, *previous* memory, and num edges
+            # --- 2. Apply Constraints using Resource Constraint Manager ---
+            # RCM takes PID proposals and applies global constraints like total max replicas
+            # and memory limits. It needs current memory and *previous* memory (if available)
+            # to estimate impact of scaling actions.
             final_adjustments = self.constraint_manager.apply_constraints(
                 initial_proposals=initial_proposals,
                 current_global_memory_usage=current_global_memory_mb,
                 num_edges=num_edges,
             )
-            logger.debug(f"[ScalingCalc] RCM Final Adjustments: {final_adjustments}")
+            logger.debug(f"[ScalingCalc] RCM Final Adjustments (Target Replicas): {final_adjustments}")
             return final_adjustments
 
         except Exception as e:
             logger.error(f"[ScalingCalc] Error during controller execution: {e}", exc_info=True)
-            # Fallback: Propose no change if controllers fail
-            logger.warning("[ScalingCalc] Falling back to no scaling changes due to controller error.")
-            # Create a dict with current replica counts as the target
+            # Fallback Strategy: If controllers fail, propose no change to avoid erratic behavior.
+            logger.warning("[ScalingCalc] Falling back to maintaining current replica counts due to controller error.")
+            # Create a dictionary with current replica counts as the target
             fallback_adjustments = {}
             for stage_name, metrics in current_stage_metrics.items():
+                # Ensure 'replicas' key exists from _gather_controller_metrics
                 fallback_adjustments[stage_name] = metrics.get("replicas", 0)
+            logger.debug(f"[ScalingCalc] Fallback Adjustments (Maintain Current): {fallback_adjustments}")
             return fallback_adjustments
 
     def _apply_scaling_actions(self, final_adjustments: Dict[str, int]) -> None:
         """
-        Applies the calculated scaling adjustments concurrently using _scale_stage.
+        Applies the calculated scaling adjustments (target replica counts) by
+        calling the appropriate scaling logic (e.g., `_scale_stage`) for each
+        stage where the target count differs from the current count. Executes
+        these actions concurrently using a ThreadPoolExecutor.
 
         Parameters:
-            final_adjustments: Dictionary from stage name to target replica count.
+            final_adjustments: Dictionary from stage name to target replica count,
+                               as determined by `_calculate_scaling_adjustments`.
         """
-        scaling_futures = []
         stages_needing_action = []
 
-        # Identify stages that require scaling
+        # --- Identify stages that require scaling up or down ---
         for stage_name, target_replica_count in final_adjustments.items():
+            # Ensure stage exists in current state
+            if stage_name not in self.stage_actors:
+                logger.warning(f"[ScalingApply] Cannot apply scaling for unknown stage '{stage_name}'. Skipping.")
+                continue
+
             current_count = len(self.stage_actors.get(stage_name, []))
+            # Ensure target is within configured min/max bounds for the stage (should be handled by RCM, but
+            # double check)
+            stage_info = next((s for s in self.stages if s.name == stage_name), None)
+            if not stage_info:
+                logger.error(f"[ScalingApply] StageInfo not found for '{stage_name}'. Cannot validate bounds.")
+                continue
+
+            # Clamp target count within the stage's absolute min/max limits
+            clamped_target = max(stage_info.min_replicas, min(stage_info.max_replicas, target_replica_count))
+            if clamped_target != target_replica_count:
+                logger.warning(
+                    f"[ScalingApply-{stage_name}] Target count {target_replica_count} was outside stage bounds"
+                    f" ({stage_info.min_replicas}-{stage_info.max_replicas}). Clamped to {clamped_target}."
+                )
+                target_replica_count = clamped_target
+
             if target_replica_count != current_count:
                 stages_needing_action.append((stage_name, target_replica_count))
                 logger.info(
-                    f"[ScalingApply-{stage_name}] Action required: Current={current_count},"
-                    f" Target={target_replica_count}"
+                    f"[ScalingApply-{stage_name}] Action required: Current={current_count}, "
+                    f"Target={target_replica_count}"
+                    f" (Min={stage_info.min_replicas}, Max={stage_info.max_replicas})"
                 )
-            elif self.scaling_state.get(stage_name) != "Idle":
-                # Reset state if no change needed but state wasn't Idle
-                self.scaling_state[stage_name] = "Idle"
+            # Optional: Reset scaling state if no action needed but state was non-Idle
+            # elif self.scaling_state.get(stage_name) != "Idle":
+            #    logger.debug(f"[ScalingApply-{stage_name}] No action needed, ensuring state is Idle.")
+            #    self.scaling_state[stage_name] = "Idle" # Assuming 'Idle' state exists
 
         if not stages_needing_action:
             logger.debug("[ScalingApply] No scaling actions required in this cycle.")
             return
 
-        # Execute scaling actions concurrently
-        logger.debug(f"[ScalingApply] Submitting {len(stages_needing_action)} scaling actions...")
-        # Use max_workers=len(self.stages) or a smaller fixed number?
-        # Using len(self.stages) might be excessive if only a few scale.
-        max_workers = min(len(stages_needing_action), 8)  # Example: Limit concurrency somewhat
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
-            for stage_name, target_count in stages_needing_action:
-                # Submit the scaling task, _scale_stage handles its own logging/errors
-                scaling_futures.append(executor.submit(self._scale_stage, stage_name, target_count))
+        # --- Execute scaling actions concurrently ---
+        # Limit concurrency to avoid overwhelming Ray scheduling or resources
+        max_workers = min(len(stages_needing_action), 8)  # Example: Limit concurrent scaling operations
+        logger.info(
+            f"[ScalingApply] Submitting {len(stages_needing_action)} scaling actions using {max_workers} workers..."
+        )
 
-        # Wait for all submitted scaling operations initiated in *this cycle* to complete
-        if scaling_futures:
-            logger.debug(f"[ScalingApply] Waiting for {len(scaling_futures)} scaling actions to complete...")
-            # The wait ensures one scaling cycle finishes before the next evaluation starts,
-            # preventing potential rapid oscillations or conflicting actions.
-            done, not_done = concurrent.futures.wait(scaling_futures, timeout=120.0)  # Add timeout
+        action_results = {}  # Store future results/exceptions
 
-            if not_done:
-                logger.warning(f"[ScalingApply] Timeout waiting for {len(not_done)} scaling actions to complete.")
-                # Consider logging which stages timed out if possible/needed
+        # Using ThreadPoolExecutor to manage concurrent calls to _scale_stage (which uses Ray remote calls)
+        with concurrent.futures.ThreadPoolExecutor(
+            max_workers=max_workers, thread_name_prefix="ScalingAction"
+        ) as executor:
+            # Submit tasks: executor.submit(fn, *args)
+            # Assuming _scale_stage exists and handles adding/removing actors for a stage
+            future_to_stage = {
+                executor.submit(self._scale_stage, stage_name, target_count): stage_name
+                for stage_name, target_count in stages_needing_action
+            }
 
-            # Check for exceptions in completed futures (optional, _scale_stage logs errors)
-            exceptions_count = 0
-            for future in done:
-                if future.exception():
-                    exceptions_count += 1
-                    # Error already logged by _scale_stage or its helpers
-            if exceptions_count > 0:
-                logger.warning(
-                    f"[ScalingApply] {exceptions_count} scaling actions completed with errors (see previous logs)."
-                )
+            # Wait for submitted scaling operations initiated in *this cycle* to complete
+            # Add a timeout to prevent indefinite blocking if a scaling action hangs
+            wait_timeout = 180.0  # Timeout for scaling actions to complete (adjust as needed)
+            logger.debug(f"[ScalingApply] Waiting up to {wait_timeout}s for scaling actions to complete...")
 
-            logger.debug("[ScalingApply] Scaling action submission and wait completed for this cycle.")
+            # Use as_completed to process results as they finish (optional, wait is simpler)
+            # done, not_done = concurrent.futures.wait(future_to_stage.keys(), timeout=wait_timeout)
 
-    # --- Refactored _perform_scaling_and_maintenance Method ---
+            # Process results as they complete
+            for future in concurrent.futures.as_completed(future_to_stage, timeout=wait_timeout):
+                stage_name = future_to_stage[future]
+                try:
+                    # Get the result (or raise exception if the task failed)
+                    result = future.result()  # _scale_stage should return success/failure or relevant info
+                    action_results[stage_name] = {"status": "completed", "result": result}
+                    logger.debug(f"[ScalingApply-{stage_name}] Action completed. Result: {result}")
+                except TimeoutError:  # Catch timeout from as_completed itself
+                    logger.error(
+                        f"[ScalingApply-{stage_name}] Scaling action timed out after {wait_timeout}s (as_completed)."
+                    )
+                    action_results[stage_name] = {"status": "timeout"}
+                except Exception as exc:
+                    # Catch exceptions raised *within* the _scale_stage function
+                    logger.error(f"[ScalingApply-{stage_name}] Action failed with exception: {exc}", exc_info=True)
+                    action_results[stage_name] = {"status": "error", "exception": exc}
+
+        # Final summary log
+        completed_count = sum(1 for res in action_results.values() if res["status"] == "completed")
+        error_count = sum(1 for res in action_results.values() if res["status"] == "error")
+        timeout_count = sum(1 for res in action_results.values() if res["status"] == "timeout")
+        logger.info(
+            f"[ScalingApply] Scaling actions summary: {completed_count} completed, {error_count} errors, "
+            f"{timeout_count} timeouts."
+        )
+        logger.debug("[ScalingApply] Scaling action submission and processing completed for this cycle.")
+
     def _perform_scaling_and_maintenance(self) -> None:
         """
-        Orchestrates the scaling and maintenance cycle for the pipeline.
+        Orchestrates scaling/maintenance, using RayStatsCollector for stats.
         """
         logger.debug("--- Performing Scaling & Maintenance Cycle ---")
+        cycle_start_time = time.time()
 
-        # Check 1: Skip if flushing is in progress
         if self._is_flushing:
             logger.debug("Skipping scaling cycle: Queue flush in progress.")
             return
 
-        # Step 0: Check if pipeline is quiet (this now includes the stats update & timeout check)
-        # If it is quiet AND stats were fetched ok, flush and exit cycle.
-        if self._is_pipeline_quiet():
-            logger.info("Pipeline detected as quiet, initiating queue flush.")
-            self._execute_queue_flush()  # Assumes _is_pipeline_quiet was True
-            return  # Skip scaling for this cycle after flush attempt
-
-        # --- If not quiet OR if stats failed, proceed with scaling ---
-        logger.debug("Pipeline not quiet or stats failed; proceeding with scaling logic.")
-
-        # Step 1: Ensure stage statistics are up-to-date for scaling calculations.
-        # We might have already called this inside _is_pipeline_quiet, but call again
-        # to ensure freshness right before scaling calculations, especially if the
-        # quiet check returned False due to activity (not timeout).
-        # The return value isn't strictly needed here for scaling decisions.
+        # --- Check for quietness for flushing (uses stats collector via helper) ---
         try:
-            stats_update_success = self._update_stage_stats()  # Call reflects new signature
-            if not stats_update_success:
-                logger.warning(
-                    "Continuing scaling cycle despite stats update issues (timeouts/errors)."
-                    " Scaling decisions might be based on stale/incomplete data."
-                )
-            logger.debug("Stage statistics updated/attempted for scaling.")
+            if self._is_pipeline_quiet():
+                logger.info("Pipeline detected as quiet, initiating queue flush.")
+                flush_success = self._execute_queue_flush()
+                logger.info(f"Automatic queue flush completed. Success: {flush_success}")
+                return  # Skip scaling if flush occurred
+            else:
+                logger.debug("Pipeline not quiet; proceeding with scaling logic.")
         except Exception as e:
-            # This catch block might be redundant if _update_stage_stats handles its own errors
-            logger.error(f"Failed to update stage stats for scaling, skipping cycle: {e}", exc_info=True)
-            return  # Cannot proceed without attempting stats update
+            logger.error(f"Error during quiet check or flush: {e}. Skipping cycle.", exc_info=True)
+            return
 
-        # Step 2: Gather metrics needed for controllers (uses self.stage_stats)
-        current_stage_metrics = self._gather_controller_metrics()
+        # --- Get Latest Stats from Collector ---
+        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
+        last_update_age = time.time() - last_update_time
 
-        # Step 3: Get current global memory usage
+        # --- Validate Stats for Scaling ---
+        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds * 3.0)
+
+        if not current_stage_stats:
+            logger.error("[Scaling] Cannot scale: No statistics available from collector. Skipping cycle.")
+            return
+        if not stats_were_successful:
+            logger.warning(
+                f"[Scaling] Cannot scale: stats collection failed {last_update_age:.1f}s ago. Skipping cycle."
+            )
+            return
+        if last_update_age > max_stats_age_for_scaling:
+            logger.warning(
+                f"[Scaling] Proceeding with STALE stats (Age: {last_update_age:.1f}s > "
+                f"Threshold: {max_stats_age_for_scaling:.1f}s)."
+            )
+            # Continue, but log the warning
+
+        # --- Gather Metrics (uses validated stats) ---
+        current_stage_metrics = self._gather_controller_metrics(current_stage_stats)
+        if not current_stage_metrics:
+            logger.error("[Scaling] Failed to gather controller metrics. Skipping calculations.")
+            return
+
+        # --- Get Memory Usage ---
         current_global_memory_mb = self._get_current_global_memory()
 
-        # Step 4: Calculate final scaling adjustments using controllers
+        # --- Calculate Scaling Adjustments ---
         final_adjustments = self._calculate_scaling_adjustments(current_stage_metrics, current_global_memory_mb)
 
-        # Step 5: Update previous memory *after* controllers have used it
+        # --- Update Memory Usage *After* Decision ---
         self.prev_global_memory_usage = current_global_memory_mb
 
-        # Step 6: Apply the calculated scaling actions concurrently
+        # --- Apply Scaling Actions ---
         self._apply_scaling_actions(final_adjustments)
 
-        logger.debug("--- Scaling & Maintenance Cycle Complete ---")
+        cycle_duration = time.time() - cycle_start_time
+        logger.debug(f"--- Scaling & Maintenance Cycle Complete (Duration: {cycle_duration:.2f}s) ---")
 
     # --- Monitoring Thread ---
 
     def _get_monitor_data(self) -> List[Tuple]:
-        """Helper function to fetch and format data for display."""
-        # Update stats - the return value isn't strictly used for display,
-        # but we call the modified function. Display will show latest available stats,
-        # even if there were timeouts fetching some.
-        try:
-            stats_updated_successfully = self._update_stage_stats()  # Call reflects new signature
-            if not stats_updated_successfully:
-                logger.debug("Monitor data based on potentially incomplete stats update.")
-        except Exception as e:
-            logger.error(f"Error updating stats in _get_monitor_data: {e}", exc_info=True)
-            # Return empty data or last known good? Empty seems safer.
-            return [("Error updating stats", "", "", "", "", "")]  # Indicate error in display
+        """
+        Fetches the latest statistics via RayStatsCollector and formats them
+        for display. Uses structure lock for safe access to pipeline components.
 
+        Returns
+        -------
+        List[Tuple]
+            A list of tuples, where each tuple represents a row in the display table.
+        """
         output_rows = []
-        # ... rest of the function remains the same ...
 
-        # Example of accessing potentially incomplete stats:
-        for stage in self.stages:
+        # --- Get latest stats from the collector ---
+        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
+        last_update_age = time.time() - last_update_time
+
+        # --- Get consistent snapshots of pipeline structure under lock ---
+        with self._structure_lock:
+            current_stages = self.stages[:]
+            current_stage_actors = {name: list(actors) for name, actors in self.stage_actors.items()}
+            current_edge_queues = self.edge_queues.copy()
+            current_scaling_state = self.scaling_state.copy()
+            current_is_flushing = self._is_flushing  # Read boolean flag under lock
+
+        # --- Check stats staleness/failure ---
+        # Use interval stored in pipeline for consistency in display rules
+        max_stats_age_display = max(10.0, self._stats_collection_interval_seconds * 2.5)
+        stats_stale = last_update_age > max_stats_age_display
+
+        if not stats_were_successful or stats_stale:
+            status = "Failed" if not stats_were_successful else "Stale"
+            age_str = f"{last_update_age:.1f}s ago"
+            warning_msg = f"[bold red]Stats {status} ({age_str})[/bold red]"
+            output_rows.append((warning_msg, "", "", "", "", ""))  # Placeholder cols
+
+        # --- Format data for each stage using snapshots ---
+        for stage in current_stages:
             stage_name = stage.name
-            replicas = self.stage_actors.get(stage_name, [])
-            # Use the stats fetched by _update_stage_stats, even if incomplete
-            stats = self.stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
-
-            # ... formatting logic using stats ...
-            replicas_str = f"{len(replicas)}/{stage.max_replicas}"
+            # Get replica info from snapshot
+            replicas = current_stage_actors.get(stage_name, [])
+            replicas_str = f"{len(replicas)}/{stage.max_replicas}"  # Assuming stage has max_replicas
             if stage.min_replicas > 0:
                 replicas_str += f" (min {stage.min_replicas})"
 
-            input_edges = [ename for ename in self.edge_queues if ename.endswith(f"_to_{stage_name}")]
-            occupancy_parts = []
-            stage_queue_depth = 0  # Calculate from updated stats
-
-            if input_edges:
-                # Use the in_flight - processing from stats as the queue depth here
-                stage_queue_depth = max(0, stats.get("in_flight", 0) - stats.get("processing", 0))
-                for ename in input_edges:
-                    try:
-                        q, max_q = self.edge_queues[ename]
-                        # Display the calculated aggregate depth for the stage's inputs
-                        occupancy_parts.append(
-                            f"{stage_queue_depth}/{max_q}"
-                        )  # Show aggregate depth vs max size of one queue (approximation)
-                    except Exception:
-                        occupancy_parts.append("ERR/ERR")
-                # Avoid duplicating queue depth display if multiple input queues
-                occupancy_str = ", ".join(list(set(occupancy_parts))) if occupancy_parts else "N/A"
-
-            else:
-                occupancy_str = "(Source)" if stage.is_source else "N/A"
-
-            scaling_state = self.scaling_state.get(stage_name, "Unknown")
+            # Use the stats collected earlier (no lock needed here)
+            stats = current_stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
             processing_count = stats.get("processing", 0)
-            stage_in_flight = stats.get("in_flight", 0)  # Total including processing + queues
+            stage_in_flight = stats.get("in_flight", 0)
+            stage_queue_depth = max(0, stage_in_flight - processing_count)
+
+            # Calculate Occupancy string (using edge queue snapshot)
+            input_edges = [ename for ename in current_edge_queues if ename.endswith(f"_to_{stage_name}")]
+            occupancy_str = "N/A"
+            if input_edges:
+                try:
+                    first_q_name = input_edges[0]
+                    # Get max size from the queue snapshot
+                    _, max_q = current_edge_queues[first_q_name]
+                    occupancy_str = f"{stage_queue_depth}/{max_q}"
+                    if len(input_edges) > 1:
+                        occupancy_str += " (multi)"
+                except KeyError:
+                    occupancy_str = f"{stage_queue_depth}/ERR"  # Queue missing from snapshot
+                except Exception:
+                    occupancy_str = f"{stage_queue_depth}/?"  # Other error
+            elif stage.is_source:  # Assuming stage has is_source
+                occupancy_str = "(Source)"
+
+            # Get scaling state from snapshot
+            scaling_state = current_scaling_state.get(stage_name, "Idle")
 
             output_rows.append(
                 (stage_name, replicas_str, occupancy_str, scaling_state, str(processing_count), str(stage_in_flight))
             )
 
-        global_processing = sum(s.get("processing", 0) for s in self.stage_stats.values())
-        global_in_flight = self._get_global_in_flight()
+        # --- Add Total Pipeline Summary Row ---
+        # Use stats collected earlier and flushing state from snapshot
+        global_processing = sum(s.get("processing", 0) for s in current_stage_stats.values())
+        global_in_flight = self._get_global_in_flight(current_stage_stats)  # Uses collected stats
+        is_flushing_str = str(current_is_flushing)  # Use value read under lock
+
         output_rows.append(
             (
                 "[bold]Total Pipeline[/bold]",
                 "",
-                "",
-                f"Flushing: {self._is_flushing}",
-                str(global_processing),
-                str(global_in_flight),
+                "",  # Replica/Occupancy cols empty
+                f"Flushing: {is_flushing_str}",  # State col
+                f"[bold]{global_processing}[/bold]",  # Processing col
+                f"[bold]{global_in_flight}[/bold]",  # In-Flight col
             )
         )
+
         return output_rows
 
-    def _monitor_pipeline_loop(self, poll_interval: float = 5.0) -> None:
+    def _monitor_pipeline_loop(self, poll_interval: float) -> None:
         """
-        Main loop for the monitoring thread. Handles either Rich or GUI display.
+        Main loop for the monitoring thread. Fetches formatted data using
+        `_get_monitor_data` (which reads shared stats) and updates the
+        chosen display (Rich Console or GUI).
+
+        Parameters
+        ----------
+        poll_interval : float
+            The target interval in seconds between display updates.
         """
+        thread_name = threading.current_thread().name
         logger.debug(
-            f"Monitoring thread started (Mode: {'GUI' if self.use_gui else 'Console'}, Interval: {poll_interval}s)."
+            f"{thread_name}: Monitoring thread started (Mode: {'GUI' if self.use_gui else 'Console'}, "
+            f"Interval: {poll_interval}s)."
         )
 
+        display_initialized = False
+
+        # --- GUI Mode ---
         if self.use_gui:
-            # Attempt to create GUI instance
-            self._display_instance = GuiUtilizationDisplay(refresh_rate_ms=int(poll_interval * 1000))
-            if self._display_instance:
+            try:
+                # Attempt to create GUI instance - requires display environment
+                self._display_instance = GuiUtilizationDisplay(refresh_rate_ms=int(poll_interval * 1000))
+                display_initialized = True
+
                 # Start the blocking GUI loop, passing the data fetching function
-                # This function will run until the GUI window is closed or stop() is called
+                # This function (_get_monitor_data) will be called by the GUI's internal timer.
+                logger.info(f"{thread_name}: Starting GUI display loop...")
+                # The start method blocks until the GUI is closed.
                 self._display_instance.start(self._get_monitor_data)
-                logger.debug("GUI display loop finished.")
-            else:
-                # GUI initialization failed (e.g., no display), fall back to console
-                logger.warning("GUI initialization failed. Falling back to console monitoring.")
-                self.use_gui = False  # Disable GUI flag internally
-                self._monitor_pipeline_loop(poll_interval)  # Retry with console mode
-                return  # Exit this attempt
+                logger.info(f"{thread_name}: GUI display loop finished.")
 
-        else:  # Console mode (Rich)
-            self._display_instance = UtilizationDisplay(refresh_rate=poll_interval)
-            self._display_instance.start()  # Start the Rich Live display
+            except Exception as e:
+                logger.error(f"{thread_name}: GUI initialization or execution failed: {e}", exc_info=True)
+                logger.warning(f"{thread_name}: Falling back to console monitoring.")
+                self.use_gui = False  # Disable GUI flag internally for this run
+                self._display_instance = None  # Clear potentially failed instance
+                display_initialized = False  # Ensure console mode runs below
+                # No need for recursive call here, the console logic below will run
 
-            while self._monitoring:
-                start_time = time.time()
-                try:
-                    monitor_data = self._get_monitor_data()
-                    if self._display_instance and hasattr(self._display_instance, "update"):
-                        self._display_instance.update(monitor_data)
-                except Exception as e:
-                    logger.error(f"Error in console monitoring loop: {e}", exc_info=True)
+        # --- Console Mode (Rich) ---
+        if not self.use_gui:
+            try:
+                # Create Rich display instance only if not already done (or if GUI failed)
+                if not self._display_instance:
+                    self._display_instance = UtilizationDisplay(refresh_rate=poll_interval)
+                    # Start the Rich Live display context manager or similar non-blocking start
+                    self._display_instance.start()
+                    display_initialized = True
+                    logger.info(f"{thread_name}: Started Rich console display.")
 
-                # Sleep accounting for processing time
-                elapsed = time.time() - start_time
-                sleep_time = max(0, poll_interval - elapsed)
-                # Use threading.Event for interruptible sleep if needed, but time.sleep is simpler
-                if self._monitoring and sleep_time > 0:
+                # Console loop continues as long as monitoring flag is set
+                while self._monitoring and display_initialized:
+                    loop_start_time = time.time()
+                    monitor_data = []  # Default empty
+                    try:
+                        # Fetch data using the method that reads shared stats
+                        monitor_data = self._get_monitor_data()
+
+                        # Update the Rich display if it exists and has update method
+                        if self._display_instance and hasattr(self._display_instance, "update"):
+                            self._display_instance.update(monitor_data)
+                        else:
+                            # Should not happen if display_initialized is True
+                            logger.warning(f"{thread_name}: Display instance missing or lacks update method.")
+                            break  # Exit loop if display is broken
+
+                    except Exception as e:
+                        logger.error(
+                            f"{thread_name}: Error in console monitoring loop (data fetch or update): {e}",
+                            exc_info=True,
+                        )
+                        # Continue loop, maybe the error is transient
+
+                    # --- Calculate sleep time ---
+                    elapsed = time.time() - loop_start_time
+                    # Use the configured poll interval
+                    sleep_time = max(0.1, poll_interval - elapsed)  # Minimum sleep
+
+                    # Check flag *before* sleeping
+                    if not self._monitoring:
+                        break
+
+                    # logger.debug(f"{thread_name}: Console monitor sleeping for {sleep_time:.2f}s")
                     time.sleep(sleep_time)
 
-            # Stop Rich display if it exists
-            if self._display_instance and hasattr(self._display_instance, "stop"):
-                self._display_instance.stop()
+            except Exception as e:
+                logger.error(f"{thread_name}: Error setting up or running console display loop: {e}", exc_info=True)
+            finally:
+                # Stop Rich display if it was initialized
+                if display_initialized and self._display_instance and hasattr(self._display_instance, "stop"):
+                    try:
+                        logger.info(f"{thread_name}: Stopping Rich console display...")
+                        self._display_instance.stop()
+                    except Exception as e:
+                        logger.error(f"{thread_name}: Error stopping Rich display: {e}")
 
-        # Clean up display instance reference
-        self._display_instance = None
-        logger.debug("Monitoring thread loop finished.")
+        # --- Cleanup ---
+        self._display_instance = None  # Clear display instance reference
+        logger.debug(f"{thread_name}: Monitoring thread loop finished.")
 
     # --- Lifecycle Methods for Monitoring/Scaling Threads ---
     def _start_queue_monitoring(self, poll_interval: float = 5.0) -> None:
@@ -1399,21 +1670,22 @@ class RayPipeline:
             self._display_instance = None  # Clear display instance ref
             logger.info("Monitoring stopped.")
 
-    def _scaling_loop(self, poll_interval: float = 10.0) -> None:
-        logger.debug(f"Scaling/Maintenance loop started (Interval: {poll_interval}s).")
+    def _scaling_loop(self, interval: float) -> None:
+        """Main loop for the scaling thread."""
+        logger.info(f"Scaling loop started. Interval: {interval}s")
         while self._scaling_monitoring:
             start_time = time.time()
             try:
                 self._perform_scaling_and_maintenance()
             except Exception as e:
-                logger.error(f"Error in scaling/maintenance loop: {e}", exc_info=True)
+                logger.error(f"Error in scaling loop: {e}", exc_info=True)
 
             elapsed = time.time() - start_time
-            sleep_time = max(0, poll_interval - elapsed)
-            if self._scaling_monitoring and sleep_time > 0:
-                logger.debug(f"Scaling loop sleeping for {sleep_time:.2f}s.")
-                time.sleep(sleep_time)
-        logger.debug("Scaling/Maintenance loop stopped.")
+            sleep_time = max(0.1, interval - elapsed)
+            if not self._scaling_monitoring:
+                break
+            time.sleep(sleep_time)
+        logger.info("Scaling loop finished.")
 
     def _start_scaling(self, poll_interval: float = 10.0) -> None:
         if not self._scaling_monitoring:
@@ -1437,31 +1709,42 @@ class RayPipeline:
     def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 10.0) -> None:
         """
         Start the pipeline: start actors, monitoring, and scaling.
-
-        Parameters are the same as before.
         """
-        if not self.stage_actors:
-            logger.error("Cannot start pipeline: Build() must be called first.")
-            return
+        # Check if built (optional, depends on design)
+        with self._structure_lock:
+            if not self.stage_actors:
+                logger.error("Cannot start pipeline: Build() must be called first or pipeline is empty.")
+                return
 
         logger.info("Starting pipeline execution...")
         start_refs = []
-        for stage_name, actors in self.stage_actors.items():
-            for actor in actors:
-                if hasattr(actor, "start"):
-                    start_refs.append(actor.start.remote())
+        # Lock structure while getting actors to start
+        with self._structure_lock:
+            for stage_name, actors in self.stage_actors.items():
+                for actor in actors:
+                    if hasattr(actor, "start"):
+                        # Ensure start method is remote-callable
+                        if hasattr(actor.start, "remote"):
+                            start_refs.append(actor.start.remote())
+                        else:
+                            logger.warning(f"Actor in stage {stage_name} has 'start' but it's not remote. Skipping.")
 
         if start_refs:
             logger.debug(f"Waiting for {len(start_refs)} actors to start...")
             try:
-                ray.get(start_refs)
+                ray.get(start_refs, timeout=60.0)  # Add timeout
                 logger.info(f"{len(start_refs)} actors started successfully.")
+            except GetTimeoutError:
+                logger.error(f"Timeout waiting for {len(start_refs)} actors to start.")
+                self.stop()
+                raise RuntimeError("Failed to start pipeline: actors did not start within timeout.")
             except Exception as e:
                 logger.error(f"Error during actor start confirmation: {e}", exc_info=True)
                 self.stop()  # Attempt cleanup
                 raise RuntimeError("Failed to start pipeline: error confirming actor starts.") from e
 
-        # Start background threads
+        # Start background threads AFTER actors are confirmed running
+        self.stats_collector.start()
         self._start_queue_monitoring(poll_interval=monitor_poll_interval)
         self._start_scaling(poll_interval=scaling_poll_interval)
         logger.info("Pipeline started successfully.")
@@ -1472,43 +1755,70 @@ class RayPipeline:
         """
         logger.info("Stopping pipeline...")
 
-        # 1. Stop background threads first
+        # 1. Stop background threads first to prevent further actions
         self._stop_scaling()
-        self._stop_queue_monitoring()  # This now handles stopping Rich or GUI
+        self._stop_queue_monitoring()
+        self.stats_collector.stop()
 
         # 2. Stop actors (graceful first, then kill)
         logger.debug("Stopping all stage actors...")
-        stop_refs = []
+        stop_refs_map: Dict[ray.ObjectRef, Any] = {}  # Map ref back to actor for targeted kill
         actors_to_kill = []
-        for stage_name, actors in self.stage_actors.items():
-            for actor in actors:
-                if hasattr(actor, "stop"):
-                    stop_refs.append(actor.stop.remote())
-                else:
-                    actors_to_kill.append(actor)
+        # Lock structure while getting actors to stop
+        with self._structure_lock:
+            current_actors = {name: list(actors) for name, actors in self.stage_actors.items()}
 
-        if stop_refs:
+        for stage_name, actors in current_actors.items():
+            for actor in actors:
+                can_stop_gracefully = False
+                if hasattr(actor, "stop") and hasattr(actor.stop, "remote"):
+                    try:
+                        ref = actor.stop.remote()
+                        stop_refs_map[ref] = actor
+                        can_stop_gracefully = True
+                    except Exception as e:
+                        logger.warning(
+                            f"Error initiating stop for actor {actor} in stage {stage_name}: {e}. Will kill."
+                        )
+                        actors_to_kill.append(actor)
+                if not can_stop_gracefully:
+                    actors_to_kill.append(actor)  # Add actors without remote stop()
+
+        if stop_refs_map:
+            stop_refs = list(stop_refs_map.keys())
             logger.debug(f"Waiting for {len(stop_refs)} actors to stop gracefully...")
             try:
-                # Add timeout
                 ready, not_ready = ray.wait(stop_refs, num_returns=len(stop_refs), timeout=60.0)
                 if not_ready:
                     logger.warning(
                         f"Timeout waiting for {len(not_ready)} actors to stop gracefully. Will proceed to kill."
                     )
                     # Add actors that timed out to the kill list
-                    # This requires mapping refs back to actors - might be complex or store actor refs directly
-                    # For simplicity now, we just proceed to kill those without stop()
+                    for ref in not_ready:
+                        timed_out_actor = stop_refs_map.get(ref)
+                        if timed_out_actor and timed_out_actor not in actors_to_kill:
+                            actors_to_kill.append(timed_out_actor)
                 logger.info(f"{len(ready)} actors stopped via stop().")
             except Exception as e:
                 logger.error(f"Error during actor stop confirmation: {e}", exc_info=True)
+                # Add all actors we tried to stop gracefully to the kill list on wait error
+                actors_to_kill.extend(a for a in stop_refs_map.values() if a not in actors_to_kill)
 
         if actors_to_kill:
             logger.debug(f"Killing {len(actors_to_kill)} actors...")
+            killed_count = 0
             for actor in actors_to_kill:
                 try:
                     ray.kill(actor, no_restart=True)
+                    killed_count += 1
                 except Exception as e:
-                    logger.error(f"Failed to kill actor {actor}: {e}")
+                    # Actor might already be dead
+                    logger.warning(f"Failed or unnecessary attempt to kill actor {actor}: {e}")
+            logger.debug(f"Kill attempted for {len(actors_to_kill)} actors (success count may vary).")
+
+        # Clear internal state after stopping
+        with self._structure_lock:
+            self.stage_actors.clear()
+            # Optionally clear edge_queues if they should be terminated/recreated
 
         logger.info("Pipeline stopped.")

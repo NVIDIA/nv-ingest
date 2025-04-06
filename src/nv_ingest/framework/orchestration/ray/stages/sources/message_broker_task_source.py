@@ -336,9 +336,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def get_stats(self) -> dict:
         elapsed = time.time() - self.start_time if self.start_time else 0
         stats = {
-            "message_count": self.message_count,
-            "elapsed_seconds": elapsed,
-            "messages_per_second": self.message_count / elapsed if elapsed > 0 else 0,
+            "processed": self.message_count,
+            "elapsed": elapsed,
+            "processing_rate_cps": self.message_count / elapsed if elapsed > 0 else 0,
+            "active_processing": 0,
         }
         logger.info("get_stats: %s", stats)
         return stats
