@@ -127,26 +127,24 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             span.set_attribute("http.url", str(request.url))
             span.add_event("Submitting file for processing")
 
-            # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
-            # will be able to trace across uvicorn -> morpheus
             current_trace_id = span.get_span_context().trace_id
-
-            job_spec_dict = json.loads(job_spec.payload)
-            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
-            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
-
             job_id = trace_id_to_uuid(current_trace_id)
 
-            # Submit the job async
-            await ingest_service.submit_job(updated_job_spec, job_id)
+            # Add trace_id to job_spec payload
+            job_spec_dict = json.loads(job_spec.payload)
+            if "tracing_options" not in job_spec_dict:
+                job_spec_dict["tracing_options"] = {}
+            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
+            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
             # Add another event
             span.add_event("Finished processing")
 
-            # We return the trace-id as a 32-byte hexidecimal string which is the format you would use when
-            # searching in Zipkin for traces. The original value is a 128 bit integer ...
-            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+            # Submit the job to the pipeline task queue
+            await ingest_service.submit_job(updated_job_spec, job_id)  # Pass job_id used for state
+            await ingest_service.set_job_state(job_id, "SUBMITTED")
 
+            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
             return job_id
 
         except Exception as ex:
@@ -160,8 +158,9 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
     responses={
         200: {"description": "Job was successfully retrieved."},
         202: {"description": "Job is not ready yet. Retry later."},
+        404: {"description": "Job completed, but result is no longer available."},
         500: {"description": "Error encountered while fetching job."},
-        503: {"description": "Service unavailable."},
+        503: {"description": "Job processing failed or service unavailable."},
     },
     tags=["Ingestion"],
     summary="Fetch a previously submitted job from the ingestion service by providing its job_id",
@@ -169,21 +168,39 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
 )
 async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
     try:
+        # Step 1: Attempt to fetch the actual result from the result queue
         job_response = await ingest_service.fetch_job(job_id)
-        json_bytes = json.dumps(job_response).encode("utf-8")
+        await ingest_service.set_job_state(job_id, "RETRIEVED")
 
+        # If fetch_job succeeds (doesn't raise), we got the result
+        json_bytes = json.dumps(job_response).encode("utf-8")
         return StreamingResponse(iter([json_bytes]), media_type="application/json")
 
-    except TimeoutError:
-        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except RedisError:
-        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except ValueError as ve:
-        raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
+    except (TimeoutError, RedisError):
+        # Step 2: Result queue is empty or missing. Check the explicit state.
+        current_state = await ingest_service.get_job_state(job_id)
+
+        if current_state == "RETRIEVED":
+            # Job finished, result is gone. Treat as definitively not available anymore.
+            logger.warning(
+                f"Job {job_id} state is RETRIEVED, client may have failed or is requested a completed job."
+                " Returning 404."
+            )
+            raise HTTPException(status_code=404, detail="Job completed, but result is no longer available.")
+        elif current_state == "FAILED":
+            # Job failed during pipeline processing.
+            logger.error(f"Job {job_id} state is FAILED. Returning 500.")
+            raise HTTPException(status_code=500, detail="Job processing failed.")
+        else:  # State is SUBMITTED, PROCESSING, None, or any other unexpected value
+            raise HTTPException(status_code=202, detail="Job is processing. Retry later.")
+
+    except ValueError as ve:  # Catch specific programmer errors if needed
+        logger.exception(f"Value error processing fetch for job {job_id}: {ve}")
+        raise HTTPException(status_code=500, detail=f"Internal value error: {str(ve)}")
     except Exception as ex:
-        # Catch-all for other exceptions, returning a 500 Internal Server Error
-        logger.exception(f"Error fetching job: {str(ex)}")
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+        # Catch-all for other unexpected exceptions during fetch/state check
+        logger.exception(f"Unexpected error fetching job {job_id}: {str(ex)}")
+        raise HTTPException(status_code=500, detail=f"Internal Server Error: {str(ex)}")
 
 
 @router.post("/convert")

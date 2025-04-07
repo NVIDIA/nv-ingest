@@ -18,13 +18,7 @@ def test_audio_extract_only(
         message_client_hostname="localhost",
     )
 
-    ingestor = (
-        Ingestor(client=client)
-        .files("./data/multimodal_test.wav")
-        .extract(
-            extract_method="audio",
-        )
-    )
+    ingestor = Ingestor(client=client).files("./data/multimodal_test.wav").extract()
 
     results = ingestor.ingest()
     assert len(results) == 1

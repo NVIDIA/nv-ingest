@@ -6,7 +6,7 @@ import json
 import logging
 import os
 from json import JSONDecodeError
-from typing import Any
+from typing import Any, Optional
 
 from typing import List
 
@@ -40,11 +40,12 @@ class RedisIngestService(IngestServiceMeta):
         return RedisIngestService.__shared_instance
 
     def __init__(self, redis_hostname: str, redis_port: int, redis_task_queue: str):
+        self._bulk_vdb_cache_prefix = "vdb_bulk_upload_cache:"
+        self._cache_prefix = "processing_cache:"
         self._redis_hostname = redis_hostname
         self._redis_port = redis_port
         self._redis_task_queue = redis_task_queue
-        self._cache_prefix = "processing_cache:"
-        self._bulk_vdb_cache_prefix = "vdb_bulk_upload_cache:"
+        self._state_prefix = "job_state:"
 
         self._ingest_client = RedisClient(
             host=self._redis_hostname, port=self._redis_port, max_pool_size=self._concurrency_level
@@ -97,7 +98,9 @@ class RedisIngestService(IngestServiceMeta):
         """Store processing jobs data using simple key-value"""
         cache_key = f"{self._cache_prefix}{job_id}"
         try:
-            self._ingest_client.get_client().set(cache_key, json.dumps([job.dict() for job in jobs_data]), ex=3600)
+            self._ingest_client.get_client().set(
+                cache_key, json.dumps([job.model_dump() for job in jobs_data]), ex=3600
+            )
         except Exception as err:
             logger.exception(f"Error setting cache for {cache_key}: {err}")
             raise
@@ -113,3 +116,27 @@ class RedisIngestService(IngestServiceMeta):
         except Exception as err:
             logger.exception(f"Error getting cache for {cache_key}: {err}")
             raise
+
+    async def set_job_state(self, job_id: str, state: str, ttl: int = 86400):  # Default TTL 24 hours
+        """Sets the explicit state of a job."""
+        state_key = f"{self._state_prefix}{job_id}"
+        try:
+            logger.debug(f"Setting state for {job_id} to {state} with TTL {ttl}")
+            self._ingest_client.get_client().set(state_key, state, ex=ttl)
+        except Exception as err:
+            logger.exception(f"Error setting state for {state_key}: {err}")
+
+    async def get_job_state(self, job_id: str) -> Optional[str]:
+        """Gets the explicit state of a job."""
+        state_key = f"{self._state_prefix}{job_id}"
+        try:
+            data = self._ingest_client.get_client().get(state_key)
+            if data:
+                state = data.decode("utf-8")
+                logger.debug(f"Retrieved state for {job_id}: {state}")
+                return state
+            logger.debug(f"No state found for {job_id}")
+            return None
+        except Exception as err:
+            logger.exception(f"Error getting state for {state_key}: {err}")
+            return None

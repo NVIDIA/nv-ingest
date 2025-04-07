@@ -7,7 +7,7 @@
 import logging
 import re
 import time
-from typing import Any
+from typing import Any, Union, Tuple
 
 import httpx
 import requests
@@ -109,6 +109,8 @@ class RestClient(MessageBrokerClientBase):
         self._submit_endpoint = "/v1/submit_job"
         self._fetch_endpoint = "/v1/fetch_job"
 
+        self._base_url = f"{self.generate_url(self._host, self._port)}"
+
     def _connect(self) -> None:
         """
         Attempts to reconnect to the HTTP server if the current connection is not responsive.
@@ -177,90 +179,144 @@ class RestClient(MessageBrokerClientBase):
             user_provided_url = f"{user_provided_url}:{user_provided_port}"
         return user_provided_url
 
-    def fetch_message(self, job_id: str, timeout: float = (10, 600)) -> ResponseSchema:
+    def fetch_message(self, job_id: str, timeout: Union[float, Tuple[float, float]] = (10, 600)) -> ResponseSchema:
         """
-        Fetches a message from the specified queue with retries on failure, handling streaming HTTP responses.
+        Fetches a message (job result) from the specified endpoint with retries on *connection* failures.
+        Terminal HTTP status codes (like 400) result in an immediate failure ResponseSchema without retry attempts
+        for that specific call.
 
         Parameters
         ----------
         job_id : str
             The server-side job identifier.
-        timeout : float
-            The timeout in seconds for blocking until a message is available.
+        timeout : Union[float, Tuple[float, float]]
+            Timeout for the request. Can be a single float (connect and read) or a tuple (connect, read).
+            Defaults to (10 seconds connect, 600 seconds read).
 
         Returns
         -------
         ResponseSchema
-            The fetched message wrapped in a ResponseSchema object.
+            The fetched message wrapped in a ResponseSchema object. Code 0 on success (200),
+            Code 1 on terminal errors (e.g., 4xx, 5xx defined in _TERMINAL_RESPONSE_STATUSES),
+            Code 2 for job not ready (202), or Code 1 after exhausting retries for connection issues.
         """
         retries = 0
+        url = f"{self._base_url}{self._fetch_endpoint}/{job_id}"
+        logger.debug(f"Attempting to fetch message for job ID {job_id} from '{url}'")
+
+        # Ensure timeout is a tuple
+        if isinstance(timeout, (int, float)):
+            req_timeout = (min(float(timeout), 30.0), float(timeout))
+        elif isinstance(timeout, tuple) and len(timeout) == 2:
+            req_timeout = timeout
+        else:
+            logger.warning(f"Invalid timeout format: {timeout}. Using default (10, 600).")
+            req_timeout = (10, 600)
+
         while True:
             try:
-                url = f"{self.generate_url(self._host, self._port)}{self._fetch_endpoint}/{job_id}"
-                logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
-
-                # Fetch using streaming response
-                with requests.get(url, timeout=(30, 600), stream=True) as result:
+                with requests.get(url, timeout=req_timeout, stream=True) as result:  # Direct use of requests
                     response_code = result.status_code
+                    trace_id = result.headers.get("x-trace-id")
 
+                    # --- Terminal Error Handling (Includes 400) ---
                     if response_code in _TERMINAL_RESPONSE_STATUSES:
-                        # Terminal response code; return error ResponseSchema
-                        return ResponseSchema(
-                            response_code=1,
-                            response_reason=(
-                                f"Terminal response code {response_code} received when fetching JobSpec: {job_id}"
-                            ),
-                            response=result.text,
+                        # Log the specific terminal error
+                        error_reason = (
+                            f"Terminal response code {response_code} received when fetching Job Result for ID:"
+                            f" {job_id}. "
+                            f"Server Response: {result.text[:500]}"  # Include part of the response for context
                         )
+                        logger.error(error_reason)
+                        # Return failure immediately (Code 1), do not retry this specific call
+                        return ResponseSchema(
+                            response_code=1,  # Use 1 for terminal/unrecoverable errors
+                            response_reason=error_reason,
+                            response=result.text,  # Return full text if available
+                            trace_id=trace_id,
+                        )
+                    # --- End Terminal Error Handling ---
 
                     if response_code == 200:
-                        # Handle streaming response, reconstructing payload incrementally
-                        response_chunks = []
-                        for chunk in result.iter_content(chunk_size=1024 * 1024):  # 1MB chunks
-                            if chunk:
-                                response_chunks.append(chunk)
-                        full_response = b"".join(response_chunks).decode("utf-8")
-
-                        return ResponseSchema(
-                            response_code=0,
-                            response_reason="OK",
-                            response=full_response,
-                        )
+                        # Success path... (handle streaming response)
+                        try:
+                            response_chunks = []
+                            for chunk in result.iter_content(chunk_size=1024 * 1024):
+                                if chunk:
+                                    response_chunks.append(chunk)
+                            full_response = b"".join(response_chunks).decode("utf-8")
+                            logger.debug(f"Successfully fetched and decoded result for job ID {job_id}")
+                            return ResponseSchema(
+                                response_code=0,  # Use 0 for success
+                                response_reason="OK",
+                                response=full_response,
+                                trace_id=trace_id,
+                            )
+                        except Exception as e:
+                            logger.error(f"Error processing streamed response for job ID {job_id}: {e}")
+                            return ResponseSchema(
+                                response_code=1,  # Treat processing error as failure
+                                response_reason=f"Failed to process response stream: {e}",
+                                trace_id=trace_id,
+                            )
 
                     elif response_code == 202:
-                        # Job is not ready yet
+                        # Job is not ready yet - return distinct code/reason
+                        logger.debug(f"Job ID {job_id} not ready yet (202 Accepted).")
                         return ResponseSchema(
-                            response_code=1,
+                            response_code=2,  # Use 2 for "not ready" / retryable timeout condition
                             response_reason="Job is not ready yet. Retry later.",
+                            trace_id=trace_id,
                         )
 
                     else:
-                        try:
-                            # Retry the operation
-                            retries = self.perform_retry_backoff(retries)
-                        except RuntimeError as rte:
-                            raise rte
+                        # Handle other unexpected non-terminal, non-success codes
+                        logger.warning(
+                            f"Received unexpected status code {response_code} for job ID {job_id}."
+                            "Attempting retry if configured."
+                        )
+                        # Fall through to retry logic based on perform_retry_backoff capability for non-terminal errors
 
+            # --- Exception Handling (Connection Errors, Timeouts, etc.) ---
             except (ConnectionError, requests.HTTPError, requests.exceptions.ConnectionError) as err:
-                logger.error(f"Error during fetching, retrying... Error: {err}")
-                self._client = None  # Invalidate client to force reconnection
-                if "Connection refused" in str(err):
-                    logger.debug(
-                        "Connection refused encountered during fetch; sleeping for 10 seconds before retrying."
-                    )
-                    time.sleep(10)
                 try:
                     retries = self.perform_retry_backoff(retries)
+                    # Optional: Recreate client or session if needed based on error type
+                    # if "Connection refused" in str(err): time.sleep(10)
+                    continue  # Go to next iteration of while loop
                 except RuntimeError as rte:
-                    # Max retries reached
+                    # Max retries reached for connection errors
+                    logger.error(f"Max retries reached for job ID {job_id} due to connection errors. Error: {rte}")
                     return ResponseSchema(response_code=1, response_reason=str(rte), response=str(err))
-                except TimeoutError:
-                    raise
+                except TimeoutError:  # If perform_retry_backoff raises this
+                    # Decide how to handle timeout during backoff - likely treat as failure
+                    return ResponseSchema(response_code=1, response_reason="Timeout during retry backoff")
+
+            # --- General Exception Handling ---
             except Exception as e:
-                # Handle non-http specific exceptions
-                logger.error(f"Unexpected error during fetch from {url}: {e}")
+                logger.exception(f"Unexpected error during fetch from {url} for job ID {job_id}: {e}")
                 return ResponseSchema(
                     response_code=1, response_reason=f"Unexpected error during fetch: {e}", response=None
+                )
+
+            # If code reaches here, it implies a non-terminal HTTP error occurred
+            #   (e.g., 503 without hitting max retries yet)
+            # Attempt retry for these cases based on perform_retry_backoff
+            try:
+                retries = self.perform_retry_backoff(retries)
+                continue
+            except RuntimeError as rte:
+                # Max retries reached for non-terminal HTTP errors
+                logger.error(
+                    f"Max retries reached for job ID {job_id} after non-terminal HTTP error {response_code}. "
+                    f"Error: {rte}"
+                )
+                last_response_text = result.text if "result" in locals() and hasattr(result, "text") else None
+                return ResponseSchema(
+                    response_code=1,
+                    response_reason=f"Max retries reached after HTTP {response_code}: {rte}",
+                    response=last_response_text,
+                    trace_id=trace_id if "trace_id" in locals() else None,
                 )
 
     def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> ResponseSchema:
@@ -285,7 +341,7 @@ class RestClient(MessageBrokerClientBase):
         while True:
             try:
                 # Submit via HTTP
-                url = f"{self.generate_url(self._host, self._port)}{self._submit_endpoint}"
+                url = f"{self._base_url}{self._submit_endpoint}"
                 result = requests.post(url, json={"payload": message}, headers={"Content-Type": "application/json"})
 
                 response_code = result.status_code
@@ -334,35 +390,29 @@ class RestClient(MessageBrokerClientBase):
 
     def perform_retry_backoff(self, existing_retries) -> int:
         """
-        Attempts to perform a backoff retry delay. This function accepts the
-        current number of retries that have been attempted and compares
-        that with the maximum number of retries allowed. If the current
-        number of retries exceeds the max then a RuntimeError is raised.
+        Calculates backoff delay and sleeps if retries are allowed.
 
         Parameters
         ----------
         existing_retries : int
-            The number of retries that have been attempted for this operation thus far
+            The number of retries already attempted.
 
         Returns
         -------
         int
-            The updated number of retry attempts that have been made for this operation
+            The updated number of retries (existing_retries + 1).
 
         Raises
         ------
         RuntimeError
-            Raised if the maximum number of retry attempts has been reached.
+            If the maximum number of retry attempts has been reached.
         """
-        backoff_delay = min(2**existing_retries, self._max_backoff)
-        logger.debug(
-            f"Retry #: {existing_retries} of max_retries: {self.max_retries} | "
-            f"current backoff_delay: {backoff_delay}s of max_backoff: {self._max_backoff}s"
-        )
-
-        if self.max_retries > 0 and existing_retries < self.max_retries:
-            logger.error(f"Operation failed, retrying in {backoff_delay}s...")
+        if (existing_retries < self.max_retries) or (self.max_retries == 0):
+            backoff_delay = min(2**existing_retries, self._max_backoff)
+            logger.info(
+                f"Operation failed. Retrying attempt {existing_retries + 1}/{self.max_retries} in {backoff_delay}s..."
+            )
             time.sleep(backoff_delay)
             return existing_retries + 1
         else:
-            raise RuntimeError(f"Max retry attempts of {self.max_retries} reached")
+            raise RuntimeError(f"Max retry attempts ({self.max_retries}) reached")

@@ -55,10 +55,23 @@ if [ "$#" -gt 0 ]; then
     # If a command is provided, run it.
     exec "$@"
 else
+    # Normalize log level: default to 'info' if INGEST_LOG_LEVEL is 'DEFAULT'
+    _log_level=$(echo "${INGEST_LOG_LEVEL:-info}" | tr '[:upper:]' '[:lower:]')
+    if [ "$_log_level" = "default" ]; then
+        _log_level="warning"
+    fi
+
     # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
         # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
-        gunicorn nv_ingest.api.main:app -w 32 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:7670 --timeout 300 &
+        gunicorn nv_ingest.api.main:app \
+            -w 32 \
+            -k uvicorn.workers.UvicornWorker \
+            --bind 0.0.0.0:7670 \
+            --timeout 300 \
+            --log-level "${_log_level}" \
+            --access-logfile - \
+            --error-logfile - &
     fi
 
     if [ "${MEM_TRACE}" = true ]; then
