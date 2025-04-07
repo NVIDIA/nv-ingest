@@ -814,7 +814,7 @@ def stream_insert_milvus(
                 else:
                     data.append(record_func(text, element))
     client.insert(collection_name=collection_name, data=data)
-    logger.error(f"logged {len(data)} records")
+    logger.info(f"logged {len(data)} records")
 
 
 def write_to_nvingest_collection(
@@ -899,7 +899,7 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
-    logger.error(f"{len(records)} records to insert to milvus")
+    logger.info(f"{len(records)} records to insert to milvus")
     if len(records) < threshold:
         stream = True
     if stream:
