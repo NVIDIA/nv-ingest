@@ -278,7 +278,7 @@ class RestClient(MessageBrokerClientBase):
                         # Fall through to retry logic based on perform_retry_backoff capability for non-terminal errors
 
             # --- Exception Handling (Connection Errors, Timeouts, etc.) ---
-            except requests.exceptions.RequestException as err:
+            except (ConnectionError, requests.HTTPError, requests.exceptions.ConnectionError) as err:
                 try:
                     retries = self.perform_retry_backoff(retries)
                     # Optional: Recreate client or session if needed based on error type
