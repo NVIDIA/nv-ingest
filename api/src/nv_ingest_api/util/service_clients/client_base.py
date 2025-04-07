@@ -5,6 +5,8 @@
 from abc import ABC
 from abc import abstractmethod
 
+from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
+
 
 class MessageBrokerClientBase(ABC):
     """
@@ -49,7 +51,7 @@ class MessageBrokerClientBase(ABC):
         """
 
     @abstractmethod
-    def fetch_message(self, job_index: str, timeout: float = 0) -> str:
+    def fetch_message(self, job_index: str, timeout: float = 0) -> ResponseSchema:
         """
         Fetches a message from the specified queue with retries on failure.
 
@@ -62,11 +64,12 @@ class MessageBrokerClientBase(ABC):
         """
 
     @abstractmethod
-    def submit_message(self, channel_name: str, message: str) -> str:
+    def submit_message(self, channel_name: str, message: str, for_nv_ingest=False) -> ResponseSchema:
         """
         Submits a message to a specified queue with retries on failure.
 
         Parameters:
             channel_name (str): The name of the queue to submit the message to.
             message (str): The message to submit.
+            for_nv_ingest (bool): Whether the message is for NV Ingest.
         """
