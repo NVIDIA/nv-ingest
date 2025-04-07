@@ -429,7 +429,26 @@ class NvIngestClient:
         Handles retries specifically when _fetch_job_result raises TimeoutError (indicating job not ready).
         Other errors from _fetch_job_result (ValueError, RuntimeError for terminal failures like 400) are treated as
             final for that job.
-        # ... (rest of docstring as before)
+        Args:
+            job_ids (Union[str, List[str]]): A job ID or list of job IDs to fetch results for.
+            timeout (float): Timeout for each fetch operation, in seconds.
+            max_retries (Optional[int]): Maximum number of retries for jobs that are not ready yet.
+            retry_delay (float): Delay between retry attempts, in seconds.
+            verbose (bool): If True, logs additional information.
+            completion_callback (Optional[Callable[[Dict, str], None]]): A callback function that is executed each time
+             a job result is successfully fetched. It receives two arguments: the job result (a dict) and the job ID.
+            return_failures (bool): If True, returns a separate list of failed jobs.
+        Returns:
+          - If `return_failures=False`: List[Tuple[Optional[Dict], str]]
+            - A list of tuples, each containing the job result (or None on failure) and the job ID.
+          - If `return_failures=True`: Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]
+            - A tuple of:
+              - List of successful job results.
+              - List of failures containing job ID and error message.
+        Raises:
+            ValueError: If there is an error in decoding the job result.
+            TimeoutError: If the fetch operation times out.
+            Exception: For all other unexpected issues.
         """
         if isinstance(job_indices, str):
             job_indices = [job_indices]
