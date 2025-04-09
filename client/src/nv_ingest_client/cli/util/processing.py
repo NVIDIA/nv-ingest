@@ -395,7 +395,7 @@ def generate_job_batch_for_iteration(
 
 def create_and_process_jobs(
     files: List[str],
-    client: Any,  # Replace Any with NvIngestClient if available
+    client: Any,
     tasks: Dict[str, Any],
     output_directory: str,
     batch_size: int,

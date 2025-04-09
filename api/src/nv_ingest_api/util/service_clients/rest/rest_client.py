@@ -7,7 +7,8 @@
 import logging
 import re
 import time
-from typing import Any, Union, Tuple
+from typing import Any, Union, Tuple, Optional
+from urllib.parse import urlparse
 
 import httpx
 import requests
@@ -94,22 +95,82 @@ class RestClient(MessageBrokerClientBase):
         port: int,
         max_retries: int = 0,
         max_backoff: int = 32,
-        connection_timeout: int = 300,
-        http_allocator: Any = httpx.AsyncClient,
+        connection_timeout: int = 300,  # Keep original parameter name
+        http_allocator: Any = httpx.AsyncClient,  # Restore original default and usage
     ):
+        """
+        Initialize the RestClient (Restored original signature).
+        """
         self._host = host
         self._port = port
         self._max_retries = max_retries
         self._max_backoff = max_backoff
-        self._connection_timeout = connection_timeout
-        self._http_allocator = http_allocator
-        self._client = self._http_allocator()
-        self._retries = 0
+        self._connection_timeout = connection_timeout  # Store original parameter
+        self._http_allocator = http_allocator  # Store allocator
+        self._client = self._http_allocator()  # Use the allocator
+        self._retries = 0  # Original attribute
 
         self._submit_endpoint = "/v1/submit_job"
         self._fetch_endpoint = "/v1/fetch_job"
+        # Regenerate base_url using original helper - assuming it exists or is similar
+        self._base_url = self.generate_url(self._host, self._port)
 
-        self._base_url = f"{self.generate_url(self._host, self._port)}"
+    # Restore original generate_url helper IF it was different
+    @staticmethod
+    def generate_url(user_provided_url, user_provided_port) -> str:
+        """Examines the user defined URL for http*://. If that
+        pattern is detected the URL is used as provided by the user.
+        If that pattern does not exist then the assumption is made that
+        the endpoint is simply `http://` and that is prepended
+        to the user supplied endpoint.
+
+        Args:
+            user_provided_url str: Endpoint where the Rest service is running
+            user_provided_port int: Port for the service.
+
+        Returns:
+            str: Fully validated URL
+        """
+        # Ensure URL is treated as string
+        url_str = str(user_provided_url)
+        if not re.match(r"^https?://", url_str):
+            # Add the default `http://` if it's not already present in the URL
+            base_url = f"http://{url_str}:{user_provided_port}"
+        else:
+            parsed_url = urlparse(url_str)
+            if parsed_url.port:
+                base_url = f"{parsed_url.scheme}://{parsed_url.netloc}"  # Use existing netloc
+            else:
+                base_url = f"{parsed_url.scheme}://{parsed_url.hostname}:{user_provided_port}"
+            if parsed_url.path and parsed_url.path != "/":
+                base_url += parsed_url.path  # Preserve path if present
+
+        return base_url.rstrip("/")  # Ensure no trailing slash
+
+    def _get_request_timeout(
+        self, specific_timeout: Optional[Union[float, Tuple[float, float]]]
+    ) -> Tuple[float, float]:
+        """
+        Determines the (connect, read) timeout tuple.
+        Uses self._connection_timeout as a default reference, primarily for connect.
+        """
+        default_connect = float(self._connection_timeout)  # Use stored value as connect default
+        default_read = 600.0  # Default read timeout (adjust if needed)
+
+        if specific_timeout is None:
+            return (default_connect, default_read)
+        elif isinstance(specific_timeout, (int, float)):
+            # Single float interpreted as read timeout
+            return (default_connect, float(specific_timeout))
+        elif isinstance(specific_timeout, tuple) and len(specific_timeout) == 2:
+            try:
+                return (float(specific_timeout[0]), float(specific_timeout[1]))
+            except (ValueError, TypeError):
+                logger.warning(f"Invalid tuple values in specific_timeout: {specific_timeout}. Using defaults.")
+                return (default_connect, default_read)
+        else:
+            logger.warning(f"Invalid timeout format provided: {specific_timeout}. Using defaults.")
+            return (default_connect, default_read)
 
     def _connect(self) -> None:
         """
@@ -158,234 +219,144 @@ class RestClient(MessageBrokerClientBase):
         except (httpx.HTTPError, AttributeError):
             return ResponseSchema(response_code=1, response_reason="Failed to ping HTTP server")
 
-    @staticmethod
-    def generate_url(user_provided_url, user_provided_port) -> str:
-        """Examines the user defined URL for http*://. If that
-        pattern is detected the URL is used as provided by the user.
-        If that pattern does not exist then the assumption is made that
-        the endpoint is simply `http://` and that is prepended
-        to the user supplied endpoint.
-
-        Args:
-            user_provided_url str: Endpoint where the Rest service is running
-
-        Returns:
-            str: Fully validated URL
-        """
-        if not re.match(r"^https?://", user_provided_url):
-            # Add the default `http://` if it's not already present in the URL
-            user_provided_url = f"http://{user_provided_url}:{user_provided_port}"
-        else:
-            user_provided_url = f"{user_provided_url}:{user_provided_port}"
-        return user_provided_url
-
-    def fetch_message(self, job_id: str, timeout: Union[float, Tuple[float, float]] = (10, 600)) -> ResponseSchema:
-        """
-        Fetches a message (job result) from the specified endpoint with retries on *connection* failures.
-        Terminal HTTP status codes (like 400) result in an immediate failure ResponseSchema without retry attempts
-        for that specific call.
-
-        Parameters
-        ----------
-        job_id : str
-            The server-side job identifier.
-        timeout : Union[float, Tuple[float, float]]
-            Timeout for the request. Can be a single float (connect and read) or a tuple (connect, read).
-            Defaults to (10 seconds connect, 600 seconds read).
-
-        Returns
-        -------
-        ResponseSchema
-            The fetched message wrapped in a ResponseSchema object. Code 0 on success (200),
-            Code 1 on terminal errors (e.g., 4xx, 5xx defined in _TERMINAL_RESPONSE_STATUSES),
-            Code 2 for job not ready (202), or Code 1 after exhausting retries for connection issues.
-        """
+    def fetch_message(self, job_id: str, timeout: Optional[Union[float, Tuple[float, float]]] = None) -> ResponseSchema:
         retries = 0
         url = f"{self._base_url}{self._fetch_endpoint}/{job_id}"
-        logger.debug(f"Attempting to fetch message for job ID {job_id} from '{url}'")
-
-        # Ensure timeout is a tuple
-        if isinstance(timeout, (int, float)):
-            req_timeout = (min(float(timeout), 30.0), float(timeout))
-        elif isinstance(timeout, tuple) and len(timeout) == 2:
-            req_timeout = timeout
-        else:
-            logger.warning(f"Invalid timeout format: {timeout}. Using default (10, 600).")
-            req_timeout = (10, 600)
+        req_timeout = self._get_request_timeout(timeout)
+        logger.debug(f"Attempting fetch for job ID {job_id} from '{url}' with timeout {req_timeout}")
 
         while True:
             try:
-                with requests.get(url, timeout=req_timeout, stream=True) as result:  # Direct use of requests
+                with requests.get(url, timeout=req_timeout, stream=True) as result:
                     response_code = result.status_code
                     trace_id = result.headers.get("x-trace-id")
 
-                    # --- Terminal Error Handling (Includes 400) ---
                     if response_code in _TERMINAL_RESPONSE_STATUSES:
-                        # Log the specific terminal error
-                        error_reason = (
-                            f"Terminal response code {response_code} received when fetching Job Result for ID:"
-                            f" {job_id}. "
-                            f"Server Response: {result.text[:500]}"  # Include part of the response for context
-                        )
-                        logger.error(error_reason)
-                        # Return failure immediately (Code 1), do not retry this specific call
+                        error_reason = f"Terminal response code {response_code} fetching {job_id}."
+                        logger.error(f"{error_reason} Response: {result.text[:200]}")
                         return ResponseSchema(
-                            response_code=1,  # Use 1 for terminal/unrecoverable errors
-                            response_reason=error_reason,
-                            response=result.text,  # Return full text if available
-                            trace_id=trace_id,
+                            response_code=1, response_reason=error_reason, response=result.text, trace_id=trace_id
                         )
-                    # --- End Terminal Error Handling ---
-
-                    if response_code == 200:
-                        # Success path... (handle streaming response)
+                    elif response_code == 200:
                         try:
-                            response_chunks = []
-                            for chunk in result.iter_content(chunk_size=1024 * 1024):
-                                if chunk:
-                                    response_chunks.append(chunk)
-                            full_response = b"".join(response_chunks).decode("utf-8")
-                            logger.debug(f"Successfully fetched and decoded result for job ID {job_id}")
+                            full_response = b"".join(c for c in result.iter_content(1024 * 1024) if c).decode("utf-8")
+                            logger.debug(f"Success fetching {job_id}")
                             return ResponseSchema(
-                                response_code=0,  # Use 0 for success
-                                response_reason="OK",
-                                response=full_response,
-                                trace_id=trace_id,
+                                response_code=0, response_reason="OK", response=full_response, trace_id=trace_id
                             )
                         except Exception as e:
-                            logger.error(f"Error processing streamed response for job ID {job_id}: {e}")
+                            logger.error(f"Stream processing error for {job_id}: {e}")
                             return ResponseSchema(
-                                response_code=1,  # Treat processing error as failure
-                                response_reason=f"Failed to process response stream: {e}",
-                                trace_id=trace_id,
+                                response_code=1, response_reason=f"Stream processing error: {e}", trace_id=trace_id
                             )
-
                     elif response_code == 202:
-                        # Job is not ready yet - return distinct code/reason
-                        logger.debug(f"Job ID {job_id} not ready yet (202 Accepted).")
+                        logger.debug(f"Job {job_id} not ready (202)")
                         return ResponseSchema(
-                            response_code=2,  # Use 2 for "not ready" / retryable timeout condition
-                            response_reason="Job is not ready yet. Retry later.",
-                            trace_id=trace_id,
+                            response_code=2, response_reason="Job not ready yet. Retry later.", trace_id=trace_id
                         )
+                    else:  # Non-200/202/Terminal
+                        logger.warning(f"Unexpected status {response_code} for {job_id}. Retrying if possible.")
+                        # Fall through
 
-                    else:
-                        # Handle other unexpected non-terminal, non-success codes
-                        logger.warning(
-                            f"Received unexpected status code {response_code} for job ID {job_id}."
-                            "Attempting retry if configured."
-                        )
-                        # Fall through to retry logic based on perform_retry_backoff capability for non-terminal errors
-
-            # --- Exception Handling (Connection Errors, Timeouts, etc.) ---
-            except (ConnectionError, requests.HTTPError, requests.exceptions.ConnectionError) as err:
+            # --- Exception Handling ---
+            except requests.exceptions.RequestException as err:
+                logger.warning(f"RequestException fetching {job_id}: {err}. Attempting retry...")
                 try:
                     retries = self.perform_retry_backoff(retries)
-                    # Optional: Recreate client or session if needed based on error type
-                    # if "Connection refused" in str(err): time.sleep(10)
-                    continue  # Go to next iteration of while loop
+                    continue
                 except RuntimeError as rte:
-                    # Max retries reached for connection errors
-                    logger.error(f"Max retries reached for job ID {job_id} due to connection errors. Error: {rte}")
+                    logger.error(f"Max retries hit fetching {job_id} after RequestException: {rte}")
                     return ResponseSchema(response_code=1, response_reason=str(rte), response=str(err))
-                except TimeoutError:  # If perform_retry_backoff raises this
-                    # Decide how to handle timeout during backoff - likely treat as failure
+                except TimeoutError:
+                    logger.error(f"Timeout during backoff for {job_id}")
                     return ResponseSchema(response_code=1, response_reason="Timeout during retry backoff")
-
-            # --- General Exception Handling ---
             except Exception as e:
-                logger.exception(f"Unexpected error during fetch from {url} for job ID {job_id}: {e}")
-                return ResponseSchema(
-                    response_code=1, response_reason=f"Unexpected error during fetch: {e}", response=None
-                )
+                logger.exception(f"Unexpected error fetching {job_id}: {e}")
+                # *** Use kwargs ***
+                return ResponseSchema(response_code=1, response_reason=f"Unexpected fetch error: {e}")
 
-            # If code reaches here, it implies a non-terminal HTTP error occurred
-            #   (e.g., 503 without hitting max retries yet)
-            # Attempt retry for these cases based on perform_retry_backoff
+            # --- Retry Logic for fall-through codes ---
             try:
                 retries = self.perform_retry_backoff(retries)
                 continue
             except RuntimeError as rte:
-                # Max retries reached for non-terminal HTTP errors
-                logger.error(
-                    f"Max retries reached for job ID {job_id} after non-terminal HTTP error {response_code}. "
-                    f"Error: {rte}"
-                )
-                last_response_text = result.text if "result" in locals() and hasattr(result, "text") else None
+                logger.error(f"Max retries hit fetching {job_id} after HTTP {response_code}: {rte}")
+                resp_text = result.text[:500] if result and hasattr(result, "text") else None
                 return ResponseSchema(
                     response_code=1,
-                    response_reason=f"Max retries reached after HTTP {response_code}: {rte}",
-                    response=last_response_text,
-                    trace_id=trace_id if "trace_id" in locals() else None,
+                    response_reason=f"Max retries after HTTP {response_code}: {rte}",
+                    response=resp_text,
+                    trace_id=trace_id,
                 )
 
-    def submit_message(self, channel_name: str, message: str, for_nv_ingest: bool = False) -> ResponseSchema:
-        """
-        Submits a JobSpec to a specified HTTP endpoint with retries on failure.
-
-        Parameters
-        ----------
-        channel_name : str
-            Not used as part of RestClient but defined in MessageClientBase.
-        message : str
-            The message to submit.
-        for_nv_ingest : bool
-            Not used as part of RestClient but defined in MessageClientBase.
-
-        Returns
-        -------
-        ResponseSchema
-            The response from the server wrapped in a ResponseSchema object.
-        """
+    def submit_message(
+        self,
+        channel_name: str,
+        message: str,
+        for_nv_ingest: bool = False,
+        timeout: Optional[Union[float, Tuple[float, float]]] = None,
+    ) -> ResponseSchema:
         retries = 0
+        url = f"{self._base_url}{self._submit_endpoint}"
+        headers = {"Content-Type": "application/json"}
+        req_timeout = self._get_request_timeout(timeout)
+        logger.debug(f"Attempting submit to '{url}' with timeout {req_timeout}")
+
         while True:
             try:
-                # Submit via HTTP
-                url = f"{self._base_url}{self._submit_endpoint}"
-                result = requests.post(url, json={"payload": message}, headers={"Content-Type": "application/json"})
-
+                result = requests.post(url, json={"payload": message}, headers=headers, timeout=req_timeout)
                 response_code = result.status_code
+                trace_id = result.headers.get("x-trace-id")
+
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
-                    # Terminal response code; return error ResponseSchema
+                    error_reason = f"Terminal response code {response_code} submitting job."
+                    logger.error(f"{error_reason} Response: {result.text[:200]}")
                     return ResponseSchema(
-                        response_code=1,
-                        response_reason=f"Terminal response code {response_code} received when submitting JobSpec",
-                        trace_id=result.headers.get("x-trace-id"),
+                        response_code=1, response_reason=error_reason, response=result.text, trace_id=trace_id
                     )
-                else:
-                    # If 200 we are good, otherwise let's try again
-                    if response_code == 200:
-                        logger.debug(f"JobSpec successfully submitted to http endpoint {self._submit_endpoint}")
-                        # The REST interface returns a JobId, so we capture that here
-                        x_trace_id = result.headers.get("x-trace-id")
-                        return ResponseSchema(
-                            response_code=0,
-                            response_reason="OK",
-                            response=result.text,
-                            transaction_id=result.text,
-                            trace_id=x_trace_id,
-                        )
-                    else:
-                        # Retry the operation
-                        retries = self.perform_retry_backoff(retries)
-            except requests.RequestException as e:
-                logger.error(f"Failed to submit job, retrying... Error: {e}")
-                self._client = None  # Invalidate client to force reconnection
-                if "Connection refused" in str(e):
-                    logger.debug(
-                        "Connection refused encountered during submission; sleeping for 10 seconds before retrying."
+                elif response_code == 200:
+                    server_job_id_raw = result.text
+                    cleaned_job_id = server_job_id_raw.strip('"')
+                    logger.debug(f"Submit successful. Server Job ID: {cleaned_job_id}, Trace: {trace_id}")
+                    return ResponseSchema(
+                        response_code=0,
+                        response_reason="OK",
+                        response=server_job_id_raw,
+                        transaction_id=cleaned_job_id,
+                        trace_id=trace_id,
                     )
-                    time.sleep(10)
+                else:  # Non-200/Terminal
+                    logger.warning(f"Unexpected status {response_code} on submit. Retrying if possible.")
+                    # Fall through
+
+            # --- Exception Handling ---
+            except requests.exceptions.RequestException as err:
+                logger.warning(f"RequestException submitting job: {err}. Attempting retry...")
                 try:
                     retries = self.perform_retry_backoff(retries)
+                    continue
                 except RuntimeError as rte:
-                    # Max retries reached
-                    return ResponseSchema(response_code=1, response_reason=str(rte), response=str(e))
+                    logger.error(f"Max retries hit submitting job after RequestException: {rte}")
+                    return ResponseSchema(response_code=1, response_reason=str(rte), response=str(err))
+                except TimeoutError:
+                    logger.error("Timeout during backoff for submit")
+                    return ResponseSchema(response_code=1, response_reason="Timeout during retry backoff")
             except Exception as e:
-                # Handle non-http specific exceptions
-                logger.error(f"Unexpected error during submission of JobSpec to {url}: {e}")
+                logger.exception(f"Unexpected error submitting job: {e}")
+                return ResponseSchema(response_code=1, response_reason=f"Unexpected submit error: {e}")
+
+            # --- Retry Logic for fall-through codes ---
+            try:
+                retries = self.perform_retry_backoff(retries)
+                continue
+            except RuntimeError as rte:
+                logger.error(f"Max retries hit submitting job after HTTP {response_code}: {rte}")
+                resp_text = result.text[:500] if result and hasattr(result, "text") else None
                 return ResponseSchema(
-                    response_code=1, response_reason=f"Unexpected error during JobSpec submission: {e}", response=None
+                    response_code=1,
+                    response_reason=f"Max retries after HTTP {response_code}: {rte}",
+                    response=resp_text,
+                    trace_id=trace_id,
                 )
 
     def perform_retry_backoff(self, existing_retries) -> int:
@@ -409,7 +380,7 @@ class RestClient(MessageBrokerClientBase):
         """
         if (existing_retries < self.max_retries) or (self.max_retries == 0):
             backoff_delay = min(2**existing_retries, self._max_backoff)
-            logger.info(
+            logger.debug(
                 f"Operation failed. Retrying attempt {existing_retries + 1}/{self.max_retries} in {backoff_delay}s..."
             )
             time.sleep(backoff_delay)
