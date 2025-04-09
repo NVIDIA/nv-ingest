@@ -290,6 +290,7 @@ class RedisClient(MessageBrokerClientBase):
             "description": fragments[0]["description"],
             "data": [],
             "trace": fragments[0].get("trace", {}),
+            "annotations": fragments[0].get("annotations", {}),
         }
 
         # Combine the 'data' elements from all fragments
