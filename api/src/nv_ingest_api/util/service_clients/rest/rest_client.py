@@ -341,7 +341,7 @@ class RestClient(MessageBrokerClientBase):
             # --- Exception Handling ---
             # Catch requests exception specifically if using requests client
             except requests.exceptions.RequestException as err:
-                logger.warning(
+                logger.debug(
                     f"RequestException fetching {job_id}: {err}. Attempting retry ({retries + 1}/{self.max_retries})..."
                 )
                 try:
