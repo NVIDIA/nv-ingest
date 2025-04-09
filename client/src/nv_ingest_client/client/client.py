@@ -284,7 +284,7 @@ class NvIngestClient:
         return self.add_task(job_index, task_factory(task_type, **task_params))
 
     def _fetch_job_result(
-        self, job_index: str, timeout: float = 100, data_only: bool = True
+        self, job_index: str, timeout: Tuple[int, float] = (100, None), data_only: bool = False
     ) -> Tuple[Any, str, Optional[str]]:
         """
         Internal method to fetch a job result using its client-side index.
@@ -335,6 +335,7 @@ class NvIngestClient:
                         f"Received successful response for job index {job_index} (Server ID: {server_job_id}). "
                         f"Decoding JSON."
                     )
+
                     response_json = json.loads(response.response)
                     result_data = response_json.get("data") if data_only else response_json
 
@@ -397,11 +398,11 @@ class NvIngestClient:
     # The Pythonic invocation and the CLI invocation approach currently have different approaches to timeouts
     # This distinction is made obvious by provided two separate functions. One for "_cli" and one for
     # direct Python use. This is the "_cli" approach
-    def fetch_job_result_cli(self, job_ids: Union[str, List[str]], timeout: float = 100, data_only: bool = True):
+    def fetch_job_result_cli(self, job_ids: Union[str, List[str]], data_only: bool = False):
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
-        return [self._fetch_job_result(job_id, timeout, data_only) for job_id in job_ids]
+        return [self._fetch_job_result(job_id, data_only) for job_id in job_ids]
 
     # Nv-Ingest jobs are often "long running". Therefore after
     # submission we intermittently check if the job is completed.
@@ -639,15 +640,13 @@ class NvIngestClient:
             job_state.trace_id = future.result()[0]  # Trace_id from `submit_job` endpoint submission
             job_state.future = None
 
-    def fetch_job_result_async(
-        self, job_ids: Union[str, List[str]], timeout: float = 10, data_only: bool = True
-    ) -> Dict[Future, str]:
+    def fetch_job_result_async(self, job_ids: Union[str, List[str]], data_only: bool = True) -> Dict[Future, str]:
         """
         Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.
 
         Parameters:
             job_ids (Union[str, List[str]]): A single job ID or a list of job IDs.
-            timeout (float): Timeout for fetching each job result, in seconds.
+            timeout (float): Timeout (connect, read) for fetching each job result, in seconds.
             data_only (bool): Whether to return only the data part of the job result.
 
         Returns:
@@ -662,7 +661,7 @@ class NvIngestClient:
         future_to_job_id = {}
         for job_id in job_ids:
             job_state = self._get_and_check_job_state(job_id)
-            future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, timeout, data_only)
+            future = self._worker_pool.submit(self.fetch_job_result_cli, job_id, data_only)
             job_state.future = future
             future_to_job_id[future] = job_id
 

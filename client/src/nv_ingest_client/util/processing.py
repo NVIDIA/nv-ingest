@@ -9,7 +9,6 @@ import re
 from typing import Any
 from typing import Dict
 from typing import List
-from typing import Optional
 from typing import Tuple
 from typing import Type
 
@@ -32,7 +31,7 @@ class IngestJobFailure(Exception):
 
 def handle_future_result(
     future: concurrent.futures.Future,
-    timeout: Optional[int] = None,
+    timeout=10,
 ) -> Tuple[Dict[str, Any], str]:
     """
     Handle the result of a completed future job and process annotations.
