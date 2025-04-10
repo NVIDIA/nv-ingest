@@ -15,10 +15,10 @@ To get started using [NeMo Retriever extraction](overview.md) in library mode, y
 
 Use the following procedure to prepare your environment.
 
-1. Run the following code to create your nvingest conda environment.
+1. Run the following code to create your NV Ingest Conda environment.
 
     ```
-conda create -y --name nvingest python=3.10 && \
+    conda create -y --name nvingest python=3.10 && \
     conda activate nvingest && \
     conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0 && \
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
@@ -26,14 +26,27 @@ conda create -y --name nvingest python=3.10 && \
 
     !!! tip
 
-        Make sure your conda environment is activated. `which python` should indicate that you're using the conda provided python installation (not an OS provided python).
+        To confirm that you have activated your Conda environment, run `which python` and confirm that you see `nvingest` in the result. You can do this before any python command that you run.
 
-Make sure to set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have one, you can get one on [build.nvidia.com](https://build.nvidia.com/nvidia/llama-3_2-nv-embedqa-1b-v2?snippet_tab=Python&signin=true&api_key=true).
-```
-#Note: these should be the same value
-export NVIDIA_BUILD_API_KEY=nvapi-...
-export NVIDIA_API_KEY=nvapi-...
-```
+2. Set or create a .env file that contains your NVIDIA Build API key and other environment variables.
+
+    !!! note
+
+        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md) and [Environment Configuration Variables](environment-config.md).
+
+    - To set your variables, use the following code.
+
+        ```
+        export NVIDIA_BUILD_API_KEY=nvapi-<your key>
+        export NVIDIA_API_KEY=nvapi-<your key>
+        ```
+    - To add your variables to an .env file, include the following.
+
+        ```
+        NVIDIA_BUILD_API_KEY=nvapi-<your key>
+        NVIDIA_API_KEY=nvapi-<your key>    
+        ```
+
 
 ## Step 2: Ingest Documents
 
@@ -44,8 +57,8 @@ You can submit jobs programmatically by using Python.
     For more Python examples, refer to [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb).
 
 
-If you have a very high number of CPUs and see the process hang without progress, 
-we recommend using `taskset` to limit the number of CPUs visible to the process. 
+If you have a very high number of CPUs, and see the process hang without progress, 
+we recommend that you use `taskset` to limit the number of CPUs visible to the process. 
 Use the following code.
 
 ```
@@ -76,7 +89,7 @@ client = NvIngestClient(
     message_client_hostname="localhost"
 )
                                             
-# Note: gpu_cagra accelerated indexing is not yet available in milvus-lite
+# gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
@@ -148,6 +161,8 @@ This chart shows some gadgets, and some very fictitious costs.
 ```
 
 ## Step 3: Query Ingested Content
+
+To query for relevant snippets of the ingested content, and use them with an LLM to generate answers, use the following code.
 
 ```python
 from openai import OpenAI

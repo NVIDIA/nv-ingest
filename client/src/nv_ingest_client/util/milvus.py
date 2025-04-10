@@ -1,32 +1,32 @@
-from pymilvus import (
-    MilvusClient,
-    Collection,
-    DataType,
-    CollectionSchema,
-    connections,
-    Function,
-    FunctionType,
-    utility,
-    BulkInsertState,
-    AnnSearchRequest,
-    RRFRanker,
-)
-from pymilvus.milvus_client.index import IndexParams
-from pymilvus.bulk_writer import RemoteBulkWriter, BulkFileType
-from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus.model.sparse import BM25EmbeddingFunction
-from llama_index.embeddings.nvidia import NVIDIAEmbedding
-from scipy.sparse import csr_array
-from typing import List
 import datetime
-import time
-from urllib.parse import urlparse
-from typing import Union, Dict
-import requests
-from nv_ingest_client.util.util import ClientConfigSchema
-from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 import logging
+import time
+from typing import Dict
+from typing import List
+from typing import Tuple
+from typing import Union
+from urllib.parse import urlparse
 
+import requests
+from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
+from nv_ingest_client.util.util import ClientConfigSchema
+from pymilvus import AnnSearchRequest
+from pymilvus import BulkInsertState
+from pymilvus import Collection
+from pymilvus import CollectionSchema
+from pymilvus import DataType
+from pymilvus import Function
+from pymilvus import FunctionType
+from pymilvus import MilvusClient
+from pymilvus import RRFRanker
+from pymilvus import connections
+from pymilvus import utility
+from pymilvus.bulk_writer import BulkFileType
+from pymilvus.bulk_writer import RemoteBulkWriter
+from pymilvus.milvus_client.index import IndexParams
+from pymilvus.model.sparse import BM25EmbeddingFunction
+from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
+from scipy.sparse import csr_array
 
 logger = logging.getLogger(__name__)
 
@@ -455,13 +455,7 @@ def create_nvingest_collection(
         sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
-    d_idx = None
-    s_idx = None
-    for k, v in index_params._indexes.items():
-        if k[1] == "dense_index" and hasattr(v, "_index_type"):
-            d_idx = v._index_type
-        if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
-            s_idx = v._index_type
+    d_idx, s_idx = _get_index_types(index_params, sparse=sparse)
     log_new_meta_collection(
         collection_name,
         fields=schema.fields,
@@ -471,6 +465,48 @@ def create_nvingest_collection(
         sparse_index=str(s_idx),
         recreate=recreate_meta,
     )
+
+
+def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[str, str]:
+    """
+    Returns the dense and optional sparse index types from Milvus index_params,
+    handling both old (dict) and new (list) formats.
+
+    Parameters:
+        index_params: The index parameters object with a _indexes attribute.
+        sparse (bool): Whether to look for sparse_index as well.
+
+    Returns:
+        tuple: (dense_index_type, sparse_index_type or None)
+    """
+    d_idx = None
+    s_idx = None
+
+    indexes = getattr(index_params, "_indexes", None)
+
+    if isinstance(indexes, dict):
+        # Old Milvus behavior (< 2.5.6)
+        for k, v in indexes.items():
+            if k[1] == "dense_index" and hasattr(v, "_index_type"):
+                d_idx = v._index_type
+            if sparse and k[1] == "sparse_index" and hasattr(v, "_index_type"):
+                s_idx = v._index_type
+
+    elif isinstance(indexes, list):
+        # New Milvus behavior (>= 2.5.6)
+        for idx in indexes:
+            index_name = getattr(idx, "index_name", None)
+            index_type = getattr(idx, "index_type", None)
+
+            if index_name == "dense_index":
+                d_idx = index_type
+            if sparse and index_name == "sparse_index":
+                s_idx = index_type
+
+    else:
+        raise TypeError(f"Unexpected type for index_params._indexes: {type(indexes)}")
+
+    return str(d_idx), str(s_idx)
 
 
 def _format_sparse_embedding(sparse_vector: csr_array):
@@ -1060,9 +1096,8 @@ def nvingest_retrieval(
     nv_ranker_model_name: str = None,
     nv_ranker_nvidia_api_key: str = None,
     nv_ranker_truncate: str = "END",
-    nv_ranker_top_k: int = 5,
+    nv_ranker_top_k: int = 50,
     nv_ranker_max_batch_size: int = 64,
-    nv_ranker_candidate_multiple: int = 10,
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -1113,6 +1148,8 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
+    from llama_index.embeddings.nvidia import NVIDIAEmbedding
+
     client_config = ClientConfigSchema()
     nvidia_api_key = client_config.nvidia_build_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
@@ -1121,9 +1158,9 @@ def nvingest_retrieval(
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
-    nv_ranker_top_k = top_k
+    final_top_k = top_k
     if nv_ranker:
-        top_k = top_k * nv_ranker_candidate_multiple
+        top_k = nv_ranker_top_k
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
@@ -1155,7 +1192,7 @@ def nvingest_retrieval(
                     model_name=nv_ranker_model_name,
                     nvidia_api_key=nv_ranker_nvidia_api_key,
                     truncate=nv_ranker_truncate,
-                    topk=nv_ranker_top_k,
+                    topk=final_top_k,
                     max_batch_size=nv_ranker_max_batch_size,
                 )
             )
@@ -1244,7 +1281,9 @@ def nv_rerank(
         map_candidates[idx] = candidate
         texts.append({"text": candidate["entity"]["text"]})
     payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
+    start = time.time()
     response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
+    logger.debug(f"RERANKER time: {time.time() - start}")
     if response.status_code != 200:
         raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []

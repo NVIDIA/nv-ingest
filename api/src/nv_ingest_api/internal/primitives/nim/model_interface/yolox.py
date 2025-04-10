@@ -401,18 +401,18 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_model_name: str = "nv-yolox-page-elements-v1"):
+    def __init__(self, yolox_model_name: str = "nemoretriever-page-elements-v2"):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if yolox_model_name.endswith("-v2"):
-            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-            final_score = YOLOX_PAGE_V2_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
-        else:
+        if yolox_model_name.endswith("-v1"):
             num_classes = YOLOX_PAGE_V1_NUM_CLASSES
             final_score = YOLOX_PAGE_V1_FINAL_SCORE
             class_labels = YOLOX_PAGE_V1_CLASS_LABELS
+        else:
+            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+            final_score = YOLOX_PAGE_V2_FINAL_SCORE
+            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
             image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -1382,7 +1382,7 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-elements-v1"):
+def get_yolox_model_name(yolox_http_endpoint, default_model_name="nemoretriever-page-elements-v2"):
     try:
         yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
         if not yolox_model_name:
@@ -1390,11 +1390,11 @@ def get_yolox_model_name(yolox_http_endpoint, default_model_name="nv-yolox-page-
                 "Failed to obtain yolox-page-elements model name from the endpoint. "
                 f"Falling back to '{default_model_name}'."
             )
-            yolox_model_name = default_model_name  # Default to v1 until gtc release
+            yolox_model_name = default_model_name
     except Exception:
         logger.warning(
             "Failed to get yolox-page-elements version after 30 seconds. " f"Falling back to '{default_model_name}'."
         )
-        yolox_model_name = default_model_name  # Default to v1 until gtc release
+        yolox_model_name = default_model_name
 
     return yolox_model_name
