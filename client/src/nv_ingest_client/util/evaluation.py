@@ -31,7 +31,7 @@ def get_recall_scores(query_df, collection_name, hybrid):
             "query_id": query_df["query_id"][i],
             "query_text": query_df["query"][i],
             "expected_pdf_page": expected_pdf_page,
-            "expected_pdf_text": query_df["answer"][i],
+            "expected_answer": query_df["answer"][i],
             "retrieved_pdf_pages": [retrieved_pdf_pages],
             "retrieved_pdf_texts": [[result["entity"]["text"] for result in retrieved_answers]],
         }
