@@ -60,6 +60,7 @@ else
     if [ "$_log_level" = "default" ]; then
         _log_level="warning"
     fi
+    _log_level="warning"
 
     # If no command is provided, run the default startup launch.
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then

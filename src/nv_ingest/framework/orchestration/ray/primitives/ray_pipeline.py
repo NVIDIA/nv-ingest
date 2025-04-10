@@ -1376,6 +1376,8 @@ class RayPipeline:
         Orchestrates scaling/maintenance, using RayStatsCollector for stats.
         """
         logger.debug("--- Performing Scaling & Maintenance Cycle ---")
+
+        return
         cycle_start_time = time.time()
 
         if self._is_flushing:
