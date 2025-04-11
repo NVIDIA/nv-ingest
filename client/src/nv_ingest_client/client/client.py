@@ -284,7 +284,7 @@ class NvIngestClient:
         return self.add_task(job_index, task_factory(task_type, **task_params))
 
     def _fetch_job_result(
-        self, job_index: str, timeout: Tuple[int, float] = (100, None), data_only: bool = False
+        self, job_index: str, timeout: Tuple[int, Union[float, None]] = (100, None), data_only: bool = False
     ) -> Tuple[Any, str, Optional[str]]:
         """
         Internal method to fetch a job result using its client-side index.
@@ -402,21 +402,21 @@ class NvIngestClient:
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
-        return [self._fetch_job_result(job_id, data_only) for job_id in job_ids]
+        return [self._fetch_job_result(job_id, data_only=data_only) for job_id in job_ids]
 
     # Nv-Ingest jobs are often "long running". Therefore after
     # submission we intermittently check if the job is completed.
     def _fetch_job_result_wait(self, job_id: str, timeout: float = 60, data_only: bool = True):
         while True:
             try:
-                return [self._fetch_job_result(job_id, timeout, data_only)]
+                return [self._fetch_job_result(job_id, timeout=(timeout, None), data_only=data_only)]
             except TimeoutError:
                 logger.debug("Job still processing ... HTTP 202 received")
 
     def _fetch_job_with_retries(
         self,
         job_index: str,
-        timeout: float,
+        timeout: Tuple[int, Union[float, None]],
         max_retries: Optional[int],
         retry_delay: float,
         verbose: bool,
@@ -447,7 +447,9 @@ class NvIngestClient:
             try:
                 # Call the internal fetch method that talks to the message client
                 # Fetch full data initially (data_only=False) for potential callback usage later
-                result_data, fetched_job_index, trace_id = self._fetch_job_result(job_index, timeout, data_only=False)
+                result_data, fetched_job_index, trace_id = self._fetch_job_result(
+                    job_index, timeout=timeout, data_only=False
+                )
                 # Success! Return the full data, index, and trace_id
                 return result_data, fetched_job_index, trace_id
 
@@ -491,7 +493,7 @@ class NvIngestClient:
     def fetch_job_result(
         self,
         job_indices: Union[str, List[str]],  # Expect client-side indices
-        timeout: float = 100,  # Timeout per fetch attempt
+        timeout: int = 100,  # Timeout per fetch attempt
         max_retries: Optional[int] = 5,  # Retries specifically for "job not ready" (TimeoutError)
         retry_delay: float = 5,  # Delay between "not ready" retries
         verbose: bool = False,
@@ -550,7 +552,7 @@ class NvIngestClient:
                     future = executor.submit(
                         self._fetch_job_with_retries,  # Call the new method
                         job_index,
-                        timeout,  # Pass necessary parameters
+                        (timeout, None),  # Pass necessary parameters
                         max_retries,
                         retry_delay,
                         verbose,
@@ -567,7 +569,6 @@ class NvIngestClient:
                 job_source_id = job_spec.source_id if job_spec else job_index
 
                 try:
-                    # future.result() will raise exceptions caught/re-raised from _fetch_job_with_retries
                     result_data, _, trace_id = future.result(timeout=None)  # Use timeout=None or a very large value
 
                     # Success path

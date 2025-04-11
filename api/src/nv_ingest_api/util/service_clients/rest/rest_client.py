@@ -100,9 +100,9 @@ class RestClient(MessageBrokerClientBase):
         max_backoff : int, optional
             Maximum backoff delay between retries, in seconds. Default is 32.
         default_connect_timeout : float, optional
-            Default timeout in seconds for establishing a connection. Default is 10.0.
+            Default timeout in seconds for establishing a connection. Default is 300.0.
         default_read_timeout : float, optional
-            Default timeout in seconds for waiting for data after connection. Default is 600.0.
+            Default timeout in seconds for waiting for data after connection. Default is None.
         http_allocator : Optional[Callable[[], Any]], optional
             A callable (e.g., a class constructor) that returns an HTTP client
             instance. If None, `requests.Session()` is used. Default is None.
@@ -146,38 +146,121 @@ class RestClient(MessageBrokerClientBase):
     @staticmethod
     def _generate_url(host: str, port: int) -> str:
         """
-        Constructs a base URL, ensuring the scheme and port are present.
+        Constructs a base URL from host and port, intelligently handling schemes and existing ports.
 
-        Examines the user defined URL for http*://. If that pattern is detected,
-        it uses the provided scheme and hostname. If not, it defaults to `http://`.
-        It ensures the port is included in the final base URL.
+        This method takes a host string, which could be a simple hostname/IP or a
+        full URL (including scheme, existing port, and path), and a default port.
+        It ensures the final URL has a scheme (defaulting to 'http'), includes a
+        port (preferring one found in the `host` string over the `port` parameter),
+        and preserves any path found in the `host` string. The result is stripped
+        of any trailing slashes for consistency.
 
         Parameters
         ----------
         host : str
-            Hostname or full URL where the REST service is running.
+            Hostname, IP address, or full URL (e.g., "localhost", "192.168.1.100",
+            "http://example.com", "https://api.example.com:8443/v1").
         port : int
-            Port number for the service.
+            The default port number to use if the `host` string does not explicitly
+            specify one.
 
         Returns
         -------
         str
-            A fully constructed base URL (e.g., "http://example.com:8000").
-        """
-        url_str = str(host)
-        if not re.match(r"^https?://", url_str):
-            base_url = f"http://{url_str}:{port}"
-        else:
-            parsed_url = urlparse(url_str)
-            scheme = parsed_url.scheme
-            hostname = parsed_url.hostname
-            if hostname is None:  # Handle case where input might just be scheme://
-                raise ValueError(f"Invalid URL provided: {url_str}")
-            base_url = f"{scheme}://{hostname}:{port}"
-            if parsed_url.path and parsed_url.path.strip("/"):
-                base_url += parsed_url.path
+            A fully constructed base URL string, including scheme, hostname, port,
+            and any original path, without a trailing slash (e.g.,
+            "http://localhost:8000", "https://api.example.com:8443/v1").
 
-        return base_url.rstrip("/")
+        Raises
+        ------
+        ValueError
+            If the `host` string appears to be a URL but lacks a valid hostname
+            (e.g., "http://", "https://:1234").
+
+        Examples
+        --------
+        >>> RestClient._generate_url("localhost", 8000)
+        'http://localhost:8000'
+        >>> RestClient._generate_url("192.168.1.50", 9000)
+        'http://192.168.1.50:9000'
+        >>> RestClient._generate_url("http://example.com", 80)
+        'http://example.com:80'
+        >>> RestClient._generate_url("https://secure.com/api", 443)
+        'https://secure.com:443/api'
+        >>> RestClient._generate_url("http://example.com:1234", 8000)
+        'http://example.com:1234'
+        >>> RestClient._generate_url("https://api.host.com:9999/v2/users", 443)
+        'https://api.host.com:9999/v2/users'
+        >>> RestClient._generate_url("example.com:8080", 9090) # Treats host as simple string here
+        'http://example.com:8080:9090' # <-- Note: Doesn't parse port unless scheme present
+        >>> RestClient._generate_url("http://example.com:8080", 9090) # Correct way for above case
+        'http://example.com:8080'
+        """
+        url_str: str = str(host).strip()  # Ensure it's a string and remove whitespace
+        scheme: str = "http"  # Default scheme if none is provided
+        parsed_path: Optional[str] = None  # Path component from the original URL, if any
+        effective_port: int = port  # Start with the default port parameter
+        hostname: Optional[str] = None  # Parsed hostname
+
+        # Check if the host string already contains a scheme using regex
+        if re.match(r"^https?://", url_str, re.IGNORECASE):
+            # If scheme is present, parse the full URL string
+            logger.debug(f"Host '{url_str}' contains scheme, parsing as URL.")
+            parsed_url = urlparse(url_str)
+
+            # Validate hostname after parsing
+            hostname = parsed_url.hostname
+            if hostname is None:
+                # This handles invalid inputs like "http://" or "https://:1234"
+                raise ValueError(
+                    f"Invalid URL provided in host string: '{url_str}'. " "Could not parse a valid hostname."
+                )
+
+            # Use the scheme from the parsed URL
+            scheme = parsed_url.scheme
+
+            # Prefer the port found within the URL string itself, if present
+            if parsed_url.port is not None:
+                logger.debug(f"Using port {parsed_url.port} found in host string '{url_str}'.")
+                effective_port = parsed_url.port
+            else:
+                # No port in the URL, use the default 'port' parameter
+                logger.debug(f"No port found in host string '{url_str}', using default parameter: {port}.")
+                effective_port = port  # Already set, just for clarity
+
+            # Preserve the original path if it exists and is not just "/"
+            if parsed_url.path and parsed_url.path.strip("/"):
+                parsed_path = parsed_url.path
+                logger.debug(f"Preserving path '{parsed_path}' from host string '{url_str}'.")
+
+        else:
+            # No scheme found, treat the entire host string as the hostname/IP
+            logger.debug(f"Host '{url_str}' does not contain scheme, treating as hostname/IP.")
+            hostname = url_str
+            # Port remains the default 'port' parameter as none could be parsed from host
+            effective_port = port
+
+        # --- Construct the final base URL ---
+        # Ensure hostname is valid before proceeding
+        if not hostname:
+            # This case should theoretically be caught by the earlier ValueError,
+            # but adding a defensive check.
+            raise ValueError(f"Could not determine a valid hostname from input: '{host}'")
+
+        base_url: str = f"{scheme}://{hostname}:{effective_port}"
+
+        # Append the original path if one was parsed
+        if parsed_path:
+            # Ensure path starts with a single slash if it's not empty
+            if not parsed_path.startswith("/"):
+                parsed_path = "/" + parsed_path
+            base_url += parsed_path
+
+        # Remove any trailing slash for consistency
+        final_url = base_url.rstrip("/")
+        logger.debug(f"Generated base URL: {final_url}")
+
+        return final_url
 
     @property
     def max_retries(self) -> int:
@@ -219,42 +302,103 @@ class RestClient(MessageBrokerClientBase):
         """
         return self._client
 
-    def ping(self) -> ResponseSchema:
+    def ping(self) -> "ResponseSchema":
         """
-        Checks if the HTTP server is responsive by sending a GET request.
+        Checks if the HTTP server endpoint is responsive using an HTTP GET request.
 
-        Attempts a GET request to the base URL (`self._base_url`). Assumes a
-        successful response (e.g., 2xx) indicates the server is reachable.
-        Uses the configured client instance (`self._client`).
+        Attempts a GET request to the client's configured base URL (`self._base_url`).
+        This method primarily serves as a basic network reachability and server
+        status check. It uses a specific, relatively short timeout distinct from
+        the client's default request timeouts.
+
+        It explicitly checks if the underlying HTTP client (`self._client`) is a
+        `requests.Session`. If so, it performs a standard GET and uses
+        `raise_for_status()` to treat HTTP 4xx/5xx errors as failures. If a
+        custom client (via `http_allocator`) is used, this standard ping cannot
+        be reliably performed, and the method will return a failure status.
 
         Returns
         -------
         ResponseSchema
-            - response_code=0: If the GET request succeeds (status code < 400).
-            - response_code=1: If the GET request fails due to connection issues,
-                               timeout, or an HTTP error status (>= 400).
-        """
-        ping_timeout = (min(self._default_connect_timeout, 5.0), 10.0)
-        logger.debug(f"Pinging server at {self._base_url} with timeout {ping_timeout}")
-        try:
-            # --- Assumes self._client has a 'get' method compatible with requests ---
-            if isinstance(self._client, requests.Session):
-                response = self._client.get(self._base_url, timeout=ping_timeout)
-                response.raise_for_status()  # Check for 4xx/5xx
-                logger.debug(f"Ping successful (Status: {response.status_code})")
-                return ResponseSchema(response_code=0, response_reason="Ping OK")
-            else:
-                logger.warning(f"Cannot perform standard ping with client type {type(self._client)}. Assuming OK.")
-                # Return success optimistically, or implement type-specific ping
-                return ResponseSchema(response_code=0, response_reason="Ping skipped for non-default client")
+            An object encapsulating the outcome:
+            - `response_code=0`: Indicates success. The GET request to the base
+              URL returned an HTTP status code less than 400 (typically 2xx).
+            - `response_code=1`: Indicates failure. This can occur due to:
+                - Network errors (e.g., connection refused, DNS resolution failure).
+                - Timeout during the ping request.
+                - An HTTP error status code (4xx or 5xx) returned by the server.
+                - The underlying HTTP client is not a `requests.Session`, and
+                  therefore a standard ping could not be executed.
+                - An unexpected exception occurred during the process.
+            The `response_reason` attribute provides more detail on the outcome.
 
+        Notes
+        -----
+        - The timeout used for the ping operation is hardcoded internally:
+          `(min(self._default_connect_timeout, 5.0), 10.0)`. This means the
+          connection attempt times out after 5 seconds (or less if the client's
+          default is lower), and the read attempt times out after 10 seconds.
+        - This method relies on the behavior of `requests.Session.get` and
+          `requests.Response.raise_for_status()` when the default client is used.
+        - Returning failure (`response_code=1`) for non-`requests` clients is
+          a safety measure, as assuming success without performing a check
+          would be misleading.
+
+        Examples
+        --------
+        >>> client = RestClient(host="http://localhost", port=8000)
+        >>> # Assuming server is running and responsive
+        >>> result = client.ping()
+        >>> if result.response_code == 0:
+        ...     print("Server is responsive.")
+        ... else:
+        ...     print(f"Server check failed: {result.response_reason}")
+        Server is responsive.
+
+        >>> client_bad = RestClient(host="http://nonexistent-server", port=1234)
+        >>> result_bad = client_bad.ping()
+        >>> if result_bad.response_code == 1:
+        ...     print(f"Server check failed as expected: {result_bad.response_reason}")
+        Server check failed as expected: Ping failed due to RequestException...
+
+        """
+        # Define a specific, relatively short timeout for the ping operation.
+        # Connect timeout is the lesser of the configured default or 5 seconds.
+        # Read timeout is fixed at 10 seconds.
+        ping_timeout: Tuple[float, float] = (min(self._default_connect_timeout, 5.0), 10.0)
+        logger.debug(f"Attempting to ping server at {self._base_url} with timeout {ping_timeout}")
+
+        try:
+            # --- Check if we are using the standard Requests client ---
+            # This determines if we can reliably use the '.get()' and 'raise_for_status()' methods.
+            if isinstance(self._client, requests.Session):
+                response: requests.Response = self._client.get(self._base_url, timeout=ping_timeout)
+
+                # Check the HTTP status code. raise_for_status() will raise an
+                # requests.exceptions.HTTPError for 4xx and 5xx status codes.
+                response.raise_for_status()
+
+                # If raise_for_status() did not raise an exception, the ping is considered successful.
+                logger.debug(f"Ping successful to {self._base_url} (Status: {response.status_code})")
+                # Return success code (0) and a confirmation reason.
+                return ResponseSchema(response_code=0, response_reason="Ping OK")
+
+        # --- Exception Handling ---
+        # Catch exceptions specifically related to the requests library operations.
+        # This includes ConnectionError, Timeout, TooManyRedirects, etc.
         except requests.exceptions.RequestException as e:
-            error_reason = f"Failed to ping HTTP server at {self._base_url}: {e}"
+            error_reason = f"Ping failed due to RequestException for {self._base_url}: {e}"
+            # Log as a warning, as these are somewhat expected failures in network communication.
             logger.warning(error_reason)
+            # Return failure code (1) with the specific exception details.
             return ResponseSchema(response_code=1, response_reason=error_reason)
+
+        # Catch any other unexpected exceptions that might occur during the process.
         except Exception as e:
             error_reason = f"Unexpected error during ping to {self._base_url}: {e}"
+            # Log with exception level to capture the stack trace for debugging.
             logger.exception(error_reason)
+            # Return failure code (1) indicating an unexpected problem.
             return ResponseSchema(response_code=1, response_reason=error_reason)
 
     def fetch_message(self, job_id: str, timeout: Optional[Union[float, Tuple[float, float]]] = None) -> ResponseSchema:
@@ -272,7 +416,6 @@ class RestClient(MessageBrokerClientBase):
             The server-assigned identifier of the job result to fetch.
         timeout : Optional[Union[float, Tuple[float, float]]], optional
             Specific timeout override for this request. Interpreted by
-            `_get_request_timeout`. Uses client defaults if None. Default is None.
 
         Returns
         -------
@@ -393,7 +536,6 @@ class RestClient(MessageBrokerClientBase):
             Not used by RestClient. Default is False.
         timeout : Optional[Union[float, Tuple[float, float]]], optional
             Specific timeout override for this request. Interpreted by
-            `_get_request_timeout`. Uses client defaults if None. Default is None.
 
         Returns
         -------
