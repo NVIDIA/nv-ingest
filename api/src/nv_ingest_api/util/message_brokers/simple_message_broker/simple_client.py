@@ -14,7 +14,7 @@ import logging
 from typing import Optional
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
-from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase, FetchMode
 
 logger = logging.getLogger(__name__)
 
@@ -103,7 +103,9 @@ class SimpleClient(MessageBrokerClientBase):
         """
         return self._handle_push(queue_name, message, timeout, for_nv_ingest)
 
-    def fetch_message(self, queue_name: str, timeout: Optional[float] = None) -> ResponseSchema:
+    def fetch_message(
+        self, queue_name: str, timeout: Optional[float] = None, override_fetch_mode: FetchMode = None
+    ) -> ResponseSchema:
         """
         Fetch a message from the specified queue.
 
