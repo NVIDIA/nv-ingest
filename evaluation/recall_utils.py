@@ -3,6 +3,7 @@ from collections import defaultdict
 import os
 import numpy as np
 import pandas as pd
+import pickle
 
 
 def get_recall_scores(query_df, collection_name, hybrid):
@@ -44,3 +45,9 @@ def get_recall_scores(query_df, collection_name, hybrid):
         print(f"  - Recall @{k}: {np.mean(hits[k]) :.3f}")
 
     return results_df
+
+
+def get_bo_results():
+    with open('earnings_results_bo.pkl', 'rb') as f:
+        df = pickle.load(f)
+        return df
