@@ -604,7 +604,7 @@ class RestClient(MessageBrokerClientBase):
 
             # --- Exception Handling ---
             except requests.exceptions.RequestException as err:
-                logger.warning(
+                logger.debug(
                     f"RequestException submitting job: {err}. Attempting retry ({retries + 1}/{self.max_retries})..."
                 )
                 try:
