@@ -117,7 +117,6 @@ class RestClient(MessageBrokerClientBase):
         self._headers = kwargs.get("headers", {})
         self._auth = kwargs.get("auth", None)
 
-
     def _connect(self) -> None:
         """
         Attempts to reconnect to the HTTP server if the current connection is not responsive.
