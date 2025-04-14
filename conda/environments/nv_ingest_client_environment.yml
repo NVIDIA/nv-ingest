@@ -6,6 +6,7 @@ channels:
   - conda-forge
 dependencies:
   - click>=8.1.7
+  - diskcache>=5.6.3
   - fsspec>=2024.10.0
   - httpx>=0.28.1
   - pydantic>=2.10.3
