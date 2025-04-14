@@ -9,8 +9,10 @@ from nv_ingest_client.util.milvus import (
     create_nvingest_collection,
     grab_meta_collection_info,
     reconstruct_pages,
+    add_metadata,
 )
 from nv_ingest_client.util.util import ClientConfigSchema
+import pandas as pd
 
 
 @pytest.fixture
@@ -106,8 +108,9 @@ def test_milvus_meta_multiple_coll(tmp_path):
     assert entity["collection_name"] == f"{collection_name}2"
 
 
-def test_page_reconstruction():
-    records = [
+@pytest.fixture
+def records():
+    return [
         [
             {
                 "document_type": "text",
@@ -178,6 +181,21 @@ def test_page_reconstruction():
             },
         ],
     ]
+
+
+@pytest.fixture
+def metadata():
+    return pd.DataFrame(
+        {
+            "source_name": ["file_1.pdf", "file_2.pdf"],
+            "meta_a": ["meta_a_1", "meta_a_2"],
+            "meta_b": ["meta_b_1", "meta_b_2"],
+        }
+    )
+
+
+def test_page_reconstruction(records):
+
     candidates = [
         {
             "id": 456331433807935937,
@@ -213,3 +231,15 @@ def test_page_reconstruction():
     pages.append(reconstruct_pages(candidates[1], records, page_signum=1))
     assert pages[0] == "roses are red.\nviolets are blue.\nsunflowers are yellow.\n"
     assert pages[1] == "two time two is four.\nfour times four is sixteen.\n"
+
+
+def test_metadata_add(records, metadata):
+    for record in records:
+        for element in record:
+            add_metadata(element, metadata, "source_name", ["meta_a", "meta_b"])
+
+            assert "meta_a" in [*element["metadata"]["content_metadata"]]
+            assert "meta_b" in [*element["metadata"]["content_metadata"]]
+            idx = element["metadata"]["source_metadata"]["source_name"].split("_")[1].split(".")[0]
+            assert element["metadata"]["content_metadata"]["meta_a"] == f"meta_a_{idx}"
+            assert element["metadata"]["content_metadata"]["meta_b"] == f"meta_b_{idx}"

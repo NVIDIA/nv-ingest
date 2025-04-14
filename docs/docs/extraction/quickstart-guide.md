@@ -97,7 +97,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
 ## Step 2: Install Python Dependencies
 
-You can interact with the NV-Ingest service from the host or by `docker exec`-ing into the NV-Ingest container.
+You can interact with the NV-Ingest service from the host, or by using `docker exec` to run commands in the NV-Ingest container.
 
 To interact from the host, you'll need a Python environment and install the client dependencies:
 
@@ -400,6 +400,18 @@ You can specify multiple `--profile` options.
 | `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~37GB additional space |
 | `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~16 GB additional space |
 | `vlm`                 | Advanced | Uses llama 3.2 11B VLM for experimental image captioning of unstructured images. | [1 additional dedicated GPU](support-matrix.md) | ~16GB additional space |
+
+
+
+## Troubleshooting
+
+In rare cases, when you run a job you might an see an error similar to `max open file descriptor`. 
+This error is related to number of active jobs and cores available on your computer. 
+To resolve this issue, raise the maximum number of open file descriptors by using the following [ulimit](https://ss64.com/bash/ulimit.html) command.
+
+```bash
+ulimit -n 10,000
+```
 
 
 
