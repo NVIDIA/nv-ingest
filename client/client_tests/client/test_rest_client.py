@@ -31,7 +31,6 @@ def rest_client(mock_rest_client_allocator):
         port=7670,
         max_retries=0,
         max_backoff=32,
-        connection_timeout=300,
         http_allocator=mock_rest_client_allocator,
     )
 
