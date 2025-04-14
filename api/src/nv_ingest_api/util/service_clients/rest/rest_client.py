@@ -215,11 +215,11 @@ class RestClient(MessageBrokerClientBase):
 
                 # Fetch using streaming response
                 with requests.get(
-                        url,
-                        timeout=(30, 600),
-                        stream=True,
-                        headers=headers,
-                        auth=self._auth,
+                    url,
+                    timeout=(30, 600),
+                    stream=True,
+                    headers=headers,
+                    auth=self._auth,
                 ) as result:
                     response_code = result.status_code
 
