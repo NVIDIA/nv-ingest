@@ -149,7 +149,7 @@ def test_submit_message_with_retries(ock_time_sleep, mock_redis_client_instance)
     pipeline_mock.rpush.assert_any_call(queue_name, message)  # check arguments on any call
 
     # verify expire was not queued (since ttl_seconds=none)
-    pipeline_mock.expire.assert_not_called()
+    pipeline_mock.expire.assert_called()
 
     # verify execute was called twice
     assert pipeline_mock.execute.call_count == 2

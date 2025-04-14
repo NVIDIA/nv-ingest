@@ -54,7 +54,7 @@ class RedisClient(MessageBrokerClientBase):
         redis_allocator: Callable[..., redis.Redis] = redis.Redis,
         fetch_mode: "FetchMode" = None,  # Replace with appropriate default if FetchMode.DESTRUCTIVE is available.
         cache_config: Optional[Dict[str, Any]] = None,
-        message_ttl_seconds: Optional[int] = None,
+        message_ttl_seconds: Optional[int] = 600,
     ) -> None:
         """
         Initializes the Redis client with connection pooling, retry/backoff configuration,
