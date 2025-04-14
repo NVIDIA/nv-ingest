@@ -10,6 +10,7 @@ from nv_ingest_client.util.milvus import (
     grab_meta_collection_info,
     reconstruct_pages,
     add_metadata,
+    pandas_file_reader,
 )
 from nv_ingest_client.util.util import ClientConfigSchema
 import pandas as pd
@@ -243,3 +244,22 @@ def test_metadata_add(records, metadata):
             idx = element["metadata"]["source_metadata"]["source_name"].split("_")[1].split(".")[0]
             assert element["metadata"]["content_metadata"]["meta_a"] == f"meta_a_{idx}"
             assert element["metadata"]["content_metadata"]["meta_b"] == f"meta_b_{idx}"
+
+
+def test_metadata_import(metadata, tmp_path):
+    file_name = f"{tmp_path}/meta.json"
+    metadata.to_json(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.csv"
+    metadata.to_csv(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.pq"
+    metadata.to_parquet(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.parquet"
+    metadata.to_parquet(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
