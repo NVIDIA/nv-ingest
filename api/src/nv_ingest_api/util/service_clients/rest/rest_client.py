@@ -96,6 +96,7 @@ class RestClient(MessageBrokerClientBase):
         max_backoff: int = 32,
         connection_timeout: int = 300,
         http_allocator: Any = httpx.AsyncClient,
+        **kwargs,
     ):
         self._host = host
         self._port = port
@@ -108,6 +109,13 @@ class RestClient(MessageBrokerClientBase):
 
         self._submit_endpoint = "/v1/submit_job"
         self._fetch_endpoint = "/v1/fetch_job"
+
+        if "base_url" in kwargs:
+            logger.debug("Using custom base_url; ignoring host and port")
+
+        self._base_url = kwargs.get("base_url") or self.generate_url(self._host, self._port)
+        self._headers = kwargs.get("headers", {})
+        self._auth = kwargs.get("auth", None)
 
     def _connect(self) -> None:
         """
@@ -194,13 +202,24 @@ class RestClient(MessageBrokerClientBase):
             The fetched message wrapped in a ResponseSchema object.
         """
         retries = 0
+        url = f"{self._base_url}{self._fetch_endpoint}/{job_id}"
+
+        # Ensure headers are included
+        headers = {"Content-Type": "application/json"}
+        headers.update(self._headers)
+
         while True:
             try:
-                url = f"{self.generate_url(self._host, self._port)}{self._fetch_endpoint}/{job_id}"
                 logger.debug(f"Invoking fetch_message http endpoint @ '{url}'")
 
                 # Fetch using streaming response
-                with requests.get(url, timeout=(30, 600), stream=True) as result:
+                with requests.get(
+                    url,
+                    timeout=(30, 600),
+                    stream=True,
+                    headers=headers,
+                    auth=self._auth,
+                ) as result:
                     response_code = result.status_code
 
                     if response_code in _TERMINAL_RESPONSE_STATUSES:
@@ -282,11 +301,22 @@ class RestClient(MessageBrokerClientBase):
             The response from the server wrapped in a ResponseSchema object.
         """
         retries = 0
+        url = f"{self._base_url}{self._submit_endpoint}"
+
+        # Ensure content-type is present
+        headers = {"Content-Type": "application/json"}
+        headers.update(self._headers)
+
         while True:
             try:
                 # Submit via HTTP
-                url = f"{self.generate_url(self._host, self._port)}{self._submit_endpoint}"
-                result = requests.post(url, json={"payload": message}, headers={"Content-Type": "application/json"})
+                result = requests.post(
+                    url,
+                    json={"payload": message},
+                    headers=headers,
+                    auth=self._auth,
+                    timeout=self._connection_timeout,
+                )
 
                 response_code = result.status_code
                 if response_code in _TERMINAL_RESPONSE_STATUSES:
