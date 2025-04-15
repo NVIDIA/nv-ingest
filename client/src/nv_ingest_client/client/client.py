@@ -576,6 +576,7 @@ class NvIngestClient:
                         f"Successfully fetched result for job index {job_index} (Source: {job_source_id},"
                         f" Trace: {trace_id})"
                     )
+                    # We only return the data chunks on the ingestor path.
                     results.append(result_data["data"])
 
                     # Run the callback if provided
