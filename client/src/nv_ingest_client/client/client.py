@@ -550,7 +550,7 @@ class NvIngestClient:
             for job_index in job_indices:
                 if job_index in self._job_states:  # Check if job still valid
                     future = executor.submit(
-                        self._fetch_job_with_retries,  # Call the new method
+                        self._fetch_job_with_retries,
                         job_index,
                         (timeout, None),  # Pass necessary parameters
                         max_retries,
@@ -576,7 +576,7 @@ class NvIngestClient:
                         f"Successfully fetched result for job index {job_index} (Source: {job_source_id},"
                         f" Trace: {trace_id})"
                     )
-                    results.append((result_data, job_index))  # Append tuple (result_data, client_index)
+                    results.append(result_data["data"])
 
                     # Run the callback if provided
                     if completion_callback:
