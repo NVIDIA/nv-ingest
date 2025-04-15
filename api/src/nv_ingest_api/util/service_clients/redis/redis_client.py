@@ -14,16 +14,22 @@ from typing import Tuple
 
 import redis
 
-from diskcache import Cache
 
 from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase, FetchMode
+
+try:
+    from diskcache import Cache
+
+    DISKCACHE_AVAILABLE = True
+except ImportError:
+    DISKCACHE_AVAILABLE = False
 
 # pylint: skip-file
 
 logger = logging.getLogger(__name__)
 
 # Default cache path and TTL (adjust as needed)
-DEFAULT_CACHE_DIR = "/tmp/.nv_ingest/fetch_cache"
+DEFAULT_CACHE_DIR = "/tmp/.fetch_cache"
 DEFAULT_CACHE_TTL_SECONDS = 3600  # 1 hour
 
 
@@ -48,7 +54,7 @@ class RedisClient(MessageBrokerClientBase):
         redis_allocator: Callable[..., redis.Redis] = redis.Redis,
         fetch_mode: "FetchMode" = None,  # Replace with appropriate default if FetchMode.DESTRUCTIVE is available.
         cache_config: Optional[Dict[str, Any]] = None,
-        message_ttl_seconds: Optional[int] = None,
+        message_ttl_seconds: Optional[int] = 600,
     ) -> None:
         """
         Initializes the Redis client with connection pooling, retry/backoff configuration,
@@ -125,7 +131,7 @@ class RedisClient(MessageBrokerClientBase):
 
         # Configure Cache if mode requires it
         self._cache: Optional[Any] = None
-        if self._fetch_mode == FetchMode.CACHE_BEFORE_DELETE:
+        if self._fetch_mode == FetchMode.CACHE_BEFORE_DELETE and DISKCACHE_AVAILABLE:
             cache_dir: str = (cache_config or {}).get("directory", DEFAULT_CACHE_DIR)
             self._cache_ttl: int = (cache_config or {}).get("ttl", DEFAULT_CACHE_TTL_SECONDS)
             try:
@@ -386,8 +392,8 @@ class RedisClient(MessageBrokerClientBase):
                             raise ValueError(f"Failed to decode message fragment {i + 1}: {e_frag}")
                     else:
                         logger.error(
-                            f"Unexpected BLPOP response format for fragment {i + 1} on "
-                            f"'{channel_name}': {frag_response}"
+                            f"Unexpected BLPOP response format for fragment {i + 1} "
+                            f"on '{channel_name}': {frag_response}"
                         )
                         raise ValueError(f"Unexpected BLPOP response format for fragment {i + 1}")
                 logger.debug(f"Successfully fetched all {expected_count} fragments destructively.")
@@ -471,8 +477,9 @@ class RedisClient(MessageBrokerClientBase):
                                     break
                             else:
                                 logger.warning(
-                                    f"Expected fragment 0 but found index {fragment_idx} at LINDEX 0 for "
-                                    f"'{channel_name}'. List state potentially inconsistent. Will keep polling."
+                                    f"Expected fragment 0 but found index {fragment_idx} "
+                                    f"at LINDEX 0 for '{channel_name}'. List state potentially inconsistent. "
+                                    f"Will keep polling."
                                 )
                         except json.JSONDecodeError as e:
                             logger.error(
@@ -507,8 +514,8 @@ class RedisClient(MessageBrokerClientBase):
                                     logger.debug(f"Processed fragment {fragment_idx + 1}/{expected_count} from LRANGE.")
                             except json.JSONDecodeError as e:
                                 logger.error(
-                                    f"Failed to decode JSON fragment during poll for '{channel_name}': {e}. "
-                                    f"Data: {item_bytes[:200]}"
+                                    f"Failed to decode JSON fragment during poll for "
+                                    f"'{channel_name}': {e}. Data: {item_bytes[:200]}"
                                 )
                                 raise ValueError(f"Failed to decode message fragment: {e}")
                         if processed_count_this_pass > 0:
@@ -623,11 +630,11 @@ class RedisClient(MessageBrokerClientBase):
         effective_fetch_mode: "FetchMode" = override_fetch_mode if override_fetch_mode is not None else self._fetch_mode
         log_prefix: str = f"fetch_message(mode={effective_fetch_mode.name}, channel='{channel_name}')"
         if override_fetch_mode:
-            logger.info(f"{log_prefix}: Using overridden mode.")
+            logger.debug(f"{log_prefix}: Using overridden mode.")
         else:
             logger.debug(f"{log_prefix}: Using configured mode.")
 
-        if effective_fetch_mode == FetchMode.CACHE_BEFORE_DELETE:
+        if effective_fetch_mode == FetchMode.CACHE_BEFORE_DELETE and DISKCACHE_AVAILABLE:
             if not self._cache:
                 raise RuntimeError(f"{log_prefix}: Cache not available.")
             cache_key: str = f"fetch_cache:{channel_name}"
@@ -672,7 +679,7 @@ class RedisClient(MessageBrokerClientBase):
                 return final_message
 
             except TimeoutError as e:
-                logger.warning(f"{log_prefix}: Timeout during fetch operation: {e}")
+                logger.debug(f"{log_prefix}: Timeout during fetch operation: {e}")
                 raise e
 
             except (redis.RedisError, ConnectionError) as e:

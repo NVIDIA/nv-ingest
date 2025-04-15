@@ -134,7 +134,7 @@ def get_nim_service(env_var_prefix):
 
 
 def get_default_cpu_count():
-    default_cpu_count = os.environ.get("NV_INGEST_MAX_UTIL", int(max(1, math.floor(len(os.sched_getaffinity(0))))))
+    default_cpu_count = int(os.environ.get("NV_INGEST_MAX_UTIL", int(max(1, math.floor(len(os.sched_getaffinity(0)))))))
 
     return default_cpu_count
 

@@ -494,7 +494,7 @@ class NvIngestClient:
         self,
         job_indices: Union[str, List[str]],  # Expect client-side indices
         timeout: int = 100,  # Timeout per fetch attempt
-        max_retries: Optional[int] = 5,  # Retries specifically for "job not ready" (TimeoutError)
+        max_retries: Optional[int] = None,  # Retries specifically for "job not ready"
         retry_delay: float = 5,  # Delay between "not ready" retries
         verbose: bool = False,
         completion_callback: Optional[Callable[[Dict, str], None]] = None,

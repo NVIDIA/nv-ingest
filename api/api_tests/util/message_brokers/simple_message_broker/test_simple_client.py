@@ -37,9 +37,6 @@ def client():
     return SimpleClient(HOST, PORT)
 
 
-# Existing tests...
-
-
 @pytest.mark.usefixtures("broker_server")
 def test_message_ordering():
     """Test that messages are popped in the same order they were pushed (FIFO)."""
@@ -71,11 +68,11 @@ def test_push_to_full_queue():
 
     # Push messages until the queue is full
     for msg in messages:
-        response = client.submit_message(queue_name, msg, timeout=1)
+        response = client.submit_message(queue_name, msg, timeout=(1, None))
         assert response.response_code == 0
 
     # Attempt to push one more message beyond capacity
-    response = client.submit_message(queue_name, "Extra Message", timeout=1)
+    response = client.submit_message(queue_name, "Extra Message", timeout=(1, None))
     assert response.response_code == 1, "Expected failure when pushing to a full queue."
     assert response.response_reason == PUSH_TIMEOUT_MSG
 
@@ -107,12 +104,12 @@ def test_invalid_inputs():
     assert response.response_reason == "Invalid message."
 
     # Test with negative timeout
-    response = client.submit_message(queue_name, "Test Message", timeout=-5)
+    response = client.submit_message(queue_name, "Test Message", timeout=(-5, None))
     assert response.response_code == 1
     assert PUSH_TIMEOUT_MSG in response.response_reason
 
     # Test with extremely large timeout
-    response = client.submit_message(queue_name, "Test Message", timeout=1e10)
+    response = client.submit_message(queue_name, "Test Message", timeout=(1e10, None))
     assert response.response_code == 1
 
 
@@ -123,7 +120,7 @@ def test_server_unavailable():
 
     # Do not start the broker_server fixture to simulate server unavailability
 
-    response = client.submit_message(queue_name, "Test Message", timeout=1)
+    response = client.submit_message(queue_name, "Test Message", timeout=(1, None))
     assert response.response_code == 1
     assert response.response_reason == PUSH_TIMEOUT_MSG
 
@@ -135,7 +132,7 @@ def test_client_retry_logic():
     queue_name = f"test_queue_{uuid4()}"
 
     start_time = time.time()
-    response = client.submit_message(queue_name, "Test Message", timeout=6)
+    response = client.submit_message(queue_name, "Test Message", timeout=(6, None))
     elapsed_time = time.time() - start_time
 
     # Expected total backoff delay is sum of backoff delays: 2^1 + 2^2 = 2 + 4 = 6 seconds
@@ -152,7 +149,7 @@ def test_operation_timeout():
     client = SimpleClient(HOST, PORT, connection_timeout=0.001)  # Set a very short timeout
     queue_name = f"test_queue_{uuid4()}"
 
-    response = client.submit_message(queue_name, "Test Message", timeout=1)
+    response = client.submit_message(queue_name, "Test Message", timeout=(1, None))
     assert response.response_code == 1
     assert PUSH_TIMEOUT_MSG in response.response_reason
 
@@ -208,7 +205,7 @@ def test_pop_empty_queue(client):
     """Test popping from an empty queue."""
     queue_name = f"test_queue_{uuid4()}"
 
-    response = client.fetch_message(queue_name, timeout=1)
+    response = client.fetch_message(queue_name, timeout=(1, None))
     assert response.response_code == 1
     assert response.response_reason == POP_TIMEOUT_MSG
 
@@ -219,7 +216,7 @@ def test_push_with_timeout(client):
     queue_name = f"test_queue_{uuid4()}"
     message = "Test Message"
 
-    response = client.submit_message(queue_name, message, timeout=5)
+    response = client.submit_message(queue_name, message, timeout=(5, None))
     assert response.response_code == 0
     assert response.response == "Data stored."
     assert response.transaction_id is not None
@@ -236,7 +233,7 @@ def test_pop_with_timeout(client):
     assert push_response.response_code == 0
 
     # Pop the message with a timeout
-    pop_response = client.fetch_message(queue_name, timeout=5)
+    pop_response = client.fetch_message(queue_name, timeout=(5, None))
     assert pop_response.response_code == 0
     assert pop_response.response == message
     assert pop_response.transaction_id is not None
@@ -265,7 +262,7 @@ def test_pop_error_handling(client):
     # Simulate connection error by closing the client's socket
     client._socket = None
 
-    response = client.fetch_message(queue_name, timeout=1)
+    response = client.fetch_message(queue_name, timeout=(1, None))
     # The client should handle the error and return an appropriate response
     assert response.response_code == 1
     assert response.response_reason == POP_TIMEOUT_MSG
