@@ -128,6 +128,9 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response containing the fetched message.
         """
+        if isinstance(timeout, int):
+            timeout = (timeout, None)
+
         return self._handle_pop(queue_name, timeout)
 
     def ping(self) -> ResponseSchema:
