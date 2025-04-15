@@ -473,6 +473,7 @@ milvus:
       storageClass: null
   minio:
     mode: standalone
+    bucketName: a-bucket
     persistence:
       size: 10Gi
       storageClass: null
