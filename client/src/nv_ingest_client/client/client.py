@@ -576,7 +576,7 @@ class NvIngestClient:
                         f"Successfully fetched result for job index {job_index} (Source: {job_source_id},"
                         f" Trace: {trace_id})"
                     )
-                    results.append((result_data, job_index))  # Append tuple (result_data, client_index)
+                    results.append(result_data.get("data"))
 
                     # Run the callback if provided
                     if completion_callback:
