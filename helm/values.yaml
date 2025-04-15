@@ -129,6 +129,8 @@ nemoretriever-page-elements-v2:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 ## @skip nemoretriever-graphic-elements-v1
 ## @param nemoretriever-graphic-elements-v1.deployed [default: true] true if the nemoretriever-graphic-elements NIM should be deployed and false otherwise
@@ -168,6 +170,8 @@ nemoretriever-graphic-elements-v1:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 ## @skip nemoretriever-table-structure-v1
 ## @param nemoretriever-table-structure-v1.deployed [default: true] true if the nemoretriever-table-structure NIM should be deployed and false otherwise
@@ -208,6 +212,8 @@ nemoretriever-table-structure-v1:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 ## @skip nim-vlm-image-captioning
 ## @param nim-vlm-image-captioning.deployed [default: false] true if the vlm-nim should be deployed and false otherwise
@@ -238,6 +244,8 @@ nim-vlm-image-captioning:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 ## @skip nim-vlm-text-extraction
 ## @param nim-vlm-text-extraction.deployed [default: false] true if the vlm-nim should be deployed and false otherwise
@@ -268,6 +276,8 @@ nim-vlm-text-extraction:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 ## @skip paddleocr-nim
 ## @param paddleocr-nim.deployed [default: true] true if the paddleocr-nim should be deployed and false otherwise
@@ -308,6 +318,8 @@ paddleocr-nim:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 
 ## @skip text-embedding-nim
@@ -348,6 +360,9 @@ text-embedding-nim:
     logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 
 ## @skip nvidia-nim-llama-32-nv-embedqa-1b-v2
@@ -388,6 +403,9 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
     logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 
 ## @skip llama-32-nv-rerankqa-1b-v2
@@ -428,6 +446,9 @@ llama-32-nv-rerankqa-1b-v2:
     logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
+      value: "8000"
+    - name: NIM_TRITON_MODEL_BATCH_SIZE
+      value: "1"
 
 
 ## @section Milvus Deployment parameters
