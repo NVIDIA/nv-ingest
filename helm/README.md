@@ -3,7 +3,7 @@
 This documentation contains documentation for the NV-Ingest Helm charts.
 
 > [!Note]
-> NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever Extraction.
+> NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever extraction.
 
 ## Prerequisites
 

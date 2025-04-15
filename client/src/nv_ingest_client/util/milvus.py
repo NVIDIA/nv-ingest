@@ -6,9 +6,11 @@ from typing import List
 from typing import Tuple
 from typing import Union
 from urllib.parse import urlparse
+from pathlib import Path
+import pandas as pd
+from functools import partial
 
 import requests
-from llama_index.embeddings.nvidia import NVIDIAEmbedding
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 from nv_ingest_client.util.util import ClientConfigSchema
 from pymilvus import AnnSearchRequest
@@ -30,6 +32,21 @@ from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from scipy.sparse import csr_array
 
 logger = logging.getLogger(__name__)
+
+pandas_reader_map = {
+    ".json": pd.read_json,
+    ".csv": partial(pd.read_csv, index_col=0),
+    ".parquet": pd.read_parquet,
+    ".pq": pd.read_parquet,
+}
+
+
+def pandas_file_reader(input_file: str):
+    path_file = Path(input_file)
+    if not path_file.exists:
+        raise ValueError(f"File does not exist: {input_file}")
+    file_type = path_file.suffix
+    return pandas_reader_map[file_type](input_file)
 
 
 def create_nvingest_meta_schema():
@@ -201,6 +218,9 @@ class MilvusOperator:
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
         bucket_name: str = "a-bucket",
+        meta_dataframe: Union[str, pd.DataFrame] = None,
+        meta_source_field: str = None,
+        meta_fields: list[str] = None,
         **kwargs,
     ):
         self.milvus_kwargs = locals()
@@ -597,6 +617,18 @@ def _insert_location_into_content_metadata(
     element["metadata"]["content_metadata"]["max_dimensions"] = max_dimensions
 
 
+def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
+    element_name = element["metadata"]["source_metadata"]["source_name"]
+    df = meta_dataframe[meta_dataframe[meta_source_field] == element_name]
+    if df is None:
+        logger.info(f"NO METADATA ENTRY found for {element_name}")
+    if df.shape[0] > 1:
+        logger.info(f"FOUND MORE THAN ONE metadata entry for {element_name}, will use first entry")
+    meta_fields = df[meta_data_fields]
+    for col in meta_data_fields:
+        element["metadata"]["content_metadata"][col] = meta_fields.iloc[0][col]
+
+
 def write_records_minio(
     records,
     writer: RemoteBulkWriter,
@@ -608,6 +640,9 @@ def write_records_minio(
     enable_infographics: bool = True,
     enable_audio: bool = True,
     record_func=_record_dict,
+    meta_dataframe=None,
+    meta_source_field=None,
+    meta_fields=None,
 ) -> RemoteBulkWriter:
     """
     Writes the supplied records to milvus using the supplied writer.
@@ -655,6 +690,8 @@ def write_records_minio(
             _insert_location_into_content_metadata(
                 element, enable_charts, enable_tables, enable_images, enable_infographics
             )
+            if meta_dataframe is not None and meta_source_field and meta_fields:
+                add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
             if text:
                 if sparse_model is not None:
                     writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
@@ -767,6 +804,9 @@ def stream_insert_milvus(
     enable_infographics: bool = True,
     enable_audio: bool = True,
     record_func=_record_dict,
+    meta_dataframe=None,
+    meta_source_field=None,
+    meta_fields=None,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -809,13 +849,15 @@ def stream_insert_milvus(
             _insert_location_into_content_metadata(
                 element, enable_charts, enable_tables, enable_images, enable_infographics
             )
+            if meta_dataframe is not None and meta_source_field and meta_fields:
+                add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
             if text:
                 if sparse_model is not None:
                     data.append(record_func(text, element, sparse_model.encode_documents([text])))
                 else:
                     data.append(record_func(text, element))
     client.insert(collection_name=collection_name, data=data)
-    logger.error(f"logged {len(data)} records")
+    logger.info(f"logged {len(data)} records")
 
 
 def write_to_nvingest_collection(
@@ -835,6 +877,9 @@ def write_to_nvingest_collection(
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
     threshold: int = 10,
+    meta_dataframe=None,
+    meta_source_field=None,
+    meta_fields=None,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -900,9 +945,11 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
-    logger.error(f"{len(records)} records to insert to milvus")
+    logger.info(f"{len(records)} records to insert to milvus")
     if len(records) < threshold:
         stream = True
+    if isinstance(meta_dataframe, str):
+        meta_dataframe = pandas_file_reader(meta_dataframe)
     if stream:
         stream_insert_milvus(
             records,
@@ -914,6 +961,9 @@ def write_to_nvingest_collection(
             enable_tables=enable_tables,
             enable_images=enable_images,
             enable_infographics=enable_infographics,
+            meta_dataframe=meta_dataframe,
+            meta_source_field=meta_source_field,
+            meta_fields=meta_fields,
         )
     else:
         # Connections parameters to access the remote bucket
@@ -936,6 +986,9 @@ def write_to_nvingest_collection(
             enable_tables=enable_tables,
             enable_images=enable_images,
             enable_infographics=enable_infographics,
+            meta_dataframe=meta_dataframe,
+            meta_source_field=meta_source_field,
+            meta_fields=meta_fields,
         )
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
@@ -951,6 +1004,7 @@ def dense_retrieval(
     top_k: int,
     dense_field: str = "vector",
     output_fields: List[str] = ["text"],
+    _filter: str = "",
 ):
     """
     This function takes the input queries and conducts a dense
@@ -988,6 +1042,7 @@ def dense_retrieval(
         anns_field=dense_field,
         limit=top_k,
         output_fields=output_fields,
+        filter=_filter,
     )
     return results
 
@@ -1004,6 +1059,7 @@ def hybrid_retrieval(
     output_fields: List[str] = ["text"],
     gpu_search: bool = True,
     local_index: bool = False,
+    _filter: str = "",
 ):
     """
     This function takes the input queries and conducts a hybrid
@@ -1058,6 +1114,7 @@ def hybrid_retrieval(
         "anns_field": dense_field,
         "param": s_param_1,
         "limit": top_k,
+        "expr": _filter,
     }
 
     dense_req = AnnSearchRequest(**search_param_1)
@@ -1070,6 +1127,7 @@ def hybrid_retrieval(
         "anns_field": sparse_field,
         "param": s_param_2,
         "limit": top_k,
+        "expr": _filter,
     }
     sparse_req = AnnSearchRequest(**search_param_2)
 
@@ -1097,9 +1155,9 @@ def nvingest_retrieval(
     nv_ranker_model_name: str = None,
     nv_ranker_nvidia_api_key: str = None,
     nv_ranker_truncate: str = "END",
-    nv_ranker_top_k: int = 5,
+    nv_ranker_top_k: int = 50,
     nv_ranker_max_batch_size: int = 64,
-    nv_ranker_candidate_multiple: int = 10,
+    _filter: str = "",
 ):
     """
     This function takes the input queries and conducts a hybrid/dense
@@ -1150,6 +1208,8 @@ def nvingest_retrieval(
     List
         Nested list of top_k results per query.
     """
+    from llama_index.embeddings.nvidia import NVIDIAEmbedding
+
     client_config = ClientConfigSchema()
     nvidia_api_key = client_config.nvidia_build_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
@@ -1158,9 +1218,9 @@ def nvingest_retrieval(
     local_index = False
     embed_model = NVIDIAEmbedding(base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key)
     client = MilvusClient(milvus_uri)
-    nv_ranker_top_k = top_k
+    final_top_k = top_k
     if nv_ranker:
-        top_k = top_k * nv_ranker_candidate_multiple
+        top_k = nv_ranker_top_k
     if milvus_uri.endswith(".db"):
         local_index = True
     if hybrid:
@@ -1178,9 +1238,12 @@ def nvingest_retrieval(
             output_fields=output_fields,
             gpu_search=gpu_search,
             local_index=local_index,
+            _filter=_filter,
         )
     else:
-        results = dense_retrieval(queries, collection_name, client, embed_model, top_k, output_fields=output_fields)
+        results = dense_retrieval(
+            queries, collection_name, client, embed_model, top_k, output_fields=output_fields, _filter=_filter
+        )
     if nv_ranker:
         rerank_results = []
         for query, candidates in zip(queries, results):
@@ -1192,7 +1255,7 @@ def nvingest_retrieval(
                     model_name=nv_ranker_model_name,
                     nvidia_api_key=nv_ranker_nvidia_api_key,
                     truncate=nv_ranker_truncate,
-                    topk=nv_ranker_top_k,
+                    topk=final_top_k,
                     max_batch_size=nv_ranker_max_batch_size,
                 )
             )
@@ -1281,7 +1344,9 @@ def nv_rerank(
         map_candidates[idx] = candidate
         texts.append({"text": candidate["entity"]["text"]})
     payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
+    start = time.time()
     response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
+    logger.debug(f"RERANKER time: {time.time() - start}")
     if response.status_code != 200:
         raise ValueError(f"Failed retrieving ranking results: {response.status_code} - {response.text}")
     rank_results = []
