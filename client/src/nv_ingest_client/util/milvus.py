@@ -6,6 +6,9 @@ from typing import List
 from typing import Tuple
 from typing import Union
 from urllib.parse import urlparse
+from pathlib import Path
+import pandas as pd
+from functools import partial
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -29,6 +32,21 @@ from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from scipy.sparse import csr_array
 
 logger = logging.getLogger(__name__)
+
+pandas_reader_map = {
+    ".json": pd.read_json,
+    ".csv": partial(pd.read_csv, index_col=0),
+    ".parquet": pd.read_parquet,
+    ".pq": pd.read_parquet,
+}
+
+
+def pandas_file_reader(input_file: str):
+    path_file = Path(input_file)
+    if not path_file.exists:
+        raise ValueError(f"File does not exist: {input_file}")
+    file_type = path_file.suffix
+    return pandas_reader_map[file_type](input_file)
 
 
 def create_nvingest_meta_schema():
@@ -200,9 +218,9 @@ class MilvusOperator:
         access_key: str = "minioadmin",
         secret_key: str = "minioadmin",
         bucket_name: str = "a-bucket",
-        meta_dataframe=None,
-        meta_source_field=None,
-        meta_fields=None,
+        meta_dataframe: Union[str, pd.DataFrame] = None,
+        meta_source_field: str = None,
+        meta_fields: list[str] = None,
         **kwargs,
     ):
         self.milvus_kwargs = locals()
@@ -930,6 +948,8 @@ def write_to_nvingest_collection(
     logger.error(f"{len(records)} records to insert to milvus")
     if len(records) < threshold:
         stream = True
+    if isinstance(meta_dataframe, str):
+        meta_dataframe = pandas_file_reader(meta_dataframe)
     if stream:
         stream_insert_milvus(
             records,

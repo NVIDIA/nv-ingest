@@ -78,6 +78,7 @@ class RestClient(MessageBrokerClientBase):
         default_connect_timeout: float = 300.0,
         default_read_timeout: Optional[float] = None,
         http_allocator: Optional[Callable[[], Any]] = None,
+        **kwargs,
     ) -> None:
         """
         Initializes the RestClient.
@@ -138,7 +139,10 @@ class RestClient(MessageBrokerClientBase):
 
         self._submit_endpoint: str = "/v1/submit_job"
         self._fetch_endpoint: str = "/v1/fetch_job"
-        self._base_url: str = self._generate_url(self._host, self._port)
+        self._base_url: str = kwargs.get("base_url") or self._generate_url(self._host, self._port)
+        self._headers = kwargs.get("headers", {})
+        self._auth = kwargs.get("auth", None)
+
         logger.debug(f"RestClient base URL set to: {self._base_url}")
 
     @staticmethod
@@ -298,6 +302,10 @@ class RestClient(MessageBrokerClientBase):
         TypeError
             If the configured client does not support the required HTTP GET method.
         """
+        # Ensure headers are included
+        headers = {"Content-Type": "application/json"}
+        headers.update(self._headers)
+
         retries: int = 0
         url: str = f"{self._base_url}{self._fetch_endpoint}/{job_id}"
         req_timeout: Tuple[float, Optional[float]] = self._timeout
@@ -309,10 +317,11 @@ class RestClient(MessageBrokerClientBase):
 
             try:
                 if isinstance(self._client, requests.Session):
-                    with self._client.get(url, timeout=req_timeout, stream=True) as result:
+                    with self._client.get(
+                        url, timeout=req_timeout, headers=headers, stream=True, auth=self._auth
+                    ) as result:
                         response_code = result.status_code
-                        trace_id = result.headers.get("x-trace-id")
-                        response_text: str = result.text
+                        response_text = result.text
 
                         if response_code in _TERMINAL_RESPONSE_STATUSES:
                             error_reason: str = f"Terminal response code {response_code} fetching {job_id}."
@@ -414,6 +423,10 @@ class RestClient(MessageBrokerClientBase):
         request_payload: Dict[str, str] = {"payload": message}
         req_timeout: Tuple[float, Optional[float]] = self._timeout
 
+        # Ensure content-type is present
+        headers = {"Content-Type": "application/json"}
+        headers.update(self._headers)
+
         while True:
             result: Optional[Any] = None
             trace_id: Optional[str] = None
@@ -425,6 +438,7 @@ class RestClient(MessageBrokerClientBase):
                         url,
                         json=request_payload,
                         headers=headers,
+                        auth=self._auth,
                         timeout=req_timeout,
                     )
                     response_code = result.status_code
