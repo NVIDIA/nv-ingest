@@ -7,7 +7,7 @@ affinity: {}
 nodeSelector: {}
 
 ## @param logLevel Log level of NVIngest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL.
-logLevel: DEBUG
+logLevel: DEFAULT
 
 ## @param extraEnvVarsCM [string] [default: ""] A Config map holding Enviroment variables to include in the NVIngest containerextraEnvVarsCM: ""
 extraEnvVarsCM: ""
@@ -461,6 +461,10 @@ llama-32-nv-rerankqa-1b-v2:
 milvusDeployed: true
 ## @param milvus [default: sane {}] Find values at https://artifacthub.io/packages/helm/milvus-helm/milvus
 milvus:
+  image:
+    all:
+      repository: milvusdb/milvus
+      tag: v2.5.3-gpu
   cluster:
     enabled: false
   etcd:
@@ -475,6 +479,9 @@ milvus:
   pulsar:
     enabled: false
   standalone:
+    resources:
+      limits:
+        nvidia.com/gpu: 1
     persistence:
       persistentVolumeClaim:
         size: 10Gi
