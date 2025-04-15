@@ -62,7 +62,7 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 
     while True:
         try:
-            job = client.fetch_message(validated_config.task_queue, 100, override_fetch_mode=FetchMode.DESTRUCTIVE)
+            job = client.fetch_message(validated_config.task_queue, 10, override_fetch_mode=FetchMode.DESTRUCTIVE)
             logger.debug(f"Received Job Type: {type(job)}")
             if isinstance(job, BaseModel):
                 if job.response_code != 0:
