@@ -564,10 +564,8 @@ class NvIngestClient:
                     # Success Case
                     if verbose:
                         logger.info(f"Successfully fetched result for job {job_index} (Trace: {trace_id})")
-                    if data_only:
-                        results.append(result_data.get("data"))  # Store the actual result payload
-                    else:
-                        results.append(result_data)
+
+                    results.append(result_data.get("data"))  # Store the actual result payload
 
                     if completion_callback:
                         try:
