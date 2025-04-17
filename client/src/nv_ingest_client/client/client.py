@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
 # pylint: disable=broad-except
 
 import json
@@ -15,7 +14,7 @@ from concurrent.futures import ThreadPoolExecutor
 from concurrent.futures import as_completed
 from concurrent.futures import wait
 from concurrent.futures import FIRST_COMPLETED
-from typing import Any, Type, Callable
+from typing import Any, Type, Callable, Set
 from typing import Dict
 from typing import List
 from typing import Optional
@@ -55,6 +54,395 @@ class DataDecodeException(Exception):
         return f"{self.__class__.__name__}({self.message}, Data={self.data})"
 
 
+class _ConcurrentProcessor:
+    """
+    Manages the concurrent submission and result fetching of jobs using a client's
+    worker pool, handling concurrency limits, timeouts, retries, and callbacks.
+    """
+
+    def __init__(
+        self,
+        client: "NvIngestClient",
+        job_indices: List[str],
+        job_queue_id: Optional[str],
+        concurrency_limit: int,
+        timeout: Tuple[int, Optional[float]],
+        max_job_retries: Optional[int],
+        retry_delay: float,
+        completion_callback: Optional[Callable[[Any, str], None]],
+        fail_on_submit_error: bool,
+        data_only: bool,
+        verbose: bool = False,
+    ) -> None:
+        """
+        Initialize the concurrent processor.
+
+        Parameters
+        ----------
+        client : NvIngestClient
+            The ingest client used for job submission and fetching.
+        job_indices : list of str
+            List of job identifiers to process.
+        job_queue_id : str or None
+            Identifier for the job queue, required for submission.
+        concurrency_limit : int
+            Maximum number of jobs to have in flight at once.
+        timeout : tuple of (int, float or None)
+            Timeout settings for fetch attempts: (connect_timeout, read_timeout).
+        max_job_retries : int or None
+            Maximum number of fetch retries for 'not ready' jobs. None for infinite.
+        retry_delay : float
+            Delay in seconds between retry cycles.
+        completion_callback : callable or None
+            Function called upon each successful fetch, with signature
+            (result_data, job_index).
+        fail_on_submit_error : bool
+            If True, abort processing on any submission error.
+        data_only : bool
+            If True, extract and return only the 'data' field from results.
+        verbose : bool, default=False
+            If True, enable detailed logging.
+        """
+        self.client = client
+        self.job_queue_id = job_queue_id
+        self.concurrency_limit = concurrency_limit
+        self.timeout = timeout
+        self.max_job_retries = max_job_retries
+        self.retry_delay = retry_delay
+        self.completion_callback = completion_callback
+        self.fail_on_submit_error = fail_on_submit_error
+        self.data_only = data_only
+        self.verbose = verbose
+
+        # --- State Variables ---
+        self.all_job_indices: Set[str] = set(job_indices)
+        self.job_indices_to_submit: List[str] = list(job_indices)  # Queue for initial submission
+        self.retry_job_ids: List[str] = []  # Queue for jobs needing fetch retry
+        self.active_futures: Dict[Future, str] = {}  # Future -> job_index
+        self.retry_counts: Dict[str, int] = defaultdict(int)
+        self.results: List[Any] = []
+        self.failures: List[Tuple[str, str]] = []  # (job_index, error_message)
+        self.processed_count: int = 0
+        self.total_jobs: int = len(job_indices)
+        self._needs_retry_delay: bool = False  # Flag to indicate if a retry delay is needed
+
+    # --- Core Execution Method ---
+
+    def run(self) -> Tuple[List[Any], List[Tuple[str, str]]]:
+        """
+        Execute the concurrent processing loop until all jobs are handled.
+
+        Returns
+        -------
+        results : list of any
+            Collected successful job results.
+        failures : list of (str, str)
+            Tuples of (job_index, error_message) for any failed jobs.
+        """
+        self.executor = self.client._worker_pool  # Assuming client has a worker pool
+
+        logger.info(
+            f"Starting concurrent processing for {self.total_jobs} jobs " f"with limit {self.concurrency_limit}."
+        )
+
+        while self.processed_count < self.total_jobs:
+            self._apply_retry_delay_if_needed()
+
+            # Submit new and retry tasks up to the concurrency limit
+            submitted_count = self._fill_concurrency_slots()
+            if submitted_count > 0 and self.verbose:
+                logger.info(f"Submitted {submitted_count} job fetches.")
+
+            # Wait for and process any completed tasks
+            completed_futures = self._wait_for_completion()
+            if completed_futures:
+                self._process_completed_futures(completed_futures)
+            elif not self.active_futures and not self.job_indices_to_submit and not self.retry_job_ids:
+                # Nothing running, nothing pending - should be done. Exit gracefully.
+                if self.verbose:
+                    logger.debug("No active futures or pending jobs. Exiting loop.")
+                break
+            elif not self.active_futures and (self.job_indices_to_submit or self.retry_job_ids):
+                # Nothing running, but jobs are pending (maybe waiting for retry delay)
+                if self.verbose:
+                    logger.debug("No active futures, but jobs pending submission/retry.")
+                time.sleep(0.1)  # Prevent busy-waiting if only retries/submissions remain after delay
+                continue
+
+        self._log_final_status()
+        return self.results, self.failures
+
+    # --- Helper Methods ---
+
+    def _apply_retry_delay_if_needed(self) -> None:
+        """
+        Apply a delay before retrying fetches if the retry flag is set.
+
+        Notes
+        -----
+        This method sleeps for `self.retry_delay` seconds and then
+        clears the retry flag.
+        """
+        if self._needs_retry_delay and self.retry_delay > 0:
+            if self.verbose:
+                logger.debug(f"Applying retry delay: {self.retry_delay}s")
+            time.sleep(self.retry_delay)
+            self._needs_retry_delay = False  # Reset delay flag
+
+    def _fill_concurrency_slots(self) -> int:
+        """
+        Fill available concurrency slots by submitting new or retry fetch tasks.
+
+        Returns
+        -------
+        submitted_count : int
+            Number of fetch tasks successfully submitted this cycle.
+        """
+        submitted_count = 0
+        while len(self.active_futures) < self.concurrency_limit:
+            job_to_process = None
+            is_retry = False
+
+            # Prioritize submitting new jobs
+            if self.job_indices_to_submit:
+                job_to_process = self.job_indices_to_submit.pop(0)
+                is_retry = False
+            # Then submit jobs from the retry queue
+            elif self.retry_job_ids:
+                job_to_process = self.retry_job_ids.pop(0)
+                is_retry = True
+            else:
+                # No more jobs to submit or retry currently
+                break
+
+            # Try to submit the fetch task for the selected job
+            if self._submit_job_fetch(job_to_process, is_retry):
+                submitted_count += 1
+
+        return submitted_count
+
+    def _submit_job_fetch(self, job_index: str, is_retry: bool) -> bool:
+        """
+        Submit a fetch task for a given job index, handling initial submission if needed.
+
+        Parameters
+        ----------
+        job_index : str
+            Identifier of the job to fetch.
+        is_retry : bool
+            True if this fetch is a retry attempt.
+
+        Returns
+        -------
+        success : bool
+            True if the fetch task was enqueued, False otherwise.
+        """
+        try:
+            if not is_retry:
+                # For new jobs, ensure they are submitted first
+                job_state = self.client._get_and_check_job_state(job_index, required_state=[JobStateEnum.PENDING])
+                if not job_state.job_id:  # Submit if not already submitted
+                    self.client._submit_job(job_index, self.job_queue_id)
+                    job_state.state = JobStateEnum.SUBMITTED  # Update local state assumption
+
+            # Submit the fetch task (for both new and retries)
+            if self.verbose and is_retry:
+                logger.info(f"Retrying fetch for job {job_index} (Attempt {self.retry_counts[job_index] + 1})")
+
+            future = self.executor.submit(
+                self.client._fetch_job_result,
+                job_index,
+                timeout=self.timeout,
+                data_only=self.data_only,
+            )
+            self.active_futures[future] = job_index
+            return True
+
+        except Exception as e:
+            # Handle errors during initial check/submit or fetch submission
+            error_msg = f"Failed to initiate fetch for job {job_index}: {e}"
+            logger.error(error_msg)
+            self._handle_processing_failure(job_index, error_msg, is_submission_failure=not is_retry)
+            if self.fail_on_submit_error and not is_retry:
+                raise RuntimeError(f"Stopping due to submission error for {job_index}: {e}") from e
+            return False  # Fetch task not submitted
+
+    def _wait_for_completion(self) -> Set[Future]:
+        """
+        Wait for at least one active fetch future to complete.
+
+        Returns
+        -------
+        done : set of Future
+            Completed futures. Empty if none were active or timed out.
+        """
+        if not self.active_futures:
+            if self.verbose:
+                logger.debug("No active futures to wait on.")
+            return set()
+
+        try:
+            done, _ = wait(list(self.active_futures.keys()), return_when=FIRST_COMPLETED)
+
+            return done
+        except Exception as e:
+            logger.error(f"Unexpected error during future wait: {e}", exc_info=True)
+            return set()
+
+    def _process_completed_futures(self, completed_futures: Set[Future]) -> None:
+        """
+        Process a set of completed fetch futures.
+
+        Parameters
+        ----------
+        completed_futures : set of Future
+            Futures whose results or exceptions must be handled.
+        """
+        for future in completed_futures:
+            job_index = self.active_futures.pop(future)  # Remove processed future
+            will_retry = False
+            try:
+                result_data, _, trace_id = future.result()
+                self._handle_processing_success(job_index, result_data, trace_id)
+
+            except TimeoutError as e:  # Raised by _fetch_job_result for "Not Ready"
+                will_retry = self._handle_fetch_timeout(job_index, e)
+
+            except (ValueError, RuntimeError) as e:  # Terminal error from _fetch_job_result
+                error_msg = f"Terminal error during fetch: {e}"
+                logger.error(f"Job {job_index} failed: {error_msg}")
+                self._handle_processing_failure(job_index, error_msg)
+
+            except Exception as e:  # Other unexpected errors during future processing
+                error_msg = f"Unexpected error processing fetch future: {e}"
+                logger.exception(f"Job {job_index} failed: {error_msg}")  # Log with stack trace
+                self._handle_processing_failure(job_index, f"Unexpected future processing error: {e}")
+
+            finally:
+                if not will_retry:
+                    self.processed_count += 1  # Increment only if job finished (success or permanent fail)
+
+    def _handle_processing_success(self, job_index: str, result_data: Any, trace_id: Optional[str]) -> None:
+        """
+        Handle a successfully fetched job result.
+
+        Parameters
+        ----------
+        job_index : str
+            Identifier of the completed job.
+        result_data : any
+            Data returned by the fetch operation.
+        trace_id : str or None
+            Optional trace identifier from the fetch.
+        """
+        if self.verbose:
+            logger.info(
+                f"Successfully fetched result for job {job_index}" f"{' (Trace: ' + trace_id + ')' if trace_id else ''}"
+            )
+        self.results.append(result_data)
+        # Reset retry count on success (though it shouldn't be needed)
+        if job_index in self.retry_counts:
+            del self.retry_counts[job_index]
+
+        if self.completion_callback:
+            try:
+                self.completion_callback(result_data, job_index)
+            except Exception as cb_err:
+                logger.error(f"Error in completion_callback for job {job_index}: {cb_err}")
+
+    def _handle_fetch_timeout(self, job_index: str, error: TimeoutError) -> bool:
+        """
+        Handle a fetch timeout (job not ready) and decide on retry.
+
+        Parameters
+        ----------
+        job_index : str
+            Identifier of the job that timed out.
+        error : TimeoutError
+            Exception instance indicating the timeout.
+
+        Returns
+        -------
+        will_retry : bool
+            True if the job has been queued for retry, False if it has failed permanently.
+        """
+        self.retry_counts[job_index] += 1
+        if self.max_job_retries is None or self.retry_counts[job_index] <= self.max_job_retries:
+            if self.verbose:
+                logger.info(
+                    f"Job {job_index} not ready (Attempt {self.retry_counts[job_index]}/"
+                    f"{self.max_job_retries or 'inf'}). Will retry after delay."
+                )
+            self.retry_job_ids.append(job_index)  # Add back to retry queue
+            self._needs_retry_delay = True  # Signal that a delay is needed
+            return True  # Will retry
+        else:
+            error_msg = f"Exceeded max retries ({self.max_job_retries}) " f"waiting for readiness. Last reason: {error}"
+            logger.error(f"Job {job_index} failed: {error_msg}")
+            self._handle_processing_failure(job_index, error_msg)
+            return False  # Will not retry
+
+    def _handle_processing_failure(self, job_index: str, error_msg: str, is_submission_failure: bool = False) -> None:
+        """
+        Handle any failure during submission or fetching.
+
+        Parameters
+        ----------
+        job_index : str
+            Identifier of the job that failed.
+        error_msg : str
+            Description of the failure cause.
+        is_submission_failure : bool, default=False
+            True if the failure occurred during initial job submission.
+        """
+        self.failures.append((job_index, error_msg))
+        # Attempt to mark state as FAILED on the server/client side if possible
+        # This might be redundant if _fetch_job_result already did it.
+        try:
+            # Don't check required_state, just try to get the state object
+            job_state = self.client._get_job_state_object(job_index)  # Assume this method exists
+            if job_state and job_state.state not in [JobStateEnum.FAILED, JobStateEnum.COMPLETED]:
+                job_state.state = JobStateEnum.FAILED
+                if self.verbose:
+                    logger.debug(f"Marked job {job_index} state as FAILED locally.")
+                # Optionally: self.client.update_job_state(job_index, JobStateEnum.FAILED) if needed
+        except Exception as state_update_err:
+            if self.verbose:
+                logger.warning(
+                    f"Could not update state to FAILED for job {job_index} " f"after failure: {state_update_err}"
+                )
+
+        # If it's specifically a submission failure, don't increment processed_count here.
+        # The calling function (_submit_job_fetch) will handle incrementing if needed.
+        # For fetch failures, the caller (_process_completed_futures) increments if not retrying.
+
+        # Clean up retry counts if the failure is terminal
+        if job_index in self.retry_counts:
+            del self.retry_counts[job_index]
+
+    def _log_final_status(self) -> None:
+        """
+        Log the final processing summary and check for consistency.
+
+        Notes
+        -----
+        Warns if the number of processed jobs does not match the total.
+        """
+        # Final check for consistency
+        if self.processed_count != self.total_jobs:
+            logger.warning(
+                f"Processing loop finished, but processed count ({self.processed_count}) "
+                f"doesn't match total jobs ({self.total_jobs}). "
+                f"Results: {len(self.results)}, Failures: {len(self.failures)}, "
+                f"Still Active: {len(self.active_futures)}, "
+                f"Pending Submit: {len(self.job_indices_to_submit)}, "
+                f"Pending Retry: {len(self.retry_job_ids)}"
+            )
+            # You might want to add logic here to mark any remaining jobs in queues/active as failed.
+
+        logger.info(f"Concurrent processing finished. " f"Success: {len(self.results)}, Failures: {len(self.failures)}")
+
+
 class NvIngestClient:
     """
     A client class for interacting with the nv-ingest service, supporting custom client allocators.
@@ -65,26 +453,31 @@ class NvIngestClient:
         message_client_allocator: Type[MessageBrokerClientBase] = RestClient,
         message_client_hostname: Optional[str] = "localhost",
         message_client_port: Optional[int] = 7670,
-        message_client_kwargs: Optional[Dict] = None,
+        message_client_kwargs: Optional[Dict[str, Any]] = None,
         msg_counter_id: Optional[str] = "nv-ingest-message-id",
         worker_pool_size: int = 1,
     ) -> None:
         """
-        Initializes the NvIngestClient with a client allocator, REST configuration, a message counter ID,
-        and a worker pool for parallel processing.
+        Initialize the NvIngestClient.
 
         Parameters
         ----------
-        message_client_allocator : Callable[..., RestClient]
-            A callable that when called returns an instance of the client used for communication.
+        message_client_allocator : Type[MessageBrokerClientBase], optional
+            Callable that creates the message broker client. Defaults to RestClient.
         message_client_hostname : str, optional
-            The hostname of the REST server. Defaults to "localhost".
+            Hostname of the REST/message service. Defaults to "localhost".
         message_client_port : int, optional
-            The port number of the REST server. Defaults to 7670.
+            Port of the REST/message service. Defaults to 7670.
+        message_client_kwargs : dict, optional
+            Extra keyword arguments passed to the client allocator.
         msg_counter_id : str, optional
-            The key for tracking message counts. Defaults to "nv-ingest-message-id".
+            Identifier for message counting. Defaults to "nv-ingest-message-id".
         worker_pool_size : int, optional
-            The number of worker processes in the pool. Defaults to 1.
+            Number of workers in the thread pool. Defaults to 1.
+
+        Returns
+        -------
+        None
         """
 
         self._current_message_id = 0
@@ -156,8 +549,29 @@ class NvIngestClient:
     def _get_and_check_job_state(
         self,
         job_index: str,
-        required_state: Union[JobStateEnum, List[JobStateEnum]] = None,
+        required_state: Optional[Union[JobStateEnum, List[JobStateEnum]]] = None,
     ) -> JobState:
+        """
+        Retrieve and optionally validate the state of a job.
+
+        Parameters
+        ----------
+        job_index : str
+            The client-side identifier of the job.
+        required_state : JobStateEnum or list of JobStateEnum, optional
+            State or list of states the job must currently be in. If provided and
+            the job is not in one of these states, an error is raised.
+
+        Returns
+        -------
+        JobState
+            The state object for the specified job.
+
+        Raises
+        ------
+        ValueError
+            If the job does not exist or is not in an allowed state.
+        """
         if required_state and not isinstance(required_state, list):
             required_state = [required_state]
         job_state = self._job_states.get(job_index)
@@ -172,10 +586,31 @@ class NvIngestClient:
 
         return job_state
 
-    def job_count(self):
+    def job_count(self) -> int:
+        """
+        Get the number of jobs currently tracked by the client.
+
+        Returns
+        -------
+        int
+            The total count of jobs in internal state tracking.
+        """
         return len(self._job_states)
 
     def _add_single_job(self, job_spec: JobSpec) -> str:
+        """
+        Add a single job specification to internal tracking.
+
+        Parameters
+        ----------
+        job_spec : JobSpec
+            The specification object describing the job.
+
+        Returns
+        -------
+        str
+            The newly generated job index.
+        """
         job_index = self._generate_job_index()
 
         self._job_states[job_index] = JobState(job_spec=job_spec)
@@ -183,6 +618,24 @@ class NvIngestClient:
         return job_index
 
     def add_job(self, job_spec: Union[BatchJobSpec, JobSpec]) -> Union[str, List[str]]:
+        """
+        Add one or more jobs to the client for later processing.
+
+        Parameters
+        ----------
+        job_spec : JobSpec or BatchJobSpec
+            A single job specification or a batch containing multiple specs.
+
+        Returns
+        -------
+        str or list of str
+            The job index for a single spec, or a list of indices for a batch.
+
+        Raises
+        ------
+        ValueError
+            If an unsupported type is provided.
+        """
         if isinstance(job_spec, JobSpec):
             job_index = self._add_single_job(job_spec)
             self._job_index_to_job_spec[job_index] = job_spec
@@ -201,42 +654,40 @@ class NvIngestClient:
 
     def create_job(
         self,
-        payload: str,
+        payload: Dict[str, Any],
         source_id: str,
         source_name: str,
-        document_type: str = None,
-        tasks: Optional[list] = None,
-        extended_options: Optional[dict] = None,
+        document_type: Optional[str] = None,
+        tasks: Optional[List[Task]] = None,
+        extended_options: Optional[Dict[str, Any]] = None,
     ) -> str:
         """
-        Creates a new job with the specified parameters and adds it to the job tracking dictionary.
+        Construct and register a new job from provided metadata.
 
         Parameters
         ----------
-        job_id : uuid.UUID, optional
-            The unique identifier for the job. If not provided, a new UUID will be generated.
         payload : dict
-            The payload associated with the job. Defaults to an empty dictionary if not provided.
-        tasks : list, optional
-            A list of tasks to be associated with the job.
-        document_type : str
-            The type of document to be processed.
+            The data payload for the job.
         source_id : str
-            The source identifier for the job.
+            Identifier of the data source.
         source_name : str
-            The unique name of the job's source data.
+            Human-readable name for the source.
+        document_type : str, optional
+            Type of document (inferred from source_name if omitted).
+        tasks : list of Task, optional
+            Initial set of processing tasks to attach.
         extended_options : dict, optional
-            Additional options for job creation.
+            Extra parameters for advanced configuration.
 
         Returns
         -------
         str
-            The job ID as a string.
+            The client-side job index.
 
         Raises
         ------
         ValueError
-            If a job with the specified `job_id` already exists.
+            If job creation parameters are invalid.
         """
 
         document_type = document_type or source_name.split(".")[-1]
@@ -253,6 +704,16 @@ class NvIngestClient:
         return job_id
 
     def add_task(self, job_index: str, task: Task) -> None:
+        """
+        Attach an existing Task object to a pending job.
+
+        Parameters
+        ----------
+        job_index : str
+            The client-side identifier of the target job.
+        task : Task
+            The task instance to add.
+        """
         job_state = self._get_and_check_job_state(job_index, required_state=JobStateEnum.PENDING)
 
         job_state.job_spec.add_task(task)
@@ -261,52 +722,66 @@ class NvIngestClient:
         self,
         job_index: Union[str, int],
         task_type: TaskType,
-        task_params: dict = None,
+        task_params: Optional[Dict[str, Any]] = None,
     ) -> None:
         """
-        Creates a task of the specified type with given parameters and associates it with the existing job.
+        Create and attach a new task to a pending job by type and parameters.
 
         Parameters
         ----------
-        job_index: Union[str, int]
-            The unique identifier of the job to which the task will be added. This can be either a string or an integer.
+        job_index : str or int
+            Identifier of the job to modify.
         task_type : TaskType
-            The type of the task to be created, defined as an enum value.
-        task_params : dict
-            A dictionary containing parameters for the task.
+            Enum specifying the kind of task to create.
+        task_params : dict, optional
+            Parameters for the new task.
 
         Raises
         ------
         ValueError
-            If the job with the specified `job_id` does not exist or if an attempt is made to modify a job after its
-            submission.
+            If the job does not exist or is not pending.
         """
         task_params = task_params or {}
 
         return self.add_task(job_index, task_factory(task_type, **task_params))
 
     def _fetch_job_result(
-        self, job_index: str, timeout: Tuple[int, Union[float, None]] = (100, None), data_only: bool = False
+        self,
+        job_index: str,
+        timeout: Tuple[int, Optional[float]] = (100, None),
+        data_only: bool = False,
     ) -> Tuple[Any, str, Optional[str]]:
         """
-        Internal method to fetch a job result using its client-side index.
-        Handles different response codes from the message client's ResponseSchema.
+        Retrieve the result of a submitted job, handling status codes.
 
-        Args:
-            job_index (str): The client-side identifier of the job.
-            timeout (float): Timeout for the fetch operation in seconds.
-            data_only (bool): If True, attempts to extract 'data' field from the JSON response.
+        Parameters
+        ----------
+        job_index : str
+            Client-side job identifier.
+        timeout : tuple
+            Timeouts (connect, read) for the fetch operation.
+        data_only : bool, optional
+            If True, return only the 'data' portion of the payload.
 
-        Returns:
-            Tuple[Any, str, Optional[str]]: The job result (parsed JSON or specific part), client job index,
-            and trace_id.
+        Returns
+        -------
+        result_data : any
+            Parsed job result or full JSON payload.
+        job_index : str
+            Echoes the client-side job ID.
+        trace_id : str or None
+            Trace identifier from the message client.
 
-        Raises:
-            ValueError: If the job state is invalid, JSON decoding fails, or server_job_id is missing.
-            TimeoutError: If the underlying fetch indicates the job is not ready (RestClient response_code == 2).
-            RuntimeError: If the underlying fetch returns a terminal error (RestClient response_code == 1, e.g.,
-                HTTP 404/400/500).
-            Exception: For other unexpected issues during processing.
+        Raises
+        ------
+        TimeoutError
+            If the job is not yet ready (HTTP 202).
+        RuntimeError
+            For terminal server errors (HTTP 404/500, etc.).
+        ValueError
+            On JSON decoding errors or missing state.
+        Exception
+            For unexpected issues.
         """
         try:
             # Get job state using the client-side index
@@ -397,258 +872,129 @@ class NvIngestClient:
                 job_state.state = JobStateEnum.FAILED
             raise  # Re-raise the original exception
 
-    # The Pythonic invocation and the CLI invocation approach currently have different approaches to timeouts
-    # This distinction is made obvious by provided two separate functions. One for "_cli" and one for
-    # direct Python use. This is the "_cli" approach
-    def fetch_job_result_cli(self, job_ids: Union[str, List[str]], data_only: bool = False):
+    def fetch_job_result_cli(
+        self,
+        job_ids: Union[str, List[str]],
+        data_only: bool = False,
+    ) -> List[Tuple[Any, str, Optional[str]]]:
+        """
+        Fetch job results via CLI semantics (synchronous list return).
+
+        Parameters
+        ----------
+        job_ids : str or list of str
+            Single or multiple client-side job identifiers.
+        data_only : bool, optional
+            If True, extract only the 'data' field. Default is False.
+
+        Returns
+        -------
+        list of (result_data, job_index, trace_id)
+            List of tuples for each fetched job.
+        """
         if isinstance(job_ids, str):
             job_ids = [job_ids]
 
         return [self._fetch_job_result(job_id, data_only=data_only) for job_id in job_ids]
 
-    def fetch_job_result(
+    def process_jobs_concurrently(
         self,
         job_indices: Union[str, List[str]],
+        job_queue_id: Optional[str] = None,
+        concurrency_limit: int = 128,
         timeout: int = 100,
-        fetch_batch_size: int = 128,
-        max_job_retries: int = None,
+        max_job_retries: Optional[int] = None,
         retry_delay: float = 5.0,
-        verbose: bool = False,
-        completion_callback: Optional[Callable[[Dict, str], None]] = None,
+        fail_on_submit_error: bool = False,
+        completion_callback: Optional[Callable[[Any, str], None]] = None,
         return_failures: bool = False,
-        data_only: bool = False,
+        data_only: bool = True,
+        verbose: bool = False,
     ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
         """
-        Fetches job results using a batched approach with controlled concurrency and retries.
+        Submit and fetch multiple jobs concurrently.
 
-        Args:
-            job_indices: A job ID or list of job IDs to fetch results for.
-            timeout: Timeout (seconds) for each underlying fetch connection/read attempt.
-            fetch_batch_size: Maximum number of jobs to fetch concurrently.
-            max_job_retries: Maximum retries for jobs returning "Not Ready".
-            retry_delay: Delay (seconds) between retrying jobs that weren't ready.
-            verbose: Log more details about retries.
-            completion_callback: Callback executed on successful fetch of a job's result data.
-            return_failures: If True, return (results, failures) tuple.
-            data_only: If True, attempt to return only the 'data' field from results. (Passed down).
+        Parameters
+        ----------
+        job_indices : str or list of str
+            Single or multiple job indices to process.
+        job_queue_id : str, optional
+            Queue identifier for submission.
+        concurrency_limit : int, optional
+            Max number of simultaneous in-flight jobs. Default is 128.
+        timeout : int, optional
+            Timeout in seconds per fetch attempt. Default is 100.
+        max_job_retries : int, optional
+            Max retries for 'not ready' jobs. None for infinite. Default is None.
+        retry_delay : float, optional
+            Delay in seconds between retry cycles. Default is 5.0.
+        fail_on_submit_error : bool, optional
+            If True, abort on submission error. Default is False.
+        completion_callback : callable, optional
+            Called on each successful fetch as (result_data, job_index).
+        return_failures : bool, optional
+            If True, return (results, failures). Default is False.
+        data_only : bool, optional
+            If True, return only payload 'data'. Default is True.
+        verbose : bool, optional
+            If True, enable debug logging. Default is False.
 
-        Returns:
-          - If `return_failures=False`: List of successful results [result_data].
-          - If `return_failures=True`: Tuple of ([successful results], [failures=(job_index, error_msg)]).
+        Returns
+        -------
+        results : list
+            List of successful job results when `return_failures` is False.
+        results, failures : tuple
+            Tuple of (successful results, failure tuples) when `return_failures` is True.
 
-        Raises:
-            Propagates exceptions from pre-flight checks or unexpected internal errors.
+        Raises
+        ------
+        RuntimeError
+            If `fail_on_submit_error` is True and a submission fails.
         """
+        # Normalize single index to list
         if isinstance(job_indices, str):
             job_indices = [job_indices]
 
-        return self._fetch_job_results_batched(
-            job_indices=job_indices,
-            timeout=timeout,
-            fetch_batch_size=fetch_batch_size,
-            max_job_retries=max_job_retries,
-            retry_delay=retry_delay,
-            verbose=verbose,
-            completion_callback=completion_callback,
-            return_failures=return_failures,
-            data_only=data_only,
-        )
-
-    def _fetch_job_results_batched(
-        self,
-        job_indices: List[str],
-        timeout: int,
-        fetch_batch_size: int,
-        max_job_retries: int,
-        retry_delay: float,
-        verbose: bool,
-        completion_callback: Optional[Callable[[Dict, str], None]],
-        return_failures: bool,
-        data_only: bool,
-    ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
-        """
-        Internal worker to fetch results for multiple jobs using batching and external retries.
-
-        Args:
-            job_indices: List of client-side job indices to fetch.
-            timeout: Timeout (seconds) for individual fetch connect/read attempts.
-            fetch_batch_size: Max number of concurrent fetch operations.
-            max_job_retries: Max retries for a job if it returns "Not Ready".
-            retry_delay: Delay (seconds) between retry cycles.
-            verbose: If True, log more detailed retry info.
-            completion_callback: Called for each successfully completed job *result*.
-            return_failures: If True, return (results, failures) tuple.
-            data_only: Passed down to _fetch_job_result.
-
-        Returns:
-            List of results or (results, failures) tuple.
-        """
-        total_jobs = len(job_indices)
-        if total_jobs == 0:
+        # Handle empty input
+        if not job_indices:
             return ([], []) if return_failures else []
 
-        job_ids_to_process = list(job_indices)  # Queue of jobs yet to be submitted
-        retry_job_ids = []  # Jobs waiting for retry
-        retry_counts = defaultdict(int)  # Tracks retries per job_index
-        results = []  # Stores successful results
-        failures = []  # Stores (job_index, error_message) tuples
-        active_futures: Dict[Future, str] = {}  # Maps active Future instances to job_index
+        # Prepare timeout tuple for fetch calls
+        effective_timeout: Tuple[int, None] = (timeout, None)
 
-        executor = self._worker_pool
-
-        effective_fetch_timeout = (timeout, None)
-        logger.info(
-            f"Starting batched fetch for {total_jobs} jobs. Batch size: {fetch_batch_size}, "
-            f"Max retries: {max_job_retries}, Retry delay: {retry_delay}s"
+        # Delegate to the concurrent processor
+        processor = _ConcurrentProcessor(
+            client=self,
+            job_indices=job_indices,
+            job_queue_id=job_queue_id,
+            concurrency_limit=concurrency_limit,
+            timeout=effective_timeout,
+            max_job_retries=max_job_retries,
+            retry_delay=retry_delay,
+            completion_callback=completion_callback,
+            fail_on_submit_error=fail_on_submit_error,
+            data_only=data_only,
+            verbose=verbose,
         )
 
-        processed_count = 0  # Counter for jobs that finished (success or terminal failure)
-
-        while processed_count < total_jobs:
-            # --- Submit New/Retry Tasks ---
-            can_submit = fetch_batch_size - len(active_futures)
-
-            # Prioritize retries
-            submit_now = min(can_submit, len(retry_job_ids))
-            if submit_now > 0:
-                ids_to_retry = retry_job_ids[:submit_now]
-                del retry_job_ids[:submit_now]  # Consume submitted retries
-                can_submit -= submit_now
-                if verbose:
-                    logger.info(f"Submitting {len(ids_to_retry)} jobs from retry queue.")
-                for job_index in ids_to_retry:
-                    future = executor.submit(
-                        self._fetch_job_result,  # Direct call to single-job fetcher
-                        job_index,
-                        timeout=effective_fetch_timeout,
-                        data_only=data_only,
-                    )
-                    active_futures[future] = job_index
-
-            # Submit new jobs if space available
-            submit_now = min(can_submit, len(job_ids_to_process))
-            if submit_now > 0:
-                ids_to_process = job_ids_to_process[:submit_now]
-                del job_ids_to_process[:submit_now]  # Consume submitted new jobs
-                if verbose:
-                    logger.info(f"Submitting {len(ids_to_process)} new jobs for fetch.")
-                for job_index in ids_to_process:
-                    future = executor.submit(
-                        self._fetch_job_result, job_index, timeout=effective_fetch_timeout, data_only=data_only
-                    )
-                    active_futures[future] = job_index
-
-            # --- Wait for and Process Completed Futures ---
-            if not active_futures:
-                # This might happen if all remaining jobs hit max retries quickly
-                if len(results) + len(failures) >= total_jobs:
-                    break  # All jobs accounted for
-                else:
-                    # Should not happen if loop condition is correct, but adds robustness
-                    logger.warning("No active futures, but not all jobs accounted for. Waiting...")
-                    time.sleep(max(retry_delay, 0.5))  # Wait before checking submission logic again
-                    continue
-
-            # Wait for at least one future to complete. Use a small timeout to allow
-            # the loop to cycle reasonably often, even if fetches are slow.
-            done, _ = wait(list(active_futures.keys()), timeout=1.0, return_when=FIRST_COMPLETED)
-
-            needs_retry_delay = False
-            for future in done:
-                job_index = active_futures.pop(future)  # Remove processed future
-                will_retry = False
-                try:
-                    # Result is Tuple[Any, str, Optional[str]] from _fetch_job_result
-                    result_data, _, trace_id = future.result()  # Raises exceptions from _fetch_job_result
-
-                    # Success Case
-                    if verbose:
-                        logger.info(f"Successfully fetched result for job {job_index} (Trace: {trace_id})")
-
-                    results.append(result_data.get("data"))  # Store the actual result payload
-
-                    if completion_callback:
-                        try:
-                            # Pass the full result dict if needed by callback, or just result_data
-                            # Assuming callback expects the data part from _fetch_job_result's tuple
-                            completion_callback(result_data, job_index)
-                        except Exception as cb_err:
-                            logger.error(f"Error in completion_callback for job {job_index}: {cb_err}")
-
-                except TimeoutError as e:  # Raised by _fetch_job_result for "Not Ready"
-                    retry_counts[job_index] += 1
-                    if max_job_retries is None or retry_counts[job_index] <= max_job_retries:
-                        if verbose:
-                            logger.info(
-                                f"Job {job_index} not ready (Attempt {retry_counts[job_index]}/{max_job_retries})."
-                                f" Will retry."
-                            )
-                        retry_job_ids.append(job_index)  # Add back to retry queue
-                        will_retry = True
-                        needs_retry_delay = True
-                    else:
-                        error_msg = (
-                            f"Job {job_index} failed: Exceeded max retries ({max_job_retries})"
-                            f" waiting for readiness. Last reason: {e}"
-                        )
-                        logger.error(error_msg)
-                        failures.append((job_index, error_msg))
-
-                except (ValueError, RuntimeError) as e:  # Terminal error from _fetch_job_result
-                    error_msg = f"Job {job_index} failed: Terminal error during fetch: {e}"
-                    logger.error(error_msg)
-                    failures.append((job_index, str(e)))
-                    # State should have been set to FAILED inside _fetch_job_result
-
-                except Exception as e:  # Other unexpected errors
-                    error_msg = f"Job {job_index} failed: Unexpected error processing fetch future: {e}"
-                    logger.exception(error_msg)
-                    failures.append((job_index, f"Unexpected future processing error: {e}"))
-                    # Attempt to mark state FAILED if _fetch_job_result didn't
-                    try:
-                        job_state = self._get_and_check_job_state(job_index, required_state=None)
-                        if job_state and job_state.state not in [
-                            JobStateEnum.FAILED
-                        ]:  # Avoid overwriting specific failures
-                            job_state.state = JobStateEnum.FAILED
-                    except Exception as state_err:
-                        logger.error(
-                            f"Could not update state to FAILED for job {job_index} after unexpected error: {state_err}"
-                        )
-
-                finally:
-                    if not will_retry:
-                        processed_count += 1
-
-            # Apply delay only if a retry was triggered in this cycle
-            if needs_retry_delay and retry_delay > 0:
-                logger.debug(f"Waiting {retry_delay}s due to jobs needing retry...")
-                time.sleep(retry_delay)
-
-        # --- Loop Finished ---
-        if len(results) + len(failures) != total_jobs:
-            logger.warning(
-                f"Batch fetch completed. Final counts mismatch: Results={len(results)},"
-                f" Failures={len(failures)}, Total={total_jobs}"
-            )
-            # Add any remaining jobs from retry/processing queues as failures?
-            remaining_ids = set(retry_job_ids) | set(job_ids_to_process) | set(active_futures.values())
-            for job_index in remaining_ids:
-                if not any(f[0] == job_index for f in failures):
-                    failures.append((job_index, "Job did not complete within fetch process"))
-
-        logger.info(f"Batch fetch finished. Success: {len(results)}, Failures: {len(failures)}")
+        results, failures = processor.run()
 
         if return_failures:
             return results, failures
-        else:
-            if failures:
-                logger.warning(
-                    f"Completed fetching batch. {len(results)} succeeded, {len(failures)} failed (check logs)."
-                )
-            return results
 
-    def _ensure_submitted(self, job_ids: List[str]):
+        if failures:
+            logger.warning(f"{len(failures)} job(s) failed during concurrent processing." " Check logs for details.")
+        return results
+
+    def _ensure_submitted(self, job_ids: Union[str, List[str]]) -> None:
+        """
+        Block until all specified jobs have been marked submitted.
+
+        Parameters
+        ----------
+        job_ids : str or list of str
+            One or more job indices expected to reach a SUBMITTED state.
+        """
         if isinstance(job_ids, str):
             job_ids = [job_ids]  # Ensure job_ids is always a list
 
@@ -748,8 +1094,33 @@ class NvIngestClient:
             raise
 
     def submit_job(
-        self, job_indices: Union[str, List[str]], job_queue_id: str, batch_size: int = 10
-    ) -> List[Union[Dict, None]]:
+        self,
+        job_indices: Union[str, List[str]],
+        job_queue_id: str,
+        batch_size: int = 10,
+    ) -> List[str]:
+        """
+        Submit one or more jobs in batches.
+
+        Parameters
+        ----------
+        job_indices : str or list of str
+            Job indices to submit.
+        job_queue_id : str
+            Queue identifier for submission.
+        batch_size : int, optional
+            Maximum number of jobs per batch. Default is 10.
+
+        Returns
+        -------
+        list of str
+            Trace identifiers for each submitted job.
+
+        Raises
+        ------
+        Exception
+            Propagates first error if any job in a batch fails.
+        """
         if isinstance(job_indices, str):
             job_indices = [job_indices]
 
