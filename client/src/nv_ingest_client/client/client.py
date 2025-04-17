@@ -516,7 +516,7 @@ class NvIngestClient:
         message_client_port: Optional[int] = 7670,
         message_client_kwargs: Optional[Dict[str, Any]] = None,
         msg_counter_id: Optional[str] = "nv-ingest-message-id",
-        worker_pool_size: int = 16,
+        worker_pool_size: int = 8,
     ) -> None:
         """
         Initialize the NvIngestClient.

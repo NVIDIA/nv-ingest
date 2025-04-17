@@ -260,7 +260,7 @@ class Ingestor:
 
         # Default concurrent-processing parameters
         DEFAULT_TIMEOUT: int = 100
-        DEFAULT_MAX_RETRIES: int = 5
+        DEFAULT_MAX_RETRIES: int = None
         DEFAULT_DATA_ONLY: bool = True
         DEFAULT_VERBOSE: bool = False
 
