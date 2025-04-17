@@ -41,3 +41,6 @@ Thumbs.db
 
 # Ignore time-slicing directory
 time-slicing/
+
+# Ignore helm-docs template file
+README.md.gotmpl
