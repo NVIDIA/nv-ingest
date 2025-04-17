@@ -38,3 +38,6 @@ update_helm_readme.sh
 # Ignore OS files
 .DS_Store
 Thumbs.db
+
+# Ignore time-slicing directory
+time-slicing/
