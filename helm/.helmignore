@@ -21,3 +21,20 @@
 .idea/
 *.tmproj
 .vscode/
+
+# Ignore shell scripts
+update_helm_readme.sh
+
+# Ignore temporary files
+*.tmp
+*.prefix
+*.suffix
+
+# Ignore editor files
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
