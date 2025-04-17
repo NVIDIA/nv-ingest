@@ -130,96 +130,190 @@ class _ConcurrentProcessor:
 
     def run(self) -> Tuple[List[Any], List[Tuple[str, str]]]:
         """
-        Execute the concurrent processing loop until all jobs are handled.
+        Executes the concurrent processing loop until all jobs are processed or
+        an unrecoverable error occurs. Uses `as_completed` to process results.
 
-        Returns
-        -------
-        results : list of any
-            Collected successful job results.
-        failures : list of (str, str)
-            Tuples of (job_index, error_message) for any failed jobs.
+        Returns:
+            A tuple containing two lists: (successful_results, failures).
         """
-        self.executor = self.client._worker_pool  # Assuming client has a worker pool
+        self.executor = self.client._worker_pool
 
         logger.info(
-            f"Starting concurrent processing for {self.total_jobs} jobs " f"with limit {self.concurrency_limit}."
+            f"Starting concurrent processing for {self.total_jobs} jobs "
+            f"with concurrency limit {self.concurrency_limit}."
         )
 
         while self.processed_count < self.total_jobs:
             self._apply_retry_delay_if_needed()
 
-            # Submit new and retry tasks up to the concurrency limit
             submitted_count = self._fill_concurrency_slots()
             if submitted_count > 0 and self.verbose:
-                logger.info(f"Submitted {submitted_count} job fetches.")
+                logger.debug(f"Submitted {submitted_count} new/retry job fetches.")
 
-            # Wait for and process any completed tasks
-            completed_futures = self._wait_for_completion()
-            if completed_futures:
-                self._process_completed_futures(completed_futures)
-            elif not self.active_futures and not self.job_indices_to_submit and not self.retry_job_ids:
-                # Nothing running, nothing pending - should be done. Exit gracefully.
+            if self.active_futures:
+                # as_completed can take a timeout argument
+                for future in as_completed(self.active_futures.keys()):
+                    self._process_one_completed_future(future)
+                    # Break after processing one to allow filling concurrency slots again
+                    break
+
+            # If no futures are active, check if we are truly done or waiting
+            elif not self.job_indices_to_submit and not self.retry_job_ids:
+                if self.processed_count < self.total_jobs:
+                    logger.warning(
+                        "No active futures or pending jobs, but processed_count < total_jobs. Possible state issue."
+                    )
                 if self.verbose:
                     logger.debug("No active futures or pending jobs. Exiting loop.")
                 break
-            elif not self.active_futures and (self.job_indices_to_submit or self.retry_job_ids):
-                # Nothing running, but jobs are pending (maybe waiting for retry delay)
+            else:
                 if self.verbose:
                     logger.debug("No active futures, but jobs pending submission/retry.")
-                time.sleep(0.1)  # Prevent busy-waiting if only retries/submissions remain after delay
-                continue
+                if not self._needs_retry_delay and self.retry_delay <= 0:
+                    time.sleep(0.05)
 
         self._log_final_status()
         return self.results, self.failures
 
     # --- Helper Methods ---
 
-    def _apply_retry_delay_if_needed(self) -> None:
-        """
-        Apply a delay before retrying fetches if the retry flag is set.
-
-        Notes
-        -----
-        This method sleeps for `self.retry_delay` seconds and then
-        clears the retry flag.
-        """
+    def _apply_retry_delay_if_needed(self):
+        """Applies the retry delay if the flag is set."""
         if self._needs_retry_delay and self.retry_delay > 0:
             if self.verbose:
-                logger.debug(f"Applying retry delay: {self.retry_delay}s")
+                logger.debug(f"Applying retry delay: {self.retry_delay}s before next submissions.")
             time.sleep(self.retry_delay)
-            self._needs_retry_delay = False  # Reset delay flag
+            self._needs_retry_delay = False
 
     def _fill_concurrency_slots(self) -> int:
         """
-        Fill available concurrency slots by submitting new or retry fetch tasks.
+        Initiates asynchronous submission for new jobs and submits fetch tasks
+        for new/retry jobs until the concurrency limit is reached or queues are empty.
 
-        Returns
-        -------
-        submitted_count : int
-            Number of fetch tasks successfully submitted this cycle.
+        Returns:
+            The number of new fetch tasks successfully submitted to the executor.
         """
-        submitted_count = 0
+        submitted_fetch_count = 0
         while len(self.active_futures) < self.concurrency_limit:
-            job_to_process = None
-            is_retry = False
+            job_index: Optional[str] = None
+            is_retry: bool = False
 
-            # Prioritize submitting new jobs
             if self.job_indices_to_submit:
-                job_to_process = self.job_indices_to_submit.pop(0)
+                job_index = self.job_indices_to_submit.pop(0)
                 is_retry = False
-            # Then submit jobs from the retry queue
             elif self.retry_job_ids:
-                job_to_process = self.retry_job_ids.pop(0)
+                job_index = self.retry_job_ids.pop(0)
                 is_retry = True
             else:
-                # No more jobs to submit or retry currently
-                break
+                break  # No more jobs to process currently
 
-            # Try to submit the fetch task for the selected job
-            if self._submit_job_fetch(job_to_process, is_retry):
-                submitted_count += 1
+            if self._initiate_processing(job_index, is_retry):
+                submitted_fetch_count += 1
 
-        return submitted_count
+        return submitted_fetch_count
+
+    def _initiate_processing(self, job_index: str, is_retry: bool) -> bool:
+        """
+        Initiates async submission if needed (for new jobs) and submits the fetch task.
+
+        Args:
+            job_index: The index of the job to process.
+            is_retry: True if this is a retry fetch attempt.
+
+        Returns:
+            True if the fetch task was successfully submitted to the executor,
+            False otherwise (e.g., submission initiation failed pre-emptively).
+
+        Raises:
+            RuntimeError: If `fail_on_submit_error` is True and an error occurs
+                          during the call to `submit_job_async`.
+        """
+        submission_initiated = False
+        try:
+            # --- Step 1: Initiate Asynchronous Submission (if needed) ---
+            if not is_retry:
+                if not self.job_queue_id:
+                    # This should ideally be checked earlier, but double-check here
+                    raise ValueError("job_queue_id must be provided to submit new jobs.")
+
+                if self.verbose:
+                    logger.debug(f"Initiating async submission for new job {job_index} via submit_job_async.")
+
+                _ = self.client.submit_job_async(job_index, self.job_queue_id)
+                submission_initiated = True  # Assume success if no exception is raised
+
+            # --- Step 2: Submit the Fetch Task ---
+            if self.verbose and is_retry:
+                logger.info(f"Retrying fetch for job {job_index} (Attempt {self.retry_counts[job_index]+1})")
+            elif self.verbose and not is_retry:
+                logger.debug(f"Submitting fetch task for job {job_index} (submission initiated separately).")
+
+            # Submit the task to fetch the result (_fetch_job_result should handle retries internally via exceptions)
+            future = self.executor.submit(
+                self.client._fetch_job_result,
+                job_index,
+                timeout=self.timeout,
+                data_only=self.data_only,
+            )
+            self.active_futures[future] = job_index
+            return True  # Fetch task successfully submitted
+
+        except Exception as e:
+            # This catches errors from:
+            # 1. The synchronous part of client.submit_job_async() (e.g., bad initial state).
+            # 2. The self.executor.submit() call for the fetch task itself.
+            component = (
+                "initiating async submission" if not is_retry and not submission_initiated else "submitting fetch task"
+            )
+            error_msg = f"Failed {component} for job {job_index}: {e}"
+            logger.error(error_msg)
+
+            # This failure means the fetch future was *not* created or added,
+            # or the submission couldn't even be queued.
+            # Treat as a terminal failure for this job_index.
+            self._handle_processing_failure(job_index, error_msg, is_submission_failure=True)
+            self.processed_count += 1  # Increment count as no future will track this job.
+
+            if self.fail_on_submit_error:
+                # If failure occurred during the submission initiation part specifically
+                if not is_retry and not submission_initiated:
+                    raise RuntimeError(f"Stopping due to error initiating submission for {job_index}: {e}") from e
+                # Else, error was submitting fetch task, still raise if flag is set
+                raise RuntimeError(f"Stopping due to error submitting fetch task for {job_index}: {e}") from e
+
+            return False  # Fetch task not submitted
+
+    def _process_one_completed_future(self, future: Future):
+        """Processes a single future that has completed."""
+        job_index = self.active_futures.pop(future)
+        will_retry = False
+        try:
+            result_data, fetched_job_index, trace_id = future.result()
+            if fetched_job_index != job_index:
+                logger.warning(f"Mismatch: Future associated with {job_index} returned data for {fetched_job_index}")
+            self._handle_processing_success(job_index, result_data, trace_id)
+
+        except TimeoutError as e:  # Raised by _fetch_job_result for "Not Ready"
+            will_retry = self._handle_fetch_timeout(job_index, e)
+
+        except (ValueError, RuntimeError) as e:  # Raised by _fetch_job_result for terminal errors
+            error_msg = f"Terminal error during fetch: {e}"
+            logger.error(f"Job {job_index} failed: {error_msg}")
+            self._handle_processing_failure(job_index, error_msg)
+
+        except Exception as e:  # Other unexpected errors during future execution
+            error_msg = f"Unexpected error processing fetch future: {e}"
+            logger.exception(f"Job {job_index} failed: {error_msg}")
+            self._handle_processing_failure(job_index, f"Unexpected future processing error: {e}")
+
+        finally:
+            if not will_retry:
+                self.processed_count += 1
+                if self.verbose:
+                    logger.debug(
+                        f"Job {job_index} finished processing (Success/Fail). "
+                        f"Processed count: {self.processed_count}/{self.total_jobs}"
+                    )
 
     def _submit_job_fetch(self, job_index: str, is_retry: bool) -> bool:
         """
@@ -1147,6 +1241,7 @@ class NvIngestClient:
             if len(submission_errors) > 1:
                 error_msg += f"... [{len(submission_errors) - 1} more messages truncated]"
             raise type(submission_errors[0])(error_msg)
+
         return results
 
     def submit_job_async(self, job_indices: Union[str, List[str]], job_queue_id: str) -> Dict[Future, str]:
