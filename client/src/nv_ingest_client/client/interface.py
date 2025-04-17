@@ -259,17 +259,13 @@ class Ingestor:
             callback = progress_callback
 
         # Default concurrent-processing parameters
-        DEFAULT_CONCURRENCY: int = 128
         DEFAULT_TIMEOUT: int = 100
         DEFAULT_MAX_RETRIES: int = 5
-        DEFAULT_RETRY_DELAY: float = 5.0
         DEFAULT_DATA_ONLY: bool = True
         DEFAULT_VERBOSE: bool = False
 
-        concurrency_limit: int = kwargs.pop("concurrency_limit", DEFAULT_CONCURRENCY)
         timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
         max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
-        retry_delay: float = kwargs.pop("retry_delay", DEFAULT_RETRY_DELAY)
         data_only: bool = kwargs.pop("data_only", DEFAULT_DATA_ONLY)
         verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
 
@@ -278,10 +274,8 @@ class Ingestor:
         results_data = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
-            concurrency_limit=concurrency_limit,
             timeout=timeout,
             max_job_retries=max_job_retries,
-            retry_delay=retry_delay,
             completion_callback=callback,
             return_failures=return_failures,
             data_only=data_only,
