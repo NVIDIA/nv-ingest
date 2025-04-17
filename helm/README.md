@@ -170,7 +170,7 @@ kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-wor
 
 ##### Enable time-slicing
 
-With the Nvidia GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing/time-slicing-config.yaml`](time-slicing-config.yaml).
+With the Nvidia GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
 
 ```bash
 kubectl apply -n gpu-operator -f time-slicing/time-slicing-config.yaml
