@@ -1,12 +1,14 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+import concurrent
 
 # pylint: disable=broad-except
 
 import json
 import logging
 import math
+import time
 from collections import defaultdict
 from concurrent.futures import Future
 from concurrent.futures import ThreadPoolExecutor
@@ -28,6 +30,7 @@ from nv_ingest_client.primitives.tasks import Task
 from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
+from nv_ingest_client.util.processing import handle_future_result, IngestJobFailure
 from nv_ingest_client.util.util import create_job_specs_for_batch
 
 logger = logging.getLogger(__name__)
@@ -1246,6 +1249,129 @@ class NvIngestClient:
             future_to_job_index[future] = job_index
 
         return future_to_job_index
+
+    def fetch_job_result(
+        self,
+        job_ids: Union[str, List[str]],
+        timeout: float = 100,
+        max_retries: Optional[int] = None,
+        retry_delay: float = 1,
+        verbose: bool = False,
+        completion_callback: Optional[Callable[[Dict, str], None]] = None,
+        return_failures: bool = False,
+    ) -> Union[List[Tuple[Optional[Dict], str]], Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]]:
+        """
+        Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.
+
+        Args:
+            job_ids (Union[str, List[str]]): A job ID or list of job IDs to fetch results for.
+            timeout (float): Timeout for each fetch operation, in seconds.
+            max_retries (Optional[int]): Maximum number of retries for jobs that are not ready yet.
+            retry_delay (float): Delay between retry attempts, in seconds.
+            verbose (bool): If True, logs additional information.
+            completion_callback (Optional[Callable[[Dict, str], None]]): A callback function that is executed each time
+             a job result is successfully fetched. It receives two arguments: the job result (a dict) and the job ID.
+            return_failures (bool): If True, returns a separate list of failed jobs.
+
+        Returns:
+          - If `return_failures=False`: List[Tuple[Optional[Dict], str]]
+            - A list of tuples, each containing the job result (or None on failure) and the job ID.
+          - If `return_failures=True`: Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]
+            - A tuple of:
+              - List of successful job results.
+              - List of failures containing job ID and error message.
+
+        Raises:
+            ValueError: If there is an error in decoding the job result.
+            TimeoutError: If the fetch operation times out.
+            Exception: For all other unexpected issues.
+        """
+
+        if isinstance(job_ids, str):
+            job_ids = [job_ids]
+
+        results = []
+        failures = []
+
+        def fetch_with_retries(job_id: str):
+            retries = 0
+            while (max_retries is None) or (retries < max_retries):
+                try:
+                    # Attempt to fetch the job result
+                    result = self._fetch_job_result(job_id, timeout, data_only=False)
+                    return result, job_id
+                except TimeoutError:
+                    if verbose:
+                        logger.info(
+                            f"Job {job_id} is not ready. Retrying {retries + 1}/{max_retries if max_retries else '∞'} "
+                            f"after {retry_delay} seconds."
+                        )
+                    retries += 1
+                    time.sleep(retry_delay)  # Wait before retrying
+                except (RuntimeError, Exception) as err:
+                    logger.error(f"Error while fetching result for job ID {job_id}: {err}")
+                    return None, job_id
+            logger.error(f"Max retries exceeded for job {job_id}.")
+            return None, job_id
+
+        # Use ThreadPoolExecutor to fetch results concurrently
+        with ThreadPoolExecutor() as executor:
+            futures = {executor.submit(fetch_with_retries, job_id): job_id for job_id in job_ids}
+
+            # Collect results as futures complete
+            for future in as_completed(futures):
+                job_id = futures[future]
+                try:
+                    result, _ = handle_future_result(future, timeout=timeout)
+
+                    # Append a tuple of (result data, job_id). (Using result.get("data") if result is valid.)
+                    results.append(result.get("data"))
+                    # Run the callback if provided and the result is valid
+                    if completion_callback and result:
+                        completion_callback(result, job_id)
+                except concurrent.futures.TimeoutError as e:
+                    error_msg = (
+                        f"Timeout while fetching result for job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                except json.JSONDecodeError as e:
+                    error_msg = (
+                        f"Decoding error while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                except RuntimeError as e:
+                    error_msg = (
+                        f"Error while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                except IngestJobFailure as e:
+                    error_msg = (
+                        f"Error while processing job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e.description}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, e.annotations))
+                except Exception as e:
+                    error_msg = (
+                        f"Error while fetching result for job ID {job_id}: "
+                        f"{self._job_index_to_job_spec[job_id].source_id}\n{e}"
+                    )
+                    logger.error(error_msg)
+                    failures.append((self._job_index_to_job_spec[job_id].source_id, str(e)))
+                finally:
+                    # Clean up the job spec mapping
+                    del self._job_index_to_job_spec[job_id]
+
+        if return_failures:
+            return results, failures
+
+        return results
 
     def create_jobs_for_batch(self, files_batch: List[str], tasks: Dict[str, Any]) -> List[str]:
         """

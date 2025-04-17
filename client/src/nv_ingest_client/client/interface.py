@@ -261,12 +261,10 @@ class Ingestor:
         # Default concurrent-processing parameters
         DEFAULT_TIMEOUT: int = 100
         DEFAULT_MAX_RETRIES: int = None
-        DEFAULT_DATA_ONLY: bool = True
         DEFAULT_VERBOSE: bool = False
 
         timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
         max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
-        data_only: bool = kwargs.pop("data_only", DEFAULT_DATA_ONLY)
         verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
@@ -278,7 +276,6 @@ class Ingestor:
             max_job_retries=max_job_retries,
             completion_callback=callback,
             return_failures=return_failures,
-            data_only=data_only,
             verbose=verbose,
             **proc_kwargs,
         )
