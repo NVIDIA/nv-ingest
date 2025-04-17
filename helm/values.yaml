@@ -750,7 +750,7 @@ redis:
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port.
 ## @param envVars.REDIS_MORPHEUS_TASK_QUEUE [default: "morpheus_task_queue"]
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
-## @param envVars.NV_INGEST_MAX_UTIL [default: "20"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set.
+## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set.
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
 ## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
 ## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
@@ -781,7 +781,7 @@ redis:
 envVars:
   INGEST_EDGE_BUFFER_SIZE: 64
   MAX_INGEST_PROCESS_WORKERS: 16
-  NV_INGEST_MAX_UTIL: 20
+  NV_INGEST_MAX_UTIL: 48
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
   REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
