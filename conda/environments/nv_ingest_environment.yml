@@ -8,6 +8,7 @@ channels:
 dependencies:
   - azure-core>=1.32.0
   - click>=8.1.7
+  - diskcache>=5.6.3
   - fastapi>=0.115.6
   - fastparquet>=2024.11.0
   - fsspec>=2024.10.0

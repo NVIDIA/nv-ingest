@@ -31,16 +31,15 @@ def rest_client(mock_rest_client_allocator):
         port=7670,
         max_retries=0,
         max_backoff=32,
-        connection_timeout=300,
         http_allocator=mock_rest_client_allocator,
     )
 
 
 # Test generate_url function
 def test_generate_url(rest_client):
-    assert rest_client.generate_url("localhost", 7670) == "http://localhost:7670"
-    assert rest_client.generate_url("http://localhost", 7670) == "http://localhost:7670"
-    assert rest_client.generate_url("https://localhost", 7670) == "https://localhost:7670"
+    assert rest_client._generate_url("localhost", 7670) == "http://localhost:7670"
+    assert rest_client._generate_url("http://localhost", 7670) == "http://localhost:7670"
+    assert rest_client._generate_url("https://localhost", 7670) == "https://localhost:7670"
 
     # A few more complicated and possible tricks
-    assert rest_client.generate_url("localhost-https-else", 7670) == "http://localhost-https-else:7670"
+    assert rest_client._generate_url("localhost-https-else", 7670) == "http://localhost-https-else:7670"

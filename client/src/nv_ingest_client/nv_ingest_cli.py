@@ -82,13 +82,6 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
 )
-@click.option(
-    "--document_processing_timeout",
-    default=10,
-    show_default=True,
-    type=int,
-    help="Timeout when waiting for a document to be processed.",
-)
 @click.option("--dry_run", is_flag=True, help="Perform a dry run without executing actions.")
 @click.option("--fail_on_error", is_flag=True, help="Fail on error.")
 @click.option("--output_directory", type=click.Path(), default=None, help="Output directory for results.")
@@ -209,7 +202,6 @@ def main(
     concurrency_n: int,
     dataset: str,
     doc: List[str],
-    document_processing_timeout: int,
     dry_run: bool,
     fail_on_error: bool,
     log_level: str,
@@ -276,7 +268,6 @@ def main(
                 tasks=task,
                 output_directory=output_directory,
                 batch_size=batch_size,
-                timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
             )
