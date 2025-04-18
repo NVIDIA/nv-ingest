@@ -454,6 +454,7 @@ class RedisClient(MessageBrokerClientBase):
                     )
                 else:
                     raise TimeoutError(f"Timeout waiting for initial fragment 0 for {channel_name}.")
+
             client = self.get_client()
             try:
                 if expected_count is None:
@@ -486,6 +487,7 @@ class RedisClient(MessageBrokerClientBase):
                                 f"Failed to decode JSON at index 0 for '{channel_name}': {e}. Data: {frag0_bytes[:200]}"
                             )
                             raise ValueError(f"Failed to decode potential fragment 0: {e}")
+
                 if expected_count is not None and len(fragments_map) < expected_count:
                     current_len: int = client.llen(channel_name)
                     logger.debug(
@@ -637,6 +639,7 @@ class RedisClient(MessageBrokerClientBase):
         if effective_fetch_mode == FetchMode.CACHE_BEFORE_DELETE and DISKCACHE_AVAILABLE:
             if not self._cache:
                 raise RuntimeError(f"{log_prefix}: Cache not available.")
+
             cache_key: str = f"fetch_cache:{channel_name}"
             try:
                 cached_final_result = self._cache.get(cache_key)
@@ -731,12 +734,15 @@ class RedisClient(MessageBrokerClientBase):
         """
         if not fragments:
             raise ValueError("Cannot combine empty list of fragments")
+
         fragments.sort(key=lambda x: x.get("fragment", 0))
         combined_message: Dict[str, Any] = {"data": []}
         first_frag: Dict[str, Any] = fragments[0]
+
         for key in ["status", "description", "trace", "annotations"]:
             if key in first_frag:
                 combined_message[key] = first_frag[key]
+
         for fragment in fragments:
             fragment_data = fragment.get("data")
             if isinstance(fragment_data, list):
@@ -744,6 +750,7 @@ class RedisClient(MessageBrokerClientBase):
             else:
                 fragment_idx = fragment.get("fragment", "unknown")
                 logger.warning(f"Fragment {fragment_idx} missing 'data' list or has wrong type. Skipping its data.")
+
         return combined_message
 
     def submit_message(

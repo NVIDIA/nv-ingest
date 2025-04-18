@@ -23,7 +23,6 @@ from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 logger = logging.getLogger("uvicorn")
 
 
-# Helper to parse FetchMode from env var
 def get_fetch_mode_from_env() -> "FetchMode":
     """
     Retrieves the fetch mode from the environment variable FETCH_MODE.
@@ -52,7 +51,7 @@ class RedisIngestService(IngestServiceMeta):
     __shared_instance: Optional["RedisIngestService"] = None
 
     @staticmethod
-    def getInstance() -> "RedisIngestService":
+    def get_instance() -> "RedisIngestService":
         """
         Static access method implementing the Singleton pattern.
 
@@ -68,7 +67,7 @@ class RedisIngestService(IngestServiceMeta):
 
             fetch_mode: "FetchMode" = get_fetch_mode_from_env()
             result_data_ttl: int = int(os.getenv("RESULT_DATA_TTL_SECONDS", "3600"))
-            state_ttl: int = int(os.getenv("STATE_TTL_SECONDS", "86400"))
+            state_ttl: int = int(os.getenv("STATE_TTL_SECONDS", "7200"))
 
             cache_config: Dict[str, Any] = {
                 "directory": os.getenv("FETCH_CACHE_DIR", "./.fetch_cache"),
@@ -188,6 +187,7 @@ class RedisIngestService(IngestServiceMeta):
                 job_spec = json_data
             else:
                 raise TypeError(f"Unexpected payload type: {type(json_data)}")
+
             validate_ingest_job(job_spec)
             job_spec["job_id"] = trace_id
             tasks = job_spec.get("tasks", [])

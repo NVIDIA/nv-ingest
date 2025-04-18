@@ -45,7 +45,7 @@ async def _get_ingest_service() -> IngestServiceMeta:
     Gather the appropriate Ingestion Service to use for the nv-ingest endpoint.
     """
     logger.debug("Creating RedisIngestService singleton for dependency injection")
-    return RedisIngestService.getInstance()
+    return RedisIngestService.get_instance()
 
 
 INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
@@ -175,7 +175,7 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
     summary="Fetch the result of a previously submitted job by its job_id",
     operation_id="fetch_job",
 )
-async def fetch_job_state_first(job_id: str, ingest_service: INGEST_SERVICE_T):
+async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
     """
     Fetches job result, checking job state *before* attempting data retrieval.
 

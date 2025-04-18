@@ -9,7 +9,7 @@ import logging
 import os
 import tempfile
 from concurrent.futures import Future
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, ANY
 from unittest.mock import patch
 
 import pytest
@@ -239,32 +239,108 @@ def test_chain(ingestor):
 
 
 def test_ingest(ingestor, mock_client):
-    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
-    mock_client.submit_job.return_value = ["job_state_1", "job_state_2"]
-    mock_client.fetch_job_result.return_value = [{"result": "success"}]
+    """
+    Test the ingest method for the successful processing path.
 
-    result = ingestor.ingest(timeout=30)
+    Verifies that the ingestor correctly adds jobs (if applicable) and
+    calls the client's concurrent processing method, returning the
+    successful results.
+    """
+    # Arrange
+    # Mock the methods expected to be called by ingestor.ingest
+    job_indices = ["job_id_1", "job_id_2"]
+    # Assume ingestor might call add_job first
+    # If ingestor receives indices directly, this mock might not be needed.
+    mock_client.add_job.return_value = job_indices
+    # Mock the main processing method to return successful results
+    expected_results = [{"result": "success_1"}, {"result": "success_2"}]
+    mock_client.process_jobs_concurrently.return_value = expected_results
 
-    mock_client.add_job.assert_called_once_with(ingestor._job_specs)
-    mock_client.submit_job.assert_called_once_with(mock_client.add_job.return_value, ingestor._job_queue_id)
+    # Store expected arguments used in process_jobs_concurrently
+    # Replace with actual values if available from ingestor instance
+    expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
+    expected_max_retries = getattr(ingestor, "_max_retries", None)
+    expected_verbose = getattr(ingestor, "_verbose", False)
+    # Assume ingestor stores the indices after calling add_job, or gets them passed in
+    ingestor._job_indices = job_indices  # Simulate ingestor storing indices
 
-    mock_client.fetch_job_result.assert_called_once_with(mock_client.add_job.return_value, return_failures=False)
-    assert result == [{"result": "success"}]
+    # Act
+    result = ingestor.ingest(timeout=30)  # timeout=30 is passed to process_jobs_concurrently
+
+    # Assert
+    # Verify add_job was called (if ingestor is responsible for it)
+    if hasattr(ingestor, "_job_specs"):
+        mock_client.add_job.assert_called_once_with(ingestor._job_specs)
+
+    # Verify the main concurrent processing method was called correctly
+    mock_client.process_jobs_concurrently.assert_called_once_with(
+        job_indices=job_indices,
+        job_queue_id=expected_job_queue_id,
+        timeout=30,  # Check if the passed timeout is used directly
+        max_job_retries=expected_max_retries,
+        completion_callback=ANY,  # Usually None or an internal callback
+        return_failures=False,  # Specific to this test case
+        verbose=expected_verbose,
+    )
+    # Verify the result returned by ingestor matches the mocked result
+    assert result == expected_results
+    # Verify submit_job_async was NOT called directly by ingestor
+    mock_client.submit_job_async.assert_not_called()
+    # Verify fetch_job_result was NOT called directly by ingestor
+    if hasattr(mock_client, "fetch_job_result"):  # Check if attr exists before asserting not called
+        mock_client.fetch_job_result.assert_not_called()
 
 
 def test_ingest_return_failures(ingestor, mock_client):
-    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
-    mock_client.submit_job.return_value = ["job_state_1", "job_state_2"]
-    mock_client.fetch_job_result.return_value = [{"result": "success"}], [(0, {"status": "FAILED"})]
+    """
+    Test the ingest method when return_failures=True.
 
-    results, failures = ingestor.ingest(timeout=30, return_failures=True)
+    Verifies that the ingestor calls the client's concurrent processing
+    method with return_failures=True and correctly returns both results
+    and failures.
+    """
+    # Arrange
+    job_indices = ["job_id_1", "job_id_2", "job_id_3"]
+    # Assume ingestor might call add_job first
+    mock_client.add_job.return_value = job_indices
+    # Mock the main processing method to return both results and failures
+    expected_results = [{"result": "success_1"}]
+    expected_failures = [("job_id_2", "TimeoutError"), ("job_id_3", "Processing Error")]
+    mock_client.process_jobs_concurrently.return_value = (expected_results, expected_failures)
 
-    mock_client.add_job.assert_called_once_with(ingestor._job_specs)
-    mock_client.submit_job.assert_called_once_with(mock_client.add_job.return_value, ingestor._job_queue_id)
+    # Store expected arguments used in process_jobs_concurrently
+    expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
+    expected_max_retries = getattr(ingestor, "_max_retries", None)
+    expected_verbose = getattr(ingestor, "_verbose", False)
+    ingestor._job_indices = job_indices  # Simulate ingestor storing indices
 
-    mock_client.fetch_job_result.assert_called_once_with(mock_client.add_job.return_value, return_failures=True)
-    assert results == [{"result": "success"}]
-    assert failures == [(0, {"status": "FAILED"})]
+    # Act
+    results, failures = ingestor.ingest(timeout=30, return_failures=True)  # Pass return_failures=True
+
+    # Assert
+    # Verify add_job was called (if applicable)
+    if hasattr(ingestor, "_job_specs"):
+        mock_client.add_job.assert_called_once_with(ingestor._job_specs)
+
+    # Verify the main concurrent processing method was called correctly
+    mock_client.process_jobs_concurrently.assert_called_once_with(
+        job_indices=job_indices,
+        job_queue_id=expected_job_queue_id,
+        timeout=30,
+        max_job_retries=expected_max_retries,
+        completion_callback=ANY,
+        return_failures=True,  # Specific to this test case
+        # data_only=False, # Removed
+        verbose=expected_verbose,
+    )
+    # Verify the results and failures returned match the mocked tuple
+    assert results == expected_results
+    assert failures == expected_failures
+    # Verify submit_job was NOT called directly by ingestor (also fixing original inconsistency)
+    mock_client.submit_job.assert_not_called()
+    # Verify fetch_job_result was NOT called directly by ingestor
+    if hasattr(mock_client, "fetch_job_result"):
+        mock_client.fetch_job_result.assert_not_called()
 
 
 def test_ingest_async(ingestor, mock_client):
