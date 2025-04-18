@@ -817,7 +817,7 @@ envVars:
   AUDIO_INFER_PROTOCOL: "grpc"
 
   MRC_IGNORE_NUMA_CHECK: 1
-  READY_CHECK_ALL_COMPONENTS: "true"
+  COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
 
 ## @section Open Telemetry

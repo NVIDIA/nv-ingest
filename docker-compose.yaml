@@ -22,6 +22,7 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
       # NIM OpenTelemetry Settings
+      - NIM_ENABLE_OTEL=0
       - NIM_OTEL_SERVICE_NAME=page-elements
       - NIM_OTEL_TRACES_EXPORTER=otlp
       - NIM_OTEL_METRICS_EXPORTER=console
@@ -277,7 +278,6 @@ services:
       # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
-      - READY_CHECK_ALL_COMPONENTS=True
       - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
@@ -295,6 +295,12 @@ services:
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
+      # "ready" check configuration.
+      # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
+      # 2. COMPONENTS_TO_READY_CHECK=ALL for checking all services
+      # 3. COMPONENTS_TO_READY_CHECK=YOLOX_HTTP_ENDPOINT, PADDLE_HTTP_ENDPOINT
+      #    comma separated list of HTTP environment variables for specific services to check for ready
+      - COMPONENTS_TO_READY_CHECK=ALL
     healthcheck:
       test: curl --fail http://nv-ingest-ms-runtime:7670/v1/health/ready || exit 1
       interval: 10s
