@@ -31,13 +31,15 @@ def traceable(trace_name=None):
 
     Notes
     -----
-    The decorated function must accept a IngestControlMessage object as its first argument. The
-    IngestControlMessage object must implement `has_metadata`, `get_metadata`, and `set_metadata`
-    methods used by the decorator to check for the trace tagging flag and to add trace metadata.
+    The decorated function must accept a IngestControlMessage object as one of its arguments.
+    For a regular function, this is expected to be the first argument; for a class method,
+    this is expected to be the second argument (after 'self'). The IngestControlMessage object
+    must implement `has_metadata`, `get_metadata`, and `set_metadata` methods used by the decorator
+    to check for the trace tagging flag and to add trace metadata.
 
     The trace metadata added by the decorator includes two entries:
-    - 'trace::entry::<trace_name>': The monotonic timestamp marking the function's entry.
-    - 'trace::exit::<trace_name>': The monotonic timestamp marking the function's exit.
+    - 'trace::entry::<trace_name>': The timestamp marking the function's entry.
+    - 'trace::exit::<trace_name>': The timestamp marking the function's exit.
 
     Example
     -------
@@ -47,23 +49,25 @@ def traceable(trace_name=None):
     ... def process_message(message):
     ...     pass
 
-    Applying the decorator with a custom trace name:
+    Applying the decorator with a custom trace name on a class method:
 
-    >>> @traceable(custom_trace_name="CustomTraceName")
-    ... def process_message(message):
-    ...     pass
-
-    In both examples, `process_message` will have entry and exit timestamps added to the
-    IngestControlMessage's metadata if 'config::add_trace_tagging' is True.
-
+    >>> class Processor:
+    ...     @traceable(trace_name="CustomTrace")
+    ...     def process(self, message):
+    ...         pass
     """
 
     def decorator_trace_tagging(func):
         @functools.wraps(func)
         def wrapper_trace_tagging(*args, **kwargs):
-            # Assuming the first argument is always the message
             ts_fetched = datetime.now()
-            message = args[0]
+            # Determine which argument is the message.
+            if hasattr(args[0], "has_metadata"):
+                message = args[0]
+            elif len(args) > 1 and hasattr(args[1], "has_metadata"):
+                message = args[1]
+            else:
+                raise ValueError("traceable decorator could not find a message argument with 'has_metadata()'")
 
             do_trace_tagging = (message.has_metadata("config::add_trace_tagging") is True) and (
                 message.get_metadata("config::add_trace_tagging") is True
@@ -79,7 +83,7 @@ def traceable(trace_name=None):
                     message.set_timestamp(f"trace::entry::{trace_prefix}_channel_in", ts_send)
                     message.set_timestamp(f"trace::exit::{trace_prefix}_channel_in", ts_fetched)
 
-            # Call the decorated function
+            # Call the decorated function.
             result = func(*args, **kwargs)
 
             if do_trace_tagging:
