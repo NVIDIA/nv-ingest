@@ -552,7 +552,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   env:
     - name: NIM_HTTP_API_PORT
       value: "8000"
-    - name: NIM_TRITON_MODEL_BATCH_SIZE
+    - name: NIM_TRITON_MAX_BATCH_SIZE
       value: "1"
 
 
