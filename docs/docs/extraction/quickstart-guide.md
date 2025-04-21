@@ -1,4 +1,4 @@
-# Quickstart Guide for NeMo Retriever Extraction (Self-Hosted)
+# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
 
 Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
@@ -419,6 +419,7 @@ ulimit -n 10,000
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
+- [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
