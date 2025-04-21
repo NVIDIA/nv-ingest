@@ -1417,7 +1417,9 @@ def recreate_elements(data):
     return elements
 
 
-def pull_all_milvus(collection_name: str, milvus_uri: str = "http://localhost:19530", write_dir: str = None):
+def pull_all_milvus(
+    collection_name: str, milvus_uri: str = "http://localhost:19530", write_dir: str = None, batch_size: int = 1000
+):
     """
     This function takes the input collection name and pulls all the records
     from the collection. It will either return the records as a list of
@@ -1431,6 +1433,8 @@ def pull_all_milvus(collection_name: str, milvus_uri: str = "http://localhost:19
         milvus-lite.
     write_dir : str, optional
         Directory to write the records to. If None, the records will be returned as a list.
+    batch_size : int, optional
+        The number of records to pull in each batch. Defaults to 1000.
     Returns
     -------
     List
@@ -1438,7 +1442,10 @@ def pull_all_milvus(collection_name: str, milvus_uri: str = "http://localhost:19
     """
     client = MilvusClient(milvus_uri)
     iterator = client.query_iterator(
-        collection_name=collection_name, filter="pk >= 0", output_fields=["source", "content_metadata", "text"]
+        collection_name=collection_name,
+        filter="pk >= 0",
+        output_fields=["source", "content_metadata", "text"],
+        batch_size=batch_size,
     )
     full_results = []
     write_dir = Path(write_dir) if write_dir else None
@@ -1462,6 +1469,12 @@ def pull_all_milvus(collection_name: str, milvus_uri: str = "http://localhost:19
 
 
 def get_embeddings(full_records, embedder, batch_size=256):
+    """
+    This function takes the input records and creates a list of embeddings.
+    The default batch size is 256, but this can be adjusted based on the
+    available resources, to a maximum of 259. This is set by the NVIDIA embedding
+    microservice.
+    """
     embedded = []
     embed_payload = [res["metadata"]["content"] for res in full_records]
     for i in range(0, len(embed_payload), batch_size):
@@ -1473,6 +1486,7 @@ def get_embeddings(full_records, embedder, batch_size=256):
 def embed_index_collection(
     data,
     collection_name,
+    batch_size: int = 256,
     embedding_endpoint: str = None,
     model_name: str = None,
     nvidia_api_key: str = None,
@@ -1576,7 +1590,7 @@ def embed_index_collection(
             results = None
             with open(results_file, "r") as infile:
                 results = json.loads(infile.read())
-            embeddings = get_embeddings(results, embed_model)
+            embeddings = get_embeddings(results, embed_model, batch_size)
             for record, emb in zip(results, embeddings):
                 record["metadata"]["embedding"] = emb
                 record["document_type"] = "text"
@@ -1584,7 +1598,7 @@ def embed_index_collection(
             mil_op.milvus_kwargs["recreate"] = False
     # running all at once
     else:
-        embeddings = get_embeddings(data, embed_model)
+        embeddings = get_embeddings(data, embed_model, batch_size)
         for record, emb in zip(data, embeddings):
             record["metadata"]["embedding"] = emb
             record["document_type"] = "text"
@@ -1618,6 +1632,8 @@ def reindex_collection(
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
+    embed_batch_size: int = 256,
+    query_batch_size: int = 1000,
     **kwargs,
 ):
     """
@@ -1626,13 +1642,6 @@ def reindex_collection(
     collection. After embedding the records, it will run the same ingestion process as the vdb_upload
     stage in the Ingestor pipeline. This function will get embedding_endpoint, model_name and nvidia_api_key
     defaults from the environment variables set in the environment if not explicitly set in the function call.
-
-    reindex_collection(
-        collection_name,
-        sparse=sparse
-        )
-
-
 
     Parameters
     ----------
@@ -1664,17 +1673,17 @@ def reindex_collection(
         meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
             Defaults to None.
         meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+        embed_batch_size (int, optional): The batch size for embedding. Defaults to 256.
+        query_batch_size (int, optional): The batch size for querying. Defaults to 1000.
         **kwargs: Additional keyword arguments for customization.
     """
 
     new_collection_name = new_collection_name if new_collection_name else current_collection_name
-    start = time.time()
-    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir)
-    logger.error(f"pull_results time: {time.time() - start}")
-    start_2 = time.time()
+    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir, query_batch_size)
     embed_index_collection(
         pull_results,
         new_collection_name,
+        batch_size=embed_batch_size,
         embedding_endpoint=embedding_endpoint,
         model_name=model_name,
         nvidia_api_key=nvidia_api_key,
@@ -1700,8 +1709,6 @@ def reindex_collection(
         meta_fields=meta_fields,
         **kwargs,
     )
-    logger.error(f"embed_index_collection time: {time.time() - start_2}")
-    logger.error(f"total pull+reindex time: {time.time() - start}")
 
 
 def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
