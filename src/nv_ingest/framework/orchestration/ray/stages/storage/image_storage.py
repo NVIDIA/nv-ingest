@@ -31,8 +31,8 @@ class ImageStorageStage(RayActorStage):
     payload and updates the control message accordingly.
     """
 
-    def __init__(self, config: ImageStorageModuleSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: ImageStorageModuleSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("ImageStorageStage configuration validated successfully.")

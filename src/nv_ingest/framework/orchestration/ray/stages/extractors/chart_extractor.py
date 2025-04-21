@@ -31,8 +31,8 @@ class ChartExtractorStage(RayActorStage):
     and annotates the message metadata with extraction info.
     """
 
-    def __init__(self, config: ChartExtractorSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: ChartExtractorSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             # logger.warning(

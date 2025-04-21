@@ -26,8 +26,8 @@ class TextSplitterStage(RayActorStage):
     and tokenization logic. The updated DataFrame is then set back into the message.
     """
 
-    def __init__(self, config: TextSplitterSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: TextSplitterSchema) -> None:
+        super().__init__(config)
         # Store the validated configuration (assumed to be an instance of TextSplitterSchema)
         self.validated_config: TextSplitterSchema = config
         logger.info("TextSplitterStage initialized with config: %s", config)

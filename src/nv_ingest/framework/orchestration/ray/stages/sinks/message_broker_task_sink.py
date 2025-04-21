@@ -75,8 +75,8 @@ class MessageBrokerTaskSinkConfig(BaseModel):
 
 @ray.remote
 class MessageBrokerTaskSinkStage(RayActorSinkStage):
-    def __init__(self, config: MessageBrokerTaskSinkConfig, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: MessageBrokerTaskSinkConfig) -> None:
+        super().__init__(config)
 
         self.config: MessageBrokerTaskSinkConfig  # Add type hint for self.config
 

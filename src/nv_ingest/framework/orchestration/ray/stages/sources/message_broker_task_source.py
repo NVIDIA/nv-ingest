@@ -104,8 +104,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
 
     # Use the updated config type hint
-    def __init__(self, config: MessageBrokerTaskSourceConfig, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
+        super().__init__(config)
         self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
         logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config.dict())  # Log validated config
 

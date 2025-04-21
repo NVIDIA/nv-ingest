@@ -28,7 +28,7 @@ class PptxExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted content DataFrame.
     """
 
-    def __init__(self, config: PPTXExtractorSchema, progress_engine_count: int) -> None:
+    def __init__(self, config: PPTXExtractorSchema) -> None:
         """
         Initializes the PptxExtractorStage.
 
@@ -36,10 +36,8 @@ class PptxExtractorStage(RayActorStage):
         ----------
         config : PPTXExtractorSchema
             The validated configuration object for PPTX extraction.
-        progress_engine_count : int
-            The number of progress engines (often corresponds to concurrency).
         """
-        super().__init__(config, progress_engine_count)
+        super().__init__(config)
         try:
             # The config passed in should already be validated, but storing it.
             self.validated_config = config

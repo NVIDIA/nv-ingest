@@ -30,8 +30,8 @@ class ImageExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted primitives DataFrame.
     """
 
-    def __init__(self, config: ImageExtractorSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: ImageExtractorSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("ImageExtractorStage configuration validated successfully.")

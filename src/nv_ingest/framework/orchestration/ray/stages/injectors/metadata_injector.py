@@ -29,9 +29,9 @@ class MetadataInjectionStage(RayActorStage):
     injection is required, and if so, injects the appropriate metadata.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: BaseModel) -> None:
         # Call the base initializer to set attributes like self.running.
-        super().__init__(config, progress_engine_count)
+        super().__init__(config)
         # Additional initialization can be added here if necessary.
         logger.info("MetadataInjectionStage initialized with config: %s", config)
 

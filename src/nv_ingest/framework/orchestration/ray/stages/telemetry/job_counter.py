@@ -30,9 +30,9 @@ class JobCounterStage(RayActorStage):
     statistic each time it processes a message.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: BaseModel) -> None:
         # Ensure base attributes (e.g. self.running) are initialized.
-        super().__init__(config, progress_engine_count)
+        super().__init__(config)
         # The validated config should be a JobCounterSchema instance.
         self.validated_config: JobCounterSchema = config
         # Obtain the global stats' singleton.

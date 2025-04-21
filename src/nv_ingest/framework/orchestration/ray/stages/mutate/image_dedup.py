@@ -31,8 +31,8 @@ class ImageDedupStage(RayActorStage):
       3. Updates the message payload with the deduplicated DataFrame.
     """
 
-    def __init__(self, config: ImageDedupSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: ImageDedupSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("ImageDedupStage configuration validated successfully.")

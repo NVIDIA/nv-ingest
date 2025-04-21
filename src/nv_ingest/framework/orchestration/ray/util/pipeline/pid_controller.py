@@ -336,7 +336,8 @@ class ResourceConstraintManager:
 
     # --- Private Methods ---
 
-    def _get_effective_min_replicas(self, stage_name: str, metrics: Dict[str, Any], pipeline_in_flight: int) -> int:
+    @staticmethod
+    def _get_effective_min_replicas(stage_name: str, metrics: Dict[str, Any], pipeline_in_flight: int) -> int:
         """Helper to calculate the effective minimum replicas for a stage."""
         min_replicas_metric = metrics.get("min_replicas", 0)
         # If the pipeline is active globally, enforce a minimum of 1 replica,

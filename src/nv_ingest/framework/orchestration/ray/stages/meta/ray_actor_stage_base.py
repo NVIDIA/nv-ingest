@@ -24,7 +24,7 @@ class RayActorStage(ABC):
     and ensures actor exit is called safely from the main Ray thread context.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int = 1) -> None:
+    def __init__(self, config: BaseModel) -> None:
         """
         Initialize the RayActorStage.
 
@@ -32,11 +32,8 @@ class RayActorStage(ABC):
         ----------
         config : BaseModel
             Configuration for the stage.
-        progress_engine_count : int, optional
-            Number of progress engine threads to run, by default 1
         """
         self.config: BaseModel = config
-        self.progress_engine_count: int = progress_engine_count
         self.input_queue: Optional[Any] = None
         self.output_queue: Optional[Any] = None
         self.running: bool = False
@@ -55,7 +52,8 @@ class RayActorStage(ABC):
         self._shutting_down: bool = False
         self._lock = threading.Lock()
 
-    def _get_actor_id_str(self) -> str:
+    @staticmethod
+    def _get_actor_id_str() -> str:
         """Helper to safely get actor ID string for logging."""
         try:
             return f"Actor {get_runtime_context().get_actor_id()}"

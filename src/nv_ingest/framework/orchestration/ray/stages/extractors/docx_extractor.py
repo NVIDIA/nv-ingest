@@ -30,8 +30,8 @@ class DocxExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted content DataFrame.
     """
 
-    def __init__(self, config: DocxExtractorSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: DocxExtractorSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("DocxExtractorStage configuration validated successfully.")

@@ -177,9 +177,7 @@ class RayPipeline:
             for stage in self.stages:
                 logger.debug(f"[Build-MemScale] Estimating overhead for stage '{stage.name}'...")
                 # Ensure estimate_actor_memory_overhead is available
-                overhead = estimate_actor_memory_overhead(
-                    stage.callable, actor_kwargs={"config": stage.config, "progress_engine_count": -1}
-                )
+                overhead = estimate_actor_memory_overhead(stage.callable, actor_kwargs={"config": stage.config})
                 stage_overheads[stage.name] = overhead
                 total_overhead += overhead
                 logger.debug(f"[Build-MemScale] Stage '{stage.name}' overhead: {overhead / (1024 * 1024):.2f} MB")
@@ -317,10 +315,9 @@ class RayPipeline:
                     if not hasattr(stage.callable, "options") or not hasattr(stage.callable, "remote"):
                         raise TypeError(f"Stage '{stage.name}' callable is not a Ray remote function/class.")
 
-                    # Assume actor takes 'config' and 'progress_engine_count'
                     # Pass necessary options like name, concurrency
                     actor = stage.callable.options(name=actor_name, max_concurrency=100).remote(
-                        config=stage.config, progress_engine_count=-1  # Adjust args as per actor's __init__
+                        config=stage.config,
                     )
                     replicas.append(actor)
                 except Exception as e:
@@ -538,10 +535,9 @@ class RayPipeline:
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            # Assume actor takes 'config' and 'progress_engine_count'
             # Adjust .options() as needed (e.g., resource requests)
             new_actor = stage_info.callable.options(name=actor_name, max_concurrency=100).remote(
-                config=stage_info.config, progress_engine_count=-1
+                config=stage_info.config
             )
             return new_actor
         except Exception as e:

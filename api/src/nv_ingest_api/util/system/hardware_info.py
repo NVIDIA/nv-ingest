@@ -19,33 +19,60 @@ CGROUP_V2_CPU_FILE = "/sys/fs/cgroup/cpu.max"  # Standard path in v2 unified hie
 
 class CoreCountDetector:
     """
-    Detects the effective CPU core count available to the current process.
+    Detects the effective CPU core count available to the current process,
+    optionally applying a weighting factor for hyperthreads (SMT).
 
     It attempts to reconcile information from:
     1. Linux Cgroup v2 CPU limits (cpu.max)
-    2. Linux Cgroup v1 CPU limits (cpu.cfs_quota_us, cpu.cfs_period_us, cpu.shares)
+    2. Linux Cgroup v1 CPU limits (cpu.cfs_quota_us, cpu.cfs_period_us)
     3. OS scheduler affinity (os.sched_getaffinity)
-    4. OS reported CPU counts (os.cpu_count / psutil.cpu_count)
+    4. OS reported CPU counts (psutil.cpu_count for logical/physical)
 
-    Prioritizes Cgroup quota limits if set, as they represent hard time-slice
-    restrictions often used in container orchestrators like Kubernetes/Helm.
-    Falls back to affinity, then OS count.
+    Prioritizes Cgroup quota limits. If the limit is based on core count
+    (affinity/OS), it applies hyperthreading weight if psutil provides
+    physical/logical counts.
     """
 
-    def __init__(self):
-        """Initializes the detector and performs the detection."""
+    def __init__(self, hyperthread_weight: float = 0.75):
+        """
+        Initializes the detector and performs the detection.
+
+        Parameters
+        ----------
+        hyperthread_weight : float, optional
+            The performance weighting factor for hyperthreads (0.0 to 1.0).
+            A value of 1.0 treats hyperthreads the same as physical cores.
+            A value of 0.5 suggests a hyperthread adds 50% extra performance.
+            Requires psutil to be installed and report physical cores.
+            Defaults to 0.75.
+        """
+        if not (0.0 <= hyperthread_weight <= 1.0):
+            raise ValueError("hyperthread_weight must be between 0.0 and 1.0")
+
+        self.hyperthread_weight: float = hyperthread_weight if psutil else 1.0  # Force 1.0 if psutil missing
+        if not psutil and hyperthread_weight != 1.0:
+            logger.warning("psutil not found. Hyperthreading weight ignored (effectively 1.0).")
+
+        # OS Info
         self.os_logical_cores: Optional[int] = None
         self.os_physical_cores: Optional[int] = None
         self.os_sched_affinity_cores: Optional[int] = None
-        self.cgroup_type: Optional[str] = None  # 'v1' or 'v2'
+
+        # Cgroup Info
+        self.cgroup_type: Optional[str] = None
         self.cgroup_quota_cores: Optional[float] = None
         self.cgroup_period_us: Optional[int] = None
-        self.cgroup_shares: Optional[int] = None  # v1 only
-        self.cgroup_usage_percpu_us: Optional[list[int]] = None  # v1 cpuacct
-        self.cgroup_usage_total_us: Optional[int] = None  # v1 cpuacct
+        self.cgroup_shares: Optional[int] = None
+        self.cgroup_usage_percpu_us: Optional[list[int]] = None
+        self.cgroup_usage_total_us: Optional[int] = None
 
-        self.detection_method: str = "unknown"
-        self.effective_cores: Optional[float] = None  # Can be fractional due to quota
+        # --- Result ---
+        # Raw limit before potential weighting
+        self.raw_limit_value: Optional[float] = None
+        self.raw_limit_method: str = "unknown"
+        # Final potentially weighted result
+        self.effective_cores: Optional[float] = None
+        self.detection_method: str = "unknown"  # Method for the final effective_cores
 
         self._detect()
 
@@ -222,89 +249,172 @@ class CoreCountDetector:
 
         return logical, physical
 
+    # --- Weighting Function ---
+    def _apply_hyperthread_weight(self, logical_limit: int) -> float:
+        """
+        Applies hyperthreading weight to an integer logical core limit.
+
+        Parameters
+        ----------
+        logical_limit : int
+            The maximum number of logical cores allowed (e.g., from affinity or OS count).
+
+        Returns
+        -------
+        float
+            The estimated effective core performance based on weighting.
+            Returns logical_limit if weighting cannot be applied.
+        """
+        P = self.os_physical_cores
+        # Weighting requires knowing both physical and logical counts
+        if P is not None and P > 0 and self.os_logical_cores is not None:
+            # Apply the heuristic: P physical cores + (N-P) hyperthreads * weight
+            # Ensure N is capped by the actual number of logical cores available
+            N = min(logical_limit, self.os_logical_cores)
+
+            physical_part = min(N, P)
+            hyperthread_part = max(0, N - P)
+
+            weighted_cores = (physical_part * 1.0) + (hyperthread_part * self.hyperthread_weight)
+
+            if weighted_cores != N:  # Log only if weighting changes the value
+                logger.info(
+                    f"Applying hyperthread weight ({self.hyperthread_weight:.2f}) to "
+                    f"logical limit {logical_limit} (System: {P}P/{self.os_logical_cores}L): "
+                    f"Effective weighted cores = {weighted_cores:.2f}"
+                )
+            else:
+                logger.debug(
+                    f"Hyperthread weighting ({self.hyperthread_weight:.2f}) applied to "
+                    f"logical limit {logical_limit} (System: {P}P/{self.os_logical_cores}L), "
+                    f"but result is still {weighted_cores:.2f} (e.g., limit <= physical or weight=1.0)"
+                )
+            return weighted_cores
+        else:
+            # Cannot apply weighting
+            if self.hyperthread_weight != 1.0:  # Only warn if weighting was requested
+                if not psutil:
+                    # Already warned about missing psutil during init
+                    pass
+                elif P is None:
+                    logger.warning("Cannot apply hyperthread weight: Physical core count not available.")
+                else:  # L must be missing
+                    logger.warning("Cannot apply hyperthread weight: Logical core count not available.")
+
+            logger.debug(f"Skipping hyperthread weight calculation for logical limit {logical_limit}.")
+            return float(logical_limit)  # Return the original limit as float
+
     def _detect(self):
-        """Performs the detection sequence."""
+        """Performs the detection sequence and applies weighting."""
         logger.debug("Starting effective core count detection...")
 
-        # 1. Get OS level counts first for context
+        # 1. Get OS level counts first
         self.os_logical_cores, self.os_physical_cores = self._get_os_cpu_counts()
 
-        # 2. Try Cgroup v2 (preferred modern standard)
+        # 2. Try Cgroup v2
         cgroup_detected = self._read_cgroup_v2()
 
         # 3. Try Cgroup v1 if v2 not found or didn't yield quota
         if not cgroup_detected or (self.cgroup_type == "v2" and self.cgroup_quota_cores is None):
-            if not cgroup_detected:  # Only log if we haven't already found v2
-                logger.debug("Cgroup v2 not detected or no quota found, trying v1.")
             cgroup_detected = self._read_cgroup_v1()
 
         # 4. Get OS Affinity
         self.os_sched_affinity_cores = self._get_os_affinity()
 
-        # 5. Determine Effective Cores based on priority: Cgroup Quota > Affinity > OS Logical
-        final_limit = float("inf")
-        method = "os_logical_count"  # Default if nothing else found
+        # --- 5. Determine the RAW Limit (before weighting) ---
+        raw_limit = float("inf")
+        raw_method = "unknown"
 
-        # Priority 1: Cgroup Quota (if defined and positive)
+        # Priority 1: Cgroup Quota
         if self.cgroup_quota_cores is not None and self.cgroup_quota_cores > 0:
-            final_limit = min(final_limit, self.cgroup_quota_cores)
-            method = f"cgroup_{self.cgroup_type}_quota"
-            logger.debug(f"Applying Cgroup Quota limit: {self.cgroup_quota_cores:.2f}")
+            raw_limit = min(raw_limit, self.cgroup_quota_cores)
+            raw_method = f"cgroup_{self.cgroup_type}_quota"
+            logger.debug(f"Raw limit set by Cgroup Quota: {self.cgroup_quota_cores:.2f}")
 
-        # Priority 2: Scheduler Affinity (if defined and positive)
+        # Priority 2: Scheduler Affinity
         if self.os_sched_affinity_cores is not None and self.os_sched_affinity_cores > 0:
-            # If we already have a cgroup quota, the effective limit is the MINIMUM
-            # of the two. You can't use more cores than affinity allows, AND you
-            # can't use more CPU time than the quota allows.
-            if method.startswith("cgroup"):
-                if self.os_sched_affinity_cores < final_limit:
-                    logger.info(
-                        f"Refining Cgroup quota limit ({final_limit:.2f}) with smaller sched_affinity limit"
-                        f" ({self.os_sched_affinity_cores})"
-                    )
-                    final_limit = float(self.os_sched_affinity_cores)
-                    method = "sched_affinity_capped_by_cgroup"  # Or just sched_affinity? Let's be clear.
-                else:
-                    # CGroup limit is already stricter or equal to affinity limit
-                    logger.debug(
-                        f"Sched_affinity limit ({self.os_sched_affinity_cores}) is not stricter than Cgroup quota"
-                        f" ({final_limit:.2f}). Keeping Cgroup limit."
-                    )
-            else:
-                # No Cgroup quota, affinity is the primary limit found so far
-                final_limit = min(final_limit, float(self.os_sched_affinity_cores))
-                method = "sched_affinity"
-                logger.debug(f"Applying Sched Affinity limit: {self.os_sched_affinity_cores}")
+            affinity_limit = float(self.os_sched_affinity_cores)
+            if affinity_limit < raw_limit:
+                raw_limit = affinity_limit
+                raw_method = "sched_affinity"
+                logger.debug(f"Raw limit updated by Sched Affinity: {affinity_limit}")
+            elif raw_method.startswith("cgroup"):
+                logger.debug(
+                    f"Sched Affinity limit ({affinity_limit}) not stricter than Cgroup Quota ({raw_limit:.2f})."
+                )
 
-        # Priority 3: OS Logical Cores (as fallback)
-        if final_limit == float("inf"):  # If no cgroup quota or affinity was found/applied
+        # Priority 3: OS Logical Cores
+        if raw_limit == float("inf"):  # If no cgroup quota or affinity was found/applied
             if self.os_logical_cores is not None and self.os_logical_cores > 0:
-                final_limit = float(self.os_logical_cores)
-                method = "os_logical_count"
-                logger.debug(f"Applying OS Logical Core count limit: {self.os_logical_cores}")
+                raw_limit = float(self.os_logical_cores)
+                raw_method = "os_logical_count"
+                logger.debug(f"Raw limit set by OS Logical Core count: {self.os_logical_cores}")
             else:
-                # Absolute fallback - should be rare
-                logger.warning("Could not determine any CPU core limit. Defaulting to 1.")
-                final_limit = 1.0
-                method = "fallback_default"
+                # Absolute fallback
+                logger.warning("Could not determine any CPU core limit. Defaulting raw limit to 1.0.")
+                raw_limit = 1.0
+                raw_method = "fallback_default"
 
-        self.effective_cores = final_limit
-        self.detection_method = method
+        self.raw_limit_value = raw_limit
+        self.raw_limit_method = raw_method
+        logger.info(f"Raw CPU limit determined: {self.raw_limit_value:.2f} (Method: {self.raw_limit_method})")
+
+        # --- 6. Apply Weighting (if applicable) ---
+        final_effective_cores = raw_limit
+        final_method = raw_method
+
+        # Apply weighting ONLY if the raw limit is NOT from a cgroup quota
+        # AND the limit is an integer (or effectively integer) core count
+        if not raw_method.startswith("cgroup_"):
+            # Check if raw_limit is effectively an integer
+            if abs(raw_limit - round(raw_limit)) < 1e-9 and raw_limit > 0:
+                logical_limit_int = int(round(raw_limit))
+                weighted_value = self._apply_hyperthread_weight(logical_limit_int)
+                final_effective_cores = weighted_value
+                # Update method if weighting was actually applied and changed the value
+                if abs(weighted_value - raw_limit) > 1e-9:
+                    final_method = f"{raw_method}_weighted"
+                else:
+                    # Keep original method name if weighting didn't change result
+                    final_method = raw_method
+
+            else:  # Raw limit was affinity/os count but not an integer? Should be rare.
+                logger.debug(
+                    f"Raw limit method '{raw_method}' is not cgroup quota, "
+                    f"but value {raw_limit:.2f} is not integer. Skipping weighting."
+                )
+
+        elif raw_method.startswith("cgroup_"):
+            logger.debug("Raw limit is from Cgroup quota. Using quota value directly (skipping SMT weighting).")
+
+        self.effective_cores = final_effective_cores
+        self.detection_method = final_method  # The method for the final value
+
         logger.info(
-            f"Effective CPU core limit determined: {self.effective_cores:.2f} (Method: {self.detection_method})"
+            f"Effective CPU core limit determined: {self.effective_cores:.2f} " f"(Method: {self.detection_method})"
         )
 
     def get_effective_cores(self) -> Optional[float]:
-        """Returns the primary result: the effective core limit."""
+        """Returns the primary result: the effective core limit, potentially weighted."""
         return self.effective_cores
 
     def get_details(self) -> Dict[str, Any]:
         """Returns a dictionary with all detected information."""
+        # Calculate full system weighted potential for info
+        os_weighted_cores = None
+        if self.os_physical_cores and self.os_logical_cores:
+            # Use weighting func with the total logical cores as the limit
+            os_weighted_cores = self._apply_hyperthread_weight(self.os_logical_cores)
+
         return {
             "effective_cores": self.effective_cores,
             "detection_method": self.detection_method,
+            "raw_limit_value": self.raw_limit_value,
+            "raw_limit_method": self.raw_limit_method,
+            "hyperthread_weight_applied": self.hyperthread_weight,
             "os_logical_cores": self.os_logical_cores,
             "os_physical_cores": self.os_physical_cores,
+            "os_weighted_potential": os_weighted_cores,  # Full system potential weighted
             "os_sched_affinity_cores": self.os_sched_affinity_cores,
             "cgroup_type": self.cgroup_type,
             "cgroup_quota_cores": self.cgroup_quota_cores,

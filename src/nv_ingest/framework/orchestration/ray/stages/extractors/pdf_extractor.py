@@ -51,8 +51,8 @@ class PDFExtractorStage(RayActorStage):
       4. Optionally, stores additional extraction info in the message metadata.
     """
 
-    def __init__(self, config: PDFExtractorSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: PDFExtractorSchema) -> None:
+        super().__init__(config)
         try:
             # Validate and store the PDF extractor configuration.
             self.validated_config = config

@@ -31,8 +31,8 @@ class TextEmbeddingTransformStage(RayActorStage):
     trace or extraction metadata is added.
     """
 
-    def __init__(self, config: TextEmbeddingSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: TextEmbeddingSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("TextEmbeddingTransformStage configuration validated successfully.")

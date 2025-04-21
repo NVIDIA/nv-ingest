@@ -31,8 +31,8 @@ class ImageCaptionTransformStage(RayActorStage):
     are stored in the control message.
     """
 
-    def __init__(self, config: ImageCaptionExtractionSchema, progress_engine_count: int) -> None:
-        super().__init__(config, progress_engine_count)
+    def __init__(self, config: ImageCaptionExtractionSchema) -> None:
+        super().__init__(config)
         try:
             self.validated_config = config
             logger.info("ImageCaptionTransformStage configuration validated.")

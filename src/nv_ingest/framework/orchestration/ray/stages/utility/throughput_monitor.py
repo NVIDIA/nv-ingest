@@ -22,9 +22,9 @@ class ThroughputMonitorStage(RayActorStage):
     It also adds the throughput as metadata on the control message before passing it on.
     """
 
-    def __init__(self, config: BaseModel, progress_engine_count: int) -> None:
+    def __init__(self, config: BaseModel) -> None:
         # Initialize base attributes (e.g., self.running, self.start_time) via the base class.
-        super().__init__(config, progress_engine_count)
+        super().__init__(config)
         self.count = 0
         self.last_emit_time = None  # Timestamp when the last throughput measure was emitted
 

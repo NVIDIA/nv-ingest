@@ -39,8 +39,7 @@ def main():
         poll_interval=0.1,
     )
 
-    # Create an instance of the MessageBrokerTaskSource actor with the configuration and a progress_engine_count of 1.
-    message_broker_actor = MessageBrokerTaskSourceStage.remote(config, 1)
+    message_broker_actor = MessageBrokerTaskSourceStage.remote(config)
 
     # Start the actor to begin fetching messages.
     ray.get(message_broker_actor.start.remote())
