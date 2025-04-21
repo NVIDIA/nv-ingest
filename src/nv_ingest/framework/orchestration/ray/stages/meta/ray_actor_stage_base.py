@@ -41,12 +41,15 @@ class RayActorStage(ABC):
         self.output_queue: Optional[Any] = None
         self.running: bool = False
         self.active_processing: bool = False
+
         # Core stats
         self.stats: Dict[str, int] = {"processed": 0}
         self.start_time: Optional[float] = None
+
         # Rate calculation state
         self._last_processed_count: int = 0
         self._last_stats_time: Optional[float] = None
+
         # Threading and shutdown state
         self._processing_thread: Optional[threading.Thread] = None
         self._shutting_down: bool = False

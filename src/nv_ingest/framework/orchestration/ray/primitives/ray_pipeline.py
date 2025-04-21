@@ -163,6 +163,7 @@ class RayPipeline:
         Estimates stage memory overhead and adjusts max_replicas if dynamic scaling is enabled.
         Updates self.stage_memory_overhead and potentially modifies self.stages[...].max_replicas.
         """
+        return  # disable dynamic memory scaling for testing
         if not self.dynamic_memory_scaling:
             logger.info("Dynamic memory scaling disabled, skipping build-time adjustment.")
             return
@@ -662,10 +663,10 @@ class RayPipeline:
             if self.scaling_state.get(stage_name) == "Scaling Up":
                 self.scaling_state[stage_name] = "Idle"
 
-    def _stop_or_kill_actors(self, actors_to_remove: List[Any], stage_name: str) -> None:
+    @staticmethod
+    def _stop_actors(actors_to_remove: List[Any], stage_name: str) -> None:
         """Initiates stop/kill for a list of actors."""
         stop_refs = []
-        actors_to_kill = []
 
         logger.debug(f"[ScaleDown-{stage_name}] Processing {len(actors_to_remove)} actors for removal.")
         for actor in actors_to_remove:
@@ -677,26 +678,11 @@ class RayPipeline:
                 except Exception as e:
                     # Log if submitting stop fails, might need kill
                     logger.error(
-                        f"[ScaleDown-{stage_name}] Error submitting stop() for actor '{actor}':"
-                        f" {e}. Will attempt kill.",
+                        f"[ScaleDown-{stage_name}] Error submitting stop() for actor '{actor}':" f" {e}.",
                         exc_info=False,
                     )
-                    actors_to_kill.append(actor)
             else:
                 logger.warning(f"[ScaleDown-{stage_name}] Actor '{actor}' has no stop() method.")
-                actors_to_kill.append(actor)
-
-        # Kill actors that don't have stop() or failed during stop submission
-        if actors_to_kill:
-            logger.debug(f"[ScaleDown-{stage_name}] Killing {len(actors_to_kill)} actors.")
-            for actor in actors_to_kill:
-                logger.warning(f"[ScaleDown-{stage_name}] Killing actor '{actor}'.")
-                try:
-                    # no_restart=True ensures Ray doesn't try to revive it
-                    ray.kill(actor, no_restart=True)
-                except Exception as kill_e:
-                    # Log error but continue trying to kill others
-                    logger.error(f"[ScaleDown-{stage_name}] Failed to kill actor '{actor}': {kill_e}")
 
         # Log how many stop requests were sent (they proceed in the background)
         if stop_refs:
@@ -726,7 +712,7 @@ class RayPipeline:
         logger.debug(f"[ScaleDown-{stage_name}] Actor list updated. Remaining actors: {len(remaining_actors)}")
 
         # Initiate stop/kill for the removed actors
-        self._stop_or_kill_actors(actors_to_remove, stage_name)
+        self._stop_actors(actors_to_remove, stage_name)
 
         logger.info(f"[ScaleDown-{stage_name}] Scale down initiated. New target replica count: {len(remaining_actors)}")
         # Set state to Idle optimistically, assuming stop/kill initiated successfully
@@ -798,6 +784,8 @@ class RayPipeline:
         Checks if the pipeline is considered "quiet" for potential queue flushing.
         Uses the RayStatsCollector for recent stats.
         """
+
+        return False  # disable quiet check for testing
 
         if self._is_flushing:
             logger.debug("Pipeline quiet check: False (Flush already in progress)")
@@ -1377,7 +1365,6 @@ class RayPipeline:
         """
         logger.debug("--- Performing Scaling & Maintenance Cycle ---")
 
-        return
         cycle_start_time = time.time()
 
         if self._is_flushing:

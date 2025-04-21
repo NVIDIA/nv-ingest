@@ -4,15 +4,13 @@
 
 import logging
 import math
-import os
-import platform
 from dataclasses import dataclass
 
 import numpy as np
 from collections import deque
-from typing import Dict, Any, Deque, List, Tuple
+from typing import Dict, Any, Deque, List, Tuple, Optional
 
-import psutil
+from nv_ingest_api.util.system.hardware_info import CoreCountDetector
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -298,88 +296,43 @@ class ResourceConstraintManager:
         self,
         max_replicas: int,
         memory_threshold: int,
-        estimated_edge_cost_mb: int,  # Note: Still unused in current logic
+        estimated_edge_cost_mb: int,  # Still unused
         memory_safety_buffer_fraction: float,
     ):
         """
-        Initializes the Resource Constraint Manager.
+        Initializes the Resource Constraint Manager using CoreCountDetector.
 
-        Parameters
-        ----------
-        max_replicas : int
-            Absolute maximum number of replicas allowed across *all* stages combined.
-        memory_threshold : int
-            The total system memory usage (e.g., from psutil.virtual_memory().used,
-            in MB) that the pipeline should aim to stay under.
-        estimated_edge_cost_mb : int
-            An estimate of the memory footprint (in MB) for each inter-stage
-            queue (edge) actor. Used for rough pipeline memory estimation.
-            (Currently unused in constraint logic).
-        memory_safety_buffer_fraction : float
-            A fraction (0.0 to <1.0) of `memory_threshold` to reserve as headroom.
-            The manager aims to keep the *projected* memory usage below
-            `memory_threshold * (1 - memory_safety_buffer_fraction)`. This buffer
-            accounts for estimation errors and initialization overhead of new actors.
+        Parameters are the same as before.
         """
         if not (0.0 <= memory_safety_buffer_fraction < 1.0):
             raise ValueError("memory_safety_buffer_fraction must be between 0.0 and 1.0")
 
         self.max_replicas = max_replicas
         self.memory_threshold = memory_threshold
-        self.estimated_edge_cost_mb = estimated_edge_cost_mb
+        self.estimated_edge_cost_mb = estimated_edge_cost_mb  # Keep track, though unused
         self.memory_safety_buffer_fraction = memory_safety_buffer_fraction
         self.effective_memory_limit = self.memory_threshold * (1.0 - self.memory_safety_buffer_fraction)
 
-        # Determine available cores based on process affinity
-        self.available_cores = None
+        core_detector = CoreCountDetector()  # Instantiate the detector
+        self.available_cores: Optional[float] = core_detector.get_effective_cores()
+        self.core_detection_details: Dict[str, Any] = core_detector.get_details()
 
-        try:
-            # Get physical and logical core counts
-            physical = psutil.cpu_count(logical=False)
-            logical = psutil.cpu_count(logical=True)
+        # Determine a practical replica limit based on cores (optional, but often useful)
+        self.core_based_replica_limit: Optional[int] = None
+        if self.available_cores is not None and self.available_cores > 0:
+            self.core_based_replica_limit = math.floor(self.available_cores)
+        else:
+            self.core_based_replica_limit = None  # Treat as unlimited if detection failed
 
-            # Calculate adjusted core estimate
-            estimated_cores = (physical + logical) / 2 if physical and logical else None
-
-            # Use sched_getaffinity if available (Linux/POSIX)
-            affinity_count = len(os.sched_getaffinity(0))
-            if affinity_count <= 0:
-                logger.warning(
-                    "[ConstraintMgr] sched_getaffinity(0) returned 0 or negative cores. Disabling core limit."
-                )
-                self.available_cores = None
-            else:
-                if estimated_cores:
-                    self.available_cores = min(affinity_count, estimated_cores)
-                else:
-                    self.available_cores = affinity_count
-
-        except AttributeError:
-            # Fallback for systems without sched_getaffinity (e.g., Windows, some macOS)
-            cpu_count = os.cpu_count()
-            if cpu_count and cpu_count > 0:
-                self.available_cores = cpu_count
-                logger.warning(
-                    f"[ConstraintMgr] os.sched_getaffinity not available on this platform ({platform.system()}). "
-                    f"Using os.cpu_count() ({self.available_cores}) as the core limit."
-                )
-            else:
-                logger.warning(
-                    "[ConstraintMgr] Could not determine core count via sched_getaffinity or os.cpu_count(). "
-                    "Disabling core-based replica limit."
-                )
-                self.available_cores = None
-        except Exception as e:
-            logger.error(
-                f"[ConstraintMgr] Error determining available cores: {e}. Disabling core limit.", exc_info=True
-            )
-            self.available_cores = None
         logger.info(
             f"[ConstraintMgr] Initialized. MaxReplicas={max_replicas}, "
-            f"AvailableCoresLimit={'None' if self.available_cores is None else self.available_cores}, "
+            f"EffectiveCoreLimit={self.available_cores:.2f} "  # Log the potentially fractional value
+            f"(Method: {self.core_detection_details.get('detection_method')}), "
+            f"CoreBasedReplicaLimit={self.core_based_replica_limit}, "  # Log the derived integer limit
             f"MemThreshold={memory_threshold}MB, "
             f"EffectiveLimit={self.effective_memory_limit:.1f}MB "
         )
+        logger.debug(f"[ConstraintMgr] Core detection details: {self.core_detection_details}")
 
     # --- Private Methods ---
 
@@ -527,7 +480,6 @@ class ResourceConstraintManager:
         else:
             projected_total_replicas = baseline_total_replicas + total_requested_increase_replicas
 
-            # Check Max Replicas Constraint
             if projected_total_replicas > self.max_replicas:
                 allowed_increase_max_r = max(0, self.max_replicas - baseline_total_replicas)
                 factor_max_r = (
@@ -541,9 +493,9 @@ class ResourceConstraintManager:
                     f"({projected_total_replicas}/{self.max_replicas}). Limiting factor: {factor_max_r:.3f}"
                 )
 
-            # Check Available Cores Constraint (using affinity/cpu_count)
             if self.available_cores is not None and projected_total_replicas > self.available_cores:
-                allowed_increase_cores = max(0, self.available_cores - baseline_total_replicas)
+                # Allowed increase is float, based on fractional limit
+                allowed_increase_cores = max(0.0, self.available_cores - baseline_total_replicas)
                 factor_cores = (
                     allowed_increase_cores / total_requested_increase_replicas
                     if total_requested_increase_replicas > 0
@@ -551,11 +503,13 @@ class ResourceConstraintManager:
                 )
                 reduction_factor = min(reduction_factor, factor_cores)
                 logger.warning(
-                    f"[ConstraintMgr-Proportional] Available core limit potentially hit by initial request "
-                    f"({projected_total_replicas}/{self.available_cores} cores). Limiting factor: {factor_cores:.3f}"
+                    f"[ConstraintMgr-Proportional] Effective core limit potentially hit by initial request "
+                    # Log the comparison accurately
+                    f"({projected_total_replicas} replicas vs {self.available_cores:.2f} effective cores)."
+                    f" Limiting factor: {factor_cores:.3f}"
                 )
 
-            # Check Effective Memory Limit Constraint
+            # Check Effective Memory Limit Constraint (Unchanged)
             projected_total_global_memory = current_global_memory_usage + total_projected_mem_increase
             if projected_total_global_memory > self.effective_memory_limit:
                 allowed_mem_increase = max(0.0, self.effective_memory_limit - current_global_memory_usage)
@@ -572,7 +526,7 @@ class ResourceConstraintManager:
             # Determine if any scale up is possible after all checks
             scale_up_allowed = reduction_factor > 0.001  # Epsilon for floating point comparison
 
-        # Apply reduction factor to the original requested increase
+        # Apply reduction factor to the original requested increase (Logic Unchanged, relies on math.floor later)
         final_proposals = tentative_proposals.copy()
 
         if not scale_up_allowed or reduction_factor <= 0.001:
@@ -589,6 +543,7 @@ class ResourceConstraintManager:
             )
             for name, requested_increase, _ in upscale_requests:
                 proposal_meta = initial_proposals_meta[name]
+                # Floor ensures we only add whole replicas, respecting the proportional reduction
                 allowed_increase = math.floor(requested_increase * reduction_factor)
                 target_replicas = proposal_meta.current_replicas + allowed_increase  # Target relative to original count
                 current_val_after_aggressive = tentative_proposals.get(name, proposal_meta.current_replicas)
@@ -605,7 +560,6 @@ class ResourceConstraintManager:
                         f"AggressiveVal={current_val_after_aggressive} -> Final={final_replicas_for_stage}"
                     )
                 final_proposals[name] = final_replicas_for_stage
-        # else: No reduction needed, scale-up requests are fully allowed by global constraints.
 
         return final_proposals
 
