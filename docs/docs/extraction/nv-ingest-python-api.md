@@ -114,7 +114,7 @@ result = ingestor.extract().ingest(show_progress=True)
 
 ## Split Documents
 
-Splitting, also known as chunking, breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
+Splitting, also known as [chunking](chunking.md), breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
 Use the `split` method to chunk large documents into smaller sections before processing as shown in the following code.
 
 !!! note
