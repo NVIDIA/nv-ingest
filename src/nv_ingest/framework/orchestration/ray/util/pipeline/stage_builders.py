@@ -188,7 +188,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count):
         name="pdf_extractor",
         stage_actor=PDFExtractorStage,
         config=extractor_config,
-        min_replicas=8,
+        min_replicas=0,
         max_replicas=8,  # max(1, int(default_cpu_count / 2)),
     )
 
@@ -215,8 +215,8 @@ def add_table_extractor_stage(pipeline, default_cpu_count):
         name="table_extractor",
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
-        min_replicas=4,
-        max_replicas=4,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=4,
     )
 
 
@@ -242,8 +242,8 @@ def add_chart_extractor_stage(pipeline, default_cpu_count):
         name="chart_extractor",
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
-        min_replicas=4,
-        max_replicas=4,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=4,
     )
 
 
@@ -287,8 +287,8 @@ def add_image_extractor_stage(pipeline, default_cpu_count):
         name="image_extractor",
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -307,8 +307,8 @@ def add_docx_extractor_stage(pipeline, default_cpu_count):
         name="docx_extractor",
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -357,8 +357,8 @@ def add_audio_extractor_stage(pipeline, default_cpu_count):
         name="audio_extractor",
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -370,7 +370,7 @@ def add_image_dedup_stage(pipeline, default_cpu_count):
         stage_actor=ImageDedupStage,
         config=config,
         min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        max_replicas=1,
     )
 
 
@@ -381,8 +381,8 @@ def add_image_filter_stage(pipeline, default_cpu_count):
         name="image_filter",
         stage_actor=ImageFilterStage,
         config=config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -395,8 +395,8 @@ def add_text_splitter_stage(pipeline, default_cpu_count):
         name="text_splitter",
         stage_actor=TextSplitterStage,
         config=config,
-        min_replicas=2,
-        max_replicas=2,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=2,
     )
 
 
@@ -425,8 +425,8 @@ def add_image_caption_stage(pipeline, default_cpu_count):
         name="image_caption",
         stage_actor=ImageCaptionTransformStage,
         config=config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -453,8 +453,8 @@ def add_text_embedding_stage(pipeline, default_cpu_count):
         name="text_embedding",
         stage_actor=TextEmbeddingTransformStage,
         config=config,
-        min_replicas=2,
-        max_replicas=2,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=2,
     )
 
 
@@ -465,8 +465,8 @@ def add_embedding_storage_stage(pipeline, default_cpu_count):
         name="embedding_storage",
         stage_actor=EmbeddingStorageStage,
         config=config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -476,8 +476,8 @@ def add_image_storage_stage(pipeline, default_cpu_count):
         name="image_storage",
         stage_actor=ImageStorageStage,
         config=config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 4)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
@@ -500,8 +500,8 @@ def add_sink_stage(pipeline, default_cpu_count):
         name="sink",
         sink_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
-        min_replicas=1,
-        max_replicas=1,  # max(1, int(default_cpu_count / 16)),
+        min_replicas=0,
+        max_replicas=1,
     )
 
 
