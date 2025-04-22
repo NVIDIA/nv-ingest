@@ -405,8 +405,10 @@ You can specify multiple `--profile` options.
 
 ## Troubleshooting
 
-In rare cases, when you run a job you might an see an error similar to `max open file descriptor` or `can't start new thread`. 
-These errors occur when the open file descriptor limit for your service user account is too low.
+### Too Many Open Files Error
+
+In rare cases, when you run a job you might an see an error similar to `too many open files` or `max open file descriptor`. 
+This error occurs when the open file descriptor limit for your service user account is too low.
 To resolve the issue, set or raise the maximum number of open file descriptors (`-n`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
 Before you change the `-n` setting, consider the following:
 
@@ -415,6 +417,20 @@ Before you change the `-n` setting, consider the following:
 
 ```bash
 ulimit -n 10,000
+```
+
+### Can't Start New Thread Error
+
+In rare cases, when you run a job you might an see an error similar to `can't start new thread`. 
+This error occurs when the maximum number of processes available to a single user is too low.
+To resolve the issue, set or raise the maximum number of processes (`-u`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
+Before you change the `-u` setting, consider the following:
+
+- Apply the `-u` setting directly to the user (or the Docker container environment) that runs your ingest service.
+- For `-u` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
+
+```bash
+ulimit -u 10,000
 ```
 
 
