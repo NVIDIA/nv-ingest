@@ -27,7 +27,7 @@ dependencies = [
     "langchain-nvidia-ai-endpoints>=0.3.7",
     "llama-index-embeddings-nvidia==0.1.5",
     "minio>=7.2.15",
-    "nv-ingest-api>=2025.4.21",
+    "nv-ingest-api",
     "openai~=1.68.1",
     "pyarrow>=19.0.0",
     "pydantic>2.0.0",
