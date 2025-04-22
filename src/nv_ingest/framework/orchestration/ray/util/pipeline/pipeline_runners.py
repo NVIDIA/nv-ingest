@@ -95,7 +95,7 @@ def _launch_pipeline(ingest_config: Dict[str, Any]) -> float:
     logger.info("Starting pipeline setup")
 
     # Initialize the pipeline with the configuration
-    pipeline = RayPipeline(dynamic_memory_scaling=True, dynamic_memory_threshold=0.75)
+    pipeline = RayPipeline()
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline

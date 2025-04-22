@@ -23,7 +23,7 @@ def test_valid_schema_with_custom_values():
         "api_key": "your-api-key-here",
         "endpoint_url": "https://custom.api.endpoint",
         "prompt": "Describe the image:",
-        "model_name": "some-vlm-model",
+        "image_caption_model_name": "some-vlm-model",
         "raise_on_failure": True,
     }
     schema = ImageCaptionExtractionSchema(**valid_data)

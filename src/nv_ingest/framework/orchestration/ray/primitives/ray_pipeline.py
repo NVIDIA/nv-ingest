@@ -3,6 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import threading
+from dataclasses import dataclass
+
 import psutil
 import uuid
 import ray
@@ -34,46 +36,85 @@ class StageInfo:
         self.min_replicas = min_replicas
         self.max_replicas = max_replicas
 
+        # --- Configuration Objects ---
+
+
+@dataclass
+class ScalingConfig:
+    """Configuration for PID and Resource Constraint Manager based scaling."""
+
+    dynamic_memory_scaling: bool = False
+    dynamic_memory_threshold: float = 0.75
+    pid_kp: float = 0.1
+    pid_ki: float = 0.001
+    pid_kd: float = 0.0
+    pid_target_queue_depth: int = 0
+    pid_penalty_factor: float = 0.1
+    pid_error_boost_factor: float = 1.5
+    pid_window_size: int = 10
+    rcm_estimated_edge_cost_mb: int = 5000
+    rcm_memory_safety_buffer_fraction: float = 0.15
+    # Optional: Move scaling loop interval here?
+    # scaling_poll_interval: float = 30.0
+
+
+@dataclass
+class FlushingConfig:
+    """Configuration for queue flushing behavior."""
+
+    queue_flush_interval_seconds: int = 600
+    queue_flush_drain_timeout_seconds: int = 300
+    quiet_period_threshold: int = 0
+
+
+@dataclass
+class StatsConfig:
+    """Configuration for the RayStatsCollector."""
+
+    collection_interval_seconds: float = 10.0
+    actor_timeout_seconds: float = 5.0
+    queue_timeout_seconds: float = 2.0
+
+
+@dataclass
+class DisplayConfig:
+    """Configuration for monitoring display."""
+
+    use_gui: bool = False
+
 
 class RayPipeline:
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
     Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
     Delegates statistics collection to RayStatsCollector.
+
+    Configuration is managed via dedicated config objects (ScalingConfig, etc.).
     """
 
     def __init__(
         self,
-        gui: bool = False,
-        dynamic_memory_scaling: bool = False,
-        dynamic_memory_threshold: float = 0.75,
-        queue_flush_interval_seconds: int = 600,
-        queue_flush_drain_timeout_seconds: int = 300,
-        quiet_period_threshold: int = 0,
-        pid_kp: float = 0.1,
-        pid_ki: float = 0.001,
-        pid_kd: float = 0.0,
-        pid_target_queue_depth: int = 0,
-        pid_penalty_factor: float = 0.1,
-        pid_error_boost_factor: float = 1.5,
-        pid_window_size: int = 10,
-        rcm_estimated_edge_cost_mb: int = 5000,
-        rcm_memory_safety_buffer_fraction: float = 0.15,
-        # --- Stats Collector Config ---
-        stats_collection_interval_seconds: float = 10.0,
-        stats_actor_timeout_seconds: float = 5.0,
-        stats_queue_timeout_seconds: float = 2.0,
+        scaling_config: ScalingConfig = ScalingConfig(),
+        flushing_config: FlushingConfig = FlushingConfig(),
+        stats_config: StatsConfig = StatsConfig(),
+        display_config: DisplayConfig = DisplayConfig(),
     ) -> None:
-        self.use_gui = gui
+        # Store config objects
+        self.scaling_config = scaling_config
+        self.flushing_config = flushing_config
+        self.stats_config = stats_config
+        self.display_config = display_config
+
+        # Use attributes from config objects
+        self.use_gui = self.display_config.use_gui
 
         # --- Core Pipeline Structure ---
         self.stages: List[StageInfo] = []
         self.connections: Dict[str, List[Tuple[str, int]]] = {}
-        self.stage_actors: Dict[str, List[Any]] = {}  # Map: stage_name -> List[ActorHandle]
-        self.edge_queues: Dict[str, Tuple[Any, int]] = {}  # Map: q_name -> Tuple[QueueHandle, Capacity]
+        self.stage_actors: Dict[str, List[Any]] = {}
+        self.edge_queues: Dict[str, Tuple[Any, int]] = {}
 
         # --- Structure Lock ---
-        # Protects stages, stage_actors, edge_queues during modification and access
         self._structure_lock: threading.Lock = threading.Lock()
 
         # --- State ---
@@ -81,13 +122,14 @@ class RayPipeline:
         self.prev_global_memory_usage: Optional[int] = None
 
         # --- Build Time Config & State ---
-        self.dynamic_memory_scaling = dynamic_memory_scaling
-        self.dynamic_memory_threshold = dynamic_memory_threshold
-        self.stage_memory_overhead: Dict[str, float] = {}
+        # Use scaling_config for these
+        self.dynamic_memory_scaling = self.scaling_config.dynamic_memory_scaling
+        self.dynamic_memory_threshold = self.scaling_config.dynamic_memory_threshold
+        self.stage_memory_overhead: Dict[str, float] = {}  # This seems populated later
 
-        # --- Background Threads (Keep monitoring/scaling threads if separate) ---
-        self._queue_monitoring_thread: Optional[threading.Thread] = None  # Example
-        self._scaling_thread: Optional[threading.Thread] = None  # Example
+        # --- Background Threads ---
+        self._monitor_thread: Optional[threading.Thread] = None  # Renamed from _queue_monitoring_thread
+        self._scaling_thread: Optional[threading.Thread] = None
         self._display_instance: Optional[Any] = None
         self._monitoring = False
         self._scaling_monitoring = False
@@ -95,50 +137,57 @@ class RayPipeline:
         # --- Queue Flushing ---
         self._is_flushing: bool = False
         self._last_queue_flush_time: float = time.time()
-        self.queue_flush_interval_seconds = queue_flush_interval_seconds
-        self.queue_flush_drain_timeout_seconds = queue_flush_drain_timeout_seconds
-        self.quiet_period_threshold = quiet_period_threshold
+        # Use flushing_config for these
+        self.queue_flush_interval_seconds = self.flushing_config.queue_flush_interval_seconds
+        self.queue_flush_drain_timeout_seconds = self.flushing_config.queue_flush_drain_timeout_seconds
+        self.quiet_period_threshold = self.flushing_config.quiet_period_threshold
 
         # --- Instantiate Autoscaling Controllers ---
+        # Use scaling_config
         self.pid_controller = PIDController(
-            kp=pid_kp,
-            ki=pid_ki,
-            kd=pid_kd,
-            stage_cost_estimates={},
-            target_queue_depth=pid_target_queue_depth,
-            window_size=pid_window_size,
-            penalty_factor=pid_penalty_factor,
-            error_boost_factor=pid_error_boost_factor,
+            kp=self.scaling_config.pid_kp,
+            ki=self.scaling_config.pid_ki,
+            kd=self.scaling_config.pid_kd,
+            stage_cost_estimates={},  # Populated during build
+            target_queue_depth=self.scaling_config.pid_target_queue_depth,
+            window_size=self.scaling_config.pid_window_size,
+            penalty_factor=self.scaling_config.pid_penalty_factor,
+            error_boost_factor=self.scaling_config.pid_error_boost_factor,
         )
-        logger.info("PIDController initialized...")
+        logger.info("PIDController initialized using ScalingConfig.")
+
         try:
             total_system_memory_bytes = psutil.virtual_memory().total
+            # Use scaling_config for dynamic_memory_threshold
             absolute_memory_threshold_mb = int(
-                self.dynamic_memory_threshold * total_system_memory_bytes / (1024 * 1024)
+                self.scaling_config.dynamic_memory_threshold * total_system_memory_bytes / (1024 * 1024)
             )
         except Exception as e:
             logger.error(f"Failed to get system memory: {e}. Using high limit.")
-            absolute_memory_threshold_mb = 1_000_000
+            absolute_memory_threshold_mb = 1_000_000  # Fallback value
+
+        # Use scaling_config
         self.constraint_manager = ResourceConstraintManager(
-            max_replicas=1,
+            max_replicas=1,  # Updated during build
             memory_threshold=absolute_memory_threshold_mb,
-            estimated_edge_cost_mb=rcm_estimated_edge_cost_mb,
-            memory_safety_buffer_fraction=rcm_memory_safety_buffer_fraction,
-        )  # Add real controller import/init
-        logger.info("ResourceConstraintManager initialized...")
+            estimated_edge_cost_mb=self.scaling_config.rcm_estimated_edge_cost_mb,
+            memory_safety_buffer_fraction=self.scaling_config.rcm_memory_safety_buffer_fraction,
+        )
+        logger.info("ResourceConstraintManager initialized using ScalingConfig.")
 
         # --- Instantiate Stats Collector ---
-        # Store config values needed for staleness checks later
-        self._stats_collection_interval_seconds = stats_collection_interval_seconds
+        # Use stats_config
+        # Store interval for staleness checks later
+        self._stats_collection_interval_seconds = self.stats_config.collection_interval_seconds
         self.stats_collector = RayStatsCollector(
-            pipeline_accessor=self,
-            interval=stats_collection_interval_seconds,
-            actor_timeout=stats_actor_timeout_seconds,
-            queue_timeout=stats_queue_timeout_seconds,
+            pipeline_accessor=self,  # This dependency remains for now
+            interval=self.stats_config.collection_interval_seconds,
+            actor_timeout=self.stats_config.actor_timeout_seconds,
+            queue_timeout=self.stats_config.queue_timeout_seconds,
         )
+        logger.info("RayStatsCollector initialized using StatsConfig.")
 
         logger.info(f"GUI Mode Requested: {self.use_gui}")
-        logger.info("RayPipeline initialized.")
 
     # --- Accessor Methods for Stats Collector (and internal use) ---
 

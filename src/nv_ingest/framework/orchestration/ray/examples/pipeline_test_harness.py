@@ -123,7 +123,7 @@ if __name__ == "__main__":
     logger.info("SimpleMessageBroker server started.")
 
     # Build the pipeline.
-    pipeline = RayPipeline(dynamic_memory_scaling=True, dynamic_memory_threshold=0.75, gui=True)
+    pipeline = RayPipeline()
     logger.info("Created RayPipeline instance.")
 
     # Create configuration instances for the source and sink stages.
