@@ -16,7 +16,6 @@ import time
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
-from nv_ingest.framework.orchestration.ray.util.system_tools.memory import estimate_actor_memory_overhead
 from nv_ingest.framework.orchestration.ray.util.system_tools.visualizers import (
     GuiUtilizationDisplay,
     UtilizationDisplay,
@@ -157,86 +156,6 @@ class RayPipeline:
         """Returns a snapshot of the current edge queues."""
         with self._structure_lock:
             return self.edge_queues.copy()
-
-    def _perform_dynamic_memory_scaling(self) -> None:
-        """
-        Estimates stage memory overhead and adjusts max_replicas if dynamic scaling is enabled.
-        Updates self.stage_memory_overhead and potentially modifies self.stages[...].max_replicas.
-        """
-        return  # disable dynamic memory scaling for testing
-        if not self.dynamic_memory_scaling:
-            logger.info("Dynamic memory scaling disabled, skipping build-time adjustment.")
-            return
-
-        logger.info("Dynamic memory scaling enabled. Estimating per-stage memory overhead...")
-        total_overhead = 0.0
-        stage_overheads = {}  # Temporarily store results
-
-        try:
-            # Estimate overhead for each stage
-            for stage in self.stages:
-                logger.debug(f"[Build-MemScale] Estimating overhead for stage '{stage.name}'...")
-                # Ensure estimate_actor_memory_overhead is available
-                overhead = estimate_actor_memory_overhead(stage.callable, actor_kwargs={"config": stage.config})
-                stage_overheads[stage.name] = overhead
-                total_overhead += overhead
-                logger.debug(f"[Build-MemScale] Stage '{stage.name}' overhead: {overhead / (1024 * 1024):.2f} MB")
-
-            # Calculate average and required replicas based on threshold
-            avg_overhead = total_overhead / len(self.stages) if self.stages else 0.0
-            if avg_overhead <= 0:
-                logger.warning(
-                    "[Build-MemScale] Could not calculate positive average overhead; skipping max_replica adjustment."
-                )
-                self.stage_memory_overhead = stage_overheads  # Store estimates even if no adjustment
-                return
-
-            logger.debug(f"[Build-MemScale] Average overhead per stage: {avg_overhead / (1024 * 1024):.2f} MB")
-            total_system_memory = psutil.virtual_memory().total
-            threshold_bytes = self.dynamic_memory_threshold * total_system_memory
-            logger.debug(
-                f"[Build-MemScale] System Mem: {total_system_memory / (1024 * 1024):.1f}MB, "
-                f"Threshold: {threshold_bytes / (1024 * 1024):.1f}MB ({self.dynamic_memory_threshold * 100:.0f}%)"
-            )
-
-            required_total_replicas = int(threshold_bytes / avg_overhead)
-            current_total_replicas = sum(stage.max_replicas for stage in self.stages)
-            logger.debug(
-                f"[Build-MemScale] Current total max replicas: {current_total_replicas}; "
-                f"Estimated required replicas for memory threshold: {required_total_replicas}"
-            )
-
-            # Adjust max_replicas proportionally if needed
-            if required_total_replicas > 0 and current_total_replicas != required_total_replicas:
-                ratio = required_total_replicas / current_total_replicas
-                logger.info(f"[Build-MemScale] Adjusting max_replicas by scaling factor: {ratio:.2f}")
-                for stage in self.stages:
-                    original = stage.max_replicas
-                    # Ensure adjustment respects min_replicas (at least 1 unless min is 0)
-                    adjusted_max = max(
-                        stage.min_replicas,
-                        1 if stage.min_replicas > 0 else 0,  # Ensure at least 1 if min > 0
-                        int(stage.max_replicas * ratio),
-                    )
-                    if adjusted_max != original:
-                        stage.max_replicas = adjusted_max  # Modify StageInfo directly
-                        logger.info(
-                            f"[Build-MemScale] Stage '{stage.name}': max_replicas adjusted {original} -> {adjusted_max}"
-                        )
-            else:
-                logger.info("[Build-MemScale] No max_replica adjustment needed based on average overhead.")
-
-            # Store the final estimates
-            self.stage_memory_overhead = stage_overheads
-
-        except Exception as e:
-            logger.error(
-                f"[Build-MemScale] Error during dynamic memory overhead estimation: {e}. "
-                "Skipping max_replica adjustment.",
-                exc_info=True,
-            )
-            # Store any estimates calculated so far, even if incomplete/error
-            self.stage_memory_overhead = stage_overheads
 
     def _configure_autoscalers(self) -> None:
         """
@@ -501,20 +420,17 @@ class RayPipeline:
         """
         logger.info("--- Starting Pipeline Build Process ---")
         try:
-            # Step 1: Perform optional dynamic memory scaling
-            self._perform_dynamic_memory_scaling()
-
-            # Step 2: Configure PID and Resource Manager based on final stage settings
+            # Step 1: Configure PID and Resource Manager based on final stage settings
             self._configure_autoscalers()
 
-            # Step 3: Instantiate initial actors based on min_replicas
+            # Step 2: Instantiate initial actors based on min_replicas
             # This populates self.stage_actors
             self._instantiate_initial_actors()
 
-            # Step 4: Create queues and submit wiring calls
+            # Step 3: Create queues and submit wiring calls
             wiring_futures = self._create_and_wire_edges()
 
-            # Step 5: Wait for wiring calls to complete
+            # Step 4: Wait for wiring calls to complete
             self._wait_for_wiring(wiring_futures)
 
             logger.info("--- Pipeline Build Completed Successfully ---")
@@ -530,7 +446,8 @@ class RayPipeline:
             return {}
 
     # --- Scaling Logic ---
-    def _create_single_replica(self, stage_info: StageInfo) -> Any:
+    @staticmethod
+    def _create_single_replica(stage_info: StageInfo) -> Any:
         """Creates a single new Ray actor replica for the given stage."""
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
@@ -578,7 +495,8 @@ class RayPipeline:
 
         return wiring_refs
 
-    def _start_actors(self, actors_to_start: List[Any], stage_name: str) -> None:
+    @staticmethod
+    def _start_actors(actors_to_start: List[Any], stage_name: str) -> None:
         """Starts a list of actors if they have a 'start' method and waits for completion."""
         start_refs = []
         for actor in actors_to_start:
@@ -769,7 +687,8 @@ class RayPipeline:
             )
             self.scaling_state[stage_name] = "Error"
 
-    def _get_global_in_flight(self, stage_stats: Dict[str, Dict[str, int]]) -> int:
+    @staticmethod
+    def _get_global_in_flight(stage_stats: Dict[str, Dict[str, int]]) -> int:
         """Calculates total in-flight items across all stages from a stats dict."""
         if not stage_stats:
             return 0
@@ -1359,6 +1278,7 @@ class RayPipeline:
         """
         Orchestrates scaling/maintenance, using RayStatsCollector for stats.
         """
+
         logger.debug("--- Performing Scaling & Maintenance Cycle ---")
 
         cycle_start_time = time.time()
