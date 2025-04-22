@@ -261,7 +261,9 @@ class MilvusOperator:
         self.milvus_kwargs = locals()
         self.milvus_kwargs.pop("self")
         self.collection_name = self.milvus_kwargs.pop("collection_name")
-        self.milvus_kwargs.pop("kwargs", None)
+        for k, v in self.milvus_kwargs.pop("kwargs", {}).items():
+            self.milvus_kwargs[k] = v
+        # self.milvus_kwargs.pop("kwargs", None)
 
     def get_connection_params(self):
         conn_dict = {
@@ -618,9 +620,9 @@ def _pull_text(
         pg_num = element["metadata"]["content_metadata"].get("page_number")
         doc_type = element["document_type"]
         if not verify_emb:
-            logger.info(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
+            logger.debug(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
         if not text:
-            logger.info(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
+            logger.debug(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
         # if we do find text but no embedding remove anyway
         text = None
     return text
@@ -897,7 +899,7 @@ def stream_insert_milvus(
                     element = record_func(text, element)
                 client.insert(collection_name=collection_name, data=[element])
                 count += 1
-    logger.info(f"logged {count} records")
+    logger.info(f"streamed {count} records")
 
 
 def write_to_nvingest_collection(
@@ -989,6 +991,7 @@ def write_to_nvingest_collection(
     schema = Collection(collection_name).schema
     num_elements = len([rec for record in records for rec in record])
     logger.info(f"{num_elements} elements to insert to milvus")
+    logger.info(f"threshold for streaming is {threshold}")
     if num_elements < threshold:
         stream = True
     if isinstance(meta_dataframe, str):
