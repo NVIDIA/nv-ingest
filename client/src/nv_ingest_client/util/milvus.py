@@ -917,7 +917,7 @@ def write_to_nvingest_collection(
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
-    threshold: int = 50,
+    threshold: int = 1000,
     meta_dataframe=None,
     meta_source_field=None,
     meta_fields=None,
