@@ -9,12 +9,16 @@ import os
 import click
 import logging
 
+from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
+
 # Import our new pipeline class.
 from nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor import AudioExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor import ChartExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor import DocxExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor import ImageExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor import InfographicExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor import PDFExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor import PPTXExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor import TableExtractorStage
 
 from nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector import MetadataInjectionStage
@@ -37,8 +41,9 @@ from nv_ingest.framework.schemas.framework_metadata_injector_schema import Metad
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_docx_schema import DocxExtractorSchema
-from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema, ImageConfigSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
@@ -248,28 +253,25 @@ def add_chart_extractor_stage(pipeline, default_cpu_count):
 
 
 def add_infographic_extractor_stage(pipeline, default_cpu_count):
-    # TODO
-    # paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
-    # infographic_content_extractor_config = ingest_config.get(
-    #    "infographic_content_extraction_module",
-    #    {
-    #        "endpoint_config": {
-    #            "paddle_endpoints": (paddle_grpc, paddle_http),
-    #            "paddle_infer_protocol": paddle_protocol,
-    #            "auth_token": paddle_auth,
-    #        }
-    #    },
-    # )
+    infographic_content_extractor_config = InfographicExtractorSchema(
+        **{
+            "endpoint_config": {
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": paddle_auth,
+            }
+        }
+    )
 
-    # infographic_extractor_stage = pipe.add_stage(
-    #    generate_infographic_extractor_stage(
-    #        morpheus_pipeline_config, infographic_content_extractor_config, pe_count=max(1, int(default_cpu_count / 4))
-    #    )
-    # )
-
-    # return infographic_extractor_stage
-    pass
+    pipeline.add_stage(
+        name="infographic_extractor",
+        stage_actor=InfographicExtractorStage,
+        config=infographic_content_extractor_config,
+        min_replicas=0,
+        max_replicas=1,
+    )
 
 
 def add_image_extractor_stage(pipeline, default_cpu_count):
@@ -313,29 +315,23 @@ def add_docx_extractor_stage(pipeline, default_cpu_count):
 
 
 def add_pptx_extractor_stage(pipeline, default_cpu_count):
-    # yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
-    # pptx_extractor_config = ingest_config.get(
-    #    "pptx_extraction_module",
-    #    {
-    #        "pptx_extraction_config": {
-    #            "yolox_endpoints": (yolox_grpc, yolox_http),
-    #            "yolox_infer_protocol": yolox_protocol,
-    #            "auth_token": yolox_auth,
-    #        }
-    #    },
-    # )
-    # pptx_extractor_stage = pipe.add_stage(
-    #    generate_pptx_extractor_stage(
-    #        morpheus_pipeline_config,
-    #        extraction_config=pptx_extractor_config,
-    #        pe_count=max(1, int(default_cpu_count / 4)),
-    #        task="extract",
-    #        task_desc="pptx_content_extractor",
-    #    )
-    # )
-    #
-    # return pptx_extractor_stage
-    pass
+    yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
+
+    pptx_extractor_config = {
+        "pptx_extraction_config": {
+            "yolox_endpoints": (yolox_grpc, yolox_http),
+            "yolox_infer_protocol": yolox_protocol,
+            "auth_token": yolox_auth,
+        }
+    }
+
+    pipeline.add_stage(
+        name="pptx_extractor",
+        stage_actor=PPTXExtractorStage,
+        config=PPTXExtractorSchema(**pptx_extractor_config),
+        min_replicas=0,
+        max_replicas=1,
+    )
 
 
 def add_audio_extractor_stage(pipeline, default_cpu_count):

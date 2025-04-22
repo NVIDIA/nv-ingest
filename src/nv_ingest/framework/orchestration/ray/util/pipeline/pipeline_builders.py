@@ -30,6 +30,8 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_embedding_storage_stage,
     add_image_storage_stage,
     add_sink_stage,
+    add_pptx_extractor_stage,
+    add_infographic_extractor_stage,
 )
 
 
@@ -75,8 +77,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     pdf_extractor_stage = add_pdf_extractor_stage(pipeline, default_cpu_count)
     image_extractor_stage = add_image_extractor_stage(pipeline, default_cpu_count)
     docx_extractor_stage = add_docx_extractor_stage(pipeline, default_cpu_count)
-    # TODO(Devin)
-    # pptx_extractor_stage = add_pptx_extractor_stage(pipeline, default_cpu_count)
+    pptx_extractor_stage = add_pptx_extractor_stage(pipeline, default_cpu_count)
     audio_extractor_stage = add_audio_extractor_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
@@ -87,10 +88,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     image_filter_stage = add_image_filter_stage(pipeline, default_cpu_count)
     table_extraction_stage = add_table_extractor_stage(pipeline, default_cpu_count)
     chart_extraction_stage = add_chart_extractor_stage(pipeline, default_cpu_count)
-    # TODO(Devin)
-    # infographic_extraction_stage = add_infographic_extractor_stage(
-    #    pipeline, default_cpu_count
-    # )
+    infographic_extraction_stage = add_infographic_extractor_stage(pipeline, default_cpu_count)
     image_caption_stage = add_image_caption_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
@@ -129,8 +127,10 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     ###### Document Extractors ########
     pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=16)
     pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=16)
-    pipeline.make_edge("docx_extractor", "image_extractor", queue_size=16)
-    pipeline.make_edge("image_extractor", "table_extractor", queue_size=16)
+    pipeline.make_edge("docx_extractor", "pptx_extractor", queue_size=16)
+    pipeline.make_edge("pptx_extractor", "image_extractor", queue_size=16)
+    pipeline.make_edge("image_extractor", "infographic_extractor", queue_size=16)
+    pipeline.make_edge("infographic_extractor", "table_extractor", queue_size=16)
 
     ###### Primitive Extractors ########
     pipeline.make_edge("table_extractor", "chart_extractor", queue_size=16)
