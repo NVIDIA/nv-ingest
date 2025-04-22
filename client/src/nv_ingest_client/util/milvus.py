@@ -223,6 +223,7 @@ class MilvusOperator:
         meta_dataframe: Union[str, pd.DataFrame] = None,
         meta_source_field: str = None,
         meta_fields: list[str] = None,
+        stream: bool = False,
         **kwargs,
     ):
         """
@@ -876,7 +877,7 @@ def stream_insert_milvus(
         This function will be used to parse the records for necessary information.
 
     """
-    data = []
+    count = 0
     for result in records:
         for element in result:
             text = _pull_text(
@@ -889,11 +890,12 @@ def stream_insert_milvus(
                 add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
             if text:
                 if sparse_model is not None:
-                    data.append(record_func(text, element, sparse_model.encode_documents([text])))
+                    element = record_func(text, element, sparse_model.encode_documents([text]))
                 else:
-                    data.append(record_func(text, element))
-    client.insert(collection_name=collection_name, data=data)
-    logger.info(f"logged {len(data)} records")
+                    element = record_func(text, element)
+                client.insert(collection_name=collection_name, data=[element])
+                count += 1
+    logger.info(f"logged {count} records")
 
 
 def write_to_nvingest_collection(
@@ -912,10 +914,11 @@ def write_to_nvingest_collection(
     access_key: str = "minioadmin",
     secret_key: str = "minioadmin",
     bucket_name: str = "a-bucket",
-    threshold: int = 10,
+    threshold: int = 50,
     meta_dataframe=None,
     meta_source_field=None,
     meta_fields=None,
+    stream: bool = False,
 ):
     """
     This function takes the input records and creates a corpus,
@@ -954,7 +957,6 @@ def write_to_nvingest_collection(
     bucket_name : str, optional
         Minio bucket name.
     """
-    stream = False
     local_index = False
     connections.connect(uri=milvus_uri)
     if urlparse(milvus_uri).scheme:
@@ -981,8 +983,9 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
-    logger.info(f"{len(records)} records to insert to milvus")
-    if len(records) < threshold:
+    num_elements = len([rec for record in records for rec in record])
+    logger.info(f"{num_elements} elements to insert to milvus")
+    if num_elements < threshold:
         stream = True
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
