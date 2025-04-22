@@ -21,6 +21,7 @@ import nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker
 # Define the module under test.
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
+
 # -----------------------------------------------------------------------------
 # Dummy Classes for Testing (for client and BaseModel response simulation)
 # -----------------------------------------------------------------------------
@@ -47,7 +48,7 @@ class DummyClient:
         self.responses = responses
         self.call_count = 0
 
-    def fetch_message(self, task_queue, count):
+    def fetch_message(self, task_queue, count, override_fetch_mode=None):
         if self.call_count < len(self.responses):
             response = self.responses[self.call_count]
             self.call_count += 1
@@ -266,25 +267,30 @@ def test_fetch_and_process_messages_timeout_error():
     Test that if client.fetch_message raises a TimeoutError,
     fetch_and_process_messages catches it and continues to the next message.
     """
-    client = DummyClient([None])
     call = [0]
 
-    def fetch_override(task_queue, count):
-        if call[0] == 0:
-            call[0] += 1
-            raise TimeoutError("Timeout")
-        else:
-            return {
-                "job_id": "job_after_timeout",
-                "job_payload": [{"a": "b"}],
-                "tasks": [],
-                "tracing_options": {},
-            }
+    class TimeoutThenValidClient:
+        def fetch_message(self, task_queue, count, override_fetch_mode=None):
+            if call[0] == 0:
+                call[0] += 1
+                raise TimeoutError("Timeout")
+            else:
+                return DummyResponse(
+                    response_code=0,
+                    response=json.dumps(
+                        {
+                            "job_id": "job_after_timeout",
+                            "job_payload": [{"a": "b"}],
+                            "tasks": [],
+                            "tracing_options": {},
+                        }
+                    ),
+                )
 
-    client.fetch_message = fetch_override
     config = DummyValidatedConfig(task_queue="queue1")
+
     with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message:
-        gen = fetch_and_process_messages(client, config)
+        gen = fetch_and_process_messages(TimeoutThenValidClient(), config)
         result = next(gen)
         gen.close()
         assert result == "processed"
@@ -296,26 +302,44 @@ def test_fetch_and_process_messages_exception_handling():
     Test that if client.fetch_message raises a generic Exception,
     fetch_and_process_messages logs the error and continues fetching.
     """
-    client = DummyClient([None])
     call = [0]
 
-    def fetch_override(task_queue, count):
-        if call[0] == 0:
-            call[0] += 1
-            raise Exception("Generic error")
-        else:
-            return {
-                "job_id": "job_after_exception",
-                "job_payload": [{"c": "d"}],
-                "tasks": [],
-                "tracing_options": {},
-            }
+    class ExceptionThenValidClient:
+        def fetch_message(self, task_queue, count, override_fetch_mode=None):
+            if call[0] == 0:
+                call[0] += 1
+                raise Exception("Generic error")
+            else:
+                return DummyResponse(
+                    response_code=0,
+                    response=json.dumps(
+                        {
+                            "job_id": "job_after_exception",
+                            "job_payload": [{"c": "d"}],
+                            "tasks": [],
+                            "tracing_options": {},
+                        }
+                    ),
+                )
 
-    client.fetch_message = fetch_override
     config = DummyValidatedConfig(task_queue="queue1")
-    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message:
-        gen = fetch_and_process_messages(client, config)
+
+    # Patch process_message and the logger so we can assert they're called appropriately.
+    with patch(f"{MODULE_UNDER_TEST}.process_message", return_value="processed") as mock_process_message, patch(
+        f"{MODULE_UNDER_TEST}.logger"
+    ) as mock_logger:
+        # Create the generator.
+        gen = fetch_and_process_messages(ExceptionThenValidClient(), config)
+
+        # The generator should swallow the Exception, log it, then yield the processed message.
         result = next(gen)
         gen.close()
+
+        # Assert that the processed result is returned.
         assert result == "processed"
+
+        # Assert that the process_message function was called once.
         mock_process_message.assert_called_once()
+
+        # Assert that an exception was logged. Adjust the number as needed.
+        assert mock_logger.exception.call_count > 0

@@ -4,10 +4,11 @@
 
 from abc import ABC
 from abc import abstractmethod
-from typing import List
+from typing import List, Optional
 
 from nv_ingest.framework.schemas.framework_message_wrapper_schema import MessageWrapper
 from nv_ingest.framework.schemas.framework_processing_job_schema import ProcessingJob
+from nv_ingest_api.util.service_clients.client_base import FetchMode
 
 
 class IngestServiceMeta(ABC):
@@ -26,3 +27,15 @@ class IngestServiceMeta(ABC):
     @abstractmethod
     async def get_processing_cache(self, job_id: str) -> List[ProcessingJob]:
         """Abstract method for getting processing cache"""
+
+    @abstractmethod
+    async def set_job_state(self, job_id: str, state: str, ttl: int = 86400):
+        """Abstract method for setting job state"""
+
+    @abstractmethod
+    async def get_job_state(self, job_id: str) -> Optional[str]:
+        """Abstract method for getting job state"""
+
+    @abstractmethod
+    async def get_fetch_mode(self) -> FetchMode:
+        """Abstract method for getting fetch mode"""

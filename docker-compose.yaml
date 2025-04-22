@@ -269,6 +269,7 @@ services:
       - NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       # Self-hosted paddle endpoints.
       - PADDLE_GRPC_ENDPOINT=paddle:8001

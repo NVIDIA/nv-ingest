@@ -395,11 +395,10 @@ def generate_job_batch_for_iteration(
 
 def create_and_process_jobs(
     files: List[str],
-    client: Any,  # Replace Any with NvIngestClient if available
+    client: Any,
     tasks: Dict[str, Any],
     output_directory: str,
     batch_size: int,
-    timeout: int = 10,
     fail_on_error: bool = False,
     save_images_separately: bool = False,
 ) -> Tuple[int, Dict[str, List[float]], int, Dict[str, str]]:
@@ -429,8 +428,6 @@ def create_and_process_jobs(
     batch_size : int
         The number of jobs to process in each batch. Memory is limited to `batch_size * 2` jobs at
         any time.
-    timeout : int, optional
-        The timeout in seconds for each job to complete before it is retried. Default is 10 seconds.
     fail_on_error : bool, optional
         If True, the function will raise an error and stop processing when encountering an unrecoverable
         error. If False, the function logs the error and continues processing other jobs. Default is False.
@@ -473,13 +470,13 @@ def create_and_process_jobs(
             job_id_map.update(job_id_map_updates)
             retry_job_ids = []
 
-            futures_dict: Dict[Any, str] = client.fetch_job_result_async(job_ids, timeout=timeout, data_only=False)
+            futures_dict: Dict[Any, str] = client.fetch_job_result_async(job_ids, data_only=False)
             for future in as_completed(futures_dict.keys()):
                 retry: bool = False
                 job_id: str = futures_dict[future]
                 source_name: str = job_id_map[job_id]
                 try:
-                    future_response, trace_id = handle_future_result(future, futures_dict)
+                    future_response, trace_id = handle_future_result(future)
                     trace_ids[source_name] = trace_id
 
                     if output_directory:

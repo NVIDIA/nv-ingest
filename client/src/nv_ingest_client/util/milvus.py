@@ -9,6 +9,8 @@ from urllib.parse import urlparse
 from pathlib import Path
 import pandas as pd
 from functools import partial
+import json
+import os
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -223,6 +225,36 @@ class MilvusOperator:
         meta_fields: list[str] = None,
         **kwargs,
     ):
+        """
+        Initializes the Milvus operator class with the specified configuration parameters.
+        Args:
+            collection_name (Union[str, Dict], optional): The name of the Milvus collection or a dictionary
+                containing collection configuration. Defaults to "nv_ingest_collection".
+            milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
+            sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
+            recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+            gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
+            gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
+            dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
+            minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
+            enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
+            enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
+            enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
+            enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
+            enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
+            bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
+            compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
+            access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
+            secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
+            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+            meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
+                containing metadata. Defaults to None.
+            meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
+                Defaults to None.
+            meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+            **kwargs: Additional keyword arguments for customization.
+        """
+
         self.milvus_kwargs = locals()
         self.milvus_kwargs.pop("self")
         self.collection_name = self.milvus_kwargs.pop("collection_name")
@@ -683,6 +715,8 @@ def write_records_minio(
         Returns the writer supplied, with information related to minio records upload.
     """
     for result in records:
+        if not isinstance(result, list):
+            result = [result]
         for element in result:
             text = _pull_text(
                 element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
@@ -778,6 +812,8 @@ def create_bm25_model(
     """
     all_text = []
     for result in records:
+        if not isinstance(result, list):
+            result = [result]
         for element in result:
             text = _pull_text(
                 element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
@@ -1354,6 +1390,325 @@ def nv_rerank(
         idx = rank_vals["index"]
         rank_results.append(map_candidates[idx])
     return rank_results
+
+
+def recreate_elements(data):
+    """
+    This function takes the input data and creates a list of elements
+    with the necessary metadata for ingestion.
+
+    Parameters
+    ----------
+    data : List
+        List of chunks with attached metadata
+
+    Returns
+    -------
+    List
+        List of elements with metadata.
+    """
+    elements = []
+    for element in data:
+        element["metadata"] = {}
+        element["metadata"]["content_metadata"] = element.pop("content_metadata")
+        element["metadata"]["source_metadata"] = element.pop("source")
+        element["metadata"]["content"] = element.pop("text")
+        elements.append(element)
+    return elements
+
+
+def pull_all_milvus(
+    collection_name: str, milvus_uri: str = "http://localhost:19530", write_dir: str = None, batch_size: int = 1000
+):
+    """
+    This function takes the input collection name and pulls all the records
+    from the collection. It will either return the records as a list of
+    dictionaries or write them to a specified directory in JSON format.
+    Parameters
+    ----------
+    collection_name : str
+        Milvus Collection to query against
+    milvus_uri : str,
+        Milvus address with http(s) preffix and port. Can also be a file path, to activate
+        milvus-lite.
+    write_dir : str, optional
+        Directory to write the records to. If None, the records will be returned as a list.
+    batch_size : int, optional
+        The number of records to pull in each batch. Defaults to 1000.
+    Returns
+    -------
+    List
+        List of records/files with records from the collection.
+    """
+    client = MilvusClient(milvus_uri)
+    iterator = client.query_iterator(
+        collection_name=collection_name,
+        filter="pk >= 0",
+        output_fields=["source", "content_metadata", "text"],
+        batch_size=batch_size,
+    )
+    full_results = []
+    write_dir = Path(write_dir) if write_dir else None
+    batch_num = 0
+    while True:
+        results = iterator.next()
+        results = recreate_elements(results)
+        if not results:
+            iterator.close()
+            break
+        if write_dir:
+            # write to disk
+            file_name = write_dir / f"milvus_data_{batch_num}.json"
+            full_results.append(file_name)
+            with open(file_name, "w") as outfile:
+                outfile.write(json.dumps(results))
+        else:
+            full_results += results
+        batch_num += 1
+    return full_results
+
+
+def get_embeddings(full_records, embedder, batch_size=256):
+    """
+    This function takes the input records and creates a list of embeddings.
+    The default batch size is 256, but this can be adjusted based on the
+    available resources, to a maximum of 259. This is set by the NVIDIA embedding
+    microservice.
+    """
+    embedded = []
+    embed_payload = [res["metadata"]["content"] for res in full_records]
+    for i in range(0, len(embed_payload), batch_size):
+        payload = embed_payload[i : i + batch_size]
+        embedded += embedder._get_text_embeddings(payload)
+    return embedded
+
+
+def embed_index_collection(
+    data,
+    collection_name,
+    batch_size: int = 256,
+    embedding_endpoint: str = None,
+    model_name: str = None,
+    nvidia_api_key: str = None,
+    milvus_uri: str = "http://localhost:19530",
+    sparse: bool = False,
+    recreate: bool = True,
+    gpu_index: bool = True,
+    gpu_search: bool = True,
+    dense_dim: int = 2048,
+    minio_endpoint: str = "localhost:9000",
+    enable_text: bool = True,
+    enable_charts: bool = True,
+    enable_tables: bool = True,
+    enable_images: bool = True,
+    enable_infographics: bool = True,
+    bm25_save_path: str = "bm25_model.json",
+    compute_bm25_stats: bool = True,
+    access_key: str = "minioadmin",
+    secret_key: str = "minioadmin",
+    bucket_name: str = "a-bucket",
+    meta_dataframe: Union[str, pd.DataFrame] = None,
+    meta_source_field: str = None,
+    meta_fields: list[str] = None,
+    **kwargs,
+):
+    """
+    This function takes the input data and creates a collection in Milvus,
+    it will embed the records using the NVIDIA embedding model and store them in the collection.
+    After embedding the records, it will run the same ingestion process as the vdb_upload stage in
+    the Ingestor pipeline.
+
+    Args:
+        data (Union[str, List]): The data to be ingested. Can be a list of records or a file path.
+        collection_name (Union[str, Dict], optional): The name of the Milvus collection or a dictionary
+            containing collection configuration. Defaults to "nv_ingest_collection".
+        embedding_endpoint (str, optional): The endpoint for the NVIDIA embedding service. Defaults to None.
+        model_name (str, optional): The name of the embedding model. Defaults to None.
+        nvidia_api_key (str, optional): The API key for NVIDIA services. Defaults to None.
+        milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
+        sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
+        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+        gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
+        gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
+        dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
+        minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
+        enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
+        enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
+        enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
+        enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
+        enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
+        bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
+        compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
+        access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
+        secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
+            containing metadata. Defaults to None.
+        meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
+            Defaults to None.
+        meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+        **kwargs: Additional keyword arguments for customization.
+    """
+    from llama_index.embeddings.nvidia import NVIDIAEmbedding
+
+    client_config = ClientConfigSchema()
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
+    embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
+    model_name = model_name if model_name else client_config.embedding_nim_model_name
+    embed_model = NVIDIAEmbedding(
+        base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key, truncate="END"
+    )
+
+    mil_op = MilvusOperator(
+        collection_name=collection_name,
+        milvus_uri=milvus_uri,
+        sparse=sparse,
+        recreate=recreate,
+        gpu_index=gpu_index,
+        gpu_search=gpu_search,
+        dense_dim=dense_dim,
+        minio_endpoint=minio_endpoint,
+        enable_text=enable_text,
+        enable_charts=enable_charts,
+        enable_tables=enable_tables,
+        enable_images=enable_images,
+        enable_infographics=enable_infographics,
+        bm25_save_path=bm25_save_path,
+        compute_bm25_stats=compute_bm25_stats,
+        access_key=access_key,
+        secret_key=secret_key,
+        bucket_name=bucket_name,
+        meta_dataframe=meta_dataframe,
+        meta_source_field=meta_source_field,
+        meta_fields=meta_fields,
+        **kwargs,
+    )
+    # running in parts
+    if data is not None and isinstance(data[0], (str, os.PathLike)):
+        for results_file in data:
+            results = None
+            with open(results_file, "r") as infile:
+                results = json.loads(infile.read())
+            embeddings = get_embeddings(results, embed_model, batch_size)
+            for record, emb in zip(results, embeddings):
+                record["metadata"]["embedding"] = emb
+                record["document_type"] = "text"
+            mil_op.run(results)
+            mil_op.milvus_kwargs["recreate"] = False
+    # running all at once
+    else:
+        embeddings = get_embeddings(data, embed_model, batch_size)
+        for record, emb in zip(data, embeddings):
+            record["metadata"]["embedding"] = emb
+            record["document_type"] = "text"
+        mil_op.run(data)
+
+
+def reindex_collection(
+    current_collection_name: str,
+    new_collection_name: str = None,
+    write_dir: str = None,
+    embedding_endpoint: str = None,
+    model_name: str = None,
+    nvidia_api_key: str = None,
+    milvus_uri: str = "http://localhost:19530",
+    sparse: bool = False,
+    recreate: bool = True,
+    gpu_index: bool = True,
+    gpu_search: bool = True,
+    dense_dim: int = 2048,
+    minio_endpoint: str = "localhost:9000",
+    enable_text: bool = True,
+    enable_charts: bool = True,
+    enable_tables: bool = True,
+    enable_images: bool = True,
+    enable_infographics: bool = True,
+    bm25_save_path: str = "bm25_model.json",
+    compute_bm25_stats: bool = True,
+    access_key: str = "minioadmin",
+    secret_key: str = "minioadmin",
+    bucket_name: str = "a-bucket",
+    meta_dataframe: Union[str, pd.DataFrame] = None,
+    meta_source_field: str = None,
+    meta_fields: list[str] = None,
+    embed_batch_size: int = 256,
+    query_batch_size: int = 1000,
+    **kwargs,
+):
+    """
+    This function will reindex a collection in Milvus. It will pull all the records from the
+    current collection, embed them using the NVIDIA embedding model, and store them in a new
+    collection. After embedding the records, it will run the same ingestion process as the vdb_upload
+    stage in the Ingestor pipeline. This function will get embedding_endpoint, model_name and nvidia_api_key
+    defaults from the environment variables set in the environment if not explicitly set in the function call.
+
+    Parameters
+    ----------
+        current_collection_name (str): The name of the current Milvus collection.
+        new_collection_name (str, optional): The name of the new Milvus collection. Defaults to None.
+        write_dir (str, optional): The directory to write the pulled records to. Defaults to None.
+        embedding_endpoint (str, optional): The endpoint for the NVIDIA embedding service. Defaults to None.
+        model_name (str, optional): The name of the embedding model. Defaults to None.
+        nvidia_api_key (str, optional): The API key for NVIDIA services. Defaults to None.
+        milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
+        sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
+        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+        gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
+        gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
+        dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
+        minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
+        enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
+        enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
+        enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
+        enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
+        enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
+        bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
+        compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
+        access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
+        secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
+        bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+        meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
+            containing metadata. Defaults to None.
+        meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
+            Defaults to None.
+        meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+        embed_batch_size (int, optional): The batch size for embedding. Defaults to 256.
+        query_batch_size (int, optional): The batch size for querying. Defaults to 1000.
+        **kwargs: Additional keyword arguments for customization.
+    """
+
+    new_collection_name = new_collection_name if new_collection_name else current_collection_name
+    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir, query_batch_size)
+    embed_index_collection(
+        pull_results,
+        new_collection_name,
+        batch_size=embed_batch_size,
+        embedding_endpoint=embedding_endpoint,
+        model_name=model_name,
+        nvidia_api_key=nvidia_api_key,
+        milvus_uri=milvus_uri,
+        sparse=sparse,
+        recreate=recreate,
+        gpu_index=gpu_index,
+        gpu_search=gpu_search,
+        dense_dim=dense_dim,
+        minio_endpoint=minio_endpoint,
+        enable_text=enable_text,
+        enable_charts=enable_charts,
+        enable_tables=enable_tables,
+        enable_images=enable_images,
+        enable_infographics=enable_infographics,
+        bm25_save_path=bm25_save_path,
+        compute_bm25_stats=compute_bm25_stats,
+        access_key=access_key,
+        secret_key=secret_key,
+        bucket_name=bucket_name,
+        meta_dataframe=meta_dataframe,
+        meta_source_field=meta_source_field,
+        meta_fields=meta_fields,
+        **kwargs,
+    )
 
 
 def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
