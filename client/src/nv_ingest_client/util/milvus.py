@@ -254,6 +254,8 @@ class MilvusOperator:
                 Defaults to None.
             meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
             **kwargs: Additional keyword arguments for customization.
+            stream (bool, optional): When true, the records will be inserted into milvus using the stream
+                insert method.
         """
 
         self.milvus_kwargs = locals()
@@ -956,6 +958,8 @@ def write_to_nvingest_collection(
         Minio secret key.
     bucket_name : str, optional
         Minio bucket name.
+    stream : bool, optional
+        When true, the records will be inserted into milvus using the stream insert method.
     """
     local_index = False
     connections.connect(uri=milvus_uri)
