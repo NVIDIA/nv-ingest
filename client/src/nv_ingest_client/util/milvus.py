@@ -263,7 +263,6 @@ class MilvusOperator:
         self.collection_name = self.milvus_kwargs.pop("collection_name")
         for k, v in self.milvus_kwargs.pop("kwargs", {}).items():
             self.milvus_kwargs[k] = v
-        # self.milvus_kwargs.pop("kwargs", None)
 
     def get_connection_params(self):
         conn_dict = {
