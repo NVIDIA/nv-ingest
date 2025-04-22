@@ -19,10 +19,6 @@ import time
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
-from nv_ingest.framework.orchestration.ray.util.system_tools.visualizers import (
-    GuiUtilizationDisplay,
-    UtilizationDisplay,
-)
 
 logger = logging.getLogger(__name__)
 
@@ -45,8 +41,6 @@ class ScalingConfig:
     pid_window_size: int = 10
     rcm_estimated_edge_cost_mb: int = 5000
     rcm_memory_safety_buffer_fraction: float = 0.15
-    # Optional: Move scaling loop interval here?
-    # scaling_poll_interval: float = 30.0
 
 
 @dataclass
@@ -67,13 +61,6 @@ class StatsConfig:
     queue_timeout_seconds: float = 2.0
 
 
-@dataclass
-class DisplayConfig:
-    """Configuration for monitoring display."""
-
-    use_gui: bool = False
-
-
 class RayPipeline:
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
@@ -88,25 +75,14 @@ class RayPipeline:
         scaling_config: ScalingConfig = ScalingConfig(),
         flushing_config: FlushingConfig = FlushingConfig(),
         stats_config: StatsConfig = StatsConfig(),
-        display_config: DisplayConfig = DisplayConfig(),
     ) -> None:
         # Store config objects
         self.scaling_config = scaling_config
         self.flushing_config = flushing_config
         self.stats_config = stats_config
-        self.display_config = display_config
-
-        # Use attributes from config objects
-        self.use_gui = self.display_config.use_gui
 
         # --- Instantiate Topology ---
         self.topology = PipelineTopology()
-
-        # TODO
-        # self.stages: List[StageInfo] = []
-        # self.connections: Dict[str, List[Tuple[str, int]]] = {}
-        # self.stage_actors: Dict[str, List[Any]] = {}
-        # self.edge_queues: Dict[str, Tuple[Any, int]] = {}
 
         # --- Structure Lock ---
         self._structure_lock: threading.Lock = threading.Lock()
@@ -122,16 +98,11 @@ class RayPipeline:
         self.stage_memory_overhead: Dict[str, float] = {}  # This seems populated later
 
         # --- Background Threads ---
-        self._monitor_thread: Optional[threading.Thread] = None  # Renamed from _queue_monitoring_thread
         self._scaling_thread: Optional[threading.Thread] = None
-        self._display_instance: Optional[Any] = None
-        self._monitoring = False
         self._scaling_monitoring = False
 
         # --- Queue Flushing ---
-        # self._is_flushing: bool = False
         self._last_queue_flush_time: float = time.time()
-        # Use flushing_config for these
         self.queue_flush_interval_seconds = self.flushing_config.queue_flush_interval_seconds
         self.queue_flush_drain_timeout_seconds = self.flushing_config.queue_flush_drain_timeout_seconds
         self.quiet_period_threshold = self.flushing_config.quiet_period_threshold
@@ -170,8 +141,6 @@ class RayPipeline:
         logger.info("ResourceConstraintManager initialized using ScalingConfig.")
 
         # --- Instantiate Stats Collector ---
-        # Use stats_config
-        # Store interval for staleness checks later
         self._stats_collection_interval_seconds = self.stats_config.collection_interval_seconds
         self.stats_collector = RayStatsCollector(
             pipeline_accessor=self,  # This dependency remains for now
@@ -180,8 +149,6 @@ class RayPipeline:
             queue_timeout=self.stats_config.queue_timeout_seconds,
         )
         logger.info("RayStatsCollector initialized using StatsConfig.")
-
-        logger.info(f"GUI Mode Requested: {self.use_gui}")
 
     # --- Accessor Methods for Stats Collector (and internal use) ---
 
@@ -405,12 +372,14 @@ class RayPipeline:
             new_actor = stage_info.callable.options(name=actor_name, max_concurrency=100).remote(
                 config=stage_info.config
             )
+
             return new_actor
         except Exception as e:
             logger.error(
                 f"[ScaleUtil] Failed to create actor '{actor_name}' for stage '{stage_info.name}':" f" {e}",
                 exc_info=True,
             )
+
             # Propagate error to halt the scaling operation
             raise RuntimeError(f"Actor creation failed for stage '{stage_info.name}' during scale up") from e
 
@@ -930,6 +899,7 @@ class RayPipeline:
             current_global_memory_bytes = psutil.virtual_memory().used
             current_global_memory_mb = int(current_global_memory_bytes / (1024 * 1024))
             logger.debug(f"[ScalingMemCheck] Current global memory usage (used): {current_global_memory_mb} MB")
+
             return current_global_memory_mb
         except Exception as e:
             logger.error(
@@ -937,6 +907,7 @@ class RayPipeline:
                 f"Attempting to use previous value ({self.prev_global_memory_usage} MB).",
                 exc_info=False,
             )
+
             # Use previous value if available, otherwise default to 0 (less ideal, but avoids None)
             # Returning 0 might incorrectly signal low memory usage if it's the first read that fails.
             return self.prev_global_memory_usage if self.prev_global_memory_usage is not None else 0
@@ -1088,165 +1059,7 @@ class RayPipeline:
 
         logger.debug(f"--- Scaling & Maintenance Cycle Complete (Duration: {time.time() - cycle_start_time:.2f}s) ---")
 
-    # --- Monitoring Thread ---
-
-    def _get_monitor_data(self) -> List[Tuple]:
-        """Fetches stats and topology data for display."""
-        output_rows = []
-        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
-        last_update_age = time.time() - last_update_time
-
-        # --- Get snapshots from topology ---
-        # Use individual accessors as they are already locked
-        current_stages = self.topology.get_stages_info()
-        current_stage_actors = self.topology.get_stage_actors()
-        current_edge_queues = self.topology.get_edge_queues()
-        current_scaling_state = self.topology.get_scaling_state()
-        current_is_flushing = self.topology.get_is_flushing()
-
-        # --- Check stats staleness/failure (same as before) ---
-        max_stats_age_display = max(10.0, self._stats_collection_interval_seconds * 2.5)
-        stats_stale = last_update_age > max_stats_age_display
-        if not stats_were_successful or stats_stale:
-            status = "Failed" if not stats_were_successful else "Stale"
-            warning_msg = f"[bold red]Stats {status} ({last_update_age:.1f}s ago)[/bold red]"
-            output_rows.append((warning_msg, "", "", "", "", ""))
-
-        # --- Format data using topology snapshots ---
-        for stage in current_stages:
-            stage_name = stage.name
-            replicas = current_stage_actors.get(stage_name, [])
-            replicas_str = f"{len(replicas)}/{stage.max_replicas}" + (
-                f" (min {stage.min_replicas})" if stage.min_replicas > 0 else ""
-            )
-
-            stats = current_stage_stats.get(stage_name, {"processing": 0, "in_flight": 0})
-            processing = stats.get("processing", 0)
-            in_flight = stats.get("in_flight", 0)
-            queue_depth = max(0, in_flight - processing)
-
-            input_edges = [ename for ename in current_edge_queues if ename.endswith(f"_to_{stage_name}")]
-            occupancy_str = "N/A"
-            if input_edges:
-                try:
-                    q_name = input_edges[0]
-                    _, max_q = current_edge_queues[q_name]  # Use snapshot
-                    occupancy_str = f"{queue_depth}/{max_q}" + (" (multi)" if len(input_edges) > 1 else "")
-                except KeyError:
-                    occupancy_str = f"{queue_depth}/ERR"
-                except Exception:
-                    occupancy_str = f"{queue_depth}/?"
-            elif stage.is_source:
-                occupancy_str = "(Source)"
-
-            scaling_state = current_scaling_state.get(stage_name, "Idle")  # Use snapshot
-
-            output_rows.append(
-                (stage_name, replicas_str, occupancy_str, scaling_state, str(processing), str(in_flight))
-            )
-
-        # --- Add Total Summary Row ---
-        global_processing = sum(s.get("processing", 0) for s in current_stage_stats.values() if isinstance(s, dict))
-        global_in_flight = self._get_global_in_flight(current_stage_stats)
-        is_flushing_str = str(current_is_flushing)  # Use snapshot
-
-        output_rows.append(
-            (
-                "[bold]Total Pipeline[/bold]",
-                "",
-                "",
-                f"Flushing: {is_flushing_str}",
-                f"[bold]{global_processing}[/bold]",
-                f"[bold]{global_in_flight}[/bold]",
-            )
-        )
-
-        return output_rows
-
-    def _monitor_pipeline_loop(self, poll_interval: float) -> None:
-        """Main loop for monitoring, using _get_monitor_data (which uses topology)."""
-        thread_name = threading.current_thread().name
-        logger.debug(
-            f"{thread_name}: Monitoring thread started (Mode: {'GUI' if self.use_gui else 'Console'}, "
-            f"Interval: {poll_interval}s)."
-        )
-        display_initialized = False
-        try:
-            if self.use_gui:
-                self._display_instance = GuiUtilizationDisplay(refresh_rate_ms=int(poll_interval * 1000))
-                display_initialized = True
-                logger.info(f"{thread_name}: Starting GUI display loop...")
-                self._display_instance.start(self._get_monitor_data)  # Pass data func
-                logger.info(f"{thread_name}: GUI display loop finished.")
-            elif False:  # TODO Disabled for now
-                self._display_instance = UtilizationDisplay(refresh_rate=poll_interval)
-                self._display_instance.start()  # Assumes non-blocking start or context manager use
-                display_initialized = True
-                logger.info(f"{thread_name}: Started Rich console display.")
-                while self._monitoring:
-                    loop_start = time.time()
-                    try:
-                        monitor_data = self._get_monitor_data()  # Uses topology
-                        if self._display_instance and hasattr(self._display_instance, "update"):
-                            self._display_instance.update(monitor_data)
-                        elif not self._display_instance:
-                            break  # Exit if display disappeared
-                    except Exception as e:
-                        logger.error(f"{thread_name}: Error in monitor loop: {e}", exc_info=True)
-                    elapsed = time.time() - loop_start
-                    sleep_time = max(0.1, poll_interval - elapsed)
-                    if not self._monitoring:
-                        break
-                    time.sleep(sleep_time)
-            else:
-                pass
-        except Exception as e:
-            logger.error(f"{thread_name}: Display setup/exec failed: {e}", exc_info=True)
-            self.use_gui = False  # Fallback
-        finally:
-            if display_initialized and self._display_instance and hasattr(self._display_instance, "stop"):
-                try:
-                    logger.info(f"{thread_name}: Stopping display...")
-                    self._display_instance.stop()
-                except Exception as e:
-                    logger.error(f"{thread_name}: Error stopping display: {e}")
-            self._display_instance = None
-            logger.debug(f"{thread_name}: Monitoring thread loop finished.")
-
     # --- Lifecycle Methods for Monitoring/Scaling Threads ---
-    def _start_monitoring(self, poll_interval: float = 5.0) -> None:
-        if not self._monitoring:
-            self._monitoring = True
-            # Pass interval to the unified loop function
-            self._monitor_thread = threading.Thread(
-                target=self._monitor_pipeline_loop, args=(poll_interval,), daemon=True
-            )
-            self._monitor_thread.start()
-            logger.info(f"Monitoring thread launched (Interval: {poll_interval}s).")
-
-    def _stop_monitoring(self) -> None:
-        if self._monitoring:
-            logger.debug("Stopping monitoring thread...")
-            self._monitoring = False  # Signal loop to stop
-
-            # If using GUI, explicitly call stop to destroy the window from this thread
-            if self.use_gui and self._display_instance and hasattr(self._display_instance, "stop"):
-                logger.debug("Requesting GUI stop...")
-                try:
-                    self._display_instance.stop()  # This signals the Tk mainloop to exit
-                except Exception as e:
-                    logger.error(f"Error stopping GUI display instance: {e}", exc_info=True)
-
-            # Join the thread (will wait for Rich loop to finish or GUI mainloop to exit)
-            if self._monitor_thread is not None:
-                join_timeout = 10.0 if self.use_gui else 5.0  # Allow longer timeout for GUI shutdown
-                self._monitor_thread.join(timeout=join_timeout)
-                if self._monitor_thread.is_alive():
-                    logger.warning("Monitoring thread did not exit cleanly.")
-            self._monitor_thread = None
-            self._display_instance = None  # Clear display instance ref
-            logger.info("Monitoring stopped.")
-
     def _scaling_loop(self, interval: float) -> None:
         """Main loop for the scaling thread."""
         logger.info(f"Scaling loop started. Interval: {interval}s")
@@ -1308,7 +1121,6 @@ class RayPipeline:
                 raise RuntimeError("Pipeline start failed: actors did not start.") from e
 
         self.stats_collector.start()
-        self._start_monitoring(poll_interval=monitor_poll_interval)  # Renamed
         self._start_scaling(poll_interval=scaling_poll_interval)
         logger.info("Pipeline started successfully.")
 
@@ -1318,7 +1130,6 @@ class RayPipeline:
 
         # 1. Stop background threads first
         self._stop_scaling()
-        self._stop_monitoring()  # Renamed
         self.stats_collector.stop()
 
         # 2. Stop actors (using topology)
