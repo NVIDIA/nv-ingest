@@ -64,5 +64,3 @@ ingestor = ingestor.split(
 When the NV-Ingest container is built, it automatically downloads a tokenizer that is used when `"tokenizer"` is set to `None`. This means that no HuggingFace downloads will take place at runtime. If the `DOWNLOAD_LLAMA_TOKENIZER` env varibale is set to `"True"`, the `"meta-llama/Llama-3.2-1B"` tokenizer will be downloaded. Please review the [license agreement](https://huggingface.co/meta-llama/Llama-3.2-1B) for Llama 3.2 materials before using this. This is a gated model so you'll need to [request access](https://huggingface.co/meta-llama/Llama-3.2-1B) and set `HF_ACCESS_TOKEN` to your HuggingFace access token in order to predownload it.
 
 Otherwise, the `"intfloat/e5-large-unsupervised"` tokenizer will be predowloaded, which is ungated and does not require any special permissions.
-
-
