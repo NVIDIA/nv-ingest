@@ -21,5 +21,6 @@ Before you begin using [NeMo Retriever extraction](overview.md), ensure the foll
 ## Related Topics
 
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Library Mode)](quickstart-library-mode.md)
-- [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
+- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Helm](helm.md)

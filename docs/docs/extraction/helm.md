@@ -1,4 +1,4 @@
-# Helm Deployment for NeMo Retriever Extraction
+# Deploy With Helm for NeMo Retriever Extraction
 
 <!-- Use this documentation to deploy [NeMo Retriever extraction](overview.md) by using Helm. -->
 

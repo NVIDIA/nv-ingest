@@ -1,4 +1,4 @@
-# Quickstart Guide for NeMo Retriever Extraction (Library Mode)
+# Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
 
 For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
@@ -239,6 +239,7 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
