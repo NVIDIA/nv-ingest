@@ -104,11 +104,8 @@ class RayActorStage(ABC):
                     self.active_processing = True
                     updated_cm: Any = self.on_data(control_message)
                     if updated_cm and self.output_queue is not None:
-                        if self.running:
-                            self.output_queue.put(updated_cm)
-                        else:
-                            logger.warning(f"{actor_id_str}: Suppressed output write after stop signal.")
-                    # Use atomic increment or ensure thread safety if stats are accessed elsewhere
+                        self.output_queue.put(updated_cm)
+
                     self.stats["processed"] += 1
                 except Exception as e:
                     cm_info = f" (message type: {type(control_message).__name__})" if control_message else ""
