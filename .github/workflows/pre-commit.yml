@@ -11,5 +11,7 @@ jobs:
     steps:
       - name: Check out repository code
         uses: actions/checkout@v4
+        with:
+          ref: main
       - uses: actions/setup-python@v3
       - uses: pre-commit/action@v3.0.1
