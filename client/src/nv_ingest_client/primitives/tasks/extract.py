@@ -149,6 +149,11 @@ class ExtractTaskSchema(BaseModel):
     @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
+
+        # Skip validation for txt since it does not have an extract stage.
+        if document_type in ["txt", "text"]:
+            return
+
         valid_methods = set(_Type_Extract_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
