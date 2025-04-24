@@ -526,100 +526,115 @@ class RayPipeline:
 
     def _handle_scale_down(self, stage_name: str, current_replicas: List[Any], target_count: int) -> None:
         """
-        Handles scaling down: initiates stop on actors, registers them with
-        the topology for pending removal.
+        Handles scaling down: initiates stop on actors, registers handles with
+        the topology for pending removal if stop was successful.
         """
         current_count = len(current_replicas)
         num_to_remove = current_count - target_count
         logger.info(f"[ScaleDown-{stage_name}] Scaling down from {current_count} to {target_count} (-{num_to_remove}).")
 
+        # Basic validation
         if num_to_remove <= 0:
             logger.warning(f"[ScaleDown-{stage_name}] Invalid num_to_remove {num_to_remove}. Aborting.")
-            # No state update needed here, topology manages idle state based on pending list
-            return
+            return  # No action needed, state remains as is (likely Idle or handled by topology)
 
+        # Identify actors to remove (e.g., last N)
         actors_to_remove = current_replicas[-num_to_remove:]
         logger.debug(f"[ScaleDown-{stage_name}] Identified {len(actors_to_remove)} actors for removal.")
 
-        # --- Initiate stop and collect signal future names ---
-        stop_refs_map = {}  # Map { ObjectRef: (actor_handle, actor_id_str) }
-        actors_registered_info: Dict[str, List[Tuple[Any, str]]] = defaultdict(list)  # {stage: [(actor, signal_name)]}
-        actors_failed_or_skipped = 0
+        # --- Initiate stop and collect handles of actors where stop was sent ---
+        actors_to_register_map: Dict[str, List[Any]] = defaultdict(list)  # {stage: [actor_handle]}
+        stop_initiation_failures = 0  # Count actors where stop failed or timed out
+        stop_refs_map = {}  # {ObjectRef[bool]: (actor_handle, actor_id_str)}
 
         for actor in actors_to_remove:
-            actor_id_str = str(actor)
+            actor_id_str = str(actor)  # For logging
             try:
+                # Call stop() which returns a boolean confirmation
                 stop_ref = actor.stop.remote()
                 stop_refs_map[stop_ref] = (actor, actor_id_str)
                 logger.debug(f"[ScaleDown-{stage_name}] Submitted stop() call for actor '{actor_id_str}'.")
             except Exception as e:
+                # Catch errors during the remote call submission itself
                 logger.error(
                     f"[ScaleDown-{stage_name}] Error submitting stop() for actor '{actor_id_str}': {e}. "
                     f"Cannot register.",
                     exc_info=False,
                 )
-                actors_failed_or_skipped += 1
+                stop_initiation_failures += 1
 
-        # Wait for stop() calls to return signal future names
+        # Wait briefly for the stop() calls to return their boolean result
         if stop_refs_map:
             refs_list = list(stop_refs_map.keys())
+            # Use a reasonable timeout, stop() should be quick
             ready_refs, remaining_refs = ray.wait(refs_list, num_returns=len(refs_list), timeout=10.0)
 
+            # Process actors where stop() call completed
             for ref in ready_refs:
                 actor, actor_id_str = stop_refs_map[ref]
                 try:
-                    signal_future_name = ray.get(ref)
-                    if isinstance(signal_future_name, str):
+                    # Get the boolean result: True if stop signal was sent, False if not running
+                    stop_sent = ray.get(ref)
+                    if stop_sent:  # Only register if stop() returned True
                         logger.debug(
-                            f"[ScaleDown-{stage_name}] Received signal future name '{signal_future_name}' "
-                            f"for actor '{actor_id_str}'. Preparing registration."
+                            f"[ScaleDown-{stage_name}] Stop() call succeeded (returned True) for '{actor_id_str}'. "
+                            f"Preparing registration."
                         )
-                        # Prepare for registration call
-                        actors_registered_info[stage_name].append((actor, signal_future_name))
-                    else:  # Includes None case or wrong type
-                        logger.warning(
-                            f"[ScaleDown-{stage_name}] Actor '{actor_id_str}' stop() "
-                            f"returned invalid/None signal name. Skipping registration."
+                        # Add the actor handle to the list for registration
+                        actors_to_register_map[stage_name].append(actor)
+                    else:
+                        # stop() returned False, meaning the actor wasn't running when called
+                        logger.debug(
+                            f"[ScaleDown-{stage_name}] Stop() call for '{actor_id_str}' "
+                            f"returned False (was not running). Skipping registration."
                         )
-                        actors_failed_or_skipped += 1
+                        stop_initiation_failures += 1  # Count as skipped/failed
                 except Exception as e:
+                    # Catch errors during ray.get() for the result
                     logger.error(
-                        f"[ScaleDown-{stage_name}] Error getting result from stop() for actor "
+                        f"[ScaleDown-{stage_name}] Error getting result from stop() call for "
                         f"'{actor_id_str}': {e}. Skipping registration.",
                         exc_info=True,
                     )
-                    actors_failed_or_skipped += 1
+                    stop_initiation_failures += 1
 
-            actors_failed_or_skipped += len(remaining_refs)
+            # Handle actors where the stop() call itself timed out or failed after submission
+            stop_initiation_failures += len(remaining_refs)
             for ref in remaining_refs:
-                _, actor_id_str = stop_refs_map[ref]
+                _, actor_id_str = stop_refs_map[ref]  # Get actor ID for logging
                 logger.warning(
-                    f"[ScaleDown-{stage_name}] Timed out getting signal future name from stop() "
-                    f"for actor '{actor_id_str}'. Skipping registration."
+                    f"[ScaleDown-{stage_name}] Timed out waiting for stop() method execution result for "
+                    f"'{actor_id_str}'. Skipping registration."
                 )
 
-        # --- Register actors with the topology ---
-        if actors_registered_info:
+        # --- Register successfully stopped actors with the topology ---
+        if actors_to_register_map:
+            num_registered = sum(len(v) for v in actors_to_register_map.values())
             logger.info(
-                f"[ScaleDown-{stage_name}] Registering {sum(len(v) for v in actors_registered_info.values())} "
-                f"actors with topology for pending removal monitoring."
+                f"[ScaleDown-{stage_name}] Registering {num_registered} "
+                f"actor handles with topology for pending removal monitoring."
             )
             try:
-                self.topology.register_actors_pending_removal(actors_registered_info)
+                # Call the topology method with the map {stage_name: [actor_handle_list]}
+                self.topology.register_actors_pending_removal(actors_to_register_map)
             except Exception as e:
+                # This indicates a problem communicating with the topology object itself
                 logger.error(
-                    f"[ScaleDown-{stage_name}] Failed to register actors pending removal with topology: {e}",
+                    f"[ScaleDown-{stage_name}] "
+                    f"CRITICAL - Failed to register actors pending removal with topology: {e}",
                     exc_info=True,
                 )
-                # How to handle this? Maybe force kill? Revert state? Log critical error.
-        else:
-            logger.info(
-                f"[ScaleDown-{stage_name}] No actors successfully received a signal future name for registration."
-            )
+                # How to handle this? State might be inconsistent. Maybe mark stage as Error?
+                self.topology.update_scaling_state(stage_name, "Error")
+        elif actors_to_remove:  # Only log if actors were selected but none registered
+            logger.info(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
 
+        # --- Final Logging ---
+        total_attempted = len(actors_to_remove)
         logger.info(
-            f"[ScaleDown-{stage_name}] Scale down initiation process complete for {len(actors_to_remove)} "
-            f"actors (Skipped/Failed: {actors_failed_or_skipped}). Topology will handle final removal."
+            f"[ScaleDown-{stage_name}] Scale down initiation process complete for {total_attempted} actors "
+            f"(Skipped/Failed Initiation: {stop_initiation_failures}). "
+            f"Topology cleanup thread will handle final removal."
         )
 
     def _scale_stage(self, stage_name: str, new_replica_count: int) -> None:

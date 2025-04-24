@@ -93,8 +93,10 @@ class RayActorStage(ABC):
         # --- Threading and shutdown management ---
         self._processing_thread: Optional[threading.Thread] = None
         self._shutting_down: bool = False
+
         # Lock specifically for coordinating the final shutdown sequence (_request_actor_exit)
         self._lock = threading.Lock()
+        self._shutdown_signal_complete = False  # Initialize flag
 
         # --- Additional state variables ---
         actor_id_str = self._get_actor_id_str()  # Get ID for naming
@@ -253,20 +255,7 @@ class RayActorStage(ABC):
         finally:
             logger.debug(f"{actor_id_str}: Processing loop thread finished.")
 
-            signal_name_to_put = self._shutdown_signal_future_name
-            try:
-                # Put the signal object using the name assigned during __init__
-                ray.put(True, name=signal_name_to_put)
-                logger.info(
-                    f"{actor_id_str}: Successfully put shutdown signal object with name '{signal_name_to_put}'."
-                )
-            except Exception as e:
-                logger.error(
-                    f"{actor_id_str}: "
-                    f"CRITICAL - "
-                    f"Failed to put shutdown signal object with name '{signal_name_to_put}': {e}",
-                    exc_info=True,
-                )
+            self._shutdown_signal_complete = True
 
             # --- Trigger Actor Exit from Main Thread ---
             # It's crucial to call ray.actor.exit_actor() from the main actor
@@ -299,24 +288,19 @@ class RayActorStage(ABC):
         to prevent multiple exit attempts and then calls `ray.actor.exit_actor()`
         to terminate the actor process gracefully.
         """
+
         actor_id_str = self._get_actor_id_str()
-        # Use a lock to ensure exit logic runs only once, even if triggered multiple times
         with self._lock:
             if self._shutting_down:
-                logger.warning(f"{actor_id_str}: Exit already in progress, ignoring redundant request.")
                 return
-            # Mark that shutdown has been initiated
             self._shutting_down = True
 
         logger.info(f"{actor_id_str}: Executing actor exit process.")
         try:
-            # The official way to stop the actor process from within
             ray.actor.exit_actor()
-            # This call does not return; the actor process terminates.
+
         except Exception as e:
-            logger.critical(
-                f"{actor_id_str}: " f"CRITICAL - Failed to execute ray.actor.exit_actor(): {e}", exc_info=True
-            )
+            logger.critical(f"{actor_id_str}: CRITICAL - Failed execute ray.actor.exit_actor(): {e}", exc_info=True)
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
@@ -342,6 +326,7 @@ class RayActorStage(ABC):
         # --- Initialize Actor State ---
         self.running = True
         self._shutting_down = False  # Reset shutdown flag on start
+        self._shutdown_signal_complete = False
         self.start_time = time.time()
 
         # --- Reset Statistics ---
@@ -363,7 +348,7 @@ class RayActorStage(ABC):
         return True
 
     @ray.method(num_returns=1)
-    def stop(self) -> str:
+    def stop(self) -> bool:
         """
         Signals the actor's processing loop to stop gracefully.
 
@@ -384,14 +369,22 @@ class RayActorStage(ABC):
         # Check if the actor is actually running
         if not self.running:
             logger.warning(f"{actor_id_str}: Stop called but actor was not running.")
-            return self._shutdown_signal_future_name
+            return True
 
         # Signal the processing loop to stop by setting the flag
         self.running = False
         logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
 
         # Note: The actual termination happens asynchronously when the loop finishes.
-        return self._shutdown_signal_future_name
+        return True
+
+    @ray.method(num_returns=1)
+    def is_shutdown_complete(self) -> bool:
+        """
+        Checks if the actor's processing loop has finished and signaled completion.
+        Raises RayActorError if the actor process has terminated.
+        """
+        return self._shutdown_signal_complete
 
     # --- get_stats ---
 

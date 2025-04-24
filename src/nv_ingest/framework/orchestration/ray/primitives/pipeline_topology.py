@@ -12,11 +12,10 @@ from typing import List, Dict, Tuple, Any, Optional, Iterator, Set
 import ray
 from ray.exceptions import RayActorError, GetTimeoutError
 
-# --- Constants for Cleanup Thread ---
+# --- Constants ---
 CLEANUP_INTERVAL_SECONDS = 15.0
 PENDING_SHUTDOWN_TIMEOUT_SECONDS = 300.0
-PENDING_CHECK_GET_TIMEOUT = 0.1  # Timeout for ray.get on signal name
-PENDING_CHECK_ACTOR_PING_TIMEOUT = 1.0  # Timeout for fallback actor ping
+PENDING_CHECK_ACTOR_METHOD_TIMEOUT = 5.0
 
 logger = logging.getLogger(__name__)
 
@@ -158,54 +157,73 @@ class PipelineTopology:
 
         return removed
 
-    def register_actors_pending_removal(self, registration_info: Dict[str, List[Tuple[Any, str]]]) -> None:
+    def register_actors_pending_removal(self, registration_info: Dict[str, List[Any]]) -> None:
         """
-        Registers actors that have been told to stop and their associated shutdown signal future names.
-        The topology's background thread will monitor these for completion.
+        Registers actor handles that have been told to stop. The topology's background
+        thread will monitor these for completion.
 
         Parameters
         ----------
-        registration_info : Dict[str, List[Tuple[Any, str]]]
-            Dictionary mapping stage names to a list of tuples, where each tuple
-            contains (actor_handle, shutdown_signal_future_name).
+        registration_info : Dict[str, List[Any]]
+            Dictionary mapping stage names to a list of actor handles.
         """
         added_count = 0
         time_registered = time.time()
+        stages_updated = set()
+
+        # Acquire lock to safely modify pending list and scaling state
         with self._lock:
-            for stage_name, actor_signal_list in registration_info.items():
-                if stage_name not in {s.name for s in self._stages}:
+            all_known_stages = {s.name for s in self._stages}  # Get current stage names under lock
+
+            for stage_name, actor_list in registration_info.items():
+                # Validate stage name
+                if stage_name not in all_known_stages:
                     logger.warning(
-                        f"[TopologyRegister] Received pending removal registration for unknown stage '{stage_name}'. "
-                        f"Skipping."
+                        f"[TopologyRegister] Received pending removal registration for unknown stage "
+                        f"'{stage_name}'. Skipping."
                     )
                     continue
 
+                # Get or initialize the pending set for this stage
                 stage_pending_set = self._pending_removal_actors[stage_name]
-                for actor_handle, signal_future_name in actor_signal_list:
-                    # Add the actor to the pending set for this stage
-                    actor_id_str = str(actor_handle)  # Use string representation
-                    actor_tuple = (actor_handle, actor_id_str, time_registered, signal_future_name)
+
+                for actor_handle in actor_list:
+                    if not actor_handle:  # Skip None or invalid handles
+                        logger.warning(
+                            f"[TopologyRegister-{stage_name}] Received invalid handle in registration list. Skipping."
+                        )
+                        continue
+
+                    actor_id_str = str(actor_handle)  # Use string representation for logging/lookup
+                    # Store tuple: (handle, id_string, timestamp)
+                    actor_tuple = (actor_handle, actor_id_str, time_registered)
+
+                    # Add to set (sets handle duplicates automatically)
                     if actor_tuple not in stage_pending_set:
                         stage_pending_set.add(actor_tuple)
                         added_count += 1
                         logger.debug(
-                            f"[TopologyRegister-{stage_name}] Registered actor '{actor_id_str}'"
-                            f" pending removal (Signal: {signal_future_name})."
+                            f"[TopologyRegister-{stage_name}] Registered actor '{actor_id_str}' pending removal."
                         )
                     else:
+                        # This case is less likely now that stop() confirms before registration
                         logger.debug(
                             f"[TopologyRegister-{stage_name}] Actor '{actor_id_str}' "
-                            f"already registered pending removal. Ignoring duplicate registration."
+                            f"was already registered pending removal. Ignoring duplicate."
                         )
 
-                # Update scaling state if actors were added to pending
-                if actor_signal_list:
+                # Mark stage as having pending removals if actors were added
+                if actor_list:
                     self._scaling_state[stage_name] = "Scaling Down Pending"
+                    stages_updated.add(stage_name)
 
-        logger.info(
-            f"[TopologyRegister] Registered {added_count} "
-            f"actors across {len(registration_info)} stages pending removal."
-        )
+        if added_count > 0:
+            logger.info(
+                f"[TopologyRegister] Registered {added_count} actors across "
+                f"{len(stages_updated)} stages pending removal."
+            )
+        elif registration_info:
+            logger.debug("[TopologyRegister] No new actors registered pending removal (likely duplicates).")
 
     def _start_cleanup_thread(self) -> None:
         """Starts the background thread for cleaning up terminated actors."""
@@ -248,136 +266,154 @@ class PipelineTopology:
         self._cleanup_thread = None  # Clear thread object
 
     def _cleanup_loop(self) -> None:
-        """The main loop for the background cleanup thread."""
-        logger.debug("[TopologyCleanupLoop] Cleanup loop started.")
+        """
+        The main loop for the background cleanup thread. Periodically checks actors
+        pending removal, updates topology, and removes them from the pending list.
+        """
+        logger.info("[TopologyCleanupLoop] Cleanup thread started.")
 
         while self._cleanup_thread_running:
-            try:
-                logger.debug("[TopologyCleanupLoop] Starting cleanup cycle...")
-                actors_removed_this_cycle = 0
-                processed_actor_ids_this_cycle = set()
-                actors_to_remove_from_pending: Dict[str, List[Tuple[Any, str, float, str]]] = defaultdict(list)
-                stages_to_check_for_idle: Set[str] = set()  # Track stages potentially becoming idle
+            cycle_start_time = time.time()
+            actors_removed_this_cycle = 0
+            processed_actor_ids_this_cycle = set()
+            # Store actors to remove from pending list {stage: [tuple(handle, id, time)]}
+            actors_to_remove_from_pending: Dict[str, List[Tuple[Any, str, float]]] = defaultdict(list)
+            # Track stages that had removals to check if their pending list is now empty
+            stages_potentially_idle: Set[str] = set()
 
-                # --- Acquire Lock for the whole check cycle ---
-                # This ensures consistency between checking pending list and modifying topology
+            try:
+                # --- Acquire Lock for read/write operations ---
                 with self._lock:
-                    # Check if still running after acquiring lock
+                    # Double-check running flag after acquiring lock
                     if not self._cleanup_thread_running:
+                        logger.debug("[TopologyCleanupLoop] Stop signal received after lock acquisition. Exiting loop.")
                         break
 
-                    # Iterate through stages with pending actors
+                    # Iterate over stages that have pending actors
+                    # Use list() to copy keys in case dict changes during iteration (less likely here due to lock)
                     for stage_name in list(self._pending_removal_actors.keys()):
                         pending_set = self._pending_removal_actors[stage_name]
                         if not pending_set:
-                            continue  # Should be cleaned up below, but check anyway
+                            continue  # Skip if somehow empty
 
-                        pending_set_copy = pending_set.copy()  # Iterate copy
+                        # Iterate over a copy of the set to allow safe removal marking
+                        pending_set_copy = pending_set.copy()
 
                         for actor_tuple in pending_set_copy:
-                            actor, actor_id, time_registered, signal_future_name = actor_tuple
+                            # Tuple contains: (handle, id_string, registration_timestamp)
+                            actor_handle, actor_id_str, time_registered = actor_tuple
 
-                            if actor_id in processed_actor_ids_this_cycle:
+                            # Avoid reprocessing an actor multiple times within one cycle
+                            if actor_id_str in processed_actor_ids_this_cycle:
                                 continue
 
                             remove_from_topology = False
                             mark_for_pending_removal = False
-                            signal_status = "PENDING"
+                            actor_status = "PENDING"  # PENDING, COMPLETED, ACTOR_GONE, TIMEOUT, UNRESPONSIVE, ERROR
 
-                            # 1. Check for Overall Timeout
+                            # 1. Check for Overall Timeout first
                             if time.time() - time_registered > PENDING_SHUTDOWN_TIMEOUT_SECONDS:
                                 logger.warning(
-                                    f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id}' "
-                                    f"timed out ({PENDING_SHUTDOWN_TIMEOUT_SECONDS}s). Forcing removal."
+                                    f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                    f"timed out waiting for shutdown "
+                                    f"({PENDING_SHUTDOWN_TIMEOUT_SECONDS}s). Forcing removal."
                                 )
                                 remove_from_topology = True
                                 mark_for_pending_removal = True
-                                signal_status = "TIMEOUT"
+                                actor_status = "TIMEOUT"
 
-                            # 2. If not timed out, check signal object
+                            # 2. If not timed out, check actor status via is_shutdown_complete
                             if not remove_from_topology:
                                 try:
-                                    result = ray.get(signal_future_name, timeout=PENDING_CHECK_GET_TIMEOUT)
-                                    if result is True:
+                                    # Call the remote method on the actor handle
+                                    check_ref = actor_handle.is_shutdown_complete.remote()
+                                    # Wait for the boolean result with a specific timeout
+                                    is_complete = ray.get(check_ref, timeout=PENDING_CHECK_ACTOR_METHOD_TIMEOUT)
+
+                                    if is_complete:
+                                        # Actor's loop finished, signal flag is True
                                         logger.info(
-                                            f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id}' "
-                                            f"shutdown signal '{signal_future_name}' found (True)."
+                                            f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                            f"reported shutdown complete (flag is True). Marking for removal."
                                         )
                                         remove_from_topology = True
                                         mark_for_pending_removal = True
-                                        signal_status = "COMPLETED"
+                                        actor_status = "COMPLETED"
                                     else:
-                                        signal_status = "ERROR"  # Treat unexpected value as error
-                                except GetTimeoutError:
-                                    signal_status = "PENDING"  # Still waiting
-                                except ValueError:  # Object gone
+                                        # Actor's loop still running, flag is False
+                                        logger.debug(
+                                            f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                            f"reported still running (flag is False). Will check again."
+                                        )
+                                        actor_status = "PENDING"
+
+                                except RayActorError:
+                                    # The actor handle is invalid, meaning the process has terminated.
                                     logger.warning(
-                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id}' "
-                                        f"signal '{signal_future_name}' likely deleted. Assuming actor gone."
+                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                        f"handle is invalid (RayActorError raised). "
+                                        f"Assuming actor terminated. Marking for removal."
                                     )
                                     remove_from_topology = True
                                     mark_for_pending_removal = True
-                                    signal_status = "ACTOR_GONE"
+                                    actor_status = "ACTOR_GONE"
+                                except (GetTimeoutError, TimeoutError):
+                                    # The call to is_shutdown_complete timed out
+                                    logger.warning(
+                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                        f"status check timed out after {PENDING_CHECK_ACTOR_METHOD_TIMEOUT}s. "
+                                        f"Assuming unresponsive, will rely on overall timeout."
+                                    )
+                                    actor_status = "UNRESPONSIVE"
                                 except Exception as e:
+                                    # Catch other potential errors during the check
                                     logger.error(
-                                        f"[TopologyCleanupLoop-{stage_name}] "
-                                        f"Error checking signal '{signal_future_name}' for '{actor_id}': {e}",
+                                        f"[TopologyCleanupLoop-{stage_name}] Error checking status for actor "
+                                        f"'{actor_id_str}': {e}",
                                         exc_info=False,
                                     )
-                                    signal_status = "ERROR"
+                                    actor_status = "ERROR"  # Rely on overall timeout
 
-                            # 3. Fallback Ping if needed
-                            if signal_status in ["PENDING", "ERROR"]:
-                                try:
-                                    # Assuming stop() is idempotent and fast enough for ping
-                                    ray.get(actor.stop.remote(), timeout=PENDING_CHECK_ACTOR_PING_TIMEOUT)
-                                    # If ping succeeds, actor handle is responsive
-                                except RayActorError:  # Actor process gone
-                                    logger.warning(
-                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id}' "
-                                        f"handle ping failed (RayActorError). Actor gone."
-                                    )
-                                    remove_from_topology = True
-                                    mark_for_pending_removal = True
-                                    signal_status = "ACTOR_GONE"
-                                except GetTimeoutError:  # Actor unresponsive
-                                    logger.warning(
-                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id}' "
-                                        f"handle ping timed out."
-                                    )
-                                except Exception:
-                                    pass  # Ignore other ping errors, rely on timeout
-
-                            # 4. Perform Actions (still inside the lock)
+                            # 3. Perform Actions based on findings (still inside the lock)
                             if remove_from_topology:
                                 logger.info(
-                                    f"[TopologyCleanupLoop-{stage_name}] Removing actor '{actor_id}' "
-                                    f"from topology (Reason: {signal_status})."
+                                    f"[TopologyCleanupLoop-{stage_name}] Removing actor '{actor_id_str}' "
+                                    f"from main topology list (Reason: {actor_status})."
                                 )
                                 # Use internal method which assumes lock is held
-                                removed_list = self.remove_actors_from_stage(stage_name, [actor])
+                                # Pass the specific handle to remove
+                                removed_list = self.remove_actors_from_stage(stage_name, [actor_handle])
                                 if removed_list:
                                     actors_removed_this_cycle += 1
+                                else:
+                                    # This might happen if removal was attempted twice rapidly
+                                    logger.debug(
+                                        f"[TopologyCleanupLoop-{stage_name}] Actor '{actor_id_str}' "
+                                        f"was apparently already removed from main list."
+                                    )
 
+                            # 4. Mark for removal from the pending list if needed
                             if mark_for_pending_removal:
                                 logger.debug(
-                                    f"[TopologyCleanupLoop-{stage_name}] Marking actor '{actor_id}' "
+                                    f"[TopologyCleanupLoop-{stage_name}] Marking actor '{actor_id_str}' "
                                     f"for removal from pending list."
                                 )
                                 actors_to_remove_from_pending[stage_name].append(actor_tuple)
-                                processed_actor_ids_this_cycle.add(actor_id)
-                                stages_to_check_for_idle.add(stage_name)  # Mark stage for potential state update
+                                processed_actor_ids_this_cycle.add(actor_id_str)  # Use ID string for tracking
+                                stages_potentially_idle.add(stage_name)  # Track stage
 
                     # --- Update the pending removal data structure (still inside lock) ---
-                    for stage_to_update, actors_list in actors_to_remove_from_pending.items():
+                    for stage_to_update, actors_list_to_remove in actors_to_remove_from_pending.items():
+                        # Check if stage still exists in pending dict (might have been removed if empty)
                         if stage_to_update in self._pending_removal_actors:
                             current_pending_set = self._pending_removal_actors[stage_to_update]
-                            for removal_tuple in actors_list:
-                                current_pending_set.discard(removal_tuple)
+                            for removal_tuple in actors_list_to_remove:
+                                current_pending_set.discard(removal_tuple)  # Safely remove tuple
 
                     # --- Check stages whose pending lists might now be empty (still inside lock) ---
                     stages_with_empty_pending = []
-                    for stage_to_check in stages_to_check_for_idle:
+                    for stage_to_check in stages_potentially_idle:
+                        # Check if the key exists AND the set is empty
                         if (
                             stage_to_check in self._pending_removal_actors
                             and not self._pending_removal_actors[stage_to_check]
@@ -388,23 +424,39 @@ class PipelineTopology:
                             # If state was pending, set back to Idle
                             if self._scaling_state.get(stage_to_check) == "Scaling Down Pending":
                                 logger.info(
-                                    f"[TopologyCleanupLoop-{stage_to_check}] "
-                                    f"All pending actors cleared. Setting scaling state to Idle."
+                                    f"[TopologyCleanupLoop-{stage_to_check}] All pending actors cleared for stage. "
+                                    f"Setting scaling state to Idle."
                                 )
                                 self._scaling_state[stage_to_check] = "Idle"
 
+                # --- End of lock block ---
+
+                # --- Logging for the cycle ---
+                cycle_duration = time.time() - cycle_start_time
+                if actors_removed_this_cycle > 0:
+                    logger.info(
+                        f"[TopologyCleanupLoop] Cleanup cycle finished in {cycle_duration:.3f}s. "
+                        f"Removed {actors_removed_this_cycle} actors from topology."
+                    )
+                else:
+                    logger.debug(
+                        f"[TopologyCleanupLoop] Cleanup cycle finished in {cycle_duration:.3f}s. "
+                        f"No actors removed from topology."
+                    )
+
             except Exception as e:
                 # Catch broad exceptions in the loop itself to prevent thread death
-                logger.error(f"[TopologyCleanupLoop] Unhandled error in cleanup loop: {e}", exc_info=True)
+                logger.error("[TopologyCleanupLoop] Unhandled error in cleanup loop iteration: " f"{e}", exc_info=True)
 
             # --- Wait for the next interval or stop signal ---
-            # Use event.wait for interruptible sleep
-            woken = self._stop_event.wait(timeout=CLEANUP_INTERVAL_SECONDS)
-            if woken:  # If woken by stop event
-                logger.debug("[TopologyCleanupLoop] Stop event received.")
-                break  # Exit the loop
+            # Use event.wait for interruptible sleep outside the main try/except
+            logger.debug(f"[TopologyCleanupLoop] Sleeping for {CLEANUP_INTERVAL_SECONDS}s...")
+            woken_by_stop = self._stop_event.wait(timeout=CLEANUP_INTERVAL_SECONDS)
+            if woken_by_stop:
+                logger.info("[TopologyCleanupLoop] Stop event received during sleep. Exiting.")
+                break  # Exit the while loop cleanly
 
-        logger.info("[TopologyCleanupLoop] Cleanup loop finished.")
+        logger.info("[TopologyCleanupLoop] Cleanup loop thread finished.")
 
     def set_edge_queues(self, queues: Dict[str, Tuple[Any, int]]) -> None:
         """Sets the dictionary of edge queues."""
