@@ -70,6 +70,8 @@ _Type_Extract_Method_Image = Literal["image"]
 
 _Type_Extract_Method_Audio = Literal["audio"]
 
+_Type_Extract_Method_Text = Literal["txt"]
+
 _Type_Extract_Method_Map = {
     "bmp": get_args(_Type_Extract_Method_Image),
     "docx": get_args(_Type_Extract_Method_DOCX),
@@ -82,6 +84,8 @@ _Type_Extract_Method_Map = {
     "tiff": get_args(_Type_Extract_Method_Image),
     "mp3": get_args(_Type_Extract_Method_Audio),
     "wav": get_args(_Type_Extract_Method_Audio),
+    "text": get_args(_Type_Extract_Method_Text),
+    "txt": get_args(_Type_Extract_Method_Text),
 }
 
 _Type_Extract_Tables_Method_PDF = Literal["yolox", "pdfium", "nemoretriever_parse"]
