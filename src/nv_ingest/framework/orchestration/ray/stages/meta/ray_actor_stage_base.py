@@ -4,6 +4,7 @@
 
 import threading
 import time
+import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
@@ -94,6 +95,12 @@ class RayActorStage(ABC):
         self._shutting_down: bool = False
         # Lock specifically for coordinating the final shutdown sequence (_request_actor_exit)
         self._lock = threading.Lock()
+
+        # --- Additional state variables ---
+        actor_id_str = self._get_actor_id_str()  # Get ID for naming
+
+        # Helper to allow external code to know when a replica is fully shut down.
+        self._shutdown_signal_future_name = f"shutdown_signal_{actor_id_str}_{uuid.uuid4()}"
 
     @staticmethod
     def _get_actor_id_str() -> str:
@@ -245,6 +252,22 @@ class RayActorStage(ABC):
             logger.exception(f"{actor_id_str}: Unexpected error caused processing loop termination: {e}")
         finally:
             logger.debug(f"{actor_id_str}: Processing loop thread finished.")
+
+            signal_name_to_put = self._shutdown_signal_future_name
+            try:
+                # Put the signal object using the name assigned during __init__
+                ray.put(True, name=signal_name_to_put)
+                logger.info(
+                    f"{actor_id_str}: Successfully put shutdown signal object with name '{signal_name_to_put}'."
+                )
+            except Exception as e:
+                logger.error(
+                    f"{actor_id_str}: "
+                    f"CRITICAL - "
+                    f"Failed to put shutdown signal object with name '{signal_name_to_put}': {e}",
+                    exc_info=True,
+                )
+
             # --- Trigger Actor Exit from Main Thread ---
             # It's crucial to call ray.actor.exit_actor() from the main actor
             # thread, not the background thread. We use the current_actor handle
@@ -336,10 +359,11 @@ class RayActorStage(ABC):
         self._processing_thread.start()
 
         logger.info(f"{actor_id_str}: Actor started successfully.")
+
         return True
 
     @ray.method(num_returns=1)
-    def stop(self) -> bool:
+    def stop(self) -> str:
         """
         Signals the actor's processing loop to stop gracefully.
 
@@ -360,14 +384,14 @@ class RayActorStage(ABC):
         # Check if the actor is actually running
         if not self.running:
             logger.warning(f"{actor_id_str}: Stop called but actor was not running.")
-            return False
+            return self._shutdown_signal_future_name
 
         # Signal the processing loop to stop by setting the flag
         self.running = False
         logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
 
         # Note: The actual termination happens asynchronously when the loop finishes.
-        return True
+        return self._shutdown_signal_future_name
 
     # --- get_stats ---
 
