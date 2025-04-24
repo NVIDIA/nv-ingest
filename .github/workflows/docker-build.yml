@@ -18,6 +18,8 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: main
 
       - name: Get current date (yyyy.mm.dd)
         run: echo "CURRENT_DATE=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
