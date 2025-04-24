@@ -246,6 +246,7 @@ services:
     cap_add:
       - sys_nice
     environment:
+      - ARROW_DEFAULT_MEMORY_POOL=system
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
