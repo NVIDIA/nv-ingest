@@ -13,7 +13,7 @@ from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
     [
         (DocumentTypeEnum.BMP, ContentTypeEnum.IMAGE),
         (DocumentTypeEnum.DOCX, ContentTypeEnum.STRUCTURED),
-        (DocumentTypeEnum.HTML, ContentTypeEnum.STRUCTURED),
+        (DocumentTypeEnum.HTML, ContentTypeEnum.TEXT),
         (DocumentTypeEnum.JPEG, ContentTypeEnum.IMAGE),
         (DocumentTypeEnum.PDF, ContentTypeEnum.STRUCTURED),
         (DocumentTypeEnum.PNG, ContentTypeEnum.IMAGE),
