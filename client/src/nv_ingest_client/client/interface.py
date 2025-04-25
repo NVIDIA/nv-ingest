@@ -120,6 +120,10 @@ class Ingestor:
 
         self._client = NvIngestClient(**kwargs)
 
+    @staticmethod
+    def _is_glob(pattern: str) -> bool:
+        return any(ch in pattern for ch in ("*", "?", "["))
+
     def _check_files_local(self) -> bool:
         """
         Check if all specified document files are local and exist.
@@ -127,18 +131,32 @@ class Ingestor:
         Returns
         -------
         bool
-            Returns True if all files in `_documents` are local and accessible;
-            False if any file is missing or inaccessible.
+            True if all explicit file paths exist. Glob-patterns
+            are allowed to match zero files (they’re simply skipped).
+            Returns False immediately if an explicit path is missing
+            or any matched file is gone.
         """
         if not self._documents:
             return False
 
         for pattern in self._documents:
-            matched = glob.glob(pattern, recursive=True)
-            if not matched:
-                return False
-            for file_path in matched:
-                if not os.path.exists(file_path):
+            if self._is_glob(pattern):
+                # glob patterns: OK if they match nothing
+                matched = glob.glob(pattern, recursive=True)
+                if not matched:
+                    logger.debug(f"No files found for glob pattern, skipping: {pattern}")
+                    continue
+            else:
+                # explicit path: must exist
+                if not os.path.exists(pattern):
+                    logger.error(f"Explicit file path not found: {pattern}")
+                    return False
+                matched = [pattern]
+
+            # verify that every matched file is still there
+            for path in matched:
+                if not os.path.exists(path):
+                    logger.error(f"Matched file does not exist: {path}")
                     return False
 
         return True
@@ -147,20 +165,22 @@ class Ingestor:
         """
         Add documents to the manager for processing and check if they are all local.
 
+        Glob patterns that match nothing are fine.  But explicit paths
+        that don’t exist will cause `_all_local` to stay False.
+
         Parameters
         ----------
-        documents : List[str]
-            A list of document paths or patterns to be processed.
+        documents : str or List[str]
+            A list of document paths or glob patterns to be processed.
 
         Returns
         -------
         Ingestor
-            Returns self for chaining. If all specified documents are local,
-            `_job_specs` is initialized, and `_all_local` is set to True.
+            Returns self for chaining. If all explicit paths exist,
+            `_job_specs` is initialized and `_all_local` is set to True.
         """
         if isinstance(documents, str):
             documents = [documents]
-
         if not documents:
             return self
 
