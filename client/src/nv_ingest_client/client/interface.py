@@ -121,8 +121,17 @@ class Ingestor:
         self._client = NvIngestClient(**kwargs)
 
     @staticmethod
+    def _is_remote(pattern: str) -> bool:
+        parsed = urlparse(pattern)
+        return parsed.scheme in ("http", "https", "s3", "gs", "gcs", "ftp")
+
+    @staticmethod
     def _is_glob(pattern: str) -> bool:
-        return any(ch in pattern for ch in ("*", "?", "["))
+        # only treat '*' and '[' (and '?' when not remote) as glob chars
+        wildcard = {"*", "["}
+        if not Ingestor._is_remote(pattern):
+            wildcard.add("?")
+        return any(ch in pattern for ch in wildcard)
 
     def _check_files_local(self) -> bool:
         """
@@ -131,53 +140,48 @@ class Ingestor:
         Returns
         -------
         bool
-            True if all explicit file paths exist. Glob-patterns
-            are allowed to match zero files (they’re simply skipped).
-            Returns False immediately if an explicit path is missing
-            or any matched file is gone.
+            False immediately if any pattern is a remote URI.
+            Local glob-patterns may match zero files (they’re skipped).
+            Returns False if any explicit local path is missing
+            or any matched file no longer exists.
         """
         if not self._documents:
             return False
 
         for pattern in self._documents:
+            # FAIL on any remote URI
+            if self._is_remote(pattern):
+                logger.error(f"Remote URI in local-check: {pattern}")
+                return False
+
+            # local glob: OK to match zero files
             if self._is_glob(pattern):
-                # glob patterns: OK if they match nothing
-                matched = glob.glob(pattern, recursive=True)
-                if not matched:
-                    logger.debug(f"No files found for glob pattern, skipping: {pattern}")
+                matches = glob.glob(pattern, recursive=True)
+                if not matches:
+                    logger.debug(f"No files for glob, skipping: {pattern}")
                     continue
             else:
-                # explicit path: must exist
+                # explicit local path must exist
                 if not os.path.exists(pattern):
-                    logger.error(f"Explicit file path not found: {pattern}")
+                    logger.error(f"Local file not found: {pattern}")
                     return False
-                matched = [pattern]
+                matches = [pattern]
 
-            # verify that every matched file is still there
-            for path in matched:
-                if not os.path.exists(path):
-                    logger.error(f"Matched file does not exist: {path}")
+            # verify all matched files still exist
+            for fp in matches:
+                if not os.path.exists(fp):
+                    logger.error(f"Matched file disappeared: {fp}")
                     return False
 
         return True
 
     def files(self, documents: Union[str, List[str]]) -> "Ingestor":
         """
-        Add documents to the manager for processing and check if they are all local.
+        Add documents (local paths, globs, or remote URIs) for processing.
 
-        Glob patterns that match nothing are fine.  But explicit paths
-        that don’t exist will cause `_all_local` to stay False.
-
-        Parameters
-        ----------
-        documents : str or List[str]
-            A list of document paths or glob patterns to be processed.
-
-        Returns
-        -------
-        Ingestor
-            Returns self for chaining. If all explicit paths exist,
-            `_job_specs` is initialized and `_all_local` is set to True.
+        Remote URIs will force `_all_local=False`. Local globs that match
+        nothing are fine. Explicit local paths that don't exist cause
+        `_all_local=False`.
         """
         if isinstance(documents, str):
             documents = [documents]
