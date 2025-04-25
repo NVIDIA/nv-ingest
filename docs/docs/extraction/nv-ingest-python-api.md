@@ -17,7 +17,7 @@ The following table describes methods of the `Ingestor` class.
 | `files` | Add document paths for processing. |
 | `load` | Ensure files are locally accessible (downloads if needed). |
 | `extract` | Add an extraction task (text, tables, charts). |
-| `split` | Split documents into smaller sections for processing.
+| `split` | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `embed` | Generate embeddings from extracted content. |
 | `caption` | Extract captions from images within the document. |
 | `ingest` | Submit jobs and retrieve results synchronously. |
