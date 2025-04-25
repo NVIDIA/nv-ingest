@@ -240,6 +240,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | containerSecurityContext | object | `{}` |  |
 | envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
@@ -259,7 +260,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
-| envVars.READY_CHECK_ALL_COMPONENTS | string | `"true"` |  |
 | envVars.REDIS_MORPHEUS_TASK_QUEUE | string | `"morpheus_task_queue"` |  |
 | envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
@@ -483,7 +483,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.deployed | bool | `true` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].value | string | `"8000"` |  |
-| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].value | string | `"1"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
