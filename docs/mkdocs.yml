@@ -58,13 +58,14 @@ nav:
       - Get Started:
         - Prerequisites: extraction/prerequisites.md
         - Support Matrix: extraction/support-matrix.md
-        - Quickstart (Library Mode): extraction/quickstart-library-mode.md
-        - Quickstart (Self-Hosted): extraction/quickstart-guide.md
-        - Helm Deployment: extraction/helm.md
+        - Deploy (Library Mode): extraction/quickstart-library-mode.md
+        - Deploy (Self-Hosted): extraction/quickstart-guide.md
+        - Deploy (Helm Chart): extraction/helm.md
       - Developer Guide:
         - Notebooks: extraction/notebooks.md
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
+        - Split Documents: extraction/chunking.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
         - Upload Data: extraction/data-store.md

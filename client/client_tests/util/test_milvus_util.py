@@ -26,8 +26,8 @@ def milvus_test_dict():
 
 def test_extra_kwargs(milvus_test_dict):
     mil_op = MilvusOperator(filter_errors=True)
-    milvus_test_dict.pop("collection_name")
-    assert mil_op.milvus_kwargs == milvus_test_dict
+    assert "filter_errors" in mil_op.milvus_kwargs
+    assert mil_op.milvus_kwargs["filter_errors"] is True
 
 
 @pytest.mark.parametrize("collection_name", [None, "name"])

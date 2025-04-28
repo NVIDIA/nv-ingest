@@ -453,13 +453,16 @@ def transform_create_text_embeddings_internal(
 
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
 
+    def _content_type_getter(row):
+        return row["content_metadata"]["type"]
+
     # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
             logger.debug(f"Skipping unsupported content type: {content_type}")
             continue
 
-        content_mask = df_transform_ledger["document_type"] == content_type.value
+        content_mask = df_transform_ledger["metadata"].apply(_content_type_getter) == content_type.value
         if not content_mask.any():
             continue
 

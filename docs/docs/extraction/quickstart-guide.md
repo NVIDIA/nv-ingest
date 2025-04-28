@@ -1,4 +1,4 @@
-# Quickstart Guide for NeMo Retriever Extraction (Self-Hosted)
+# Deploy With Docker Compose (Self-Hosted) for NeMo Retriever Extraction
 
 Use this documentation to get started using [NeMo Retriever extraction](overview.md) in self-hosted mode.
 
@@ -405,12 +405,32 @@ You can specify multiple `--profile` options.
 
 ## Troubleshooting
 
-In rare cases, when you run a job you might an see an error similar to `max open file descriptor`. 
-This error is related to number of active jobs and cores available on your computer. 
-To resolve this issue, raise the maximum number of open file descriptors by using the following [ulimit](https://ss64.com/bash/ulimit.html) command.
+### Too Many Open Files Error
+
+In rare cases, when you run a job you might an see an error similar to `too many open files` or `max open file descriptor`. 
+This error occurs when the open file descriptor limit for your service user account is too low.
+To resolve the issue, set or raise the maximum number of open file descriptors (`-n`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
+Before you change the `-n` setting, consider the following:
+
+- Apply the `-n` setting directly to the user (or the Docker container environment) that runs your ingest service.
+- For `-n` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
 
 ```bash
 ulimit -n 10,000
+```
+
+### Can't Start New Thread Error
+
+In rare cases, when you run a job you might an see an error similar to `can't start new thread`. 
+This error occurs when the maximum number of processes available to a single user is too low.
+To resolve the issue, set or raise the maximum number of processes (`-u`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
+Before you change the `-u` setting, consider the following:
+
+- Apply the `-u` setting directly to the user (or the Docker container environment) that runs your ingest service.
+- For `-u` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
+
+```bash
+ulimit -u 10,000
 ```
 
 
@@ -419,6 +439,7 @@ ulimit -n 10,000
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Library Mode)](quickstart-library-mode.md)
+- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
+- [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)
