@@ -5,8 +5,7 @@
 import time
 import threading
 import logging
-from concurrent.futures import ThreadPoolExecutor, as_completed
-from typing import Tuple, Dict, Any, Optional, List
+from typing import Tuple, Dict, Any, Optional
 
 import ray
 from ray.exceptions import RayActorError
@@ -219,287 +218,114 @@ class RayStatsCollector:
         """
         Performs a single collection cycle of statistics from pipeline actors/queues.
 
-        This method fetches the current pipeline structure using the provided
-        accessors and performs parallel Ray requests.
-
         Returns
         -------
         Tuple[Dict[str, Dict[str, int]], bool]
-            A tuple containing:
-            - A dictionary mapping stage names to their collected statistics.
-            - A boolean indicating if *all* stats were collected successfully.
+            A dictionary mapping stage names to their collected statistics, and a
+            boolean indicating if the overall collection was successful.
         """
         if not ray:
             logger.error("[StatsCollectNow] Ray is not available. Cannot collect stats.")
             return {}, False
 
-        collection_start_time = time.time()
         overall_success = True
         stage_stats_updates: Dict[str, Dict[str, int]] = {}
-        actor_stats_results: Dict[Any, Dict[str, int]] = {}
+        actor_tasks: Dict[ray.ObjectRef, Tuple[Any, str]] = {}
         queue_sizes: Dict[str, int] = {}
 
-        # --- Snapshot current actors and queues via Accessors ---
-        # We rely on the accessors provided by the pipeline to handle
-        # necessary locking and return consistent snapshots.
         try:
             current_stages = self._pipeline.get_stages_info()
-            current_stage_actors = self._pipeline.get_stage_actors()  # Expects Dict[str, List[ActorHandle]]
-            current_edge_queues_map = self._pipeline.get_edge_queues()  # Expects Dict[str, Tuple[QueueHandle, int]]
-            current_edge_queues_items = list(current_edge_queues_map.items())
-            current_edge_names = list(current_edge_queues_map.keys())
+            current_stage_actors = self._pipeline.get_stage_actors()
+            current_edge_queues = self._pipeline.get_edge_queues()
         except Exception as e:
-            logger.error(f"[StatsCollectNow] Failed to get pipeline structure via accessors: {e}", exc_info=True)
-            return {}, False  # Cannot proceed without structure
+            logger.error(f"[StatsCollectNow] Failed to get pipeline structure: {e}", exc_info=True)
+            return {}, False
 
-        logger.debug(f"[StatsCollectNow] Starting collection for {len(current_stages)} stages...")
+        logger.debug(f"[StatsCollectNow] Starting collection for {len(current_stages)} stages.")
 
-        # --- 1. Prepare and Initiate Actor Stat Requests ---
-        actor_tasks: Dict[ray.ObjectRef, Tuple[Any, str]] = {}
-        actors_to_query_count = 0
-        for stage_info in current_stages:  # Iterate using StageInfo objects
+        # --- 1. Prepare Actor Stat Requests ---
+        for stage_info in current_stages:
             stage_name = stage_info.name
-            actors = current_stage_actors.get(stage_name, [])  # Get actors for this stage
-            stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0}  # Initialize
+            stage_stats_updates[stage_name] = {"processing": 0, "in_flight": 0}
+
+            if stage_info.pending_shutdown:
+                logger.debug(f"[StatsCollectNow] Stage '{stage_name}' pending shutdown. Skipping actor queries.")
+                # Assume stage has 1 active job to prevent premature scale-down
+                stage_stats_updates[stage_name]["processing"] = 1
+                stage_stats_updates[stage_name]["in_flight"] = 1
+                continue
+
+            actors = current_stage_actors.get(stage_name, [])
             for actor in actors:
                 if hasattr(actor, "get_stats") and callable(getattr(actor, "get_stats")):
                     try:
                         stats_ref = actor.get_stats.remote()
-                        if isinstance(stats_ref, ray.ObjectRef):
-                            actor_tasks[stats_ref] = (actor, stage_name)
-                            actors_to_query_count += 1
-                        else:
-                            logger.warning(
-                                f"[StatsCollectNow] Actor {actor} get_stats did not return ObjectRef"
-                                f" (Stage: {stage_name}). Skipping."
-                            )
-                            actor_stats_results[actor] = {"active_processing": 0}
-                            overall_success = False
+                        actor_tasks[stats_ref] = (actor, stage_name)
                     except Exception as e:
-                        actor_repr = repr(actor)
                         logger.error(
-                            f"[StatsCollectNow] Error initiating get_stats for actor {actor_repr}"
-                            f" (Stage: {stage_name}): {e}"
+                            f"[StatsCollectNow] Failed to initiate get_stats for actor {actor}: {e}", exc_info=True
                         )
-                        actor_stats_results[actor] = {"active_processing": 0}
                         overall_success = False
                 else:
-                    logger.debug(f"[StatsCollectNow] Actor {actor} in stage {stage_name} lacks get_stats method.")
-                    actor_stats_results[actor] = {"active_processing": 0}
+                    logger.debug(f"[StatsCollectNow] Actor {actor} in stage '{stage_name}' lacks get_stats method.")
 
         logger.debug(f"[StatsCollectNow] Initiated {len(actor_tasks)} actor stat requests.")
 
-        # --- 2. Collect Queue Stats (Parallel Threads using executor.submit) ---
-        queues_to_query: List[Tuple[str, Any]] = []
-        for q_name, (queue_actor, _) in current_edge_queues_items:
-            if hasattr(queue_actor, "qsize") and callable(getattr(queue_actor, "qsize")):
-                queues_to_query.append((q_name, queue_actor))
-            else:
-                logger.warning(f"[StatsCollectNow] Queue object for {q_name} lacks qsize. Assuming size 0.")
-                queue_sizes[q_name] = 0  # Default directly
-
-        queues_processed_th = 0
-        queues_errored_th = 0
-        if queues_to_query:
-            logger.debug(
-                f"[StatsCollectNow] Collecting {len(queues_to_query)} queue stats via ThreadPoolExecutor (submit)..."
-            )
-            num_workers = min(max(1, len(queues_to_query)), 32)
-            futures_map: Dict[Any, str] = {}  # Map Future object back to queue name
-
+        # --- 2. Collect Queue Stats (Synchronous Threaded Calls) ---
+        for q_name, (queue_actor, _) in current_edge_queues.items():
             try:
-                with ThreadPoolExecutor(max_workers=num_workers) as executor:
-                    # --- Use executor.submit ---
-                    for q_name, q_actor in queues_to_query:
-                        future = executor.submit(self._get_qsize_sync, q_name, q_actor)
-                        futures_map[future] = q_name
-
-                    # --- Process results as they complete ---
-                    processed_count = 0
-                    # Use as_completed with a timeout
-                    for future in as_completed(futures_map, timeout=self._queue_timeout):
-                        q_name_res = futures_map[future]
-                        try:
-                            # Get the result tuple (name, size) from the future
-                            _, q_size_res = future.result()  # result() blocks until future is done
-                            queue_sizes[q_name_res] = q_size_res
-                            if q_size_res == -1:
-                                queues_errored_th += 1
-                                overall_success = False
-                            else:
-                                queues_processed_th += 1
-                        except Exception as exc:
-                            # Catch exceptions raised *within* the _get_qsize_sync task
-                            logger.error(f"[StatsCollectNow] Exception getting result for queue '{q_name_res}': {exc}")
-                            queue_sizes[q_name_res] = -1  # Mark as error
-                            queues_errored_th += 1
-                            overall_success = False
-                        processed_count += 1
-
-                    # Check if timeout occurred indirectly (not all futures completed)
-                    if processed_count < len(futures_map):
-                        logger.warning(
-                            f"[StatsCollectNow] ThreadPoolExecutor potentially timed out after "
-                            f"{self._queue_timeout}s processing queue sizes ({processed_count}/{len(futures_map)} "
-                            f"completed)."
-                        )
-                        overall_success = False
-                        # Mark any remaining futures as errored (though identifying them precisely after timeout is
-                        # harder)
-                        for future, q_name_orig in futures_map.items():
-                            if q_name_orig not in queue_sizes:
-                                logger.debug(
-                                    f"[StatsCollectNow] Marking queue {q_name_orig} "
-                                    f"as errored due to overall timeout."
-                                )
-                                queue_sizes[q_name_orig] = -1
-                                queues_errored_th += 1  # Count potentially timed-out ones
-
-            except TimeoutError:  # Catch timeout from as_completed directly
-                logger.warning(
-                    f"[StatsCollectNow] ThreadPoolExecutor timed out via as_completed after "
-                    f"{self._queue_timeout}s waiting for queue sizes."
-                )
-                overall_success = False
-                # Mark any queues not yet processed as errored
-                processed_names = set(queue_sizes.keys())
-                for q_name_orig, _ in queues_to_query:
-                    if q_name_orig not in processed_names:
-                        queue_sizes[q_name_orig] = -1
-                        queues_errored_th += 1
-                        logger.debug(
-                            f"[StatsCollectNow] Marking queue {q_name_orig} as errored due to overall timeout."
-                        )
-
+                if hasattr(queue_actor, "qsize") and callable(getattr(queue_actor, "qsize")):
+                    q_size_val = queue_actor.qsize()
+                    queue_sizes[q_name] = int(q_size_val)
+                else:
+                    logger.warning(
+                        f"[StatsCollectNow] Queue actor '{q_name}' lacks qsize method. Defaulting size to 0."
+                    )
+                    queue_sizes[q_name] = 0
             except Exception as e:
-                logger.error(f"[StatsCollectNow] Error during ThreadPoolExecutor queue collection: {e}", exc_info=True)
+                logger.error(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
+                queue_sizes[q_name] = 0
                 overall_success = False
-                # Mark all attempted queues as errored
-                for q_name_orig, _ in queues_to_query:
-                    if q_name_orig not in queue_sizes:
-                        queue_sizes[q_name_orig] = -1
-                        queues_errored_th += 1
 
-            if queues_errored_th > 0:
-                logger.warning(
-                    f"[StatsCollectNow] ThreadPool queue summary: {queues_processed_th} success, "
-                    f"{queues_errored_th} errors/timeouts."
-                )
-
-        else:
-            logger.debug("[StatsCollectNow] No queues with qsize method found to query.")
-
-        # --- 3. Collect Actor Stats Results ---
-        actors_processed = 0
-        actors_timed_out = 0
-        actors_errored = 0
+        # --- 3. Resolve Actor Stats ---
         if actor_tasks:
-            refs_list = list(actor_tasks.keys())
-            ready_refs, remaining_refs = [], []
             try:
                 ready_refs, remaining_refs = ray.wait(
-                    refs_list, num_returns=len(refs_list), timeout=self._actor_timeout
+                    list(actor_tasks.keys()), num_returns=len(actor_tasks), timeout=self._actor_timeout
                 )
-                # Process ready refs...
+
                 for ref in ready_refs:
                     actor, stage_name = actor_tasks[ref]
-                    actor_repr = repr(actor)
                     try:
                         stats = ray.get(ref)
                         if isinstance(stats, dict) and "active_processing" in stats:
-                            stats["active_processing"] = int(stats.get("active_processing", 0))
-                            actor_stats_results[actor] = stats
-                            actors_processed += 1
+                            active = int(stats.get("active_processing", 0))
+                            stage_stats_updates[stage_name]["processing"] += active
                         else:
                             logger.warning(
-                                f"[StatsCollectNow] Actor {actor_repr} (Stage: {stage_name}) "
-                                f"invalid stats format: {stats}. Defaulting."
+                                f"[StatsCollectNow] Actor {actor} (Stage '{stage_name}') returned invalid stats."
                             )
-                            actor_stats_results[actor] = {"active_processing": 0}
                             overall_success = False
-                            actors_errored += 1
-                    except RayActorError as e:
-                        logger.error(
-                            f"[StatsCollectNow] Actor {actor_repr} unavailable/errored getting stats "
-                            f"(Stage: {stage_name}): {e}"
-                        )
-                        actor_stats_results[actor] = {"active_processing": 0}
-                        overall_success = False
-                        actors_errored += 1
                     except Exception as e:
-                        logger.error(
-                            f"[StatsCollectNow] Unexpected error processing stats from actor "
-                            f"{actor_repr} (Stage: {stage_name}): {e}",
-                            exc_info=True,
-                        )
-                        actor_stats_results[actor] = {"active_processing": 0}
-                        overall_success = False
-                        actors_errored += 1
-
-                # Process timed out refs...
-                actors_timed_out = len(remaining_refs)
-                if actors_timed_out > 0:
-                    overall_success = False
-                    for ref in remaining_refs:
-                        actor, stage_name = actor_tasks[ref]
-                        actor_repr = repr(actor)
                         logger.warning(
-                            f"[StatsCollectNow] Timeout ({self._actor_timeout}s) getting stats from actor "
-                            f"{actor_repr} (Stage: {stage_name})."
+                            f"[StatsCollectNow] Error getting stats for actor {actor} (Stage '{stage_name}'): {e}"
                         )
-                        actor_stats_results[actor] = {"active_processing": 0}
+                        overall_success = False
 
-            except Exception as e:  # Error during ray.wait itself
-                logger.error(f"[StatsCollectNow] Error during ray.wait for actor stats: {e}", exc_info=True)
+                if remaining_refs:
+                    logger.warning(f"[StatsCollectNow] {len(remaining_refs)} actor stats requests timed out.")
+                    overall_success = False
+
+            except Exception as e:
+                logger.error(f"[StatsCollectNow] Error during actor stats collection: {e}", exc_info=True)
                 overall_success = False
-                actors_errored += len(actor_tasks) - len(ready_refs) - len(remaining_refs)
-                for ref in actor_tasks:  # Default remaining
-                    if ref not in ready_refs and ref not in remaining_refs:
-                        actor, stage_name = actor_tasks[ref]
-                        if actor not in actor_stats_results:
-                            actor_stats_results[actor] = {"active_processing": 0}
 
-            if actors_timed_out > 0 or actors_errored > 0:
-                logger.warning(
-                    f"[StatsCollectNow] Actor summary: {actors_processed} success, {actors_timed_out} "
-                    f"timeouts, {actors_errored} errors."
-                )
-
-        # --- 4. Aggregate Stats per Stage ---
-        logger.debug("[StatsCollectNow] Aggregating collected stats...")
+        # --- 4. Aggregate In-Flight Stats ---
         for stage_info in current_stages:
             stage_name = stage_info.name
-            # stage_stats_updates already initialized
+            input_queues = [q_name for q_name in current_edge_queues.keys() if q_name.endswith(f"_to_{stage_name}")]
+            total_queued = sum(queue_sizes.get(q, 0) for q in input_queues)
+            stage_stats_updates[stage_name]["in_flight"] += total_queued
 
-            # Sum processing count
-            actors_for_stage = current_stage_actors.get(stage_name, [])
-            processing_count = 0
-            for actor in actors_for_stage:
-                stats = actor_stats_results.get(actor, {"active_processing": 0})
-                processing_count += int(stats.get("active_processing", 0))
-            stage_stats_updates[stage_name]["processing"] = processing_count
-
-            # Sum queue sizes for input queues
-            input_edges = [ename for ename in current_edge_names if ename.endswith(f"_to_{stage_name}")]
-            total_queued = 0
-            queue_read_error_for_stage = False
-            for ename in input_edges:
-                q_size = queue_sizes.get(ename, 0)  # Default 0 if missing
-                if q_size == -1:  # Error case
-                    logger.warning(f"[StatsAggregate] Using 0 for errored queue {ename} input to {stage_name}.")
-                    queue_read_error_for_stage = True
-                else:
-                    total_queued += q_size
-
-            if queue_read_error_for_stage:
-                overall_success = False  # Mark as potentially inaccurate
-
-            stage_in_flight = processing_count + total_queued
-            stage_stats_updates[stage_name]["in_flight"] = stage_in_flight
-
-        collection_duration = time.time() - collection_start_time
-        logger.info(
-            f"[StatsCollectNow] Finished collection cycle. Duration: {collection_duration:.3f}s. "
-            f"Overall success: {overall_success}"
-        )
+        logger.info(f"[StatsCollectNow] Stats collection complete. Overall success: {overall_success}")
         return stage_stats_updates, overall_success

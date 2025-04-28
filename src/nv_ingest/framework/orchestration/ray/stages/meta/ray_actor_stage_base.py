@@ -4,7 +4,6 @@
 
 import threading
 import time
-import uuid
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
@@ -97,12 +96,7 @@ class RayActorStage(ABC):
         # Lock specifically for coordinating the final shutdown sequence (_request_actor_exit)
         self._lock = threading.Lock()
         self._shutdown_signal_complete = False  # Initialize flag
-
-        # --- Additional state variables ---
-        actor_id_str = self._get_actor_id_str()  # Get ID for naming
-
-        # Helper to allow external code to know when a replica is fully shut down.
-        self._shutdown_signal_future_name = f"shutdown_signal_{actor_id_str}_{uuid.uuid4()}"
+        self._shutdown_future: Optional[ray.ObjectRef] = None
 
     @staticmethod
     def _get_actor_id_str() -> str:
@@ -279,6 +273,34 @@ class RayActorStage(ABC):
                 # Log errors during the scheduling of the exit call
                 logger.exception(f"{actor_id_str}: Failed to schedule _request_actor_exit: {e}")
 
+    @staticmethod
+    @ray.remote
+    def _immediate_true() -> bool:
+        """
+        A tiny remote method that immediately returns True.
+        Used to create a resolved ObjectRef when shutdown is already complete.
+        """
+        return True
+
+    @staticmethod
+    @ray.remote
+    def _monitor_shutdown(shutdown_signal: ray.ObjectRef) -> bool:
+        """
+        A small remote function that waits for the shutdown signal to complete.
+        """
+        import time
+
+        while True:
+            if ray.get(shutdown_signal):
+                return True
+            time.sleep(0.1)  # Sleep briefly to avoid tight loop
+
+    def _shutdown_signal_complete_ref(self) -> ray.ObjectRef:
+        """
+        Returns a Ray object ref to the shutdown signal boolean.
+        """
+        return ray.put(self._shutdown_signal_complete)
+
     @ray.method(num_returns=1)
     def _request_actor_exit(self) -> None:
         """
@@ -348,35 +370,36 @@ class RayActorStage(ABC):
         return True
 
     @ray.method(num_returns=1)
-    def stop(self) -> bool:
+    def stop(self) -> ray.ObjectRef:
         """
-        Signals the actor's processing loop to stop gracefully.
-
-        Sets the `running` flag to False. The background processing thread will
-        detect this flag, finish its current task (if any), and then initiate
-        the actor exit sequence via `_request_actor_exit`. This method returns
-        immediately and does not wait for the actor to fully shut down.
+        Signals the actor's processing loop to stop gracefully and returns a future
+        that resolves when shutdown is complete.
 
         Returns
         -------
-        bool
-            True if the stop signal was sent (i.e., the actor was running),
-            False if the actor was already stopped.
+        ObjectRef[bool]
+            A Ray future that resolves to True when shutdown is complete.
         """
         actor_id_str = self._get_actor_id_str()
         logger.info(f"{actor_id_str}: Received external stop request.")
 
-        # Check if the actor is actually running
+        if self._shutdown_future is not None:
+            logger.debug(f"{actor_id_str}: Stop called again, returning existing shutdown future.")
+            return self._shutdown_future
+
         if not self.running:
             logger.warning(f"{actor_id_str}: Stop called but actor was not running.")
-            return True
+            # Return an immediate future
+            self._shutdown_future = self._immediate_true.remote()
+            return self._shutdown_future
 
-        # Signal the processing loop to stop by setting the flag
+        # --- Initiate Shutdown ---
         self.running = False
         logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
 
-        # Note: The actual termination happens asynchronously when the loop finishes.
-        return True
+        # --- Spawn shutdown watcher task ---
+        self._shutdown_future = self._monitor_shutdown.remote(self._shutdown_signal_complete_ref())
+        return self._shutdown_future
 
     @ray.method(num_returns=1)
     def is_shutdown_complete(self) -> bool:
