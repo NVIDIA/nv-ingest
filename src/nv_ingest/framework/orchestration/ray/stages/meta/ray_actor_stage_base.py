@@ -319,6 +319,8 @@ class RayActorStage(ABC):
 
         logger.info(f"{actor_id_str}: Executing actor exit process.")
         try:
+            if self._processing_thread and self._processing_thread.is_alive():
+                self._processing_thread.join(timeout=5)
             ray.actor.exit_actor()
 
         except Exception as e:
