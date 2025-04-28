@@ -47,3 +47,5 @@ class InfographicExtractorStage(RayActorStage):
 
         control_message.payload(new_df)
         control_message.set_metadata("infographic_extraction_info", extraction_info)
+
+        return control_message
