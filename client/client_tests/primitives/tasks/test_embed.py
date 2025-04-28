@@ -62,9 +62,7 @@ def test_embed_task_to_dict(
     filter_errors,
 ):
 
-    task = EmbedTask(
-        endpoint_url=endpoint_url, model_name=model_name, api_key=api_key, filter_errors=filter_errors
-    )
+    task = EmbedTask(endpoint_url=endpoint_url, model_name=model_name, api_key=api_key, filter_errors=filter_errors)
 
     expected_dict = {"type": "embed", "task_properties": {"filter_errors": filter_errors}}
 
