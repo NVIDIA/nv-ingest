@@ -32,8 +32,7 @@ from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from scipy.sparse import csr_array
-import numpy as np
-from tritonclient.grpc import InferenceServerClient, InferInput, InferRequestedOutput
+from nv_ingest_client.util.transport import infer_microservice
 
 
 logger = logging.getLogger(__name__)
@@ -778,6 +777,7 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
         if task.state == BulkInsertState.ImportFailed:
             print("Failed reason:", task.failed_reason)
         time.sleep(1)
+    # connections.load(collection_name=collection_name)
 
 
 def create_bm25_model(
@@ -887,6 +887,8 @@ def stream_insert_milvus(
     count = 0
     for result in records:
         if result is not None:
+            if not isinstance(result, list):
+                result = [result]
             for element in result:
                 text = _pull_text(
                     element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
@@ -1043,7 +1045,6 @@ def write_to_nvingest_collection(
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
         # passes before running a search against the collection.\
-        time.sleep(20)
 
 
 def dense_retrieval(
@@ -1497,50 +1498,6 @@ def get_embeddings(full_records, embedder, batch_size=256):
     return embedded
 
 
-def infer_batch(text_batch: list[str], client: InferenceServerClient, model_name: str, parameters: dict):
-    text_np = np.array([[text.encode("utf-8")] for text in text_batch], dtype=np.object_)
-    text_input = InferInput("text", text_np.shape, "BYTES")
-    text_input.set_data_from_numpy(text_np)
-    infer_input = [text_input]
-    infer_output = [InferRequestedOutput(nn) for nn in ["token_count", "embeddings"]]
-    result = client.infer(
-        model_name=model_name,
-        parameters=parameters,
-        inputs=infer_input,
-        outputs=infer_output,
-    )
-    token_count, embeddings = result.as_numpy("token_count"), result.as_numpy("embeddings")
-    return token_count, embeddings
-
-
-def infer_with_grpc(
-    text_ls: list[str],
-    model_name: str,
-    grpc_host: str = "localhost:8001",
-):
-    parameters = {"input_type": "query", "truncate": "END"}
-
-    grpc_client = InferenceServerClient(url=grpc_host, verbose=False)
-    config = grpc_client.get_model_config(model_name=model_name).config
-    max_batch_size = config.max_batch_size
-    total_token_count = 0
-    embeddings_ls = []
-    embed_payload = [res["metadata"]["content"] for res in text_ls]
-    for offset in range(0, len(embed_payload), max_batch_size):
-        text_batch = embed_payload[offset : offset + max_batch_size]
-        token_count, embeddings = infer_batch(
-            text_batch=text_batch,
-            client=grpc_client,
-            model_name=model_name,
-            parameters=parameters,
-        )
-        if token_count is not None:
-            total_token_count += token_count.prod()
-        embeddings_ls.append(embeddings)
-    embeddings = np.concatenate(embeddings_ls)
-    return total_token_count, embeddings
-
-
 def embed_index_collection(
     data,
     collection_name,
@@ -1568,6 +1525,8 @@ def embed_index_collection(
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
+    intput_type: str = "passage",
+    truncate: str = "END",
     **kwargs,
 ):
     """
@@ -1612,10 +1571,10 @@ def embed_index_collection(
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
-    # embed_model = NVIDIAEmbedding(
-    #     base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key, truncate="END"
-    # )
-
+    # if not scheme we assume we are using grpc
+    grpc = "http" not in urlparse(embedding_endpoint).scheme
+    kwargs.pop("input_type", None)
+    kwargs.pop("truncate", None)
     mil_op = MilvusOperator(
         collection_name=collection_name,
         milvus_uri=milvus_uri,
@@ -1646,19 +1605,27 @@ def embed_index_collection(
             results = None
             with open(results_file, "r") as infile:
                 results = json.loads(infile.read())
-            _, embeddings = infer_with_grpc(results, model_name, embedding_endpoint)
+                embeddings = infer_microservice(
+                    results, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+                )
             for record, emb in zip(results, embeddings):
                 record["metadata"]["embedding"] = emb
                 record["document_type"] = "text"
-            mil_op.run(results)
-            mil_op.milvus_kwargs["recreate"] = False
+            if results is not None and len(results) > 0:
+                mil_op.run(results)
+                mil_op.milvus_kwargs["recreate"] = False
     # running all at once
     else:
-        _, embeddings = infer_with_grpc(data, model_name, embedding_endpoint)
+        embeddings = infer_microservice(
+            data, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+        )
         for record, emb in zip(data, embeddings):
             record["metadata"]["embedding"] = emb
             record["document_type"] = "text"
-        mil_op.run(data)
+        # this check ensures that we do not purge the current collection
+        # without having some actual data to insert.
+        if data is not None and len(data) > 0:
+            mil_op.run(data)
 
 
 def reindex_collection(
@@ -1690,6 +1657,8 @@ def reindex_collection(
     meta_fields: list[str] = None,
     embed_batch_size: int = 256,
     query_batch_size: int = 1000,
+    input_type: str = "passage",
+    truncate: str = "END",
     **kwargs,
 ):
     """
@@ -1763,6 +1732,8 @@ def reindex_collection(
         meta_dataframe=meta_dataframe,
         meta_source_field=meta_source_field,
         meta_fields=meta_fields,
+        input_type=input_type,
+        truncate=truncate,
         **kwargs,
     )
 
