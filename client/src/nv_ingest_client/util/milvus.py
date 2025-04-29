@@ -1039,7 +1039,7 @@ def write_to_nvingest_collection(
         # this sleep is required, to ensure atleast this amount of time
         # passes before running a search against the collection.\
 
-    client.flush(collection_name)
+    client.flush(collection_name) 
     client.load_collection(collection_name=collection_name)
 
 
