@@ -122,7 +122,7 @@ def pdfium_try_get_bitmap_as_numpy(image_obj) -> np.ndarray:
 @traceable_func(trace_name="pdf_content_extractor::pdfium_pages_to_numpy")
 def pdfium_pages_to_numpy(
     pages: List[pdfium.PdfPage],
-    render_dpi: int = 72,
+    render_dpi: int = 300,
     scale_tuple: Optional[Tuple[int, int]] = None,
     padding_tuple: Optional[Tuple[int, int]] = None,
     rotation: int = 0,
@@ -394,7 +394,7 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
     try:
         original_images, _ = pdfium_pages_to_numpy(
             [page],  # A batch with a single image.
-            render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
+            render_dpi=300,  # dpi = 72 is equivalent to scale = 1.
             rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
         )
         image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge, **kwargs)
