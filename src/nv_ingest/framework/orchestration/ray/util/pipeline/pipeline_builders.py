@@ -6,6 +6,7 @@
 # flake8: noqa
 
 import json
+import logging
 import math
 import os
 from typing import Dict, Any
@@ -33,6 +34,8 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_pptx_extractor_stage,
     add_infographic_extractor_stage,
 )
+
+logger = logging.getLogger("uvicorn")
 
 
 def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any]):
@@ -65,6 +68,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     ########################################################################################################
     ## Insertion and Pre-processing stages
     ########################################################################################################
+    logger.debug("Setting up ingestion pipeline")
     source_stage = add_source_stage(pipeline, default_cpu_count)
     # TODO(Devin)
     # submitted_job_counter_stage = add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
@@ -118,36 +122,38 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     # completed_job_counter_stage = add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
+    ingest_edge_buffer_size = int(os.environ.get("INGEST_EDGE_BUFFER_SIZE", 32))
+
     # Add edges
     ###### INTAKE STAGES ########
-    pipeline.make_edge("source", "metadata_injection", queue_size=16)
-    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=16)
+    pipeline.make_edge("source", "metadata_injection", queue_size=ingest_edge_buffer_size)
+    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=INGEST_EDGE_BUFFER_SIZE)
     pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=128)  # to limit memory pressure
 
     ###### Document Extractors ########
-    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=16)
-    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=16)
-    pipeline.make_edge("docx_extractor", "pptx_extractor", queue_size=16)
-    pipeline.make_edge("pptx_extractor", "image_extractor", queue_size=16)
-    pipeline.make_edge("image_extractor", "infographic_extractor", queue_size=16)
-    pipeline.make_edge("infographic_extractor", "table_extractor", queue_size=16)
+    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("docx_extractor", "pptx_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("pptx_extractor", "image_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("image_extractor", "infographic_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("infographic_extractor", "table_extractor", queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Extractors ########
-    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=16)
-    pipeline.make_edge("chart_extractor", "image_filter", queue_size=16)
+    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("chart_extractor", "image_filter", queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Mutators ########
-    pipeline.make_edge("image_filter", "image_dedup", queue_size=16)
-    pipeline.make_edge("image_dedup", "text_splitter", queue_size=16)
+    pipeline.make_edge("image_filter", "image_dedup", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("image_dedup", "text_splitter", queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Transforms ########
-    pipeline.make_edge("text_splitter", "text_embedding", queue_size=16)
-    pipeline.make_edge("text_embedding", "image_caption", queue_size=16)
-    pipeline.make_edge("image_caption", "image_storage", queue_size=16)
+    pipeline.make_edge("text_splitter", "text_embedding", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("text_embedding", "image_caption", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("image_caption", "image_storage", queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Storage ########
-    pipeline.make_edge("image_storage", "embedding_storage", queue_size=16)
-    pipeline.make_edge("embedding_storage", "sink", queue_size=16)
+    pipeline.make_edge("image_storage", "embedding_storage", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("embedding_storage", "sink", queue_size=ingest_edge_buffer_size)
 
     pipeline.build()
 

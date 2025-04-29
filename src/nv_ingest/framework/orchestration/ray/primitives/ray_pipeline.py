@@ -270,7 +270,7 @@ class RayPipeline:
         logger.debug(f"[Build-WaitWiring] Waiting for {len(wiring_refs)} wiring calls...")
         try:
             ray.get(wiring_refs)
-            logger.info("[Build-WaitWiring] All wiring calls completed.")
+            logger.debug("[Build-WaitWiring] All wiring calls completed.")
         except Exception as e:
             logger.error(f"[Build-WaitWiring] Error during wiring confirmation: {e}", exc_info=True)
             raise RuntimeError("Build failed: error confirming initial wiring") from e
@@ -281,6 +281,7 @@ class RayPipeline:
         if min_replicas < 1:
             logger.warning(f"Source stage '{name}': min_replicas must be >= 1. Overriding.")
             min_replicas = 1
+
         stage_info = StageInfo(
             name=name,
             callable=source_actor,
@@ -538,7 +539,7 @@ class RayPipeline:
         # Register actors pending removal (with their shutdown futures)
         if actors_to_register_map:
             num_registered = sum(len(v) for v in actors_to_register_map.values())
-            logger.info(
+            logger.debug(
                 f"[ScaleDown-{stage_name}] Registering {num_registered} "
                 f"actor handles with topology for shutdown monitoring."
             )
@@ -551,7 +552,7 @@ class RayPipeline:
                 )
                 self.topology.update_scaling_state(stage_name, "Error")
         elif actors_to_remove:
-            logger.info(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
+            logger.warning(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
 
         total_attempted = len(actors_to_remove)
         logger.info(
@@ -795,13 +796,13 @@ class RayPipeline:
                             logger.error(f"Failed sending set_input_queue to {actor}: {e}")
 
             if wiring_refs:
-                logger.info(f"Waiting up to {wiring_timeout}s for {len(wiring_refs)} actors to re-wire...")
+                logger.debug(f"Waiting up to {wiring_timeout}s for {len(wiring_refs)} actors to re-wire...")
                 try:
                     ready, not_ready = ray.wait(wiring_refs, num_returns=len(wiring_refs), timeout=wiring_timeout)
                     if not_ready:
                         raise RuntimeError("Actor re-wiring timed out or failed.")
                     ray.get(ready)  # Check for internal errors
-                    logger.info(f"{len(ready)} actors re-wired successfully.")
+                    logger.debug(f"{len(ready)} actors re-wired successfully.")
                 except Exception as e:
                     raise RuntimeError("Actor re-wiring failed.") from e
 
@@ -979,7 +980,7 @@ class RayPipeline:
             return
 
         max_workers = min(len(stages_needing_action), 8)
-        logger.info(
+        logger.debug(
             f"[ScalingApply] Submitting {len(stages_needing_action)} scaling actions ({max_workers} workers)..."
         )
         action_results = {}

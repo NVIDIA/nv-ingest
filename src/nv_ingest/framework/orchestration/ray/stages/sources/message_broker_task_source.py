@@ -32,7 +32,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import validate_inges
 from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
-logging.basicConfig(level=logging.WARNING)
 logger = logging.getLogger(__name__)
 
 
@@ -130,7 +129,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     def _create_client(self):
         # Access broker config via self.config.broker_client
         broker_config = self.config.broker_client
-        logger.debug("Creating client of type: %s", broker_config.client_type)
+        logger.info("Creating client of type: %s", broker_config.client_type)
 
         if broker_config.client_type == "redis":
             client = RedisClient(

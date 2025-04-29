@@ -31,6 +31,7 @@ from nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink
 from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import (
     MessageBrokerTaskSourceStage,
     MessageBrokerTaskSourceConfig,
+    start_simple_message_broker,
 )
 from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import ImageStorageStage
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
@@ -528,3 +529,6 @@ def add_source_stage(pipeline, default_cpu_count):
         min_replicas=1,
         max_replicas=1,
     )
+
+    if source_config.broker_client.client_type == "simple":
+        start_simple_message_broker(source_config.broker_client.model_dump())

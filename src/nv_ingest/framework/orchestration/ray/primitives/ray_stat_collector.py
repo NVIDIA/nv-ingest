@@ -130,7 +130,7 @@ class RayStatsCollector:
                 if self._thread.is_alive():
                     logger.warning(f"Stats collector thread did not stop gracefully after {join_timeout:.1f}s.")
                 else:
-                    logger.info("Stats collector thread joined successfully.")
+                    logger.debug("Stats collector thread joined successfully.")
                 self._thread = None
             else:
                 logger.warning("Stop called for stats collector, but thread object was None.")
@@ -327,5 +327,5 @@ class RayStatsCollector:
             total_queued = sum(queue_sizes.get(q, 0) for q in input_queues)
             stage_stats_updates[stage_name]["in_flight"] += total_queued
 
-        logger.info(f"[StatsCollectNow] Stats collection complete. Overall success: {overall_success}")
+        logger.debug(f"[StatsCollectNow] Stats collection complete. Overall success: {overall_success}")
         return stage_stats_updates, overall_success

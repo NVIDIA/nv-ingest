@@ -223,7 +223,7 @@ class PipelineTopology:
                     stages_updated.add(stage_name)
 
         if added_count > 0:
-            logger.info(
+            logger.debug(
                 f"[TopologyRegister] Registered {added_count} "
                 f"actors across {len(stages_updated)} stages pending removal."
             )
@@ -325,7 +325,7 @@ class PipelineTopology:
                                 try:
                                     ready, _ = ray.wait([shutdown_future], timeout=PENDING_CHECK_ACTOR_METHOD_TIMEOUT)
                                     if ready:
-                                        logger.info(
+                                        logger.debug(
                                             f"[TopologyCleanupLoop-{stage_name}] "
                                             f"Actor '{actor_id_str}' shutdown future completed. Marking for removal."
                                         )
@@ -348,7 +348,7 @@ class PipelineTopology:
 
                             # 3. Perform removal actions
                             if remove_from_topology:
-                                logger.info(
+                                logger.debug(
                                     f"[TopologyCleanupLoop-{stage_name}] Removing actor '{actor_id_str}' "
                                     f"from topology (Reason: {actor_status})."
                                 )
@@ -383,7 +383,7 @@ class PipelineTopology:
                             stages_with_empty_pending.append(stage_to_check)
                             del self._pending_removal_actors[stage_to_check]
                             if self._scaling_state.get(stage_to_check) == "Scaling Down Pending":
-                                logger.info(
+                                logger.debug(
                                     f"[TopologyCleanupLoop-{stage_to_check}] All pending actors cleared. "
                                     f"Setting scaling state to Idle."
                                 )
@@ -392,7 +392,7 @@ class PipelineTopology:
                     # --- Log cycle summary ---
                     cycle_duration = time.time() - cycle_start_time
                     if actors_removed_this_cycle > 0:
-                        logger.info(
+                        logger.debug(
                             f"[TopologyCleanupLoop] Cleanup cycle finished in {cycle_duration:.3f}s. "
                             f"Removed {actors_removed_this_cycle} actors."
                         )
@@ -406,7 +406,6 @@ class PipelineTopology:
                 logger.error(f"[TopologyCleanupLoop] Unhandled error in cleanup loop iteration: " f"{e}", exc_info=True)
 
             # --- Wait until next cycle ---
-            logger.debug(f"[TopologyCleanupLoop] Sleeping for {CLEANUP_INTERVAL_SECONDS}s...")
             woken_by_stop = self._stop_event.wait(timeout=CLEANUP_INTERVAL_SECONDS)
             if woken_by_stop:
                 logger.info("[TopologyCleanupLoop] Stop event received during sleep. Exiting loop.")
@@ -453,7 +452,8 @@ class PipelineTopology:
             self._edge_queues.clear()
             self._scaling_state.clear()
             self._is_flushing = False  # Reset flushing state too
-            logger.info("Cleared runtime state (actors, queues, scaling state, flushing flag).")
+
+            logger.debug("Cleared runtime state (actors, queues, scaling state, flushing flag).")
 
     # --- Accessor Methods (Read Operations - Use Lock, Return Copies) ---
 

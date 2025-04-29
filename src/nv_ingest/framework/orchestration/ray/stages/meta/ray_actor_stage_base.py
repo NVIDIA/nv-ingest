@@ -321,6 +321,8 @@ class RayActorStage(ABC):
         try:
             if self._processing_thread and self._processing_thread.is_alive():
                 self._processing_thread.join(timeout=5)
+                time.sleep(0.1)  # Allow time for thread cleanup
+
             ray.actor.exit_actor()
 
         except Exception as e:
