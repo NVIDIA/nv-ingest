@@ -50,6 +50,9 @@ _DEFAULT_EXTRACTOR_MAP = {
     "xml": "lxml",
     "mp3": "audio",
     "wav": "audio",
+    "json": "txt",
+    "md": "txt",
+    "sh": "txt",
 }
 
 _Type_Extract_Method_PDF = Literal[
@@ -152,7 +155,7 @@ class ExtractTaskSchema(BaseModel):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
 
         # Skip validation for txt and html types since it does not have an extract stage.
-        if document_type in ["txt", "text", "html"]:
+        if document_type in ["txt", "text", "html", "json", "md", "sh"]:
             return
 
         valid_methods = set(_Type_Extract_Method_Map[document_type])
