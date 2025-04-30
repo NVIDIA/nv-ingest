@@ -11,10 +11,18 @@ from typing import Dict, Any
 import ray
 from pydantic import BaseModel, ConfigDict
 
-from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
+from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline, ScalingConfig
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
 
 logger = logging.getLogger(__name__)
+
+
+def str_to_bool(value: str) -> bool:
+    return value.strip().lower() in {"1", "true", "yes", "on"}
+
+
+DISABLE_DYNAMIC_SCALING = str_to_bool(os.environ.get("INGEST_DISABLE_DYNAMIC_SCALING", "false"))
+DYNAMIC_MEMORY_THRESHOLD = float(os.environ.get("INGEST_DYNAMIC_MEMORY_THRESHOLD", 0.75))
 
 
 class PipelineCreationSchema(BaseModel):
@@ -95,7 +103,13 @@ def _launch_pipeline(ingest_config: Dict[str, Any]) -> float:
     logger.info("Starting pipeline setup")
 
     # Initialize the pipeline with the configuration
-    pipeline = RayPipeline()
+
+    dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
+    scaling_config = ScalingConfig(
+        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=DYNAMIC_MEMORY_THRESHOLD
+    )
+
+    pipeline = RayPipeline(scaling_config=scaling_config)
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline

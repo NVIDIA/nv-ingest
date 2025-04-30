@@ -31,7 +31,7 @@ logger = logging.getLogger(__name__)
 class ScalingConfig:
     """Configuration for PID and Resource Constraint Manager based scaling."""
 
-    dynamic_memory_scaling: bool = False
+    dynamic_memory_scaling: bool = True
     dynamic_memory_threshold: float = 0.75
     pid_kp: float = 0.1
     pid_ki: float = 0.001
@@ -202,7 +202,13 @@ class RayPipeline:
 
         for stage in current_stages:
             replicas = []
-            num_initial_actors = max(stage.min_replicas, 1) if stage.is_source or stage.is_sink else stage.min_replicas
+
+            if not self.dynamic_memory_scaling:
+                num_initial_actors = stage.max_replicas
+            else:
+                num_initial_actors = (
+                    max(stage.min_replicas, 1) if stage.is_source or stage.is_sink else stage.min_replicas
+                )
 
             if num_initial_actors > 0:
                 logger.debug(f"[Build-Actors] Stage '{stage.name}' creating {num_initial_actors} initial actor(s).")
@@ -611,6 +617,7 @@ class RayPipeline:
     def _is_pipeline_quiet(self) -> bool:
         """Checks if pipeline is quiet using topology state and stats collector."""
 
+        # TODO(Devin)
         return False  # disabled for now
         # Check topology state first
         if self.topology.get_is_flushing():
@@ -1017,6 +1024,11 @@ class RayPipeline:
     def _perform_scaling_and_maintenance(self) -> None:
         """Orchestrates scaling/maintenance using topology and stats collector."""
         logger.debug("--- Performing Scaling & Maintenance Cycle ---")
+
+        if not self.dynamic_memory_scaling:
+            logger.debug("Dynamic memory scaling disabled. Skipping cycle.")
+            return
+
         cycle_start_time = time.time()
 
         # Check flushing state via topology
