@@ -65,6 +65,7 @@ nav:
         - Notebooks: extraction/notebooks.md
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
+        - Split Documents: extraction/chunking.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
         - Upload Data: extraction/data-store.md
