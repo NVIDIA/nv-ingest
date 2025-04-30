@@ -80,7 +80,7 @@ def infer_with_http(
     return all_embeddings
 
 
-def infer_batch(text_batch: list[str], client: InferenceServerClient, model_name: str, parameters: dict):
+def infer_batch_grpc(text_batch: list[str], client: InferenceServerClient, model_name: str, parameters: dict):
     text_np = np.array([[text.encode("utf-8")] for text in text_batch], dtype=np.object_)
     text_input = InferInput("text", text_np.shape, "BYTES")
     text_input.set_data_from_numpy(text_np)
@@ -117,7 +117,7 @@ def infer_with_grpc(
     embed_payload = [res["metadata"]["content"] for res in text_ls]
     for offset in range(0, len(embed_payload), batch_size):
         text_batch = embed_payload[offset : offset + batch_size]
-        token_count, embeddings = infer_batch(
+        token_count, embeddings = infer_batch_grpc(
             text_batch=text_batch,
             client=grpc_client,
             model_name=model_name,

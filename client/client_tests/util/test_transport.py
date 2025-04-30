@@ -6,7 +6,7 @@ from nv_ingest_client.util.transport import (
     infer_microservice,
     infer_batch_http,
     infer_with_http,
-    infer_batch,
+    infer_batch_grpc,
     infer_with_grpc,
 )
 
@@ -110,7 +110,7 @@ def test_infer_batch(mock_grpc_client):
     ]
     mock_grpc_client.infer.return_value = mock_result
 
-    token_count, embeddings = infer_batch(
+    token_count, embeddings = infer_batch_grpc(
         text_batch=["test1", "test2"],
         client=mock_grpc_client,
         model_name="test_model",
