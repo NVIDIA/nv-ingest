@@ -9,7 +9,8 @@ from typing import Any, Dict, List, Tuple, Literal, Optional, Union
 from pydantic import BaseModel, Field
 import ray
 
-from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
+from api.build.lib.nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
@@ -74,7 +75,7 @@ class MessageBrokerTaskSinkConfig(BaseModel):
 
 
 @ray.remote
-class MessageBrokerTaskSinkStage(RayActorSinkStage):
+class MessageBrokerTaskSinkStage(RayActorStage):
     def __init__(self, config: MessageBrokerTaskSinkConfig) -> None:
         super().__init__(config)
 
@@ -222,10 +223,12 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
         self.client.submit_message(response_channel, json.dumps(fail_msg))
 
     # --- Public API Methods for Sink Stage ---
-    def on_data(self, control_message: Any) -> Any:
+    def on_data(self, control_message: IngestControlMessage) -> Any:
         """
         For this sink stage, no additional transformation is performed.
         """
+        control_message = self.write_output(control_message)
+
         return control_message
 
     def write_output(self, control_message: Any) -> Any:
@@ -257,6 +260,7 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
             logger.debug(f"Sink Total JSON payload size: {total_size_mb:.2f} MB")
             annotate_cm(control_message, message="Pushed")
             self._push_to_broker(json_payloads, response_channel)
+
         except ValueError as e:
             mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
             self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
@@ -264,5 +268,7 @@ class MessageBrokerTaskSinkStage(RayActorSinkStage):
             logger.exception(f"Critical error processing message: {e}")
             mdf_size = len(mdf) if mdf is not None and not mdf.empty else 0
             self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
+
         self.message_count += 1
+
         return control_message

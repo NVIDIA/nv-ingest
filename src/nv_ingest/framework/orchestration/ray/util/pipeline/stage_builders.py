@@ -9,6 +9,8 @@ import os
 import click
 import logging
 
+from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
+from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
 # Import our new pipeline class.
@@ -359,6 +361,27 @@ def add_audio_extractor_stage(pipeline, default_cpu_count):
     )
 
 
+def add_otel_tracer_stage(pipeline, default_cpu_count):
+    _ = default_cpu_count  # Placeholder for future use
+    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+
+    otel_tracer_config = OpenTelemetryTracerSchema(
+        **{
+            "otel_endpoint": otel_endpoint,
+        }
+    )
+
+    pipeline.add_stage(
+        name="otel_tracer",
+        stage_actor=OpenTelemetryTracerStage,
+        config=otel_tracer_config,
+        min_replicas=0,
+        max_replicas=2,
+    )
+
+    return "otel_tracer"
+
+
 def add_image_dedup_stage(pipeline, default_cpu_count):
     config = ImageDedupSchema()
 
@@ -493,9 +516,9 @@ def add_sink_stage(pipeline, default_cpu_count):
         }
     )
 
-    pipeline.add_sink(
-        name="sink",
-        sink_actor=MessageBrokerTaskSinkStage,
+    pipeline.add_stage(
+        name="redis_return_sink",
+        stage_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
         min_replicas=0,
         max_replicas=2,

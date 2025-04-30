@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import sys
 import threading
 import time
 from abc import ABC, abstractmethod
@@ -14,6 +15,19 @@ import logging
 from ray import get_runtime_context
 
 logger = logging.getLogger(__name__)
+
+
+def setup_stdout_logging(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
+    logger = logging.getLogger(name)
+    logger.setLevel(level)
+
+    if not any(isinstance(h, logging.StreamHandler) for h in logger.handlers):
+        handler = logging.StreamHandler(sys.stdout)
+        handler.setLevel(level)
+        handler.setFormatter(logging.Formatter("%(asctime)s %(levelname)s %(name)s: %(message)s"))
+        logger.addHandler(handler)
+
+    return logger
 
 
 class RayActorStage(ABC):
@@ -65,7 +79,7 @@ class RayActorStage(ABC):
         Lock to protect access to shutdown-related state (`_shutting_down`).
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, log_to_stdout=False) -> None:
         """
         Initialize the RayActorStage.
 
@@ -97,6 +111,10 @@ class RayActorStage(ABC):
         self._lock = threading.Lock()
         self._shutdown_signal_complete = False  # Initialize flag
         self._shutdown_future: Optional[ray.ObjectRef] = None
+
+        # --- Logging ---
+        # Ray won't propagate logging to the root logger by default, so we set up a custom logger for debugging
+        self._logger = setup_stdout_logging(self.__class__.__name__) if log_to_stdout else logging.getLogger(__name__)
 
     @staticmethod
     def _get_actor_id_str() -> str:

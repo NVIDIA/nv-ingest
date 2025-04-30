@@ -157,72 +157,102 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             return client
 
     @staticmethod
-    def _process_message(job: dict, ts_fetched: datetime) -> any:
+    def _process_message(job: dict, ts_fetched: datetime) -> Any:
         """
         Process a raw job fetched from the message broker into an IngestControlMessage.
         """
         control_message = IngestControlMessage()
         job_id = None
+
         try:
+            # Log the payload (with content redacted) if in debug mode
             if logger.isEnabledFor(logging.DEBUG):
                 no_payload = copy.deepcopy(job)
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]
                 logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
+
+            # Validate incoming job structure
             validate_ingest_job(job)
+
             ts_entry = datetime.now()
             job_id = job.pop("job_id")
+
             job_payload = job.get("job_payload", {})
             job_tasks = job.get("tasks", [])
             tracing_options = job.pop("tracing_options", {})
-            do_trace_tagging = tracing_options.get("trace", False)
-            ts_send = tracing_options.get("ts_send", None)
+
+            # Extract tracing options
+            do_trace_tagging = tracing_options.get("trace", True)
+            if do_trace_tagging in (True, "True", "true", "1"):
+                do_trace_tagging = True
+
+            ts_send = tracing_options.get("ts_send")
             if ts_send is not None:
                 ts_send = datetime.fromtimestamp(ts_send / 1e9)
-            trace_id = tracing_options.get("trace_id", None)
+            trace_id = tracing_options.get("trace_id")
+
+            # Create response channel and load payload
             response_channel = f"{job_id}"
             df = pd.DataFrame(job_payload)
             control_message.payload(df)
             annotate_cm(control_message, message="Created")
+
+            # Add basic metadata
             control_message.set_metadata("response_channel", response_channel)
             control_message.set_metadata("job_id", job_id)
             control_message.set_metadata("timestamp", datetime.now().timestamp())
+
+            # Add task definitions to the control message
             for task in job_tasks:
                 task_id = task.get("id", str(uuid.uuid4()))
                 task_type = task.get("type", "unknown")
                 task_props = task.get("task_properties", {})
+
                 if not isinstance(task_props, dict):
                     task_props = task_props.model_dump()
+
                 task_obj = ControlMessageTask(
                     id=task_id,
                     type=task_type,
                     properties=task_props,
                 )
                 control_message.add_task(task_obj)
+
+            # Apply tracing metadata and timestamps if enabled
+            control_message.set_metadata("config::add_trace_tagging", do_trace_tagging)
             if do_trace_tagging:
                 ts_exit = datetime.now()
-                control_message.set_metadata("config::add_trace_tagging", do_trace_tagging)
+
                 control_message.set_timestamp("trace::entry::message_broker_task_source", ts_entry)
                 control_message.set_timestamp("trace::exit::message_broker_task_source", ts_exit)
+
                 if ts_send is not None:
                     control_message.set_timestamp("trace::entry::broker_source_network_in", ts_send)
                     control_message.set_timestamp("trace::exit::broker_source_network_in", ts_fetched)
+
                 if trace_id is not None:
                     if isinstance(trace_id, int):
                         trace_id = format_trace_id(trace_id)
                     control_message.set_metadata("trace_id", trace_id)
+
                 control_message.set_timestamp("latency::ts_send", datetime.now())
+
             logger.debug("Message processed successfully with job_id: %s", job_id)
+
         except Exception as e:
             logger.exception("Failed to process job submission: %s", e)
+
             if job_id is not None:
                 response_channel = f"{job_id}"
                 control_message.set_metadata("job_id", job_id)
                 control_message.set_metadata("response_channel", response_channel)
                 control_message.set_metadata("cm_failed", True)
+
                 annotate_cm(control_message, message="Failed to process job submission", error=str(e))
             else:
                 raise
+
         return control_message
 
     def _fetch_message(self, timeout=100):

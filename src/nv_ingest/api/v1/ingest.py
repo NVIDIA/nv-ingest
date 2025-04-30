@@ -141,7 +141,7 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             # Add trace_id to job_spec payload
             job_spec_dict = json.loads(job_spec.payload)
             if "tracing_options" not in job_spec_dict:
-                job_spec_dict["tracing_options"] = {}
+                job_spec_dict["tracing_options"] = {"trace": True}
             job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
             updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 

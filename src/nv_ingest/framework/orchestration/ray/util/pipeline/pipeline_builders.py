@@ -33,13 +33,16 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_sink_stage,
     add_pptx_extractor_stage,
     add_infographic_extractor_stage,
+    add_otel_tracer_stage,
 )
 
 logger = logging.getLogger("uvicorn")
 
 
 def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any]):
+    current_level = logging.getLogger().getEffectiveLevel()
     ray.init(
+        logging_level=current_level,
         ignore_reinit_error=True,
         dashboard_host="0.0.0.0",
         dashboard_port=8265,
@@ -113,8 +116,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     #######################################################################################################
     ## Telemetry (Note: everything after the sync stage is out of the hot path, please keep it that way) ##
     #######################################################################################################
-    # TODO(Devin)
-    # otel_tracer_stage = add_otel_tracer_stage(pipe, morpheus_pipeline_config, ingest_config)
+    otel_tracer_stage = add_otel_tracer_stage(pipeline, default_cpu_count)
     # if add_meter_stage:
     #    otel_meter_stage = add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config)
     # else:
@@ -153,7 +155,8 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
 
     ###### Primitive Storage ########
     pipeline.make_edge("image_storage", "embedding_storage", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("embedding_storage", "sink", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("embedding_storage", "redis_return_sink", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge("redis_return_sink", "otel_tracer", queue_size=ingest_edge_buffer_size)
 
     pipeline.build()
 
