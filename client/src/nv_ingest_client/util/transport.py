@@ -22,7 +22,8 @@ def infer_microservice(
     using the NVIDIA embedding microservice.
     """
     if grpc:
-        return infer_with_grpc(data, model_name, embedding_endpoint, input_type, truncate, batch_size)
+        grpc_client = InferenceServerClient(url=embedding_endpoint, verbose=False)
+        return infer_with_grpc(data, model_name, grpc_client, input_type, truncate, batch_size)
     else:
         return infer_with_http(data, model_name, embedding_endpoint, nvidia_api_key, input_type, truncate, batch_size)
 
@@ -98,12 +99,11 @@ def infer_batch(text_batch: list[str], client: InferenceServerClient, model_name
 def infer_with_grpc(
     text_ls: list[dict],
     model_name: str,
-    grpc_host: str = "localhost:8001",
+    grpc_client: InferenceServerClient = None,
     input_type: str = "passage",
     truncate: str = "END",
     batch_size: int = 30,
 ):
-    grpc_client = InferenceServerClient(url=grpc_host, verbose=False)
     config = grpc_client.get_model_config(model_name=model_name).config
     max_batch_size = config.max_batch_size
     if batch_size > max_batch_size:
