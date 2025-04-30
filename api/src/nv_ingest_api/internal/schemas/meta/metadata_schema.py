@@ -156,6 +156,8 @@ class ChartMetadataSchema(BaseModelNoExt):
 class AudioMetadataSchema(BaseModelNoExt):
     audio_transcript: str = ""
     audio_type: str = ""
+    start_time: int
+    end_time: int
 
 
 # TODO consider deprecating this in favor of info msg...

@@ -5,6 +5,7 @@
 import logging
 
 import pandas as pd
+import uuid
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -61,19 +62,32 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
         return metadata
 
     # Modify audio metadata with the result from the inference model
-    audio_result = audio_client.infer(
+    segments, transcript = audio_client.infer(
         base64_audio,
         model_name="parakeet",
         trace_info=trace_info,  # traceable_func arg
         stage_name="audio_extraction",
     )
 
-    row["document_type"] = ContentTypeEnum.AUDIO
-    audio_metadata = {"audio_transcript": audio_result}
-    metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
-    row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
+    # row["document_type"] = ContentTypeEnum.AUDIO
+    # audio_metadata = {"audio_transcript": transcript}
+    # metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+    # row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
 
-    return metadata
+    extracted_data = []
+    for segment in segments:
+        segment_metadata = metadata.copy()
+        audio_metadata = {
+            "audio_transcript": segment["text"],
+            "start_time": segment["start"],
+            "end_time": segment["end"],
+        }
+        segment_metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+        extracted_data.append(
+            [ContentTypeEnum.AUDIO, validate_schema(segment_metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]
+        )
+
+    return extracted_data
 
 
 def extract_text_from_audio_internal(
@@ -137,11 +151,25 @@ def extract_text_from_audio_internal(
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        df_extraction_ledger["metadata"] = df_extraction_ledger.apply(
+        # df_extraction_ledger["metadata"] = df_extraction_ledger.apply(
+        #     _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
+        # )
+
+        # Apply the _update_metadata function to each row in the DataFrame
+        extraction_series = df_extraction_ledger.apply(
             _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
         )
 
-        return df_extraction_ledger, execution_trace_log
+        # Explode the results if the extraction returns lists.
+        extraction_series = extraction_series.explode().dropna()
+
+        # Convert the extracted results into a DataFrame.
+        if not extraction_series.empty:
+            extracted_df = pd.DataFrame(extraction_series.to_list(), columns=["document_type", "metadata", "uuid"])
+        else:
+            extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
+
+        return extracted_df, execution_trace_log
 
     except Exception as e:
         logger.exception(f"Error occurred while extracting audio data: {e}", exc_info=True)
