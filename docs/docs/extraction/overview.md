@@ -38,13 +38,9 @@ NeMo Retriever extraction supports the following file types:
 - `pptx`
 - `jpeg`
 - `png`
+- `svg`
 - `tiff`
-- `bmp`
 - `txt`
-- `html` (treated as text)
-- `json` (treated as text)
-- `md` (treated as text)
-- `sh` (treated as text)
 
 
 ## What NeMo Retriever Extraction Isn't ✖️
