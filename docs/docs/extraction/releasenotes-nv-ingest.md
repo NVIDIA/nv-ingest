@@ -8,6 +8,8 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 ## Release 25.04
 
+### Summary
+
 The NeMo Retriever extraction 25.04 release focuses on small bug fixes and improvements, including the following:
 
 - Fixed a known issue where large text file ingestion failed.
@@ -17,12 +19,13 @@ The NeMo Retriever extraction 25.04 release focuses on small bug fixes and impro
 - Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
 
 
-
 ## Release 25.03
+
+### Summary
 
 The NeMo Retriever extraction 25.03 release includes accuracy improvements, feature expansions, and throughput improvements.
 
-### New Features
+## New Features
 
 - Consolidated NeMo Retriever extraction to run on a single GPU (H100, A100, L40S, or A10G). For details, refer to [Support Matrix](support-matrix.md).
 - Added Library Mode for a lightweight no-GPU deployment that uses NIM endpoints hosted on build.nvidia.com. For details, refer to [Deploy Without Containers (Library Mode)](quickstart-library-mode.md).
@@ -39,12 +42,16 @@ The NeMo Retriever extraction 25.03 release includes accuracy improvements, feat
 
 
 
+
 ## Release 24.12.1
+
+### Bug fixes
 
 Cases where .split() tasks fail during ingestion are now fixed.
 
 
-
 ## Release 24.12
+
+### Known Issues
 
 We currently do not support OCR-based text extraction. This was discovered in an unsupported use case and is not a product functionality issue.
