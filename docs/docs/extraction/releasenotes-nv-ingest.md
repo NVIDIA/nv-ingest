@@ -6,6 +6,17 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+## Release 25.04
+
+### Summary
+
+The NeMo Retriever extraction 25.04 release focuses on small bug fixes and improvements, including the following:
+
+- The REST service is now more resilient, and recovers from worker failures and connection errors.
+- Various improvements on the client side to reduce retry rates, and improve overall quality of life.
+- Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
+
+
 ## Release 25.03
 
 ### Summary
