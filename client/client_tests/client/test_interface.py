@@ -47,7 +47,7 @@ def documents():
 
 @pytest.fixture
 def text_documents():
-    return ["data/test.txt", "data/test.json", "data/test.md", "data/test.sh"]
+    return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
 
 
 @pytest.fixture
