@@ -20,6 +20,9 @@ dependencies:
 - name: nvidia-nim-llama-32-nv-embedqa-1b-v2
   repository: https://helm.ngc.nvidia.com/nim/nvidia
   version: 1.5.0
+- name: riva-nim
+  repository: https://helm.ngc.nvidia.com/nim/nvidia
+  version: 1.0.0
 - name: milvus
   repository: https://zilliztech.github.io/milvus-helm
   version: 4.1.11
@@ -32,5 +35,5 @@ dependencies:
 - name: opentelemetry-collector
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
   version: 0.78.1
-digest: sha256:5c8cae3721298e564b85ba8c06cf320b5abf9db9bf0a0f57886c99f4dec6a661
-generated: "2025-03-15T05:48:53.923722082-04:00"
+digest: sha256:7675e65058740aa9ab90e4f3b458f226bd2dd9a992a3ea7353dd2de6f732a26f
+generated: "2025-05-01T10:32:44.178383534-04:00"

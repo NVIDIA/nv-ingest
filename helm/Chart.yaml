@@ -70,6 +70,11 @@ dependencies:
   #   alias: llama-32-nv-rerankqa-1b-v2
   #   condition: llama-32-nv-rerankqa-1b-v2.deployed
 
+  - name: riva-nim
+    repository: "alias:nvidia-nim"
+    version: 1.0.0
+    condition: riva-nim.deployed
+
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
     version: 4.1.11
