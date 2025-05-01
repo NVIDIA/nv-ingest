@@ -629,8 +629,8 @@ def _pull_text(
         text = None
     if text and len(text) > 65535:
         logger.warning(
-            f"Text is too long, skipping, text_length: {len(text)}, "
-            f"file_name: {element['metadata']['source_metadata']['source_name']} "
+            f"Text is too long, skipping. It is advised to use SplitTask, to make smaller chunk sizes."
+            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata']['source_name']} "
             f"page_number: {element['metadata']['content_metadata']['page_number']}"
         )
         text = None
