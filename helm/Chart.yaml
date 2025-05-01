@@ -26,7 +26,7 @@ dependencies:
     repository: "alias:nvidia-nim"
     version: 1.2.0
     alias: nemoretriever-table-structure-v1
-    condition: nvidia-nim-nemoretriever-table-structure-v1.deployed
+    condition: nemoretriever-table-structure-v1.deployed
 
   # # VLM for image captioning.
   # # This same chart can power several different underlying VLM models. Configure in values.yaml
