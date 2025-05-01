@@ -46,6 +46,11 @@ def documents():
 
 
 @pytest.fixture
+def text_documents():
+    return ["data/test.txt", "data/test.json", "data/test.md", "data/test.sh"]
+
+
+@pytest.fixture
 def ingestor(mock_client, documents):
     return Ingestor(documents, client=mock_client)
 
@@ -138,6 +143,12 @@ def test_extract_task_some_args(ingestor):
     assert task._extract_charts is True
     assert task._extract_images is True
     assert task._extract_infographics is True
+
+
+def test_extract_task_text_filetypes(text_documents):
+    Ingestor(text_documents, client=mock_client).extract(
+        extract_text=True, extract_tables=False, extract_charts=False, extract_images=False, extract_infographics=False
+    )
 
 
 def test_filter_task_no_args(ingestor):
