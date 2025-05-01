@@ -15,6 +15,7 @@ The NeMo Retriever extraction 25.04 release focuses on small bug fixes and impro
 - Fixed a known issue where large text file ingestion failed.
 - The REST service is now more resilient, and recovers from worker failures and connection errors.
 - Various improvements on the client side to reduce retry rates, and improve overall quality of life.
+- New notebook for [How to reindex a collection]( https://github.com/NVIDIA/nv-ingest/blob/main/examples/reindex_example.ipynb).
 - Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
 
 
