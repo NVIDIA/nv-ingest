@@ -12,6 +12,7 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 The NeMo Retriever extraction 25.04 release focuses on small bug fixes and improvements, including the following:
 
+- Fixed a known issue where large text file ingestion failed.
 - The REST service is now more resilient, and recovers from worker failures and connection errors.
 - Various improvements on the client side to reduce retry rates, and improve overall quality of life.
 - Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
