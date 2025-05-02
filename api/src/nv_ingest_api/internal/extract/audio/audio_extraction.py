@@ -82,6 +82,9 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
             "start_time": segment["start"],
             "end_time": segment["end"],
         }
+        segment_metadata["content_metadata"]["start_time"] = segment["start"]
+        segment_metadata["content_metadata"]["end_time"] = segment["end"]
+
         segment_metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
         extracted_data.append(
             [ContentTypeEnum.AUDIO, validate_schema(segment_metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]
