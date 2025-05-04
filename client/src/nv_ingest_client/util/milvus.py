@@ -205,7 +205,7 @@ class MilvusOperator:
         collection_name: Union[str, Dict] = "nv_ingest_collection",
         milvus_uri: str = "http://localhost:19530",
         sparse: bool = False,
-        recreate: bool = True,
+        recreate: bool = False,
         gpu_index: bool = True,
         gpu_search: bool = True,
         dense_dim: int = 2048,
@@ -233,7 +233,7 @@ class MilvusOperator:
                 containing collection configuration. Defaults to "nv_ingest_collection".
             milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
             sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
-            recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+            recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to False.
             gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
             gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
             dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
@@ -430,7 +430,7 @@ def create_collection(
     collection_name: str,
     schema: CollectionSchema,
     index_params: IndexParams = None,
-    recreate=True,
+    recreate=False,
 ):
     """
     Creates a milvus collection with the supplied name and schema. Within that collection,
@@ -461,7 +461,7 @@ def create_nvingest_collection(
     collection_name: str,
     milvus_uri: str = "http://localhost:19530",
     sparse: bool = False,
-    recreate: bool = True,
+    recreate: bool = False,
     gpu_index: bool = True,
     gpu_search: bool = True,
     dense_dim: int = 2048,
@@ -1501,7 +1501,7 @@ def embed_index_collection(
     nvidia_api_key: str = None,
     milvus_uri: str = "http://localhost:19530",
     sparse: bool = False,
-    recreate: bool = True,
+    recreate: bool = False,
     gpu_index: bool = True,
     gpu_search: bool = True,
     dense_dim: int = 2048,
@@ -1536,7 +1536,7 @@ def embed_index_collection(
         nvidia_api_key (str, optional): The API key for NVIDIA services. Defaults to None.
         milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
         sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
-        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to False.
         gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
         gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
         dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
@@ -1623,7 +1623,7 @@ def reindex_collection(
     nvidia_api_key: str = None,
     milvus_uri: str = "http://localhost:19530",
     sparse: bool = False,
-    recreate: bool = True,
+    recreate: bool = False,
     gpu_index: bool = True,
     gpu_search: bool = True,
     dense_dim: int = 2048,
@@ -1662,7 +1662,7 @@ def reindex_collection(
         nvidia_api_key (str, optional): The API key for NVIDIA services. Defaults to None.
         milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
         sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
-        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+        recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to False.
         gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
         gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
         dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
