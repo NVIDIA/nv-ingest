@@ -146,9 +146,15 @@ def test_extract_task_some_args(ingestor):
 
 
 def test_extract_task_text_filetypes(text_documents):
-    Ingestor(text_documents, client=mock_client).extract(
-        extract_text=True, extract_tables=False, extract_charts=False, extract_images=False, extract_infographics=False
-    )
+    for doc in text_documents:
+        Ingestor(client=mock_client).files([doc]).extract(
+            extract_text=True,
+            extract_tables=False,
+            extract_charts=False,
+            extract_images=False,
+            extract_infographics=False,
+            document_type=doc.split(".")[1],
+        )
 
 
 def test_filter_task_no_args(ingestor):
