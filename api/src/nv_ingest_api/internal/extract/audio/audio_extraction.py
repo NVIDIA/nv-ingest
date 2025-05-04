@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 
 
 @unified_exception_handler
-def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dict:
+def _extract_audio_metadata(row: pd.Series, audio_client: Any, segment_audio: bool, trace_info: Dict) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -69,25 +69,27 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
         stage_name="audio_extraction",
     )
 
-    # row["document_type"] = ContentTypeEnum.AUDIO
-    # audio_metadata = {"audio_transcript": transcript}
-    # metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
-    # row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
-
     extracted_data = []
-    for segment in segments:
-        segment_metadata = metadata.copy()
-        audio_metadata = {
-            "audio_transcript": segment["text"],
-            "start_time": segment["start"],
-            "end_time": segment["end"],
-        }
-        segment_metadata["content_metadata"]["start_time"] = segment["start"]
-        segment_metadata["content_metadata"]["end_time"] = segment["end"]
+    if segment_audio:
+        for segment in segments:
+            segment_metadata = metadata.copy()
+            audio_metadata = {"audio_transcript": segment["text"]}
+            segment_metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+            segment_metadata["content_metadata"]["start_time"] = segment["start"]
+            segment_metadata["content_metadata"]["end_time"] = segment["end"]
 
-        segment_metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+            extracted_data.append(
+                [
+                    ContentTypeEnum.AUDIO,
+                    validate_schema(segment_metadata, MetadataSchema).model_dump(),
+                    str(uuid.uuid4()),
+                ]
+            )
+    else:
+        audio_metadata = {"audio_transcript": transcript}
+        metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
         extracted_data.append(
-            [ContentTypeEnum.AUDIO, validate_schema(segment_metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]
+            [ContentTypeEnum.AUDIO, validate_schema(metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]
         )
 
     return extracted_data
@@ -128,16 +130,16 @@ def extract_text_from_audio_internal(
     """
     logger.debug(f"Entering audio extraction stage with {len(df_extraction_ledger)} rows.")
 
-    extract_params = task_config.get("params", {}).get("extract_audio_params", {})
     audio_extraction_config = extraction_config.audio_extraction_config
 
-    grpc_endpoint = extract_params.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
-    http_endpoint = extract_params.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
-    infer_protocol = extract_params.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
-    auth_token = extract_params.get("auth_token") or audio_extraction_config.auth_token
-    function_id = extract_params.get("function_id") or audio_extraction_config.function_id
-    use_ssl = extract_params.get("use_ssl") or audio_extraction_config.use_ssl
-    ssl_cert = extract_params.get("ssl_cert") or audio_extraction_config.ssl_cert
+    grpc_endpoint = task_config.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
+    http_endpoint = task_config.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
+    infer_protocol = task_config.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
+    auth_token = task_config.get("auth_token") or audio_extraction_config.auth_token
+    function_id = task_config.get("function_id") or audio_extraction_config.function_id
+    use_ssl = task_config.get("use_ssl") or audio_extraction_config.use_ssl
+    ssl_cert = task_config.get("ssl_cert") or audio_extraction_config.ssl_cert
+    segment_audio = task_config.get("segment_audio") or audio_extraction_config.segment_audio
 
     parakeet_client = create_audio_inference_client(
         (grpc_endpoint, http_endpoint),
@@ -154,13 +156,8 @@ def extract_text_from_audio_internal(
 
     try:
         # Apply the _update_metadata function to each row in the DataFrame
-        # df_extraction_ledger["metadata"] = df_extraction_ledger.apply(
-        #     _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
-        # )
-
-        # Apply the _update_metadata function to each row in the DataFrame
         extraction_series = df_extraction_ledger.apply(
-            _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
+            _extract_audio_metadata, axis=1, args=(parakeet_client, segment_audio, execution_trace_log)
         )
 
         # Explode the results if the extraction returns lists.
