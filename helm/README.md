@@ -23,13 +23,13 @@ kubectl create namespace ${NAMESPACE}
 - Install the Helm repos
 
 ```bash
-# Nvidia nemo-microservices NGC repository
+# NVIDIA nemo-microservices NGC repository
 helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM NGC repository
+# NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM baidu NGC repository
+# NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
@@ -170,7 +170,7 @@ kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-wor
 
 ##### Enable time-slicing
 
-With the Nvidia GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
+With the NVIDIA GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
 
 ```bash
 kubectl apply -n gpu-operator -f time-slicing/time-slicing-config.yaml
@@ -194,40 +194,42 @@ kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-wor
 }
 ```
 
-#### Enabling Nvidia GPU MIG
+#### Enable NVIDIA GPU MIG
 
-Nvidia MIG if a technology that allows for a specific GPU to be sliced into individual "Virtual GPUs". [Nvidia MIG Docs](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html).
-This approach is often viewed as more "production grade" than time-slicing because it isolates it process to a preallocated amount of compute and memory.
+[NVIDIA MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html) is a technology that enables a specific GPU to be sliced into individual virtual GPUs.
+This approach is considered better for production environments than time-slicing, because it isolates it process to a pre-allocated amount of compute and memory.
 
-The setup is more involved and we go over that now.
+Use this section to learn how to enable NVIDIA GPU MIG.
 
 ##### Compatible GPUs
 
-Not all GPUs are compatible with MIG. The MIG support matrix can be found [here](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-gpus)
+For the list of GPUs that are compatible with MIG, refer to [the MIG support matrix](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-gpus).
 
 ##### Understanding GPU profiles
 
-While not identical you can think of a GPU profile like a traditional "Virtual Machine". Where each VM has a predefined set of compute and memory.
-Each Nvidia GPU has different types of valid profiles. You can view the profiles that are available for your GPU by running
+You can think of a GPU profile like a traditional virtual computer (vm), where each vm has a predefined set of compute and memory.
+
+Each NVIDIA GPU has different valid profiles. To see the profiles that are available for your GPU, run the following code.
 
 ```bash
 nvidia-smi mig -lgip
 ```
 
-This will display the complete matrix of available profiles for your GPU. Reading the output is made more clear by referencing [this documentation](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-mig-profiles)
+The complete matrix of available profiles for your GPU appears. To understand the output, refer to [Supported MIG Profiles](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-mig-profiles).
 
 ##### MIG Profile configuration
 
 An example MIG profile for a DGX H100 can be found in mig/nv-ingest-mig-config.yaml. This profile demonstrates mixed MIG modes across different GPUs
-on the DGX machine. This file should be altered for your needs and contain only the profiles supported by your GPU.
+on the DGX machine.
+You should edit the file for your scenario, and include only the profiles supported by your GPU.
 
-Installing the MIG profile on the kubernetes cluster can be installed like software
+To install the MIG profile on the Kubernetes cluster, use the following code.
 
 ```bash
 kubectl apply -n gpu-operator -f mig/nv-ingest-mig-config.yaml
 ```
 
-Once the configmap is installed you can adjust the MIG profile to be `mixed`. We do this because our configuration
+After the configmap is installed, you can adjust the MIG profile to be `mixed`. We do this because our configuration
 file specifies different profiles across the GPUs. This is not required if you are not using a `mixed` MIG mode.
 
 ```bash
@@ -236,7 +238,7 @@ kubectl patch clusterpolicies.nvidia.com/cluster-policy \
     -p='[{"op":"replace", "path":"/spec/mig/strategy", "value":"mixed"}]'
 ```
 
-Patch the cluster so MIG manager uses the custom config map
+Patch the cluster so MIG manager uses the custom config map by using the following code.
 
 ```bash
 kubectl patch clusterpolicies.nvidia.com/cluster-policy \
@@ -244,13 +246,13 @@ kubectl patch clusterpolicies.nvidia.com/cluster-policy \
     -p='[{"op":"replace", "path":"/spec/migManager/config/name", "value":"nv-ingest-mig-config"}]'
 ```
 
-Label the nodes with which MIG profile you would like for them to use
+Label the nodes with which MIG profile you would like for them to use by using the following code.
 
 ```bash
 kubectl label nodes <node-name> nvidia.com/mig.config=single-gpu-nv-ingest --overwrite
 ```
 
-Validate the configuration was applied
+Validate that the configuration was applied by running the following code.
 
 ```bash
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
