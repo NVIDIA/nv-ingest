@@ -1,0 +1,45 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nv-ingest-mig-config
+data:
+  config.yaml: |
+    version: v1
+    mig-configs:
+      all-disabled:
+        - devices: all
+          mig-enabled: false
+
+      single-gpu-nv-ingest:
+        - devices: [0]
+          mig-enabled: true
+          mig-devices:
+            "1g.10gb": 7
+        - devices: [1]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [2]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [3]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [4]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [5]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [6]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
+        - devices: [7]
+          mig-enabled: true
+          mig-devices:
+            "7g.80gb": 1
