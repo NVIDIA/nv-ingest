@@ -35,7 +35,7 @@ class EmbedTaskSchema(BaseModel):
     """
 
     endpoint_url: Optional[str] = None
-    embedding_model: Optional[str] = None
+    model_name: Optional[str] = None
     api_key: Optional[str] = None
     filter_errors: bool = False
 
@@ -83,7 +83,7 @@ class EmbedTask(Task):
     def __init__(
         self,
         endpoint_url: Optional[str] = None,
-        embedding_model: Optional[str] = None,
+        model_name: Optional[str] = None,
         api_key: Optional[str] = None,
         text: Optional[bool] = None,
         tables: Optional[bool] = None,
@@ -96,7 +96,7 @@ class EmbedTask(Task):
         ----------
         endpoint_url : Optional[str], optional
             URL of the embedding endpoint. Defaults to None.
-        embedding_model : Optional[str], optional
+        model_name : Optional[str], optional
             Name of the embedding model. Defaults to None.
         api_key : Optional[str], optional
             API key for the embedding service. Defaults to None.
@@ -119,7 +119,7 @@ class EmbedTask(Task):
             )
 
         self._endpoint_url: Optional[str] = endpoint_url
-        self._model_name: Optional[str] = embedding_model
+        self._model_name: Optional[str] = model_name
         self._api_key: Optional[str] = api_key
         self._filter_errors: bool = filter_errors
 

@@ -12,7 +12,7 @@ def test_embed_task_initialization():
 
     task = EmbedTask(
         endpoint_url="http://embedding-ms:8000/v1",
-        embedding_model="nvidia/test-model",
+        model_name="nvidia/test-model",
         api_key="api-key",
         filter_errors=True,
     )
@@ -29,7 +29,7 @@ def test_embed_task_initialization():
 def test_embed_task_str_representation():
     task = EmbedTask(
         endpoint_url="http://embedding-ms:8000/v1",
-        embedding_model="nvidia/llama-3.2-nv-embedqa-1b-v2",
+        model_name="nvidia/llama-3.2-nv-embedqa-1b-v2",
         api_key="api-key",
         filter_errors=False,
     )
@@ -62,9 +62,7 @@ def test_embed_task_to_dict(
     filter_errors,
 ):
 
-    task = EmbedTask(
-        endpoint_url=endpoint_url, embedding_model=model_name, api_key=api_key, filter_errors=filter_errors
-    )
+    task = EmbedTask(endpoint_url=endpoint_url, model_name=model_name, api_key=api_key, filter_errors=filter_errors)
 
     expected_dict = {"type": "embed", "task_properties": {"filter_errors": filter_errors}}
 
