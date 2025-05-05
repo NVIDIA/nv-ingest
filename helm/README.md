@@ -23,13 +23,13 @@ kubectl create namespace ${NAMESPACE}
 - Install the Helm repos
 
 ```bash
-# Nvidia nemo-microservices NGC repository
+# NVIDIA nemo-microservices NGC repository
 helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM NGC repository
+# NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM baidu NGC repository
+# NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
@@ -170,7 +170,7 @@ kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-wor
 
 ##### Enable time-slicing
 
-With the Nvidia GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
+With the NVIDIA GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
 
 ```bash
 kubectl apply -n gpu-operator -f time-slicing/time-slicing-config.yaml
@@ -192,6 +192,70 @@ kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-wor
   "name": "one-worker-one-gpu-worker",
   "nvidia.com/gpu": "16"
 }
+```
+
+#### Enable NVIDIA GPU MIG
+
+[NVIDIA MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html) is a technology that enables a specific GPU to be sliced into individual virtual GPUs.
+This approach is considered better for production environments than time-slicing, because it isolates it process to a pre-allocated amount of compute and memory.
+
+Use this section to learn how to enable NVIDIA GPU MIG.
+
+##### Compatible GPUs
+
+For the list of GPUs that are compatible with MIG, refer to [the MIG support matrix](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-gpus).
+
+##### Understanding GPU profiles
+
+You can think of a GPU profile like a traditional virtual computer (vm), where each vm has a predefined set of compute and memory.
+
+Each NVIDIA GPU has different valid profiles. To see the profiles that are available for your GPU, run the following code.
+
+```bash
+nvidia-smi mig -lgip
+```
+
+The complete matrix of available profiles for your GPU appears. To understand the output, refer to [Supported MIG Profiles](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-mig-profiles).
+
+##### MIG Profile configuration
+
+An example MIG profile for a DGX H100 can be found in mig/nv-ingest-mig-config.yaml. This profile demonstrates mixed MIG modes across different GPUs
+on the DGX machine.
+You should edit the file for your scenario, and include only the profiles supported by your GPU.
+
+To install the MIG profile on the Kubernetes cluster, use the following code.
+
+```bash
+kubectl apply -n gpu-operator -f mig/nv-ingest-mig-config.yaml
+```
+
+After the configmap is installed, you can adjust the MIG profile to be `mixed`. We do this because our configuration
+file specifies different profiles across the GPUs. This is not required if you are not using a `mixed` MIG mode.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/mig/strategy", "value":"mixed"}]'
+```
+
+Patch the cluster so MIG manager uses the custom config map by using the following code.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/migManager/config/name", "value":"nv-ingest-mig-config"}]'
+```
+
+Label the nodes with which MIG profile you would like for them to use by using the following code.
+
+```bash
+kubectl label nodes <node-name> nvidia.com/mig.config=single-gpu-nv-ingest --overwrite
+```
+
+Validate that the configuration was applied by running the following code.
+
+```bash
+kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
 
 #### Executing Jobs
@@ -222,6 +286,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.2.0 |
 | alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.2.0 |
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.5.0 |
+| alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
 | https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
@@ -240,6 +305,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | containerSecurityContext | object | `{}` |  |
 | envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
@@ -259,7 +325,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
-| envVars.READY_CHECK_ALL_COMPONENTS | string | `"true"` |  |
 | envVars.REDIS_MORPHEUS_TASK_QUEUE | string | `"morpheus_task_queue"` |  |
 | envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
@@ -483,7 +548,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.deployed | bool | `true` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].value | string | `"8000"` |  |
-| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].value | string | `"1"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
@@ -597,6 +662,32 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | resources.limits.memory | string | `"200Gi"` |  |
 | resources.requests.cpu | string | `"24000m"` |  |
 | resources.requests.memory | string | `"24Gi"` |  |
+| riva-nim.autoscaling.enabled | bool | `false` |  |
+| riva-nim.autoscaling.maxReplicas | int | `10` |  |
+| riva-nim.autoscaling.metrics | list | `[]` |  |
+| riva-nim.autoscaling.minReplicas | int | `1` |  |
+| riva-nim.customArgs | list | `[]` |  |
+| riva-nim.customCommand | list | `[]` |  |
+| riva-nim.deployed | bool | `false` |  |
+| riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| riva-nim.env[0].value | string | `"8000"` |  |
+| riva-nim.fullnameOverride | string | `"riva-nim"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.tag | string | `"1.3.0"` |  |
+| riva-nim.nim.grpcPort | int | `8001` |  |
+| riva-nim.nim.logLevel | string | `"INFO"` |  |
+| riva-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| riva-nim.replicaCount | int | `1` |  |
+| riva-nim.service.grpcPort | int | `8001` |  |
+| riva-nim.service.httpPort | int | `8000` |  |
+| riva-nim.service.metricsPort | int | `0` |  |
+| riva-nim.service.name | string | `"riva-nim"` |  |
+| riva-nim.service.type | string | `"ClusterIP"` |  |
+| riva-nim.serviceAccount.create | bool | `false` |  |
+| riva-nim.serviceAccount.name | string | `""` |  |
+| riva-nim.statefuleSet.enabled | bool | `false` |  |
 | service.annotations | object | `{}` |  |
 | service.labels | object | `{}` |  |
 | service.name | string | `""` |  |

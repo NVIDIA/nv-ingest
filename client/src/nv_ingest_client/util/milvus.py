@@ -419,6 +419,7 @@ def create_nvingest_index_params(
     elif sparse:
         index_params.add_index(
             field_name="sparse",
+            index_name="sparse_index",
             index_type="SPARSE_INVERTED_INDEX",
             metric_type="BM25",
         )
@@ -540,6 +541,8 @@ def _get_index_types(index_params: IndexParams, sparse: bool = False) -> Tuple[s
     s_idx = None
 
     indexes = getattr(index_params, "_indexes", None)
+    if indexes is None:
+        indexes = {(idx, index_param.index_name): index_param for idx, index_param in enumerate(index_params)}
 
     if isinstance(indexes, dict):
         # Old Milvus behavior (< 2.5.6)
@@ -1038,7 +1041,9 @@ def write_to_nvingest_collection(
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
         # passes before running a search against the collection.\
-        time.sleep(20)
+
+    client.flush(collection_name)
+    client.load_collection(collection_name=collection_name)
 
 
 def dense_retrieval(
