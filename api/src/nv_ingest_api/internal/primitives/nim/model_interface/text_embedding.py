@@ -57,8 +57,6 @@ class EmbeddingModelInterface(ModelInterface):
               - payloads is a list of JSON-serializable payload dictionaries.
               - batch_data_list is a list of dictionaries containing the key "prompts" corresponding to each batch.
         """
-        # if protocol != "http":
-        #     raise ValueError("EmbeddingModelInterface only supports HTTP protocol.")
 
         def chunk_list(lst, chunk_size):
             lst = lst["prompts"]
@@ -117,7 +115,6 @@ class EmbeddingModelInterface(ModelInterface):
             else:
                 return [str(response)]
         elif protocol == "grpc":
-            # embeddings = response.as_numpy("embeddings")
             return [res.flatten() for res in response]
 
     def process_inference_results(self, output: Any, protocol: str, **kwargs) -> Any:

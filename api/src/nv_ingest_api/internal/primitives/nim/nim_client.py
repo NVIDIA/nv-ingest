@@ -253,7 +253,6 @@ class NimClient:
         logger.debug(f"gRPC inference response: {response}")
 
         # TODO(self.client.has_error(response)) => raise error
-        # breakpoint()
         return [response.as_numpy(output.name()) for output in outputs]
 
     def _http_infer(self, formatted_input: dict) -> dict:
