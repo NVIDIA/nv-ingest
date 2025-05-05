@@ -6,6 +6,14 @@ on:
     # Runs every day at 11:30PM (UTC)
     - cron: "30 23 * * *"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Source branch to build wheel from'
+        required: true
+        default: 'main'
+      VERSION:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: true
 
 jobs:
   build:
@@ -13,10 +21,18 @@ jobs:
     container:
       image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
     steps:
+      - name: Determine source branch to use for run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "ENVIRONMENT=main" >> $GITHUB_ENV
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: main
+          ref: $ENVIRONMENT
 
       - name: Install build dependencies
         run: |
