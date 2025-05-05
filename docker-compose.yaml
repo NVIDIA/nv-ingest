@@ -9,7 +9,7 @@ services:
       - "6379:6379"
 
   page-elements:
-    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-1.2.0}
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -41,7 +41,7 @@ services:
     runtime: nvidia
 
   graphic-elements:
-    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
+    image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-1.2.0}
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -63,7 +63,7 @@ services:
     runtime: nvidia
 
   table-structure:
-    image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
+    image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-1.2.0}
     ports:
       - "8006:8000"
       - "8007:8001"
@@ -87,7 +87,7 @@ services:
       - table-structure
 
   paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${PADDLE_TAG:-latest}
+    image: ${PADDLE_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${PADDLE_TAG:-1.2.0}
     shm_size: 2gb
     ports:
       - "8009:8000"
@@ -110,7 +110,7 @@ services:
 
   embedding:
     # NIM ON
-    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-latest}
+    image: ${EMBEDDING_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2}:${EMBEDDING_TAG:-1.5.1}
     shm_size: 16gb
     ports:
       - "8012:8000"
@@ -133,7 +133,7 @@ services:
 
   reranker:
     # NIM ON
-    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-latest}
+    image: ${RERANKER_IMAGE:-nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2}:${RERANKER_TAG:-1.4.0}
     shm_size: 16gb
     ports:
       - "8020:8000"
@@ -154,7 +154,7 @@ services:
       - reranker
 
   nemoretriever-parse:
-    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-latest}
+    image: ${NEMORETRIEVER_PARSE_IMAGE:-nvcr.io/nvidia/nemo-microservices/nemoretriever-parse}:${NEMORETRIEVER_PARSE_TAG:-1.2.0}
     ports:
       - "8015:8000"
       - "8016:8001"
@@ -177,7 +177,7 @@ services:
       - nemoretriever-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/meta/llama-3.2-11b-vision-instruct}:${VLM_TAG:-latest}
+    image: ${VLM_IMAGE:-nvcr.io/nim/meta/llama-3.2-11b-vision-instruct}:${VLM_TAG:-1.1.1}
     ports:
       - "8018:8000"
     user: root
@@ -202,7 +202,7 @@ services:
       - vlm
 
   audio:
-    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/riva-asr}:${AUDIO_TAG:-latest}
+    image: ${AUDIO_IMAGE:-nvcr.io/nim/nvidia/riva-asr}:${AUDIO_TAG:-1.3.0}
     shm_size: 2gb
     ports:
       - "8021:50051"  # grpc
@@ -225,7 +225,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.3.0
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.4.1
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
