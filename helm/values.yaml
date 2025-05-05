@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.3.0"
+  tag: "25.4.2"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -617,6 +617,67 @@ llama-32-nv-rerankqa-1b-v2:
       value: "8000"
     - name: NIM_TRITON_MODEL_BATCH_SIZE
       value: "1"
+
+
+## @skip riva-nim
+## @param riva-nim.deployed [default: true] true if riva-nim should be deployed and false otherwise
+## @param riva-nim.fullnameOverride [default: "riva-nim"] Override for the full name of the deployment
+## @param riva-nim.customCommand [default: []] Custom command to run in the container
+## @param riva-nim.customArgs [default: []] Custom arguments to pass to the container
+## @param riva-nim.image.repository The repository to override the location of the riva-asr NIM
+## @param riva-nim.image.tag The tag override for riva-asr NIM
+## @param riva-nim.podSecurityContext [default: {}] Security context for the pod
+## @param riva-nim.replicaCount [default: 1] Number of replicas to deploy
+## @param riva-nim.serviceAccount.create [default: false] Whether to create a service account
+## @param riva-nim.serviceAccount.name [default: ""] Name of the service account
+## @param riva-nim.statefuleSet.enabled [default: false] Whether to deploy as a statefulset
+## @param riva-nim.autoscaling.enabled [default: false] Whether to enable autoscaling
+## @param riva-nim.autoscaling.minReplicas [default: 1] Minimum number of replicas
+## @param riva-nim.autoscaling.maxReplicas [default: 10] Maximum number of replicas
+## @param riva-nim.autoscaling.metrics [default: []] Metrics for autoscaling
+## @param riva-nim.service.type [default: "ClusterIP"] The type of Kubernetes service to create
+## @param riva-nim.service.name [default: "riva-nim"] The name of the service
+## @param riva-nim.service.httpPort [default: 8000] The HTTP port for the service
+## @param riva-nim.service.grpcPort [default: 8001] The gRPC port for the service
+## @param riva-nim.service.metricsPort [default: 0] The metrics port for the service
+## @param riva-nim.nim.grpcPort [default: 8001] The gRPC port for NIM communication
+## @param riva-nim.nim.logLevel [default: "INFO"] The log level for NIM
+## @param riva-nim.env [default: []] Environment variables for the container
+riva-nim:
+  deployed: false
+  fullnameOverride: riva-nim
+  customCommand: []
+  customArgs: []
+  image:
+    repository: nvcr.io/nim/nvidia/riva-asr
+    tag: "1.3.0"
+  podSecurityContext:
+    runAsUser: 1000
+    runAsGroup: 1000
+    fsGroup: 1000
+  replicaCount: 1
+  serviceAccount:
+    create: false
+    name: ""
+  statefuleSet:
+    enabled: false
+  autoscaling:
+    enabled: false
+    minReplicas: 1
+    maxReplicas: 10
+    metrics: []
+  service:
+    type: "ClusterIP"
+    name: riva-nim
+    httpPort: 8000
+    grpcPort: 8001
+    metricsPort: 0  # Generally unused and defaults to 0
+  nim:
+    grpcPort: 8001
+    logLevel: "INFO"
+  env:
+    - name: NIM_HTTP_API_PORT
+      value: "8000"
 
 
 ## @section Milvus Deployment parameters
