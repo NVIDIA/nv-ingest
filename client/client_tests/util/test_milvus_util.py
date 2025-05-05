@@ -11,6 +11,7 @@ from nv_ingest_client.util.milvus import (
     reconstruct_pages,
     add_metadata,
     pandas_file_reader,
+    create_nvingest_index_params,
 )
 from nv_ingest_client.util.util import ClientConfigSchema
 import pandas as pd
@@ -263,3 +264,120 @@ def test_metadata_import(metadata, tmp_path):
     metadata.to_parquet(file_name)
     df = pandas_file_reader(file_name)
     pd.testing.assert_frame_equal(df, metadata)
+
+
+@pytest.mark.parametrize(
+    "sparse,gpu_index,gpu_search,local_index,expected_params",
+    [
+        (
+            False,
+            True,
+            True,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "GPU_CAGRA",
+                    "metric_type": "L2",
+                    "intermediate_graph_degree": 128,
+                    "graph_degree": 100,
+                    "build_algo": "NN_DESCENT",
+                    "adapt_for_cpu": "false",
+                }
+            },
+        ),
+        (
+            False,
+            False,
+            False,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "HNSW",
+                    "metric_type": "L2",
+                    "M": 64,
+                    "efConstruction": 512,
+                }
+            },
+        ),
+        (
+            True,
+            False,
+            False,
+            True,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "FLAT",
+                    "metric_type": "L2",
+                },
+                "sparse_index": {
+                    "field_name": "sparse",
+                    "index_name": "sparse_index",
+                    "index_type": "SPARSE_INVERTED_INDEX",
+                    "metric_type": "IP",
+                    "drop_ratio_build": 0.2,
+                },
+            },
+        ),
+        (
+            True,
+            True,
+            True,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "GPU_CAGRA",
+                    "metric_type": "L2",
+                    "intermediate_graph_degree": 128,
+                    "graph_degree": 100,
+                    "build_algo": "NN_DESCENT",
+                    "adapt_for_cpu": "false",
+                },
+                "sparse_index": {
+                    "field_name": "sparse",
+                    "index_name": "sparse_index",
+                    "index_type": "SPARSE_INVERTED_INDEX",
+                    "metric_type": "BM25",
+                },
+            },
+        ),
+    ],
+)
+def test_create_nvingest_index_params(sparse, gpu_index, gpu_search, local_index, expected_params):
+    """Test that create_nvingest_index_params creates index parameters with all necessary attributes."""
+    index_params = create_nvingest_index_params(
+        sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
+    )
+
+    # Get the indexes from the index_params object
+    indexes = getattr(index_params, "_indexes", None)
+    if indexes is None:
+        indexes = {(idx, index_param.index_name): index_param for idx, index_param in enumerate(index_params)}
+    # Convert indexes to a comparable format
+    actual_params = {}
+    # Old Milvus behavior (< 2.5.6)
+    for k, v in indexes.items():
+        index_name = k[1]
+        actual_params[index_name] = {
+            "field_name": v._field_name,
+            "index_name": v._index_name,
+            "index_type": v._index_type,
+        }
+        if hasattr(v, "_configs"):
+            actual_params[index_name].update(v._configs)
+        elif hasattr(v, "_kwargs"):
+            params = v._kwargs.pop("params", {})
+            actual_params[index_name].update(v._kwargs)
+            actual_params[index_name].update(params)
+
+    # Compare the actual parameters with expected
+    assert (
+        actual_params == expected_params
+    ), f"Index parameters do not match expected values.\nActual: {actual_params}\nExpected: {expected_params}"
