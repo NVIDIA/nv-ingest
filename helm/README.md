@@ -284,6 +284,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.2.0 |
 | alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.2.0 |
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.5.0 |
+| alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
 | https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
@@ -659,6 +660,32 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | resources.limits.memory | string | `"200Gi"` |  |
 | resources.requests.cpu | string | `"24000m"` |  |
 | resources.requests.memory | string | `"24Gi"` |  |
+| riva-nim.autoscaling.enabled | bool | `false` |  |
+| riva-nim.autoscaling.maxReplicas | int | `10` |  |
+| riva-nim.autoscaling.metrics | list | `[]` |  |
+| riva-nim.autoscaling.minReplicas | int | `1` |  |
+| riva-nim.customArgs | list | `[]` |  |
+| riva-nim.customCommand | list | `[]` |  |
+| riva-nim.deployed | bool | `false` |  |
+| riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| riva-nim.env[0].value | string | `"8000"` |  |
+| riva-nim.fullnameOverride | string | `"riva-nim"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.tag | string | `"1.3.0"` |  |
+| riva-nim.nim.grpcPort | int | `8001` |  |
+| riva-nim.nim.logLevel | string | `"INFO"` |  |
+| riva-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| riva-nim.replicaCount | int | `1` |  |
+| riva-nim.service.grpcPort | int | `8001` |  |
+| riva-nim.service.httpPort | int | `8000` |  |
+| riva-nim.service.metricsPort | int | `0` |  |
+| riva-nim.service.name | string | `"riva-nim"` |  |
+| riva-nim.service.type | string | `"ClusterIP"` |  |
+| riva-nim.serviceAccount.create | bool | `false` |  |
+| riva-nim.serviceAccount.name | string | `""` |  |
+| riva-nim.statefuleSet.enabled | bool | `false` |  |
 | service.annotations | object | `{}` |  |
 | service.labels | object | `{}` |  |
 | service.name | string | `""` |  |

@@ -429,7 +429,11 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
-    _ = task_config  # Currently unused.
+
+    # Retrieve configuration values with fallback to transform_config defaults.
+    api_key: str = task_config.get("api_key") or transform_config.api_key
+    endpoint_url: str = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
+    model_name: str = task_config.get("model_name") or transform_config.embedding_model
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -478,9 +482,9 @@ def transform_create_text_embeddings_internal(
         filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size=transform_config.batch_size)
         content_embeddings = _async_runner(
             filtered_content_batches,
-            transform_config.api_key,
-            transform_config.embedding_nim_endpoint,
-            transform_config.embedding_model,
+            api_key,
+            endpoint_url,
+            model_name,
             transform_config.encoding_format,
             transform_config.input_type,
             transform_config.truncate,
