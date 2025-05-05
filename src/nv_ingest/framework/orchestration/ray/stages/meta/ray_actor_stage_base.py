@@ -96,7 +96,18 @@ class RayActorStage(ABC):
         self.active_processing: bool = False
 
         # --- Core statistics ---
-        self.stats: Dict[str, int] = {"processed": 0}
+        self.stats: Dict[str, int] = {
+            "active_processing": False,
+            "delta_processed": 0,
+            "elapsed": 0.0,
+            "errors": 0,
+            "failed": 0,
+            "processed": 0,
+            "processing_rate_cps": 0.0,
+            "successful_queue_reads": 0,
+            "successful_queue_writes": 0,
+            "queue_full": 0,
+        }
         self.start_time: Optional[float] = None
 
         # --- State for processing rate calculation ---
@@ -155,7 +166,6 @@ class RayActorStage(ABC):
             If `input_queue` is None while the actor's `running` flag is True.
             This indicates a configuration error.
         """
-        # Do not attempt to read if the actor has been signaled to stop
         if not self.running:
             return None
 
@@ -221,26 +231,36 @@ class RayActorStage(ABC):
                 try:
                     # Step 1: Attempt to get work from the input queue
                     control_message = self.read_input()
+                    self.active_processing = True  # Mark as busy
 
                     # If no message, loop back and check self.running again
                     if control_message is None:
+                        self.active_processing = False  # Mark as busy
                         continue  # Go to the next iteration of the while loop
+                    else:
+                        self.stats["successful_queue_reads"] += 1
 
                     # Step 2: Process the retrieved message
-                    self.active_processing = True  # Mark as busy
                     updated_cm: Optional[Any] = self.on_data(control_message)
-                    # Note: self.active_processing is set to False in the finally block
 
                     # Step 3: Handle the output
+                    if updated_cm is None:
+                        logger.error(f"{actor_id_str}: *************on_data returned None************.")
+                        self.stats["errors"] += 1
+                        self.stats["processed"] += 1
+
+                        raise RuntimeError(f"{actor_id_str}: on_data returned None, which is not allowed.")
+
                     if updated_cm is not None and self.output_queue is not None:
-                        try:
-                            self.output_queue.put(updated_cm)
-                        except Exception as put_err:
-                            # Log errors during put, especially relevant if the queue
-                            # or downstream actors are also shutting down.
-                            logger.error(
-                                f"{actor_id_str}: Error putting result to output queue: {put_err}", exc_info=True
-                            )
+                        while True:
+                            try:
+                                self.output_queue.put(updated_cm)
+                                self.stats["successful_queue_writes"] += 1
+                                break  # Success
+                            except Exception:
+                                logger.warning(f"{actor_id_str}: Output queue full or push failed, retrying...")
+                                self.stats["queue_full"] += 1
+                                time.sleep(0.1)
 
                     # Step 4: Increment processed count (thread safety note)
                     self.stats["processed"] += 1
@@ -250,6 +270,9 @@ class RayActorStage(ABC):
                     cm_info = f" (message type: {type(control_message).__name__})" if control_message else ""
                     logger.exception(f"{actor_id_str}: Error processing item{cm_info}: {e}")
                     # Avoid busy-spinning in case of persistent errors reading or processing
+
+                    self.stats["errors"] += 1
+
                     if self.running:
                         time.sleep(0.1)
                 finally:
@@ -337,8 +360,8 @@ class RayActorStage(ABC):
 
         logger.info(f"{actor_id_str}: Executing actor exit process.")
         try:
-            if self._processing_thread and self._processing_thread.is_alive():
-                self._processing_thread.join(timeout=5)
+            if self._processing_thread:
+                self._processing_thread.join()
                 time.sleep(0.1)  # Allow time for thread cleanup
 
             ray.actor.exit_actor()
@@ -374,8 +397,6 @@ class RayActorStage(ABC):
         self.start_time = time.time()
 
         # --- Reset Statistics ---
-        self.stats["processed"] = 0
-        # Initialize rate calculation timers and counts
         self._last_stats_time = self.start_time
         self._last_processed_count = 0
 
@@ -383,7 +404,7 @@ class RayActorStage(ABC):
         logger.debug(f"{actor_id_str}: Creating and starting processing thread.")
         self._processing_thread = threading.Thread(
             target=self._processing_loop,
-            daemon=True,  # Set as daemon so it doesn't block Python exit if main thread dies unexpectedly
+            daemon=False,
         )
         self._processing_thread.start()
 
@@ -421,6 +442,7 @@ class RayActorStage(ABC):
 
         # --- Spawn shutdown watcher task ---
         self._shutdown_future = self._monitor_shutdown.remote(self._shutdown_signal_complete_ref())
+
         return self._shutdown_future
 
     @ray.method(num_returns=1)
@@ -456,8 +478,9 @@ class RayActorStage(ABC):
                                                processed or the interval was too short.
         """
         current_time: float = time.time()
-        current_processed: int = self.stats["processed"]
+        current_processed: int = self.stats.get("processed", 0)
         is_active: bool = self.active_processing
+        delta_processed = 0
 
         processing_rate_cps: float = 0.0  # Default rate
 
@@ -482,10 +505,16 @@ class RayActorStage(ABC):
 
         # Compile and return the statistics dictionary
         return {
-            "processed": current_processed,
-            "elapsed": elapsed,
             "active_processing": is_active,  # Return the state captured at the beginning
+            "delta_processed": delta_processed,
+            "elapsed": elapsed,
+            "errors": self.stats.get("errors", 0),
+            "failed": self.stats.get("failed", 0),
+            "processed": current_processed,
             "processing_rate_cps": processing_rate_cps,
+            "queue_full": self.stats.get("queue_full", 0),
+            "successful_queue_reads": self.stats.get("successful_queue_reads", 0),
+            "successful_queue_writes": self.stats.get("successful_queue_writes", 0),
         }
 
     @ray.method(num_returns=1)

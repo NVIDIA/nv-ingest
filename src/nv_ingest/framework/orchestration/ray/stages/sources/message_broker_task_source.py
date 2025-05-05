@@ -2,7 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
 import logging
 import multiprocessing
 import uuid
@@ -104,9 +103,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
     # Use the updated config type hint
     def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config)
+        super().__init__(config, log_to_stdout=True)
         self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
-        logger.debug("Initializing MessageBrokerTaskSourceStage with config: %s", config.dict())  # Log validated config
+        self._logger.debug(
+            "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
+        )  # Log validated config
 
         # Access validated configuration directly via self.config
         self.poll_interval = self.config.poll_interval
@@ -116,20 +117,22 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         self.client = self._create_client()
 
         # Other initializations
-        self.message_count = 0
+        self._message_count = 0
+        self._last_message_count = 0
         self.output_queue = None  # Presumably set later or via base class
         self.start_time = None
 
         # Threading event remains the same
         self._pause_event = threading.Event()
         self._pause_event.set()  # Initially not paused
-        logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
+
+        self._logger.debug("MessageBrokerTaskSourceStage initialized. Task queue: %s", self.task_queue)
 
     # --- Private helper methods ---
     def _create_client(self):
         # Access broker config via self.config.broker_client
         broker_config = self.config.broker_client
-        logger.info("Creating client of type: %s", broker_config.client_type)
+        self._logger.info("Creating client of type: %s", broker_config.client_type)
 
         if broker_config.client_type == "redis":
             client = RedisClient(
@@ -141,7 +144,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 connection_timeout=broker_config.connection_timeout,
                 use_ssl=broker_config.broker_params.use_ssl,  # Use nested model attribute access
             )
-            logger.debug("RedisClient created: %s", client)  # Consider logging non-sensitive parts if needed
+            self._logger.debug("RedisClient created: %s", client)  # Consider logging non-sensitive parts if needed
             return client
         elif broker_config.client_type == "simple":
             server_host = broker_config.host
@@ -153,11 +156,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 max_backoff=broker_config.max_backoff,
                 connection_timeout=broker_config.connection_timeout,
             )
-            logger.debug("SimpleClient created: %s", client)
+            self._logger.debug("SimpleClient created: %s", client)
             return client
 
-    @staticmethod
-    def _process_message(job: dict, ts_fetched: datetime) -> Any:
+    def _process_message(self, job: dict, ts_fetched: datetime) -> Any:
         """
         Process a raw job fetched from the message broker into an IngestControlMessage.
         """
@@ -166,11 +168,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         try:
             # Log the payload (with content redacted) if in debug mode
-            if logger.isEnabledFor(logging.DEBUG):
+            if self._logger.isEnabledFor(logging.DEBUG):
                 no_payload = copy.deepcopy(job)
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]
-                logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
+                self._logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
 
             # Validate incoming job structure
             validate_ingest_job(job)
@@ -238,10 +240,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
                 control_message.set_timestamp("latency::ts_send", datetime.now())
 
-            logger.debug("Message processed successfully with job_id: %s", job_id)
+            self._logger.debug("Message processed successfully with job_id: %s", job_id)
 
         except Exception as e:
-            logger.exception("Failed to process job submission: %s", e)
+            self._logger.exception("Failed to process job submission: %s", e)
 
             if job_id is not None:
                 response_channel = f"{job_id}"
@@ -259,26 +261,25 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         """
         Fetch a message from the message broker.
         """
-        logger.info("Attempting to fetch message from queue '%s'", self.task_queue)
         try:
             job = self.client.fetch_message(self.task_queue, timeout)
             if job is None:
-                logger.debug("No message received from '%s'", self.task_queue)
+                self._logger.debug("No message received from '%s'", self.task_queue)
                 return None
-            logger.info("Received message type: %s", type(job))
+            self._logger.debug("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
-                logger.info("Message is a BaseModel with response_code: %s", job.response_code)
+                self._logger.debug("Message is a BaseModel with response_code: %s", job.response_code)
                 if job.response_code != 0:
-                    logger.debug("Message response_code != 0, returning None")
+                    self._logger.debug("Message response_code != 0, returning None")
                     return None
                 job = json.loads(job.response)
-            logger.info("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
+            self._logger.debug("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
             return job
         except TimeoutError:
-            logger.debug("Timeout waiting for message")
+            self._logger.debug("Timeout waiting for message")
             return None
         except Exception as err:
-            logger.exception("Error during message fetching: %s", err)
+            self._logger.exception("Error during message fetching: %s", err)
             return None
 
     def read_input(self) -> any:
@@ -286,16 +287,21 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         Source stage's implementation of get_input.
         Instead of reading from an input edge, fetch a message from the broker.
         """
-        logger.debug("read_input: calling _fetch_message()")
+        self._logger.debug("read_input: calling _fetch_message()")
         job = self._fetch_message(timeout=100)
         if job is None:
-            logger.debug("read_input: No job received, sleeping for poll_interval: %s", self.config.poll_interval)
+            self._logger.debug("read_input: No job received, sleeping for poll_interval: %s", self.config.poll_interval)
             time.sleep(self.config.poll_interval)
+
             return None
+
+        self.stats["successful_queue_reads"] += 1
+
         ts_fetched = datetime.now()
-        logger.debug("read_input: Job fetched, processing message")
+        self._logger.debug("read_input: Job fetched, processing message")
         control_message = self._process_message(job, ts_fetched)
-        logger.debug("read_input: Message processed, returning control message")
+        self._logger.debug("read_input: Message processed, returning control message")
+
         return control_message
 
     def on_data(self, control_message: any) -> any:
@@ -303,7 +309,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         Process the control message.
         For this source stage, no additional processing is done, so simply return it.
         """
-        logger.debug("on_data: Received control message for processing")
+        self._logger.debug("on_data: Received control message for processing")
         return control_message
 
     # In the processing loop, instead of checking a boolean, we wait on the event.
@@ -313,70 +319,98 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This loop fetches messages from the broker and writes them to the output queue,
         but blocks on the pause event when the stage is paused.
         """
-        logger.info("Processing loop started")
+        self._logger.info("Processing loop started")
         iteration = 0
         while self.running:
             iteration += 1
             try:
-                logger.debug("Processing loop iteration: %s", iteration)
+                self._logger.debug("Processing loop iteration: %s", iteration)
                 control_message = self.read_input()
                 if control_message is None:
-                    logger.debug(
+                    self._logger.debug(
                         "No control message received; sleeping for poll_interval: %s", self.config.poll_interval
                     )
                     time.sleep(self.config.poll_interval)
                     continue
-                logger.debug("Control message received; processing data")
+
+                self.active_processing = True
+
+                self._logger.debug("Control message received; processing data")
                 updated_cm = self.on_data(control_message)
+
                 # Block until not paused using the pause event.
                 if (updated_cm is not None) and (self.output_queue is not None):
-                    logger.debug("Waiting for stage to resume if paused...")
-                    self._pause_event.wait()  # This will block if the event is cleared.
-                    self.output_queue.put(updated_cm)
+                    self._logger.debug("Waiting for stage to resume if paused...")
+                    self._pause_event.wait()  # Block if paused
+
+                    # Perpetually retry put() on asyncio.QueueFull
+                    while True:
+                        try:
+                            self.output_queue.put(updated_cm)
+                            self.stats["successful_queue_writes"] += 1
+                            break
+                        except Exception:
+                            self._logger.warning("Output queue full, retrying put()...")
+                            self.stats["queue_full"] += 1
+                            time.sleep(0.1)
+
                 self.stats["processed"] += 1
-                self.message_count += 1
-                logger.debug("Iteration %s complete. Total processed: %s", iteration, self.stats["processed"])
+                self._message_count += 1
+
+                self._logger.info(f"Sourced message_count: {self._message_count}")
+                self._logger.debug("Iteration %s complete. Total processed: %s", iteration, self.stats["processed"])
             except Exception as e:
-                logger.exception("Error in processing loop at iteration %s: %s", iteration, e)
+                self._logger.exception("Error in processing loop at iteration %s: %s", iteration, e)
                 time.sleep(self.config.poll_interval)
-        logger.info("Processing loop ending")
+            finally:
+                self.active_processing = False
+
+        self._logger.info("Processing loop ending")
         ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
         if self.running:
-            logger.info("Start called but stage is already running.")
+            self._logger.info("Start called but stage is already running.")
             return False
         self.running = True
         self.start_time = time.time()
-        self.message_count = 0
-        logger.info("Starting processing loop thread.")
+        self._message_count = 0
+        self._logger.info("Starting processing loop thread.")
         threading.Thread(target=self._processing_loop, daemon=True).start()
-        logger.info("MessageBrokerTaskSourceStage started.")
+        self._logger.info("MessageBrokerTaskSourceStage started.")
         return True
 
     @ray.method(num_returns=1)
     def stop(self) -> bool:
         self.running = False
-        logger.info("Stop called on MessageBrokerTaskSourceStage")
+        self._logger.info("Stop called on MessageBrokerTaskSourceStage")
         return True
 
     @ray.method(num_returns=1)
     def get_stats(self) -> dict:
         elapsed = time.time() - self.start_time if self.start_time else 0
+        delta = self._message_count - self._last_message_count
+        self._last_message_count = self._message_count
         stats = {
-            "processed": self.message_count,
+            "active_processing": 1 if self.active_processing else 0,
+            "delta_processed": delta,
             "elapsed": elapsed,
-            "processing_rate_cps": self.message_count / elapsed if elapsed > 0 else 0,
-            "active_processing": 0,
+            "errors": self.stats.get("errors", 0),
+            "failed": 0,
+            "processed": self._message_count,
+            "processing_rate_cps": self._message_count / elapsed if elapsed > 0 else 0,
+            "successful_queue_reads": self.stats.get("successful_queue_reads", 0),
+            "successful_queue_writes": self.stats.get("successful_queue_writes", 0),
+            "queue_full": self.stats.get("queue_full", 0),
         }
-        logger.info("get_stats: %s", stats)
+
         return stats
 
     @ray.method(num_returns=1)
     def set_output_queue(self, queue_handle: any) -> bool:
         self.output_queue = queue_handle
-        logger.info("Output queue set: %s", queue_handle)
+        self._logger.info("Output queue set: %s", queue_handle)
         return True
 
     @ray.method(num_returns=1)
@@ -391,7 +425,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is paused.
         """
         self._pause_event.clear()
-        logger.info("Stage paused.")
+        self._logger.info("Stage paused.")
         return True
 
     @ray.method(num_returns=1)
@@ -406,7 +440,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             True after the stage is resumed.
         """
         self._pause_event.set()
-        logger.info("Stage resumed.")
+        self._logger.info("Stage resumed.")
         return True
 
     @ray.method(num_returns=1)
@@ -416,10 +450,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         This method pauses the stage, waits for any current processing to finish,
         replaces the output queue, and then resumes the stage.
         """
-        logger.info("Swapping output queue: pausing stage first.")
+        self._logger.info("Swapping output queue: pausing stage first.")
         self.pause()
         self.set_output_queue(new_queue)
-        logger.info("Output queue swapped. Resuming stage.")
+        self._logger.info("Output queue swapped. Resuming stage.")
         self.resume()
         return True
 
@@ -460,4 +494,5 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     p.daemon = True
     p.start()
     logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client['port']}")
+
     return p

@@ -5,6 +5,7 @@
 import time
 import threading
 import logging
+from collections import defaultdict
 from typing import Tuple, Dict, Any, Optional
 
 import ray
@@ -61,6 +62,8 @@ class RayStatsCollector:
         self._collected_stats: Dict[str, Dict[str, int]] = {}
         self._last_update_time: float = 0.0
         self._last_update_successful: bool = False
+
+        self._cumulative_stats: Dict[str, Dict[str, int]] = defaultdict(lambda: {"processed": 0})
 
         logger.info(
             f"RayStatsCollector initialized (Interval: {self._interval}s, "
@@ -182,6 +185,11 @@ class RayStatsCollector:
                 # Update shared state under lock
                 with self._lock:
                     self._collected_stats = new_stats
+
+                    for stage, stats in new_stats.items():
+                        if "delta_processed" in stats:
+                            self._cumulative_stats[stage]["processed"] += stats["delta_processed"]
+
                     self._last_update_time = time.time()
                     self._last_update_successful = success
 
@@ -252,7 +260,7 @@ class RayStatsCollector:
                 logger.debug(f"[StatsCollectNow] Stage '{stage_name}' pending shutdown. Skipping actor queries.")
                 # Assume stage has 1 active job to prevent premature scale-down
                 stage_stats_updates[stage_name]["processing"] = 1
-                stage_stats_updates[stage_name]["in_flight"] = 1
+                stage_stats_updates[stage_name]["in_flight"] = 0
                 continue
 
             actors = current_stage_actors.get(stage_name, [])
@@ -298,14 +306,16 @@ class RayStatsCollector:
                     actor, stage_name = actor_tasks[ref]
                     try:
                         stats = ray.get(ref)
-                        if isinstance(stats, dict) and "active_processing" in stats:
-                            active = int(stats.get("active_processing", 0))
-                            stage_stats_updates[stage_name]["processing"] += active
-                        else:
-                            logger.warning(
-                                f"[StatsCollectNow] Actor {actor} (Stage '{stage_name}') returned invalid stats."
-                            )
-                            overall_success = False
+                        active = int(stats.get("active_processing", 0))
+                        delta = int(stats.get("delta_processed", 0))
+                        processed = stage_stats_updates[stage_name].get("processed", 0)
+                        processing = stage_stats_updates[stage_name].get("processing", 0)
+                        stage_stats_updates[stage_name]["processing"] = processing + active
+                        stage_stats_updates[stage_name]["processed"] = processed + delta
+                        stage_stats_updates[stage_name]["delta_processed"] = (
+                            stage_stats_updates[stage_name].get("delta_processed", 0) + delta
+                        )
+
                     except Exception as e:
                         logger.warning(
                             f"[StatsCollectNow] Error getting stats for actor {actor} (Stage '{stage_name}'): {e}"
@@ -321,11 +331,21 @@ class RayStatsCollector:
                 overall_success = False
 
         # --- 4. Aggregate In-Flight Stats ---
+        _total_inflight = 0
         for stage_info in current_stages:
             stage_name = stage_info.name
             input_queues = [q_name for q_name in current_edge_queues.keys() if q_name.endswith(f"_to_{stage_name}")]
             total_queued = sum(queue_sizes.get(q, 0) for q in input_queues)
             stage_stats_updates[stage_name]["in_flight"] += total_queued
+
+            _total_inflight += total_queued + stage_stats_updates[stage_name]["processing"]
+
+        logger.debug(f"[StatsCollectNow] Collected stats for {len(stage_stats_updates)} stages.")
+        for stage, stats in stage_stats_updates.items():
+            flat_stats = ", ".join(f"{k}={v}" for k, v in stats.items())
+            total = self._cumulative_stats.get(stage, {}).get("processed", 0)
+            logger.debug(f"[StatsCollectNow] {stage}: {flat_stats}, total_processed={total}")
+        logger.debug(f"[StatsCollectNow] Total in-flight jobs: {_total_inflight}")
 
         logger.debug(f"[StatsCollectNow] Stats collection complete. Overall success: {overall_success}")
         return stage_stats_updates, overall_success

@@ -93,4 +93,5 @@ class MetadataInjectionStage(RayActorStage):
             logger.info("Metadata injection updated payload with %d rows", len(docs))
         else:
             logger.info("No metadata update was necessary during metadata injection")
+
         return message

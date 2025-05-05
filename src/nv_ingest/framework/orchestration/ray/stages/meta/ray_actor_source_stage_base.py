@@ -19,6 +19,10 @@ class RayActorSourceStage(RayActorStage, ABC):
     Instead, they must implement get_input() to fetch control messages from an external source.
     """
 
+    def __init__(self, config: Any, log_to_stdout=False) -> None:
+        super().__init__(config, log_to_stdout=log_to_stdout)
+        self.paused = False
+
     @ray.method(num_returns=1)
     def set_input_queue(self, queue_handle: Any) -> bool:
         raise NotImplementedError("Source stages do not support an input queue.")

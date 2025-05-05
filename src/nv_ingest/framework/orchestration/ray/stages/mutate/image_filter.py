@@ -58,30 +58,27 @@ class ImageFilterStage(RayActorStage):
             The updated message with filtered images in the payload.
         """
         logger.info("ImageFilterStage.on_data: Starting image filtering process.")
-        try:
-            # Extract the DataFrame payload.
-            df_ledger = control_message.payload()
-            logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-            # Remove the "filter" task from the message to obtain task-specific configuration.
-            task_config = remove_task_by_type(control_message, "filter")
-            logger.debug("Extracted task config: %s", task_config)
+        # Extract the DataFrame payload.
+        df_ledger = control_message.payload()
+        logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
-            task_params: Dict[str, Any] = task_config.get("params", {})
+        # Remove the "filter" task from the message to obtain task-specific configuration.
+        task_config = remove_task_by_type(control_message, "filter")
+        logger.debug("Extracted task config: %s", task_config)
 
-            # Perform image filtering.
-            new_df = filter_images_internal(
-                df_ledger=df_ledger,
-                task_config=task_params,
-                mutate_config=self.validated_config,
-                execution_trace_log=None,
-            )
-            logger.info("Image filtering completed. Resulting DataFrame has %d rows.", len(new_df))
+        task_params: Dict[str, Any] = task_config.get("params", {})
 
-            # Update the message payload with the filtered DataFrame.
-            control_message.payload(new_df)
+        # Perform image filtering.
+        new_df = filter_images_internal(
+            df_ledger=df_ledger,
+            task_config=task_params,
+            mutate_config=self.validated_config,
+            execution_trace_log=None,
+        )
+        logger.info("Image filtering completed. Resulting DataFrame has %d rows.", len(new_df))
 
-            return control_message
-        except Exception as e:
-            logger.exception(f"ImageFilterStage failed processing control message: {e}")
-            raise
+        # Update the message payload with the filtered DataFrame.
+        control_message.payload(new_df)
+
+        return control_message

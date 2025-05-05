@@ -9,6 +9,7 @@ import os
 import click
 import logging
 
+from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
@@ -154,20 +155,22 @@ def get_audio_retrieval_service(env_var_prefix):
     return grpc_endpoint, http_endpoint, auth_token, infer_protocol, function_id
 
 
-def add_metadata_injector_stage(pipeline, default_cpu_count):
+def add_metadata_injector_stage(pipeline, default_cpu_count, stage_name="metadata_injector"):
     _ = default_cpu_count  # Placeholder for future use
     config = MetadataInjectorSchema()
 
     pipeline.add_stage(
-        name="metadata_injection",
+        name=stage_name,
         stage_actor=MetadataInjectionStage,
         config=config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_pdf_extractor_stage(pipeline, default_cpu_count):
+
+def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extractor"):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
@@ -193,15 +196,17 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="pdf_extractor",
+        name=stage_name,
         stage_actor=PDFExtractorStage,
         config=extractor_config,
         min_replicas=0,
-        max_replicas=8,  # max(1, int(default_cpu_count / 2)),
+        max_replicas=8,
     )
 
+    return stage_name
 
-def add_table_extractor_stage(pipeline, default_cpu_count):
+
+def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_extractor"):
     yolox_table_structure_grpc, yolox_table_structure_http, yolox_auth, yolox_table_structure_protocol = (
         get_nim_service("yolox_table_structure")
     )
@@ -220,15 +225,17 @@ def add_table_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="table_extractor",
+        name=stage_name,
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
         max_replicas=4,
     )
 
+    return stage_name
 
-def add_chart_extractor_stage(pipeline, default_cpu_count):
+
+def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_extractor"):
     yolox_graphic_elements_grpc, yolox_graphic_elements_http, yolox_auth, yolox_graphic_elements_protocol = (
         get_nim_service("yolox_graphic_elements")
     )
@@ -247,15 +254,17 @@ def add_chart_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="chart_extractor",
+        name=stage_name,
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
         max_replicas=4,
     )
 
+    return stage_name
 
-def add_infographic_extractor_stage(pipeline, default_cpu_count):
+
+def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="infographic_extractor"):
     paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     infographic_content_extractor_config = InfographicExtractorSchema(
@@ -269,15 +278,17 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="infographic_extractor",
+        name=stage_name,
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_image_extractor_stage(pipeline, default_cpu_count):
+
+def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_extractor"):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
 
     image_extractor_config = ImageConfigSchema(
@@ -289,15 +300,17 @@ def add_image_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="image_extractor",
+        name=stage_name,
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_docx_extractor_stage(pipeline, default_cpu_count):
+
+def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extractor"):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
 
     docx_extractor_config = {
@@ -309,15 +322,17 @@ def add_docx_extractor_stage(pipeline, default_cpu_count):
     }
 
     pipeline.add_stage(
-        name="docx_extractor",
+        name=stage_name,
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_pptx_extractor_stage(pipeline, default_cpu_count):
+
+def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extractor"):
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
 
     pptx_extractor_config = {
@@ -329,15 +344,17 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count):
     }
 
     pipeline.add_stage(
-        name="pptx_extractor",
+        name=stage_name,
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_audio_extractor_stage(pipeline, default_cpu_count):
+
+def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_extractor"):
     audio_grpc, audio_http, audio_auth, audio_infer_protocol, audio_function_id = get_audio_retrieval_service("audio")
 
     audio_extractor_config = AudioExtractorSchema(
@@ -353,15 +370,17 @@ def add_audio_extractor_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="audio_extractor",
+        name=stage_name,
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_otel_tracer_stage(pipeline, default_cpu_count):
+
+def add_otel_tracer_stage(pipeline, default_cpu_count, stage_name="otel_tracer"):
     _ = default_cpu_count  # Placeholder for future use
     otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
 
@@ -372,55 +391,61 @@ def add_otel_tracer_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="otel_tracer",
+        name=stage_name,
         stage_actor=OpenTelemetryTracerStage,
         config=otel_tracer_config,
         min_replicas=0,
         max_replicas=2,
     )
 
-    return "otel_tracer"
+    return stage_name
 
 
-def add_image_dedup_stage(pipeline, default_cpu_count):
+def add_image_dedup_stage(pipeline, default_cpu_count, stage_name="image_dedup"):
     config = ImageDedupSchema()
 
     pipeline.add_stage(
-        name="image_dedup",
+        name=stage_name,
         stage_actor=ImageDedupStage,
         config=config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_image_filter_stage(pipeline, default_cpu_count):
+
+def add_image_filter_stage(pipeline, default_cpu_count, stage_name="image_filter"):
     config = ImageFilterSchema()
 
     pipeline.add_stage(
-        name="image_filter",
+        name=stage_name,
         stage_actor=ImageFilterStage,
         config=config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_text_splitter_stage(pipeline, default_cpu_count):
+
+def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitter"):
     _ = default_cpu_count
 
     config = TextSplitterSchema()
 
     pipeline.add_stage(
-        name="text_splitter",
+        name=stage_name,
         stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_image_caption_stage(pipeline, default_cpu_count):
+
+def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_caption"):
     auth_token = os.environ.get(
         "NVIDIA_BUILD_API_KEY",
         "",
@@ -442,15 +467,17 @@ def add_image_caption_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="image_caption",
+        name=stage_name,
         stage_actor=ImageCaptionTransformStage,
         config=config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_text_embedding_stage(pipeline, default_cpu_count):
+
+def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embedding"):
     api_key = os.environ.get(
         "NVIDIA_BUILD_API_KEY",
         "",
@@ -470,38 +497,56 @@ def add_text_embedding_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="text_embedding",
+        name=stage_name,
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
         max_replicas=3,
     )
 
+    return stage_name
 
-def add_embedding_storage_stage(pipeline, default_cpu_count):
+
+def add_embedding_storage_stage(pipeline, default_cpu_count, stage_name="embedding_storage"):
     config = EmbeddingStorageSchema()
 
     pipeline.add_stage(
-        name="embedding_storage",
+        name=stage_name,
         stage_actor=EmbeddingStorageStage,
         config=config,
         min_replicas=0,
         max_replicas=4,
     )
 
+    return stage_name
 
-def add_image_storage_stage(pipeline, default_cpu_count):
+
+def add_image_storage_stage(pipeline, default_cpu_count, stage_name="image_storage"):
     config = ImageStorageModuleSchema()
     pipeline.add_stage(
-        name="image_storage",
+        name=stage_name,
         stage_actor=ImageStorageStage,
         config=config,
         min_replicas=0,
         max_replicas=1,
     )
 
+    return stage_name
 
-def add_sink_stage(pipeline, default_cpu_count):
+
+def add_default_drain_stage(pipeline, default_cpu_count, stage_name="pipeline_drain"):
+    pipeline.add_stage(
+        name=stage_name,
+        stage_actor=DefaultDrainSink,
+        config=None,
+        min_replicas=1,
+        max_replicas=1,
+    )
+
+    return stage_name
+
+
+def add_message_broker_response_stage(pipeline, default_cpu_count, stage_name="broker_response"):
     task_broker_host = os.environ.get("MESSAGE_CLIENT_HOST", "localhost")
     task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
     client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
@@ -517,15 +562,17 @@ def add_sink_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_stage(
-        name="redis_return_sink",
+        name=stage_name,
         stage_actor=MessageBrokerTaskSinkStage,
         config=sink_config,
         min_replicas=0,
         max_replicas=2,
     )
 
+    return stage_name
 
-def add_source_stage(pipeline, default_cpu_count):
+
+def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source"):
     _ = default_cpu_count  # Placeholder for future use
     task_broker_host = os.environ.get("MESSAGE_CLIENT_HOST", "localhost")
     task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
@@ -546,7 +593,7 @@ def add_source_stage(pipeline, default_cpu_count):
     )
 
     pipeline.add_source(
-        name="source",
+        name=source_name,
         source_actor=MessageBrokerTaskSourceStage,
         config=source_config,
         min_replicas=1,
@@ -555,3 +602,5 @@ def add_source_stage(pipeline, default_cpu_count):
 
     if source_config.broker_client.client_type == "simple":
         start_simple_message_broker(source_config.broker_client.model_dump())
+
+    return source_name

@@ -7,7 +7,6 @@ from typing import Any, Dict, List, Optional, Tuple
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 
 
-# Assume ModelInterface is defined elsewhere in the project.
 class EmbeddingModelInterface(ModelInterface):
     """
     An interface for handling inference with an embedding model endpoint.

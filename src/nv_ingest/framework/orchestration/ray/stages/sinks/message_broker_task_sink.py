@@ -10,7 +10,6 @@ from pydantic import BaseModel, Field
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.internal.primitives.tracing.logging import annotate_cm
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
@@ -77,9 +76,9 @@ class MessageBrokerTaskSinkConfig(BaseModel):
 @ray.remote
 class MessageBrokerTaskSinkStage(RayActorStage):
     def __init__(self, config: MessageBrokerTaskSinkConfig) -> None:
-        super().__init__(config)
+        super().__init__(config, log_to_stdout=False)
 
-        self.config: MessageBrokerTaskSinkConfig  # Add type hint for self.config
+        self.config: MessageBrokerTaskSinkConfig
 
         self.poll_interval = self.config.poll_interval
 
@@ -220,18 +219,12 @@ class MessageBrokerTaskSinkStage(RayActorStage):
             "description": error_description,
             "trace": json_result_fragments[0].get("trace", {}) if json_result_fragments else {},
         }
+
         self.client.submit_message(response_channel, json.dumps(fail_msg))
 
-    # --- Public API Methods for Sink Stage ---
-    def on_data(self, control_message: IngestControlMessage) -> Any:
-        """
-        For this sink stage, no additional transformation is performed.
-        """
-        control_message = self.write_output(control_message)
+    # --- Public API Methods for message broker sink ---
 
-        return control_message
-
-    def write_output(self, control_message: Any) -> Any:
+    def on_data(self, control_message: Any) -> Any:
         """
         Processes the control message and pushes the resulting JSON payloads to the broker.
         """
@@ -270,5 +263,6 @@ class MessageBrokerTaskSinkStage(RayActorStage):
             self._handle_failure(response_channel, json_result_fragments, e, mdf_size)
 
         self.message_count += 1
+        self._logger.debug(f"[Message Broker Sink] Processed message count: {self.message_count}")
 
         return control_message

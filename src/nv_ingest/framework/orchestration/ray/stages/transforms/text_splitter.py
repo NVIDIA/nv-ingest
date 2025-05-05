@@ -49,30 +49,26 @@ class TextSplitterStage(RayActorStage):
         IngestControlMessage
             The updated message with its payload transformed.
         """
-        try:
-            # Extract the DataFrame payload.
-            df_payload = message.payload()
-            logger.debug("Extracted payload with %d rows.", len(df_payload))
 
-            # Remove the "split" task to obtain task-specific configuration.
-            task_config = remove_task_by_type(message, "split")
-            logger.debug("Extracted task config: %s", task_config)
+        # Extract the DataFrame payload.
+        df_payload = message.payload()
+        logger.debug("Extracted payload with %d rows.", len(df_payload))
 
-            # Transform the DataFrame (split text and tokenize).
-            df_updated = transform_text_split_and_tokenize_internal(
-                df_transform_ledger=df_payload,
-                task_config=task_config,
-                transform_config=self.validated_config,
-                execution_trace_log=None,
-            )
-            logger.info(
-                "TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated)
-            )
+        # Remove the "split" task to obtain task-specific configuration.
+        task_config = remove_task_by_type(message, "split")
+        logger.debug("Extracted task config: %s", task_config)
 
-            # Update the message payload.
-            message.payload(df_updated)
-            logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
-            return message
-        except Exception as e:
-            logger.exception("TextSplitterStage failed to process IngestControlMessage")
-            raise type(e)(f"TextSplitterStage: {str(e)}") from e
+        # Transform the DataFrame (split text and tokenize).
+        df_updated = transform_text_split_and_tokenize_internal(
+            df_transform_ledger=df_payload,
+            task_config=task_config,
+            transform_config=self.validated_config,
+            execution_trace_log=None,
+        )
+        logger.info("TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated))
+
+        # Update the message payload.
+        message.payload(df_updated)
+        logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
+
+        return message

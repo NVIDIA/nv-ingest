@@ -2,9 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# TODO(Devin)
-# flake8: noqa
-
 import json
 import logging
 import math
@@ -30,10 +27,11 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_text_embedding_stage,
     add_embedding_storage_stage,
     add_image_storage_stage,
-    add_sink_stage,
+    add_message_broker_response_stage,
     add_pptx_extractor_stage,
     add_infographic_extractor_stage,
     add_otel_tracer_stage,
+    add_default_drain_stage,
 )
 
 logger = logging.getLogger("uvicorn")
@@ -67,56 +65,60 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
 
     default_cpu_count = os.environ.get("NV_INGEST_MAX_UTIL", int(max(1, math.floor(len(os.sched_getaffinity(0))))))
     add_meter_stage = os.environ.get("MESSAGE_CLIENT_TYPE") != "simple"
+    _ = add_meter_stage  # TODO(Devin)
 
     ########################################################################################################
     ## Insertion and Pre-processing stages
     ########################################################################################################
     logger.debug("Setting up ingestion pipeline")
-    source_stage = add_source_stage(pipeline, default_cpu_count)
-    # TODO(Devin)
+    source_stage_id = add_source_stage(pipeline, default_cpu_count)
+    # TODO(Devin): Job counter used a global stats object that isn't ray compatible, need to update.
     # submitted_job_counter_stage = add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
-    metadata_injector_stage = add_metadata_injector_stage(pipeline, default_cpu_count)
+    metadata_injector_stage_id = add_metadata_injector_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
     ## Primitive extraction
     ########################################################################################################
-    pdf_extractor_stage = add_pdf_extractor_stage(pipeline, default_cpu_count)
-    image_extractor_stage = add_image_extractor_stage(pipeline, default_cpu_count)
-    docx_extractor_stage = add_docx_extractor_stage(pipeline, default_cpu_count)
-    pptx_extractor_stage = add_pptx_extractor_stage(pipeline, default_cpu_count)
-    audio_extractor_stage = add_audio_extractor_stage(pipeline, default_cpu_count)
+    pdf_extractor_stage_id = add_pdf_extractor_stage(pipeline, default_cpu_count)
+    image_extractor_stage_id = add_image_extractor_stage(pipeline, default_cpu_count)
+    docx_extractor_stage_id = add_docx_extractor_stage(pipeline, default_cpu_count)
+    pptx_extractor_stage_id = add_pptx_extractor_stage(pipeline, default_cpu_count)
+    audio_extractor_stage_id = add_audio_extractor_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
     ## Post-processing
     ########################################################################################################
-    image_dedup_stage = add_image_dedup_stage(pipeline, default_cpu_count)
-    image_filter_stage = add_image_filter_stage(pipeline, default_cpu_count)
-    table_extraction_stage = add_table_extractor_stage(pipeline, default_cpu_count)
-    chart_extraction_stage = add_chart_extractor_stage(pipeline, default_cpu_count)
-    infographic_extraction_stage = add_infographic_extractor_stage(pipeline, default_cpu_count)
-    image_caption_stage = add_image_caption_stage(pipeline, default_cpu_count)
+    image_dedup_stage_id = add_image_dedup_stage(pipeline, default_cpu_count)
+    image_filter_stage_id = add_image_filter_stage(pipeline, default_cpu_count)
+    table_extraction_stage_id = add_table_extractor_stage(pipeline, default_cpu_count)
+    chart_extraction_stage_id = add_chart_extractor_stage(pipeline, default_cpu_count)
+    infographic_extraction_stage_id = add_infographic_extractor_stage(pipeline, default_cpu_count)
+    image_caption_stage_id = add_image_caption_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
     ## Transforms and data synthesis
     ########################################################################################################
-    text_splitter_stage = add_text_splitter_stage(pipeline, default_cpu_count)
-    embed_extractions_stage = add_text_embedding_stage(pipeline, default_cpu_count)
+    text_splitter_stage_id = add_text_splitter_stage(pipeline, default_cpu_count)
+    embed_extractions_stage_id = add_text_embedding_stage(pipeline, default_cpu_count)
+
     ########################################################################################################
     ## Storage and output
     ########################################################################################################
-    embedding_storage_stage = add_embedding_storage_stage(pipeline, default_cpu_count)
-    image_storage_stage = add_image_storage_stage(pipeline, default_cpu_count)
+    embedding_storage_stage_id = add_embedding_storage_stage(pipeline, default_cpu_count)
+    image_storage_stage_id = add_image_storage_stage(pipeline, default_cpu_count)
     # vdb_task_sink_stage = add_vdb_task_sink_stage(pipe, morpheus_pipeline_config, ingest_config)
-    sink_stage = add_sink_stage(pipeline, default_cpu_count)
+    broker_response_stage_id = add_message_broker_response_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     #######################################################################################################
     ## Telemetry (Note: everything after the sync stage is out of the hot path, please keep it that way) ##
     #######################################################################################################
-    otel_tracer_stage = add_otel_tracer_stage(pipeline, default_cpu_count)
+    otel_tracer_stage_id = add_otel_tracer_stage(pipeline, default_cpu_count)
+
+    # TODO(devin)
     # if add_meter_stage:
     #    otel_meter_stage = add_otel_meter_stage(pipe, morpheus_pipeline_config, ingest_config)
     # else:
@@ -124,42 +126,48 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     # completed_job_counter_stage = add_completed_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
     ########################################################################################################
 
+    # Add a drain stage to the pipeline -- flushes and deletes control messages
+    drain_id = add_default_drain_stage(pipeline, default_cpu_count)
+
     ingest_edge_buffer_size = int(os.environ.get("INGEST_EDGE_BUFFER_SIZE", 32))
 
     # Add edges
-    ###### INTAKE STAGES ########
-    pipeline.make_edge("source", "metadata_injection", queue_size=ingest_edge_buffer_size)
-    # pipeline.make_edge("job_counter", "metadata_injection", queue_size=INGEST_EDGE_BUFFER_SIZE)
-    pipeline.make_edge("metadata_injection", "pdf_extractor", queue_size=128)  # to limit memory pressure
+    ###### Intake Stages ########
+    pipeline.make_edge(source_stage_id, metadata_injector_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(metadata_injector_stage_id, pdf_extractor_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Document Extractors ########
-    pipeline.make_edge("pdf_extractor", "audio_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("audio_extractor", "docx_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("docx_extractor", "pptx_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("pptx_extractor", "image_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("image_extractor", "infographic_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("infographic_extractor", "table_extractor", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(pdf_extractor_stage_id, audio_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(audio_extractor_stage_id, docx_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(docx_extractor_stage_id, pptx_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(pptx_extractor_stage_id, image_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_extractor_stage_id, infographic_extraction_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Extractors ########
-    pipeline.make_edge("table_extractor", "chart_extractor", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("chart_extractor", "image_filter", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(infographic_extraction_stage_id, table_extraction_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(table_extraction_stage_id, chart_extraction_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(chart_extraction_stage_id, image_filter_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Mutators ########
-    pipeline.make_edge("image_filter", "image_dedup", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("image_dedup", "text_splitter", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_filter_stage_id, image_dedup_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_dedup_stage_id, text_splitter_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Transforms ########
-    pipeline.make_edge("text_splitter", "text_embedding", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("text_embedding", "image_caption", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("image_caption", "image_storage", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(text_splitter_stage_id, embed_extractions_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(embed_extractions_stage_id, image_caption_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_caption_stage_id, image_storage_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Storage ########
-    pipeline.make_edge("image_storage", "embedding_storage", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("embedding_storage", "redis_return_sink", queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge("redis_return_sink", "otel_tracer", queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_storage_stage_id, embedding_storage_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(embedding_storage_stage_id, broker_response_stage_id, queue_size=ingest_edge_buffer_size)
+
+    ###### Response and Telemetry ########
+    pipeline.make_edge(broker_response_stage_id, otel_tracer_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(otel_tracer_stage_id, drain_id, queue_size=ingest_edge_buffer_size)
 
     pipeline.build()
 
+    # TODO(devin)
     # if add_meter_stage:
     #    pipe.add_edge(sink_stage, otel_meter_stage)
     #    pipe.add_edge(otel_meter_stage, otel_tracer_stage)

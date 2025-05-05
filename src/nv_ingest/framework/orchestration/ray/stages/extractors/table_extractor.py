@@ -80,4 +80,5 @@ class TableExtractorStage(RayActorStage):
         # Annotate the message with extraction info.
         control_message.set_metadata("table_extraction_info", extraction_info)
         logger.info("Table extraction metadata injected successfully.")
+
         return control_message
