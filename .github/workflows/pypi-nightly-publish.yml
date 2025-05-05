@@ -32,7 +32,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
         with:
-          ref: $ENVIRONMENT
+          ref: ${{ env.ENVIRONMENT }}
 
       - name: Install build dependencies
         run: |
