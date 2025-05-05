@@ -26,7 +26,7 @@ dependencies:
     repository: "alias:nvidia-nim"
     version: 1.2.0
     alias: nemoretriever-table-structure-v1
-    condition: nvidia-nim-nemoretriever-table-structure-v1.deployed
+    condition: nemoretriever-table-structure-v1.deployed
 
   # # VLM for image captioning.
   # # This same chart can power several different underlying VLM models. Configure in values.yaml
@@ -69,6 +69,11 @@ dependencies:
   #   version: 1.3.0
   #   alias: llama-32-nv-rerankqa-1b-v2
   #   condition: llama-32-nv-rerankqa-1b-v2.deployed
+
+  - name: riva-nim
+    repository: "alias:nvidia-nim"
+    version: 1.0.0
+    condition: riva-nim.deployed
 
   - name: milvus
     repository: https://zilliztech.github.io/milvus-helm
