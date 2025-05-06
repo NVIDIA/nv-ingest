@@ -34,7 +34,7 @@ class RayActorSourceStage(RayActorStage, ABC):
         pass
 
     @abstractmethod
-    def read_input(self) -> Any:
+    def _read_input(self) -> Any:
         """
         For source stages, read_input simply calls get_input().
         """

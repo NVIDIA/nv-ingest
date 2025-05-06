@@ -23,7 +23,7 @@ class ThroughputMonitorStage(RayActorStage):
     """
 
     def __init__(self, config: BaseModel) -> None:
-        # Initialize base attributes (e.g., self.running, self.start_time) via the base class.
+        # Initialize base attributes (e.g., self._running, self.start_time) via the base class.
         super().__init__(config)
         self.count = 0
         self.last_emit_time = None  # Timestamp when the last throughput measure was emitted

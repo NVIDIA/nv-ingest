@@ -31,7 +31,7 @@ class JobCounterStage(RayActorStage):
     """
 
     def __init__(self, config: BaseModel) -> None:
-        # Ensure base attributes (e.g. self.running) are initialized.
+        # Ensure base attributes (e.g. self._running) are initialized.
         super().__init__(config)
         # The validated config should be a JobCounterSchema instance.
         self.validated_config: JobCounterSchema = config

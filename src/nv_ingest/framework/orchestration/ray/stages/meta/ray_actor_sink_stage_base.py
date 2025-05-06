@@ -32,7 +32,7 @@ class RayActorSinkStage(RayActorStage, ABC):
         The main processing loop executed in a background thread.
 
         Continuously reads from the input queue, processes items using `on_data`,
-        performs final processing, and deletes the control message. Exits when `self.running` becomes
+        performs final processing, and deletes the control message. Exits when `self._running` becomes
         False. Upon loop termination, it schedules `_request_actor_exit` to run
         on the main Ray actor thread to ensure a clean shutdown via `ray.actor.exit_actor()`.
         """
@@ -41,20 +41,20 @@ class RayActorSinkStage(RayActorStage, ABC):
 
         try:
             # Loop continues as long as the actor is marked as running
-            while self.running:
+            while self._running:
                 control_message: Optional[Any] = None
                 try:
                     # Step 1: Attempt to get work from the input queue
-                    control_message = self.read_input()
+                    control_message = self._read_input()
 
-                    # If no message, loop back and check self.running again
+                    # If no message, loop back and check self._running again
                     if control_message is None:
                         continue  # Go to the next iteration of the while loop
 
                     self.stats["successful_queue_reads"] += 1
 
                     # Step 2: Process the retrieved message
-                    self.active_processing = True  # Mark as busy
+                    self._active_processing = True  # Mark as busy
                     self.on_data(control_message)
 
                     self.stats["processed"] += 1
@@ -65,15 +65,15 @@ class RayActorSinkStage(RayActorStage, ABC):
                     logger.exception(f"{actor_id_str}: Error processing item{cm_info}: {e}")
 
                     # Avoid busy-spinning in case of persistent errors reading or processing
-                    if self.running:
+                    if self._running:
                         time.sleep(0.1)
                 finally:
                     # Ensure active_processing is reset regardless of success/failure/output
-                    self.active_processing = False
+                    self._active_processing = False
 
             # --- Loop Exit ---
             logger.debug(
-                f"{actor_id_str}: Graceful exit condition met (self.running is False). Processing loop terminating."
+                f"{actor_id_str}: Graceful exit condition met (self._running is False). Processing loop terminating."
             )
 
         except Exception as e:

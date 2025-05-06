@@ -282,7 +282,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             self._logger.exception("Error during message fetching: %s", err)
             return None
 
-    def read_input(self) -> any:
+    def _read_input(self) -> any:
         """
         Source stage's implementation of get_input.
         Instead of reading from an input edge, fetch a message from the broker.
@@ -321,11 +321,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         """
         self._logger.info("Processing loop started")
         iteration = 0
-        while self.running:
+        while self._running:
             iteration += 1
             try:
                 self._logger.debug("Processing loop iteration: %s", iteration)
-                control_message = self.read_input()
+                control_message = self._read_input()
                 if control_message is None:
                     self._logger.debug(
                         "No control message received; sleeping for poll_interval: %s", self.config.poll_interval
@@ -333,7 +333,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     time.sleep(self.config.poll_interval)
                     continue
 
-                self.active_processing = True
+                self._active_processing = True
 
                 self._logger.debug("Control message received; processing data")
                 updated_cm = self.on_data(control_message)
@@ -343,7 +343,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                     self._logger.debug("Waiting for stage to resume if paused...")
                     self._pause_event.wait()  # Block if paused
 
-                    # Perpetually retry put() on asyncio.QueueFull
                     while True:
                         try:
                             self.output_queue.put(updated_cm)
@@ -357,23 +356,23 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self.stats["processed"] += 1
                 self._message_count += 1
 
-                self._logger.info(f"Sourced message_count: {self._message_count}")
+                self._logger.debug(f"Sourced message_count: {self._message_count}")
                 self._logger.debug("Iteration %s complete. Total processed: %s", iteration, self.stats["processed"])
             except Exception as e:
                 self._logger.exception("Error in processing loop at iteration %s: %s", iteration, e)
                 time.sleep(self.config.poll_interval)
             finally:
-                self.active_processing = False
+                self._active_processing = False
 
         self._logger.info("Processing loop ending")
         ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
-        if self.running:
+        if self._running:
             self._logger.info("Start called but stage is already running.")
             return False
-        self.running = True
+        self._running = True
         self.start_time = time.time()
         self._message_count = 0
         self._logger.info("Starting processing loop thread.")
@@ -383,7 +382,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
     @ray.method(num_returns=1)
     def stop(self) -> bool:
-        self.running = False
+        self._running = False
         self._logger.info("Stop called on MessageBrokerTaskSourceStage")
         return True
 
@@ -393,7 +392,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         delta = self._message_count - self._last_message_count
         self._last_message_count = self._message_count
         stats = {
-            "active_processing": 1 if self.active_processing else 0,
+            "active_processing": 1 if self._active_processing else 0,
             "delta_processed": delta,
             "elapsed": elapsed,
             "errors": self.stats.get("errors", 0),

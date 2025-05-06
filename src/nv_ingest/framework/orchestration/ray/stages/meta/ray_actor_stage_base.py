@@ -48,16 +48,16 @@ class RayActorStage(ABC):
     ----------
     config : BaseModel
         Configuration object for the stage.
-    input_queue : Optional[Any]
+    _input_queue : Optional[Any]
         Handle to the Ray queue from which input items are read.
         Expected to be set via `set_input_queue`.
-    output_queue : Optional[Any]
+    _output_queue : Optional[Any]
         Handle to the Ray queue where processed items are placed.
         Expected to be set via `set_output_queue`.
-    running : bool
+    _running : bool
         Flag indicating if the processing loop should be actively running.
         Set to True by `start()` and False by `stop()`. Controls the main loop.
-    active_processing : bool
+    _active_processing : bool
         Flag indicating if the `on_data` method is currently executing.
         Useful for understanding if the actor is busy at a given moment.
     stats : Dict[str, int]
@@ -90,10 +90,10 @@ class RayActorStage(ABC):
             the orchestrator during actor creation.
         """
         self.config: BaseModel = config
-        self.input_queue: Optional[Any] = None  # Ray Queue handle expected
-        self.output_queue: Optional[Any] = None  # Ray Queue handle expected
-        self.running: bool = False
-        self.active_processing: bool = False
+        self._input_queue: Optional[Any] = None  # Ray Queue handle expected
+        self._output_queue: Optional[Any] = None  # Ray Queue handle expected
+        self._running: bool = False
+        self._active_processing: bool = False
 
         # --- Core statistics ---
         self.stats: Dict[str, int] = {
@@ -146,7 +146,7 @@ class RayActorStage(ABC):
             # Fallback if running outside a Ray actor context or if context fails
             return "Actor (ID unavailable)"
 
-    def read_input(self) -> Optional[Any]:
+    def _read_input(self) -> Optional[Any]:
         """
         Reads an item from the input queue with a timeout.
 
@@ -166,22 +166,22 @@ class RayActorStage(ABC):
             If `input_queue` is None while the actor's `running` flag is True.
             This indicates a configuration error.
         """
-        if not self.running:
+        if not self._running:
             return None
 
         # Ensure the input queue has been configured before attempting to read
-        if self.input_queue is None:
+        if self._input_queue is None:
             # This check should ideally not fail if start() is called after setup
-            if self.running:
+            if self._running:
                 logger.error(f"{self._get_actor_id_str()}: Input queue not set while running")
                 # Indicate a programming error - queue should be set before starting
                 raise ValueError("Input queue not set while running")
-            return None  # Should not happen if self.running is False, but defensive check
+            return None  # Should not happen if self._running is False, but defensive check
 
         try:
             # Perform a non-blocking or short-blocking read from the queue
-            # The timeout allows the loop to check self.running periodically
-            return self.input_queue.get(timeout=1.0)
+            # The timeout allows the loop to check self._running periodically
+            return self._input_queue.get(timeout=1.0)
         except Exception:
             # Common exceptions include queue.Empty in older Ray versions or
             # custom queue implementations raising timeout errors.
@@ -217,7 +217,7 @@ class RayActorStage(ABC):
         The main processing loop executed in a background thread.
 
         Continuously reads from the input queue, processes items using `on_data`,
-        and puts results onto the output queue. Exits when `self.running` becomes
+        and puts results onto the output queue. Exits when `self._running` becomes
         False. Upon loop termination, it schedules `_request_actor_exit` to run
         on the main Ray actor thread to ensure a clean shutdown via `ray.actor.exit_actor()`.
         """
@@ -226,16 +226,16 @@ class RayActorStage(ABC):
 
         try:
             # Loop continues as long as the actor is marked as running
-            while self.running:
+            while self._running:
                 control_message: Optional[Any] = None
                 try:
                     # Step 1: Attempt to get work from the input queue
-                    control_message = self.read_input()
-                    self.active_processing = True  # Mark as busy
+                    control_message = self._read_input()
+                    self._active_processing = True  # Mark as busy
 
-                    # If no message, loop back and check self.running again
+                    # If no message, loop back and check self._running again
                     if control_message is None:
-                        self.active_processing = False  # Mark as busy
+                        self._active_processing = False  # Mark as busy
                         continue  # Go to the next iteration of the while loop
                     else:
                         self.stats["successful_queue_reads"] += 1
@@ -245,16 +245,15 @@ class RayActorStage(ABC):
 
                     # Step 3: Handle the output
                     if updated_cm is None:
-                        logger.error(f"{actor_id_str}: *************on_data returned None************.")
                         self.stats["errors"] += 1
                         self.stats["processed"] += 1
 
                         raise RuntimeError(f"{actor_id_str}: on_data returned None, which is not allowed.")
 
-                    if updated_cm is not None and self.output_queue is not None:
+                    if updated_cm is not None and self._output_queue is not None:
                         while True:
                             try:
-                                self.output_queue.put(updated_cm)
+                                self._output_queue.put(updated_cm)
                                 self.stats["successful_queue_writes"] += 1
                                 break  # Success
                             except Exception:
@@ -273,15 +272,15 @@ class RayActorStage(ABC):
 
                     self.stats["errors"] += 1
 
-                    if self.running:
+                    if self._running:
                         time.sleep(0.1)
                 finally:
                     # Ensure active_processing is reset regardless of success/failure/output
-                    self.active_processing = False
+                    self._active_processing = False
 
             # --- Loop Exit ---
             logger.debug(
-                f"{actor_id_str}: Graceful exit condition met (self.running is False). Processing loop terminating."
+                f"{actor_id_str}: Graceful exit condition met (self._running is False). Processing loop terminating."
             )
 
         except Exception as e:
@@ -290,7 +289,10 @@ class RayActorStage(ABC):
         finally:
             logger.debug(f"{actor_id_str}: Processing loop thread finished.")
 
+            time.sleep(60)
             self._shutdown_signal_complete = True
+            self._input_queue = None
+            self._output_queue = None
 
             # --- Trigger Actor Exit from Main Thread ---
             # It's crucial to call ray.actor.exit_actor() from the main actor
@@ -356,18 +358,15 @@ class RayActorStage(ABC):
         with self._lock:
             if self._shutting_down:
                 return
+
             self._shutting_down = True
 
         logger.info(f"{actor_id_str}: Executing actor exit process.")
-        try:
-            if self._processing_thread:
-                self._processing_thread.join()
-                time.sleep(0.1)  # Allow time for thread cleanup
 
-            ray.actor.exit_actor()
+        if self._processing_thread:
+            self._processing_thread.join()
 
-        except Exception as e:
-            logger.critical(f"{actor_id_str}: CRITICAL - Failed execute ray.actor.exit_actor(): {e}", exc_info=True)
+        ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:
@@ -385,13 +384,13 @@ class RayActorStage(ABC):
         """
         actor_id_str = self._get_actor_id_str()
         # Prevent starting if already running
-        if self.running:
+        if self._running:
             logger.warning(f"{actor_id_str}: Start called but actor is already running.")
             return False
 
         logger.info(f"{actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
-        self.running = True
+        self._running = True
         self._shutting_down = False  # Reset shutdown flag on start
         self._shutdown_signal_complete = False
         self.start_time = time.time()
@@ -430,14 +429,14 @@ class RayActorStage(ABC):
             logger.debug(f"{actor_id_str}: Stop called again, returning existing shutdown future.")
             return self._shutdown_future
 
-        if not self.running:
+        if not self._running:
             logger.warning(f"{actor_id_str}: Stop called but actor was not running.")
             # Return an immediate future
             self._shutdown_future = self._immediate_true.remote()
             return self._shutdown_future
 
         # --- Initiate Shutdown ---
-        self.running = False
+        self._running = False
         logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
 
         # --- Spawn shutdown watcher task ---
@@ -479,7 +478,7 @@ class RayActorStage(ABC):
         """
         current_time: float = time.time()
         current_processed: int = self.stats.get("processed", 0)
-        is_active: bool = self.active_processing
+        is_active: bool = self._active_processing
         delta_processed = 0
 
         processing_rate_cps: float = 0.0  # Default rate
@@ -536,7 +535,7 @@ class RayActorStage(ABC):
             True indicating the queue was set.
         """
         logger.debug(f"{self._get_actor_id_str()}: Setting input queue.")
-        self.input_queue = queue_handle
+        self._input_queue = queue_handle
         return True
 
     @ray.method(num_returns=1)
@@ -558,5 +557,5 @@ class RayActorStage(ABC):
             True indicating the queue was set.
         """
         logger.debug(f"{self._get_actor_id_str()}: Setting output queue.")
-        self.output_queue = queue_handle
+        self._output_queue = queue_handle
         return True

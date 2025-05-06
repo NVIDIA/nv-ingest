@@ -40,6 +40,7 @@ logger = logging.getLogger("uvicorn")
 def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any]):
     current_level = logging.getLogger().getEffectiveLevel()
     ray.init(
+        namespace="nv_ingest_ray",
         logging_level=current_level,
         ignore_reinit_error=True,
         dashboard_host="0.0.0.0",

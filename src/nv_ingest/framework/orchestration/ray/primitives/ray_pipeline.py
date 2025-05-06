@@ -219,7 +219,9 @@ class RayPipeline:
                         f" for '{stage.name}'"
                     )
                     try:
-                        actor = stage.callable.options(name=actor_name, max_concurrency=10).remote(config=stage.config)
+                        actor = stage.callable.options(name=actor_name, max_concurrency=10, lifetime="detached").remote(
+                            config=stage.config
+                        )
                         replicas.append(actor)
                     except Exception as e:
                         logger.error(f"[Build-Actors] Failed create actor '{actor_name}': {e}", exc_info=True)
@@ -376,8 +378,7 @@ class RayPipeline:
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            # Adjust .options() as needed (e.g., resource requests)
-            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=100).remote(
+            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=10, lifetime="detached").remote(
                 config=stage_info.config
             )
 

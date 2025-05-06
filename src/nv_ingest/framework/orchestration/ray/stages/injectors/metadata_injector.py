@@ -30,7 +30,7 @@ class MetadataInjectionStage(RayActorStage):
     """
 
     def __init__(self, config: BaseModel) -> None:
-        # Call the base initializer to set attributes like self.running.
+        # Call the base initializer to set attributes like self._running.
         super().__init__(config)
         # Additional initialization can be added here if necessary.
         logger.info("MetadataInjectionStage initialized with config: %s", config)
