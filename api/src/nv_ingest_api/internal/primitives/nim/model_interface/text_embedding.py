@@ -21,7 +21,7 @@ class EmbeddingModelInterface(ModelInterface):
         """
         return "Embedding"
 
-    def prepare_data_for_inference(self, data: List[dict]) -> List[str]:
+    def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
         Prepare input data for embedding inference. Returns a list of strings representing the text to be embedded.
         """
@@ -32,7 +32,7 @@ class EmbeddingModelInterface(ModelInterface):
         return {"prompts": data["prompts"]}
 
     def format_input(
-        self, data: List[str], protocol: str, max_batch_size: int, **kwargs
+        self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
     ) -> Tuple[List[Any], List[Dict[str, Any]]]:
         """
         Format the input payload for the embedding endpoint. This method constructs one payload per batch,
