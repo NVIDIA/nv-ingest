@@ -111,7 +111,6 @@ from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners i
 )
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
-from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
 # Start the pipeline subprocess for library mode                       
