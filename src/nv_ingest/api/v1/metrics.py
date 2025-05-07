@@ -16,6 +16,6 @@ REQUEST_COUNT = Counter("http_requests_total", "Total HTTP Requests", ["method",
 REQUEST_LATENCY = Histogram("http_request_duration_seconds", "Request latency", ["method", "endpoint"])
 
 
-@router.get("/v1/metrics")
+@router.get("/metrics")
 def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)

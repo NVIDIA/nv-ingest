@@ -32,7 +32,7 @@ app = FastAPI(
 
 app.include_router(IngestApiRouter, prefix="/v1")
 app.include_router(HealthApiRouter, prefix="/v1/health")
-app.include_router(MetricsApiRouter, prefix="/v1/metrics")
+app.include_router(MetricsApiRouter, prefix="/v1")
 
 # Set up the tracer provider and add a processor for exporting traces
 resource = Resource(attributes={"service.name": "nv-ingest"})
