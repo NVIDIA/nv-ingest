@@ -104,10 +104,13 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
 import logging, os, time, sys
-               
-from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
+
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
+    PipelineCreationSchema,
+    start_pipeline_subprocess
+)
 from nv_ingest_client.client import Ingestor, NvIngestClient
-from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
