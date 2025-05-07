@@ -56,8 +56,11 @@ from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema imp
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logger = logging.getLogger(__name__)
+
+_system_resource_probe = SystemResourceProbe()
 
 
 def validate_positive(ctx, param, value):
@@ -200,7 +203,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
         stage_actor=PDFExtractorStage,
         config=extractor_config,
         min_replicas=0,
-        max_replicas=8,
+        max_replicas=int(max(1, (default_cpu_count // 3))),  # 33% of available CPU cores
     )
 
     return stage_name
@@ -229,7 +232,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
-        max_replicas=4,
+        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
     )
 
     return stage_name
@@ -258,7 +261,7 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
-        max_replicas=4,
+        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
     )
 
     return stage_name
@@ -282,7 +285,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -304,7 +307,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -326,7 +329,7 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -348,7 +351,7 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -374,7 +377,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=1,  # Audio extraction is a heavy IO bound operation with minimal CPU usage
     )
 
     return stage_name
@@ -439,7 +442,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -501,7 +504,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=3,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
@@ -515,7 +518,7 @@ def add_embedding_storage_stage(pipeline, default_cpu_count, stage_name="embeddi
         stage_actor=EmbeddingStorageStage,
         config=config,
         min_replicas=0,
-        max_replicas=4,
+        max_replicas=1,
     )
 
     return stage_name

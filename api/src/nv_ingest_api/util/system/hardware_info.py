@@ -17,7 +17,7 @@ CGROUP_V1_CPUACCT_DIR = "/sys/fs/cgroup/cpuacct"  # Sometimes usage is here
 CGROUP_V2_CPU_FILE = "/sys/fs/cgroup/cpu.max"  # Standard path in v2 unified hierarchy
 
 
-class CoreCountDetector:
+class SystemResourceProbe:
     """
     Detects the effective CPU core count available to the current process,
     optionally applying a weighting factor for hyperthreads (SMT).

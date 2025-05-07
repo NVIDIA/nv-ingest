@@ -10,7 +10,7 @@ import numpy as np
 from collections import deque
 from typing import Dict, Any, Deque, List, Tuple, Optional
 
-from nv_ingest_api.util.system.hardware_info import CoreCountDetector
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -210,7 +210,7 @@ class PIDController:
                 self.idle_cycles[stage] = 0
 
             # Limit how much penalty can reduce the effective target below zero
-            penalty = min(2, self.penalty_factor * (self.idle_cycles[stage] ** 1.5))
+            penalty = self.penalty_factor * (self.idle_cycles[stage] ** 1.5)
 
             # Error calculation (Queue deviation from target, adjusted by idle penalty)
             error = (queue_depth - target_queue_depth) - penalty
@@ -313,7 +313,7 @@ class ResourceConstraintManager:
         self.memory_safety_buffer_fraction = memory_safety_buffer_fraction
         self.effective_memory_limit = self.memory_threshold * (1.0 - self.memory_safety_buffer_fraction)
 
-        core_detector = CoreCountDetector()  # Instantiate the detector
+        core_detector = SystemResourceProbe()  # Instantiate the detector
         self.available_cores: Optional[float] = core_detector.get_effective_cores()
         self.core_detection_details: Dict[str, Any] = core_detector.get_details()
 

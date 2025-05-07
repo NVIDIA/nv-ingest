@@ -33,6 +33,7 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_otel_tracer_stage,
     add_default_drain_stage,
 )
+from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logger = logging.getLogger("uvicorn")
 
@@ -63,8 +64,11 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
             ),
         },
     )
+    system_resource_probe = SystemResourceProbe()
 
-    default_cpu_count = os.environ.get("NV_INGEST_MAX_UTIL", int(max(1, math.floor(len(os.sched_getaffinity(0))))))
+    effective_cpu_core_count = system_resource_probe.get_effective_cores()
+    default_cpu_count = int(os.environ.get("NV_INGEST_MAX_UTIL", int(max(1, math.floor(effective_cpu_core_count)))))
+
     add_meter_stage = os.environ.get("MESSAGE_CLIENT_TYPE") != "simple"
     _ = add_meter_stage  # TODO(Devin)
 
