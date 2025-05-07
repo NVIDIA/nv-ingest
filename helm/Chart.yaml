@@ -98,6 +98,6 @@ dependencies:
     condition: otelDeployed
 
   - name: prometheus
-    version: 27.12.1
-    condition: prometheus.deployed
     repository: https://prometheus-community.github.io/helm-charts
+    version: 27.12.1
+    condition: prometheusDeployed

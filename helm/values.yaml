@@ -800,6 +800,15 @@ redis:
     configmap: |-
       protected-mode no
 
+## @section Prometheus configurations
+## @descriptionStart
+## Include any Prometheus configuration that you'd like with the deployed Prometheus
+## @descriptionEnd
+## @param prometheusDeployed [default: true] Whether to deploy Prometheus from this helm chart
+prometheusDeployed: true
+
+prometheus:
+
 ## @section Environment Variables
 ## @descriptionStart
 ## Define environment variables as key/value dictionary pairs
