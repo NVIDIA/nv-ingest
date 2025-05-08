@@ -154,7 +154,7 @@ class ExtractTaskSchema(BaseModel):
     def extract_method_must_be_valid(cls, v, values, **kwargs):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
 
-        # Skip validation for txt and html types since it does not have an extract stage.
+        # Skip validation for text-like types, since they do not have 'extract' stages.
         if document_type in ["txt", "text", "html", "json", "md", "sh"]:
             return
 
