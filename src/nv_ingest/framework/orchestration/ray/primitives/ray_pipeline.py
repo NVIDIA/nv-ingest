@@ -523,7 +523,7 @@ class RayPipeline:
         actors_to_remove = current_replicas[-num_to_remove:]
         logger.debug(f"[ScaleDown-{stage_name}] Identified {len(actors_to_remove)} actors for removal.")
 
-        actors_to_register_map: Dict[str, List[Tuple[Any, ray.ObjectRef[bool]]]] = defaultdict(list)
+        actors_to_register_map: Dict[str, List[Tuple[Any, ray.ObjectRef]]] = defaultdict(list)
         stop_initiation_failures = 0
 
         for actor in actors_to_remove:
@@ -609,8 +609,6 @@ class RayPipeline:
     def _is_pipeline_quiet(self) -> bool:
         """Checks if pipeline is quiet using topology state and stats collector."""
 
-        return False
-
         # Check topology state first
         if self.topology.get_is_flushing():
             logger.debug("Pipeline quiet check: False (Flush in progress via topology state)")
@@ -622,7 +620,9 @@ class RayPipeline:
             return False
 
         # Stats check (same as before)
-        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
+        current_stage_stats, global_in_flight, last_update_time, stats_were_successful = (
+            self.stats_collector.get_latest_stats()
+        )
         last_update_age = time.time() - last_update_time
         max_stats_age_for_quiet = max(10.0, self._stats_collection_interval_seconds * 2.5)
 
@@ -641,7 +641,6 @@ class RayPipeline:
             return False
 
         # Activity check
-        global_in_flight = self._get_global_in_flight(current_stage_stats)
         is_quiet = global_in_flight <= self.quiet_period_threshold
 
         if is_quiet:
@@ -670,19 +669,16 @@ class RayPipeline:
             drain_stats = {}
             drain_success = False
             collection_error = None
+
+            global_in_flight = -1
             try:
                 # Use the collector's method for a one-off, blocking collection
-                drain_stats, drain_success = self.stats_collector.collect_stats_now()
+                drain_stats, global_in_flight, drain_success = self.stats_collector.collect_stats_now()
             except Exception as e:
                 logger.error(f"[DrainWait] Critical error during direct stats collection call: {e}.", exc_info=True)
                 collection_error = e  # Indicate failure to even run collection
 
             # --- Process collection results ---
-            global_in_flight = -1  # Default to unknown
-            if not collection_error:
-                # Use helper, works even if drain_success is False (partial stats)
-                global_in_flight = self._get_global_in_flight(drain_stats)
-
             if global_in_flight != last_in_flight:
                 status_msg = (
                     f"Collection Success: {drain_success}"
@@ -940,7 +936,7 @@ class RayPipeline:
             final_adjustments = self.constraint_manager.apply_constraints(
                 initial_proposals=initial_proposals,
                 global_in_flight=global_in_flight,
-                current_global_memory_usage=current_global_memory_mb,
+                current_global_memory_usage_mb=current_global_memory_mb,
                 num_edges=num_edges,
             )
             logger.debug(f"[ScalingCalc] RCM Final Adjustments: {final_adjustments}")

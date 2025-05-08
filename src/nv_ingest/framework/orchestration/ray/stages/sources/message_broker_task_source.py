@@ -339,10 +339,10 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 updated_cm = self.on_data(control_message)
 
                 # Block until not paused using the pause event.
-                if (updated_cm is not None) and (self.output_queue is not None):
+                if self.output_queue is not None:
                     self._logger.debug("Waiting for stage to resume if paused...")
 
-                    if self._pause_event.is_set() and self._active_processing:
+                    if not self._pause_event.is_set():
                         self._active_processing = False
                         self._pause_event.wait()  # Block if paused
                         self._active_processing = True
@@ -367,9 +367,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 time.sleep(self.config.poll_interval)
             finally:
                 self._active_processing = False
+                self._shutdown_signal_complete = True
 
         self._logger.info("Processing loop ending")
-        ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
     def start(self) -> bool:

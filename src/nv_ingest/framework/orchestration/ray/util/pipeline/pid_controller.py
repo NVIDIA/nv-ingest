@@ -296,7 +296,7 @@ class ResourceConstraintManager:
         self,
         max_replicas: int,
         memory_threshold: int,
-        estimated_edge_cost_mb: int,  # Still unused
+        estimated_edge_cost_mb: int,
         memory_safety_buffer_fraction: float,
     ):
         """
@@ -308,10 +308,10 @@ class ResourceConstraintManager:
             raise ValueError("memory_safety_buffer_fraction must be between 0.0 and 1.0")
 
         self.max_replicas = max_replicas
-        self.memory_threshold = memory_threshold
+        self.memory_threshold_mb = memory_threshold
         self.estimated_edge_cost_mb = estimated_edge_cost_mb  # Keep track, though unused
         self.memory_safety_buffer_fraction = memory_safety_buffer_fraction
-        self.effective_memory_limit = self.memory_threshold * (1.0 - self.memory_safety_buffer_fraction)
+        self.effective_memory_limit_mb = self.memory_threshold_mb * (1.0 - self.memory_safety_buffer_fraction)
 
         core_detector = SystemResourceProbe()  # Instantiate the detector
         self.available_cores: Optional[float] = core_detector.get_effective_cores()
@@ -330,7 +330,7 @@ class ResourceConstraintManager:
             f"(Method: {self.core_detection_details.get('detection_method')}), "
             f"CoreBasedReplicaLimit={self.core_based_replica_limit}, "  # Log the derived integer limit
             f"MemThreshold={memory_threshold}MB, "
-            f"EffectiveLimit={self.effective_memory_limit:.1f}MB "
+            f"EffectiveLimit={self.effective_memory_limit_mb:.1f}MB "
         )
         logger.debug(f"[ConstraintMgr] Core detection details: {self.core_detection_details}")
 
@@ -365,14 +365,14 @@ class ResourceConstraintManager:
         Returns:
             Dict[str, int]: Updated replica proposals after aggressive scale-down.
         """
-        if current_global_memory_usage <= self.effective_memory_limit:
+        if current_global_memory_usage <= self.effective_memory_limit_mb:
             return current_proposals
 
-        memory_overrun = current_global_memory_usage - self.effective_memory_limit
+        memory_overrun = current_global_memory_usage - self.effective_memory_limit_mb
         logger.warning(
             f"[ConstraintMgr] Aggressive Scale-Down Triggered: "
             f"Current Mem ({current_global_memory_usage:.1f}MB) > Effective Limit"
-            f" ({self.effective_memory_limit:.1f}MB). "
+            f" ({self.effective_memory_limit_mb:.1f}MB). "
             f"Need to reduce by {memory_overrun:.1f}MB."
         )
 
@@ -512,15 +512,15 @@ class ResourceConstraintManager:
 
             # Check Effective Memory Limit Constraint (Unchanged)
             projected_total_global_memory = current_global_memory_usage + total_projected_mem_increase
-            if projected_total_global_memory > self.effective_memory_limit:
-                allowed_mem_increase = max(0.0, self.effective_memory_limit - current_global_memory_usage)
+            if projected_total_global_memory > self.effective_memory_limit_mb:
+                allowed_mem_increase = max(0.0, self.effective_memory_limit_mb - current_global_memory_usage)
                 factor_mem = (
                     allowed_mem_increase / total_projected_mem_increase if total_projected_mem_increase > 0 else 0.0
                 )
                 reduction_factor = min(reduction_factor, factor_mem)
                 logger.warning(
                     f"[ConstraintMgr-Proportional] Effective memory limit potentially hit by initial request "
-                    f"({projected_total_global_memory:.1f}/{self.effective_memory_limit:.1f}MB). "
+                    f"({projected_total_global_memory:.1f}/{self.effective_memory_limit_mb:.1f}MB). "
                     f"Limiting factor: {factor_mem:.3f}"
                 )
 
@@ -614,86 +614,269 @@ class ResourceConstraintManager:
 
     def apply_constraints(
         self,
-        initial_proposals: Dict[str, StagePIDProposal],
+        initial_proposals: Dict[str, "StagePIDProposal"],
         global_in_flight: int,
-        current_global_memory_usage: int,
+        current_global_memory_usage_mb: int,
         num_edges: int,
     ) -> Dict[str, int]:
         """
-        Applies all constraints to initial proposals and returns final adjustments.
+        Applies all configured constraints to initial replica proposals.
+
+        This is the main entry point for the constraint manager. It orchestrates
+        the application of various constraint phases to the raw proposals
+        received from a scaling controller (e.g., PID controller).
 
         Order of Operations:
-        1. Calculate global pipeline activity.
-        2. Apply Aggressive Memory Scale-Down if over memory limit.
-        3. Apply Proportional Allocation/Reduction for scale-up requests based on
-           global limits (max_replicas, available_cores, memory).
-        4. Enforce Per-Stage Bounds (min/max replicas, zero-replica safety).
-        5. Apply Global Consistency (wake-up safety).
+        1.  Log initial state and received proposals.
+        2.  (Optionally) Apply Aggressive Memory Scale-Down: If current global
+            memory usage exceeds the effective limit, replicas are reduced,
+            prioritizing stages with higher replica counts.
+        3.  Apply Proportional Allocation/Reduction for Scale-Up Requests:
+            Global limits (max total replicas, available cores, memory budget)
+            are checked against the *original combined scale-up intent*. If limits
+            would be breached, the originally requested *increases* are scaled
+            down proportionally. Results are capped by any adjustments from
+            the aggressive memory scale-down.
+        4.  Enforce Per-Stage Bounds: Each stage's replica count is clamped
+            between its effective minimum (considering pipeline activity) and
+            its configured maximum.
+        5.  Apply Global Consistency (Wake-up Safety): Ensures that if any
+            stage scales up from zero, other stages that could also start are
+            not left at zero if their minimums allow.
+        6.  Log a detailed summary of the decision-making process and final outcomes.
 
-        Returns:
-            Dict[str, int]: Final target replica counts per stage.
+        Parameters
+        ----------
+        initial_proposals : Dict[str, StagePIDProposal]
+            A dictionary mapping stage names to `StagePIDProposal` objects,
+            each containing the current replica count, the PID-proposed replica
+            count, and other metrics like min/max replicas and memory cost.
+        global_in_flight : int
+            The total number of tasks currently in flight across the entire pipeline.
+            Used to determine effective minimum replicas (e.g., to keep stages
+            alive if there's pending work).
+        current_global_memory_usage_mb : int
+            The current total memory usage by all replicas in the pipeline, in MB.
+        num_edges : int
+            The number of edges (queues) in the pipeline. Currently used for logging context.
+
+        Returns
+        -------
+        Dict[str, int]
+            A dictionary mapping stage names to their final target replica counts
+            after all constraints have been applied.
         """
-        _ = num_edges  # Unused for now
-        logger.debug("--- Constraint Manager: Applying Constraints ---")
+        _ = num_edges  # Mark as used if only for logging/context, otherwise remove if truly unused.
+        logger.info(
+            f"[ConstraintMgr] --- Applying Constraints START --- "
+            f"GlobalInFlight={global_in_flight}, "
+            f"CurrentGlobalMemMB={current_global_memory_usage_mb}, "
+            f"NumEdges={num_edges}."
+        )
+        logger.debug("[ConstraintMgr] Initial Proposals:")
+        for name, prop in initial_proposals.items():
+            logger.debug(
+                f"[ConstraintMgr]   Stage '{name}': Current={prop.current_replicas}, "
+                f"PIDProposed={prop.proposed_replicas}, CostMB={prop.conservative_cost_estimate:.2f}, "
+                f"MinCfg={prop.metrics.get('min_replicas', 'N/A')}, MaxCfg={prop.metrics.get('max_replicas', 'N/A')}"
+            )
 
-        # Phase 1: Calculate Global State
-        logger.debug(f"[ConstraintMgr] Pipeline In-Flight: {global_in_flight}")
-
-        # Intermediate proposals start as the initially proposed values
+        # --- Phase 1: Initialize adjustments from PID proposals ---
+        # These are the raw numbers from the PID controller before any constraints.
         intermediate_adjustments: Dict[str, int] = {
             name: prop.proposed_replicas for name, prop in initial_proposals.items()
         }
+        logger.debug(f"[ConstraintMgr] Intermediate Adjustments (Phase 1 - From PID): {intermediate_adjustments}")
 
-        # Phase 2: Aggressive Memory Scale-Down
-        try:
-            # intermediate_adjustments = self._apply_aggressive_memory_scale_down(
-            #    intermediate_adjustments, initial_proposals, current_global_memory_usage, global_in_flight
-            # )
-            pass
-        except Exception as e:
-            logger.error(f"[ConstraintMgr] Error during aggressive memory scale-down: {e}", exc_info=True)
-            intermediate_adjustments = {name: prop.current_replicas for name, prop in initial_proposals.items()}
+        # --- Phase 2: Aggressive Memory Scale-Down ---
+        # This step modifies `intermediate_adjustments` in place if memory limits are breached.
+        # try:
+        #     intermediate_adjustments = self._apply_aggressive_memory_scale_down(
+        #        intermediate_adjustments, initial_proposals,
+        #        current_global_memory_usage_mb, global_in_flight_tasks
+        #     )
+        #     logger.debug(f"[ConstraintMgr] Intermediate Adjustments (Phase 2 - After Aggressive Mem Scale-Down):
+        #     {intermediate_adjustments}")
+        # except Exception as e_agg:
+        #     logger.error(f"[ConstraintMgr] Error during aggressive memory scale-down: {e_agg}", exc_info=True)
+        #     # Fallback: revert to current replicas if aggressive scaling fails critically
+        #     intermediate_adjustments = {name: prop.current_replicas for name, prop in initial_proposals.items()}
+        # logger.info("[ConstraintMgr] Phase 2: Aggressive Memory Scale-Down (Currently Bypassed/To-Implement).")
 
-        # Phase 3: Apply Global Constraints Proportional Allocation
+        # --- Phase 3: Apply Global Constraints & Proportional Allocation ---
+        # This step calculates `tentative_adjustments` based on global limits,
+        # using `intermediate_adjustments` as input (which might have been modified by aggressive scale-down).
         try:
             tentative_adjustments = self._apply_global_constraints_proportional(
-                intermediate_adjustments,
-                initial_proposals,
-                current_global_memory_usage,
+                intermediate_adjustments,  # Input from previous phase
+                initial_proposals,  # Original proposals for calculating upscale intent
+                current_global_memory_usage_mb,
             )
-        except Exception as e:
-            logger.error(f"[ConstraintMgr] Error during global constraint proportional allocation: {e}", exc_info=True)
+            logger.debug(
+                f"[ConstraintMgr] Tentative Adjustments (Phase 3 - After Proportional Allocation): "
+                f"{tentative_adjustments}"
+            )
+        except Exception as e_prop:
+            logger.error(f"[ConstraintMgr] Error during global proportional allocation: {e_prop}", exc_info=True)
+            # Fallback: use results from aggressive scale-down (or PID if aggressive was skipped)
             tentative_adjustments = intermediate_adjustments
 
-        # Phase 4: Enforce Per-Stage Bounds
+        # --- Phase 4: Enforce Per-Stage Min/Max Replica Bounds ---
+        # This step iterates through `tentative_adjustments` and applies individual stage bounds.
         final_adjustments: Dict[str, int] = {}
-        for name, proposal in initial_proposals.items():
-            replicas_after_proportional = tentative_adjustments.get(name, proposal.current_replicas)
+        for stage_name, proposal_meta in initial_proposals.items():
+            # Get the replica count for this stage after the proportional allocation phase.
+            # Default to its current_replicas if somehow missing (should not happen).
+            replicas_after_proportional = tentative_adjustments.get(stage_name, proposal_meta.current_replicas)
             try:
-                final_replicas = self._enforce_replica_bounds(
-                    name, replicas_after_proportional, proposal.metrics, global_in_flight
+                bounded_replicas = self._enforce_replica_bounds(
+                    stage_name, replicas_after_proportional, proposal_meta.metrics, global_in_flight
                 )
-                final_adjustments[name] = final_replicas
-            except Exception as e:
-                logger.error(f"[ConstraintMgr-{name}] Error during bound enforcement: {e}", exc_info=True)
-                final_adjustments[name] = proposal.current_replicas
+                final_adjustments[stage_name] = bounded_replicas
+            except Exception as e_bounds:
+                logger.error(
+                    f"[ConstraintMgr-{stage_name}] Error during per-stage bound enforcement: {e_bounds}", exc_info=True
+                )
+                # Fallback: use the stage's current replica count if bound enforcement fails.
+                final_adjustments[stage_name] = proposal_meta.current_replicas
+        logger.debug(f"[ConstraintMgr] Final Adjustments (Phase 4 - After Per-Stage Bounds): {final_adjustments}")
 
-        # Phase 5: Apply Global Consistency (Zero-Replica Safety / Wake-up)
+        # --- Phase 5: Apply Global Consistency (e.g., Wake-up Safety) ---
+        # This step modifies `final_adjustments` in place to ensure pipeline consistency.
         try:
             self._apply_global_consistency(final_adjustments, initial_proposals)
-        except Exception as e:
-            logger.error(f"[ConstraintMgr] Error during global consistency check: {e}", exc_info=True)
+            logger.debug(f"[ConstraintMgr] Final Adjustments (Phase 5 - After Global Consistency): {final_adjustments}")
+        except Exception as e_gc:
+            logger.error(f"[ConstraintMgr] Error during global consistency application: {e_gc}", exc_info=True)
+            # No specific fallback here; modifications by _apply_global_consistency might be partial.
 
-        logger.debug("--- Constraint Manager: Constraints Applied ---")
-        final_decision_log = {name: count for name, count in final_adjustments.items()}
-        logger.info(f"[ConstraintMgr] Final Replica Decisions: {final_decision_log}")
+        # --- Summary and Final Logging ---
+        logger.info("--- Constraint Manager: Decision Summary ---")
 
-        # Log total final replicas vs limits
+        # Detailed log for each stage's journey
+        for stage_name in initial_proposals.keys():
+            prop = initial_proposals[stage_name]
+            pid_proposed = prop.proposed_replicas
+            after_aggressive = intermediate_adjustments.get(
+                stage_name, pid_proposed
+            )  # Value after aggressive (or pid if skipped)
+            after_proportional = tentative_adjustments.get(stage_name, after_aggressive)  # Value after proportional
+            final_decision = final_adjustments.get(stage_name, prop.current_replicas)  # Final value
+
+            # Build a string describing the journey and reasons for change
+            journey = f"Current={prop.current_replicas}, PID={pid_proposed}"
+            if pid_proposed != after_aggressive:  # Assuming aggressive scale-down is phase 2
+                journey += f" -> AggressiveSD={after_aggressive}"
+            if after_aggressive != after_proportional:
+                journey += f" -> Proportional={after_proportional}"
+            # Bound enforcement and global consistency modify the 'final_decision'
+            # So we compare after_proportional with final_decision
+            if after_proportional != final_decision:
+                # Determine if change was due to bounds or global consistency by checking logs or specific flags
+                # if available
+                # For now, a generic "FinalBounds/Consistency"
+                journey += f" -> Bounds/Consistency={final_decision}"
+            elif (
+                final_decision == after_proportional
+                and final_decision == pid_proposed
+                and final_decision == prop.current_replicas
+            ):
+                # No change from start to end, but good to confirm
+                pass  # No change, journey already reflects this if PID = current
+            elif final_decision == after_proportional:  # No change in last steps
+                pass
+
+            # logger.info(
+            #    f"[ConstraintMgr-Decision] Stage '{stage_name}': {journey} => FINAL={final_decision}. "
+            #    f"(MinCfg={prop.metrics.get('min_replicas', 'N/A')},
+            #       MaxCfg={prop.metrics.get('max_replicas', 'N/A')}, "
+            #    f"EffectiveMinActual={self._get_effective_min_replicas(stage_name, prop.metrics, global_in_flight)})"
+            # )
+
+        # Log global summaries
         final_total_replicas = sum(final_adjustments.values())
-        core_limit_str = f"{self.available_cores}" if self.available_cores is not None else "N/A"
-        logger.info(
-            f"[ConstraintMgr] Final Total Replicas: {final_total_replicas} "
-            f"(MaxReplicaLimit={self.max_replicas}, AvailableCoreLimit={core_limit_str})"
+        core_limit_display = (
+            f"{self.available_cores:.1f}" if self.available_cores is not None else "N/A (Detection Failed or Zero)"
+        )
+        core_based_limit_display = (
+            str(self.core_based_replica_limit)
+            if self.core_based_replica_limit is not None
+            else "N/A (No Core-Based Limit)"
         )
 
+        # Calculate projected memory usage based on final decisions
+        projected_final_memory_mb = sum(
+            final_adjustments.get(name, 0) * initial_proposals[name].conservative_cost_estimate
+            for name in final_adjustments
+        )
+
+        # --- Summary and Final Logging (Pretty Printed) ---
+        logger.info("[ConstraintMgr] --- Final State & Limit Checks ---")
+
+        # Overall Replica Summary
+        logger.info(f"[ConstraintMgr] Final Total Replicas         : {final_total_replicas}")
+
+        # Configured Global Limits
+        logger.info(f"[ConstraintMgr]   Configured MaxTotalReplicas: {self.max_replicas}")
+        logger.info(
+            f"[ConstraintMgr]   Configured MemThresholdMB  : {self.memory_threshold_mb:.1f}"
+        )  # Assuming you have self.memory_threshold_mb
+        logger.info(f"[ConstraintMgr]   Configured MemSafetyBuffer : {self.memory_safety_buffer_fraction*100:.1f}%")
+        logger.info(f"[ConstraintMgr]   Effective MemLimitMB       : {self.effective_memory_limit_mb:.1f}")
+
+        # System-Derived Constraints
+        core_limit_display = (
+            f"{self.available_cores:.1f}" if self.available_cores is not None else "N/A (Detection Failed or Zero)"
+        )
+        core_based_limit_display = (
+            str(self.core_based_replica_limit)
+            if self.core_based_replica_limit is not None
+            else "N/A (Not Applicable or Undefined)"
+        )
+        logger.info(f"[ConstraintMgr]   System AvailableEffCores : {core_limit_display}")
+        logger.info(f"[ConstraintMgr]   System CoreBasedRepLimit : {core_based_limit_display}")
+
+        # Memory Usage Summary
+        logger.info("[ConstraintMgr] Memory Usage (MB):")
+        logger.info(f"[ConstraintMgr]   Current Global           : {current_global_memory_usage_mb:.1f}")
+        logger.info(f"[ConstraintMgr]   Projected Final          : {projected_final_memory_mb:.1f}")
+        logger.info(f"[ConstraintMgr]   Target                   : < {self.effective_memory_limit_mb:.1f}")
+
+        # Limit Breach Warnings
+        breached_limits_count = 0
+        if final_total_replicas > self.max_replicas:
+            logger.warning(
+                f"[ConstraintMgr]   WARNING: MaxTotalReplicas BREACHED! "
+                f"(Final: {final_total_replicas} > Limit: {self.max_replicas})"
+            )
+            breached_limits_count += 1
+        if self.core_based_replica_limit is not None and final_total_replicas > self.core_based_replica_limit:
+            logger.warning(
+                f"[ConstraintMgr]   WARNING: CoreBasedReplicaLimit BREACHED! "
+                f"(Final: {final_total_replicas} > Limit: {self.core_based_replica_limit})"
+            )
+            breached_limits_count += 1
+        if projected_final_memory_mb > self.effective_memory_limit_mb:
+            # Add a small tolerance for floating point comparisons if necessary
+            tolerance = 0.01  # e.g., 0.01 MB
+            if projected_final_memory_mb > (self.effective_memory_limit_mb + tolerance):
+                logger.warning(
+                    f"[ConstraintMgr]   WARNING: EffectiveMemLimit BREACHED! "
+                    f"(Projected: {projected_final_memory_mb:.1f}MB > Limit: {self.effective_memory_limit_mb:.1f}MB)"
+                )
+                breached_limits_count += 1
+
+        if breached_limits_count == 0:
+            logger.info("[ConstraintMgr] All global limits appear to be respected by final decisions.")
+
+        # Final decisions per stage (can be lengthy, so consider if always needed at INFO or DEBUG)
+        # Using a more structured format for the final decisions dictionary if it's large
+        if len(final_adjustments) > 5:  # Example threshold
+            logger.info("[ConstraintMgr] Final Replica Decisions (Per Stage):")
+            for stage_name, count in sorted(final_adjustments.items()):  # Sort for consistent output
+                logger.info(f"[ConstraintMgr]     '{stage_name}': {count}")
+        else:
+            logger.info(f"[ConstraintMgr] Final Replica Decisions (Per Stage): {final_adjustments}")
+
+        logger.info("[ConstraintMgr] --- Applying Constraints END ---")
         return final_adjustments
