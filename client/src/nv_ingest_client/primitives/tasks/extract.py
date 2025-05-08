@@ -43,7 +43,7 @@ _DEFAULT_EXTRACTOR_MAP = {
     "pdf": "pdfium",
     "png": "image",
     "pptx": "python_pptx",
-    "svg": "image",
+    # "svg": "image",
     "text": "txt",
     "tiff": "image",
     "txt": "txt",
