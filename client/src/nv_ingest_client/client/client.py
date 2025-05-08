@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-import concurrent
 
 # pylint: disable=broad-except
 
+import concurrent
 import json
 import logging
 import math

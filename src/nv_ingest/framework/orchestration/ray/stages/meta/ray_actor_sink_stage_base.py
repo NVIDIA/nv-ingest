@@ -9,8 +9,6 @@ from typing import Optional, Any
 import ray
 import logging
 
-from ray import get_runtime_context
-
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 
 logger = logging.getLogger(__name__)
@@ -78,30 +76,7 @@ class RayActorSinkStage(RayActorStage, ABC):
 
         except Exception as e:
             # Catch unexpected errors in the loop structure itself
-            logger.exception(f"{actor_id_str}: Unexpected error caused processing loop termination: {e}")
+            self._logger.exception(f"{actor_id_str}: Unexpected error caused processing loop termination: {e}")
         finally:
-            logger.debug(f"{actor_id_str}: Processing loop thread finished.")
-
+            self._logger.debug(f"{actor_id_str}: Processing loop thread finished.")
             self._shutdown_signal_complete = True
-
-            # --- Trigger Actor Exit from Main Thread ---
-            # It's crucial to call ray.actor.exit_actor() from the main actor
-            # thread, not the background thread. We use the current_actor handle
-            # obtained via the runtime context to schedule the exit call remotely
-            # (but targeting the same actor).
-            try:
-                logger.debug(f"{actor_id_str}: Scheduling final actor exit via _request_actor_exit.")
-                # Get a handle to the current actor instance
-                self_handle = get_runtime_context().current_actor
-                if self_handle:
-                    # Asynchronously call the _request_actor_exit method on this actor.
-                    # Ray ensures this method runs on the main actor thread.
-                    self_handle._request_actor_exit.remote()
-                else:
-                    # This should generally not happen if called from within an actor method/thread.
-                    logger.error(
-                        f"{actor_id_str}: Could not obtain current_actor handle. Actor might not exit cleanly."
-                    )
-            except Exception as e:
-                # Log errors during the scheduling of the exit call
-                logger.exception(f"{actor_id_str}: Failed to schedule _request_actor_exit: {e}")

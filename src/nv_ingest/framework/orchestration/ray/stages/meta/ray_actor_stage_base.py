@@ -9,12 +9,11 @@ from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
 
 import ray
+import ray.actor
 from pydantic import BaseModel
 import logging
 
 from ray import get_runtime_context
-
-logger = logging.getLogger(__name__)
 
 
 def setup_stdout_logging(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
@@ -28,6 +27,47 @@ def setup_stdout_logging(name: str = __name__, level: int = logging.INFO) -> log
         logger.addHandler(handler)
 
     return logger
+
+
+@ray.remote
+def external_monitor_actor_shutdown(actor_handle: "RayActorStage", poll_interval: float = 0.1) -> bool:
+    """
+    Polls the provided actor's `is_shutdown_complete` method until it returns True
+    or the actor becomes unreachable.
+    """
+    logger = setup_stdout_logging("_external_monitor_actor_shutdown")  # Optional: for monitor's own logs
+
+    if actor_handle is None:
+        logger.error("Received null actor_handle. Cannot monitor shutdown.")
+        return False  # Or raise error
+
+    actor_id_to_monitor = None
+    try:
+        # Try to get a string representation for logging, might fail if already gone
+        actor_id_to_monitor = str(actor_handle)  # Basic representation
+    except Exception:
+        actor_id_to_monitor = "unknown_actor"
+
+    logger.debug(f"Monitoring shutdown for actor: {actor_id_to_monitor}")
+
+    while True:
+        try:
+            # Remotely call the actor's method
+            if ray.get(actor_handle.is_shutdown_complete.remote()):
+                logger.debug(f"Actor {actor_id_to_monitor} reported shutdown complete.")
+                return True
+        except ray.exceptions.RayActorError:
+            # Actor has died or is otherwise unreachable.
+            # Consider this as shutdown complete for the purpose of the future.
+            logger.warning(f"Actor {actor_id_to_monitor} became unreachable (RayActorError). Assuming shutdown.")
+            return True
+        except Exception as e:
+            # Catch other potential errors during the remote call
+            logger.error(f"Unexpected error while polling shutdown status for {actor_id_to_monitor}: {e}")
+            # Depending on policy, either continue polling or assume failure
+            return True  # Or True if any exit is "shutdown"
+
+        time.sleep(poll_interval)
 
 
 class RayActorStage(ABC):
@@ -173,7 +213,7 @@ class RayActorStage(ABC):
         if self._input_queue is None:
             # This check should ideally not fail if start() is called after setup
             if self._running:
-                logger.error(f"{self._get_actor_id_str()}: Input queue not set while running")
+                self._logger.error(f"{self._get_actor_id_str()}: Input queue not set while running")
                 # Indicate a programming error - queue should be set before starting
                 raise ValueError("Input queue not set while running")
             return None  # Should not happen if self._running is False, but defensive check
@@ -213,108 +253,137 @@ class RayActorStage(ABC):
         pass  # Must be implemented by concrete subclasses
 
     def _processing_loop(self) -> None:
-        """
-        The main processing loop executed in a background thread.
+        """Core processing routine executed in a dedicated background thread.
 
-        Continuously reads from the input queue, processes items using `on_data`,
-        and puts results onto the output queue. Exits when `self._running` becomes
-        False. Upon loop termination, it schedules `_request_actor_exit` to run
-        on the main Ray actor thread to ensure a clean shutdown via `ray.actor.exit_actor()`.
+        This loop performs the primary work of the actor:
+        1.  Continuously attempts to retrieve a `control_message` from the
+            `_input_queue`.
+        2.  If a message is obtained, it's processed by the `on_data` method.
+        3.  If `on_data` yields a result (`updated_cm`), this result is
+            indefinitely retried to be `put` onto the `_output_queue`.
+        4.  The loop continues as long as the `self._running` flag is `True`.
+            This flag is typically controlled by external calls to `start()`
+            and `stop()` methods of the actor.
+        5.  Upon exiting the main `while` loop (i.e., when `self._running`
+            becomes `False`), this method sets `self._shutdown_signal_complete`
+            to `True`, indicating to external monitors that the actor's
+            processing work is finished.
+
+        Error Handling
+        --------------
+        - Exceptions raised during `on_data` or the `_output_queue.put`
+          sequence are caught, logged, and relevant error statistics are
+          incremented. The loop then continues to the next iteration if
+          `self._running` is still `True`.
+        - If `on_data` returns `None`, it's treated as a recoverable incident;
+          a warning is logged, stats are updated, and the loop continues.
+          No output is produced for that specific input message.
+        - A critical failure in the `_output_queue.put` (e.g., `RayActorError`
+          if the queue actor is dead) will currently lead to indefinite retries.
+
+        Statistics
+        ----------
+        This method updates various keys in `self.stats`, including:
+        - `successful_queue_reads`: Incremented when an item is successfully
+          read from the input queue.
+        - `errors`: Incremented if `on_data` returns `None` or if an
+          exception occurs during `on_data` or output queuing.
+        - `processed`: Incremented after processing a control message
+        - `successful_queue_writes`: Incremented when an item is successfully
+          put onto the output queue.
+        - `queue_full`: Incremented when an attempt to put to the output
+          queue fails (e.g., due to being full or other transient errors),
+          triggering a retry.
+
+        Notes
+        -----
+        - The `self._active_processing` flag is managed to reflect whether
+          the `on_data` method is currently (or about to be) active.
+        - This method is intended to be the target of a `threading.Thread`.
+        - Thread safety for `self.stats` relies on the GIL for simple
+          increment operations
         """
         actor_id_str = self._get_actor_id_str()
-        logger.debug(f"{actor_id_str}: Processing loop thread starting.")
+        self._logger.debug(f"{actor_id_str}: Processing loop thread starting.")
 
         try:
-            # Loop continues as long as the actor is marked as running
             while self._running:
                 control_message: Optional[Any] = None
                 try:
-                    # Step 1: Attempt to get work from the input queue
+                    # Step 1: Attempt to get work from the input queue.
+                    # _read_input() is expected to handle its own timeouts and
+                    # return None if no message is available or if self._running became False.
                     control_message = self._read_input()
-                    self._active_processing = True  # Mark as busy
 
-                    # If no message, loop back and check self._running again
                     if control_message is None:
-                        self._active_processing = False  # Mark as busy
-                        continue  # Go to the next iteration of the while loop
-                    else:
-                        self.stats["successful_queue_reads"] += 1
+                        # No message from input queue (e.g., timeout or shutting down)
+                        # Loop back to check self._running again.
+                        continue
+                    # else: # Implicitly, control_message is not None here
+                    self.stats["successful_queue_reads"] += 1
 
-                    # Step 2: Process the retrieved message
+                    # Mark as busy only when a message is retrieved and about to be processed.
+                    self._active_processing = True
+
+                    # Step 2: Process the retrieved message using subclass-specific logic.
                     updated_cm: Optional[Any] = self.on_data(control_message)
 
-                    # Step 3: Handle the output
-                    if updated_cm is None:
-                        self.stats["errors"] += 1
-                        self.stats["processed"] += 1
-
-                        raise RuntimeError(f"{actor_id_str}: on_data returned None, which is not allowed.")
-
-                    if updated_cm is not None and self._output_queue is not None:
-                        while True:
+                    # If there's a valid result and an output queue is configured, attempt to put.
+                    if self._output_queue is not None:
+                        # This loop will retry indefinitely until the item is put successfully
+                        # or an unrecoverable error occurs (which is not explicitly handled to break here).
+                        # TODO(Devin) -- This can be improved, should probably fail at some point?
+                        #                Consider max retries or specific error handling for RayActorError
+                        #                to prevent indefinite blocking if the queue actor is permanently dead.
+                        is_put_successful = False
+                        while not is_put_successful:  # Renamed loop variable for clarity
                             try:
                                 self._output_queue.put(updated_cm)
                                 self.stats["successful_queue_writes"] += 1
-                                break  # Success
-                            except Exception:
-                                logger.warning(f"{actor_id_str}: Output queue full or push failed, retrying...")
-                                self.stats["queue_full"] += 1
-                                time.sleep(0.1)
+                                is_put_successful = True  # Exit retry loop on success
+                            except Exception as e_put:  # Broad exception catch for put failures
+                                self._logger.warning(
+                                    f"[{actor_id_str}] Output queue put failed (e.g., full, "
+                                    f"timeout, or actor error), retrying. Error: {e_put}"
+                                )
+                                self.stats["queue_full"] += 1  # Consider renaming if it catches more than "full"
+                                time.sleep(0.1)  # Brief pause before retrying
 
-                    # Step 4: Increment processed count (thread safety note)
+                    # Step 3: Increment "processed" count after successful processing and output (if any).
+                    # This is the primary path for "successful processing".
                     self.stats["processed"] += 1
 
-                except Exception as e:
-                    # Log exceptions during item processing but continue the loop
-                    cm_info = f" (message type: {type(control_message).__name__})" if control_message else ""
-                    logger.exception(f"{actor_id_str}: Error processing item{cm_info}: {e}")
-                    # Avoid busy-spinning in case of persistent errors reading or processing
-
+                except Exception as e_item_processing:
+                    # Catch exceptions from on_data() or unexpected issues in the item handling block.
+                    cm_info_str = f" (message type: {type(control_message).__name__})" if control_message else ""
+                    self._logger.exception(
+                        f"[{actor_id_str}] Error during processing of item{cm_info_str}: {e_item_processing}"
+                    )
                     self.stats["errors"] += 1
 
+                    # If still running, pause briefly to prevent rapid spinning on persistent errors.
                     if self._running:
                         time.sleep(0.1)
                 finally:
-                    # Ensure active_processing is reset regardless of success/failure/output
+                    # Ensure _active_processing is reset after each item attempt (success, failure, or no item).
                     self._active_processing = False
 
-            # --- Loop Exit ---
-            logger.debug(
-                f"{actor_id_str}: Graceful exit condition met (self._running is False). Processing loop terminating."
+            # --- Loop Exit Condition Met ---
+            # This point is reached when self._running becomes False.
+            self._logger.debug(f"[{actor_id_str}] Graceful exit: self._running is False. Processing loop terminating.")
+
+        except Exception as e_outer_loop:
+            # Catches very unexpected errors in the structure of the while loop itself.
+            self._logger.exception(
+                f"[{actor_id_str}] Unexpected critical error caused processing loop termination: {e_outer_loop}"
             )
-
-        except Exception as e:
-            # Catch unexpected errors in the loop structure itself
-            logger.exception(f"{actor_id_str}: Unexpected error caused processing loop termination: {e}")
         finally:
-            logger.debug(f"{actor_id_str}: Processing loop thread finished.")
-
-            time.sleep(60)
+            # This block executes when the processing thread is about to exit,
+            # either due to self._running becoming False or an unhandled critical exception.
+            self._logger.debug(f"[{actor_id_str}] Processing loop thread finished.")
+            # Signal that this actor's processing duties are complete.
+            # External monitors (e.g., via a future from stop()) can use this signal.
             self._shutdown_signal_complete = True
-            self._input_queue = None
-            self._output_queue = None
-
-            # --- Trigger Actor Exit from Main Thread ---
-            # It's crucial to call ray.actor.exit_actor() from the main actor
-            # thread, not the background thread. We use the current_actor handle
-            # obtained via the runtime context to schedule the exit call remotely
-            # (but targeting the same actor).
-            try:
-                logger.debug(f"{actor_id_str}: Scheduling final actor exit via _request_actor_exit.")
-                # Get a handle to the current actor instance
-                self_handle = get_runtime_context().current_actor
-                if self_handle:
-                    # Asynchronously call the _request_actor_exit method on this actor.
-                    # Ray ensures this method runs on the main actor thread.
-                    self_handle._request_actor_exit.remote()
-                else:
-                    # This should generally not happen if called from within an actor method/thread.
-                    logger.error(
-                        f"{actor_id_str}: Could not obtain current_actor handle. Actor might not exit cleanly."
-                    )
-            except Exception as e:
-                # Log errors during the scheduling of the exit call
-                logger.exception(f"{actor_id_str}: Failed to schedule _request_actor_exit: {e}")
 
     @staticmethod
     @ray.remote
@@ -325,33 +394,16 @@ class RayActorStage(ABC):
         """
         return True
 
-    @staticmethod
-    @ray.remote
-    def _monitor_shutdown(shutdown_signal: ray.ObjectRef) -> bool:
-        """
-        A small remote function that waits for the shutdown signal to complete.
-        """
-        import time
-
-        while True:
-            if ray.get(shutdown_signal):
-                return True
-            time.sleep(0.1)  # Sleep briefly to avoid tight loop
-
-    def _shutdown_signal_complete_ref(self) -> ray.ObjectRef:
-        """
-        Returns a Ray object ref to the shutdown signal boolean.
-        """
-        return ray.put(self._shutdown_signal_complete)
-
     @ray.method(num_returns=1)
-    def _request_actor_exit(self) -> None:
+    def _finalize_shutdown(self) -> None:
         """
         Internal Ray method called remotely by the processing thread to safely exit the actor.
 
         This method runs in the main Ray actor thread context. It acquires a lock
         to prevent multiple exit attempts and then calls `ray.actor.exit_actor()`
         to terminate the actor process gracefully.
+
+        Note: Only necessary if running in a detached actor context.
         """
 
         actor_id_str = self._get_actor_id_str()
@@ -361,11 +413,28 @@ class RayActorStage(ABC):
 
             self._shutting_down = True
 
-        logger.info(f"{actor_id_str}: Executing actor exit process.")
+        self._logger.info(f"{actor_id_str}: Executing actor exit process.")
+
+        get_runtime_context().current_actor.request_actor_exit.remote()
+
+    @ray.method(num_returns=1)
+    def request_actor_exit(self) -> None:
+        """
+        Request the actor to exit gracefully.
+
+        This method is called from the main Ray actor thread to ensure a clean
+        shutdown of the actor. It should be called when the processing loop
+        has completed its work and is ready to exit.
+
+        Note: Only necessary if running in a detached actor context.
+        """
 
         if self._processing_thread:
             self._processing_thread.join()
 
+        self._shutdown_signal_complete = True
+
+        self._logger.debug(f"{self._get_actor_id_str()}: Requesting actor exit.")
         ray.actor.exit_actor()
 
     @ray.method(num_returns=1)
@@ -385,10 +454,10 @@ class RayActorStage(ABC):
         actor_id_str = self._get_actor_id_str()
         # Prevent starting if already running
         if self._running:
-            logger.warning(f"{actor_id_str}: Start called but actor is already running.")
+            self._logger.warning(f"{actor_id_str}: Start called but actor is already running.")
             return False
 
-        logger.info(f"{actor_id_str}: Starting actor...")
+        self._logger.info(f"{actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
         self._running = True
         self._shutting_down = False  # Reset shutdown flag on start
@@ -400,47 +469,69 @@ class RayActorStage(ABC):
         self._last_processed_count = 0
 
         # --- Start Background Processing Thread ---
-        logger.debug(f"{actor_id_str}: Creating and starting processing thread.")
+        self._logger.debug(f"{actor_id_str}: Creating and starting processing thread.")
         self._processing_thread = threading.Thread(
             target=self._processing_loop,
             daemon=False,
         )
         self._processing_thread.start()
 
-        logger.info(f"{actor_id_str}: Actor started successfully.")
+        self._logger.info(f"{actor_id_str}: Actor started successfully.")
 
         return True
 
     @ray.method(num_returns=1)
     def stop(self) -> ray.ObjectRef:
-        """
-        Signals the actor's processing loop to stop gracefully and returns a future
-        that resolves when shutdown is complete.
-
-        Returns
-        -------
-        ObjectRef[bool]
-            A Ray future that resolves to True when shutdown is complete.
-        """
         actor_id_str = self._get_actor_id_str()
-        logger.info(f"{actor_id_str}: Received external stop request.")
+        self._logger.info(f"{actor_id_str}: Received external stop request.")
 
         if self._shutdown_future is not None:
-            logger.debug(f"{actor_id_str}: Stop called again, returning existing shutdown future.")
+            self._logger.debug(f"{actor_id_str}: Stop called again, returning existing shutdown future.")
             return self._shutdown_future
 
-        if not self._running:
-            logger.warning(f"{actor_id_str}: Stop called but actor was not running.")
-            # Return an immediate future
-            self._shutdown_future = self._immediate_true.remote()
-            return self._shutdown_future
+        if not self._running and self._shutdown_signal_complete:  # Check if already fully shutdown
+            self._logger.info(f"{actor_id_str}: Stop called, but actor was already shutdown and signal complete.")
+            if self._shutdown_future:  # Should have been set by the previous shutdown sequence
+                return self._shutdown_future
+            else:  # Should not happen if shutdown_signal_complete is true, but as a fallback
+                self._shutdown_future = self._immediate_true.remote()
+                return self._shutdown_future
+        elif not self._running:  # Was stopped but maybe not fully signaled (e.g. mid-shutdown)
+            self._logger.warning(
+                f"{actor_id_str}: Stop called but actor was not running (or already stopping). "
+                "Will create/return monitor future."
+            )
+            # If _shutdown_future is None here, it means stop wasn't called before OR a previous
+            # monitor didn't get stored. Proceed to create a new monitor.
+            # If it *was* already stopping and _shutdown_future exists, the first `if` catches it.
 
-        # --- Initiate Shutdown ---
-        self._running = False
-        logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
+        # --- Initiate Shutdown signal to internal loop (if still running) ---
+        if self._running:  # Only set self._running = False if it was actually running
+            self._running = False
+            self._logger.info(f"{actor_id_str}: Stop signal sent to processing loop. Shutdown initiated.")
+        else:
+            self._logger.info(
+                f"{actor_id_str}: Actor processing loop was already stopped. Monitoring for final shutdown signal."
+            )
 
         # --- Spawn shutdown watcher task ---
-        self._shutdown_future = self._monitor_shutdown.remote(self._shutdown_signal_complete_ref())
+        # Get a handle to the current actor instance to pass to the monitor.
+        # This is crucial: the monitor needs to call methods on *this specific actor*.
+        try:
+            self_handle = get_runtime_context().current_actor
+        except Exception as e:
+            self._logger.error(
+                f"{actor_id_str}: Failed to get current_actor handle for monitoring: {e}. Returning a failing future."
+            )
+
+            # Cannot proceed to monitor, return a future that resolves to False or raises
+            @ray.remote
+            def failed_future():
+                raise RuntimeError("Failed to initiate shutdown monitoring due to missing actor handle.")
+
+            return failed_future.remote()  # Or ray.put(False) directly
+
+        self._shutdown_future = external_monitor_actor_shutdown.remote(self_handle)
 
         return self._shutdown_future
 
@@ -534,7 +625,7 @@ class RayActorStage(ABC):
         bool
             True indicating the queue was set.
         """
-        logger.debug(f"{self._get_actor_id_str()}: Setting input queue.")
+        self._logger.debug(f"{self._get_actor_id_str()}: Setting input queue.")
         self._input_queue = queue_handle
         return True
 
@@ -556,6 +647,6 @@ class RayActorStage(ABC):
         bool
             True indicating the queue was set.
         """
-        logger.debug(f"{self._get_actor_id_str()}: Setting output queue.")
+        self._logger.debug(f"{self._get_actor_id_str()}: Setting output queue.")
         self._output_queue = queue_handle
         return True

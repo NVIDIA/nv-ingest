@@ -210,7 +210,7 @@ class PIDController:
                 self.idle_cycles[stage] = 0
 
             # Limit how much penalty can reduce the effective target below zero
-            penalty = self.penalty_factor * (self.idle_cycles[stage] ** 1.5)
+            penalty = self.penalty_factor * (self.idle_cycles[stage] ** 2.0)
 
             # Error calculation (Queue deviation from target, adjusted by idle penalty)
             error = (queue_depth - target_queue_depth) - penalty
@@ -613,7 +613,11 @@ class ResourceConstraintManager:
     # --- Public Method ---
 
     def apply_constraints(
-        self, initial_proposals: Dict[str, StagePIDProposal], current_global_memory_usage: int, num_edges: int
+        self,
+        initial_proposals: Dict[str, StagePIDProposal],
+        global_in_flight: int,
+        current_global_memory_usage: int,
+        num_edges: int,
     ) -> Dict[str, int]:
         """
         Applies all constraints to initial proposals and returns final adjustments.
@@ -633,8 +637,7 @@ class ResourceConstraintManager:
         logger.debug("--- Constraint Manager: Applying Constraints ---")
 
         # Phase 1: Calculate Global State
-        pipeline_in_flight_global = sum(prop.metrics.get("in_flight", 0) for prop in initial_proposals.values())
-        logger.debug(f"[ConstraintMgr] Pipeline In-Flight: {pipeline_in_flight_global}")
+        logger.debug(f"[ConstraintMgr] Pipeline In-Flight: {global_in_flight}")
 
         # Intermediate proposals start as the initially proposed values
         intermediate_adjustments: Dict[str, int] = {
@@ -643,9 +646,10 @@ class ResourceConstraintManager:
 
         # Phase 2: Aggressive Memory Scale-Down
         try:
-            intermediate_adjustments = self._apply_aggressive_memory_scale_down(
-                intermediate_adjustments, initial_proposals, current_global_memory_usage, pipeline_in_flight_global
-            )
+            # intermediate_adjustments = self._apply_aggressive_memory_scale_down(
+            #    intermediate_adjustments, initial_proposals, current_global_memory_usage, global_in_flight
+            # )
+            pass
         except Exception as e:
             logger.error(f"[ConstraintMgr] Error during aggressive memory scale-down: {e}", exc_info=True)
             intermediate_adjustments = {name: prop.current_replicas for name, prop in initial_proposals.items()}
@@ -667,7 +671,7 @@ class ResourceConstraintManager:
             replicas_after_proportional = tentative_adjustments.get(name, proposal.current_replicas)
             try:
                 final_replicas = self._enforce_replica_bounds(
-                    name, replicas_after_proportional, proposal.metrics, pipeline_in_flight_global
+                    name, replicas_after_proportional, proposal.metrics, global_in_flight
                 )
                 final_adjustments[name] = final_replicas
             except Exception as e:

@@ -219,9 +219,7 @@ class RayPipeline:
                         f" for '{stage.name}'"
                     )
                     try:
-                        actor = stage.callable.options(name=actor_name, max_concurrency=10, lifetime="detached").remote(
-                            config=stage.config
-                        )
+                        actor = stage.callable.options(name=actor_name, max_concurrency=10).remote(config=stage.config)
                         replicas.append(actor)
                     except Exception as e:
                         logger.error(f"[Build-Actors] Failed create actor '{actor_name}': {e}", exc_info=True)
@@ -378,7 +376,7 @@ class RayPipeline:
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=10, lifetime="detached").remote(
+            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=10).remote(
                 config=stage_info.config
             )
 
@@ -608,18 +606,11 @@ class RayPipeline:
             logger.error(f"[ScaleStage-{stage_name}] Unexpected error: {e}", exc_info=True)
             self.topology.update_scaling_state(stage_name, "Error")  # Ensure error state
 
-    @staticmethod
-    def _get_global_in_flight(stage_stats: Dict[str, Dict[str, int]]) -> int:
-        """Calculates total in-flight items across all stages from a stats dict."""
-        if not stage_stats:
-            return 0
-        return sum(data.get("in_flight", 0) for data in stage_stats.values())
-
     def _is_pipeline_quiet(self) -> bool:
         """Checks if pipeline is quiet using topology state and stats collector."""
 
-        # TODO(Devin)
-        return False  # disabled for now
+        return False
+
         # Check topology state first
         if self.topology.get_is_flushing():
             logger.debug("Pipeline quiet check: False (Flush in progress via topology state)")
@@ -638,11 +629,13 @@ class RayPipeline:
         if not stats_were_successful:
             logger.warning(f"Pipeline quiet check: False (Stats failed {last_update_age:.1f}s ago).")
             return False
+
         if last_update_age > max_stats_age_for_quiet:
             logger.warning(
                 f"Pipeline quiet check: False (Stats too old: {last_update_age:.1f}s > {max_stats_age_for_quiet:.1f}s)."
             )
             return False
+
         if not current_stage_stats:
             logger.warning("Pipeline quiet check: False (No stats currently available).")
             return False
@@ -870,11 +863,12 @@ class RayPipeline:
         else:
             logger.info("Manual flush denied: pipeline not quiet or interval not met.")
 
-    def _gather_controller_metrics(self, current_stage_stats: Dict[str, Dict[str, int]]) -> Dict[str, Dict[str, Any]]:
+    def _gather_controller_metrics(
+        self, current_stage_stats: Dict[str, Dict[str, int]], global_in_flight: int
+    ) -> Dict[str, Dict[str, Any]]:
         """Gathers metrics using provided stats and topology."""
         logger.debug("[ScalingMetrics] Gathering metrics for controllers...")
         current_stage_metrics = {}
-        global_in_flight = self._get_global_in_flight(current_stage_stats)
 
         # Use topology accessors
         current_stages = self.topology.get_stages_info()
@@ -929,7 +923,7 @@ class RayPipeline:
             return self.prev_global_memory_usage if self.prev_global_memory_usage is not None else 0
 
     def _calculate_scaling_adjustments(
-        self, current_stage_metrics: Dict[str, Dict[str, Any]], current_global_memory_mb: int
+        self, current_stage_metrics: Dict[str, Dict[str, Any]], global_in_flight: int, current_global_memory_mb: int
     ) -> Dict[str, int]:
         """Runs controllers to get target replica counts using topology for edge count."""
         logger.debug("[ScalingCalc] Calculating adjustments via PID and RCM...")
@@ -945,6 +939,7 @@ class RayPipeline:
 
             final_adjustments = self.constraint_manager.apply_constraints(
                 initial_proposals=initial_proposals,
+                global_in_flight=global_in_flight,
                 current_global_memory_usage=current_global_memory_mb,
                 num_edges=num_edges,
             )
@@ -1049,10 +1044,12 @@ class RayPipeline:
             return
 
         # --- Get & Validate Stats ---
-        current_stage_stats, last_update_time, stats_were_successful = self.stats_collector.get_latest_stats()
+        current_stage_stats, global_in_flight, last_update_time, stats_were_successful = (
+            self.stats_collector.get_latest_stats()
+        )
 
         last_update_age = time.time() - last_update_time
-        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds * 2)
+        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds)
         if not current_stage_stats or not stats_were_successful or last_update_age > max_stats_age_for_scaling:
             status = "No stats" if not current_stage_stats else "Failed" if not stats_were_successful else "Stale"
             logger.warning(
@@ -1061,7 +1058,7 @@ class RayPipeline:
             return
 
         # --- Gather Metrics (uses topology via helper) ---
-        current_stage_metrics = self._gather_controller_metrics(current_stage_stats)
+        current_stage_metrics = self._gather_controller_metrics(current_stage_stats, global_in_flight)
         if not current_stage_metrics:
             logger.error("[Scaling] Failed gather metrics. Skipping.")
             return
@@ -1070,7 +1067,9 @@ class RayPipeline:
         current_global_memory_mb = self._get_current_global_memory()
 
         # --- Calculate Scaling Adjustments (uses topology via helper) ---
-        final_adjustments = self._calculate_scaling_adjustments(current_stage_metrics, current_global_memory_mb)
+        final_adjustments = self._calculate_scaling_adjustments(
+            current_stage_metrics, global_in_flight, current_global_memory_mb
+        )
 
         # --- Update Memory Usage *After* Decision ---
         self.prev_global_memory_usage = current_global_memory_mb

@@ -60,6 +60,7 @@ class RayStatsCollector:
 
         # Internal state holding the latest results
         self._collected_stats: Dict[str, Dict[str, int]] = {}
+        self._total_inflight: int = 0
         self._last_update_time: float = 0.0
         self._last_update_successful: bool = False
 
@@ -146,7 +147,7 @@ class RayStatsCollector:
         else:
             logger.debug("Stats collector thread already stopped or never started.")
 
-    def get_latest_stats(self) -> Tuple[Dict[str, Dict[str, int]], float, bool]:
+    def get_latest_stats(self) -> Tuple[Dict[str, Dict[str, int]], int, float, bool]:
         """
         Returns the most recently collected statistics, update time, and success status.
 
@@ -161,9 +162,10 @@ class RayStatsCollector:
         with self._lock:
             # Return copies to prevent external modification
             stats_copy = self._collected_stats.copy()
+            total_inflight = self._total_inflight
             update_time = self._last_update_time
             success = self._last_update_successful
-        return stats_copy, update_time, success
+        return stats_copy, total_inflight, update_time, success
 
     def _collection_loop(self) -> None:
         """
@@ -179,12 +181,13 @@ class RayStatsCollector:
 
             try:
                 # Collect stats using the core logic method
-                new_stats, success = self.collect_stats_now()
+                new_stats, total_inflight, success = self.collect_stats_now()
                 collection_duration = time.time() - start_time
 
                 # Update shared state under lock
                 with self._lock:
                     self._collected_stats = new_stats
+                    self._total_inflight = total_inflight
 
                     for stage, stats in new_stats.items():
                         if "delta_processed" in stats:
@@ -222,7 +225,7 @@ class RayStatsCollector:
 
         logger.info("Stats collector loop finished.")
 
-    def collect_stats_now(self) -> Tuple[Dict[str, Dict[str, int]], bool]:
+    def collect_stats_now(self) -> Tuple[Dict[str, Dict[str, int]], int, bool]:
         """
         Performs a single collection cycle of statistics from pipeline actors/queues.
 
@@ -234,7 +237,7 @@ class RayStatsCollector:
         """
         if not ray:
             logger.error("[StatsCollectNow] Ray is not available. Cannot collect stats.")
-            return {}, False
+            return {}, 0, False
 
         overall_success = True
         stage_stats_updates: Dict[str, Dict[str, int]] = {}
@@ -247,7 +250,7 @@ class RayStatsCollector:
             current_edge_queues = self._pipeline.get_edge_queues()
         except Exception as e:
             logger.error(f"[StatsCollectNow] Failed to get pipeline structure: {e}", exc_info=True)
-            return {}, False
+            return {}, 0, False
 
         logger.debug(f"[StatsCollectNow] Starting collection for {len(current_stages)} stages.")
 
@@ -265,31 +268,22 @@ class RayStatsCollector:
 
             actors = current_stage_actors.get(stage_name, [])
             for actor in actors:
-                if hasattr(actor, "get_stats") and callable(getattr(actor, "get_stats")):
-                    try:
-                        stats_ref = actor.get_stats.remote()
-                        actor_tasks[stats_ref] = (actor, stage_name)
-                    except Exception as e:
-                        logger.error(
-                            f"[StatsCollectNow] Failed to initiate get_stats for actor {actor}: {e}", exc_info=True
-                        )
-                        overall_success = False
-                else:
-                    logger.debug(f"[StatsCollectNow] Actor {actor} in stage '{stage_name}' lacks get_stats method.")
+                try:
+                    stats_ref = actor.get_stats.remote()
+                    actor_tasks[stats_ref] = (actor, stage_name)
+                except Exception as e:
+                    logger.error(
+                        f"[StatsCollectNow] Failed to initiate get_stats for actor {actor}: {e}", exc_info=True
+                    )
+                    overall_success = False
 
         logger.debug(f"[StatsCollectNow] Initiated {len(actor_tasks)} actor stat requests.")
 
         # --- 2. Collect Queue Stats (Synchronous Threaded Calls) ---
         for q_name, (queue_actor, _) in current_edge_queues.items():
             try:
-                if hasattr(queue_actor, "qsize") and callable(getattr(queue_actor, "qsize")):
-                    q_size_val = queue_actor.qsize()
-                    queue_sizes[q_name] = int(q_size_val)
-                else:
-                    logger.warning(
-                        f"[StatsCollectNow] Queue actor '{q_name}' lacks qsize method. Defaulting size to 0."
-                    )
-                    queue_sizes[q_name] = 0
+                q_size_val = queue_actor.qsize()
+                queue_sizes[q_name] = int(q_size_val)
             except Exception as e:
                 logger.error(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
                 queue_sizes[q_name] = 0
@@ -345,7 +339,8 @@ class RayStatsCollector:
             flat_stats = ", ".join(f"{k}={v}" for k, v in stats.items())
             total = self._cumulative_stats.get(stage, {}).get("processed", 0)
             logger.debug(f"[StatsCollectNow] {stage}: {flat_stats}, total_processed={total}")
-        logger.debug(f"[StatsCollectNow] Total in-flight jobs: {_total_inflight}")
 
+        logger.debug(f"[StatsCollectNow] Total in-flight jobs: {_total_inflight}")
         logger.debug(f"[StatsCollectNow] Stats collection complete. Overall success: {overall_success}")
-        return stage_stats_updates, overall_success
+
+        return stage_stats_updates, _total_inflight, overall_success

@@ -103,7 +103,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
     # Use the updated config type hint
     def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config, log_to_stdout=True)
+        super().__init__(config, log_to_stdout=False)
         self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
         self._logger.debug(
             "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
@@ -341,7 +341,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 # Block until not paused using the pause event.
                 if (updated_cm is not None) and (self.output_queue is not None):
                     self._logger.debug("Waiting for stage to resume if paused...")
-                    self._pause_event.wait()  # Block if paused
+
+                    if self._pause_event.is_set() and self._active_processing:
+                        self._active_processing = False
+                        self._pause_event.wait()  # Block if paused
+                        self._active_processing = True
 
                     while True:
                         try:
@@ -425,6 +429,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         """
         self._pause_event.clear()
         self._logger.info("Stage paused.")
+
         return True
 
     @ray.method(num_returns=1)

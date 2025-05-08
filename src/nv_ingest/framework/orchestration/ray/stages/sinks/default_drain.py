@@ -13,7 +13,7 @@ from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_fail
 @ray.remote
 class DefaultDrainSink(RayActorSinkStage):
     def __init__(self, config: Any) -> None:
-        super().__init__(config, log_to_stdout=True)
+        super().__init__(config, log_to_stdout=False)
 
         self._last_sunk_count = 0
         self._sunk_count = 0
