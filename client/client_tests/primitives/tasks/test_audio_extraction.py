@@ -10,6 +10,7 @@ def sample_task():
         infer_protocol="grpc",
         use_ssl=True,
         ssl_cert="test_cert",
+        segment_audio=True,
     )
 
 
@@ -20,6 +21,7 @@ def test_audio_extraction_task_init(sample_task):
     assert sample_task._infer_protocol == "grpc"
     assert sample_task._use_ssl is True
     assert sample_task._ssl_cert == "test_cert"
+    assert sample_task._segment_audio is True
 
 
 def test_audio_extraction_task_str(sample_task):
@@ -31,6 +33,8 @@ def test_audio_extraction_task_str(sample_task):
     assert "infer_protocol: grpc" in task_str
     assert "use_ssl: True" in task_str
     assert "ssl_cert: [redacted]" in task_str
+    print(task_str)
+    assert "segment_audio: True" in task_str
 
 
 def test_audio_extraction_task_to_dict(sample_task):
@@ -43,6 +47,7 @@ def test_audio_extraction_task_to_dict(sample_task):
             "infer_protocol": "grpc",
             "use_ssl": True,
             "ssl_cert": "test_cert",
+            "segment_audio": True,
         },
     }
     assert sample_task.to_dict() == expected_dict
