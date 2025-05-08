@@ -20,7 +20,7 @@ The following diagram shows the Nemo Retriever extraction pipeline.
 ## Table of Contents
 1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
-3. [Quickstart](#quickstart)
+3. [Quickstart](#library-mode-quickstart)
 4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
