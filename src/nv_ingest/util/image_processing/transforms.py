@@ -371,7 +371,7 @@ def numpy_to_base64(array: np.ndarray, quality: int = 95) -> str:
         raise RuntimeError(f"Failed to encode JPEG with torchvision: {e}")
 
     # Convert to base64
-    return base64.b64encode(jpeg_bytes).decode("utf-8")
+    return bytetools.base64frombytes(jpeg_bytes)
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:
