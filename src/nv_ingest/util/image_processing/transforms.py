@@ -305,7 +305,7 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray, quality: int = 95, chroma_subsampling: int = 0) -> str:
+def numpy_to_base64(array: np.ndarray, quality: int = 95) -> str:
     """
     Converts a NumPy array representing an image to a base64-encoded JPEG string using torchvision.
 
@@ -321,8 +321,6 @@ def numpy_to_base64(array: np.ndarray, quality: int = 95, chroma_subsampling: in
         Can be (H, W) for grayscale or (H, W, C) where C∈{1,3,4}. 4-channel images lose alpha.
     quality : int, optional
         JPEG quality (1-100), by default 95
-    chroma_subsampling : int, optional
-        Chroma subsampling mode: 0 = 4:4:4, 1 = 4:2:2, 2 = 4:2:0, by default 0
 
     Returns
     -------
@@ -367,7 +365,6 @@ def numpy_to_base64(array: np.ndarray, quality: int = 95, chroma_subsampling: in
         jpeg_bytes_tensor = encode_jpeg(
             tensor.contiguous(),
             quality=quality,
-            chroma_subsampling=chroma_subsampling,
         )
         jpeg_bytes = jpeg_bytes_tensor.cpu().numpy().tobytes()
     except Exception as e:
