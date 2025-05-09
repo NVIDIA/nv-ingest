@@ -21,3 +21,26 @@
 .idea/
 *.tmproj
 .vscode/
+
+# Ignore shell scripts
+update_helm_readme.sh
+
+# Ignore temporary files
+*.tmp
+*.prefix
+*.suffix
+
+# Ignore editor files
+*.swp
+*.swo
+*~
+
+# Ignore OS files
+.DS_Store
+Thumbs.db
+
+# Ignore time-slicing directory
+time-slicing/
+
+# Ignore helm-docs template file
+README.md.gotmpl

@@ -5,17 +5,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import glob
+import json
 import logging
 import os
 import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any
+from typing import Any, Tuple
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Union
+from urllib.parse import urlparse
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
@@ -29,8 +31,17 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
+from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
+from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
+from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
+from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
+from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.milvus import MilvusOperator
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.processing import check_schema
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -109,6 +120,19 @@ class Ingestor:
 
         self._client = NvIngestClient(**kwargs)
 
+    @staticmethod
+    def _is_remote(pattern: str) -> bool:
+        parsed = urlparse(pattern)
+        return parsed.scheme in ("http", "https", "s3", "gs", "gcs", "ftp")
+
+    @staticmethod
+    def _is_glob(pattern: str) -> bool:
+        # only treat '*' and '[' (and '?' when not remote) as glob chars
+        wildcard = {"*", "["}
+        if not Ingestor._is_remote(pattern):
+            wildcard.add("?")
+        return any(ch in pattern for ch in wildcard)
+
     def _check_files_local(self) -> bool:
         """
         Check if all specified document files are local and exist.
@@ -116,40 +140,51 @@ class Ingestor:
         Returns
         -------
         bool
-            Returns True if all files in `_documents` are local and accessible;
-            False if any file is missing or inaccessible.
+            False immediately if any pattern is a remote URI.
+            Local glob-patterns may match zero files (they’re skipped).
+            Returns False if any explicit local path is missing
+            or any matched file no longer exists.
         """
         if not self._documents:
             return False
 
         for pattern in self._documents:
-            matched = glob.glob(pattern, recursive=True)
-            if not matched:
+            # FAIL on any remote URI
+            if self._is_remote(pattern):
+                logger.error(f"Remote URI in local-check: {pattern}")
                 return False
-            for file_path in matched:
-                if not os.path.exists(file_path):
+
+            # local glob: OK to match zero files
+            if self._is_glob(pattern):
+                matches = glob.glob(pattern, recursive=True)
+                if not matches:
+                    logger.debug(f"No files for glob, skipping: {pattern}")
+                    continue
+            else:
+                # explicit local path must exist
+                if not os.path.exists(pattern):
+                    logger.error(f"Local file not found: {pattern}")
+                    return False
+                matches = [pattern]
+
+            # verify all matched files still exist
+            for fp in matches:
+                if not os.path.exists(fp):
+                    logger.error(f"Matched file disappeared: {fp}")
                     return False
 
         return True
 
     def files(self, documents: Union[str, List[str]]) -> "Ingestor":
         """
-        Add documents to the manager for processing and check if they are all local.
+        Add documents (local paths, globs, or remote URIs) for processing.
 
-        Parameters
-        ----------
-        documents : List[str]
-            A list of document paths or patterns to be processed.
-
-        Returns
-        -------
-        Ingestor
-            Returns self for chaining. If all specified documents are local,
-            `_job_specs` is initialized, and `_all_local` is set to True.
+        Remote URIs will force `_all_local=False`. Local globs that match
+        nothing are fine. Explicit local paths that don't exist cause
+        `_all_local=False`.
         """
         if isinstance(documents, str):
             documents = [documents]
-
         if not documents:
             return self
 
@@ -194,7 +229,8 @@ class Ingestor:
                     local_files.append(local_path)
             else:
                 with fsspec.open(pattern_or_path, **kwargs) as f:
-                    original_name = os.path.basename(f.path)
+                    parsed_url = urlparse(f.path)
+                    original_name = os.path.basename(parsed_url.path)
                     local_path = os.path.join(temp_dir, original_name)
                     with open(local_path, "wb") as local_file:
                         shutil.copyfileobj(f, local_file)
@@ -206,51 +242,82 @@ class Ingestor:
 
         return self
 
-    def ingest(self, show_progress: bool = False, **kwargs: Any) -> List[Dict[str, Any]]:
+    def ingest(
+        self, show_progress: bool = False, return_failures: bool = False, **kwargs: Any
+    ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]:  # noqa: E501
         """
-        Synchronously submits jobs to the NvIngestClient and fetches the results.
+        Ingest documents by submitting jobs and fetching results concurrently.
 
         Parameters
         ----------
-        kwargs : dict
-            Additional parameters for `submit_job` and `fetch_job_result` methods of NvIngestClient.
-            Optionally, include 'show_progress' (bool) to display a progress bar while fetching results.
+        show_progress : bool, optional
+            Whether to display a progress bar. Default is False.
+        return_failures : bool, optional
+            If True, return a tuple (results, failures); otherwise, return only results. Default is False.
+        **kwargs : Any
+            Additional keyword arguments for the underlying client methods. Supported keys:
+            'concurrency_limit', 'timeout', 'max_job_retries', 'retry_delay',
+            'data_only', 'verbose'. Unrecognized keys are passed through to
+            process_jobs_concurrently.
 
         Returns
         -------
-        List[Dict]
-            Result of each job after execution.
+        results : list of dict
+            List of successful job results when `return_failures` is False.
+        results, failures : tuple (list of dict, list of tuple of str)
+            Tuple containing successful results and failure information when `return_failures` is True.
         """
         self._prepare_ingest_run()
 
+        # Add jobs locally first
         self._job_ids = self._client.add_job(self._job_specs)
 
-        submit_kwargs = filter_function_kwargs(self._client.submit_job, **kwargs)
-        self._job_states = self._client.submit_job(self._job_ids, self._job_queue_id, **submit_kwargs)
-
-        # Pop the show_progress flag from kwargs; default to False if not provided.
-        fetch_kwargs = filter_function_kwargs(self._client.fetch_job_result, **kwargs)
-
-        # If progress display is enabled, create a tqdm progress bar and set a callback to update it.
+        callback = None
+        pbar = None
         if show_progress:
             pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
 
-            def progress_callback(result: Dict, job_id: str) -> None:
+            def progress_callback(result_data: Dict[str, Any], job_id: str) -> None:
                 pbar.update(1)
 
-            fetch_kwargs["completion_callback"] = progress_callback
+            callback = progress_callback
 
-        result = self._client.fetch_job_result(self._job_ids, **fetch_kwargs)
+        # Default concurrent-processing parameters
+        DEFAULT_TIMEOUT: int = 100
+        DEFAULT_MAX_RETRIES: int = None
+        DEFAULT_VERBOSE: bool = False
+
+        timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
+        max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
+        verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
+
+        proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
+
+        results_data = self._client.process_jobs_concurrently(
+            job_indices=self._job_ids,
+            job_queue_id=self._job_queue_id,
+            timeout=timeout,
+            max_job_retries=max_job_retries,
+            completion_callback=callback,
+            return_failures=return_failures,
+            verbose=verbose,
+            **proc_kwargs,
+        )
 
         if show_progress and pbar:
             pbar.close()
 
+        if return_failures:
+            results, failures = results_data  # type: ignore
+        else:
+            results = results_data  # type: ignore
+            failures = None
+
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(result)
-            # only upload as part of jobs user specified this action
+            self._vdb_bulk_upload.run(results)
             self._vdb_bulk_upload = None
 
-        return result
+        return (results, failures) if return_failures else results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
@@ -335,7 +402,6 @@ class Ingestor:
             .embed() \
             .store_embed()
         # .store() \
-        # .vdb_upload()
         # fmt: on
         return self
 
@@ -354,7 +420,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        dedup_task = DedupTask(**kwargs)
+        task_options = check_schema(DedupTaskSchema, kwargs, "dedup", json.dumps(kwargs))
+        dedup_task = DedupTask(**task_options.model_dump())
         self._job_specs.add_task(dedup_task)
 
         return self
@@ -374,7 +441,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        embed_task = EmbedTask(**kwargs)
+        task_options = check_schema(EmbedTaskSchema, kwargs, "embed", json.dumps(kwargs))
+        embed_task = EmbedTask(**task_options.model_dump())
         self._job_specs.add_task(embed_task)
 
         return self
@@ -412,13 +480,16 @@ class Ingestor:
             else:
                 document_type = file_type
 
-            extract_task = ExtractTask(
-                document_type,
+            task_options = dict(
+                document_type=document_type,
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
                 **kwargs,
             )
+            task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))
+
+            extract_task = ExtractTask(**task_options.model_dump())
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self
@@ -438,7 +509,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        filter_task = FilterTask(**kwargs)
+        task_options = check_schema(FilterTaskSchema, kwargs, "filter", json.dumps(kwargs))
+        filter_task = FilterTask(**task_options.model_dump())
         self._job_specs.add_task(filter_task)
 
         return self
@@ -458,7 +530,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        extract_task = SplitTask(**kwargs)
+        task_options = check_schema(SplitTaskSchema, kwargs, "split", json.dumps(kwargs))
+        extract_task = SplitTask(**task_options.model_dump())
         self._job_specs.add_task(extract_task)
 
         return self
@@ -478,7 +551,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        store_task = StoreTask(**kwargs)
+        task_options = check_schema(StoreTaskSchema, kwargs, "store", json.dumps(kwargs))
+        store_task = StoreTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
         return self
@@ -498,7 +572,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        store_task = StoreEmbedTask(**kwargs)
+        task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
+        store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
         return self
@@ -536,7 +611,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        caption_task = CaptionTask(**kwargs)
+        task_options = check_schema(CaptionTaskSchema, kwargs, "caption", json.dumps(kwargs))
+        caption_task = CaptionTask(**task_options.model_dump())
         self._job_specs.add_task(caption_task)
 
         return self

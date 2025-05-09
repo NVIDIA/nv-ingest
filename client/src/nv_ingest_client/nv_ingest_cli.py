@@ -10,7 +10,15 @@ from io import BytesIO
 from typing import List
 
 import click
-import pkg_resources
+
+try:
+    from importlib.metadata import version, PackageNotFoundError
+except ImportError:
+    # For Python versions < 3.8, use the importlib_metadata backport.
+    from importlib_metadata import version, PackageNotFoundError
+
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
+from nv_ingest_api.util.service_clients.rest.rest_client import RestClient
 from nv_ingest_client.util.zipkin import collect_traces_from_zipkin, write_results_to_output_directory
 from nv_ingest_client.cli.util.click import LogLevel
 from nv_ingest_client.cli.util.click import click_match_and_validate_files
@@ -22,21 +30,17 @@ from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
 from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
-from nv_ingest_client.message_clients.rest.rest_client import RestClient
-from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
-from pkg_resources import DistributionNotFound
-from pkg_resources import VersionConflict
 
 try:
-    NV_INGEST_VERSION = pkg_resources.get_distribution("nv_ingest").version
-except (DistributionNotFound, VersionConflict):
+    NV_INGEST_VERSION = version("nv_ingest")
+except PackageNotFoundError:
     NV_INGEST_VERSION = "Unknown -- No Distribution found or Version conflict."
 
 try:
-    NV_INGEST_CLIENT_VERSION = pkg_resources.get_distribution("nv_ingest_client").version
-except (DistributionNotFound, VersionConflict):
+    NV_INGEST_CLIENT_VERSION = version("nv_ingest_client")
+except PackageNotFoundError:
     NV_INGEST_CLIENT_VERSION = "Unknown -- No Distribution found or Version conflict."
 
 logger = logging.getLogger(__name__)
@@ -78,13 +82,6 @@ logger = logging.getLogger(__name__)
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
 )
-@click.option(
-    "--document_processing_timeout",
-    default=10,
-    show_default=True,
-    type=int,
-    help="Timeout when waiting for a document to be processed.",
-)
 @click.option("--dry_run", is_flag=True, help="Perform a dry run without executing actions.")
 @click.option("--fail_on_error", is_flag=True, help="Fail on error.")
 @click.option("--output_directory", type=click.Path(), default=None, help="Output directory for results.")
@@ -119,9 +116,7 @@ Example:
   --task 'extract:{"document_type":"pdf", "extract_method":"nemoretriever_parse"}'
   --task 'extract:{"document_type":"pdf", "extract_method":"unstructured_io"}'
   --task 'extract:{"document_type":"docx", "extract_text":true, "extract_images":true}'
-  --task 'store:{"content_type":"image", "store_method":"minio", "endpoint":"minio:9000"}'
   --task 'embed'
-  --task 'vdb_upload'
   --task 'caption:{}'
 
 \b
@@ -131,7 +126,7 @@ Tasks and Options:
       - api_key (str): API key for captioning service.
       Default: os.environ(NVIDIA_BUILD_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/meta/llama-3.2-90b-vision-instruct'.
+      Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b
@@ -147,7 +142,7 @@ Tasks and Options:
 - extract: Extracts content from documents, customizable per document type.
     Can be specified multiple times for different 'document_type' values.
     Options:
-    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `svg`, `tiff`, `txt`). Required.
+    - document_type (str): Document format (`docx`, `jpeg`, `pdf`, `png`, `pptx`, `bmp`, `tiff`, `txt`). Required.
     - extract_charts (bool): Enables chart extraction. Default: False.
     - extract_images (bool): Enables image extraction. Default: False.
     - extract_method (str): Extraction technique. Defaults are smartly chosen based on 'document_type'.
@@ -173,14 +168,6 @@ Tasks and Options:
     - split_by (str): Criteria ('page', 'size', 'word', 'sentence'). No default.
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
-\b
-- store: Stores any images extracted from documents.
-    Options:
-    - images (bool): Flag to write extracted images to object store.
-    - structured (bool): Flag to write extracted charts and tables to object store.
-    - store_method (str): Storage type ('minio', ). Required.
-\b
-- vdb_upload: Uploads extraction embeddings to vector database.
 \b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
@@ -215,7 +202,6 @@ def main(
     concurrency_n: int,
     dataset: str,
     doc: List[str],
-    document_processing_timeout: int,
     dry_run: bool,
     fail_on_error: bool,
     log_level: str,
@@ -282,7 +268,6 @@ def main(
                 tasks=task,
                 output_directory=output_directory,
                 batch_size=batch_size,
-                timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
             )

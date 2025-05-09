@@ -174,7 +174,8 @@ class JobSpec:
         if isinstance(task, ExtractTask) and (task._extract_infographics is True):
             self._tasks.append(InfographicExtractionTask())
         if isinstance(task, ExtractTask) and (task._extract_method == "audio"):
-            self._tasks.append(AudioExtractionTask())
+            extract_audio_params = task._extract_audio_params or {}
+            self._tasks.append(AudioExtractionTask(**extract_audio_params))
 
 
 class BatchJobSpec:

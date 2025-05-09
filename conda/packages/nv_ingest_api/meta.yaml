@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{% set data = load_setup_py_data() %}
-{% set version = data.get('version') %}
 {% set py_version = environ['CONDA_PY'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
 
@@ -12,7 +10,7 @@
 
 package:
   name: nv_ingest_api
-  version: {{ version }}
+  version: {{ environ.get('NV_INGEST_API_VERSION', 'Unknown') }}
 
 source:
   path: {{ git_root }}
@@ -26,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python==3.10
+    - python=3.10
     - setuptools>=58.2.0
   run:
     - azure-core>=1.32.0
@@ -46,14 +44,13 @@ requirements:
     - python-magic>=0.4.27
     - python-pptx>=1.0.2
     - pytorch
-    - requests>=2.32.3
+    - requests>=2.28.2
     - setuptools>=58.2.0
     - tabulate>=0.9.0
     - torchaudio
     - torchvision
     - transformers>=4.47.0
-    - unstructured-client>=0.25.9
-    - wand>=0.6.10
+    # - unstructured-client>=0.25.9
 
   test:
     commands:
@@ -70,7 +67,6 @@ extra:
     - jdyer@nvidia.com
 
 channels:
-  - nvidia/label/dev
   - rapidsai
   - nvidia
   - conda-forge

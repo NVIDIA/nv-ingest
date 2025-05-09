@@ -33,7 +33,7 @@ else
     # If no command is provided, run the default startup launch
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
       # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'
-      uvicorn nv_ingest.main:app --workers 1 --host 0.0.0.0 --port 7670 --reload --app-dir /workspace/src/nv_ingest &
+      uvicorn nv_ingest.api.main:app --workers 1 --host 0.0.0.0 --port 7670 --reload --app-dir /workspace/src/nv_ingest &
     fi
 
     python /workspace/src/microservice_entrypoint.py
