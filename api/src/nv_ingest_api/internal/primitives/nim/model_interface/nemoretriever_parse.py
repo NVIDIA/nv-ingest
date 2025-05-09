@@ -198,7 +198,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{b64_img}",
+                                "url": f"data:image/jpeg;base64,{b64_img}",
                             },
                         }
                     ],
