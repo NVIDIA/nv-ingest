@@ -305,7 +305,7 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray, quality: int = 95) -> str:
+def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     """
     Converts a NumPy array representing an image to a base64-encoded JPEG string using torchvision.
 
@@ -366,6 +366,8 @@ def numpy_to_base64(array: np.ndarray, quality: int = 95) -> str:
             tensor.contiguous(),
             quality=quality,
         )
+        # TODO: Passing a list of tensors is more efficient
+        # So we can make this call on a list of values
         jpeg_bytes = jpeg_bytes_tensor.cpu().numpy().tobytes()
     except Exception as e:
         raise RuntimeError(f"Failed to encode JPEG with torchvision: {e}")
