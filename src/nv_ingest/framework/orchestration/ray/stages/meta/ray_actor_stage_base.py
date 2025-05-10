@@ -55,6 +55,8 @@ def external_monitor_actor_shutdown(actor_handle: "RayActorStage", poll_interval
             # Remotely call the actor's method
             if ray.get(actor_handle.is_shutdown_complete.remote()):
                 logger.debug(f"Actor {actor_id_to_monitor} reported shutdown complete.")
+                actor_handle.request_actor_exit.remote()
+
                 return True
         except ray.exceptions.RayActorError:
             # Actor has died or is otherwise unreachable.
@@ -425,8 +427,6 @@ class RayActorStage(ABC):
         This method is called from the main Ray actor thread to ensure a clean
         shutdown of the actor. It should be called when the processing loop
         has completed its work and is ready to exit.
-
-        Note: Only necessary if running in a detached actor context.
         """
 
         if self._processing_thread:

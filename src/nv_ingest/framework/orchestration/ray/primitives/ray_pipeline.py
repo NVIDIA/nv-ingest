@@ -219,7 +219,9 @@ class RayPipeline:
                         f" for '{stage.name}'"
                     )
                     try:
-                        actor = stage.callable.options(name=actor_name, max_concurrency=10).remote(config=stage.config)
+                        actor = stage.callable.options(
+                            name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
+                        ).remote(config=stage.config)
                         replicas.append(actor)
                     except Exception as e:
                         logger.error(f"[Build-Actors] Failed create actor '{actor_name}': {e}", exc_info=True)
@@ -245,7 +247,7 @@ class RayPipeline:
                 queue_name = f"{from_stage_name}_to_{to_stage_name}"
                 logger.debug(f"[Build-Wiring] Creating queue '{queue_name}' (size {queue_size}) and wiring.")
                 try:
-                    edge_queue = RayQueue(maxsize=queue_size)
+                    edge_queue = RayQueue(maxsize=queue_size, actor_options={"max_restarts": 0})
                     new_edge_queues[queue_name] = (edge_queue, queue_size)
 
                     # Wire using current actors from topology snapshot
@@ -376,9 +378,9 @@ class RayPipeline:
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=10).remote(
-                config=stage_info.config
-            )
+            new_actor = stage_info.callable.options(
+                name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
+            ).remote(config=stage_info.config)
 
             return new_actor
         except Exception as e:
@@ -446,7 +448,7 @@ class RayPipeline:
         """Handles scaling up, interacting with topology."""
         stage_name = stage_info.name
         num_to_add = target_count - current_count
-        logger.info(f"[ScaleUp-{stage_name}] Scaling up from {current_count} to {target_count} (+{num_to_add}).")
+        logger.debug(f"[ScaleUp-{stage_name}] Scaling up from {current_count} to {target_count} (+{num_to_add}).")
         # Update topology state
         self.topology.update_scaling_state(stage_name, "Scaling Up")
 
@@ -476,7 +478,7 @@ class RayPipeline:
                 successfully_added_actors.append(actor)  # Keep track
 
             final_count = self.topology.get_actor_count(stage_name)
-            logger.info(
+            logger.debug(
                 f"[ScaleUp-{stage_name}] Scale up complete. Added {len(successfully_added_actors)}. "
                 f"New count: {final_count}"
             )
@@ -762,7 +764,10 @@ class RayPipeline:
             new_edge_queues_map = {}
             for queue_name, (_, queue_size) in current_edge_queues.items():
                 try:
-                    new_edge_queues_map[queue_name] = (RayQueue(maxsize=queue_size), queue_size)
+                    new_edge_queues_map[queue_name] = (
+                        RayQueue(maxsize=queue_size, actor_options={"max_restarts": 0}),
+                        queue_size,
+                    )
                     logger.debug(f"Created new queue: {queue_name}")
                 except Exception as e:
                     raise RuntimeError(f"Failed to create new queue '{queue_name}'.") from e

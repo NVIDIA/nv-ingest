@@ -270,6 +270,24 @@ class PipelineTopology:
             logger.info("[TopologyCleanup] Cleanup thread stopped and joined.")
         self._cleanup_thread = None  # Clear thread object
 
+    @staticmethod
+    def _delayed_actor_release(self, actor_handle_to_release: Any, actor_id_str: str, delay_seconds: int = 60):
+        """
+        Holds a reference to an actor handle for a specified delay, then releases it.
+        This function is intended to be run in a daemon thread.
+
+        Note: this is a bit of a hack
+        """
+        logger.debug(f"[DelayedRelease-{actor_id_str}] Thread started. Holding actor reference for {delay_seconds}s.")
+        # The actor_handle_to_release is kept in scope by being a parameter to this function,
+        # and this function's frame existing for delay_seconds.
+        time.sleep(delay_seconds)
+        logger.info(
+            f"[DelayedRelease-{actor_id_str}] Delay complete. Releasing reference. Actor should now be GC'd by Ray "
+            f"if this was the last ref."
+        )
+        # When this function exits, actor_handle_to_release goes out of scope, dropping the reference.
+
     def _cleanup_loop(self) -> None:
         """
         Background thread for periodically checking shutdown status of actors pending removal.
@@ -370,20 +388,54 @@ class PipelineTopology:
                     for stage_to_update, removal_list in actors_to_remove_from_pending.items():
                         if stage_to_update in self._pending_removal_actors:
                             current_pending_set = self._pending_removal_actors[stage_to_update]
-                            for removal_tuple in removal_list:
-                                current_pending_set.discard(removal_tuple)
+                            for removal_tuple in removal_list:  # removal_list contains actor_tuples
+                                # Extract actor_handle and actor_id_str from the tuple being removed
+                                actor_handle_to_delay, actor_id_str_to_delay, _, _ = removal_tuple
+
+                                if current_pending_set.discard(
+                                    removal_tuple
+                                ):  # If discard was successful (element was present)
+                                    logger.debug(
+                                        f"[TopologyCleanupLoop-{stage_to_update}] Actor tuple for "
+                                        f"'{actor_id_str_to_delay}' discarded from pending set."
+                                    )
+                                    try:
+                                        # This is a bit of a hack. For some reason Ray likes to cause exceptions on
+                                        # the actor when we let it auto GCS just after pushing to the output queue, and
+                                        # mysteriously lose control messages.
+                                        # This lets the shutdown future complete, but leaves the actor to be killed off
+                                        # by ray.actor_exit()
+                                        delay_thread = threading.Thread(
+                                            target=self._delayed_actor_release,
+                                            args=(actor_handle_to_delay, actor_id_str_to_delay, 60),  # 60s delay
+                                            daemon=True,
+                                        )
+                                        delay_thread.start()
+                                        logger.debug(
+                                            f"[TopologyCleanupLoop-{stage_to_update}] Started delayed release thread "
+                                            f"for '{actor_id_str_to_delay}'."
+                                        )
+                                    except Exception as e_thread:
+                                        logger.error(
+                                            f"[TopologyCleanupLoop-{stage_to_update}] Failed to start delayed release "
+                                            f"thread for '{actor_id_str_to_delay}': {e_thread}"
+                                        )
+
+                            # After processing all removals for this stage's list, check if the set is empty
+                            if not self._pending_removal_actors[stage_to_update]:
+                                logger.debug(
+                                    f"[TopologyCleanupLoop-{stage_to_update}] Pending set empty. Deleting key."
+                                )
+                                del self._pending_removal_actors[stage_to_update]
 
                     # --- Update stage scaling states if pending list is empty ---
                     stages_with_empty_pending = []
+                    stages_with_empty_pending = []
                     for stage_to_check in stages_potentially_idle:
-                        if (
-                            stage_to_check in self._pending_removal_actors
-                            and not self._pending_removal_actors[stage_to_check]
-                        ):
+                        if stage_to_check not in self._pending_removal_actors:
                             stages_with_empty_pending.append(stage_to_check)
-                            del self._pending_removal_actors[stage_to_check]
                             if self._scaling_state.get(stage_to_check) == "Scaling Down Pending":
-                                logger.debug(
+                                logger.debug(  # Your original log level
                                     f"[TopologyCleanupLoop-{stage_to_check}] All pending actors cleared. "
                                     f"Setting scaling state to Idle."
                                 )
