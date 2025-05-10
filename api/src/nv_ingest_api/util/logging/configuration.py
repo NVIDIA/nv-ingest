@@ -9,6 +9,7 @@ from enum import Enum
 
 
 class LogLevel(str, Enum):
+    DEFAULT = "DEFAULT"
     DEBUG = "DEBUG"
     INFO = "INFO"
     WARNING = "WARNING"
@@ -16,16 +17,22 @@ class LogLevel(str, Enum):
     CRITICAL = "CRITICAL"
 
 
-def configure_logging(logger, level_name):
+def configure_logging(level_name: str) -> None:
     """
-    Parameters:
-    - level_name (str): The name of the logging level (e.g., "DEBUG", "INFO").
-    """
+    Configures global logging.
 
-    numeric_level = getattr(logging, level_name, None)
+    Parameters
+    ----------
+    level_name : str
+        The name of the logging level (e.g., "DEBUG", "INFO").
+    """
+    numeric_level = getattr(logging, level_name.upper(), None)
     if not isinstance(numeric_level, int):
         raise ValueError(f"Invalid log level: {level_name}")
 
-    logging.StreamHandler(sys.stdout)
-    logging.basicConfig(level=numeric_level, format="%(asctime)s - %(levelname)s - %(message)s")
-    logger.setLevel(numeric_level)
+    logging.basicConfig(
+        level=numeric_level,
+        format="%(asctime)s - %(levelname)s - %(name)s - %(message)s",
+        stream=sys.stdout,
+        force=True,  # <- reconfigures even if basicConfig was called earlier (Python 3.8+)
+    )

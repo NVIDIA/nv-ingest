@@ -51,7 +51,7 @@ class TestNVIngestNodeFailureContextManager(unittest.TestCase):
         result = dummy_node_func(cm)
         self.assertTrue(result.get_metadata("processed"))
         # Verify that payload-check was called.
-        mock_ensure.assert_called_once_with(control_message=cm)
+        mock_ensure.assert_called_once_with(cm)
         # On successful exit, annotate_task_result should have been called.
         mock_annotate.assert_called_once()
 

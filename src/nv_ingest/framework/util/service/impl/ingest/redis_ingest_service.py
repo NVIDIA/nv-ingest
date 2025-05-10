@@ -264,7 +264,7 @@ class RedisIngestService(IngestServiceMeta):
                 logger.warning(f"fetch_message for {job_id} returned None unexpectedly.")
                 raise TimeoutError("No data found (unexpected None response).")
         except (TimeoutError, redis.RedisError, ConnectionError, ValueError, RuntimeError) as e:
-            logger.warning(f"Fetch operation for job {job_id} failed: ({type(e).__name__}) {e}")
+            logger.info(f"Fetch operation for job {job_id} did not complete: ({type(e).__name__}) {e}")
             raise e
         except Exception as e:
             logger.exception(f"Unexpected error during async fetch_job for {job_id}: {e}")

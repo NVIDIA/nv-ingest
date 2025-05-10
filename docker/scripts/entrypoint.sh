@@ -61,16 +61,39 @@ else
         _log_level="warning"
     fi
 
-    # If no command is provided, run the default startup launch.
+    # --- Determine if access logs should be enabled ---
+    _access_logs_enabled="false"
+
+    # Normalize INGEST_ENABLE_SERVICE_ACCESS_LOGS to lower case
+    _explicit_access_logs=$(echo "${INGEST_ENABLE_SERVICE_ACCESS_LOGS:-false}" | tr '[:upper:]' '[:lower:]')
+
+    if [ "$_log_level" = "debug" ]; then
+        _access_logs_enabled="true"
+    elif [ "$_explicit_access_logs" = "true" ] || [ "$_explicit_access_logs" = "1" ] || [ "$_explicit_access_logs" = "yes" ]; then
+        _access_logs_enabled="true"
+    fi
+
+    # Set gunicorn access log settings
+    if [ "$_access_logs_enabled" = "true" ]; then
+        _gunicorn_access_logfile="-"
+        _gunicorn_access_logformat='default'
+    else
+        _gunicorn_access_logfile="/dev/null"
+        _gunicorn_access_logformat=''
+    fi
+
+    # --- Launch Services ---
+
     if [ "${MESSAGE_CLIENT_TYPE}" != "simple" ]; then
-        # Start uvicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
+        # Start gunicorn if MESSAGE_CLIENT_TYPE is not 'simple'.
         gunicorn nv_ingest.api.main:app \
             -w 32 \
             -k uvicorn.workers.UvicornWorker \
             --bind 0.0.0.0:7670 \
             --timeout 300 \
             --log-level "${_log_level}" \
-            --access-logfile - \
+            --access-logfile "${_gunicorn_access_logfile}" \
+            --access-logformat "${_gunicorn_access_logformat}" \
             --error-logfile - &
     fi
 

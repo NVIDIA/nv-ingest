@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
     callback=click_validate_file_exists,
 )
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
-@click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
+@click.option("--client_port", default=7670, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
 @click.option(
     "--client_type",
