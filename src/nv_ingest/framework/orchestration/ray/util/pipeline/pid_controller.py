@@ -811,8 +811,8 @@ class ResourceConstraintManager:
                 orig_prop = initial_proposals.get(stage_name)
                 pid_proposed_str = f"(PID: {orig_prop.proposed_replicas if orig_prop else 'N/A'})"
                 current_str = f"(Current: {orig_prop.current_replicas if orig_prop else 'N/A'})"
-                eff_min_str = f"(EffMin: {self._get_effective_min_replicas(stage_name, orig_prop.metrics,
-                                                                           global_in_flight) if orig_prop else 'N/A'})"
+                min_replicas = self._get_effective_min_replicas(stage_name, orig_prop.metrics, global_in_flight)
+                eff_min_str = f"(EffMin: {min_replicas if orig_prop else 'N/A'})"
 
                 # Basic alignment, can be improved with more sophisticated padding
                 logger.info(

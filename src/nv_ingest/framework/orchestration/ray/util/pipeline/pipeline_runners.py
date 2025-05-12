@@ -6,7 +6,7 @@ import logging
 import os
 import time
 from datetime import datetime
-from typing import Dict, Any
+from typing import Union, Tuple
 
 import ray
 from pydantic import BaseModel, ConfigDict
@@ -47,9 +47,9 @@ class PipelineCreationSchema(BaseModel):
     max_ingest_process_workers: str = "16"
 
     # Messaging configuration
-    message_client_host: str = "localhost"
-    message_client_port: str = "7671"
-    message_client_type: str = "simple"
+    message_client_host: str = os.getenv("MESSAGE_CLIENT_HOST", "localhost")
+    message_client_port: str = os.getenv("MESSAGE_CLIENT_PORT", "7671")
+    message_client_type: str = os.getenv("MESSAGE_CLIENT_TYPE", "simple")
 
     # Hardware configuration
     mrc_ignore_numa_check: str = "1"
@@ -99,10 +99,8 @@ class PipelineCreationSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def _launch_pipeline(ingest_config: Dict[str, Any]) -> float:
+def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
-
-    # Initialize the pipeline with the configuration
 
     dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
     scaling_config = ScalingConfig(
@@ -113,7 +111,7 @@ def _launch_pipeline(ingest_config: Dict[str, Any]) -> float:
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline
-    setup_ingestion_pipeline(pipeline, ingest_config)
+    setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
 
     # Record setup time
     end_setup = start_run = datetime.now()
@@ -121,31 +119,36 @@ def _launch_pipeline(ingest_config: Dict[str, Any]) -> float:
     logger.info(f"Pipeline setup completed in {setup_elapsed:.2f} seconds")
 
     # Run the pipeline
-    logger.info("Running pipeline")
+    logger.debug("Running pipeline")
     pipeline.start()
 
-    try:
-        while True:
-            time.sleep(5)
-    except KeyboardInterrupt:
-        logger.info("Interrupt received, shutting down pipeline.")
-        pipeline.stop()
-        ray.shutdown()
-        logger.info("Ray shutdown complete.")
+    if block:
+        try:
+            while True:
+                time.sleep(5)
+        except KeyboardInterrupt:
+            logger.info("Interrupt received, shutting down pipeline.")
+            pipeline.stop()
+            ray.shutdown()
+            logger.info("Ray shutdown complete.")
 
-    # Record execution times
-    end_run = datetime.now()
-    run_elapsed = (end_run - start_run).total_seconds()
-    total_elapsed = (end_run - start_abs).total_seconds()
+        # Record execution times
+        end_run = datetime.now()
+        run_elapsed = (end_run - start_run).total_seconds()
+        total_elapsed = (end_run - start_abs).total_seconds()
 
-    logger.info(f"Pipeline run completed in {run_elapsed:.2f} seconds")
-    logger.info(f"Total time elapsed: {total_elapsed:.2f} seconds")
+        logger.info(f"Pipeline run completed in {run_elapsed:.2f} seconds")
+        logger.info(f"Total time elapsed: {total_elapsed:.2f} seconds")
 
-    return total_elapsed
+        return None, total_elapsed
+    else:
+        return pipeline, 0.0
 
 
-def run_pipeline(ingest_config: Dict[str, Any]) -> float:
-    total_elapsed = _launch_pipeline(ingest_config)
+def run_pipeline(ingest_config: PipelineCreationSchema, block: bool = True) -> Union[RayPipeline, float]:
+    pipeline, total_elapsed = _launch_pipeline(ingest_config, block)
 
-    logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
-    return total_elapsed
+    if block:
+        logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
+
+    return pipeline

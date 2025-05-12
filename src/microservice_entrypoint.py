@@ -9,8 +9,7 @@ import os
 import click
 from pydantic import ValidationError
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
-from nv_ingest.framework.schemas.framework_ingest_config_schema import PipelineConfigSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
 from nv_ingest_api.util.converters.containers import merge_dict
 from nv_ingest_api.util.logging.configuration import LogLevel
 from nv_ingest_api.util.logging.configuration import configure_logging
@@ -60,13 +59,13 @@ def cli(
 
     try:
         if ingest_config_path:
-            ingest_config = validate_schema(ingest_config_path, PipelineConfigSchema)
+            ingest_config = validate_schema(ingest_config_path, PipelineCreationSchema)
         else:
             ingest_config = {}
 
         final_ingest_config = merge_dict(ingest_config, cli_ingest_config)
 
-        validated_config = PipelineConfigSchema(**final_ingest_config)  # noqa
+        validated_config = PipelineCreationSchema(**final_ingest_config)  # noqa
         logger.info("Configuration loaded and validated.")
 
     except ValidationError as e:
@@ -76,7 +75,7 @@ def cli(
 
     logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
 
-    run_pipeline(final_ingest_config)
+    run_pipeline(validated_config)
 
 
 if __name__ == "__main__":

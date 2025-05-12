@@ -9,6 +9,7 @@ import os
 from typing import Dict, Any
 
 import ray
+from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
 from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
@@ -38,7 +39,19 @@ from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 logger = logging.getLogger("uvicorn")
 
 
-def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any]):
+def export_config_to_env(ingest_config: Any) -> None:
+    if isinstance(ingest_config, BaseModel):
+        ingest_config = ingest_config.model_dump()
+
+    os.environ.update({key.upper(): val for key, val in ingest_config.items()})
+
+
+def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any] = None):
+    # Initialize the pipeline with the configuration
+    if ingest_config:
+        # Export the config to environment variables
+        export_config_to_env(ingest_config)
+
     current_level = logging.getLogger().getEffectiveLevel()
     ray.init(
         namespace="nv_ingest_ray",
