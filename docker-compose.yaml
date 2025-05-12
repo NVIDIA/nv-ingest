@@ -99,6 +99,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
+    cpuset: ${PADDLE_CPUSET:-0-3}
     deploy:
       resources:
         reservations:
