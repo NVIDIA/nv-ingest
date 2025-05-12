@@ -312,7 +312,7 @@ class RestClient(MessageBrokerClientBase):
 
         while True:
             result: Optional[Any] = None
-            trace_id: Optional[str] = None
+            trace_id: Optional[str] = job_id
             response_code: int = -1
 
             try:
