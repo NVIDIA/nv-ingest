@@ -13,6 +13,7 @@ dependencies:
   - fastparquet>=2024.11.0
   - fsspec>=2024.10.0
   - gunicorn
+  - h11>=0.16.0 # Must pin at or above 0.16.0 for CVE mitigation
   - httpx>=0.28.1
   - isodate>=0.7.2
   - langdetect>=1.0.9
