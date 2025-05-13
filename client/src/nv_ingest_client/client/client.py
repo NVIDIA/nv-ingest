@@ -1,10 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-import concurrent
 
 # pylint: disable=broad-except
 
+import concurrent
 import json
 import logging
 import math
@@ -31,7 +31,7 @@ from nv_ingest_client.primitives.tasks import TaskType
 from nv_ingest_client.primitives.tasks import is_valid_task_type
 from nv_ingest_client.primitives.tasks import task_factory
 from nv_ingest_client.util.processing import handle_future_result, IngestJobFailure
-from nv_ingest_client.util.util import create_job_specs_for_batch
+from nv_ingest_client.util.util import create_job_specs_for_batch, check_ingest_result
 
 logger = logging.getLogger(__name__)
 
@@ -172,7 +172,8 @@ class _ConcurrentProcessor:
 
         # Record failure only once per job index
         if not any(f[0] == job_index for f in self.failures):
-            self.failures.append((job_index, error_msg))
+            failed_job_spec = self.client._job_index_to_job_spec.get(job_index)
+            self.failures.append((f"{job_index}:{failed_job_spec.source_id}", error_msg))
         elif self.verbose:
             logger.debug(f"Failure already recorded for {job_index}")
 
@@ -219,7 +220,13 @@ class _ConcurrentProcessor:
             trace_info = f" (Trace: {trace_id})" if trace_id else ""
             logger.info(f"Successfully fetched result for job {job_index}{trace_info}")
 
-        self.results.append(result_data.get("data"))
+        is_failed, description = check_ingest_result(result_data)
+
+        if is_failed:
+            failed_job_spec = self.client._job_index_to_job_spec.get(job_index)
+            self.failures.append((f"{job_index}:{failed_job_spec.source_id}", description))
+        else:
+            self.results.append(result_data.get("data"))
 
         # Cleanup retry count if it exists
         if job_index in self.retry_counts:
@@ -446,6 +453,7 @@ class _ConcurrentProcessor:
                         result_list = future.result()
                         if not isinstance(result_list, list) or len(result_list) != 1:
                             raise ValueError(f"Expected list length 1, got {len(result_list)}")
+
                         result_tuple = result_list[0]
                         if not isinstance(result_tuple, (tuple, list)) or len(result_tuple) != 3:
                             raise ValueError(f"Expected tuple/list length 3, got {len(result_tuple)}")
@@ -454,6 +462,7 @@ class _ConcurrentProcessor:
 
                         if fetched_job_index != job_index:
                             logger.warning(f"Mismatch: Future for {job_index} returned " f"{fetched_job_index}")
+
                         self._handle_processing_success(job_index, full_response_dict, trace_id)
 
                     except TimeoutError:
