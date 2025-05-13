@@ -7,7 +7,7 @@ import time
 
 import pytest
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 
 
