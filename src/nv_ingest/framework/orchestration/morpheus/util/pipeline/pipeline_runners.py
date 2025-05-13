@@ -381,7 +381,7 @@ def is_port_in_use(port, host="127.0.0.1"):
             return True
 
 
-def start_pipeline_subprocess(
+def start_pipeline_subprocess_morpheus(
     config: PipelineCreationSchema, stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = None
 ) -> "subprocess.Popen":
     """
