@@ -32,6 +32,8 @@ from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
 from scipy.sparse import csr_array
+from nv_ingest_client.util.transport import infer_microservice
+
 
 logger = logging.getLogger(__name__)
 
@@ -722,22 +724,23 @@ def write_records_minio(
         Returns the writer supplied, with information related to minio records upload.
     """
     for result in records:
-        if not isinstance(result, list):
-            result = [result]
-        for element in result:
-            text = _pull_text(
-                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
-            )
-            _insert_location_into_content_metadata(
-                element, enable_charts, enable_tables, enable_images, enable_infographics
-            )
-            if meta_dataframe is not None and meta_source_field and meta_fields:
-                add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
-            if text:
-                if sparse_model is not None:
-                    writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
-                else:
-                    writer.append_row(record_func(text, element))
+        if result is not None:
+            if not isinstance(result, list):
+                result = [result]
+            for element in result:
+                text = _pull_text(
+                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+                )
+                _insert_location_into_content_metadata(
+                    element, enable_charts, enable_tables, enable_images, enable_infographics
+                )
+                if meta_dataframe is not None and meta_source_field and meta_fields:
+                    add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
+                if text:
+                    if sparse_model is not None:
+                        writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
+                    else:
+                        writer.append_row(record_func(text, element))
 
     writer.commit()
     print(f"Wrote data to: {writer.batch_files}")
@@ -777,6 +780,7 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
         if task.state == BulkInsertState.ImportFailed:
             print("Failed reason:", task.failed_reason)
         time.sleep(1)
+    # connections.load(collection_name=collection_name)
 
 
 def create_bm25_model(
@@ -885,22 +889,25 @@ def stream_insert_milvus(
     """
     count = 0
     for result in records:
-        for element in result:
-            text = _pull_text(
-                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
-            )
-            _insert_location_into_content_metadata(
-                element, enable_charts, enable_tables, enable_images, enable_infographics
-            )
-            if meta_dataframe is not None and meta_source_field and meta_fields:
-                add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
-            if text:
-                if sparse_model is not None:
-                    element = record_func(text, element, sparse_model.encode_documents([text]))
-                else:
-                    element = record_func(text, element)
-                client.insert(collection_name=collection_name, data=[element])
-                count += 1
+        if result is not None:
+            if not isinstance(result, list):
+                result = [result]
+            for element in result:
+                text = _pull_text(
+                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+                )
+                _insert_location_into_content_metadata(
+                    element, enable_charts, enable_tables, enable_images, enable_infographics
+                )
+                if meta_dataframe is not None and meta_source_field and meta_fields:
+                    add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
+                if text:
+                    if sparse_model is not None:
+                        element = record_func(text, element, sparse_model.encode_documents([text]))
+                    else:
+                        element = record_func(text, element)
+                    client.insert(collection_name=collection_name, data=[element])
+                    count += 1
     logger.info(f"streamed {count} records")
 
 
@@ -991,7 +998,7 @@ def write_to_nvingest_collection(
         bm25_ef.load(bm25_save_path)
     client = MilvusClient(milvus_uri)
     schema = Collection(collection_name).schema
-    num_elements = len([rec for record in records for rec in record])
+    num_elements = len([rec for record in records if record is not None for rec in record])
     logger.info(f"{num_elements} elements to insert to milvus")
     logger.info(f"threshold for streaming is {threshold}")
     if num_elements < threshold:
@@ -1040,8 +1047,9 @@ def write_to_nvingest_collection(
         )
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # this sleep is required, to ensure atleast this amount of time
-        # passes before running a search against the collection.\
-        time.sleep(20)
+        # passes before running a search against the collection.
+    client.flush(collection_name)
+    client.load_collection(collection_name=collection_name)
 
 
 def dense_retrieval(
@@ -1522,6 +1530,8 @@ def embed_index_collection(
     meta_dataframe: Union[str, pd.DataFrame] = None,
     meta_source_field: str = None,
     meta_fields: list[str] = None,
+    intput_type: str = "passage",
+    truncate: str = "END",
     **kwargs,
 ):
     """
@@ -1561,17 +1571,15 @@ def embed_index_collection(
         meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
         **kwargs: Additional keyword arguments for customization.
     """
-    from llama_index.embeddings.nvidia import NVIDIAEmbedding
-
     client_config = ClientConfigSchema()
     nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
-    embed_model = NVIDIAEmbedding(
-        base_url=embedding_endpoint, model=model_name, nvidia_api_key=nvidia_api_key, truncate="END"
-    )
-
+    # if not scheme we assume we are using grpc
+    grpc = "http" not in urlparse(embedding_endpoint).scheme
+    kwargs.pop("input_type", None)
+    kwargs.pop("truncate", None)
     mil_op = MilvusOperator(
         collection_name=collection_name,
         milvus_uri=milvus_uri,
@@ -1602,19 +1610,27 @@ def embed_index_collection(
             results = None
             with open(results_file, "r") as infile:
                 results = json.loads(infile.read())
-            embeddings = get_embeddings(results, embed_model, batch_size)
+                embeddings = infer_microservice(
+                    results, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+                )
             for record, emb in zip(results, embeddings):
                 record["metadata"]["embedding"] = emb
                 record["document_type"] = "text"
-            mil_op.run(results)
-            mil_op.milvus_kwargs["recreate"] = False
+            if results is not None and len(results) > 0:
+                mil_op.run(results)
+                mil_op.milvus_kwargs["recreate"] = False
     # running all at once
     else:
-        embeddings = get_embeddings(data, embed_model, batch_size)
+        embeddings = infer_microservice(
+            data, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+        )
         for record, emb in zip(data, embeddings):
             record["metadata"]["embedding"] = emb
             record["document_type"] = "text"
-        mil_op.run(data)
+        # this check ensures that we do not purge the current collection
+        # without having some actual data to insert.
+        if data is not None and len(data) > 0:
+            mil_op.run(data)
 
 
 def reindex_collection(
@@ -1646,6 +1662,8 @@ def reindex_collection(
     meta_fields: list[str] = None,
     embed_batch_size: int = 256,
     query_batch_size: int = 1000,
+    input_type: str = "passage",
+    truncate: str = "END",
     **kwargs,
 ):
     """
@@ -1719,6 +1737,8 @@ def reindex_collection(
         meta_dataframe=meta_dataframe,
         meta_source_field=meta_source_field,
         meta_fields=meta_fields,
+        input_type=input_type,
+        truncate=truncate,
         **kwargs,
     )
 

@@ -312,7 +312,7 @@ class RestClient(MessageBrokerClientBase):
 
         while True:
             result: Optional[Any] = None
-            trace_id: Optional[str] = None
+            trace_id: Optional[str] = job_id
             response_code: int = -1
 
             try:
@@ -470,7 +470,7 @@ class RestClient(MessageBrokerClientBase):
                         f"Requires a requests.Session compatible API."
                     )
             except requests.exceptions.RequestException as err:
-                logger.warning(
+                logger.debug(
                     f"RequestException submitting job: {err}. Attempting retry ({retries + 1}/{self._max_retries})..."
                 )
                 try:
