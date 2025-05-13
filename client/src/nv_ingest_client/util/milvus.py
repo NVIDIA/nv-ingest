@@ -31,8 +31,10 @@ from pymilvus.bulk_writer import RemoteBulkWriter
 from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
+from pymilvus.orm.types import CONSISTENCY_STRONG
 from scipy.sparse import csr_array
 from nv_ingest_client.util.transport import infer_microservice
+from nv_ingest_client.vdb.adt_vdb import VDB
 
 
 logger = logging.getLogger(__name__)
@@ -201,107 +203,6 @@ def _dict_to_params(collections_dict: dict, write_params: dict):
     return params_tuple_list
 
 
-class MilvusOperator:
-    def __init__(
-        self,
-        collection_name: Union[str, Dict] = "nv_ingest_collection",
-        milvus_uri: str = "http://localhost:19530",
-        sparse: bool = False,
-        recreate: bool = True,
-        gpu_index: bool = True,
-        gpu_search: bool = True,
-        dense_dim: int = 2048,
-        minio_endpoint: str = "localhost:9000",
-        enable_text: bool = True,
-        enable_charts: bool = True,
-        enable_tables: bool = True,
-        enable_images: bool = True,
-        enable_infographics: bool = True,
-        bm25_save_path: str = "bm25_model.json",
-        compute_bm25_stats: bool = True,
-        access_key: str = "minioadmin",
-        secret_key: str = "minioadmin",
-        bucket_name: str = "a-bucket",
-        meta_dataframe: Union[str, pd.DataFrame] = None,
-        meta_source_field: str = None,
-        meta_fields: list[str] = None,
-        stream: bool = False,
-        **kwargs,
-    ):
-        """
-        Initializes the Milvus operator class with the specified configuration parameters.
-        Args:
-            collection_name (Union[str, Dict], optional): The name of the Milvus collection or a dictionary
-                containing collection configuration. Defaults to "nv_ingest_collection".
-            milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
-            sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
-            recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
-            gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
-            gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
-            dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
-            minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
-            enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
-            enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
-            enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
-            enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
-            enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
-            bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
-            compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
-            access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
-            secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
-            meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
-                containing metadata. Defaults to None.
-            meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
-                Defaults to None.
-            meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
-            **kwargs: Additional keyword arguments for customization.
-            stream (bool, optional): When true, the records will be inserted into milvus using the stream
-                insert method.
-        """
-
-        self.milvus_kwargs = locals()
-        self.milvus_kwargs.pop("self")
-        self.collection_name = self.milvus_kwargs.pop("collection_name")
-        for k, v in self.milvus_kwargs.pop("kwargs", {}).items():
-            self.milvus_kwargs[k] = v
-
-    def get_connection_params(self):
-        conn_dict = {
-            "milvus_uri": self.milvus_kwargs["milvus_uri"],
-            "sparse": self.milvus_kwargs["sparse"],
-            "recreate": self.milvus_kwargs["recreate"],
-            "gpu_index": self.milvus_kwargs["gpu_index"],
-            "gpu_search": self.milvus_kwargs["gpu_search"],
-            "dense_dim": self.milvus_kwargs["dense_dim"],
-        }
-        return (self.collection_name, conn_dict)
-
-    def get_write_params(self):
-        write_params = self.milvus_kwargs.copy()
-        del write_params["recreate"]
-        del write_params["gpu_index"]
-        del write_params["gpu_search"]
-        del write_params["dense_dim"]
-
-        return (self.collection_name, write_params)
-
-    def run(self, records):
-        collection_name, create_params = self.get_connection_params()
-        _, write_params = self.get_write_params()
-        if isinstance(collection_name, str):
-            create_nvingest_collection(collection_name, **create_params)
-            write_to_nvingest_collection(records, collection_name, **write_params)
-        elif isinstance(collection_name, dict):
-            split_params_list = _dict_to_params(collection_name, write_params)
-            for sub_params in split_params_list:
-                coll_name, sub_write_params = sub_params
-                create_nvingest_collection(coll_name, **create_params)
-                write_to_nvingest_collection(records, coll_name, **sub_write_params)
-        else:
-            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
-
-
 def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_index: bool = False) -> CollectionSchema:
     """
     Creates a schema for the nv-ingest produced data. This is currently setup to follow
@@ -457,7 +358,12 @@ def create_collection(
     if recreate and client.has_collection(collection_name):
         client.drop_collection(collection_name)
     if not client.has_collection(collection_name):
-        client.create_collection(collection_name=collection_name, schema=schema, index_params=index_params)
+        client.create_collection(
+            collection_name=collection_name,
+            schema=schema,
+            index_params=index_params,
+            consistency_level=CONSISTENCY_STRONG,
+        )
 
 
 def create_nvingest_collection(
@@ -767,7 +673,10 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
 
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
-    task_id = utility.do_bulk_insert(collection_name=collection_name, files=writer.batch_files[0])
+    task_id = utility.do_bulk_insert(
+        collection_name=collection_name, files=writer.batch_files[0], consistency_level=CONSISTENCY_STRONG
+    )
+    # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
     state = "Pending"
     while state != "Completed":
         task = utility.get_bulk_insert_state(task_id=task_id)
@@ -780,7 +689,6 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
         if task.state == BulkInsertState.ImportFailed:
             print("Failed reason:", task.failed_reason)
         time.sleep(1)
-    # connections.load(collection_name=collection_name)
 
 
 def create_bm25_model(
@@ -1046,10 +954,8 @@ def write_to_nvingest_collection(
             meta_fields=meta_fields,
         )
         bulk_insert_milvus(collection_name, writer, milvus_uri)
-        # this sleep is required, to ensure atleast this amount of time
-        # passes before running a search against the collection.
-    client.flush(collection_name)
-    client.load_collection(collection_name=collection_name)
+        # fixes bulk insert lag time https://github.com/milvus-io/milvus/issues/21746
+        client.refresh_load(collection_name)
 
 
 def dense_retrieval(
@@ -1466,13 +1372,13 @@ def pull_all_milvus(
         filter="pk >= 0",
         output_fields=["source", "content_metadata", "text"],
         batch_size=batch_size,
+        consistency_level=CONSISTENCY_STRONG,
     )
     full_results = []
     write_dir = Path(write_dir) if write_dir else None
     batch_num = 0
     while True:
-        results = iterator.next()
-        results = recreate_elements(results)
+        results = recreate_elements(iterator.next())
         if not results:
             iterator.close()
             break
@@ -1580,7 +1486,7 @@ def embed_index_collection(
     grpc = "http" not in urlparse(embedding_endpoint).scheme
     kwargs.pop("input_type", None)
     kwargs.pop("truncate", None)
-    mil_op = MilvusOperator(
+    mil_op = Milvus(
         collection_name=collection_name,
         milvus_uri=milvus_uri,
         sparse=sparse,
@@ -1777,3 +1683,162 @@ def reconstruct_pages(anchor_record, records_list, page_signum: int = 0):
                 target_records.append(record)
 
     return ingest_json_results_to_blob(target_records)
+
+
+class Milvus(VDB):
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+
+    def create_index(self, **kwargs):
+        collection_name = kwargs.pop("collection_name")
+        create_nvingest_collection(collection_name, **kwargs)
+
+    def write_to_index(self, records, **kwargs):
+        collection_name = kwargs.pop("collection_name")
+        write_to_nvingest_collection(records, collection_name, **kwargs)
+
+    def search_index(self, queries, **kwargs):
+        collection_name = kwargs.pop("collection_name")
+        nvingest_retrieval(queries, collection_name, **kwargs)
+
+    def reindex(self, **kwargs):
+        collection_name = kwargs.pop("collection_name")
+        reindex_collection(collection_name, **kwargs)
+
+    def get_connection_params(self):
+        conn_dict = {
+            "milvus_uri": self.__dict__.get("milvus_uri", "http://localhost:19530"),
+            "sparse": self.__dict__.get("sparse", True),
+            "recreate": self.__dict__.get("recreate", True),
+            "gpu_index": self.__dict__.get("gpu_index", True),
+            "gpu_search": self.__dict__.get("gpu_search", True),
+            "dense_dim": self.__dict__.get("dense_dim", 2048),
+        }
+        return (self.collection_name, conn_dict)
+
+    def get_write_params(self):
+        write_params = self.__dict__.copy()
+        write_params.pop("recreate", True)
+        write_params.pop("gpu_index", True)
+        write_params.pop("gpu_search", True)
+        write_params.pop("dense_dim", 2048)
+
+        return (self.collection_name, write_params)
+
+    def run(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            self.create_index(collection_name=collection_name, **create_params)
+            self.write_to_index(records, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                sub_write_params.pop("collection_name", None)
+                self.create_index(collection_name=coll_name, **create_params)
+                self.write_to_index(records, collection_name=coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
+
+
+class MilvusOperator:
+    def __init__(
+        self,
+        collection_name: Union[str, Dict] = "nv_ingest_collection",
+        milvus_uri: str = "http://localhost:19530",
+        sparse: bool = False,
+        recreate: bool = True,
+        gpu_index: bool = True,
+        gpu_search: bool = True,
+        dense_dim: int = 2048,
+        minio_endpoint: str = "localhost:9000",
+        enable_text: bool = True,
+        enable_charts: bool = True,
+        enable_tables: bool = True,
+        enable_images: bool = True,
+        enable_infographics: bool = True,
+        bm25_save_path: str = "bm25_model.json",
+        compute_bm25_stats: bool = True,
+        access_key: str = "minioadmin",
+        secret_key: str = "minioadmin",
+        bucket_name: str = "a-bucket",
+        meta_dataframe: Union[str, pd.DataFrame] = None,
+        meta_source_field: str = None,
+        meta_fields: list[str] = None,
+        stream: bool = False,
+        **kwargs,
+    ):
+        """
+        Initializes the Milvus operator class with the specified configuration parameters.
+        Args:
+            collection_name (Union[str, Dict], optional): The name of the Milvus collection or a dictionary
+                containing collection configuration. Defaults to "nv_ingest_collection".
+            milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
+            sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
+            recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
+            gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
+            gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
+            dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
+            minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
+            enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
+            enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
+            enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
+            enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
+            enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
+            bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
+            compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
+            access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
+            secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
+            bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
+            meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
+                containing metadata. Defaults to None.
+            meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
+                Defaults to None.
+            meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
+            **kwargs: Additional keyword arguments for customization.
+            stream (bool, optional): When true, the records will be inserted into milvus using the stream
+                insert method.
+        """
+
+        self.milvus_kwargs = locals()
+        self.milvus_kwargs.pop("self")
+        self.collection_name = self.milvus_kwargs.pop("collection_name")
+        for k, v in self.milvus_kwargs.pop("kwargs", {}).items():
+            self.milvus_kwargs[k] = v
+        self.op = Milvus()
+
+    def get_connection_params(self):
+        conn_dict = {
+            "milvus_uri": self.milvus_kwargs["milvus_uri"],
+            "sparse": self.milvus_kwargs["sparse"],
+            "recreate": self.milvus_kwargs["recreate"],
+            "gpu_index": self.milvus_kwargs["gpu_index"],
+            "gpu_search": self.milvus_kwargs["gpu_search"],
+            "dense_dim": self.milvus_kwargs["dense_dim"],
+        }
+        return (self.collection_name, conn_dict)
+
+    def get_write_params(self):
+        write_params = self.milvus_kwargs.copy()
+        del write_params["recreate"]
+        del write_params["gpu_index"]
+        del write_params["gpu_search"]
+        del write_params["dense_dim"]
+
+        return (self.collection_name, write_params)
+
+    def run(self, records):
+        collection_name, create_params = self.get_connection_params()
+        _, write_params = self.get_write_params()
+        if isinstance(collection_name, str):
+            self.op.create_index(collection_name=collection_name, **create_params)
+            self.op.write_to_index(records, collection_name=collection_name, **write_params)
+        elif isinstance(collection_name, dict):
+            split_params_list = _dict_to_params(collection_name, write_params)
+            for sub_params in split_params_list:
+                coll_name, sub_write_params = sub_params
+                self.op.create_index(collection_name=coll_name, **create_params)
+                self.op.write_to_index(records, collection_name=coll_name, **sub_write_params)
+        else:
+            raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")

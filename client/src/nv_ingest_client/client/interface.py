@@ -39,7 +39,7 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.milvus import Milvus
 from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.processing import check_schema
 from tqdm import tqdm
@@ -592,7 +592,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        self._vdb_bulk_upload = MilvusOperator(**kwargs)
+        self._vdb_bulk_upload = Milvus(**kwargs)
 
         return self
 
