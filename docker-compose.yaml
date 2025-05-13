@@ -267,7 +267,6 @@ services:
       - MESSAGE_CLIENT_PORT=6379
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
-      - MRC_IGNORE_NUMA_CHECK=1
       # build.nvidia.com hosted nemoretriever-parse
       - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
       #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
@@ -284,7 +283,7 @@ services:
       # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
-      - REDIS_MORPHEUS_TASK_QUEUE=morpheus_task_queue
+      - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer

@@ -62,9 +62,6 @@ class PipelineCreationSchema(BaseModel):
     message_client_port: str = "7671"
     message_client_type: str = "simple"
 
-    # Hardware configuration
-    mrc_ignore_numa_check: str = "1"
-
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
         "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
@@ -84,7 +81,7 @@ class PipelineCreationSchema(BaseModel):
     paddle_infer_protocol: str = "http"
 
     # Task queue settings
-    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
 
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
