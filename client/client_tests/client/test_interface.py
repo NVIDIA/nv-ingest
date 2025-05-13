@@ -7,6 +7,7 @@
 import io
 import logging
 import os
+import sys
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import MagicMock, ANY
@@ -343,25 +344,55 @@ def test_ingest_return_failures(ingestor, mock_client):
         mock_client.fetch_job_result.assert_not_called()
 
 
-def test_ingest_async(ingestor, mock_client):
+def _make_mock_processor(desired_results, desired_failures=None):
+    if desired_failures is None:
+        desired_failures = []
+
+    proc_future = Future()
+    proc_future.set_result((desired_results, desired_failures))
+
+    mock_proc = MagicMock()
+    mock_proc.run_async.return_value = proc_future
+    return mock_proc
+
+
+def test_ingest_async_returns_success_list(monkeypatch, ingestor, mock_client):
     mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
 
-    future1 = Future()
-    future2 = Future()
-    future1.set_result("result_1")
-    future2.set_result("result_2")
-    mock_client.submit_job_async.return_value = {future1: "job_id_1", future2: "job_id_2"}
+    patch_target = "nv_ingest_client.client.interface._ConcurrentProcessor"
+    mock_proc_class = MagicMock()
+    mock_proc_class.return_value = _make_mock_processor(["result_1", "result_2"])
+    monkeypatch.setitem(sys.modules, patch_target, mock_proc_class)
 
-    ingestor._job_states = {}
-    ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
-    ingestor._job_states["job_id_2"] = MagicMock(state=JobStateEnum.FAILED)
+    with patch("nv_ingest_client.client.interface._ConcurrentProcessor") as mock_proc_cls:
+        mock_proc_cls.return_value = _make_mock_processor(["result_1", "result_2"])
+        future = ingestor.ingest_async(timeout=15)  # default return_failuture=False
+        assert future.result() == ["result_1", "result_2"]
 
-    mock_client.fetch_job_result.side_effect = lambda job_id, *args, **kwargs: (
-        ["result_1"] if job_id == "job_id_1" else ["result_2"]
-    )
+        mock_proc_cls.assert_called_once()  # processor was constructed
+        mock_proc_cls.return_value.run_async.assert_called_once()
 
-    combined_result = ingestor.ingest_async(timeout=15).result()
-    assert combined_result == ["result_1", "result_2"]
+
+def test_ingest_async_with_failures(monkeypatch, ingestor, mock_client):
+    mock_client.add_job.return_value = ["job_id_1", "job_id_2"]
+
+    # One success, one failure
+    successes = ["result_1"]
+    failures = [("job_id_2", "boom")]
+
+    patch_target = "nv_ingest_client.client.interface._ConcurrentProcessor"
+    mock_proc_class = MagicMock()
+    mock_proc_class.return_value = _make_mock_processor(successes, failures)
+    monkeypatch.setitem(sys.modules, patch_target, mock_proc_class)
+
+    with patch("nv_ingest_client.client.interface._ConcurrentProcessor") as mock_proc_cls:
+        mock_proc_cls.return_value = _make_mock_processor(["result_1"], [("job_id_2", "boom")])
+        future = ingestor.ingest_async(return_failures=True)
+
+    results, returned_failures = future.result()
+
+    assert results == successes
+    assert returned_failures == failures
 
 
 def test_create_client(ingestor):

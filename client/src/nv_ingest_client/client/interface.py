@@ -21,6 +21,7 @@ from urllib.parse import urlparse
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
+from nv_ingest_client.client.client import _ConcurrentProcessor
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import CaptionTask
@@ -46,7 +47,12 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
+DEFAULT_JOB_QUEUE_ID: str = "morpheus_task_queue"
+# Default concurrent-processing parameters
+DEFAULT_BATCH_SIZE: int = 64
+DEFAULT_TIMEOUT: int = 100
+DEFAULT_MAX_RETRIES: int = None
+DEFAULT_VERBOSE: bool = False
 
 
 def ensure_job_specs(func):
@@ -282,11 +288,6 @@ class Ingestor:
 
             callback = progress_callback
 
-        # Default concurrent-processing parameters
-        DEFAULT_TIMEOUT: int = 100
-        DEFAULT_MAX_RETRIES: int = None
-        DEFAULT_VERBOSE: bool = False
-
         timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
         max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
         verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
@@ -319,9 +320,14 @@ class Ingestor:
 
         return (results, failures) if return_failures else results
 
-    def ingest_async(self, **kwargs: Any) -> Future:
+    def ingest_async(
+        self, show_progress: bool = False, return_failures: bool = False, **kwargs: Any
+    ) -> Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]:
         """
-        Asynchronously submits jobs and returns a single future that completes when all jobs have finished.
+        Asynchronously submits jobs and returns a single future that completes
+        when all jobs have finished processing (succeeded or failed).
+        The future's result will be a tuple containing
+        (list_of_successful_results, list_of_failures) managed by the processor.
 
         Parameters
         ----------
@@ -330,46 +336,109 @@ class Ingestor:
 
         Returns
         -------
-        Future
-            A future that completes when all submitted jobs have reached a terminal state.
+        Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]
+            A future that completes when all jobs are done. Its result is
+            a tuple: (successful_results, failures). The format of successful_results
+            depends on how _ConcurrentProcessor stores them (e.g., the 'data' part).
+            Failures are tuples of (job_index, error_message).
         """
-        self._prepare_ingest_run()
+        try:
+            self._prepare_ingest_run()
 
-        self._job_ids = self._client.add_job(self._job_specs)
+            self._job_ids = self._client.add_job(self._job_specs)
 
-        future_to_job_id = self._client.submit_job_async(self._job_ids, self._job_queue_id, **kwargs)
-        self._job_states = {job_id: self._client._get_and_check_job_state(job_id) for job_id in self._job_ids}
+            if not self._job_ids:
+                logger.warning("No job IDs returned from add_job. Nothing to process.")
+                immediate_future: Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]] = Future()
+                immediate_future.set_result(([], []))
+                return immediate_future
 
-        combined_future = Future()
-        submitted_futures = set(future_to_job_id.keys())
-        completed_futures = set()
-        future_results = []
+            logger.info(f"Created {len(self._job_ids)} jobs. Initializing processor...")
 
-        def _done_callback(future):
-            job_id = future_to_job_id[future]
-            job_state = self._job_states[job_id]
-            try:
-                result = self._client.fetch_job_result(job_id)
-                if job_state.state != JobStateEnum.COMPLETED:
-                    job_state.state = JobStateEnum.COMPLETED
-            except Exception:
-                result = None
-                if job_state.state != JobStateEnum.FAILED:
-                    job_state.state = JobStateEnum.FAILED
-            completed_futures.add(future)
-            future_results.extend(result)
-            if completed_futures == submitted_futures:
-                combined_future.set_result(future_results)
+            batch_size: int = kwargs.pop("batch_size", DEFAULT_BATCH_SIZE)
+            timeout: int = kwargs.pop("timeout", DEFAULT_TIMEOUT)
+            max_job_retries: int = kwargs.pop("max_job_retries", DEFAULT_MAX_RETRIES)
+            fail_on_submit_error: bool = kwargs.pop("fail_on_submit_error", False)
+            verbose: bool = kwargs.pop("verbose", DEFAULT_VERBOSE)
 
-        for future in future_to_job_id:
-            future.add_done_callback(_done_callback)
+            completion_callback = None
+            pbar = None
+            if show_progress:
+                pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
 
-        if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(combined_future.result())
-            # only upload as part of jobs user specified this action
-            self._vdb_bulk_upload = None
+                def progress_callback(result_data: Dict[str, Any], job_id: str) -> None:
+                    pbar.update(1)
 
-        return combined_future
+                completion_callback = progress_callback
+
+            processor = _ConcurrentProcessor(
+                client=self._client,
+                batch_size=batch_size,
+                job_indices=self._job_ids,
+                job_queue_id=self._job_queue_id,
+                timeout=timeout,
+                max_job_retries=max_job_retries,
+                completion_callback=completion_callback,
+                fail_on_submit_error=fail_on_submit_error,
+                verbose=verbose,
+            )
+
+            combined_future: Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]] = Future()
+
+            processor_future = processor.run_async()
+
+            def _processor_done_callback(proc_future: Future):
+                """Sets the result or exception on the combined_future."""
+                try:
+                    if proc_future.cancelled():
+                        if not combined_future.done():
+                            combined_future.cancel()
+                            logger.info("Processor future was cancelled, cancelling combined future.")
+                    elif proc_future.exception():
+                        # Propagate exception from the processor's execution
+                        exc = proc_future.exception()
+                        logger.error(f"Processor execution failed: {exc}", exc_info=exc)
+                        if not combined_future.done():
+                            combined_future.set_exception(exc)
+                    else:
+                        # Get the (results, failures) tuple from the processor
+                        final_results, final_failures = proc_future.result()
+                        logger.info(
+                            f"Processor finished. Results: {len(final_results)}, Failures: {len(final_failures)}"
+                        )
+                        if not combined_future.done():
+                            if return_failures:
+                                combined_future.set_result((final_results, final_failures))
+                            else:
+                                combined_future.set_result(final_results)
+                except Exception as e:
+                    # Catch unexpected errors during the callback itself
+                    logger.exception("Error within _processor_done_callback")
+                    if not combined_future.done():
+                        combined_future.set_exception(e)  # Report error via the future
+
+            def _maybe_run_vdb_upload(fut: Future):
+                """If vdb upload is configured, run it with the final results."""
+                try:
+                    if self._vdb_bulk_upload:
+                        results, _ = fut.result()  # we only care about successful results
+                        logger.info("Starting VDB bulk upload after successful ingestion.")
+                        self._vdb_bulk_upload.run(results)
+                        self._vdb_bulk_upload = None  # Ensure it's only run once
+                except Exception as e:
+                    logger.exception(f"Error during vdb_bulk_upload.run(): {e}")
+
+            processor_future.add_done_callback(_processor_done_callback)
+            combined_future.add_done_callback(_maybe_run_vdb_upload)
+
+            logger.info("Processor started asynchronously. Returning combined future.")
+            return combined_future
+
+        except Exception as setup_err:
+            logger.exception("Failed during synchronous part of ingest_async setup.")
+            error_future: Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]] = Future()
+            error_future.set_exception(setup_err)
+            return error_future
 
     @ensure_job_specs
     def _prepare_ingest_run(self):

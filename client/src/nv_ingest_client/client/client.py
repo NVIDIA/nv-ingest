@@ -140,6 +140,13 @@ class _ConcurrentProcessor:
         if not self.job_queue_id:
             logger.warning("job_queue_id is not set; submission of new jobs will fail.")
 
+        # Executor check for run_async
+        if not hasattr(client, "_worker_pool"):
+            raise AttributeError("Client object is missing the '_worker_pool' attribute, required for run_async.")
+        if not isinstance(client._worker_pool, ThreadPoolExecutor):
+            raise TypeError("Client's '_worker_pool' must be a ThreadPoolExecutor for run_async.")
+        self._executor = client._worker_pool  # Store reference for run_async
+
     # --------------------------------------------------------------------------
     # Private Methods
     # --------------------------------------------------------------------------
@@ -256,7 +263,9 @@ class _ConcurrentProcessor:
         )
         if final_processed_count != total_jobs:
             logger.warning(
-                "Final accounted count doesn't match total jobs. " "Some jobs may have been lost or unaccounted for."
+                f"Final accounted count ({final_processed_count}) doesn't match "
+                f"total jobs ({total_jobs}). Some jobs may have been lost "
+                "or unaccounted for."
             )
             # Attempt to identify potentially lost jobs (best effort)
             processed_indices = {f[0] for f in self.failures}
@@ -281,10 +290,10 @@ class _ConcurrentProcessor:
                 #         self.failures.append((idx, "Job lost or unaccounted for at exit"))
 
     # --------------------------------------------------------------------------
-    # Public Methods
+    # Core Processing Logic
     # --------------------------------------------------------------------------
 
-    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
+    def _process_all_jobs(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
         """
         Executes the main processing loop in batches.
 
@@ -389,6 +398,7 @@ class _ConcurrentProcessor:
                 continue  # Otherwise, proceed to next iteration
 
             # --- Initiate Fetching for the Current Batch ---
+            batch_futures_dict: Dict[Future, str] = {}
             try:
                 if self.verbose:
                     logger.debug(
@@ -402,20 +412,22 @@ class _ConcurrentProcessor:
                 if len(batch_futures_dict) != len(current_batch_job_indices):
                     returned_indices = set(batch_futures_dict.values())
                     missing_indices = [idx for idx in current_batch_job_indices if idx not in returned_indices]
-                    logger.error(
-                        f"fetch_job_result_async discrepancy: Expected "
-                        f"{len(current_batch_job_indices)}, got "
-                        f"{len(batch_futures_dict)}. Missing: {missing_indices}"
-                    )
-                    # Fail the missing ones explicitly
-                    for missing_idx in missing_indices:
-                        self._handle_processing_failure(
-                            missing_idx, "Future not returned by fetch_job_result_async", is_submission_failure=True
+                    if missing_indices:  # Only log/fail if there are actually missing ones
+                        logger.error(
+                            f"fetch_job_result_async discrepancy: Expected "
+                            f"{len(current_batch_job_indices)}, got "
+                            f"{len(batch_futures_dict)}. Missing indices: {missing_indices}"
                         )
-                    if self.fail_on_submit_error:
-                        raise RuntimeError("fetch_job_result_async failed to return all " "expected futures.")
-                    # Continue processing only the futures we received
-                    current_batch_job_indices = list(returned_indices)
+                        for missing_idx in missing_indices:
+                            self._handle_processing_failure(
+                                missing_idx, "Future not returned by fetch_job_result_async", is_submission_failure=True
+                            )
+                        if self.fail_on_submit_error:
+                            raise RuntimeError("fetch_job_result_async failed to return all expected futures.")
+                        # Adjust the list of jobs to process based on what was actually returned
+                        current_batch_job_indices = [
+                            idx for idx in current_batch_job_indices if idx in returned_indices
+                        ]
 
             except Exception as fetch_init_err:
                 error_msg = (
@@ -435,6 +447,8 @@ class _ConcurrentProcessor:
                     raise RuntimeError(
                         f"Stopping due to fetch initiation failure: {fetch_init_err}"
                     ) from fetch_init_err
+                # Clear the batch list as they all failed initiation
+                current_batch_job_indices = []
                 continue  # Skip processing results for this failed batch
 
             # --- Process Results for the Current Batch ---
@@ -444,6 +458,8 @@ class _ConcurrentProcessor:
                 continue  # Skip processing if no futures
 
             batch_timeout = 600.0  # Timeout for waiting on the whole batch
+            batch_retries_for_next_cycle = []
+
             try:
                 # Process futures as they complete within this batch
                 for future in as_completed(batch_futures_dict.keys(), timeout=batch_timeout):
@@ -461,7 +477,9 @@ class _ConcurrentProcessor:
                         full_response_dict, fetched_job_index, trace_id = result_tuple
 
                         if fetched_job_index != job_index:
-                            logger.warning(f"Mismatch: Future for {job_index} returned " f"{fetched_job_index}")
+                            logger.warning(
+                                f"Mismatch: Future for {job_index} returned data associated with {fetched_job_index}"
+                            )
 
                         self._handle_processing_success(job_index, full_response_dict, trace_id)
 
@@ -477,9 +495,9 @@ class _ConcurrentProcessor:
                                     f"{self.max_job_retries or 'inf'})."
                                 )
                             # Collect for the *next* batch
-                            self.retry_job_ids.append(job_index)
+                            batch_retries_for_next_cycle.append(job_index)
                         else:
-                            error_msg = f"Exceeded max fetch retries " f"({self.max_job_retries}) for job {job_index}."
+                            error_msg = f"Exceeded max fetch retries ({self.max_job_retries}) for job {job_index}."
                             logger.error(error_msg)
                             self._handle_processing_failure(job_index, error_msg)
 
@@ -499,21 +517,106 @@ class _ConcurrentProcessor:
                 )
                 # Identify and fail remaining futures
                 remaining_indices_in_batch = []
-                for f, idx in batch_futures_dict.items():
-                    if not f.done():
-                        remaining_indices_in_batch.append(idx)
-                        f.cancel()  # Attempt to cancel underlying task
-                logger.warning(
-                    f"Jobs potentially lost/cancelled due to batch timeout: " f"{remaining_indices_in_batch}"
+                processed_in_batch = (
+                    {f[0] for f in self.failures}
+                    | {r.get("jobIndex") for r in self.results if isinstance(r, dict)}
+                    | set(batch_retries_for_next_cycle)
                 )
-                for idx in remaining_indices_in_batch:
-                    self._handle_processing_failure(idx, f"Batch processing timed out after {batch_timeout}s")
+                processed_in_batch = {idx for idx in processed_in_batch if idx is not None}
+
+                for f, idx in batch_futures_dict.items():
+                    if not f.done() or idx not in processed_in_batch:
+                        if idx not in processed_in_batch:  # Avoid double-failing
+                            remaining_indices_in_batch.append(idx)
+                        if not f.done():
+                            f.cancel()  # Attempt to cancel underlying task
+
+                if remaining_indices_in_batch:
+                    logger.warning(
+                        f"Jobs potentially lost/cancelled due to batch timeout: {remaining_indices_in_batch}"
+                    )
+                    for idx in remaining_indices_in_batch:
+                        # Ensure failure isn't recorded twice
+                        if not any(fail[0] == idx for fail in self.failures):
+                            self._handle_processing_failure(idx, f"Batch processing timed out after {batch_timeout}s")
+
+            # Add jobs marked for retry during this batch to the main retry list for the next cycle
+            if batch_retries_for_next_cycle:
+                self.retry_job_ids.extend(batch_retries_for_next_cycle)
+                if self.verbose:
+                    logger.debug(
+                        f"Added {len(batch_retries_for_next_cycle)} jobs from completed batch to overall retry list."
+                    )
+
             # End of processing for this batch cycle
+            if self.verbose:
+                processed_in_this_batch = len(current_batch_job_indices) - len(batch_retries_for_next_cycle)
+                logger.debug(
+                    f"Finished processing batch. Handled {processed_in_this_batch} jobs "
+                    f"(Success/Fail). Queued {len(batch_retries_for_next_cycle)} for retry."
+                )
 
         # --- Final Logging ---
         self._log_final_status(total_jobs)
 
         return self.results, self.failures
+
+    # --------------------------------------------------------------------------
+    # Public Methods
+    # --------------------------------------------------------------------------
+
+    def run(self) -> Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]:
+        """
+        Executes the main processing loop synchronously in batches.
+        This method orchestrates the job processing by repeatedly determining
+        a batch of jobs (including retries), initiating their submission (if new)
+        and fetching, and then processing the results of that batch as they
+        complete. It blocks until all jobs are processed or have terminally failed.
+        Returns
+        -------
+        Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]
+            A tuple containing two lists:
+            1. A list of successfully fetched job results ('data' dictionaries).
+            2. A list of tuples for failed jobs, where each tuple contains
+               (job_index, error_message).
+        Raises
+        ------
+        ValueError
+             If `submit_job_async` is required but `job_queue_id` was not provided.
+        RuntimeError
+             If `fail_on_submit_error` is True and a batch submission or fetch
+             initiation error occurs.
+        """
+        # Directly call the core processing logic and return its result
+        return self._process_all_jobs()
+
+    def run_async(self) -> Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]:
+        """
+        Executes the main processing loop asynchronously in batches.
+        Submits the entire batch processing logic to the client's background
+        thread pool and returns a Future that will resolve with the final
+        results and failures once all jobs have been processed or have
+        terminally failed.
+        Returns
+        -------
+        Future[Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]
+            A future representing the asynchronous execution. Calling `.result()`
+            on this future will block until completion and return a tuple containing:
+            1. A list of successfully fetched job results ('data' dictionaries).
+            2. A list of tuples for failed jobs (job_index, error_message).
+            Any exceptions raised during processing (like RuntimeError due to
+            `fail_on_submit_error`) will be raised when `.result()` is called.
+        Raises
+        ------
+        AttributeError
+            If the client object was missing `_worker_pool` during init.
+        TypeError
+            If the client's `_worker_pool` was not a `ThreadPoolExecutor` during init.
+        """
+        # Submit the core processing logic method to the executor
+        # The _process_all_jobs method will run in a background thread managed by the executor
+        future = self._executor.submit(self._process_all_jobs)
+        return future
 
 
 class NvIngestClient:
