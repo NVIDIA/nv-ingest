@@ -1,30 +1,48 @@
-import sys
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+import os
 import time
 
 import pytest
 
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess_morpheus
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 
 
-@pytest.fixture
+@pytest.fixture(scope="session")
 def pipeline_process():
+    """
+    Singleton pytest fixture for starting the pipeline process once per test session.
+
+    Ensures the pipeline is only launched once, reused across all tests,
+    and properly shut down after the session ends.
+
+    Uses:
+    -----
+    - Sets environment to disable dynamic scaling.
+    - Starts the pipeline asynchronously (block=False).
+    - Waits briefly to allow pipeline warm-up.
+    - Ensures clean shutdown at session teardown.
+    """
     config = PipelineCreationSchema()
-    process = start_pipeline_subprocess_morpheus(
-        config,
-        stdout=sys.stdout,
-        stderr=sys.stderr,
-    )
 
-    time.sleep(5)
+    os.environ["INGEST_DISABLE_DYNAMIC_SCALING"] = "True"
 
-    if process.poll() is not None:
-        raise RuntimeError("Error running pipeline subprocess.")
-
-    yield process
-
-    process.kill()
-    process.wait()
+    pipeline = None
+    try:
+        pipeline = run_pipeline(config, block=False)
+        time.sleep(5)  # Allow some warm-up time
+        yield pipeline
+    except KeyboardInterrupt:
+        print("Keyboard interrupt received. Shutting down pipeline...")
+    except Exception as e:
+        print(f"Error running pipeline: {e}")
+    finally:
+        print("Shutting down pipeline...")
+        if pipeline:
+            pipeline.stop()
 
 
 @pytest.fixture
