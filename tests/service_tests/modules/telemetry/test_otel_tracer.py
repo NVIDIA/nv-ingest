@@ -2,14 +2,16 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import pytest
+
 from datetime import datetime
 
 # Skip test module if morpheus is not present
 pytest.importorskip("mrc")
 
-from morpheus.messages import ControlMessage
+from morpheus.messages import ControlMessage  # noqa: E402
 
-from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
+from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (  # noqa: E402
     extract_annotated_task_results,
     extract_timestamps_from_message,
 )
