@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 import uuid
 from datetime import datetime
@@ -88,6 +92,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
     """
     Process a job and return an IngestControlMessage.
     """
+
     control_message = IngestControlMessage()
     job_id = None
     try:

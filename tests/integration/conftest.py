@@ -4,13 +4,13 @@ import time
 import pytest
 
 from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess_morpheus
 
 
 @pytest.fixture
 def pipeline_process():
     config = PipelineCreationSchema()
-    process = start_pipeline_subprocess(
+    process = start_pipeline_subprocess_morpheus(
         config,
         stdout=sys.stdout,
         stderr=sys.stderr,

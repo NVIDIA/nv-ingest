@@ -227,6 +227,7 @@ services:
 
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.3.0
+    shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
       dockerfile: "./Dockerfile"
@@ -242,9 +243,12 @@ services:
       - "7670:7670"
       # Simple Broker
       - "7671:7671"
+      # Ray Dashboards
+      - "8265:8265"
     cap_add:
       - sys_nice
     environment:
+      - ARROW_DEFAULT_MEMORY_POOL=system
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
@@ -252,6 +256,8 @@ services:
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_EDGE_BUFFER_SIZE=64
+      - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
+      #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
@@ -264,10 +270,10 @@ services:
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       - MRC_IGNORE_NUMA_CHECK=1
       # build.nvidia.com hosted nemoretriever-parse
-      #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
+      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
-      - NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
+      #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
