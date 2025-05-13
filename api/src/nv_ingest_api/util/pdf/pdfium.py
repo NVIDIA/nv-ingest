@@ -394,7 +394,7 @@ def extract_image_like_objects_from_pdfium_page(page, merge=True, **kwargs):
     try:
         original_images, _ = pdfium_pages_to_numpy(
             [page],  # A batch with a single image.
-            render_dpi=72,  # dpi = 72 is equivalent to scale = 1.
+            render_dpi=300,  # dpi = 72 is equivalent to scale = 1.
             rotation=rotation,  # Without rotation, coordinates from page.get_pos() will not match.
         )
         image_bboxes = extract_merged_images_from_pdfium_page(page, merge=merge, **kwargs)

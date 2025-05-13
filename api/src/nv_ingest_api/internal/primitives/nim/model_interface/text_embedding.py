@@ -5,9 +5,9 @@
 from typing import Any, Dict, List, Optional, Tuple
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
+import numpy as np
 
 
-# Assume ModelInterface is defined elsewhere in the project.
 class EmbeddingModelInterface(ModelInterface):
     """
     An interface for handling inference with an embedding model endpoint.
@@ -22,20 +22,13 @@ class EmbeddingModelInterface(ModelInterface):
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Prepare input data for embedding inference. Ensures that a 'prompts' key is provided
-        and that its value is a list.
-
-        Raises
-        ------
-        KeyError
-            If the 'prompts' key is missing.
+        Prepare input data for embedding inference. Returns a list of strings representing the text to be embedded.
         """
         if "prompts" not in data:
             raise KeyError("Input data must include 'prompts'.")
-        # Ensure the prompts are in list format.
         if not isinstance(data["prompts"], list):
             data["prompts"] = [data["prompts"]]
-        return data
+        return {"prompts": data["prompts"]}
 
     def format_input(
         self, data: Dict[str, Any], protocol: str, max_batch_size: int, **kwargs
@@ -63,29 +56,32 @@ class EmbeddingModelInterface(ModelInterface):
               - payloads is a list of JSON-serializable payload dictionaries.
               - batch_data_list is a list of dictionaries containing the key "prompts" corresponding to each batch.
         """
-        if protocol != "http":
-            raise ValueError("EmbeddingModelInterface only supports HTTP protocol.")
-
-        prompts = data.get("prompts", [])
 
         def chunk_list(lst, chunk_size):
+            lst = lst["prompts"]
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
-        batches = chunk_list(prompts, max_batch_size)
-        payloads = []
-        batch_data_list = []
-        for batch in batches:
-            payload = {
-                "model": kwargs.get("model_name"),
-                "input": batch,
-                "encoding_format": kwargs.get("encoding_format", "float"),
-                "extra_body": {
-                    "input_type": kwargs.get("input_type", "query"),
+        batches = chunk_list(data, max_batch_size)
+        if protocol == "http":
+            payloads = []
+            batch_data_list = []
+            for batch in batches:
+                payload = {
+                    "model": kwargs.get("model_name"),
+                    "input": batch,
+                    "encoding_format": kwargs.get("encoding_format", "float"),
+                    "input_type": kwargs.get("input_type", "passage"),
                     "truncate": kwargs.get("truncate", "NONE"),
-                },
-            }
-            payloads.append(payload)
-            batch_data_list.append({"prompts": batch})
+                }
+                payloads.append(payload)
+                batch_data_list.append({"prompts": batch})
+        elif protocol == "grpc":
+            payloads = []
+            batch_data_list = []
+            for batch in batches:
+                text_np = np.array([[text.encode("utf-8")] for text in batch], dtype=np.object_)
+                payloads.append(text_np)
+                batch_data_list.append({"prompts": batch})
         return payloads, batch_data_list
 
     def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs) -> Any:
@@ -108,16 +104,17 @@ class EmbeddingModelInterface(ModelInterface):
         list
             A list of generated embeddings extracted from the response.
         """
-        if protocol != "http":
-            raise ValueError("EmbeddingModelInterface only supports HTTP protocol.")
-        if isinstance(response, dict):
-            embeddings = response.get("data")
-            if not embeddings:
-                raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
-            # Each item in embeddings is expected to have an 'embedding' field.
-            return [item.get("embedding", None) for item in embeddings]
-        else:
-            return [str(response)]
+        if protocol == "http":
+            if isinstance(response, dict):
+                embeddings = response.get("data")
+                if not embeddings:
+                    raise RuntimeError("Unexpected response format: 'data' key is missing or empty.")
+                # Each item in embeddings is expected to have an 'embedding' field.
+                return [item.get("embedding", None) for item in embeddings]
+            else:
+                return [str(response)]
+        elif protocol == "grpc":
+            return [res.flatten() for res in response]
 
     def process_inference_results(self, output: Any, protocol: str, **kwargs) -> Any:
         """
