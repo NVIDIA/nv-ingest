@@ -80,7 +80,7 @@ def collect_traces_from_zipkin(
     # Take the Dictionary of filenames -> trace_ids and build just a list of trace_ids to send to Zipkin
     trace_ids = []
     for filename in trace_id_map.keys():
-        trace_ids.append(trace_id_map[filename])
+        trace_ids.append(trace_id_map[filename].replace("-", ""))
 
     traces = asyncio.run(zipkin_client.get_metrics(trace_ids=trace_ids))
 

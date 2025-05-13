@@ -129,7 +129,7 @@ class NimClient:
         """
         if self.protocol == "grpc":
             logger.debug("Performing gRPC inference for a batch...")
-            response = self._grpc_infer(batch_input, model_name)
+            response = self._grpc_infer(batch_input, model_name, **kwargs)
             logger.debug("gRPC inference received response for a batch")
         elif self.protocol == "http":
             logger.debug("Performing HTTP inference for a batch...")
@@ -221,7 +221,7 @@ class NimClient:
 
         return all_results
 
-    def _grpc_infer(self, formatted_input: np.ndarray, model_name: str) -> np.ndarray:
+    def _grpc_infer(self, formatted_input: np.ndarray, model_name: str, **kwargs) -> np.ndarray:
         """
         Perform inference using the gRPC protocol.
 
@@ -238,16 +238,24 @@ class NimClient:
             The output of the model as a numpy array.
         """
 
-        input_tensors = [grpcclient.InferInput("input", formatted_input.shape, datatype="FP32")]
-        input_tensors[0].set_data_from_numpy(formatted_input)
+        parameters = kwargs.get("parameters", {})
+        output_names = kwargs.get("outputs", ["output"])
+        dtype = kwargs.get("dtype", "FP32")
+        input_name = kwargs.get("input_name", "input")
 
-        outputs = [grpcclient.InferRequestedOutput("output")]
-        response = self.client.infer(model_name=model_name, inputs=input_tensors, outputs=outputs)
+        input_tensors = grpcclient.InferInput(input_name, formatted_input.shape, datatype=dtype)
+        input_tensors.set_data_from_numpy(formatted_input)
+
+        outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
+        response = self.client.infer(
+            model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
+        )
         logger.debug(f"gRPC inference response: {response}")
 
-        # TODO(self.client.has_error(response)) => raise error
-
-        return response.as_numpy("output")
+        if len(outputs) == 1:
+            return response.as_numpy(outputs[0].name())
+        else:
+            return [response.as_numpy(output.name()) for output in outputs]
 
     def _http_infer(self, formatted_input: dict) -> dict:
         """
