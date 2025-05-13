@@ -16,10 +16,12 @@ def get_version():
     if not version:
         version = f"{datetime.datetime.now().strftime('%Y.%m.%d')}"
 
-    # Ensure the version is PEP 440 compatible
-    pep440_regex = r"^\d{4}\.\d{1,2}\.\d{1,2}$"
-    if not re.match(pep440_regex, version):
-        raise ValueError(f"Version '{version}' is not PEP 440 compatible")
+    # We only check this for dev, we assume for release the user knows what they are doing
+    if release_type != "release":
+        # Ensure the version is PEP 440 compatible
+        pep440_regex = r"^\d{4}\.\d{1,2}\.\d{1,2}$"
+        if not re.match(pep440_regex, version):
+            raise ValueError(f"Version '{version}' is not PEP 440 compatible")
 
     # Construct the final version string
     if release_type == "dev":
