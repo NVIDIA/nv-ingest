@@ -446,7 +446,7 @@ class RedisClient(MessageBrokerClientBase):
             current_time: float = time.monotonic()
             elapsed_time: float = current_time - start_time
             if elapsed_time > timeout:
-                logger.warning(f"Overall timeout ({timeout}s) exceeded for non-destructive fetch of '{channel_name}'.")
+                logger.debug(f"Overall timeout ({timeout}s) exceeded for non-destructive fetch of '{channel_name}'.")
                 if expected_count:
                     raise TimeoutError(
                         f"Timeout collecting fragments for {channel_name}. "

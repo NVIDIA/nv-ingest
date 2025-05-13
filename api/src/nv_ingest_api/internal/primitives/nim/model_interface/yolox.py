@@ -709,7 +709,13 @@ def postprocess_results(
             raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
 
         for box, score, label in zip(bboxes, scores, labels):
-            class_name = class_labels[int(label)]
+            # TODO(Devin): Sometimes we get back unexpected class labels?
+            if (label < 0) or (label >= len(class_labels)):
+                logger.warning(f"Invalid class label {label} found in postprocessing")
+                continue
+            else:
+                class_name = class_labels[int(label)]
+
             annotation_dict[class_name].append([round(float(x), 4) for x in np.concatenate((box, [score]))])
 
         out.append(annotation_dict)

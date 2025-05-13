@@ -251,7 +251,7 @@ class NimClient:
             model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
         )
         logger.debug(f"gRPC inference response: {response}")
-        # TODO(self.client.has_error(response)) => raise error
+
         if len(outputs) == 1:
             return response.as_numpy(outputs[0].name())
         else:
