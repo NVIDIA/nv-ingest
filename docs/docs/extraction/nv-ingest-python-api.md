@@ -17,7 +17,7 @@ The following table describes methods of the `Ingestor` class.
 | `files` | Add document paths for processing. |
 | `load` | Ensure files are locally accessible (downloads if needed). |
 | `extract` | Add an extraction task (text, tables, charts). |
-| `split` | Split documents into smaller sections for processing.
+| `split` | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
 | `embed` | Generate embeddings from extracted content. |
 | `caption` | Extract captions from images within the document. |
 | `ingest` | Submit jobs and retrieve results synchronously. |
@@ -65,6 +65,7 @@ You can customize the extraction behavior by using the following code.
 ```python
 ingestor = ingestor.extract(
     extract_text=True,  # Extract text
+    text_depth="page",
     extract_tables=False,  # Skip table extraction
     extract_charts=True,  # Extract charts
     extract_infographics=True,  # Extract infographic images
@@ -108,36 +109,6 @@ Use the following code.
 
 ```python
 result = ingestor.extract().ingest(show_progress=True)
-```
-
-
-
-## Split Documents
-
-Splitting, also known as chunking, breaks large documents or text into smaller, manageable sections to improve retrieval efficiency.
-Use the `split` method to chunk large documents into smaller sections before processing as shown in the following code.
-
-!!! note
-
-    The default tokenizer (`"meta-llama/Llama-3.2-1B"`) requires a [Hugging Face access token](https://huggingface.co/docs/hub/en/security-tokens). You must set `"hf_access_token": "hf_***"` to authenticate.
-
-```python
-ingestor = ingestor.split(
-    tokenizer="meta-llama/Llama-3.2-1B",
-    chunk_size=16,
-    chunk_overlap=1,
-    params={"split_source_types": ["text", "PDF"], "hf_access_token": "hf_***"}
-)
-```
-
-To use a different tokenizer, such as `"intfloat/e5-large-unsupervised"`, you can modify the `split` call as shown following.
-
-```python
-ingestor = ingestor.split(
-    tokenizer="intfloat/e5-large-unsupervised",
-    chunk_size=1024,
-    chunk_overlap=150
-)
 ```
 
 

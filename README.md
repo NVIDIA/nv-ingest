@@ -20,7 +20,7 @@ The following diagram shows the Nemo Retriever extraction pipeline.
 ## Table of Contents
 1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
-3. [Quickstart](#quickstart)
+3. [Quickstart](#library-mode-quickstart)
 4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
@@ -37,12 +37,16 @@ NV-Ingest is a library and microservice service that does the following:
 
 NV-Ingest supports the following file types:
 
-- `pdf`
+- `bmp`
 - `docx`
-- `pptx`
+- `html` (treated as text)
 - `jpeg`
+- `json` (treated as text)
+- `md` (treated as text)
+- `pdf`
 - `png`
-- `svg`
+- `pptx`
+- `sh` (treated as text)
 - `tiff`
 - `txt`
 
@@ -104,44 +108,46 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
 import logging, os, time, sys
-               
-from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
+
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
+    PipelineCreationSchema,
+    start_pipeline_subprocess_morpheus
+)
 from nv_ingest_client.client import Ingestor, NvIngestClient
-from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
-from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
 # Start the pipeline subprocess for library mode                       
-config = PipelineCreationSchema()                                                  
+config = PipelineCreationSchema()
 
-pipeline_process = start_pipeline_subprocess(config)
+pipeline_process = start_pipeline_subprocess_morpheus(config)
 # you can configure the subprocesses to log stderr to stdout for debugging purposes
-#pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
-                                                                          
+# pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
+
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
     message_client_port=7671,
     message_client_hostname="localhost"
 )
-                                            
+
 # gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
-sparse=False
+sparse = False
 
 # do content extraction from files                                
 ingestor = (
     Ingestor(client=client)
     .files("data/multimodal_test.pdf")
-    .extract(              
+    .extract(
         extract_text=True,
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
         paddle_output_format="markdown",
         extract_infographics=True,
-        #extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
+        # extract_method="nemoretriever_parse", #Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
     ).embed()
     .vdb_upload(
@@ -157,7 +163,7 @@ print("Starting ingestion..")
 t0 = time.time()
 results = ingestor.ingest(show_progress=True)
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Time taken: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
