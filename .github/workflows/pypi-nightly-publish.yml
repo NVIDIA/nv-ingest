@@ -72,6 +72,10 @@ jobs:
         run: |
           cd client && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
+      - name: Build nv-ingest wheel
+        run: |
+          cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
+
       - name: Publish wheels to Artifactory
         env:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
@@ -80,3 +84,4 @@ jobs:
         run: |
           twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
           && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/*
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/*
