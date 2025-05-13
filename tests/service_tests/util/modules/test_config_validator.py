@@ -8,6 +8,9 @@ from unittest.mock import patch
 import pytest
 from pydantic import BaseModel
 
+# Skip this entire file if morpheus is not present
+pytest.importorskip("mrc")
+
 from nv_ingest.framework.orchestration.morpheus.util.modules.config_validator import (
     fetch_and_validate_module_config,
 )

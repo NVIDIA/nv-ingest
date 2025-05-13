@@ -2,7 +2,12 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import pytest
 from datetime import datetime
+
+# Skip this entire file if morpheus is not present
+pytest.importorskip("mrc")
+pytest.importorskip("morpheus")
 
 from morpheus.messages import ControlMessage
 
