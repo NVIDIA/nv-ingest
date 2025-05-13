@@ -84,14 +84,14 @@ jobs:
       - name: Install Conda Packages & Dependencies
         shell: bash -el {0}
         run: |
-          conda create -y --name nvingest python=3.10
+          conda create -y --name nvingest python=3.12
           conda activate nvingest
           # Install from the downloaded local channel first
           conda install -y -c ./conda/output_conda_channel -c rapidsai -c conda-forge -c nvidia nv_ingest nv_ingest_api nv_ingest_client
           # Install other dependencies
           conda install -y -c conda-forge librosa
           # Install pip dependencies
-          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
+          $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient
 
       - name: Run integration test
         env:
