@@ -11,10 +11,10 @@ import socket
 import json
 import time
 import logging
-from typing import Optional
+from typing import Optional, Tuple, Union
 
 from nv_ingest_api.internal.schemas.message_brokers.response_schema import ResponseSchema
-from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase
+from nv_ingest_api.util.service_clients.client_base import MessageBrokerClientBase, FetchMode
 
 logger = logging.getLogger(__name__)
 
@@ -80,7 +80,11 @@ class SimpleClient(MessageBrokerClientBase):
         return self
 
     def submit_message(
-        self, queue_name: str, message: str, timeout: Optional[float] = None, for_nv_ingest: bool = False
+        self,
+        queue_name: str,
+        message: str,
+        timeout: Optional[Tuple[int, Union[float]]] = (100, None),
+        for_nv_ingest: bool = False,
     ) -> ResponseSchema:
         """
         Submit a message to the specified queue.
@@ -103,7 +107,12 @@ class SimpleClient(MessageBrokerClientBase):
         """
         return self._handle_push(queue_name, message, timeout, for_nv_ingest)
 
-    def fetch_message(self, queue_name: str, timeout: Optional[float] = None) -> ResponseSchema:
+    def fetch_message(
+        self,
+        queue_name: str,
+        timeout: Optional[Tuple[int, Union[float]]] = (100, None),
+        override_fetch_mode: FetchMode = None,
+    ) -> ResponseSchema:
         """
         Fetch a message from the specified queue.
 
@@ -119,6 +128,9 @@ class SimpleClient(MessageBrokerClientBase):
         ResponseSchema
             The response containing the fetched message.
         """
+        if isinstance(timeout, int):
+            timeout = (timeout, None)
+
         return self._handle_pop(queue_name, timeout)
 
     def ping(self) -> ResponseSchema:
@@ -151,7 +163,7 @@ class SimpleClient(MessageBrokerClientBase):
         return self._execute_simple_command(command)
 
     def _handle_push(
-        self, queue_name: str, message: str, timeout: Optional[float], for_nv_ingest: bool
+        self, queue_name: str, message: str, timeout: Optional[Tuple[int, Union[float, None]]], for_nv_ingest: bool
     ) -> ResponseSchema:
         """
         Push a message to the queue with optional timeout.
@@ -183,6 +195,7 @@ class SimpleClient(MessageBrokerClientBase):
         else:
             command = {"command": "PUSH", "queue_name": queue_name, "message": message}
 
+        timeout = int(timeout[0])
         if timeout is not None:
             command["timeout"] = timeout
 
@@ -237,7 +250,7 @@ class SimpleClient(MessageBrokerClientBase):
 
             time.sleep(0.5)  # Backoff delay before retry
 
-    def _handle_pop(self, queue_name: str, timeout: Optional[float]) -> ResponseSchema:
+    def _handle_pop(self, queue_name: str, timeout: Optional[Tuple[int, Union[float, None]]]) -> ResponseSchema:
         """
         Pop a message from the queue with optional timeout.
 
@@ -258,6 +271,9 @@ class SimpleClient(MessageBrokerClientBase):
             return ResponseSchema(response_code=1, response_reason="Invalid queue name.")
 
         command = {"command": "POP", "queue_name": queue_name}
+
+        timeout = int(timeout[0])
+
         if timeout is not None:
             command["timeout"] = timeout
 

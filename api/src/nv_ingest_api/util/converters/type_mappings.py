@@ -7,7 +7,7 @@ from nv_ingest_api.internal.enums.common import ContentTypeEnum
 DOC_TO_CONTENT_MAP = {
     DocumentTypeEnum.BMP: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.DOCX: ContentTypeEnum.STRUCTURED,
-    DocumentTypeEnum.HTML: ContentTypeEnum.STRUCTURED,
+    DocumentTypeEnum.HTML: ContentTypeEnum.TEXT,
     DocumentTypeEnum.JPEG: ContentTypeEnum.IMAGE,
     DocumentTypeEnum.MP3: ContentTypeEnum.AUDIO,
     DocumentTypeEnum.PDF: ContentTypeEnum.STRUCTURED,

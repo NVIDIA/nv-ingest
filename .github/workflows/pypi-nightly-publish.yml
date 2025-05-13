@@ -6,6 +6,21 @@ on:
     # Runs every day at 11:30PM (UTC)
     - cron: "30 23 * * *"
   workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Source branch to build wheel from'
+        required: true
+        default: 'main'
+      VERSION:
+        description: 'Version string for the release (e.g., 25.4.0)'
+        required: true
+      RELEASE_TYPE:
+        description: 'Whether the build is a nightly or release'
+        required: true
+        type: choice
+        options:
+          - dev
+          - release
 
 jobs:
   build:
@@ -13,8 +28,37 @@ jobs:
     container:
       image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
     steps:
+      - name: Determine source branch and release type to use for run
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Setting build source to ${{ github.event.inputs.environment }}"
+            echo "ENVIRONMENT=${{ github.event.inputs.environment }}" >> $GITHUB_ENV
+          else
+            echo "Setting build source to main. DEFAULT"
+            echo "ENVIRONMENT=main" >> $GITHUB_ENV
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Setting RELEASE_TYPE to ${{ github.event.inputs.RELEASE_TYPE }}"
+            echo "RELEASE_TYPE=${{ github.event.inputs.RELEASE_TYPE }}" >> $GITHUB_ENV
+          else
+            echo "Setting RELEASE_TYPE to dev. DEFAULT"
+            echo "RELEASE_TYPE=dev" >> $GITHUB_ENV
+          fi
+
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "Setting VERSION to ${{ github.event.inputs.VERSION }}"
+            echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
+          else
+
+            echo "Setting VERSION to $(date +'%y.%m.%d'). DEFAULT"
+            echo "VERSION=$(date +'%y.%m.%d')" >> $GITHUB_ENV
+          fi
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          ref: ${{ env.ENVIRONMENT }}
 
       - name: Install build dependencies
         run: |
@@ -22,11 +66,11 @@ jobs:
 
       - name: Build nv-ingest-api wheel
         run: |
-          cd api && python -m build
+          cd api && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
       - name: Build nv-ingest-client wheel
         run: |
-          cd client && python -m build
+          cd client && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
       - name: Publish wheels to Artifactory
         env:

@@ -23,13 +23,13 @@ kubectl create namespace ${NAMESPACE}
 - Install the Helm repos
 
 ```bash
-# Nvidia nemo-microservices NGC repository
+# NVIDIA nemo-microservices NGC repository
 helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM NGC repository
+# NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
 
-# Nvidia NIM baidu NGC repository
+# NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
@@ -52,7 +52,6 @@ helm upgrade \
 ```
 
 Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
-
 
 ```bash
 
@@ -146,6 +145,119 @@ nv-ingest-zipkin-77b5fc459f-ptsj6
 kubectl port-forward -n ${NAMESPACE} nv-ingest-674f6b7477-65nvm 7670:7670
 ```
 
+#### Enabling GPU time-slicing
+
+##### Configure the NVIDIA Operator
+
+The NVIDIA GPU operator is used to make the Kubernetes cluster aware of the GPUs.
+
+```bash
+helm install --wait --generate-name --repo https://helm.ngc.nvidia.com/nvidia \
+    --namespace gpu-operator --create-namespace \
+    gpu-operator --set driver.enabled=false
+```
+
+Once this is installed we can check the number of available GPUs. Your ouput might differ depending on the number
+of GPUs on your nodes.
+
+```console
+kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-worker[0-9]*$")) | {name: .metadata.name, "nvidia.com/gpu": .status.allocatable["nvidia.com/gpu"]}'
+{
+  "name": "one-worker-one-gpu-worker",
+  "nvidia.com/gpu": "1"
+}
+```
+
+##### Enable time-slicing
+
+With the NVIDIA GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
+
+```bash
+kubectl apply -n gpu-operator -f time-slicing/time-slicing-config.yaml
+```
+
+Then update the cluster policy to use this new config.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    -n gpu-operator --type merge \
+    -p '{"spec": {"devicePlugin": {"config": {"name": "time-slicing-config", "default": "any"}}}}'
+```
+
+Now if we check the number of GPUs available we should see `16`, but note this is still just GPU `0` which we exposed to the node, just sliced into `16`.
+
+```console
+kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-worker[0-9]*$")) | {name: .metadata.name, "nvidia.com/gpu": .status.allocatable["nvidia.com/gpu"]}'
+{
+  "name": "one-worker-one-gpu-worker",
+  "nvidia.com/gpu": "16"
+}
+```
+
+#### Enable NVIDIA GPU MIG
+
+[NVIDIA MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html) is a technology that enables a specific GPU to be sliced into individual virtual GPUs.
+This approach is considered better for production environments than time-slicing, because it isolates it process to a pre-allocated amount of compute and memory.
+
+Use this section to learn how to enable NVIDIA GPU MIG.
+
+##### Compatible GPUs
+
+For the list of GPUs that are compatible with MIG, refer to [the MIG support matrix](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-gpus).
+
+##### Understanding GPU profiles
+
+You can think of a GPU profile like a traditional virtual computer (vm), where each vm has a predefined set of compute and memory.
+
+Each NVIDIA GPU has different valid profiles. To see the profiles that are available for your GPU, run the following code.
+
+```bash
+nvidia-smi mig -lgip
+```
+
+The complete matrix of available profiles for your GPU appears. To understand the output, refer to [Supported MIG Profiles](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-mig-profiles).
+
+##### MIG Profile configuration
+
+An example MIG profile for a DGX H100 can be found in mig/nv-ingest-mig-config.yaml. This profile demonstrates mixed MIG modes across different GPUs
+on the DGX machine.
+You should edit the file for your scenario, and include only the profiles supported by your GPU.
+
+To install the MIG profile on the Kubernetes cluster, use the following code.
+
+```bash
+kubectl apply -n gpu-operator -f mig/nv-ingest-mig-config.yaml
+```
+
+After the configmap is installed, you can adjust the MIG profile to be `mixed`. We do this because our configuration
+file specifies different profiles across the GPUs. This is not required if you are not using a `mixed` MIG mode.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/mig/strategy", "value":"mixed"}]'
+```
+
+Patch the cluster so MIG manager uses the custom config map by using the following code.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/migManager/config/name", "value":"nv-ingest-mig-config"}]'
+```
+
+Label the nodes with which MIG profile you would like for them to use by using the following code.
+
+```bash
+kubectl label nodes <node-name> nvidia.com/mig.config=single-gpu-nv-ingest --overwrite
+```
+
+Validate that the configuration was applied by running the following code.
+
+```bash
+kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
+```
+
 #### Executing Jobs
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
@@ -163,198 +275,457 @@ nv-ingest-cli \
 
 You can also use NV-Ingest's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous nv-ingest-cli example.
 
-## Parameters
+## Requirements
 
-### Deployment parameters
+| Repository | Name | Version |
+|------------|------|---------|
+| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.2.0 |
+| alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
+| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.5.0 |
+| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.2.0 |
+| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.2.0 |
+| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.2.0 |
+| alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.5.0 |
+| alias:nvidia-nim | riva-nim | 1.0.0 |
+| https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
+| https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
+| https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
+| oci://registry-1.docker.io/bitnamicharts | redis | 19.1.3 |
 
-| Name                                | Description                                                                                                      | Value   |
-| ----------------------------------- | ---------------------------------------------------------------------------------------------------------------- | ------- |
-| `affinity`                          | [default: {}] Affinity settings for deployment.                                                                  | `{}`    |
-| `nodeSelector`                      | Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`                                  | `{}`    |
-| `logLevel`                          | Log level of NV-Ingest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL. | `DEBUG` |
-| `extraEnvVarsCM`                    | [default: ""] A Config map holding Environment variables to include in the NV-Ingest container                     | `""`    |
-| `extraEnvVarsSecret`                | [default: ""] A K8S Secret to map to Environment variables to include in the NV-Ingest container                   | `""`    |
-| `fullnameOverride`                  | [default: ""] A name to force the fullname of the NV-Ingest container to have, defaults to the Helm Release Name  | `""`    |
-| `nameOverride`                      | [default: ""] A name to base the objects created by this helm chart                                              | `""`    |
-| `image.repository`                  | NIM Image Repository                                                                                             | `""`    |
-| `image.tag`                         | Image tag or version                                                                                             | `""`    |
-| `image.pullPolicy`                  | Image pull policy                                                                                                | `""`    |
-| `podAnnotations`                    | Sets additional annotations on the main deployment pods                                                          | `{}`    |
-| `podLabels`                         | Specify extra labels to be add to on deployed pods.                                                              | `{}`    |
-| `podSecurityContext`                | Specify privilege and access control settings for pod                                                            |         |
-| `podSecurityContext.fsGroup`        | Specify file system owner group id.                                                                              | `1000`  |
-| `extraVolumes`                      | Adds arbitrary additional volumes to the deployment set definition                                               | `{}`    |
-| `extraVolumeMounts`                 | Specify volume mounts to the main container from `extraVolumes`                                                  | `{}`    |
-| `imagePullSecrets`                  | Specify list of secret names that are needed for the main container and any init containers.                     |         |
-| `containerSecurityContext`          | Sets privilege and access control settings for container (Only affects the main container, not pod-level)        | `{}`    |
-| `tolerations`                       | Specify tolerations for pod assignment. Allows the scheduler to schedule pods with matching taints.              |         |
-| `replicaCount`                      | The number of replicas for NV-Ingest when autoscaling is disabled                                                 | `1`     |
-| `resources.limits."nvidia.com/gpu"` | Specify number of GPUs to present to the running service.                                                        |         |
-| `resources.limits.memory`           | Specify limit for memory                                                                                         | `32Gi`  |
-| `resources.requests.memory`         | Specify request for memory                                                                                       | `16Gi`  |
-| `tmpDirSize`                        | Specify the amount of space to reserve for temporary storage                                                     | `8Gi`   |
+## Values
 
-### NIM Configuration
-
-Define additional values to the dependent NIM helm charts by updating the "yolox-nim", "cached-nim", "deplot-nim", and "paddleocr-nim"
-values. A sane set of configurations are already included in this value file and only the "image.repository" and "image.tag" fields are
-explicitly called out here.
-
-| Name                             | Description                                                     | Value |
-| -------------------------------- | --------------------------------------------------------------- | ----- |
-| `yolox-nim.image.repository`     | The repository to override the location of the YOLOX            |       |
-| `yolox-nim.image.tag`            | The tag override for YOLOX                                      |       |
-| `cached-nim.image.repository`    | The repository to override the location of the Cached Model NIM |       |
-| `cached-nim.image.tag`           | The tag override for Cached Model NIM                           |       |
-| `paddleocr-nim.image.repository` | The repository to override the location of the Paddle OCR NIM   |       |
-| `paddleocr-nim.image.tag`        | The tag override for Paddle OCR NIM                             |       |
-| `deplot-nim.image.repository`    | The repository to override the location of the Deplot NIM       |       |
-| `deplot-nim.image.tag`           | The tag override for Deplot NIM                                 |       |
-
-### Milvus Deployment parameters
-
-NV-Ingest uses Milvus and Minio to store extracted images from a document
-This chart by default sets up a Milvus standalone instance in the namespace using the
-Helm chart at found https://artifacthub.io/packages/helm/milvus-helm/milvus
-
-| Name             | Description                                                            | Value     |
-| ---------------- | ---------------------------------------------------------------------- | --------- |
-| `milvusDeployed` | Whether to deploy Milvus and Minio from this helm chart                | `true`    |
-| `milvus`         | Find values at https://artifacthub.io/packages/helm/milvus-helm/milvus | `sane {}` |
-
-### Autoscaling parameters
-
-Values used for creating a `Horizontal Pod Autoscaler`. If autoscaling is not enabled, the rest are ignored.
-NVIDIA recommends usage of the custom metrics API, commonly implemented with the prometheus-adapter.
-Standard metrics of CPU and memory are of limited use in scaling NIM.
-
-| Name                      | Description                               | Value   |
-| ------------------------- | ----------------------------------------- | ------- |
-| `autoscaling.enabled`     | Enables horizontal pod autoscaler.        | `false` |
-| `autoscaling.minReplicas` | Specify minimum replicas for autoscaling. | `1`     |
-| `autoscaling.maxReplicas` | Specify maximum replicas for autoscaling. | `100`   |
-| `autoscaling.metrics`     | Array of metrics for autoscaling.         | `[]`    |
-
-### Redis configurations
-
-Include any redis configuration that you'd like with the deployed Redis
-Find values at https://github.com/bitnami/charts/tree/main/bitnami/redis
-
-| Name            | Description                                                              | Value     |
-| --------------- | ------------------------------------------------------------------------ | --------- |
-| `redisDeployed` | Whether to deploy Redis from this helm chart                             | `true`    |
-| `redis`         | Find values at https://github.com/bitnami/charts/tree/main/bitnami/redis | `sane {}` |
-
-### Environment Variables
-
-Define environment variables as key/value dictionary pairs
-
-| Name                                   | Description                                                                                               | Value                      |
-| -------------------------------------- | --------------------------------------------------------------------------------------------------------- | -------------------------- |
-| `envVars`                              | Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value | `sane {}`                  |
-| `envVars.MESSAGE_CLIENT_HOST`          | Override this value if disabling Redis deployment in this chart.                                          | `"nv-ingest-redis-master"` |
-| `envVars.MESSAGE_CLIENT_PORT`          | Override this value if disabling Redis deployment in this chart.                                          | `"7670"`                   |
-| `envVars.NV_INGEST_DEFAULT_TIMEOUT_MS` | Override the Timeout of the NV-Ingest requests.                                                            | `"1234"`                   |
-| `envVars.MINIO_INTERNAL_ADDRESS`       | Override this to the cluster local DNS name of minio                                                      | `"nv-ingest-minio:9000"`   |
-| `envVars.MINIO_PUBLIC_ADDRESS`         | Override this to publicly routable minio address, default assumes port-forwarding                         | `"http://localhost:9000"`  |
-| `envVars.MINIO_BUCKET`                 | Override this for specific minio bucket to upload extracted images to                                     | `"nv-ingest"`              |
-
-### Open Telemetry
-
-Define environment variables as key/value dictionary pairs for configuring OTEL Deployments
-A sane set of parameters is set for the deployed version of OpenTelemetry with this Helm Chart.
-Override any values to the Open Telemetry helm chart by overriding the `open-telemetry` value.
-
-| Name                                      | Description                                                                                                                                                    | Value                                   |
-| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------- |
-| `otelEnabled`                             | Whether to enable OTEL collection                                                                                                                              | `true`                                  |
-| `otelDeployed`                            | Whether to deploy OTEL from this helm chart                                                                                                                    | `true`                                  |
-| `opentelemetry-collector`                 | Configures the opentelemetry helm chart - see https://github.com/open-telemetry/opentelemetry-helm-charts/blob/main/charts/opentelemetry-collector/values.yaml |                                         |
-| `otelEnvVars`                             | Adds arbitrary environment variables for configuring OTEL using key-value pairs, for example NAME: value                                                       | `sane {}`                               |
-| `otelEnvVars.OTEL_EXPORTER_OTLP_ENDPOINT` | Default deployment target for GRPC otel - Default "http://{{ .Release.Name }}-opentelemetry-collector:4317"                                                    |                                         |
-| `otelEnvVars.OTEL_SERVICE_NAME`           |                                                                                                                                                                | `"nemo-retrieval-service"`              |
-| `otelEnvVars.OTEL_TRACES_EXPORTER`        |                                                                                                                                                                | `"otlp"`                                |
-| `otelEnvVars.OTEL_METRICS_EXPORTER`       |                                                                                                                                                                | `"otlp"`                                |
-| `otelEnvVars.OTEL_LOGS_EXPORTER`          |                                                                                                                                                                | `"none"`                                |
-| `otelEnvVars.OTEL_PROPAGATORS`            |                                                                                                                                                                | `"tracecontext baggage"`                |
-| `otelEnvVars.OTEL_RESOURCE_ATTRIBUTES`    |                                                                                                                                                                | `"deployment.environment=$(NAMESPACE)"` |
-| `otelEnvVars.OTEL_PYTHON_EXCLUDED_URLS`   |                                                                                                                                                                | `"health"`                              |
-| `zipkinDeployed`                          | Whether to deploy Zipkin with OpenTelemetry from this helm chart                                                                                               | `true`                                  |
-
-### Ingress parameters
-
-| Name                                 | Description                                           | Value                    |
-| ------------------------------------ | ----------------------------------------------------- | ------------------------ |
-| `ingress.enabled`                    | Enables ingress.                                      | `false`                  |
-| `ingress.className`                  | Specify class name for Ingress.                       | `""`                     |
-| `ingress.annotations`                | Specify additional annotations for ingress.           | `{}`                     |
-| `ingress.hosts`                      | Specify list of hosts each containing lists of paths. |                          |
-| `ingress.hosts[0].host`              | Specify name of host.                                 | `chart-example.local`    |
-| `ingress.hosts[0].paths[0].path`     | Specify ingress path.                                 | `/`                      |
-| `ingress.hosts[0].paths[0].pathType` | Specify path type.                                    | `ImplementationSpecific` |
-| `ingress.tls`                        | Specify list of pairs of TLS `secretName` and hosts.  | `[]`                     |
-
-### Probe parameters
-
-| Name                                | Description                               | Value     |
-| ----------------------------------- | ----------------------------------------- | --------- |
-| `livenessProbe.enabled`             | Enables `livenessProbe``                  | `false`   |
-| `livenessProbe.httpGet.path`        | `LivenessProbe`` endpoint path            | `/health` |
-| `livenessProbe.httpGet.port`        | `LivenessProbe`` endpoint port            | `http`    |
-| `livenessProbe.initialDelaySeconds` | Initial delay seconds for `livenessProbe` | `120`     |
-| `livenessProbe.timeoutSeconds`      | Timeout seconds for `livenessProbe`       | `20`      |
-| `livenessProbe.periodSeconds`       | Period seconds for `livenessProbe`        | `10`      |
-| `livenessProbe.successThreshold`    | Success threshold for `livenessProbe`     | `1`       |
-| `livenessProbe.failureThreshold`    | Failure threshold for `livenessProbe`     | `20`      |
-
-### Probe parameters
-
-| Name                               | Description                              | Value     |
-| ---------------------------------- | ---------------------------------------- | --------- |
-| `startupProbe.enabled`             | Enables `startupProbe``                  | `false`   |
-| `startupProbe.httpGet.path`        | `StartupProbe`` endpoint path            | `/health` |
-| `startupProbe.httpGet.port`        | `StartupProbe`` endpoint port            | `http`    |
-| `startupProbe.initialDelaySeconds` | Initial delay seconds for `startupProbe` | `120`     |
-| `startupProbe.timeoutSeconds`      | Timeout seconds for `startupProbe`       | `10`      |
-| `startupProbe.periodSeconds`       | Period seconds for `startupProbe`        | `30`      |
-| `startupProbe.successThreshold`    | Success threshold for `startupProbe`     | `1`       |
-| `startupProbe.failureThreshold`    | Failure threshold for `startupProbe`     | `220`     |
-
-### Probe parameters
-
-| Name                                 | Description                                | Value     |
-| ------------------------------------ | ------------------------------------------ | --------- |
-| `readinessProbe.enabled`             | Enables `readinessProbe``                  | `false`   |
-| `readinessProbe.httpGet.path`        | `ReadinessProbe`` endpoint path            | `/health` |
-| `readinessProbe.httpGet.port`        | `ReadinessProbe`` endpoint port            | `http`    |
-| `readinessProbe.initialDelaySeconds` | Initial delay seconds for `readinessProbe` | `120`     |
-| `readinessProbe.timeoutSeconds`      | Timeout seconds for `readinessProbe`       | `10`      |
-| `readinessProbe.periodSeconds`       | Period seconds for `readinessProbe`        | `30`      |
-| `readinessProbe.successThreshold`    | Success threshold for `readinessProbe`     | `1`       |
-| `readinessProbe.failureThreshold`    | Failure threshold for `readinessProbe`     | `220`     |
-
-### Service parameters
-
-| Name                         | Description                                                                                                                               | Value       |
-| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| `service.type`               | Specifies the service type for the deployment.                                                                                            | `ClusterIP` |
-| `service.name`               | Overrides the default service name                                                                                                        | `""`        |
-| `service.port`               | Specifies the HTTP Port for the service.                                                                                                  | `8000`      |
-| `service.nodePort`           | Specifies an optional HTTP Node Port for the service.                                                                                     | `nil`       |
-| `service.annotations`        | Specify additional annotations to be added to service.                                                                                    | `{}`        |
-| `service.labels`             | Specifies additional labels to be added to service.                                                                                       | `{}`        |
-| `serviceAccount`             | Options to specify service account for the deployment.                                                                                    |             |
-| `serviceAccount.create`      | Specifies whether a service account should be created.                                                                                    | `true`      |
-| `serviceAccount.annotations` | Sets annotations to be added to the service account.                                                                                      | `{}`        |
-| `serviceAccount.name`        | Specifies the name of the service account to use. If it is not set and create is "true", a name is generated using a "fullname" template. | `""`        |
-
-### Secret Creation
-
-Manage the creation of secrets used by the helm chart
-
-| Name                       | Description                                            | Value   |
-| -------------------------- | ------------------------------------------------------ | ------- |
-| `ngcApiSecret.create`         | Specifies whether to create the ngc api secret         | `false` |
-| `ngcApiSecret.password`       | The password to use for the NGC Secret                 | `""`    |
-| `ngcImagePullSecret.create`   | Specifies whether to create the NVCR Image Pull secret | `false` |
-| `ngcImagePullSecret.password` | The password to use for the NVCR Image Pull Secret     | `""`    |
+| Key | Type | Default | Description |
+|-----|------|---------|-------------|
+| affinity | object | `{}` |  |
+| autoscaling.enabled | bool | `false` |  |
+| autoscaling.maxReplicas | int | `100` |  |
+| autoscaling.metrics | list | `[]` |  |
+| autoscaling.minReplicas | int | `1` |  |
+| containerArgs | list | `[]` |  |
+| containerSecurityContext | object | `{}` |  |
+| envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
+| envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
+| envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
+| envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
+| envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
+| envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
+| envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
+| envVars.MILVUS_ENDPOINT | string | `"http://nv-ingest-milvus:19530"` |  |
+| envVars.MINIO_BUCKET | string | `"nv-ingest"` |  |
+| envVars.MINIO_INTERNAL_ADDRESS | string | `"nv-ingest-minio:9000"` |  |
+| envVars.MINIO_PUBLIC_ADDRESS | string | `"http://localhost:9000"` |  |
+| envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
+| envVars.MRC_IGNORE_NUMA_CHECK | int | `1` |  |
+| envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"` |  |
+| envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
+| envVars.NV_INGEST_DEFAULT_TIMEOUT_MS | string | `"1234"` |  |
+| envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
+| envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
+| envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
+| envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.REDIS_MORPHEUS_TASK_QUEUE | string | `"morpheus_task_queue"` |  |
+| envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
+| envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
+| envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
+| envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
+| envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.YOLOX_GRPC_ENDPOINT | string | `"nemoretriever-page-elements-v2:8001"` |  |
+| envVars.YOLOX_HTTP_ENDPOINT | string | `"http://nemoretriever-page-elements-v2:8000/v1/infer"` |  |
+| envVars.YOLOX_INFER_PROTOCOL | string | `"grpc"` |  |
+| envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT | string | `"nemoretriever-table-structure-v1:8001"` |  |
+| envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT | string | `"http://nemoretriever-table-structure-v1:8000/v1/infer"` |  |
+| envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL | string | `"grpc"` |  |
+| extraEnvVarsCM | string | `""` |  |
+| extraEnvVarsSecret | string | `""` |  |
+| extraVolumeMounts | object | `{}` |  |
+| extraVolumes | object | `{}` |  |
+| fullnameOverride | string | `""` |  |
+| image.pullPolicy | string | `"IfNotPresent"` |  |
+| image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
+| image.tag | string | `"25.3.0"` |  |
+| imagePullSecrets[0].name | string | `"ngc-api"` |  |
+| imagePullSecrets[1].name | string | `"ngc-secret"` |  |
+| ingress.annotations | object | `{}` |  |
+| ingress.className | string | `""` |  |
+| ingress.enabled | bool | `false` |  |
+| ingress.hosts[0].host | string | `"chart-example.local"` |  |
+| ingress.hosts[0].paths[0].path | string | `"/"` |  |
+| ingress.hosts[0].paths[0].pathType | string | `"ImplementationSpecific"` |  |
+| ingress.tls | list | `[]` |  |
+| livenessProbe.enabled | bool | `false` |  |
+| livenessProbe.failureThreshold | int | `20` |  |
+| livenessProbe.httpGet.path | string | `"/v1/health/live"` |  |
+| livenessProbe.httpGet.port | string | `"http"` |  |
+| livenessProbe.initialDelaySeconds | int | `120` |  |
+| livenessProbe.periodSeconds | int | `10` |  |
+| livenessProbe.successThreshold | int | `1` |  |
+| livenessProbe.timeoutSeconds | int | `20` |  |
+| llama-32-nv-rerankqa-1b-v2.autoscaling.enabled | bool | `false` |  |
+| llama-32-nv-rerankqa-1b-v2.autoscaling.maxReplicas | int | `10` |  |
+| llama-32-nv-rerankqa-1b-v2.autoscaling.metrics | list | `[]` |  |
+| llama-32-nv-rerankqa-1b-v2.autoscaling.minReplicas | int | `1` |  |
+| llama-32-nv-rerankqa-1b-v2.customArgs | list | `[]` |  |
+| llama-32-nv-rerankqa-1b-v2.customCommand | list | `[]` |  |
+| llama-32-nv-rerankqa-1b-v2.deployed | bool | `false` |  |
+| llama-32-nv-rerankqa-1b-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| llama-32-nv-rerankqa-1b-v2.env[0].value | string | `"8000"` |  |
+| llama-32-nv-rerankqa-1b-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| llama-32-nv-rerankqa-1b-v2.env[1].value | string | `"1"` |  |
+| llama-32-nv-rerankqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2"` |  |
+| llama-32-nv-rerankqa-1b-v2.image.tag | string | `"1.3.1"` |  |
+| llama-32-nv-rerankqa-1b-v2.nim.grpcPort | int | `8001` |  |
+| llama-32-nv-rerankqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
+| llama-32-nv-rerankqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
+| llama-32-nv-rerankqa-1b-v2.podSecurityContext.runAsGroup | int | `1000` |  |
+| llama-32-nv-rerankqa-1b-v2.podSecurityContext.runAsUser | int | `1000` |  |
+| llama-32-nv-rerankqa-1b-v2.replicaCount | int | `1` |  |
+| llama-32-nv-rerankqa-1b-v2.service.grpcPort | int | `8001` |  |
+| llama-32-nv-rerankqa-1b-v2.service.httpPort | int | `8000` |  |
+| llama-32-nv-rerankqa-1b-v2.service.metricsPort | int | `0` |  |
+| llama-32-nv-rerankqa-1b-v2.service.name | string | `"llama-32-nv-rerankqa-1b-v2"` |  |
+| llama-32-nv-rerankqa-1b-v2.service.type | string | `"ClusterIP"` |  |
+| llama-32-nv-rerankqa-1b-v2.serviceAccount.create | bool | `false` |  |
+| llama-32-nv-rerankqa-1b-v2.serviceAccount.name | string | `""` |  |
+| llama-32-nv-rerankqa-1b-v2.statefuleSet.enabled | bool | `false` |  |
+| logLevel | string | `"DEFAULT"` |  |
+| milvus.cluster.enabled | bool | `false` |  |
+| milvus.etcd.persistence.storageClass | string | `nil` |  |
+| milvus.etcd.replicaCount | int | `1` |  |
+| milvus.image.all.repository | string | `"milvusdb/milvus"` |  |
+| milvus.image.all.tag | string | `"v2.5.3-gpu"` |  |
+| milvus.minio.bucketName | string | `"a-bucket"` |  |
+| milvus.minio.mode | string | `"standalone"` |  |
+| milvus.minio.persistence.size | string | `"50Gi"` |  |
+| milvus.minio.persistence.storageClass | string | `nil` |  |
+| milvus.pulsar.enabled | bool | `false` |  |
+| milvus.standalone.extraEnv[0].name | string | `"LOG_LEVEL"` |  |
+| milvus.standalone.extraEnv[0].value | string | `"error"` |  |
+| milvus.standalone.persistence.persistentVolumeClaim.size | string | `"50Gi"` |  |
+| milvus.standalone.persistence.persistentVolumeClaim.storageClass | string | `nil` |  |
+| milvus.standalone.resources.limits."nvidia.com/gpu" | int | `1` |  |
+| milvusDeployed | bool | `true` |  |
+| nameOverride | string | `""` |  |
+| nemo.groupID | string | `"1000"` |  |
+| nemo.userID | string | `"1000"` |  |
+| nemoretriever-graphic-elements-v1.autoscaling.enabled | bool | `false` |  |
+| nemoretriever-graphic-elements-v1.autoscaling.maxReplicas | int | `10` |  |
+| nemoretriever-graphic-elements-v1.autoscaling.metrics | list | `[]` |  |
+| nemoretriever-graphic-elements-v1.autoscaling.minReplicas | int | `1` |  |
+| nemoretriever-graphic-elements-v1.customArgs | list | `[]` |  |
+| nemoretriever-graphic-elements-v1.customCommand | list | `[]` |  |
+| nemoretriever-graphic-elements-v1.deployed | bool | `true` |  |
+| nemoretriever-graphic-elements-v1.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nemoretriever-graphic-elements-v1.env[0].value | string | `"8000"` |  |
+| nemoretriever-graphic-elements-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nemoretriever-graphic-elements-v1.env[1].value | string | `"1"` |  |
+| nemoretriever-graphic-elements-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1"` |  |
+| nemoretriever-graphic-elements-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-graphic-elements-v1.nim.grpcPort | int | `8001` |  |
+| nemoretriever-graphic-elements-v1.nim.logLevel | string | `"INFO"` |  |
+| nemoretriever-graphic-elements-v1.podSecurityContext.fsGroup | int | `1000` |  |
+| nemoretriever-graphic-elements-v1.podSecurityContext.runAsGroup | int | `1000` |  |
+| nemoretriever-graphic-elements-v1.podSecurityContext.runAsUser | int | `1000` |  |
+| nemoretriever-graphic-elements-v1.replicaCount | int | `1` |  |
+| nemoretriever-graphic-elements-v1.service.grpcPort | int | `8001` |  |
+| nemoretriever-graphic-elements-v1.service.httpPort | int | `8000` |  |
+| nemoretriever-graphic-elements-v1.service.metricsPort | int | `0` |  |
+| nemoretriever-graphic-elements-v1.service.name | string | `"nemoretriever-graphic-elements-v1"` |  |
+| nemoretriever-graphic-elements-v1.service.type | string | `"ClusterIP"` |  |
+| nemoretriever-graphic-elements-v1.serviceAccount.create | bool | `false` |  |
+| nemoretriever-graphic-elements-v1.serviceAccount.name | string | `""` |  |
+| nemoretriever-graphic-elements-v1.statefuleSet.enabled | bool | `false` |  |
+| nemoretriever-page-elements-v2.autoscaling.enabled | bool | `false` |  |
+| nemoretriever-page-elements-v2.autoscaling.maxReplicas | int | `10` |  |
+| nemoretriever-page-elements-v2.autoscaling.metrics | list | `[]` |  |
+| nemoretriever-page-elements-v2.autoscaling.minReplicas | int | `1` |  |
+| nemoretriever-page-elements-v2.deployed | bool | `true` |  |
+| nemoretriever-page-elements-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nemoretriever-page-elements-v2.env[0].value | string | `"8000"` |  |
+| nemoretriever-page-elements-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nemoretriever-page-elements-v2.env[1].value | string | `"1"` |  |
+| nemoretriever-page-elements-v2.image.pullPolicy | string | `"IfNotPresent"` |  |
+| nemoretriever-page-elements-v2.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v2"` |  |
+| nemoretriever-page-elements-v2.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-page-elements-v2.nim.grpcPort | int | `8001` |  |
+| nemoretriever-page-elements-v2.nim.logLevel | string | `"INFO"` |  |
+| nemoretriever-page-elements-v2.podSecurityContext.fsGroup | int | `1000` |  |
+| nemoretriever-page-elements-v2.podSecurityContext.runAsGroup | int | `1000` |  |
+| nemoretriever-page-elements-v2.podSecurityContext.runAsUser | int | `1000` |  |
+| nemoretriever-page-elements-v2.replicaCount | int | `1` |  |
+| nemoretriever-page-elements-v2.service.grpcPort | int | `8001` |  |
+| nemoretriever-page-elements-v2.service.httpPort | int | `8000` |  |
+| nemoretriever-page-elements-v2.service.metricsPort | int | `0` |  |
+| nemoretriever-page-elements-v2.service.name | string | `"nemoretriever-page-elements-v2"` |  |
+| nemoretriever-page-elements-v2.service.type | string | `"ClusterIP"` |  |
+| nemoretriever-page-elements-v2.serviceAccount.create | bool | `false` |  |
+| nemoretriever-page-elements-v2.serviceAccount.name | string | `""` |  |
+| nemoretriever-page-elements-v2.statefuleSet.enabled | bool | `false` |  |
+| nemoretriever-table-structure-v1.autoscaling.enabled | bool | `false` |  |
+| nemoretriever-table-structure-v1.autoscaling.maxReplicas | int | `10` |  |
+| nemoretriever-table-structure-v1.autoscaling.metrics | list | `[]` |  |
+| nemoretriever-table-structure-v1.autoscaling.minReplicas | int | `1` |  |
+| nemoretriever-table-structure-v1.customArgs | list | `[]` |  |
+| nemoretriever-table-structure-v1.customCommand | list | `[]` |  |
+| nemoretriever-table-structure-v1.deployed | bool | `true` |  |
+| nemoretriever-table-structure-v1.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nemoretriever-table-structure-v1.env[0].value | string | `"8000"` |  |
+| nemoretriever-table-structure-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nemoretriever-table-structure-v1.env[1].value | string | `"1"` |  |
+| nemoretriever-table-structure-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-table-structure-v1"` |  |
+| nemoretriever-table-structure-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-table-structure-v1.nim.grpcPort | int | `8001` |  |
+| nemoretriever-table-structure-v1.nim.logLevel | string | `"INFO"` |  |
+| nemoretriever-table-structure-v1.podSecurityContext.fsGroup | int | `1000` |  |
+| nemoretriever-table-structure-v1.podSecurityContext.runAsGroup | int | `1000` |  |
+| nemoretriever-table-structure-v1.podSecurityContext.runAsUser | int | `1000` |  |
+| nemoretriever-table-structure-v1.replicaCount | int | `1` |  |
+| nemoretriever-table-structure-v1.service.grpcPort | int | `8001` |  |
+| nemoretriever-table-structure-v1.service.httpPort | int | `8000` |  |
+| nemoretriever-table-structure-v1.service.metricsPort | int | `0` |  |
+| nemoretriever-table-structure-v1.service.name | string | `"nemoretriever-table-structure-v1"` |  |
+| nemoretriever-table-structure-v1.service.type | string | `"ClusterIP"` |  |
+| nemoretriever-table-structure-v1.serviceAccount.create | bool | `false` |  |
+| nemoretriever-table-structure-v1.serviceAccount.name | string | `""` |  |
+| nemoretriever-table-structure-v1.statefuleSet.enabled | bool | `false` |  |
+| ngcApiSecret.create | bool | `false` |  |
+| ngcApiSecret.password | string | `""` |  |
+| ngcImagePullSecret.create | bool | `false` |  |
+| ngcImagePullSecret.name | string | `"ngcImagePullSecret"` |  |
+| ngcImagePullSecret.password | string | `""` |  |
+| ngcImagePullSecret.registry | string | `"nvcr.io"` |  |
+| ngcImagePullSecret.username | string | `"$oauthtoken"` |  |
+| nim-vlm-image-captioning.customArgs | list | `[]` |  |
+| nim-vlm-image-captioning.customCommand | list | `[]` |  |
+| nim-vlm-image-captioning.deployed | bool | `false` |  |
+| nim-vlm-image-captioning.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nim-vlm-image-captioning.env[0].value | string | `"8000"` |  |
+| nim-vlm-image-captioning.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nim-vlm-image-captioning.env[1].value | string | `"1"` |  |
+| nim-vlm-image-captioning.fullnameOverride | string | `"nim-vlm-image-captioning"` |  |
+| nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"` |  |
+| nim-vlm-image-captioning.image.tag | string | `"latest"` |  |
+| nim-vlm-image-captioning.nim.grpcPort | int | `8001` |  |
+| nim-vlm-image-captioning.nim.logLevel | string | `"INFO"` |  |
+| nim-vlm-image-captioning.podSecurityContext.fsGroup | int | `1000` |  |
+| nim-vlm-image-captioning.podSecurityContext.runAsGroup | int | `1000` |  |
+| nim-vlm-image-captioning.podSecurityContext.runAsUser | int | `1000` |  |
+| nim-vlm-image-captioning.replicaCount | int | `1` |  |
+| nim-vlm-image-captioning.service.grpcPort | int | `8001` |  |
+| nim-vlm-image-captioning.service.httpPort | int | `8000` |  |
+| nim-vlm-image-captioning.service.metricsPort | int | `0` |  |
+| nim-vlm-image-captioning.service.name | string | `"nim-vlm-image-captioning"` |  |
+| nim-vlm-image-captioning.service.type | string | `"ClusterIP"` |  |
+| nim-vlm-text-extraction.customArgs | list | `[]` |  |
+| nim-vlm-text-extraction.customCommand | list | `[]` |  |
+| nim-vlm-text-extraction.deployed | bool | `false` |  |
+| nim-vlm-text-extraction.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nim-vlm-text-extraction.env[0].value | string | `"8000"` |  |
+| nim-vlm-text-extraction.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| nim-vlm-text-extraction.env[1].value | string | `"1"` |  |
+| nim-vlm-text-extraction.fullnameOverride | string | `"nim-vlm-text-extraction-nemoretriever-parse"` |  |
+| nim-vlm-text-extraction.image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nemoretriever-parse"` |  |
+| nim-vlm-text-extraction.image.tag | string | `"1.2.0ea"` |  |
+| nim-vlm-text-extraction.nim.grpcPort | int | `8001` |  |
+| nim-vlm-text-extraction.nim.logLevel | string | `"INFO"` |  |
+| nim-vlm-text-extraction.podSecurityContext.fsGroup | int | `1000` |  |
+| nim-vlm-text-extraction.podSecurityContext.runAsGroup | int | `1000` |  |
+| nim-vlm-text-extraction.podSecurityContext.runAsUser | int | `1000` |  |
+| nim-vlm-text-extraction.replicaCount | int | `1` |  |
+| nim-vlm-text-extraction.service.grpcPort | int | `8001` |  |
+| nim-vlm-text-extraction.service.httpPort | int | `8000` |  |
+| nim-vlm-text-extraction.service.metricsPort | int | `0` |  |
+| nim-vlm-text-extraction.service.name | string | `"nim-vlm-text-extraction-nemoretriever-parse"` |  |
+| nim-vlm-text-extraction.service.type | string | `"ClusterIP"` |  |
+| nodeSelector | object | `{}` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.autoscaling.enabled | bool | `false` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.autoscaling.maxReplicas | int | `10` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.autoscaling.metrics | list | `[]` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.autoscaling.minReplicas | int | `1` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.customArgs | list | `[]` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.customCommand | list | `[]` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.deployed | bool | `true` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[0].value | string | `"8000"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].name | string | `"NIM_TRITON_MAX_BATCH_SIZE"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].value | string | `"1"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag | string | `"1.5.0"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.grpcPort | int | `8001` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.podSecurityContext.runAsGroup | int | `1000` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.podSecurityContext.runAsUser | int | `1000` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.replicaCount | int | `1` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.service.grpcPort | int | `8001` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.service.httpPort | int | `8000` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.service.metricsPort | int | `0` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.service.name | string | `"nv-ingest-embedqa"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.service.type | string | `"ClusterIP"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.serviceAccount.create | bool | `false` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.serviceAccount.name | string | `""` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.statefuleSet.enabled | bool | `false` |  |
+| opentelemetry-collector.config.exporters.debug.verbosity | string | `"detailed"` |  |
+| opentelemetry-collector.config.exporters.zipkin.endpoint | string | `"http://nv-ingest-zipkin:9411/api/v2/spans"` |  |
+| opentelemetry-collector.config.extensions.health_check | object | `{}` |  |
+| opentelemetry-collector.config.extensions.zpages.endpoint | string | `"0.0.0.0:55679"` |  |
+| opentelemetry-collector.config.processors.batch | object | `{}` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].name | string | `"drop_noisy_traces_url"` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.enabled_regex_matching | bool | `true` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.invert_match | bool | `true` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.key | string | `"http.target"` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].string_attribute.values[0] | string | `"\\/health"` |  |
+| opentelemetry-collector.config.processors.tail_sampling.policies[0].type | string | `"string_attribute"` |  |
+| opentelemetry-collector.config.processors.transform.trace_statements[0].context | string | `"span"` |  |
+| opentelemetry-collector.config.processors.transform.trace_statements[0].statements[0] | string | `"set(status.code, 1) where attributes[\"http.path\"] == \"/health\""` |  |
+| opentelemetry-collector.config.processors.transform.trace_statements[0].statements[1] | string | `"replace_match(attributes[\"http.route\"], \"/v1\", attributes[\"http.target\"]) where attributes[\"http.target\"] != nil"` |  |
+| opentelemetry-collector.config.processors.transform.trace_statements[0].statements[2] | string | `"replace_pattern(name, \"/v1\", attributes[\"http.route\"]) where attributes[\"http.route\"] != nil"` |  |
+| opentelemetry-collector.config.processors.transform.trace_statements[0].statements[3] | string | `"set(name, Concat([name, attributes[\"http.url\"]], \" \")) where name == \"POST\""` |  |
+| opentelemetry-collector.config.receivers.otlp.protocols.grpc.endpoint | string | `"${env:MY_POD_IP}:4317"` |  |
+| opentelemetry-collector.config.receivers.otlp.protocols.http.cors.allowed_origins[0] | string | `"*"` |  |
+| opentelemetry-collector.config.service.extensions[0] | string | `"zpages"` |  |
+| opentelemetry-collector.config.service.extensions[1] | string | `"health_check"` |  |
+| opentelemetry-collector.config.service.pipelines.logs.exporters[0] | string | `"debug"` |  |
+| opentelemetry-collector.config.service.pipelines.logs.processors[0] | string | `"batch"` |  |
+| opentelemetry-collector.config.service.pipelines.logs.receivers[0] | string | `"otlp"` |  |
+| opentelemetry-collector.config.service.pipelines.metrics.exporters[0] | string | `"debug"` |  |
+| opentelemetry-collector.config.service.pipelines.metrics.processors[0] | string | `"batch"` |  |
+| opentelemetry-collector.config.service.pipelines.metrics.receivers[0] | string | `"otlp"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.exporters[0] | string | `"debug"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.exporters[1] | string | `"zipkin"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[0] | string | `"tail_sampling"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.processors[1] | string | `"transform"` |  |
+| opentelemetry-collector.config.service.pipelines.traces.receivers[0] | string | `"otlp"` |  |
+| opentelemetry-collector.mode | string | `"deployment"` |  |
+| otelDeployed | bool | `true` |  |
+| otelEnabled | bool | `true` |  |
+| otelEnvVars.OTEL_LOGS_EXPORTER | string | `"none"` |  |
+| otelEnvVars.OTEL_METRICS_EXPORTER | string | `"otlp"` |  |
+| otelEnvVars.OTEL_PROPAGATORS | string | `"tracecontext,baggage"` |  |
+| otelEnvVars.OTEL_PYTHON_EXCLUDED_URLS | string | `"health"` |  |
+| otelEnvVars.OTEL_RESOURCE_ATTRIBUTES | string | `"deployment.environment=$(NAMESPACE)"` |  |
+| otelEnvVars.OTEL_SERVICE_NAME | string | `"nemo-retrieval-service"` |  |
+| otelEnvVars.OTEL_TRACES_EXPORTER | string | `"otlp"` |  |
+| paddleocr-nim."paddleocr-nim.deployed" | bool | `true` |  |
+| paddleocr-nim.autoscaling.enabled | bool | `false` |  |
+| paddleocr-nim.autoscaling.maxReplicas | int | `10` |  |
+| paddleocr-nim.autoscaling.metrics | list | `[]` |  |
+| paddleocr-nim.autoscaling.minReplicas | int | `1` |  |
+| paddleocr-nim.customArgs | list | `[]` |  |
+| paddleocr-nim.customCommand | list | `[]` |  |
+| paddleocr-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| paddleocr-nim.env[0].value | string | `"8000"` |  |
+| paddleocr-nim.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| paddleocr-nim.env[1].value | string | `"1"` |  |
+| paddleocr-nim.fullnameOverride | string | `"nv-ingest-paddle"` |  |
+| paddleocr-nim.image.repository | string | `"nvcr.io/nim/baidu/paddleocr"` |  |
+| paddleocr-nim.image.tag | string | `"1.2.0"` |  |
+| paddleocr-nim.nim.grpcPort | int | `8001` |  |
+| paddleocr-nim.nim.logLevel | string | `"INFO"` |  |
+| paddleocr-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| paddleocr-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| paddleocr-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| paddleocr-nim.replicaCount | int | `1` |  |
+| paddleocr-nim.service.grpcPort | int | `8001` |  |
+| paddleocr-nim.service.httpPort | int | `8000` |  |
+| paddleocr-nim.service.metricsPort | int | `0` |  |
+| paddleocr-nim.service.name | string | `"nv-ingest-paddle"` |  |
+| paddleocr-nim.service.type | string | `"ClusterIP"` |  |
+| paddleocr-nim.serviceAccount.create | bool | `false` |  |
+| paddleocr-nim.serviceAccount.name | string | `""` |  |
+| paddleocr-nim.statefuleSet.enabled | bool | `false` |  |
+| podAnnotations."traffic.sidecar.istio.io/excludeOutboundPorts" | string | `"8007"` |  |
+| podLabels | object | `{}` |  |
+| podSecurityContext.fsGroup | int | `1000` |  |
+| readinessProbe.enabled | bool | `false` |  |
+| readinessProbe.failureThreshold | int | `220` |  |
+| readinessProbe.httpGet.path | string | `"/v1/health/ready"` |  |
+| readinessProbe.httpGet.port | string | `"http"` |  |
+| readinessProbe.initialDelaySeconds | int | `120` |  |
+| readinessProbe.periodSeconds | int | `30` |  |
+| readinessProbe.successThreshold | int | `1` |  |
+| readinessProbe.timeoutSeconds | int | `10` |  |
+| redis.auth.enabled | bool | `false` |  |
+| redis.master.configmap | string | `"protected-mode no"` |  |
+| redis.master.persistence.size | string | `"50Gi"` |  |
+| redis.master.resources.limits.memory | string | `"12Gi"` |  |
+| redis.master.resources.requests.memory | string | `"6Gi"` |  |
+| redis.replica.persistence.size | string | `"50Gi"` |  |
+| redis.replica.replicaCount | int | `1` |  |
+| redis.replica.resources.limits.memory | string | `"12Gi"` |  |
+| redis.replica.resources.requests.memory | string | `"6Gi"` |  |
+| redisDeployed | bool | `true` |  |
+| replicaCount | int | `1` |  |
+| resources.limits.cpu | string | `"48000m"` |  |
+| resources.limits.memory | string | `"200Gi"` |  |
+| resources.requests.cpu | string | `"24000m"` |  |
+| resources.requests.memory | string | `"24Gi"` |  |
+| riva-nim.autoscaling.enabled | bool | `false` |  |
+| riva-nim.autoscaling.maxReplicas | int | `10` |  |
+| riva-nim.autoscaling.metrics | list | `[]` |  |
+| riva-nim.autoscaling.minReplicas | int | `1` |  |
+| riva-nim.customArgs | list | `[]` |  |
+| riva-nim.customCommand | list | `[]` |  |
+| riva-nim.deployed | bool | `false` |  |
+| riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| riva-nim.env[0].value | string | `"8000"` |  |
+| riva-nim.fullnameOverride | string | `"riva-nim"` |  |
+| riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
+| riva-nim.image.tag | string | `"1.3.0"` |  |
+| riva-nim.nim.grpcPort | int | `8001` |  |
+| riva-nim.nim.logLevel | string | `"INFO"` |  |
+| riva-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| riva-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| riva-nim.replicaCount | int | `1` |  |
+| riva-nim.service.grpcPort | int | `8001` |  |
+| riva-nim.service.httpPort | int | `8000` |  |
+| riva-nim.service.metricsPort | int | `0` |  |
+| riva-nim.service.name | string | `"riva-nim"` |  |
+| riva-nim.service.type | string | `"ClusterIP"` |  |
+| riva-nim.serviceAccount.create | bool | `false` |  |
+| riva-nim.serviceAccount.name | string | `""` |  |
+| riva-nim.statefuleSet.enabled | bool | `false` |  |
+| service.annotations | object | `{}` |  |
+| service.labels | object | `{}` |  |
+| service.name | string | `""` |  |
+| service.nodePort | string | `nil` |  |
+| service.port | int | `7670` |  |
+| service.type | string | `"ClusterIP"` |  |
+| serviceAccount.annotations | object | `{}` |  |
+| serviceAccount.automount | bool | `true` |  |
+| serviceAccount.create | bool | `true` |  |
+| serviceAccount.name | string | `""` |  |
+| text-embedding-nim.autoscaling.enabled | bool | `false` |  |
+| text-embedding-nim.autoscaling.maxReplicas | int | `10` |  |
+| text-embedding-nim.autoscaling.metrics | list | `[]` |  |
+| text-embedding-nim.autoscaling.minReplicas | int | `1` |  |
+| text-embedding-nim.customArgs | list | `[]` |  |
+| text-embedding-nim.customCommand | list | `[]` |  |
+| text-embedding-nim.deployed | bool | `false` |  |
+| text-embedding-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
+| text-embedding-nim.env[0].value | string | `"8000"` |  |
+| text-embedding-nim.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
+| text-embedding-nim.env[1].value | string | `"1"` |  |
+| text-embedding-nim.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
+| text-embedding-nim.image.repository | string | `"nvcr.io/nim/nvidia/nv-embedqa-e5-v5"` |  |
+| text-embedding-nim.image.tag | string | `"1.5.0"` |  |
+| text-embedding-nim.nim.grpcPort | int | `8001` |  |
+| text-embedding-nim.nim.logLevel | string | `"INFO"` |  |
+| text-embedding-nim.podSecurityContext.fsGroup | int | `1000` |  |
+| text-embedding-nim.podSecurityContext.runAsGroup | int | `1000` |  |
+| text-embedding-nim.podSecurityContext.runAsUser | int | `1000` |  |
+| text-embedding-nim.replicaCount | int | `1` |  |
+| text-embedding-nim.service.grpcPort | int | `8001` |  |
+| text-embedding-nim.service.httpPort | int | `8000` |  |
+| text-embedding-nim.service.metricsPort | int | `0` |  |
+| text-embedding-nim.service.name | string | `"nv-ingest-embedqa"` |  |
+| text-embedding-nim.service.type | string | `"ClusterIP"` |  |
+| text-embedding-nim.serviceAccount.create | bool | `false` |  |
+| text-embedding-nim.serviceAccount.name | string | `""` |  |
+| text-embedding-nim.statefuleSet.enabled | bool | `false` |  |
+| tmpDirSize | string | `"50Gi"` |  |
+| tolerations | list | `[]` |  |
+| zipkinDeployed | bool | `true` |  |

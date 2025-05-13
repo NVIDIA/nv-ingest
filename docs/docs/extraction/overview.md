@@ -33,12 +33,16 @@ NeMo Retriever extraction is a microservice service that does the following:
 
 NeMo Retriever extraction supports the following file types:
 
-- `pdf`
+- `bmp`
 - `docx`
-- `pptx`
+- `html` (treated as text)
 - `jpeg`
+- `json` (treated as text)
+- `md` (treated as text)
+- `pdf`
 - `png`
-- `svg`
+- `pptx`
+- `sh` (treated as text)
 - `tiff`
 - `txt`
 
@@ -55,7 +59,8 @@ NeMo Retriever extraction does not do the following:
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Library Mode)](quickstart-library-mode.md)
-- [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
+- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

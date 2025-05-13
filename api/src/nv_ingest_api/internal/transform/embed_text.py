@@ -429,7 +429,11 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
-    _ = task_config  # Currently unused.
+
+    # Retrieve configuration values with fallback to transform_config defaults.
+    api_key: str = task_config.get("api_key") or transform_config.api_key
+    endpoint_url: str = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
+    model_name: str = task_config.get("model_name") or transform_config.embedding_model
 
     if execution_trace_log is None:
         execution_trace_log = {}
@@ -453,13 +457,16 @@ def transform_create_text_embeddings_internal(
 
     logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
 
+    def _content_type_getter(row):
+        return row["content_metadata"]["type"]
+
     # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
             logger.debug(f"Skipping unsupported content type: {content_type}")
             continue
 
-        content_mask = df_transform_ledger["document_type"] == content_type.value
+        content_mask = df_transform_ledger["metadata"].apply(_content_type_getter) == content_type.value
         if not content_mask.any():
             continue
 
@@ -475,9 +482,9 @@ def transform_create_text_embeddings_internal(
         filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size=transform_config.batch_size)
         content_embeddings = _async_runner(
             filtered_content_batches,
-            transform_config.api_key,
-            transform_config.embedding_nim_endpoint,
-            transform_config.embedding_model,
+            api_key,
+            endpoint_url,
+            model_name,
             transform_config.encoding_format,
             transform_config.input_type,
             transform_config.truncate,

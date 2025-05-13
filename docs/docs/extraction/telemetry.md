@@ -20,7 +20,7 @@ After OpenTelemetry and Zipkin are running, you can open your browser to explore
 
 After Prometheus is running, you can open your browser to explore metrics: 
 
-- **Docker** — Use http://$YOUR_DOCKER_HOST:9090/ziplin/
+- **Docker** — Use http://$YOUR_DOCKER_HOST:9090/zipkin/
 - **Kubernetes** — Use http://$YOUR_K8S_OTEL_POD:9090/zipkin/
 
 ![](images/prometheus.png)

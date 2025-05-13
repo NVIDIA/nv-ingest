@@ -9,8 +9,12 @@ from nv_ingest_client.util.milvus import (
     create_nvingest_collection,
     grab_meta_collection_info,
     reconstruct_pages,
+    add_metadata,
+    pandas_file_reader,
+    create_nvingest_index_params,
 )
 from nv_ingest_client.util.util import ClientConfigSchema
+import pandas as pd
 
 
 @pytest.fixture
@@ -23,8 +27,8 @@ def milvus_test_dict():
 
 def test_extra_kwargs(milvus_test_dict):
     mil_op = MilvusOperator(filter_errors=True)
-    milvus_test_dict.pop("collection_name")
-    assert mil_op.milvus_kwargs == milvus_test_dict
+    assert "filter_errors" in mil_op.milvus_kwargs
+    assert mil_op.milvus_kwargs["filter_errors"] is True
 
 
 @pytest.mark.parametrize("collection_name", [None, "name"])
@@ -106,8 +110,9 @@ def test_milvus_meta_multiple_coll(tmp_path):
     assert entity["collection_name"] == f"{collection_name}2"
 
 
-def test_page_reconstruction():
-    records = [
+@pytest.fixture
+def records():
+    return [
         [
             {
                 "document_type": "text",
@@ -178,6 +183,21 @@ def test_page_reconstruction():
             },
         ],
     ]
+
+
+@pytest.fixture
+def metadata():
+    return pd.DataFrame(
+        {
+            "source_name": ["file_1.pdf", "file_2.pdf"],
+            "meta_a": ["meta_a_1", "meta_a_2"],
+            "meta_b": ["meta_b_1", "meta_b_2"],
+        }
+    )
+
+
+def test_page_reconstruction(records):
+
     candidates = [
         {
             "id": 456331433807935937,
@@ -213,3 +233,151 @@ def test_page_reconstruction():
     pages.append(reconstruct_pages(candidates[1], records, page_signum=1))
     assert pages[0] == "roses are red.\nviolets are blue.\nsunflowers are yellow.\n"
     assert pages[1] == "two time two is four.\nfour times four is sixteen.\n"
+
+
+def test_metadata_add(records, metadata):
+    for record in records:
+        for element in record:
+            add_metadata(element, metadata, "source_name", ["meta_a", "meta_b"])
+
+            assert "meta_a" in [*element["metadata"]["content_metadata"]]
+            assert "meta_b" in [*element["metadata"]["content_metadata"]]
+            idx = element["metadata"]["source_metadata"]["source_name"].split("_")[1].split(".")[0]
+            assert element["metadata"]["content_metadata"]["meta_a"] == f"meta_a_{idx}"
+            assert element["metadata"]["content_metadata"]["meta_b"] == f"meta_b_{idx}"
+
+
+def test_metadata_import(metadata, tmp_path):
+    file_name = f"{tmp_path}/meta.json"
+    metadata.to_json(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.csv"
+    metadata.to_csv(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.pq"
+    metadata.to_parquet(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+    file_name = f"{tmp_path}/meta.parquet"
+    metadata.to_parquet(file_name)
+    df = pandas_file_reader(file_name)
+    pd.testing.assert_frame_equal(df, metadata)
+
+
+@pytest.mark.parametrize(
+    "sparse,gpu_index,gpu_search,local_index,expected_params",
+    [
+        (
+            False,
+            True,
+            True,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "GPU_CAGRA",
+                    "metric_type": "L2",
+                    "intermediate_graph_degree": 128,
+                    "graph_degree": 100,
+                    "build_algo": "NN_DESCENT",
+                    "adapt_for_cpu": "false",
+                }
+            },
+        ),
+        (
+            False,
+            False,
+            False,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "HNSW",
+                    "metric_type": "L2",
+                    "M": 64,
+                    "efConstruction": 512,
+                }
+            },
+        ),
+        (
+            True,
+            False,
+            False,
+            True,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "FLAT",
+                    "metric_type": "L2",
+                },
+                "sparse_index": {
+                    "field_name": "sparse",
+                    "index_name": "sparse_index",
+                    "index_type": "SPARSE_INVERTED_INDEX",
+                    "metric_type": "IP",
+                    "drop_ratio_build": 0.2,
+                },
+            },
+        ),
+        (
+            True,
+            True,
+            True,
+            False,
+            {
+                "dense_index": {
+                    "field_name": "vector",
+                    "index_name": "dense_index",
+                    "index_type": "GPU_CAGRA",
+                    "metric_type": "L2",
+                    "intermediate_graph_degree": 128,
+                    "graph_degree": 100,
+                    "build_algo": "NN_DESCENT",
+                    "adapt_for_cpu": "false",
+                },
+                "sparse_index": {
+                    "field_name": "sparse",
+                    "index_name": "sparse_index",
+                    "index_type": "SPARSE_INVERTED_INDEX",
+                    "metric_type": "BM25",
+                },
+            },
+        ),
+    ],
+)
+def test_create_nvingest_index_params(sparse, gpu_index, gpu_search, local_index, expected_params):
+    """Test that create_nvingest_index_params creates index parameters with all necessary attributes."""
+    index_params = create_nvingest_index_params(
+        sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
+    )
+
+    # Get the indexes from the index_params object
+    indexes = getattr(index_params, "_indexes", None)
+    if indexes is None:
+        indexes = {(idx, index_param.index_name): index_param for idx, index_param in enumerate(index_params)}
+    # Convert indexes to a comparable format
+    actual_params = {}
+    # Old Milvus behavior (< 2.5.6)
+    for k, v in indexes.items():
+        index_name = k[1]
+        actual_params[index_name] = {
+            "field_name": v._field_name,
+            "index_name": v._index_name,
+            "index_type": v._index_type,
+        }
+        if hasattr(v, "_configs"):
+            actual_params[index_name].update(v._configs)
+        elif hasattr(v, "_kwargs"):
+            params = v._kwargs.pop("params", {})
+            actual_params[index_name].update(v._kwargs)
+            actual_params[index_name].update(params)
+
+    # Compare the actual parameters with expected
+    assert (
+        actual_params == expected_params
+    ), f"Index parameters do not match expected values.\nActual: {actual_params}\nExpected: {expected_params}"

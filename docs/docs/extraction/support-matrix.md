@@ -38,5 +38,6 @@ For more information, refer to [Profile Information](quickstart-guide.md#profile
 ## Related Topics
 
 - [Prerequisites](prerequisites.md)
-- [Quickstart (Library Mode)](quickstart-library-mode.md)
-- [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)
+- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Helm](helm.md)

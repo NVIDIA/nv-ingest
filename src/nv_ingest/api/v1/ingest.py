@@ -22,6 +22,7 @@ from nv_ingest.framework.schemas.framework_message_wrapper_schema import Message
 from nv_ingest.framework.schemas.framework_processing_job_schema import ProcessingJob, ConversionStatus
 from nv_ingest.framework.util.service.impl.ingest.redis_ingest_service import RedisIngestService
 from nv_ingest.framework.util.service.meta.ingest.ingest_service_meta import IngestServiceMeta
+from nv_ingest_api.util.service_clients.client_base import FetchMode
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
 from nv_ingest_client.primitives.tasks.extract import ExtractTask
 from opentelemetry import trace
@@ -44,10 +45,17 @@ async def _get_ingest_service() -> IngestServiceMeta:
     Gather the appropriate Ingestion Service to use for the nv-ingest endpoint.
     """
     logger.debug("Creating RedisIngestService singleton for dependency injection")
-    return RedisIngestService.getInstance()
+    return RedisIngestService.get_instance()
 
 
 INGEST_SERVICE_T = Annotated[IngestServiceMeta, Depends(_get_ingest_service)]
+STATE_RETRIEVED_DESTRUCTIVE = "RETRIEVED_DESTRUCTIVE"
+STATE_RETRIEVED_NON_DESTRUCTIVE = "RETRIEVED_NON_DESTRUCTIVE"
+STATE_RETRIEVED_CACHED = "RETRIEVED_CACHED"
+STATE_FAILED = "FAILED"
+STATE_PROCESSING = "PROCESSING"
+STATE_SUBMITTED = "SUBMITTED"
+INTERMEDIATE_STATES = {STATE_PROCESSING, STATE_SUBMITTED}
 
 
 # POST /submit
@@ -127,26 +135,24 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
             span.set_attribute("http.url", str(request.url))
             span.add_event("Submitting file for processing")
 
-            # Inject the x-trace-id into the JobSpec definition so that OpenTelemetry
-            # will be able to trace across uvicorn -> morpheus
             current_trace_id = span.get_span_context().trace_id
-
-            job_spec_dict = json.loads(job_spec.payload)
-            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
-            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
-
             job_id = trace_id_to_uuid(current_trace_id)
 
-            # Submit the job async
-            await ingest_service.submit_job(updated_job_spec, job_id)
+            # Add trace_id to job_spec payload
+            job_spec_dict = json.loads(job_spec.payload)
+            if "tracing_options" not in job_spec_dict:
+                job_spec_dict["tracing_options"] = {"trace": True}
+            job_spec_dict["tracing_options"]["trace_id"] = str(current_trace_id)
+            updated_job_spec = MessageWrapper(payload=json.dumps(job_spec_dict))
 
             # Add another event
             span.add_event("Finished processing")
 
-            # We return the trace-id as a 32-byte hexidecimal string which is the format you would use when
-            # searching in Zipkin for traces. The original value is a 128 bit integer ...
-            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
+            # Submit the job to the pipeline task queue
+            await ingest_service.submit_job(updated_job_spec, job_id)  # Pass job_id used for state
+            await ingest_service.set_job_state(job_id, "SUBMITTED")
 
+            response.headers["x-trace-id"] = trace.format_trace_id(current_trace_id)
             return job_id
 
         except Exception as ex:
@@ -158,32 +164,131 @@ async def submit_job(request: Request, response: Response, job_spec: MessageWrap
 @router.get(
     "/fetch_job/{job_id}",
     responses={
-        200: {"description": "Job was successfully retrieved."},
-        202: {"description": "Job is not ready yet. Retry later."},
-        500: {"description": "Error encountered while fetching job."},
-        503: {"description": "Service unavailable."},
+        200: {"description": "Job result successfully retrieved."},
+        202: {"description": "Job is processing or result not yet available. Retry later."},
+        404: {"description": "Job ID not found or associated state has expired."},
+        410: {"description": "Job result existed but is now gone (expired or retrieved destructively/cached)."},
+        500: {"description": "Internal server error during fetch processing."},
+        503: {"description": "Job processing failed, or backend service temporarily unavailable preventing fetch."},
     },
     tags=["Ingestion"],
-    summary="Fetch a previously submitted job from the ingestion service by providing its job_id",
+    summary="Fetch the result of a previously submitted job by its job_id",
     operation_id="fetch_job",
 )
 async def fetch_job(job_id: str, ingest_service: INGEST_SERVICE_T):
+    """
+    Fetches job result, checking job state *before* attempting data retrieval.
+
+    Distinguishes non-existent jobs (404) from expired results (410).
+    """
     try:
-        job_response = await ingest_service.fetch_job(job_id)
-        json_bytes = json.dumps(job_response).encode("utf-8")
+        current_state = await ingest_service.get_job_state(job_id)
+        logger.debug(f"Initial state check for job {job_id}: {current_state}")
 
-        return StreamingResponse(iter([json_bytes]), media_type="application/json")
+        if current_state is None:
+            logger.warning(f"Job {job_id} not found or expired. Returning 404.")
+            raise HTTPException(status_code=404, detail="Job ID not found or state has expired.")
 
-    except TimeoutError:
-        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except RedisError:
-        raise HTTPException(status_code=202, detail="Job is not ready yet. Retry later.")
-    except ValueError as ve:
-        raise HTTPException(status_code=500, detail=f"Value error encountered: {str(ve)}")
-    except Exception as ex:
-        # Catch-all for other exceptions, returning a 500 Internal Server Error
-        logger.exception(f"Error fetching job: {str(ex)}")
-        raise HTTPException(status_code=500, detail=f"Nv-Ingest Internal Server Error: {str(ex)}")
+        if current_state == STATE_FAILED:
+            logger.error(f"Job {job_id} failed. Returning 503.")
+            raise HTTPException(status_code=503, detail="Job processing failed.")
+
+        if current_state == STATE_RETRIEVED_DESTRUCTIVE:
+            logger.warning(f"Job {job_id} was destructively retrieved. Returning 410.")
+            raise HTTPException(status_code=410, detail="Job result is gone (destructive read).")
+
+        if current_state in INTERMEDIATE_STATES or current_state in {
+            STATE_RETRIEVED_NON_DESTRUCTIVE,
+            STATE_RETRIEVED_CACHED,
+        }:
+            logger.debug(f"Attempting fetch for job {job_id} in state {current_state}.")
+
+            try:
+                job_response = await ingest_service.fetch_job(job_id)
+                logger.debug(f"Fetched result for job {job_id}.")
+
+                try:
+                    current_fetch_mode = await ingest_service.get_fetch_mode()
+                    if current_fetch_mode == FetchMode.DESTRUCTIVE:
+                        target_state = STATE_RETRIEVED_DESTRUCTIVE
+                    elif current_fetch_mode == FetchMode.NON_DESTRUCTIVE:
+                        target_state = STATE_RETRIEVED_NON_DESTRUCTIVE
+                    elif current_fetch_mode == FetchMode.CACHE_BEFORE_DELETE:
+                        target_state = STATE_RETRIEVED_CACHED
+                    else:
+                        target_state = "RETRIEVED_UNKNOWN"
+
+                    if target_state != "RETRIEVED_UNKNOWN":
+                        await ingest_service.set_job_state(job_id, target_state)
+                        logger.debug(f"Updated job {job_id} state to {target_state}.")
+                except Exception as state_err:
+                    logger.error(f"Failed to set job state for {job_id} after fetch: {state_err}")
+
+                try:
+                    json_bytes = json.dumps(job_response).encode("utf-8")
+                    return StreamingResponse(iter([json_bytes]), media_type="application/json", status_code=200)
+                except TypeError as json_err:
+                    logger.exception(f"Serialization error for job {job_id}: {json_err}")
+                    raise HTTPException(status_code=500, detail="Internal server error: Failed to serialize result.")
+
+            except (TimeoutError, RedisError, ConnectionError) as fetch_err:
+                fetch_err_type = type(fetch_err).__name__
+
+                if isinstance(fetch_err, TimeoutError):
+                    logger.info(
+                        f"Job {job_id} still processing (state: {current_state}), fetch attempt timed out cleanly."
+                    )
+                else:
+                    logger.warning(
+                        f"Backend error ({fetch_err_type}) during fetch attempt for job {job_id} "
+                        f"(state: {current_state}): {fetch_err}"
+                    )
+
+                if current_state == STATE_RETRIEVED_NON_DESTRUCTIVE:
+                    if isinstance(fetch_err, TimeoutError):
+                        raise HTTPException(status_code=410, detail="Job result is gone (TTL expired).")
+                    else:
+                        raise HTTPException(
+                            status_code=503, detail="Backend service unavailable preventing access to job result."
+                        )
+
+                elif current_state == STATE_RETRIEVED_CACHED:
+                    raise HTTPException(status_code=410, detail="Job result is gone (previously cached, fetch failed).")
+
+                elif current_state in INTERMEDIATE_STATES:
+                    if isinstance(fetch_err, TimeoutError):
+                        raise HTTPException(
+                            status_code=202, detail=f"Job is processing (state: {current_state}). Retry later."
+                        )
+                    else:
+                        raise HTTPException(
+                            status_code=503, detail="Backend service unavailable preventing fetch of job result."
+                        )
+
+                else:
+                    logger.error(f"Unexpected state '{current_state}' for job {job_id} after fetch failure.")
+                    raise HTTPException(
+                        status_code=500, detail="Internal server error: Unexpected job state after fetch failure."
+                    )
+
+            except ValueError as ve:
+                logger.exception(f"Value error fetching job {job_id}: {ve}")
+                raise HTTPException(status_code=500, detail="Internal server error processing job data.")
+
+            except Exception as fetch_ex:
+                logger.exception(f"Unexpected fetch error for job {job_id}: {fetch_ex}")
+                raise HTTPException(status_code=500, detail="Internal server error during data fetch.")
+
+        else:
+            logger.error(f"Unknown job state '{current_state}' for job {job_id}.")
+            raise HTTPException(status_code=500, detail=f"Internal server error: Unknown job state '{current_state}'.")
+
+    except HTTPException as http_exc:
+        raise http_exc  # Pass through cleanly
+
+    except Exception as initial_err:
+        logger.exception(f"Unexpected server error handling fetch for job {job_id}: {initial_err}")
+        raise HTTPException(status_code=500, detail="Internal server error during job fetch.")
 
 
 @router.post("/convert")

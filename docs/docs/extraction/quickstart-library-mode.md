@@ -1,4 +1,4 @@
-# Quickstart Guide for NeMo Retriever Extraction (Library Mode)
+# Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
 
 For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
 Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
@@ -69,37 +69,39 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 
 ```python
 import logging, os, time, sys
-               
-from nv_ingest.util.pipeline.pipeline_runners import start_pipeline_subprocess
+
+from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
+    PipelineCreationSchema,
+    start_pipeline_subprocess_morpheus
+)
 from nv_ingest_client.client import Ingestor, NvIngestClient
-from nv_ingest_client.message_clients.simple.simple_client import SimpleClient
-from nv_ingest.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
 # Start the pipeline subprocess for library mode                       
-config = PipelineCreationSchema()                                                  
+config = PipelineCreationSchema()
 
-pipeline_process = start_pipeline_subprocess(config)
+pipeline_process = start_pipeline_subprocess_morpheus(config)
 # you can configure the subprocesses to log stderr to stdout for debugging purposes
-#pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
-                                                                          
+# pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
+
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
     message_client_port=7671,
     message_client_hostname="localhost"
 )
-                                            
+
 # gpu_cagra accelerated indexing is not available in milvus-lite
 # Provide a filename for milvus_uri to use milvus-lite
 milvus_uri = "milvus.db"
 collection_name = "test"
-sparse=False
+sparse = False
 
 # do content extraction from files                                
 ingestor = (
     Ingestor(client=client)
     .files("data/multimodal_test.pdf")
-    .extract(              
+    .extract(
         extract_text=True,
         extract_tables=True,
         extract_charts=True,
@@ -107,7 +109,7 @@ ingestor = (
         paddle_output_format="markdown",
         extract_infographics=True,
         # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
-        #extract_method="nemoretriever_parse",
+        # extract_method="nemoretriever_parse",
         text_depth="page"
     ).embed()
     .vdb_upload(
@@ -123,7 +125,7 @@ print("Starting ingestion..")
 t0 = time.time()
 results = ingestor.ingest(show_progress=True)
 t1 = time.time()
-print(f"Time taken: {t1-t0} seconds")
+print(f"Time taken: {t1 - t0} seconds")
 
 # results blob is directly inspectable
 print(ingest_json_results_to_blob(results[0]))
@@ -239,6 +241,7 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
-- [Quickstart (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Docker Compose (Self-Hosted)](quickstart-guide.md)
+- [Deploy With Helm](helm.md)
 - [Notebooks](notebooks.md)
 - [Multimodal PDF Data Extraction](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag)

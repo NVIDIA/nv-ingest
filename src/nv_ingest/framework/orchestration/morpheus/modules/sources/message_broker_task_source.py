@@ -1,3 +1,7 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 import uuid
 from datetime import datetime
@@ -28,6 +32,7 @@ from nv_ingest_api.util.message_brokers.simple_message_broker.simple_client impo
 from nv_ingest_api.util.message_brokers.simple_message_broker.broker import SimpleMessageBroker
 from nv_ingest_api.internal.primitives.control_message_task import ControlMessageTask
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
+from nv_ingest_api.util.service_clients.client_base import FetchMode
 from nv_ingest_api.util.service_clients.redis.redis_client import RedisClient
 
 logger = logging.getLogger(__name__)
@@ -61,7 +66,7 @@ def fetch_and_process_messages(client, validated_config: MessageBrokerTaskSource
 
     while True:
         try:
-            job = client.fetch_message(validated_config.task_queue, 100)
+            job = client.fetch_message(validated_config.task_queue, 10, override_fetch_mode=FetchMode.DESTRUCTIVE)
             logger.debug(f"Received Job Type: {type(job)}")
             if isinstance(job, BaseModel):
                 if job.response_code != 0:
@@ -87,6 +92,7 @@ def process_message(job: Dict, ts_fetched: datetime) -> IngestControlMessage:
     """
     Process a job and return an IngestControlMessage.
     """
+
     control_message = IngestControlMessage()
     job_id = None
     try:

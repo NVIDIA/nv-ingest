@@ -1,0 +1,282 @@
+# NV-Ingest Helm Charts
+
+This documentation contains documentation for the NV-Ingest Helm charts.
+
+> [!Note]
+> NV-Ingest is also known as NVIDIA Ingest and NeMo Retriever extraction.
+
+## Prerequisites
+
+### Hardware/Software
+
+[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
+
+## Setup Environment
+
+- First create your namespace
+
+```bash
+NAMESPACE=nv-ingest
+kubectl create namespace ${NAMESPACE}
+```
+
+- Install the Helm repos
+
+```bash
+# NVIDIA nemo-microservices NGC repository
+helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microservices --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# NVIDIA NIM NGC repository
+helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# NVIDIA NIM baidu NGC repository
+helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
+```
+
+- Install the chart
+
+```bash
+helm upgrade \
+    --install \
+    nv-ingest \
+    https://helm.ngc.nvidia.com/nvidia/nemo-microservices/charts/nv-ingest-25.3.0.tgz \
+    -n ${NAMESPACE} \
+    --username '$oauthtoken' \
+    --password "${NGC_API_KEY}" \
+    --set ngcImagePullSecret.create=true \
+    --set ngcImagePullSecret.password="${NGC_API_KEY}" \
+    --set ngcApiSecret.create=true \
+    --set ngcApiSecret.password="${NGC_API_KEY}" \
+    --set image.repository="nvcr.io/nvidia/nemo-microservices/nv-ingest" \
+    --set image.tag="25.3.0"
+```
+
+Optionally you can create your own versions of the `Secrets` if you do not want to use the creation via the helm chart.
+
+
+```bash
+
+NAMESPACE=nv-ingest
+DOCKER_CONFIG='{"auths":{"nvcr.io":{"username":"$oauthtoken", "password":"'${NGC_API_KEY}'" }}}'
+echo -n $DOCKER_CONFIG | base64 -w0
+NGC_REGISTRY_PASSWORD=$(echo -n $DOCKER_CONFIG | base64 -w0 )
+
+kubectl apply -n ${NAMESPACE} -f - <<EOF
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ngcImagePullSecret
+type: kubernetes.io/dockerconfigjson
+data:
+  .dockerconfigjson: ${NGC_REGISTRY_PASSWORD}
+EOF
+kubectl create -n ${NAMESPACE} secret generic ngc-api --from-literal=NGC_API_KEY=${NGC_API_KEY}
+
+```
+
+Alternatively, you can also use an External Secret Store like Vault, the name of the secret name expected for the NGC API is `ngc-api` and the secret name expected for NVCR is `ngcImagePullSecret`.
+
+In this case, make sure to remove the following from your helm command:
+
+```bash
+    --set ngcImagePullSecret.create=true \
+    --set ngcImagePullSecret.password="${NGC_API_KEY}" \
+    --set ngcApiSecret.create=true \
+    --set ngcApiSecret.password="${NGC_API_KEY}" \
+```
+
+### Minikube Setup
+
+The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
+
+```bash
+minikube start --driver docker --container-runtime docker --gpus all --nodes 3
+minikube addons enable nvidia-gpu-device-plugin
+minikube addons enable storage-provisioner-rancher
+```
+
+## Usage
+
+Jobs are submitted via the `nv-ingest-cli` command.
+
+#### NV-Ingest CLI Installation
+
+NV-Ingest uses a HTTP/Rest based submission method. By default the Rest service runs on port `7670`.
+
+First, build `nv-ingest-cli` from the source to ensure you have the latest code.
+For more information, refer to [NV-Ingest-Client](https://github.com/NVIDIA/nv-ingest/tree/main/client).
+
+```bash
+# Just to be cautious we remove any existing installation
+pip uninstall nv-ingest-client
+
+pip install nv-ingest-client==25.3.0
+```
+
+#### Rest Endpoint Ingress
+
+It is recommended that the end user provide a mechanism for [`Ingress`](https://kubernetes.io/docs/concepts/services-networking/ingress/) for the NV-Ingest pod.
+You can test outside of your Kubernetes cluster by [port-forwarding](https://kubernetes.io/docs/reference/kubectl/generated/kubectl_port-forward/) the NV-Ingest pod to your local environment.
+
+Example:
+
+You can find the name of your NV-Ingest pod you want to forward traffic to by running:
+
+```bash
+kubectl get pods -n <namespace> --no-headers -o custom-columns=":metadata.name"
+kubectl port-forward -n ${NAMESPACE} service/nv-ingest 7670:7670
+```
+
+The output will look similar to the following but with different auto-generated sequences.
+
+```
+nv-ingest-674f6b7477-65nvm
+nv-ingest-etcd-0
+nv-ingest-milvus-standalone-7f8ffbdfbc-jpmlj
+nv-ingest-minio-7cbd4f5b9d-99hl4
+nv-ingest-opentelemetry-collector-7bb59d57fc-4h59q
+nv-ingest-paddle-0
+nv-ingest-redis-master-0
+nv-ingest-redis-replicas-0
+nv-ingest-yolox-0
+nv-ingest-zipkin-77b5fc459f-ptsj6
+```
+
+```bash
+kubectl port-forward -n ${NAMESPACE} nv-ingest-674f6b7477-65nvm 7670:7670
+```
+
+#### Enabling GPU time-slicing
+
+##### Configure the NVIDIA Operator
+
+The NVIDIA GPU operator is used to make the Kubernetes cluster aware of the GPUs.
+
+```bash
+helm install --wait --generate-name --repo https://helm.ngc.nvidia.com/nvidia \
+    --namespace gpu-operator --create-namespace \
+    gpu-operator --set driver.enabled=false
+```
+
+Once this is installed we can check the number of available GPUs. Your ouput might differ depending on the number
+of GPUs on your nodes.
+
+```console
+kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-worker[0-9]*$")) | {name: .metadata.name, "nvidia.com/gpu": .status.allocatable["nvidia.com/gpu"]}'
+{
+  "name": "one-worker-one-gpu-worker",
+  "nvidia.com/gpu": "1"
+}
+```
+
+##### Enable time-slicing
+
+With the NVIDIA GPU operator properly installed we want to enable time-slicing to allow more than one Pod to use this GPU. We do this by creating a time-slicing config file using [`time-slicing-config.yaml`](time-slicing/time-slicing-config.yaml).
+
+```bash
+kubectl apply -n gpu-operator -f time-slicing/time-slicing-config.yaml
+```
+
+Then update the cluster policy to use this new config.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    -n gpu-operator --type merge \
+    -p '{"spec": {"devicePlugin": {"config": {"name": "time-slicing-config", "default": "any"}}}}'
+```
+
+
+Now if we check the number of GPUs available we should see `16`, but note this is still just GPU `0` which we exposed to the node, just sliced into `16`.
+
+```console
+kubectl get nodes -o json | jq -r '.items[] | select(.metadata.name | test("-worker[0-9]*$")) | {name: .metadata.name, "nvidia.com/gpu": .status.allocatable["nvidia.com/gpu"]}'
+{
+  "name": "one-worker-one-gpu-worker",
+  "nvidia.com/gpu": "16"
+}
+```
+
+#### Enable NVIDIA GPU MIG
+
+[NVIDIA MIG](https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/latest/gpu-operator-mig.html) is a technology that enables a specific GPU to be sliced into individual virtual GPUs.
+This approach is considered better for production environments than time-slicing, because it isolates it process to a pre-allocated amount of compute and memory.
+
+Use this section to learn how to enable NVIDIA GPU MIG.
+
+##### Compatible GPUs
+
+For the list of GPUs that are compatible with MIG, refer to [the MIG support matrix](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-gpus).
+
+##### Understanding GPU profiles
+
+You can think of a GPU profile like a traditional virtual computer (vm), where each vm has a predefined set of compute and memory.
+
+Each NVIDIA GPU has different valid profiles. To see the profiles that are available for your GPU, run the following code.
+
+```bash
+nvidia-smi mig -lgip
+```
+
+The complete matrix of available profiles for your GPU appears. To understand the output, refer to [Supported MIG Profiles](https://docs.nvidia.com/datacenter/tesla/mig-user-guide/#supported-mig-profiles).
+
+##### MIG Profile configuration
+
+An example MIG profile for a DGX H100 can be found in mig/nv-ingest-mig-config.yaml. This profile demonstrates mixed MIG modes across different GPUs
+on the DGX machine.
+You should edit the file for your scenario, and include only the profiles supported by your GPU.
+
+To install the MIG profile on the Kubernetes cluster, use the following code.
+
+```bash
+kubectl apply -n gpu-operator -f mig/nv-ingest-mig-config.yaml
+```
+
+After the configmap is installed, you can adjust the MIG profile to be `mixed`. We do this because our configuration
+file specifies different profiles across the GPUs. This is not required if you are not using a `mixed` MIG mode.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/mig/strategy", "value":"mixed"}]'
+```
+
+Patch the cluster so MIG manager uses the custom config map by using the following code.
+
+```bash
+kubectl patch clusterpolicies.nvidia.com/cluster-policy \
+    --type='json' \
+    -p='[{"op":"replace", "path":"/spec/migManager/config/name", "value":"nv-ingest-mig-config"}]'
+```
+
+Label the nodes with which MIG profile you would like for them to use by using the following code.
+
+```bash
+kubectl label nodes <node-name> nvidia.com/mig.config=single-gpu-nv-ingest --overwrite
+```
+
+Validate that the configuration was applied by running the following code.
+
+```bash
+kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
+```
+
+#### Executing Jobs
+
+Here is a sample invocation of a PDF extraction task using the port forward above:
+
+```bash
+mkdir -p ./processed_docs
+
+nv-ingest-cli \
+  --doc /path/to/your/unique.pdf \
+  --output_directory ./processed_docs \
+  --task='extract:{"document_type": "pdf", "extract_text": true, "extract_images": true, "extract_tables": true, "extract_charts": true}' \
+  --client_host=localhost \
+  --client_port=7670
+```
+
+You can also use NV-Ingest's Python client API to interact with the service running in the cluster. Use the same host and port as in the previous nv-ingest-cli example.
+
+{{ template "chart.requirementsSection" . }}
+
+{{ template "chart.valuesSection" . }}

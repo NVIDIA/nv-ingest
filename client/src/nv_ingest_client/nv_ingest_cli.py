@@ -71,7 +71,7 @@ logger = logging.getLogger(__name__)
     callback=click_validate_file_exists,
 )
 @click.option("--client_host", default="localhost", help="DNS name or URL for the endpoint.")
-@click.option("--client_port", default=6397, type=int, help="Port for the client endpoint.")
+@click.option("--client_port", default=7670, type=int, help="Port for the client endpoint.")
 @click.option("--client_kwargs", help="Additional arguments to pass to the client.", default="{}")
 @click.option(
     "--client_type",
@@ -81,13 +81,6 @@ logger = logging.getLogger(__name__)
 )
 @click.option(
     "--concurrency_n", default=10, show_default=True, type=int, help="Number of inflight jobs to maintain at one time."
-)
-@click.option(
-    "--document_processing_timeout",
-    default=10,
-    show_default=True,
-    type=int,
-    help="Timeout when waiting for a document to be processed.",
 )
 @click.option("--dry_run", is_flag=True, help="Perform a dry run without executing actions.")
 @click.option("--fail_on_error", is_flag=True, help="Fail on error.")
@@ -209,7 +202,6 @@ def main(
     concurrency_n: int,
     dataset: str,
     doc: List[str],
-    document_processing_timeout: int,
     dry_run: bool,
     fail_on_error: bool,
     log_level: str,
@@ -276,7 +268,6 @@ def main(
                 tasks=task,
                 output_directory=output_directory,
                 batch_size=batch_size,
-                timeout=document_processing_timeout,
                 fail_on_error=fail_on_error,
                 save_images_separately=save_images_separately,
             )

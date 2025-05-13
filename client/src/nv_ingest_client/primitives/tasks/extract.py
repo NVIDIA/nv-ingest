@@ -36,7 +36,7 @@ _DEFAULT_EXTRACTOR_MAP = {
     "csv": "pandas",
     "docx": "python_docx",
     "excel": "openpyxl",
-    "html": "beautifulsoup",
+    "html": "txt",
     "jpeg": "image",
     "jpg": "image",
     "parquet": "pandas",
@@ -44,7 +44,9 @@ _DEFAULT_EXTRACTOR_MAP = {
     "png": "image",
     "pptx": "python_pptx",
     "svg": "image",
+    "text": "txt",
     "tiff": "image",
+    "txt": "txt",
     "xml": "lxml",
     "mp3": "audio",
     "wav": "audio",
@@ -68,16 +70,21 @@ _Type_Extract_Method_Image = Literal["image"]
 
 _Type_Extract_Method_Audio = Literal["audio"]
 
+_Type_Extract_Method_Text = Literal["txt"]
+
 _Type_Extract_Method_Map = {
     "bmp": get_args(_Type_Extract_Method_Image),
     "docx": get_args(_Type_Extract_Method_DOCX),
+    "html": get_args(_Type_Extract_Method_Text),
     "jpeg": get_args(_Type_Extract_Method_Image),
     "jpg": get_args(_Type_Extract_Method_Image),
     "pdf": get_args(_Type_Extract_Method_PDF),
     "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
     # "svg": get_args(_Type_Extract_Method_Image),
+    "text": get_args(_Type_Extract_Method_Text),
     "tiff": get_args(_Type_Extract_Method_Image),
+    "txt": get_args(_Type_Extract_Method_Text),
     "mp3": get_args(_Type_Extract_Method_Audio),
     "wav": get_args(_Type_Extract_Method_Audio),
 }
@@ -143,6 +150,11 @@ class ExtractTaskSchema(BaseModel):
     @field_validator("extract_method")
     def extract_method_must_be_valid(cls, v, values, **kwargs):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
+
+        # Skip validation for txt and html types since it does not have an extract stage.
+        if document_type in ["txt", "text", "html"]:
+            return
+
         valid_methods = set(_Type_Extract_Method_Map[document_type])
         if v not in valid_methods:
             raise ValueError(f"extract_method must be one of {valid_methods}")
