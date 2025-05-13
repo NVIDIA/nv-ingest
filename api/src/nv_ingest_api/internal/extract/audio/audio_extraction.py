@@ -73,6 +73,8 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
     metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
     row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
 
+    logger.error(f"Row metadata updated with audio metadata: {row}")
+
     return metadata
 
 

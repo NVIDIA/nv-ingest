@@ -48,7 +48,7 @@ class PPTXExtractorStage(RayActorStage):
             raise
 
     @traceable("pptx_extractor")
-    @filter_by_task(required_tasks=["pptx-extract"])
+    @filter_by_task(required_tasks=[("extract", {"document_type": "pptx"})])
     @nv_ingest_node_failure_try_except(annotation_id="pptx_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
@@ -69,7 +69,7 @@ class PPTXExtractorStage(RayActorStage):
         df_ledger = control_message.payload()
 
         # Remove the "pptx-extract" task from the message to obtain task-specific configuration.
-        task_config = remove_task_by_type(control_message, "pptx-extract")
+        task_config = remove_task_by_type(control_message, "extract")
 
         new_df, extraction_info = extract_primitives_from_pptx_internal(
             df_extraction_ledger=df_ledger,
