@@ -3,8 +3,8 @@ import time
 
 import pytest
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import start_pipeline_subprocess_morpheus
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import start_pipeline_subprocess_morpheus
 
 
 @pytest.fixture
