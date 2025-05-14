@@ -26,7 +26,7 @@ jobs:
   build:
     runs-on: linux-large-disk
     container:
-      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     steps:
       - name: Determine source branch and release type to use for run
         run: |

@@ -11,6 +11,9 @@ import pandas as pd
 import pytest
 from pydantic import BaseModel
 
+# Skip entire test module if morpheus is not present.
+pytest.importorskip("mrc")
+
 from nv_ingest.framework.orchestration.morpheus.modules.sources.message_broker_task_source import (
     process_message,
     fetch_and_process_messages,

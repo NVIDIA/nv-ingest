@@ -581,7 +581,7 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
     task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
 
     client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
-    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "morpheus_task_queue")
+    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "ingest_task_queue")
 
     source_config = MessageBrokerTaskSourceConfig(
         **{

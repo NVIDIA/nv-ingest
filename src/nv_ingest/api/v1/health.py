@@ -51,7 +51,7 @@ async def get_live_state() -> dict:
 async def get_ready_state() -> dict:
     # "Ready" to use means this.
     # 1. nv-ingest FastAPI is live, check you are here nothing to do.
-    # 2. Morpheus pipeline is up and running
+    # 2. Ray pipeline is up and running
     # 3. NIMs that are configured by the service are reporting "ready"
     # After all of those are "ready" this service returns "ready" as well
     # Otherwise a HTTP 503 Service not Available response is returned.
@@ -64,7 +64,7 @@ async def get_ready_state() -> dict:
     # readiness endpoint which is really bad. I think it safe
     # for now to assume that if nv-ingest is running so is
     # the pipeline.
-    morpheus_pipeline_ready = True
+    pipeline_ready = True
 
     # Components that the service should check for "ready"
     # Possible options are
@@ -95,7 +95,7 @@ async def get_ready_state() -> dict:
                 endpoint_nim_name_map[endpoint_url] = nim_name
 
         # Check the endpoints for their readiness
-        ready_statuses = {"ingest_ready": ingest_ready, "morpheus_pipeline_ready": morpheus_pipeline_ready}
+        ready_statuses = {"ingest_ready": ingest_ready, "pipeline_ready": pipeline_ready}
         ready_to_work = True  # consider nv-ingest ready until an endpoint proves otherwise
         for endpoint, nim_name in endpoint_nim_name_map.items():
             endpoint_ready = is_ready(endpoint, "/v1/health/ready")

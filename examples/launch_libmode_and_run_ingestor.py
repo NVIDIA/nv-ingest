@@ -9,7 +9,7 @@ from nv_ingest_client.client import Ingestor
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -18,7 +18,7 @@ local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
 
-configure_local_logging(logger, local_log_level)
+configure_local_logging(local_log_level)
 
 
 def run_ingestor():
