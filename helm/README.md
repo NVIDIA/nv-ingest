@@ -279,13 +279,14 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 
 | Repository | Name | Version |
 |------------|------|---------|
-| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.2.0 |
+| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.3.0 |
 | alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
-| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.5.0 |
-| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.2.0 |
-| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.2.0 |
-| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.2.0 |
-| alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.5.0 |
+| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.6.0 |
+| alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.5.0 |
+| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.3.0 |
+| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.3.0 |
+| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.3.0 |
+| alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
