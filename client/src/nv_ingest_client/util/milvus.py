@@ -39,6 +39,8 @@ from nv_ingest_client.vdb.adt_vdb import VDB
 
 logger = logging.getLogger(__name__)
 
+CONSISTENCY = CONSISTENCY_STRONG
+
 pandas_reader_map = {
     ".json": pd.read_json,
     ".csv": partial(pd.read_csv, index_col=0),
@@ -362,7 +364,7 @@ def create_collection(
             collection_name=collection_name,
             schema=schema,
             index_params=index_params,
-            consistency_level=CONSISTENCY_STRONG,
+            consistency_level=CONSISTENCY,
         )
 
 
@@ -500,6 +502,43 @@ def verify_embedding(element):
     return False
 
 
+def cleanup_records(
+    records,
+    enable_text: bool = True,
+    enable_charts: bool = True,
+    enable_tables: bool = True,
+    enable_images: bool = True,
+    enable_infographics: bool = True,
+    enable_audio: bool = True,
+    meta_dataframe: pd.DataFrame = None,
+    meta_source_field: str = None,
+    meta_fields: list[str] = None,
+    record_func=_record_dict,
+    sparse_model=None,
+):
+    cleaned_records = []
+    for result in records:
+        if result is not None:
+            if not isinstance(result, list):
+                result = [result]
+            for element in result:
+                text = _pull_text(
+                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+                )
+                _insert_location_into_content_metadata(
+                    element, enable_charts, enable_tables, enable_images, enable_infographics
+                )
+                if meta_dataframe is not None and meta_source_field and meta_fields:
+                    add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
+                if text:
+                    if sparse_model is not None:
+                        element = record_func(text, element, sparse_model.encode_documents([text]))
+                    else:
+                        element = record_func(text, element)
+                    cleaned_records.append(element)
+    return cleaned_records
+
+
 def _pull_text(
     element,
     enable_text: bool,
@@ -576,21 +615,7 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
         element["metadata"]["content_metadata"][col] = meta_fields.iloc[0][col]
 
 
-def write_records_minio(
-    records,
-    writer: RemoteBulkWriter,
-    sparse_model=None,
-    enable_text: bool = True,
-    enable_charts: bool = True,
-    enable_tables: bool = True,
-    enable_images: bool = True,
-    enable_infographics: bool = True,
-    enable_audio: bool = True,
-    record_func=_record_dict,
-    meta_dataframe=None,
-    meta_source_field=None,
-    meta_fields=None,
-) -> RemoteBulkWriter:
+def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
     """
     Writes the supplied records to milvus using the supplied writer.
     If a sparse model is supplied, it will be used to generate sparse
@@ -629,25 +654,8 @@ def write_records_minio(
     RemoteBulkWriter
         Returns the writer supplied, with information related to minio records upload.
     """
-    for result in records:
-        if result is not None:
-            if not isinstance(result, list):
-                result = [result]
-            for element in result:
-                text = _pull_text(
-                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
-                )
-                _insert_location_into_content_metadata(
-                    element, enable_charts, enable_tables, enable_images, enable_infographics
-                )
-                if meta_dataframe is not None and meta_source_field and meta_fields:
-                    add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
-                if text:
-                    if sparse_model is not None:
-                        writer.append_row(record_func(text, element, sparse_model.encode_documents([text])))
-                    else:
-                        writer.append_row(record_func(text, element))
-
+    for element in records:
+        writer.append_row(element)
     writer.commit()
     print(f"Wrote data to: {writer.batch_files}")
     return writer
@@ -674,7 +682,7 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
     task_id = utility.do_bulk_insert(
-        collection_name=collection_name, files=writer.batch_files[0], consistency_level=CONSISTENCY_STRONG
+        collection_name=collection_name, files=writer.batch_files[0], consistency_level=CONSISTENCY
     )
     # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
     state = "Pending"
@@ -747,22 +755,7 @@ def create_bm25_model(
     return bm25_ef
 
 
-def stream_insert_milvus(
-    records,
-    client: MilvusClient,
-    collection_name: str,
-    sparse_model=None,
-    enable_text: bool = True,
-    enable_charts: bool = True,
-    enable_tables: bool = True,
-    enable_images: bool = True,
-    enable_infographics: bool = True,
-    enable_audio: bool = True,
-    record_func=_record_dict,
-    meta_dataframe=None,
-    meta_source_field=None,
-    meta_fields=None,
-):
+def stream_insert_milvus(records, client: MilvusClient, collection_name: str):
     """
     This function takes the input records and creates a corpus,
     factoring in filters (i.e. texts, charts, tables) and fits
@@ -774,48 +767,15 @@ def stream_insert_milvus(
     ----------
     records : List
         List of chunks with attached metadata
+    client : MilvusClient
+        Milvus client instance
     collection_name : str
         Milvus Collection to search against
-    sparse_model : model,
-        Sparse model used to generate sparse embedding in the form of
-        scipy.sparse.csr_array
-    enable_text : bool, optional
-        When true, ensure all text type records are used.
-    enable_charts : bool, optional
-        When true, ensure all chart type records are used.
-    enable_tables : bool, optional
-        When true, ensure all table type records are used.
-    enable_images : bool, optional
-        When true, ensure all image type records are used.
-    enable_infographics : bool, optional
-        When true, ensure all infographic type records are used.
-    enable_audio : bool, optional
-        When true, ensure all audio transcript type records are used.
-    record_func : function, optional
-        This function will be used to parse the records for necessary information.
-
     """
     count = 0
-    for result in records:
-        if result is not None:
-            if not isinstance(result, list):
-                result = [result]
-            for element in result:
-                text = _pull_text(
-                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
-                )
-                _insert_location_into_content_metadata(
-                    element, enable_charts, enable_tables, enable_images, enable_infographics
-                )
-                if meta_dataframe is not None and meta_source_field and meta_fields:
-                    add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
-                if text:
-                    if sparse_model is not None:
-                        element = record_func(text, element, sparse_model.encode_documents([text]))
-                    else:
-                        element = record_func(text, element)
-                    client.insert(collection_name=collection_name, data=[element])
-                    count += 1
+    for element in records:
+        client.insert(collection_name=collection_name, data=[element])
+        count += 1
     logger.info(f"streamed {count} records")
 
 
@@ -913,20 +873,25 @@ def write_to_nvingest_collection(
         stream = True
     if isinstance(meta_dataframe, str):
         meta_dataframe = pandas_file_reader(meta_dataframe)
+    cleaned_records = cleanup_records(
+        records,
+        enable_text=enable_text,
+        enable_charts=enable_charts,
+        enable_tables=enable_tables,
+        enable_images=enable_images,
+        enable_infographics=enable_infographics,
+        meta_dataframe=meta_dataframe,
+        meta_source_field=meta_source_field,
+        meta_fields=meta_fields,
+        sparse_model=bm25_ef,
+    )
+    if len(cleaned_records) == 0:
+        raise ValueError("No records with Embeddings to insert detected.")
     if stream:
         stream_insert_milvus(
-            records,
+            cleaned_records,
             client,
             collection_name,
-            bm25_ef,
-            enable_text=enable_text,
-            enable_charts=enable_charts,
-            enable_tables=enable_tables,
-            enable_images=enable_images,
-            enable_infographics=enable_infographics,
-            meta_dataframe=meta_dataframe,
-            meta_source_field=meta_source_field,
-            meta_fields=meta_fields,
         )
     else:
         # Connections parameters to access the remote bucket
@@ -941,17 +906,8 @@ def write_to_nvingest_collection(
             schema=schema, remote_path="/", connect_param=conn, file_type=BulkFileType.PARQUET
         )
         writer = write_records_minio(
-            records,
+            cleaned_records,
             text_writer,
-            bm25_ef,
-            enable_text=enable_text,
-            enable_charts=enable_charts,
-            enable_tables=enable_tables,
-            enable_images=enable_images,
-            enable_infographics=enable_infographics,
-            meta_dataframe=meta_dataframe,
-            meta_source_field=meta_source_field,
-            meta_fields=meta_fields,
         )
         bulk_insert_milvus(collection_name, writer, milvus_uri)
         # fixes bulk insert lag time https://github.com/milvus-io/milvus/issues/21746
@@ -1005,6 +961,7 @@ def dense_retrieval(
         limit=top_k,
         output_fields=output_fields,
         filter=_filter,
+        consistency_level=CONSISTENCY,
     )
     return results
 
@@ -1094,7 +1051,12 @@ def hybrid_retrieval(
     sparse_req = AnnSearchRequest(**search_param_2)
 
     results = client.hybrid_search(
-        collection_name, [sparse_req, dense_req], RRFRanker(), limit=top_k, output_fields=output_fields
+        collection_name,
+        [sparse_req, dense_req],
+        RRFRanker(),
+        limit=top_k,
+        output_fields=output_fields,
+        consistency_level=CONSISTENCY,
     )
     return results
 
@@ -1372,7 +1334,7 @@ def pull_all_milvus(
         filter="pk >= 0",
         output_fields=["source", "content_metadata", "text"],
         batch_size=batch_size,
-        consistency_level=CONSISTENCY_STRONG,
+        consistency_level=CONSISTENCY,
     )
     full_results = []
     write_dir = Path(write_dir) if write_dir else None
