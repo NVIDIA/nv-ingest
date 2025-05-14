@@ -29,7 +29,7 @@ class PipelineCreationSchema(BaseModel):
     """
     Schema for pipeline creation configuration.
 
-    Contains all parameters required to set up and execute a Morpheus pipeline,
+    Contains all parameters required to set up and execute the pipeline,
     including endpoints, API keys, and processing options.
     """
 
@@ -70,7 +70,7 @@ class PipelineCreationSchema(BaseModel):
     paddle_infer_protocol: str = os.getenv("PADDLE_INFER_PROTOCOL", "http")
 
     # Task queue settings
-    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
 
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(

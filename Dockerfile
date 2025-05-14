@@ -6,7 +6,7 @@
 ARG BASE_IMG=nvcr.io/nvidia/cuda
 ARG BASE_IMG_TAG=12.5.1-base-ubuntu22.04
 
-# Use NVIDIA Morpheus as the base image
+# Use NVIDIA cuda as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
 ARG RELEASE_TYPE="dev"

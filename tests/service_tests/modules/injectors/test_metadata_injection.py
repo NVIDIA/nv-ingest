@@ -6,6 +6,8 @@
 import pandas as pd
 import pytest
 
+pytest.importorskip("mrc")
+
 from nv_ingest.framework.orchestration.morpheus.modules.injectors.metadata_injector import on_data
 from nv_ingest_api.internal.enums.common import DocumentTypeEnum
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
