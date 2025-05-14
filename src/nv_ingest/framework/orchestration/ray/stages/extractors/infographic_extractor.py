@@ -38,14 +38,20 @@ class InfographicExtractorStage(RayActorStage):
         # Remove the "infographic_data_extract" task from the message
         task_config = remove_task_by_type(control_message, "infographic_data_extract")
 
+        execution_trace_log = {}
         new_df, extraction_info = extract_infographic_data_from_image_internal(
             df_extraction_ledger=df_ledger,
             task_config=task_config,
             extraction_config=self.validated_config,
-            execution_trace_log=None,
+            execution_trace_log=execution_trace_log,
         )
 
         control_message.payload(new_df)
         control_message.set_metadata("infographic_extraction_info", extraction_info)
+
+        do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
+        if do_trace_tagging and execution_trace_log:
+            for key, ts in execution_trace_log.items():
+                control_message.set_timestamp(key, ts)
 
         return control_message
