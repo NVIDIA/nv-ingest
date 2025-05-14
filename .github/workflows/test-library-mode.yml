@@ -90,6 +90,8 @@ jobs:
           conda install -y -c ./conda/output_conda_channel -c rapidsai -c conda-forge -c nvidia nv_ingest nv_ingest_api nv_ingest_client
           # Install other dependencies
           conda install -y -c conda-forge librosa
+          # Ensure dynamically linked libraries in the conda environment are found at runtime
+          export LD_LIBRARY_PATH=$CONDA/envs/nvingest/lib:$LD_LIBRARY_PATH
           # Install pip dependencies
           $CONDA/envs/nvingest/bin/python -m pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient
 
