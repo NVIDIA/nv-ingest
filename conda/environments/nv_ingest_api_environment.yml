@@ -4,7 +4,6 @@ channels:
   - rapidsai
   - nvidia
   - conda-forge
-  - pytorch
 dependencies:
   - diskcache>=5.6.3
   - pydantic>2.0.0
