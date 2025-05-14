@@ -27,7 +27,7 @@ from nv_ingest_api.util.nim import create_inference_client
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
-logger = logging.getLogger(f"morpheus.{__name__}")
+logger = logging.getLogger(f"ray.{__name__}")
 
 
 def _filter_valid_chart_images(

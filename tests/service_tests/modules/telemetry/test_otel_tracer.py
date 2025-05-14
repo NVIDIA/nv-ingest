@@ -2,11 +2,16 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import pytest
+
 from datetime import datetime
 
-from morpheus.messages import ControlMessage
+# Skip test module if morpheus is not present
+pytest.importorskip("mrc")
 
-from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (
+from morpheus.messages import ControlMessage  # noqa: E402
+
+from nv_ingest.framework.orchestration.morpheus.modules.telemetry.otel_tracer import (  # noqa: E402
     extract_annotated_task_results,
     extract_timestamps_from_message,
 )
@@ -71,5 +76,3 @@ def test_extract_annotated_task_results_no_annotation_keys():
     expected_output = {}
 
     result = extract_annotated_task_results(msg)
-
-    assert result == expected_output

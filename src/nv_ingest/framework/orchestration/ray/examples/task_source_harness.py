@@ -35,7 +35,7 @@ def main():
     # Create an instance of the configuration for the source stage.
     config = MessageBrokerTaskSourceConfig(
         broker_client=redis_config,
-        task_queue="morpheus_task_queue",
+        task_queue="ingest_task_queue",
         poll_interval=0.1,
     )
 
