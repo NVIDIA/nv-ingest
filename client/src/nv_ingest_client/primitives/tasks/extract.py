@@ -43,13 +43,15 @@ _DEFAULT_EXTRACTOR_MAP = {
     "pdf": "pdfium",
     "png": "image",
     "pptx": "python_pptx",
-    "svg": "image",
     "text": "txt",
     "tiff": "image",
     "txt": "txt",
     "xml": "lxml",
     "mp3": "audio",
     "wav": "audio",
+    "json": "txt",
+    "md": "txt",
+    "sh": "txt",
 }
 
 _Type_Extract_Method_PDF = Literal[
@@ -81,7 +83,6 @@ _Type_Extract_Method_Map = {
     "pdf": get_args(_Type_Extract_Method_PDF),
     "png": get_args(_Type_Extract_Method_Image),
     "pptx": get_args(_Type_Extract_Method_PPTX),
-    # "svg": get_args(_Type_Extract_Method_Image),
     "text": get_args(_Type_Extract_Method_Text),
     "tiff": get_args(_Type_Extract_Method_Image),
     "txt": get_args(_Type_Extract_Method_Text),
@@ -151,8 +152,8 @@ class ExtractTaskSchema(BaseModel):
     def extract_method_must_be_valid(cls, v, values, **kwargs):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
 
-        # Skip validation for txt and html types since it does not have an extract stage.
-        if document_type in ["txt", "text", "html"]:
+        # Skip validation for text-like types, since they do not have 'extract' stages.
+        if document_type in ["txt", "text", "html", "json", "md", "sh"]:
             return
 
         valid_methods = set(_Type_Extract_Method_Map[document_type])
