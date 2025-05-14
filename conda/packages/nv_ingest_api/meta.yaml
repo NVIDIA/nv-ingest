@@ -24,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python=3.10
+    - python=3.12
     - setuptools>=58.2.0
   run:
     - azure-core>=1.32.0
@@ -38,7 +38,7 @@ requirements:
     - pypdfium2>=4.30.0
     - pytest>=8.0.2
     - pytest-mock>=3.14.0
-    - python>=3.10
+    - python>=3.12
     - python-docx>=1.1.2
     - python-dotenv>=1.0.1
     - python-magic>=0.4.27
