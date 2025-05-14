@@ -229,7 +229,7 @@ class TestDocxExtraction(unittest.TestCase):
         )
 
         # Call the function
-        result_df = extract_primitives_from_docx_internal(
+        result_df, _ = extract_primitives_from_docx_internal(
             df, self.sample_task_config, self.mock_extraction_config, self.trace_info
         )
 
@@ -278,7 +278,7 @@ class TestDocxExtraction(unittest.TestCase):
         )
 
         # Call the function
-        result_df = extract_primitives_from_docx_internal(
+        result_df, _ = extract_primitives_from_docx_internal(
             df, self.sample_task_config, self.mock_extraction_config, self.trace_info
         )
 
@@ -306,7 +306,7 @@ class TestDocxExtraction(unittest.TestCase):
         df = pd.DataFrame([{"content": self.sample_base64, "source_id": "doc1"}])
 
         # Call the function
-        result_df = extract_primitives_from_docx_internal(
+        result_df, _ = extract_primitives_from_docx_internal(
             df, self.sample_task_config, self.mock_extraction_config, self.trace_info
         )
 
@@ -339,7 +339,7 @@ class TestDocxExtraction(unittest.TestCase):
         df = pd.DataFrame([{"content": self.sample_base64, "source_id": "doc1"}])
 
         # Call the function
-        result_df = extract_primitives_from_docx_internal(
+        result_df, _ = extract_primitives_from_docx_internal(
             df, self.sample_task_config, self.mock_extraction_config, self.trace_info
         )
 

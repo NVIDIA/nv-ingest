@@ -33,7 +33,7 @@ dependencies:
   - python-docx>=1.1.2
   - python-dotenv>=1.0.1
   - python-pptx>=1.0.2
-  - pytorch
+  - pytorch==2.4.1  # https://github.com/pytorch/pytorch/issues/111469
   - ray-all>=2.37.0
   - redis-py>=5.2.1
   - requests>=2.28.2
