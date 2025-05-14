@@ -7,7 +7,7 @@ import base64
 import functools
 import io
 import logging
-from typing import Optional, Dict, Any, Union
+from typing import Optional, Dict, Any, Union, Tuple
 
 import pandas as pd
 from pydantic import BaseModel
@@ -146,7 +146,7 @@ def extract_primitives_from_docx_internal(
     task_config: Union[Dict[str, Any], BaseModel],
     extraction_config: DocxExtractorSchema,
     execution_trace_log: Optional[Dict[str, Any]] = None,
-) -> pd.DataFrame:
+) -> Tuple[pd.DataFrame, Union[Dict, None]]:
     """
     Processes a pandas DataFrame containing DOCX files encoded in base64, extracting text from
     each document and replacing the original content with the extracted text.
@@ -202,4 +202,4 @@ def extract_primitives_from_docx_internal(
     else:
         extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-    return extracted_df
+    return extracted_df, {}

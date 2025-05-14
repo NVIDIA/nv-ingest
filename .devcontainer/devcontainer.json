@@ -40,7 +40,6 @@
       "MESSAGE_CLIENT_PORT": "7671",
       "MESSAGE_CLIENT_TYPE": "simple",
       "MINIO_BUCKET": "${MINIO_BUCKET:-nv-ingest}",
-      "MRC_IGNORE_NUMA_CHECK": "1",
       "NGC_API_KEY": "${NGC_API_KEY:-ngcapikey}",
       "NVIDIA_BUILD_API_KEY": "${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}",
       "PADDLE_HTTP_ENDPOINT": "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr",
