@@ -19,7 +19,7 @@ jobs:
   build:
     runs-on: linux-large-disk
     container:
-      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
+      image: rapidsai/ci-conda:cuda12.2.2-ubuntu22.04-py3.12
     steps:
       - name: Check access
         if:
@@ -109,6 +109,5 @@ jobs:
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
-          # Ensure dynamically linked libraries in the conda environment are found at runtime
-          export LD_LIBRARY_PATH=$CONDA/envs/nvingest/lib:$LD_LIBRARY_PATH
+          unset LD_LIBRARY_PATH  # https://github.com/pytorch/pytorch/issues/111469
           $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
