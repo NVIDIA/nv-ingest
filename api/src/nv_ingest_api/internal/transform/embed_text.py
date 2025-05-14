@@ -230,28 +230,35 @@ def _async_runner(
 def _add_embeddings(row, embeddings, info_msgs):
     """
     Updates a DataFrame row with embedding data and associated error info.
+    Ensures the 'embedding' field is always present, even if None.
 
     Parameters
     ----------
     row : pandas.Series
         A row of the DataFrame.
-    embeddings : list
-        List of embeddings corresponding to DataFrame rows.
-    info_msgs : list
-        List of info message dictionaries corresponding to DataFrame rows.
+    embeddings : dict
+        Dictionary mapping row indices to embeddings.
+    info_msgs : dict
+        Dictionary mapping row indices to info message dicts.
 
     Returns
     -------
     pandas.Series
-        The updated row with embedding and info message metadata added.
+        The updated row with 'embedding', 'info_message_metadata', and
+        '_contains_embeddings' appropriately set.
     """
-    row["metadata"]["embedding"] = embeddings[row.name]
-    if info_msgs[row.name] is not None:
-        row["metadata"]["info_message_metadata"] = info_msgs[row.name]
+    embedding = embeddings.get(row.name, None)
+    info_msg = info_msgs.get(row.name, None)
+
+    # Always set embedding, even if None
+    row["metadata"]["embedding"] = embedding
+
+    if info_msg:
+        row["metadata"]["info_message_metadata"] = info_msg
         row["document_type"] = ContentTypeEnum.INFO_MSG
         row["_contains_embeddings"] = False
     else:
-        row["_contains_embeddings"] = True
+        row["_contains_embeddings"] = embedding is not None
 
     return row
 
@@ -287,7 +294,7 @@ def _get_pandas_table_content(row):
     str
         The table/chart content from the row.
     """
-    return row["table_metadata"]["table_content"]
+    return row.get("table_metadata", {}).get("table_content")
 
 
 def _get_pandas_image_content(row):
@@ -304,7 +311,14 @@ def _get_pandas_image_content(row):
     str
         The image caption from the row.
     """
-    return row["image_metadata"]["caption"]
+    return row.get("image_metadata", {}).get("caption")
+
+
+def _get_pandas_audio_content(row):
+    """
+    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
+    """
+    return row.get("audio_metadata", {}).get("audio_transcript")
 
 
 # ------------------------------------------------------------------------------
@@ -350,13 +364,6 @@ def _generate_batches(prompts: List[str], batch_size: int = 100) -> List[str]:
         A list of batches, each containing a subset of the prompts.
     """
     return [batch for batch in _batch_generator(prompts, batch_size)]
-
-
-def _get_pandas_audio_content(row):
-    """
-    A pandas UDF used to select extracted audio transcription to be used to create embeddings.
-    """
-    return row["audio_metadata"]["audio_transcript"]
 
 
 # ------------------------------------------------------------------------------
@@ -408,8 +415,11 @@ def transform_create_text_embeddings_internal(
     execution_trace_log: Optional[Dict] = None,
 ) -> Tuple[pd.DataFrame, Dict]:
     """
-    Generates text embeddings for supported content types (TEXT, STRUCTURED, IMAGE)
+    Generates text embeddings for supported content types (TEXT, STRUCTURED, IMAGE, AUDIO)
     from a pandas DataFrame using asynchronous requests.
+
+    This function ensures that even if the extracted content is empty or None,
+    the embedding field is explicitly created and set to None.
 
     Parameters
     ----------
@@ -417,8 +427,8 @@ def transform_create_text_embeddings_internal(
         The DataFrame containing content for embedding extraction.
     task_config : Dict[str, Any]
         Dictionary containing task properties (e.g., filter error flag).
-    transform_config : Any
-        Validated configuration for text embedding extraction (EmbedExtractionsSchema).
+    transform_config : TextEmbeddingSchema, optional
+        Validated configuration for text embedding extraction.
     execution_trace_log : Optional[Dict], optional
         Optional trace information for debugging or logging (default is None).
 
@@ -429,24 +439,20 @@ def transform_create_text_embeddings_internal(
             - The updated DataFrame with embeddings applied.
             - A dictionary with trace information.
     """
-
-    # Retrieve configuration values with fallback to transform_config defaults.
-    api_key: str = task_config.get("api_key") or transform_config.api_key
-    endpoint_url: str = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
-    model_name: str = task_config.get("model_name") or transform_config.embedding_model
+    api_key = task_config.get("api_key") or transform_config.api_key
+    endpoint_url = task_config.get("endpoint_url") or transform_config.embedding_nim_endpoint
+    model_name = task_config.get("model_name") or transform_config.embedding_model
 
     if execution_trace_log is None:
         execution_trace_log = {}
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
-    # TODO(Devin)
     if df_transform_ledger.empty:
         return df_transform_ledger, {"trace_info": execution_trace_log}
 
     embedding_dataframes = []
-    content_masks = []  # List of pandas boolean Series
+    content_masks = []
 
-    # Define pandas content extractors for supported content types.
     pandas_content_extractor = {
         ContentTypeEnum.TEXT: _get_pandas_text_content,
         ContentTypeEnum.STRUCTURED: _get_pandas_table_content,
@@ -455,49 +461,62 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
     }
 
-    logger.debug("Generating text embeddings for supported content types: TEXT, STRUCTURED, IMAGE.")
-
     def _content_type_getter(row):
         return row["content_metadata"]["type"]
 
-    # Process each supported content type.
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
             logger.debug(f"Skipping unsupported content type: {content_type}")
             continue
 
+        # Get rows matching the content type
         content_mask = df_transform_ledger["metadata"].apply(_content_type_getter) == content_type.value
         if not content_mask.any():
             continue
 
-        # Extract content from metadata and filter out rows with empty content.
-        extracted_content = df_transform_ledger.loc[content_mask, "metadata"].apply(content_getter)
-        non_empty_mask = extracted_content.notna() & (extracted_content.str.strip() != "")
-        final_mask = content_mask & non_empty_mask
-        if not final_mask.any():
-            continue
+        # Always include all content_mask rows and prepare them
+        df_content = df_transform_ledger.loc[content_mask].copy().reset_index(drop=True)
 
-        df_content = df_transform_ledger.loc[final_mask].copy().reset_index(drop=True)
-        filtered_content = df_content["metadata"].apply(content_getter)
-        filtered_content_batches = _generate_batches(filtered_content.tolist(), batch_size=transform_config.batch_size)
-        content_embeddings = _async_runner(
-            filtered_content_batches,
-            api_key,
-            endpoint_url,
-            model_name,
-            transform_config.encoding_format,
-            transform_config.input_type,
-            transform_config.truncate,
-            False,
+        # Extract content and normalize empty or non-str to None
+        extracted_content = (
+            df_content["metadata"]
+            .apply(content_getter)
+            .apply(lambda x: x.strip() if isinstance(x, str) and x.strip() else None)
         )
-        # Apply the embeddings (and any error info) to each row.
-        df_content[["metadata", "document_type", "_contains_embeddings"]] = df_content.apply(
-            _add_embeddings, **content_embeddings, axis=1
-        )[["metadata", "document_type", "_contains_embeddings"]]
-        df_content["_content"] = filtered_content
+        df_content["_content"] = extracted_content
+
+        # Prepare batches for only valid (non-None) content
+        valid_content_mask = df_content["_content"].notna()
+        if valid_content_mask.any():
+            filtered_content_batches = _generate_batches(
+                df_content.loc[valid_content_mask, "_content"].tolist(), batch_size=transform_config.batch_size
+            )
+            content_embeddings = _async_runner(
+                filtered_content_batches,
+                api_key,
+                endpoint_url,
+                model_name,
+                transform_config.encoding_format,
+                transform_config.input_type,
+                transform_config.truncate,
+                False,
+            )
+            # Build a simple row index -> embedding map
+            embeddings_dict = dict(
+                zip(df_content.loc[valid_content_mask].index, content_embeddings.get("embeddings", []))
+            )
+            info_msgs_dict = dict(
+                zip(df_content.loc[valid_content_mask].index, content_embeddings.get("info_msgs", []))
+            )
+        else:
+            embeddings_dict = {}
+            info_msgs_dict = {}
+
+        # Apply embeddings or None to all rows
+        df_content = df_content.apply(_add_embeddings, embeddings=embeddings_dict, info_msgs=info_msgs_dict, axis=1)
 
         embedding_dataframes.append(df_content)
-        content_masks.append(final_mask)
+        content_masks.append(content_mask)
 
     combined_df = _concatenate_extractions_pandas(df_transform_ledger, embedding_dataframes, content_masks)
     return combined_df, {"trace_info": execution_trace_log}

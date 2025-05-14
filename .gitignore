@@ -201,8 +201,7 @@ triton_models/cached
 triton_models/deplot
 triton_models/paddle
 
-# Explicitly ignore .vscode/. Shared settings should go in morpheus.code-workspace
-# and user settings will go in .vscode/
+# Explicitly ignore .vscode/
 .vscode/
 
 # Ignore user-defined clangd settings

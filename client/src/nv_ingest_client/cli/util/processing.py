@@ -387,7 +387,7 @@ def generate_job_batch_for_iteration(
 
         job_index_map_updates = {job_index: file for job_index, file in zip(new_job_indices, batch_files)}
         processed += new_job_count
-        _ = client.submit_job_async(new_job_indices, "morpheus_task_queue")
+        _ = client.submit_job_async(new_job_indices, "ingest_task_queue")
         job_indices.extend(new_job_indices)
 
     return job_indices, job_index_map_updates, processed
