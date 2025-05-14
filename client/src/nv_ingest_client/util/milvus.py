@@ -743,7 +743,7 @@ def write_records_minio(
                         writer.append_row(record_func(text, element))
 
     writer.commit()
-    print(f"Wrote data to: {writer.batch_files}")
+    logger.debug(f"Wrote data to: {writer.batch_files}")
     return writer
 
 
@@ -767,7 +767,8 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
 
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
-    task_id = utility.do_bulk_insert(collection_name=collection_name, files=writer.batch_files[0])
+    files_to_upload = [_file for file_set in writer.batch_files for _file in file_set]
+    task_id = utility.do_bulk_insert(collection_name=collection_name, files=files_to_upload)
     state = "Pending"
     while state != "Completed":
         task = utility.get_bulk_insert_state(task_id=task_id)
