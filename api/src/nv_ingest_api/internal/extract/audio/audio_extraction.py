@@ -5,6 +5,8 @@
 import logging
 
 import pandas as pd
+import functools
+import uuid
 from typing import Any
 from typing import Dict
 from typing import Optional
@@ -21,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @unified_exception_handler
-def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) -> Dict:
+def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, segment_audio: bool = None) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -56,24 +58,42 @@ def _update_audio_metadata(row: pd.Series, audio_client: Any, trace_info: Dict) 
     base64_audio = metadata.pop("content")
     content_metadata = metadata.get("content_metadata", {})
 
-    # Only modify if content type is audio
+    # Only extract transcript if content type is audio
     if (content_metadata.get("type") != ContentTypeEnum.AUDIO) or (base64_audio in (None, "")):
-        return metadata
+        return [row.to_list()]
 
-    # Modify audio metadata with the result from the inference model
-    audio_result = audio_client.infer(
+    # Get the result from the inference model
+    segments, transcript = audio_client.infer(
         base64_audio,
         model_name="parakeet",
         trace_info=trace_info,  # traceable_func arg
         stage_name="audio_extraction",
     )
 
-    row["document_type"] = ContentTypeEnum.AUDIO
-    audio_metadata = {"audio_transcript": audio_result}
-    metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
-    row["metadata"] = validate_schema(metadata, MetadataSchema).model_dump()
+    extracted_data = []
+    if segment_audio:
+        for segment in segments:
+            segment_metadata = metadata.copy()
+            audio_metadata = {"audio_transcript": segment["text"]}
+            segment_metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+            segment_metadata["content_metadata"]["start_time"] = segment["start"]
+            segment_metadata["content_metadata"]["end_time"] = segment["end"]
 
-    return metadata
+            extracted_data.append(
+                [
+                    ContentTypeEnum.AUDIO,
+                    validate_schema(segment_metadata, MetadataSchema).model_dump(),
+                    str(uuid.uuid4()),
+                ]
+            )
+    else:
+        audio_metadata = {"audio_transcript": transcript}
+        metadata["audio_metadata"] = validate_schema(audio_metadata, AudioMetadataSchema).model_dump()
+        extracted_data.append(
+            [ContentTypeEnum.AUDIO, validate_schema(metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]
+        )
+
+    return extracted_data
 
 
 def extract_text_from_audio_internal(
@@ -111,16 +131,16 @@ def extract_text_from_audio_internal(
     """
     logger.debug(f"Entering audio extraction stage with {len(df_extraction_ledger)} rows.")
 
-    extract_params = task_config.get("params", {}).get("extract_audio_params", {})
     audio_extraction_config = extraction_config.audio_extraction_config
 
-    grpc_endpoint = extract_params.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
-    http_endpoint = extract_params.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
-    infer_protocol = extract_params.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
-    auth_token = extract_params.get("auth_token") or audio_extraction_config.auth_token
-    function_id = extract_params.get("function_id") or audio_extraction_config.function_id
-    use_ssl = extract_params.get("use_ssl") or audio_extraction_config.use_ssl
-    ssl_cert = extract_params.get("ssl_cert") or audio_extraction_config.ssl_cert
+    grpc_endpoint = task_config.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
+    http_endpoint = task_config.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
+    infer_protocol = task_config.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
+    auth_token = task_config.get("auth_token") or audio_extraction_config.auth_token
+    function_id = task_config.get("function_id") or audio_extraction_config.function_id
+    use_ssl = task_config.get("use_ssl") or audio_extraction_config.use_ssl
+    ssl_cert = task_config.get("ssl_cert") or audio_extraction_config.ssl_cert
+    segment_audio = task_config.get("segment_audio") or audio_extraction_config.segment_audio
 
     parakeet_client = create_audio_inference_client(
         (grpc_endpoint, http_endpoint),
@@ -136,12 +156,27 @@ def extract_text_from_audio_internal(
         logger.debug("No trace_info provided. Initialized empty trace_info dictionary.")
 
     try:
-        # Apply the _update_metadata function to each row in the DataFrame
-        df_extraction_ledger["metadata"] = df_extraction_ledger.apply(
-            _update_audio_metadata, axis=1, args=(parakeet_client, execution_trace_log)
+        # Create a partial function to extract using the provided configurations.
+        _extract_from_audio_partial = functools.partial(
+            _extract_from_audio,
+            audio_client=parakeet_client,
+            trace_info=execution_trace_log,
+            segment_audio=segment_audio,
         )
 
-        return df_extraction_ledger, execution_trace_log
+        # Apply the _extract_from_audio_partial function to each row in the DataFrame
+        extraction_series = df_extraction_ledger.apply(_extract_from_audio_partial, axis=1)
+
+        # Explode the results if the extraction returns lists.
+        extraction_series = extraction_series.explode().dropna()
+
+        # Convert the extracted results into a DataFrame.
+        if not extraction_series.empty:
+            extracted_df = pd.DataFrame(extraction_series.to_list(), columns=["document_type", "metadata", "uuid"])
+        else:
+            extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
+
+        return extracted_df, execution_trace_log
 
     except Exception as e:
         logger.exception(f"Error occurred while extracting audio data: {e}", exc_info=True)
