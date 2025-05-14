@@ -216,7 +216,7 @@ Submits a job to a specified job queue. This method can optionally wait for a re
 
 - **Example**:
   ```python
-  client.submit_job(job_id, "morpheus_task_queue")
+  client.submit_job(job_id, "ingest_task_queue")
   ```
 
 ### submit_jobs
@@ -232,7 +232,7 @@ Submits multiple jobs to a specified job queue. This method does not wait for an
 
 - **Example**:
   ```python
-  client.submit_jobs([job_id0, job_id1], "morpheus_task_queue")
+  client.submit_jobs([job_id0, job_id1], "ingest_task_queue")
   ```
 
 ### submit_job_async
@@ -252,7 +252,7 @@ job ID or a list of job IDs.
 
 - **Example**:
   ```python
-  client.submit_job_async(job_id, "morpheus_task_queue")
+  client.submit_job_async(job_id, "ingest_task_queue")
   ```
 
 ## Job Retrieval

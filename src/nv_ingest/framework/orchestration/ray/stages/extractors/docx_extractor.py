@@ -31,7 +31,7 @@ class DocxExtractorStage(RayActorStage):
     """
 
     def __init__(self, config: DocxExtractorSchema) -> None:
-        super().__init__(config)
+        super().__init__(config, log_to_stdout=False)
         try:
             self.validated_config = config
             logger.info("DocxExtractorStage configuration validated successfully.")
@@ -40,7 +40,7 @@ class DocxExtractorStage(RayActorStage):
             raise
 
     @traceable("docx_extractor")
-    @filter_by_task(required_tasks=["docx-extract"])
+    @filter_by_task(required_tasks=[("extract", {"document_type": "docx"})])
     @nv_ingest_node_failure_try_except(annotation_id="docx_extractor", raise_on_failure=True)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
@@ -56,15 +56,15 @@ class DocxExtractorStage(RayActorStage):
         IngestControlMessage
             The updated message with extracted DOCX content.
         """
-        logger.info("DocxExtractorStage.on_data: Starting DOCX extraction process.")
+        self._logger.debug("DocxExtractorStage.on_data: Starting DOCX extraction process.")
 
         # Extract the DataFrame payload.
         df_ledger = control_message.payload()
-        logger.debug("Extracted payload with %d rows.", len(df_ledger))
+        self._logger.debug("Extracted payload with %d rows.", len(df_ledger))
 
         # Remove the "docx-extract" task from the message to obtain task-specific configuration.
-        task_config = remove_task_by_type(control_message, "docx-extract")
-        logger.debug("Extracted task config: %s", task_config)
+        task_config = remove_task_by_type(control_message, "extract")
+        self._logger.debug("Extracted task config: %s", task_config)
 
         # Perform DOCX content extraction.
         new_df, extraction_info = extract_primitives_from_docx_internal(
@@ -73,7 +73,6 @@ class DocxExtractorStage(RayActorStage):
             extraction_config=self.validated_config,
             execution_trace_log=None,
         )
-        logger.info("DOCX extraction completed. Resulting DataFrame has %d rows.", len(new_df))
 
         # Update the message payload with the extracted DOCX content DataFrame.
         control_message.payload(new_df)
