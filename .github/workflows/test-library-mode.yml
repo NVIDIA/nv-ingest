@@ -109,4 +109,6 @@ jobs:
         shell: bash -el {0}
         run: |
           echo 'Running tests...'
+          # Ensure dynamically linked libraries in the conda environment are found at runtime
+          export LD_LIBRARY_PATH=$CONDA/envs/nvingest/lib:$LD_LIBRARY_PATH
           $CONDA/envs/nvingest/bin/python -m pytest -rsx tests/integration
