@@ -24,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python=3.10
+    - python=3.12
     - setuptools>=58.2.0
   run:
     - click>=8.1.7
@@ -32,7 +32,7 @@ requirements:
     - httpx>=0.28.1
     - pydantic>=2.0.0
     - pypdfium2>=4.30.0
-    - python>=3.10
+    - python>=3.12
     - python-docx>=1.1.2
     - python-pptx>=1.0.2
     - requests>=2.28.2
