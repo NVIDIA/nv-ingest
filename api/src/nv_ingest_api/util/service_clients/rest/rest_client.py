@@ -470,7 +470,7 @@ class RestClient(MessageBrokerClientBase):
                         f"Requires a requests.Session compatible API."
                     )
             except requests.exceptions.RequestException as err:
-                logger.warning(
+                logger.debug(
                     f"RequestException submitting job: {err}. Attempting retry ({retries + 1}/{self._max_retries})..."
                 )
                 try:

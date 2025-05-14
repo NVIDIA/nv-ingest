@@ -47,7 +47,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_JOB_QUEUE_ID: str = "morpheus_task_queue"
+DEFAULT_JOB_QUEUE_ID: str = "ingest_task_queue"
 # Default concurrent-processing parameters
 DEFAULT_BATCH_SIZE: int = 64
 DEFAULT_TIMEOUT: int = 100
@@ -83,7 +83,7 @@ class Ingestor:
     client : Optional[NvIngestClient], optional
         An instance of NvIngestClient. If not provided, a client is created.
     job_queue_id : str, optional
-        The ID of the job queue for job submission, default is "morpheus_task_queue".
+        The ID of the job queue for job submission, default is "ingest_task_queue".
     """
 
     def __init__(

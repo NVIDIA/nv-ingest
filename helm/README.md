@@ -279,13 +279,14 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 
 | Repository | Name | Version |
 |------------|------|---------|
-| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.2.0 |
+| alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.3.0 |
 | alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
-| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.5.0 |
-| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.2.0 |
-| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.2.0 |
-| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.2.0 |
-| alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.5.0 |
+| alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.6.0 |
+| alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.5.0 |
+| alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.3.0 |
+| alias:nvidia-nim | nemoretriever-page-elements-v2(nvidia-nim-nemoretriever-page-elements-v2) | 1.3.0 |
+| alias:nvidia-nim | nemoretriever-table-structure-v1(nvidia-nim-nemoretriever-table-structure-v1) | 1.3.0 |
+| alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
@@ -317,7 +318,6 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MINIO_INTERNAL_ADDRESS | string | `"nv-ingest-minio:9000"` |  |
 | envVars.MINIO_PUBLIC_ADDRESS | string | `"http://localhost:9000"` |  |
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
-| envVars.MRC_IGNORE_NUMA_CHECK | int | `1` |  |
 | envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"` |  |
 | envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
 | envVars.NV_INGEST_DEFAULT_TIMEOUT_MS | string | `"1234"` |  |
@@ -325,7 +325,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
-| envVars.REDIS_MORPHEUS_TASK_QUEUE | string | `"morpheus_task_queue"` |  |
+| envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
 | envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
 | envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
