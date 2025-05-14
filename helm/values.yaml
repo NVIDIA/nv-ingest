@@ -809,7 +809,7 @@ redis:
 ## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
 ## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differeing REST endpoint host.
 ## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port.
-## @param envVars.REDIS_MORPHEUS_TASK_QUEUE [default: "morpheus_task_queue"]
+## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"]
 ## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
 ## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set.
 ## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
@@ -836,7 +836,6 @@ redis:
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"]
 ## @param envVars.AUDIO_GRPC_ENDPOINT [default: "audio:50051"]
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.MRC_IGNORE_NUMA_CHECK [default: "1"]
 ## @param envVars.READY_CHECK_ALL_COMPONENTS [default: "true"]
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"]
 envVars:
@@ -845,7 +844,7 @@ envVars:
   NV_INGEST_MAX_UTIL: 48
   MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
   MESSAGE_CLIENT_PORT: "6379"
-  REDIS_MORPHEUS_TASK_QUEUE: "morpheus_task_queue"
+  REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
   NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
 
   MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
@@ -877,7 +876,6 @@ envVars:
   AUDIO_GRPC_ENDPOINT: "audio:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
-  MRC_IGNORE_NUMA_CHECK: 1
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
 

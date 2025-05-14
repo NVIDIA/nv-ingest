@@ -30,7 +30,7 @@ def main():
     ingest_config = PipelineCreationSchema(**config_data)
 
     try:
-        _, _ = run_pipeline(ingest_config, block=True)
+        _ = run_pipeline(ingest_config, block=True)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     except Exception as e:

@@ -16,7 +16,7 @@ import pandas as pd
 from pydantic import BaseModel
 
 from nv_ingest_api.internal.extract.image.image_helpers.common import unstructured_image_extractor
-from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageConfigSchema
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 logger = logging.getLogger(__name__)
@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 def _decode_and_extract_from_image(
     base64_row: pd.Series,
     task_config: Dict[str, Any],
-    validated_extraction_config: ImageExtractorSchema,
+    validated_extraction_config: ImageConfigSchema,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> Any:
     """
@@ -106,10 +106,10 @@ def _decode_and_extract_from_image(
 
         logger.debug(
             f"decode_and_extract: Extracting image content using image_extraction_config: "
-            f"{validated_extraction_config.image_extraction_config}"
+            f"{validated_extraction_config}"
         )
-        if validated_extraction_config.image_extraction_config is not None:
-            extract_params["image_extraction_config"] = validated_extraction_config.image_extraction_config
+        if validated_extraction_config is not None:
+            extract_params["image_extraction_config"] = validated_extraction_config
 
         if execution_trace_log is not None:
             extract_params["trace_info"] = execution_trace_log

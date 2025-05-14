@@ -1,23 +1,26 @@
 dependencies:
 - name: nvidia-nim-nemoretriever-page-elements-v2
   repository: https://helm.ngc.nvidia.com/nim/nvidia
-  version: 1.2.0
+  version: 1.3.0
 - name: nvidia-nim-nemoretriever-graphic-elements-v1
   repository: https://helm.ngc.nvidia.com/nim/nvidia
-  version: 1.2.0
+  version: 1.3.0
 - name: nvidia-nim-nemoretriever-table-structure-v1
   repository: https://helm.ngc.nvidia.com/nim/nvidia
-  version: 1.2.0
+  version: 1.3.0
 - name: nim-vlm
   repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
   version: 1.2.0-ea-v2
 - name: nvidia-nim-paddleocr
   repository: https://helm.ngc.nvidia.com/nim/baidu
-  version: 1.2.0
+  version: 1.3.0
 - name: nvidia-nim-nv-embedqa-e5-v5
   repository: https://helm.ngc.nvidia.com/nim/nvidia
-  version: 1.5.0
+  version: 1.6.0
 - name: nvidia-nim-llama-32-nv-embedqa-1b-v2
+  repository: https://helm.ngc.nvidia.com/nim/nvidia
+  version: 1.6.0
+- name: nvidia-nim-llama-32-nv-rerankqa-1b-v2
   repository: https://helm.ngc.nvidia.com/nim/nvidia
   version: 1.5.0
 - name: riva-nim
@@ -35,5 +38,5 @@ dependencies:
 - name: opentelemetry-collector
   repository: https://open-telemetry.github.io/opentelemetry-helm-charts
   version: 0.78.1
-digest: sha256:7675e65058740aa9ab90e4f3b458f226bd2dd9a992a3ea7353dd2de6f732a26f
-generated: "2025-05-01T10:32:44.178383534-04:00"
+digest: sha256:d4e9759346f00eca736e37015a5abff68767deba7d44f3510d94f3c1af82f876
+generated: "2025-05-05T13:53:52.959390456-04:00"
