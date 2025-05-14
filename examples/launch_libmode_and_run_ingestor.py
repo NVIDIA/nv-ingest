@@ -69,7 +69,7 @@ def main():
 
     pipeline = None
     try:
-        pipeline = run_pipeline(ingest_config, block=False)
+        pipeline = run_pipeline(ingest_config, block=False, disable_dynamic_scaling=True)
         time.sleep(10)
         run_ingestor()
         # Run other code...
