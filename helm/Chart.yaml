@@ -2,7 +2,7 @@ apiVersion: v2
 name: nv-ingest
 description: NV-Ingest Microservice
 type: application
-version: 25.3.0
+version: 25.4.2
 maintainers:
   - name: NVIDIA Corporation
     url: https://www.nvidia.com/
@@ -96,3 +96,8 @@ dependencies:
     repository: https://open-telemetry.github.io/opentelemetry-helm-charts
     version: 0.78.1
     condition: otelDeployed
+
+  - name: prometheus
+    repository: https://prometheus-community.github.io/helm-charts
+    version: 27.12.1
+    condition: prometheus.enabled
