@@ -62,7 +62,7 @@ class PDFExtractorStage(RayActorStage):
             raise
 
     @traceable("pdf_extraction")
-    @filter_by_task(required_tasks=["extract"])
+    @filter_by_task(required_tasks=[("extract", {"document_type": "pdf"})])
     @nv_ingest_node_failure_try_except(annotation_id="pdf_extractor", raise_on_failure=False)
     def on_data(self, control_message: Any) -> Any:
         """

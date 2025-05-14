@@ -184,4 +184,4 @@ def extract_primitives_from_pptx_internal(
     else:
         extracted_df = pd.DataFrame({"document_type": [], "metadata": [], "uuid": []})
 
-    return extracted_df
+    return extracted_df, {}
