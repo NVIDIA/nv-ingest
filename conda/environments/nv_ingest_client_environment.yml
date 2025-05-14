@@ -14,7 +14,7 @@ dependencies:
   - pytest>=8.0.2
   - pytest-mock>=3.14.0
   - pytest-cov>=6.0.0
-  - python>=3.10
+  - python>=3.12
   - python-build>=1.2.2
   - python-docx>=1.1.2
   - python-pptx>=1.0.2

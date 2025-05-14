@@ -11,9 +11,9 @@ authors = [
     {name = "Jeremy Dyer", email = "jdyer@nvidia.com"}
 ]
 license = {file = "LICENSE"}
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 classifiers = [
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
     "Operating System :: OS Independent",
 ]
 dependencies = [
@@ -31,7 +31,7 @@ dependencies = [
     "pyarrow>=19.0.0",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
-    "pymilvus==2.5.4",
+    "pymilvus==2.5.8",
     "pymilvus[bulk_writer,model]",
     "pypdfium2>=4.30.1",
     "python-docx>=1.1.2",
