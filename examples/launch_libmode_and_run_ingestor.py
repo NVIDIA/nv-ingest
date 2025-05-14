@@ -35,11 +35,11 @@ def run_ingestor():
         .files("./data/multimodal_test.pdf")
         .extract(
             extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
+            extract_tables=False,
+            extract_charts=False,
             extract_images=True,
             paddle_output_format="markdown",
-            extract_infographics=True,
+            extract_infographics=False,
             text_depth="page",
         )
         # .split()
