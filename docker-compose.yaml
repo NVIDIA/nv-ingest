@@ -87,7 +87,12 @@ services:
       - table-structure
 
   custom-ocr:
-    image: ${CUSTOM_OCR_IMAGE:-placeholder}:${PADDLE_TAG:-latest}
+    image: ${CUSTOM_OCR_IMAGE:-placeholder}:${CUSTOM_OCR_TAG:-latest}
+    build:
+      context: "./custom_ocr"
+      dockerfile: "Dockerfile"
+      args:
+        - CUSTOM_OCR_BASE_IMAGE=${CUSTOM_OCR_BASE_IMAGE}
     shm_size: 16gb
     ports:
       - "8009:8000"
