@@ -408,7 +408,7 @@ def pdfium_extractor(
         )
 
     # Validate and extract custom_ocr_output_format
-    custom_ocr_output_format_str = extractor_config.get("custom_ocr_output_format", "pseudo_markdown")
+    custom_ocr_output_format_str = extractor_config.get("paddle_output_format", "markdown")
     try:
         custom_ocr_output_format = TableFormatEnum[custom_ocr_output_format_str.upper()]
     except KeyError:
