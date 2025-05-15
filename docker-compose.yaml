@@ -86,25 +86,22 @@ services:
     profiles:
       - table-structure
 
-  paddle:
-    image: ${PADDLE_IMAGE:-nvcr.io/nim/baidu/paddleocr}:${PADDLE_TAG:-latest}
-    shm_size: 2gb
+  custom-ocr:
+    image: ${CUSTOM_OCR_IMAGE:-placeholder}:${PADDLE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8009:8000"
       - "8010:8001"
       - "8011:8002"
     user: root
     environment:
-      - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
     deploy:
       resources:
         reservations:
           devices:
             - driver: nvidia
-              device_ids: ["0"]
+              device_ids: ["1"]
               capabilities: [gpu]
     runtime: nvidia
 
@@ -257,7 +254,7 @@ services:
       - INGEST_EDGE_BUFFER_SIZE=64
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
       #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
-      - INSTALL_AUDIO_EXTRACTION_DEPS=true
+      #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0
       #- MESSAGE_CLIENT_PORT=7671
@@ -277,9 +274,9 @@ services:
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       # Self-hosted paddle endpoints.
-      - PADDLE_GRPC_ENDPOINT=paddle:8001
-      - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
-      - PADDLE_INFER_PROTOCOL=grpc
+      - CUSTOM_OCR_GRPC_ENDPOINT=
+      - CUSTOM_OCR_HTTP_ENDPOINT=http://custom-ocr:8000/infer
+      - CUSTOM_OCR_INFER_PROTOCOL=http
       # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http

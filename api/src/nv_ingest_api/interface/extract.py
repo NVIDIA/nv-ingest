@@ -781,9 +781,9 @@ def extract_chart_data_from_image(
     *,
     df_ledger: pd.DataFrame,
     yolox_endpoints: Tuple[str, str],
-    paddle_endpoints: Tuple[str, str],
+    custom_ocr_endpoints: Tuple[str, str],
     yolox_protocol: str = "grpc",
-    paddle_protocol: str = "grpc",
+    custom_ocr_protocol: str = "grpc",
     auth_token: str = "",
 ) -> DataFrame:
     """
@@ -795,11 +795,11 @@ def extract_chart_data_from_image(
         DataFrame containing metadata required for chart extraction.
     yolox_endpoints : Tuple[str, str]
         YOLOX inference server endpoints.
-    paddle_endpoints : Tuple[str, str]
+    custom_ocr_endpoints : Tuple[str, str]
         PaddleOCR inference server endpoints.
     yolox_protocol : str, optional
         Protocol for YOLOX inference (default "grpc").
-    paddle_protocol : str, optional
+    custom_ocr_protocol : str, optional
         Protocol for PaddleOCR inference (default "grpc").
     auth_token : str, optional
         Authentication token for inference services.
@@ -821,9 +821,9 @@ def extract_chart_data_from_image(
         **{
             "endpoint_config": {
                 "yolox_endpoints": yolox_endpoints,
-                "paddle_endpoints": paddle_endpoints,
+                "custom_ocr_endpoints": custom_ocr_endpoints,
                 "yolox_infer_protocol": yolox_protocol,
-                "paddle_infer_protocol": paddle_protocol,
+                "custom_ocr_infer_protocol": custom_ocr_protocol,
                 "auth_token": auth_token,
             }
         }
@@ -844,9 +844,9 @@ def extract_table_data_from_image(
     *,
     df_ledger: pd.DataFrame,
     yolox_endpoints: Optional[Tuple[str, str]] = None,
-    paddle_endpoints: Optional[Tuple[str, str]] = None,
+    custom_ocr_endpoints: Optional[Tuple[str, str]] = None,
     yolox_protocol: Optional[str] = None,
-    paddle_protocol: Optional[str] = None,
+    custom_ocr_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
 ) -> pd.DataFrame:
     """
@@ -858,11 +858,11 @@ def extract_table_data_from_image(
         DataFrame containing metadata required for chart extraction.
     yolox_endpoints : Optional[Tuple[str, str]], default=None
         YOLOX inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
-    paddle_endpoints : Optional[Tuple[str, str]], default=None
+    custom_ocr_endpoints : Optional[Tuple[str, str]], default=None
         PaddleOCR inference server endpoints. If None, the default defined in ChartExtractorConfigSchema is used.
     yolox_protocol : Optional[str], default=None
         Protocol for YOLOX inference. If None, the default defined in ChartExtractorConfigSchema is used.
-    paddle_protocol : Optional[str], default=None
+    custom_ocr_protocol : Optional[str], default=None
         Protocol for PaddleOCR inference. If None, the default defined in ChartExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
         Authentication token for inference services. If None, the default defined in ChartExtractorConfigSchema is used.
@@ -882,9 +882,9 @@ def extract_table_data_from_image(
     config_kwargs = {
         "endpoint_config": {
             "yolox_endpoints": yolox_endpoints,
-            "paddle_endpoints": paddle_endpoints,
+            "custom_ocr_endpoints": custom_ocr_endpoints,
             "yolox_infer_protocol": yolox_protocol,
-            "paddle_infer_protocol": paddle_protocol,
+            "custom_ocr_infer_protocol": custom_ocr_protocol,
             "auth_token": auth_token,
         }
     }
@@ -907,8 +907,8 @@ def extract_table_data_from_image(
 def extract_infographic_data_from_image(
     *,
     df_ledger: pd.DataFrame,
-    paddle_endpoints: Optional[Tuple[str, str]] = None,
-    paddle_protocol: Optional[str] = None,
+    custom_ocr_endpoints: Optional[Tuple[str, str]] = None,
+    custom_ocr_protocol: Optional[str] = None,
     auth_token: Optional[str] = None,
 ) -> pd.DataFrame:
     """
@@ -924,10 +924,10 @@ def extract_infographic_data_from_image(
     ----------
     df_extraction_ledger : pd.DataFrame
         DataFrame containing the images and associated metadata from which infographic data is to be extracted.
-    paddle_endpoints : Optional[Tuple[str, str]], default=None
+    custom_ocr_endpoints : Optional[Tuple[str, str]], default=None
         A tuple of PaddleOCR endpoint addresses (e.g., (gRPC_endpoint, HTTP_endpoint)) used for inference.
         If None, the default endpoints from InfographicExtractorConfigSchema are used.
-    paddle_protocol : Optional[str], default=None
+    custom_ocr_protocol : Optional[str], default=None
         The protocol (e.g., "grpc" or "http") for PaddleOCR inference.
         If None, the default protocol from InfographicExtractorConfigSchema is used.
     auth_token : Optional[str], default=None
@@ -951,8 +951,8 @@ def extract_infographic_data_from_image(
     extractor_config_kwargs = {
         "endpoint_config": InfographicExtractorConfigSchema(
             **{
-                "paddle_endpoints": paddle_endpoints,
-                "paddle_infer_protocol": paddle_protocol,
+                "custom_ocr_endpoints": custom_ocr_endpoints,
+                "custom_ocr_infer_protocol": custom_ocr_protocol,
                 "auth_token": auth_token,
             }
         )
