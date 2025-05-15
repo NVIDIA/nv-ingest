@@ -66,9 +66,7 @@ class PipelineCreationSchema(BaseModel):
     otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 
     # OCR settings
-    custom_ocr_http_endpoint: str = os.getenv(
-        "CUSTOM_OCR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/custom-ocr"
-    )
+    custom_ocr_http_endpoint: str = os.getenv("CUSTOM_OCR_HTTP_ENDPOINT", "")
     custom_ocr_infer_protocol: str = os.getenv("PADDLE_INFER_PROTOCOL", "http")
 
     # Task queue settings

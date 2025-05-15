@@ -1,15 +1,19 @@
 import base64
 import json
-import os
-import time
 import logging
+import time
+from typing import List
+
 import torch
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
-from typing import List
-from torchvision.io import read_file, decode_image, ImageReadMode
-from torch.utils.data import Dataset, DataLoader
+from scene_text_inference import SceneTextAPI
+from torch.utils.data import DataLoader
+from torch.utils.data import Dataset
+from torchvision.io import ImageReadMode
+from torchvision.io import decode_image
+from torchvision.io import read_file
 
 # Set the root logger to WARNING so that standard INFO logs are not printed.
 logging.basicConfig(level=logging.WARNING)
@@ -25,8 +29,6 @@ if not perf_logger.hasHandlers():
     perf_logger.addHandler(perf_handler)
 
 # Initialize your inference API.
-from scene_text_inference import SceneTextAPI
-
 scene_text = SceneTextAPI("rtx_v2")
 
 app = FastAPI()
@@ -80,9 +82,7 @@ def decode_base64_image_torch(data_url: str) -> torch.Tensor:
         raise ValueError("Invalid base64 encoding.") from e
 
     writable_buf = bytearray(image_bytes)
-    image_tensor = decode_image(
-        torch.frombuffer(writable_buf, dtype=torch.uint8), mode=ImageReadMode.RGB
-    )
+    image_tensor = decode_image(torch.frombuffer(writable_buf, dtype=torch.uint8), mode=ImageReadMode.RGB)
     return image_tensor
 
 
@@ -118,9 +118,7 @@ def infer_single(single_item: InferenceRequest):
         elif single_item.type == "image_path":
             tensor = load_image_as_tensor(single_item.url)
         else:
-            return JSONResponse(
-                content={"error": f"Unsupported type: {single_item.type}"}
-            )
+            return JSONResponse(content={"error": f"Unsupported type: {single_item.type}"})
         data_loading_end = time.time()
         data_loading_time = data_loading_end - data_loading_start
 
@@ -159,9 +157,7 @@ def infer(batch: BatchRequest):
         total_inference_time = 0.0
         for image_batch in dataloader:
             image_batch = image_batch.squeeze()
-            image_batch = (
-                image_batch.to("cuda", non_blocking=True).to(torch.float32) / 255.0
-            )
+            image_batch = image_batch.to("cuda", non_blocking=True).to(torch.float32) / 255.0
             inference_start = time.time()
             result = scene_text.infer(image_batch)
             inference_end = time.time()
