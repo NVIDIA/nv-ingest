@@ -466,7 +466,7 @@ def _extract_text_and_bounding_boxes(
     inference_results = nemoretriever_parse_client.infer(
         data=data,
         model_name="nemoretriever_parse",
-        stage_name="pdf_content_extractor",
+        stage_name="pdf_extraction",
         max_batch_size=NEMORETRIEVER_PARSE_MAX_BATCH_SIZE,
         execution_trace_log=execution_trace_log,
     )

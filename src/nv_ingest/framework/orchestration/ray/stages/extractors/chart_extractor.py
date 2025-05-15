@@ -69,11 +69,12 @@ class ChartExtractorStage(RayActorStage):
         logger.debug("ChartExtractorStage: Task config extracted: %s", task_config)
 
         # Perform chart data extraction.
+        execution_trace_log = {}
         new_df, extraction_info = extract_chart_data_from_image_internal(
             df_extraction_ledger=df_payload,
             task_config=task_config,
             extraction_config=self.validated_config,
-            execution_trace_log=None,
+            execution_trace_log=execution_trace_log,
         )
         logger.info("ChartExtractorStage: Chart extraction completed. New payload has %d rows.", len(new_df))
 
@@ -82,4 +83,10 @@ class ChartExtractorStage(RayActorStage):
         # Annotate the message with extraction info.
         control_message.set_metadata("chart_extraction_info", extraction_info)
         logger.info("ChartExtractorStage: Metadata injection complete. Returning updated control message.")
+
+        do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
+        if do_trace_tagging and execution_trace_log:
+            for key, ts in execution_trace_log.items():
+                control_message.set_timestamp(key, ts)
+
         return control_message
