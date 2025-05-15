@@ -17,9 +17,8 @@ NeMo Retriever extraction enables parallelization of splitting documents into pa
 From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
-!!! note
-
-    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+> [!Note]
+> Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 The following diagram shows the Nemo Retriever extraction pipeline.
