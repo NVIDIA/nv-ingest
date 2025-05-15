@@ -27,7 +27,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
-from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.vdb.milvus import Milvus
 
 import nv_ingest_client.client.interface as module_under_test
 
@@ -201,13 +201,13 @@ def test_store_task_some_args_extra_param(ingestor):
 def test_vdb_upload_task_no_args(ingestor):
     ingestor.vdb_upload()
 
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
 
 
 def test_vdb_upload_task_some_args(ingestor):
     ingestor.vdb_upload(filter_errors=True)
 
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
 
 
 def test_caption_task_no_args(ingestor):
@@ -234,7 +234,7 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
     assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 8
 
 

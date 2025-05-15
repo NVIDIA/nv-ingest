@@ -8,19 +8,19 @@ class VDB(ABC):
         self.__dict__.update(kwargs)
 
     @abstractmethod
-    def create_index(self, collection_name: str):
+    def create_index(self, **kwargs):
         pass
 
     @abstractmethod
-    def write_to_index(self, collection_name: str, schema: dict):
+    def write_to_index(self, records: list, **kwargs):
         pass
 
     @abstractmethod
-    def search_index(self, collection_name: str, records: list):
+    def retrieval(self, queries: list, **kwargs):
         pass
 
     @abstractmethod
-    def reindex(self, collection_name: str, records: list):
+    def reindex(self, records: list, **kwargs):
         pass
 
     @abstractmethod

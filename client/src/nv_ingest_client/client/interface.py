@@ -39,7 +39,8 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.util.milvus import Milvus
+from nv_ingest_client.util.vdb import VDB
+from nv_ingest_client.util.vdb import available_vdb_ops
 from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.processing import check_schema
 from tqdm import tqdm
@@ -315,7 +316,6 @@ class Ingestor:
 
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(results)
-            self._vdb_bulk_upload = None
 
         return (results, failures) if return_failures else results
 
@@ -366,8 +366,6 @@ class Ingestor:
 
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(combined_future.result())
-            # only upload as part of jobs user specified this action
-            self._vdb_bulk_upload = None
 
         return combined_future
 
@@ -592,7 +590,18 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        self._vdb_bulk_upload = Milvus(**kwargs)
+        vdb_op = kwargs.pop("vdb_op", "milvus")
+        if isinstance(vdb_op, str):
+            vdb_op = available_vdb_ops.get(vdb_op, None)
+            if not vdb_op:
+                raise ValueError(f"Invalid op string: {vdb_op}, Supported ops: {available_vdb_ops.keys()}")
+            vdb_op = vdb_op(**kwargs)
+        elif isinstance(vdb_op, VDB):
+            vdb_op = vdb_op
+        else:
+            raise ValueError(f"Invalid type for op: {type(vdb_op)}, must be type VDB or str.")
+
+        self._vdb_bulk_upload = vdb_op
 
         return self
 
