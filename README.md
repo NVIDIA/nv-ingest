@@ -4,14 +4,23 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# NVIDIA Ingest: Multi-modal data extraction
+# What is NeMo Retriever Extraction?
 
-NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, text files, Microsoft Word and PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts, and unstructured images that you can use in downstream generative applications.
+NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
+NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
+to find, contextualize, and extract text, tables, charts and images that you can use in downstream generative applications.
 
 > [!Note]
-> NVIDIA Ingest is also known as NV-Ingest and [NeMo Retriever extraction](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+> NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database, such as [Milvus](https://milvus.io/).
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
+and optionally manage storing into a vector database [Milvus](https://milvus.io/).
+
+!!! note
+
+    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
 
 The following diagram shows the Nemo Retriever extraction pipeline.
 
@@ -49,6 +58,15 @@ NV-Ingest supports the following file types:
 - `sh` (treated as text)
 - `tiff`
 - `txt`
+
+
+### What NeMo Retriever Extraction Isn't
+
+NeMo Retriever extraction does not do the following:
+
+- Run a static pipeline or fixed set of operations on every submitted document.
+- Act as a wrapper for any specific document parsing library.
+
 
 For more information, see the [full NV Ingest documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
