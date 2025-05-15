@@ -54,6 +54,5 @@ def test_dummy_message_broker_client_ping_works():
 def test_dummy_message_broker_client_fetch_message_works():
     client = DummyMessageBrokerClient("localhost", 6379)
     result = client.fetch_message("job-123", timeout=(50, None), override_fetch_mode=FetchMode.NON_DESTRUCTIVE)
-    assert isinstance(result, ResponseSchema)
-    assert result.status == "OK"
-    assert result.data["job_index"] == "job-123"
+    assert result.response_code == 200
+    assert result.response["job_index"] == "job-123"
