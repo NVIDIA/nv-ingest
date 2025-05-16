@@ -189,6 +189,8 @@ def nemoretriever_parse_extractor(
     pdf_metadata = extract_pdf_metadata(doc, source_id)
     page_count = pdf_metadata.page_count
 
+    pdf_bytes = pdf_stream.getbuffer().tobytes()
+
     source_metadata = {
         "source_name": pdf_metadata.filename,
         "source_id": source_id,
@@ -217,21 +219,30 @@ def nemoretriever_parse_extractor(
     max_workers = nemoretriever_parse_config.workers_per_progress_engine
     with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as executor:
 
-        for page_idx in range(page_count):
-            page = doc.get_page(page_idx)
+        def _render_page(pdf_bytes: bytes, idx: int):
+            with pdfium.PdfDocument(io.BytesIO(pdf_bytes)) as _d:
+                p = _d.get_page(idx)
+                p_img, _ = _convert_pdfium_page_to_numpy_for_parser(p)
+                y_img, y_pad = _convert_pdfium_page_to_numpy_for_yolox(p)
+                p.close()
+            return idx, p_img, y_img, y_pad
 
-            page_image, padding_offset = _convert_pdfium_page_to_numpy_for_parser(page)
-            pages_for_ocr.append((page_idx, page_image))
-            page_image_for_tables, padding_offset_for_tables = _convert_pdfium_page_to_numpy_for_yolox(page)
-            pages_for_tables.append((page_idx, page_image_for_tables, padding_offset_for_tables))
+        render_workers = min(cpu_count(), 8)
+        render_pool = ThreadPoolExecutor(max_workers=render_workers)
+        render_futs = [
+            render_pool.submit(_render_page, pdf_bytes, i) for i in range(page_count)
+        ]
 
-            page.close()
+        for fut in as_completed(render_futs):
+            page_idx, parser_img, yolox_img, yolox_pad = fut.result()
+            pages_for_ocr.append((page_idx, parser_img))
+            pages_for_tables.append((page_idx, yolox_img, yolox_pad))
 
             # Whenever pages_as_images hits NEMORETRIEVER_PARSE_MAX_BATCH_SIZE, submit a job
-            if (extract_text) and (len(pages_for_ocr) >= NEMORETRIEVER_PARSE_MAX_BATCH_SIZE):
+            if extract_text and len(pages_for_ocr) >= NEMORETRIEVER_PARSE_MAX_BATCH_SIZE:
                 future_parser = executor.submit(
                     lambda *args, **kwargs: ("parser", _extract_text_and_bounding_boxes(*args, **kwargs)),
-                    pages_for_ocr[:],  # pass a copy
+                    pages_for_ocr[:],
                     nemoretriever_parse_client,
                     execution_trace_log=execution_trace_log,
                 )
@@ -246,7 +257,7 @@ def nemoretriever_parse_extractor(
             ):
                 future_yolox = executor.submit(
                     lambda *args, **kwargs: ("yolox", _extract_page_elements(*args, **kwargs)),
-                    pages_for_tables[:],  # pass a copy
+                    pages_for_tables[:],
                     page_count,
                     source_metadata,
                     base_unified_metadata,
@@ -262,6 +273,7 @@ def nemoretriever_parse_extractor(
                 futures.append(future_yolox)
                 pages_for_tables.clear()
 
+        render_pool.shutdown(wait=True)
         # After page loop, if we still have leftover pages_as_images, submit one last job
         if extract_text and pages_for_ocr:
             future_parser = executor.submit(
