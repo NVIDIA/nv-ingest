@@ -22,6 +22,7 @@ from multiprocessing import cpu_count
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
+import io
 import pandas as pd
 import pypdfium2 as libpdfium
 
