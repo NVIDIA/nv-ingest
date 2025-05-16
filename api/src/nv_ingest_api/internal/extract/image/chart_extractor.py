@@ -27,7 +27,7 @@ from nv_ingest_api.util.nim import create_inference_client
 PADDLE_MIN_WIDTH = 32
 PADDLE_MIN_HEIGHT = 32
 
-logger = logging.getLogger(f"morpheus.{__name__}")
+logger = logging.getLogger(f"ray.{__name__}")
 
 
 def _filter_valid_chart_images(
@@ -80,7 +80,7 @@ def _run_chart_inference(
             yolox_client.infer,
             data=data_yolox,
             model_name="yolox",
-            stage_name="chart_data_extraction",
+            stage_name="chart_extraction",
             max_batch_size=8,
             trace_info=trace_info,
         )
@@ -88,7 +88,7 @@ def _run_chart_inference(
             paddle_client.infer,
             data=data_paddle,
             model_name="paddle",
-            stage_name="chart_data_extraction",
+            stage_name="chart_extraction",
             max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )

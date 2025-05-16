@@ -29,14 +29,14 @@ class PipelineCreationSchema(BaseModel):
     """
     Schema for pipeline creation configuration.
 
-    Contains all parameters required to set up and execute a Morpheus pipeline,
+    Contains all parameters required to set up and execute the pipeline,
     including endpoints, API keys, and processing options.
     """
 
     # Audio processing settings
     audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
     audio_function_id: str = os.getenv("AUDIO_FUNCTION_ID", "1598d209-5e27-4d3c-8079-4751568b1081")
-    audio_infer_protocol: str = "grpc"
+    audio_infer_protocol: str = os.getenv("AUDIO_INFER_PROTOCOL", "grpc")
 
     # Embedding model settings
     embedding_nim_endpoint: str = os.getenv("EMBEDDING_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
@@ -44,21 +44,18 @@ class PipelineCreationSchema(BaseModel):
 
     # General pipeline settings
     ingest_log_level: str = os.getenv("INGEST_LOG_LEVEL", "INFO")
-    max_ingest_process_workers: str = "16"
+    max_ingest_process_workers: str = os.getenv("MAX_INGEST_PROCESS_WORKERS", "16")
 
     # Messaging configuration
     message_client_host: str = os.getenv("MESSAGE_CLIENT_HOST", "localhost")
     message_client_port: str = os.getenv("MESSAGE_CLIENT_PORT", "7671")
     message_client_type: str = os.getenv("MESSAGE_CLIENT_TYPE", "simple")
 
-    # Hardware configuration
-    mrc_ignore_numa_check: str = "1"
-
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
         "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
-    nemoretriever_parse_infer_protocol: str = "http"
+    nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
     nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
 
     # API keys
@@ -70,10 +67,10 @@ class PipelineCreationSchema(BaseModel):
 
     # OCR settings
     paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
-    paddle_infer_protocol: str = "http"
+    paddle_infer_protocol: str = os.getenv("PADDLE_INFER_PROTOCOL", "http")
 
     # Task queue settings
-    redis_morpheus_task_queue: str = "morpheus_task_queue"
+    REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
 
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
@@ -81,30 +78,44 @@ class PipelineCreationSchema(BaseModel):
     )
     vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
-    # YOLOX model endpoints for various document processing tasks
+    # YOLOX image processing settings
     yolox_graphic_elements_http_endpoint: str = os.getenv(
         "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
         "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1",
     )
-    yolox_graphic_elements_infer_protocol: str = "http"
+    yolox_graphic_elements_infer_protocol: str = os.getenv("YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL", "http")
+
+    # YOLOX page elements settings
     yolox_http_endpoint: str = os.getenv(
         "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
-    yolox_infer_protocol: str = "http"
+    yolox_infer_protocol: str = os.getenv("YOLOX_INFER_PROTOCOL", "http")
+
+    # YOLOX table structure settings
     yolox_table_structure_http_endpoint: str = os.getenv(
         "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
     )
-    yolox_table_structure_infer_protocol: str = "http"
+    yolox_table_structure_infer_protocol: str = os.getenv("YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL", "http")
 
     model_config = ConfigDict(extra="forbid")
 
 
-def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tuple[Union[RayPipeline, None], float]:
+def _launch_pipeline(
+    ingest_config: PipelineCreationSchema,
+    block: bool,
+    disable_dynamic_scaling: bool = None,
+    dynamic_memory_threshold: float = None,
+) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
     dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
+    if disable_dynamic_scaling is not None:
+        dynamic_memory_scaling = not disable_dynamic_scaling
+
+    dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
+
     scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=DYNAMIC_MEMORY_THRESHOLD
+        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
     )
 
     pipeline = RayPipeline(scaling_config=scaling_config)
@@ -145,8 +156,13 @@ def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tupl
         return pipeline, 0.0
 
 
-def run_pipeline(ingest_config: PipelineCreationSchema, block: bool = True) -> Union[RayPipeline, float]:
-    pipeline, total_elapsed = _launch_pipeline(ingest_config, block)
+def run_pipeline(
+    ingest_config: PipelineCreationSchema,
+    block: bool = True,
+    disable_dynamic_scaling: bool = None,
+    dynamic_memory_threshold: float = None,
+) -> Union[RayPipeline, float]:
+    pipeline, total_elapsed = _launch_pipeline(ingest_config, block, disable_dynamic_scaling, dynamic_memory_threshold)
 
     if block:
         logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")

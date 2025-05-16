@@ -130,7 +130,7 @@ if __name__ == "__main__":
     # Create configuration instances for the source and sink stages.
     source_config = MessageBrokerTaskSourceConfig(
         broker_client=simple_config,
-        task_queue="morpheus_task_queue",
+        task_queue="ingest_task_queue",
         poll_interval=0.1,
     )
     sink_config = MessageBrokerTaskSinkConfig(
