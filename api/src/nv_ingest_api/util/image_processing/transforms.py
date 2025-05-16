@@ -391,30 +391,23 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
     Raises
     ------
     ValueError
-        If the base64 string is invalid or cannot be decoded into an image.
-    ImportError
-        If required libraries are not installed.
-
-    Examples
-    --------
-    >>> base64_str = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD...'
-    >>> img_array = base64_to_numpy(base64_str)
+        If the base64 string is invalid or cannot be
     """
     try:
-        # Decode the base64 string
-        image_data = base64.b64decode(base64_string)
+        img_bytes = base64.b64decode(base64_string)
     except (base64.binascii.Error, ValueError) as e:
         raise ValueError("Invalid base64 string") from e
 
+    buf_tensor = torch.frombuffer(bytearray(img_bytes), dtype=torch.uint8)
+
+    # decode (RGB) → C×H×W
     try:
-        writable_buf = bytearray(image_data)
-        image_tensor = decode_image(
-            torch.frombuffer(writable_buf, dtype=torch.uint8), mode=ImageReadMode.RGB
-        )
-    except UnidentifiedImageError as e:
-        raise ValueError("Unable to decode image from base64 string") from e
+        img_tensor = decode_image(buf_tensor, mode=ImageReadMode.RGB)
+    except RuntimeError as e:
+        raise ValueError("Unable to decode image data") from e
 
-    # Convert the image to a NumPy array
-    image_array = image_tensor.numpy()
+    # reorder to H×W×C and make contiguous
+    img_tensor = img_tensor.permute(1, 2, 0).contiguous()
 
-    return image_array
+    #  tensor → NumPy
+    return img_tensor.numpy()
