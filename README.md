@@ -18,7 +18,7 @@ From there, NeMo Retriever extraction can optionally manage computation of embed
 and optionally manage storing into a vector database [Milvus](https://milvus.io/).
 
 > [!Note]
-> Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+> Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 The following diagram shows the Nemo Retriever extraction pipeline.
@@ -26,24 +26,24 @@ The following diagram shows the Nemo Retriever extraction pipeline.
 ![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
 
 ## Table of Contents
-1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
+1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
-3. [Quickstart](#quickstart)
-4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
+3. [Quickstart](#library-mode-quickstart)
+4. [GitHub Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
 
-## What NVIDIA-Ingest Is
+## What NeMo Retriever Extraction Is
 
-NV-Ingest is a library and microservice service that does the following:
+NeMo Retriever Extraction is a library and microservice service that does the following:
 
 - Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents nv-ingest supports extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of before and after processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 
-NV-Ingest supports the following file types:
+NeMo Retriever Extraction supports the following file types:
 
 - `pdf`
 - `docx`
@@ -63,7 +63,7 @@ NeMo Retriever extraction does not do the following:
 - Act as a wrapper for any specific document parsing library.
 
 
-For more information, see the [full NV Ingest documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+For more information, see the [full NeMo Retriever Extraction documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
 
 ## Prerequisites
@@ -287,9 +287,9 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 
-## NV Ingest Repository Structure
+## GitHub Repository Structure
 
-The following is a description of the folders in the nv-ingest repository.
+The following is a description of the folders in the GitHub repository.
 
 - [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer) — VSCode containers for local development
 - [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github) — GitHub repo configuration files
