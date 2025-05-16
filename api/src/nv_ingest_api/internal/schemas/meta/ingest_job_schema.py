@@ -160,29 +160,40 @@ class IngestTaskSchema(BaseModelNoExt):
     @model_validator(mode="before")
     @classmethod
     def check_task_properties_type(cls, values):
-        task_type, task_properties = values.get("type"), values.get("task_properties", {})
-        if task_type and task_properties:
-            expected_type = {
-                TaskTypeEnum.CAPTION: IngestTaskCaptionSchema,
-                TaskTypeEnum.DEDUP: IngestTaskDedupSchema,
-                TaskTypeEnum.EMBED: IngestTaskEmbedSchema,
-                TaskTypeEnum.EXTRACT: IngestTaskExtractSchema,
-                TaskTypeEnum.FILTER: IngestTaskFilterSchema,  # Extend mapping as necessary
-                TaskTypeEnum.SPLIT: IngestTaskSplitSchema,
-                TaskTypeEnum.STORE_EMBEDDING: IngestTaskStoreEmbedSchema,
-                TaskTypeEnum.STORE: IngestTaskStoreSchema,
-                TaskTypeEnum.VDB_UPLOAD: IngestTaskVdbUploadSchema,
-                TaskTypeEnum.AUDIO_DATA_EXTRACT: IngestTaskAudioExtraction,
-                TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
-                TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
-                TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
-            }.get(
-                task_type
-            )  # Removed .upper()
+        task_type = values.get("type")
+        task_properties = values.get("task_properties", {})
 
-            # Validate task_properties against the expected schema.
-            validated_task_properties = expected_type(**task_properties)
-            values["task_properties"] = validated_task_properties
+        # Ensure task_type is lowercased and converted to enum early
+        if isinstance(task_type, str):
+            task_type = task_type.lower()
+            try:
+                task_type = TaskTypeEnum(task_type)
+            except ValueError:
+                raise ValueError(f"{task_type} is not a valid TaskTypeEnum value")
+
+        task_type_to_schema = {
+            TaskTypeEnum.CAPTION: IngestTaskCaptionSchema,
+            TaskTypeEnum.DEDUP: IngestTaskDedupSchema,
+            TaskTypeEnum.EMBED: IngestTaskEmbedSchema,
+            TaskTypeEnum.EXTRACT: IngestTaskExtractSchema,
+            TaskTypeEnum.FILTER: IngestTaskFilterSchema,
+            TaskTypeEnum.SPLIT: IngestTaskSplitSchema,
+            TaskTypeEnum.STORE_EMBEDDING: IngestTaskStoreEmbedSchema,
+            TaskTypeEnum.STORE: IngestTaskStoreSchema,
+            TaskTypeEnum.VDB_UPLOAD: IngestTaskVdbUploadSchema,
+            TaskTypeEnum.AUDIO_DATA_EXTRACT: IngestTaskAudioExtraction,
+            TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
+            TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
+            TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+        }
+
+        expected_schema_cls = task_type_to_schema.get(task_type)
+        if expected_schema_cls is None:
+            raise ValueError(f"Unsupported or missing task_type '{task_type}'")
+
+        validated_task_properties = expected_schema_cls(**task_properties)
+        values["type"] = task_type  # ensure type is now always the enum
+        values["task_properties"] = validated_task_properties
         return values
 
     @field_validator("type", mode="before")

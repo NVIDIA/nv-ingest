@@ -99,14 +99,11 @@ def _decode_and_extract_from_pptx(
 
     # Retrieve extraction parameters (and remove boolean flags as they are consumed).
     extract_params: Dict[str, Any] = prepared_task_props.get("params", {})
-    try:
-        extract_text: bool = extract_params.pop("extract_text", False)
-        extract_images: bool = extract_params.pop("extract_images", False)
-        extract_tables: bool = extract_params.pop("extract_tables", False)
-        extract_charts: bool = extract_params.pop("extract_charts", False)
-        extract_infographics: bool = extract_params.pop("extract_infographics", False)
-    except KeyError as e:
-        raise ValueError(f"Missing required extraction flag: {e}")
+    extract_text: bool = extract_params.pop("extract_text", False)
+    extract_images: bool = extract_params.pop("extract_images", False)
+    extract_tables: bool = extract_params.pop("extract_tables", False)
+    extract_charts: bool = extract_params.pop("extract_charts", False)
+    extract_infographics: bool = extract_params.pop("extract_infographics", False)
 
     # Inject additional configuration and trace information.
     if getattr(extraction_config, "pptx_extraction_config", None) is not None:

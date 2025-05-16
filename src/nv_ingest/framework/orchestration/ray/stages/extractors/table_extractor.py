@@ -67,11 +67,12 @@ class TableExtractorStage(RayActorStage):
         logger.debug("Extracted task configuration: %s", task_config)
 
         # Perform table data extraction.
+        execution_trace_log = {}
         new_df, extraction_info = extract_table_data_from_image_internal(
             df_extraction_ledger=df_payload,
             task_config=task_config,
             extraction_config=self.validated_config,
-            execution_trace_log=None,
+            execution_trace_log=execution_trace_log,
         )
         logger.info("Table extraction completed. Extracted %d rows.", len(new_df))
 
@@ -80,5 +81,10 @@ class TableExtractorStage(RayActorStage):
         # Annotate the message with extraction info.
         control_message.set_metadata("table_extraction_info", extraction_info)
         logger.info("Table extraction metadata injected successfully.")
+
+        do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
+        if do_trace_tagging and execution_trace_log:
+            for key, ts in execution_trace_log.items():
+                control_message.set_timestamp(key, ts)
 
         return control_message
