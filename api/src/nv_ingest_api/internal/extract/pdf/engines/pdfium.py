@@ -18,6 +18,7 @@
 
 import concurrent.futures
 import logging
+from multiprocessing import cpu_count
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
@@ -480,8 +481,28 @@ def pdfium_extractor(
     accumulated_text = []
 
     # Prepare for table/chart extraction
-    pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
+    pages_for_tables = []  # (page_idx, np_image, pad_offset)
     futures = []  # To track asynchronous table/chart extraction tasks
+
+    # ---------- pre-render pages in a lightweight pool ----------
+    pdf_bytes = pdf_stream.getbuffer().tobytes()
+
+    def _render_page(pdf_bytes: bytes, idx: int):
+        # Each thread opens its own document (pdfium isn’t thread-safe per doc)
+        with libpdfium.PdfDocument(io.BytesIO(pdf_bytes)) as _d:
+            p = _d.get_page(idx)
+            imgs, pads = pdfium_pages_to_numpy(
+                [p],
+                scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                trace_info=execution_trace_log,
+            )
+            p.close()
+        return idx, imgs[0], pads[0]
+
+    render_workers = min(cpu_count(), 8)
+    with concurrent.futures.ThreadPoolExecutor(max_workers=render_workers) as _render_pool:
+        render_futs = [_render_pool.submit(_render_page, pdf_bytes, i) for i in range(page_count)]
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
@@ -526,13 +547,8 @@ def pdfium_extractor(
 
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts or extract_infographics:
-                image, padding_offsets = pdfium_pages_to_numpy(
-                    [page],
-                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    trace_info=execution_trace_log,
-                )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                idx_r, img, pad = render_futs[page_idx].result()     # waits if not done
+                pages_for_tables.append((idx_r, img, pad))
 
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
