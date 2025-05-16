@@ -1065,8 +1065,8 @@ def hybrid_retrieval(
 
 def nvingest_retrieval(
     queries,
-    vdb_op: VDB = None,
     collection_name: str = None,
+    vdb_op: VDB = None,
     milvus_uri: str = "http://localhost:19530",
     top_k: int = 5,
     hybrid: bool = False,
@@ -1778,105 +1778,3 @@ class Milvus(VDB):
                 self.write_to_index(records, collection_name=coll_name, **sub_write_params)
         else:
             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
-
-
-# class MilvusOperator:
-#     def __init__(
-#         self,
-#         collection_name: Union[str, Dict] = "nv_ingest_collection",
-#         milvus_uri: str = "http://localhost:19530",
-#         sparse: bool = False,
-#         recreate: bool = True,
-#         gpu_index: bool = True,
-#         gpu_search: bool = True,
-#         dense_dim: int = 2048,
-#         minio_endpoint: str = "localhost:9000",
-#         enable_text: bool = True,
-#         enable_charts: bool = True,
-#         enable_tables: bool = True,
-#         enable_images: bool = True,
-#         enable_infographics: bool = True,
-#         bm25_save_path: str = "bm25_model.json",
-#         compute_bm25_stats: bool = True,
-#         access_key: str = "minioadmin",
-#         secret_key: str = "minioadmin",
-#         bucket_name: str = "a-bucket",
-#         meta_dataframe: Union[str, pd.DataFrame] = None,
-#         meta_source_field: str = None,
-#         meta_fields: list[str] = None,
-#         stream: bool = False,
-#         **kwargs,
-#     ):
-#         """
-#         Initializes the Milvus operator class with the specified configuration parameters.
-#         Args:
-#             collection_name (Union[str, Dict], optional): The name of the Milvus collection or a dictionary
-#                 containing collection configuration. Defaults to "nv_ingest_collection".
-#             milvus_uri (str, optional): The URI of the Milvus server. Defaults to "http://localhost:19530".
-#             sparse (bool, optional): Whether to use sparse indexing. Defaults to False.
-#             recreate (bool, optional): Whether to recreate the collection if it already exists. Defaults to True.
-#             gpu_index (bool, optional): Whether to use GPU for indexing. Defaults to True.
-#             gpu_search (bool, optional): Whether to use GPU for search operations. Defaults to True.
-#             dense_dim (int, optional): The dimensionality of dense vectors. Defaults to 2048.
-#             minio_endpoint (str, optional): The endpoint for the MinIO server. Defaults to "localhost:9000".
-#             enable_text (bool, optional): Whether to enable text data ingestion. Defaults to True.
-#             enable_charts (bool, optional): Whether to enable chart data ingestion. Defaults to True.
-#             enable_tables (bool, optional): Whether to enable table data ingestion. Defaults to True.
-#             enable_images (bool, optional): Whether to enable image data ingestion. Defaults to True.
-#             enable_infographics (bool, optional): Whether to enable infographic data ingestion. Defaults to True.
-#             bm25_save_path (str, optional): The file path to save the BM25 model. Defaults to "bm25_model.json".
-#             compute_bm25_stats (bool, optional): Whether to compute BM25 statistics. Defaults to True.
-#             access_key (str, optional): The access key for MinIO authentication. Defaults to "minioadmin".
-#             secret_key (str, optional): The secret key for MinIO authentication. Defaults to "minioadmin".
-#             bucket_name (str, optional): The name of the MinIO bucket. Defaults to "a-bucket".
-#             meta_dataframe (Union[str, pd.DataFrame], optional): A metadata DataFrame or the path to a CSV file
-#                 containing metadata. Defaults to None.
-#             meta_source_field (str, optional): The field in the metadata that serves as the source identifier.
-#                 Defaults to None.
-#             meta_fields (list[str], optional): A list of metadata fields to include. Defaults to None.
-#             **kwargs: Additional keyword arguments for customization.
-#             stream (bool, optional): When true, the records will be inserted into milvus using the stream
-#                 insert method.
-#         """
-
-#         self.milvus_kwargs = locals()
-#         self.milvus_kwargs.pop("self")
-#         self.collection_name = self.milvus_kwargs.pop("collection_name")
-#         for k, v in self.milvus_kwargs.pop("kwargs", {}).items():
-#             self.milvus_kwargs[k] = v
-#         self.op = Milvus()
-
-#     def get_connection_params(self):
-#         conn_dict = {
-#             "milvus_uri": self.milvus_kwargs["milvus_uri"],
-#             "sparse": self.milvus_kwargs["sparse"],
-#             "recreate": self.milvus_kwargs["recreate"],
-#             "gpu_index": self.milvus_kwargs["gpu_index"],
-#             "gpu_search": self.milvus_kwargs["gpu_search"],
-#             "dense_dim": self.milvus_kwargs["dense_dim"],
-#         }
-#         return (self.collection_name, conn_dict)
-
-#     def get_write_params(self):
-#         write_params = self.milvus_kwargs.copy()
-#         del write_params["recreate"]
-#         del write_params["gpu_index"]
-#         del write_params["gpu_search"]
-#         del write_params["dense_dim"]
-
-#         return (self.collection_name, write_params)
-
-#     def run(self, records):
-#         collection_name, create_params = self.get_connection_params()
-#         _, write_params = self.get_write_params()
-#         if isinstance(collection_name, str):
-#             self.op.create_index(collection_name=collection_name, **create_params)
-#             self.op.write_to_index(records, collection_name=collection_name, **write_params)
-#         elif isinstance(collection_name, dict):
-#             split_params_list = _dict_to_params(collection_name, write_params)
-#             for sub_params in split_params_list:
-#                 coll_name, sub_write_params = sub_params
-#                 self.op.create_index(collection_name=coll_name, **create_params)
-#                 self.op.write_to_index(records, collection_name=coll_name, **sub_write_params)
-#         else:
-#             raise ValueError(f"Unsupported type for collection_name detected: {type(collection_name)}")
