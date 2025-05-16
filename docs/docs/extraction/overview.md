@@ -14,7 +14,7 @@ and optionally manage storing into a vector database [Milvus](https://milvus.io/
 
 !!! note
 
-    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run nv-ingest on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [nv-ingest 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+    Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
 
 
 
@@ -28,7 +28,7 @@ NeMo Retriever extraction is a microservice service that does the following:
 
 - Accept a JSON job description, containing a document payload, and a set of ingestion tasks to perform on that payload.
 - Allow the results of a job to be retrieved. The result is a JSON dictionary that contains a list of metadata describing objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, we support extraction through pdfium, Unstructured.io, and Adobe Content Extraction Services.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of pre- and post- processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 NeMo Retriever extraction supports the following file types:
