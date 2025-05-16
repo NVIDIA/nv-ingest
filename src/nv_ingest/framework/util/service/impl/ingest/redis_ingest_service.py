@@ -63,7 +63,7 @@ class RedisIngestService(IngestServiceMeta):
         if RedisIngestService.__shared_instance is None:
             redis_host: str = os.getenv("MESSAGE_CLIENT_HOST", "localhost")
             redis_port: int = int(os.getenv("MESSAGE_CLIENT_PORT", "6379"))
-            redis_task_queue: str = os.getenv("REDIS_MORPHEUS_TASK_QUEUE", "morpheus_task_queue")
+            redis_task_queue: str = os.getenv("REDIS_INGEST_TASK_QUEUE", "ingest_task_queue")
 
             fetch_mode: "FetchMode" = get_fetch_mode_from_env()
             result_data_ttl: int = int(os.getenv("RESULT_DATA_TTL_SECONDS", "3600"))
@@ -264,7 +264,7 @@ class RedisIngestService(IngestServiceMeta):
                 logger.warning(f"fetch_message for {job_id} returned None unexpectedly.")
                 raise TimeoutError("No data found (unexpected None response).")
         except (TimeoutError, redis.RedisError, ConnectionError, ValueError, RuntimeError) as e:
-            logger.warning(f"Fetch operation for job {job_id} failed: ({type(e).__name__}) {e}")
+            logger.info(f"Fetch operation for job {job_id} did not complete: ({type(e).__name__}) {e}")
             raise e
         except Exception as e:
             logger.exception(f"Unexpected error during async fetch_job for {job_id}: {e}")

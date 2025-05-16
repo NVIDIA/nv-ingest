@@ -17,7 +17,6 @@
 
 import logging
 import io
-import operator
 import re
 import uuid
 from collections import defaultdict
@@ -155,6 +154,12 @@ def _finalize_images(
             extracted_data.append(image_entry)
 
 
+def _safe_position(shape):
+    top = shape.top if shape.top is not None else float("inf")
+    left = shape.left if shape.left is not None else float("inf")
+    return (top, left)
+
+
 # -----------------------------------------------------------------------------
 # Helper Function: Recursive Image Extraction
 # -----------------------------------------------------------------------------
@@ -283,7 +288,7 @@ def python_pptx(
 
     for slide_idx, slide in enumerate(presentation.slides):
         # Obtain a flat list of shapes (ungrouped) sorted by top then left.
-        shapes = sorted(ungroup_shapes(slide.shapes), key=operator.attrgetter("top", "left"))
+        shapes = sorted(ungroup_shapes(slide.shapes), key=_safe_position)
 
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
@@ -656,21 +661,43 @@ def get_bbox(
     shape_object: Optional[Slide] = None,
     text_depth: Optional[TextTypeEnum] = None,
 ):
-    bbox = (-1, -1, -1, -1)
-    if text_depth == TextTypeEnum.DOCUMENT:
-        bbox = (-1, -1, -1, -1)
-    elif text_depth == TextTypeEnum.PAGE:
-        top = left = 0
-        width = presentation_object.slide_width
-        height = presentation_object.slide_height
-        bbox = (top, left, top + height, left + width)
-    elif shape_object:
-        top = shape_object.top
-        left = shape_object.left
-        width = shape_object.width
-        height = shape_object.height
-        bbox = (top, left, top + height, left + width)
-    return bbox
+    """
+    Safely computes bounding box for a slide, shape, or document.
+    Ensures that missing or None values are gracefully handled.
+
+    Returns
+    -------
+    Tuple[int, int, int, int]
+        Bounding box as (top, left, bottom, right).
+        Defaults to (-1, -1, -1, -1) if invalid or unsupported.
+    """
+    try:
+        if text_depth == TextTypeEnum.DOCUMENT:
+            return (-1, -1, -1, -1)
+
+        elif text_depth == TextTypeEnum.PAGE and presentation_object:
+            top = left = 0
+            width = presentation_object.slide_width
+            height = presentation_object.slide_height
+            return (top, left, top + height, left + width)
+
+        elif shape_object:
+            top = shape_object.top if shape_object.top is not None else -1
+            left = shape_object.left if shape_object.left is not None else -1
+            width = shape_object.width if shape_object.width is not None else -1
+            height = shape_object.height if shape_object.height is not None else -1
+
+            # If all are valid, return normally, else return placeholder
+            if -1 in [top, left, width, height]:
+                return (-1, -1, -1, -1)
+
+            return (top, left, top + height, left + width)
+
+    except Exception as e:
+        logger.warning(f"get_bbox: Failed to compute bbox due to {e}")
+        return (-1, -1, -1, -1)
+
+    return (-1, -1, -1, -1)
 
 
 def ungroup_shapes(shapes):

@@ -46,7 +46,7 @@ from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_JOB_QUEUE_ID = "morpheus_task_queue"
+DEFAULT_JOB_QUEUE_ID = "ingest_task_queue"
 
 
 def ensure_job_specs(func):
@@ -77,7 +77,7 @@ class Ingestor:
     client : Optional[NvIngestClient], optional
         An instance of NvIngestClient. If not provided, a client is created.
     job_queue_id : str, optional
-        The ID of the job queue for job submission, default is "morpheus_task_queue".
+        The ID of the job queue for job submission, default is "ingest_task_queue".
     """
 
     def __init__(

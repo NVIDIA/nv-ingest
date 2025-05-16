@@ -7,7 +7,7 @@ _DEFAULT_REDIS_HOST = "redis"
 _DEFAULT_REDIS_PORT = 6379
 
 # job config
-_DEFAULT_TASK_QUEUE = "morpheus_task_queue"
+_DEFAULT_TASK_QUEUE = "ingest_task_queue"
 _DEFAULT_JOB_TIMEOUT = 90
 
 # extract_config
