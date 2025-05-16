@@ -20,6 +20,7 @@ import logging
 import math
 import uuid
 import concurrent.futures
+from multiprocessing import cpu_count
 from typing import Any
 from typing import Dict
 from typing import Tuple
@@ -228,12 +229,12 @@ def nemoretriever_parse_extractor(
             return idx, p_img, y_img, y_pad
 
         render_workers = min(cpu_count(), 8)
-        render_pool = ThreadPoolExecutor(max_workers=render_workers)
+        render_pool = concurrent.futures.ThreadPoolExecutor(max_workers=render_workers)
         render_futs = [
             render_pool.submit(_render_page, pdf_bytes, i) for i in range(page_count)
         ]
 
-        for fut in as_completed(render_futs):
+        for fut in concurrent.futures.as_completed(render_futs):
             page_idx, parser_img, yolox_img, yolox_pad = fut.result()
             pages_for_ocr.append((page_idx, parser_img))
             pages_for_tables.append((page_idx, yolox_img, yolox_pad))
