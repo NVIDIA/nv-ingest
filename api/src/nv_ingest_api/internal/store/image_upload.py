@@ -116,6 +116,7 @@ def _upload_images_to_minio(df: pd.DataFrame, params: Dict[str, Any]) -> pd.Data
             if "content" not in metadata:
                 logger.error("Row %s: missing 'content' in metadata", idx)
                 continue
+
             if "source_metadata" not in metadata or not isinstance(metadata["source_metadata"], dict):
                 logger.error("Row %s: missing or invalid 'source_metadata' in metadata", idx)
                 continue

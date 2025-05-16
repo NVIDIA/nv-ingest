@@ -45,6 +45,10 @@ class SystemResourceProbe:
             A value of 0.5 suggests a hyperthread adds 50% extra performance.
             Requires psutil to be installed and report physical cores.
             Defaults to 0.75.
+
+            Note: the default value of 0.75 is a heuristic and may not be optimal
+            for all situations. It is where parallel pdf decomposition efficiency
+            is observed to begin rolling off.
         """
         if not (0.0 <= hyperthread_weight <= 1.0):
             raise ValueError("hyperthread_weight must be between 0.0 and 1.0")

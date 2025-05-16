@@ -100,12 +100,22 @@ class PipelineCreationSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
-def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tuple[Union[RayPipeline, None], float]:
+def _launch_pipeline(
+    ingest_config: PipelineCreationSchema,
+    block: bool,
+    disable_dynamic_scaling: bool = None,
+    dynamic_memory_threshold: float = None,
+) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
     dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
+    if disable_dynamic_scaling is not None:
+        dynamic_memory_scaling = not disable_dynamic_scaling
+
+    dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
+
     scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=DYNAMIC_MEMORY_THRESHOLD
+        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
     )
 
     pipeline = RayPipeline(scaling_config=scaling_config)
@@ -146,8 +156,13 @@ def _launch_pipeline(ingest_config: PipelineCreationSchema, block: bool) -> Tupl
         return pipeline, 0.0
 
 
-def run_pipeline(ingest_config: PipelineCreationSchema, block: bool = True) -> Union[RayPipeline, float]:
-    pipeline, total_elapsed = _launch_pipeline(ingest_config, block)
+def run_pipeline(
+    ingest_config: PipelineCreationSchema,
+    block: bool = True,
+    disable_dynamic_scaling: bool = None,
+    dynamic_memory_threshold: float = None,
+) -> Union[RayPipeline, float]:
+    pipeline, total_elapsed = _launch_pipeline(ingest_config, block, disable_dynamic_scaling, dynamic_memory_threshold)
 
     if block:
         logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
