@@ -3,9 +3,12 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import uuid
 from typing import List, Any
 from typing import Optional
 from typing import Tuple
+from cachetools import cached, LRUCache
+
 
 import PIL
 import numpy as np
@@ -22,6 +25,24 @@ from nv_ingest_api.util.image_processing.clustering import (
 )
 from nv_ingest_api.util.image_processing.transforms import pad_image, numpy_to_base64, crop_image
 from nv_ingest_api.util.metadata.aggregators import Base64Image
+
+
+_bitmap_cache = LRUCache(maxsize=256)
+
+def _page_uid(page):
+    """Give every PdfPage a permanent, unique tag the first time it appears."""
+    uid = getattr(page, "_cache_uid", None)
+    if uid is None:
+        uid = uuid.uuid4().hex                      # 32-char str, hashable
+        setattr(page, "_cache_uid", uid)
+    return uid
+
+def _render_key(page, scale, rotation):
+    return (_page_uid(page), scale, rotation)
+
+@cached(_bitmap_cache, key=_render_key)
+def _render_page(page, scale, rotation):
+    return page.render(scale=scale, rotation=rotation)
 
 logger = logging.getLogger(__name__)
 
@@ -175,7 +196,7 @@ def pdfium_pages_to_numpy(
 
     for idx, page in enumerate(pages):
         # Render the page as a bitmap with the specified scale and rotation
-        page_bitmap = page.render(scale=scale, rotation=rotation)
+        page_bitmap = _render_page(page, scale, rotation)
 
         # Convert the bitmap to a PIL image
         pil_image = page_bitmap.to_pil()

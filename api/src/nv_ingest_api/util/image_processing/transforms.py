@@ -12,7 +12,7 @@ from typing import Optional
 from typing import Tuple
 
 import torch
-from torchvision.io import encode_jpeg
+from torchvision.io import encode_jpeg, decode_image, ImageReadMode
 
 import numpy as np
 from PIL import Image
@@ -74,9 +74,7 @@ def scale_image_to_encoding_size(
             new_size = (int(width * reduction_step), int(height * reduction_step))
 
             img_resized = img.resize(new_size, Image.LANCZOS)
-            buffered = io.BytesIO()
-            img_resized.save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            base64_image = numpy_to_base64(np.array(img_resized))
 
             # Adjust the reduction step if necessary
             if len(base64_image) > max_base64_size:
@@ -409,16 +407,14 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
         raise ValueError("Invalid base64 string") from e
 
     try:
-        # Convert the bytes into a BytesIO object
-        image_bytes = BytesIO(image_data)
-
-        # Open the image using PIL
-        image = Image.open(image_bytes)
-        image.load()
+        writable_buf = bytearray(image_data)
+        image_tensor = decode_image(
+            torch.frombuffer(writable_buf, dtype=torch.uint8), mode=ImageReadMode.RGB
+        )
     except UnidentifiedImageError as e:
         raise ValueError("Unable to decode image from base64 string") from e
 
     # Convert the image to a NumPy array
-    image_array = np.array(image)
+    image_array = image_tensor.numpy()
 
     return image_array
