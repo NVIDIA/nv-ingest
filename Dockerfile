@@ -3,10 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 
-ARG BASE_IMG=nvcr.io/nvidia/cuda
-ARG BASE_IMG_TAG=12.5.1-base-ubuntu22.04
+ARG BASE_IMG=ubuntu
+ARG BASE_IMG_TAG=22.04
 
-# Use NVIDIA cuda as the base image
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 
 ARG RELEASE_TYPE="dev"

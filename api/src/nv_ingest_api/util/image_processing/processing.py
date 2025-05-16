@@ -150,7 +150,7 @@ def extract_tables_and_charts_yolox(
             min_score=YOLOX_MIN_SCORE,
             final_thresh=YOLOX_FINAL_SCORE,
             trace_info=trace_info,
-            stage_name="pdf_content_extractor",
+            stage_name="pdf_extraction",
         )
 
         # Process results: iterate over each image's inference output.
