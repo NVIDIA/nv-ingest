@@ -474,7 +474,7 @@ def pdfium_extractor(
         )
 
     # Validate and extract paddle_output_format
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    paddle_output_format_str = extractor_config.get("paddle_output_format", "markdown")
     try:
         paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
     except KeyError:
