@@ -288,9 +288,20 @@ class CustomOCRModelInterface(ModelInterface):
         ValueError
             If the `table_content_format` is unrecognized.
         """
+        if isinstance(json_response, str):
+            raise RuntimeError(f"CustomOCR error response: {json_response}")
+
+        if not isinstance(json_response, list):
+            raise RuntimeError(
+                f"Unexpected response type {type(json_response).__name__}; expected list of item dictionaries."
+            )
+
         results: List[str] = []
 
         for item_idx, item in enumerate(json_response):
+            if not isinstance(item, dict):
+                raise RuntimeError(f"Unexpected response type {type(item).__name__}; expected dictionary.")
+
             regions = item.get("regions", [])
 
             text_predictions = []
