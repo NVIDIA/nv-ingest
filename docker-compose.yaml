@@ -9,7 +9,9 @@ services:
       - "6379:6379"
 
   page-elements:
-    image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    #image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    image: nvcr.io/nvstaging/nim/nemoretriever-page-elements-v2:1.3.1-rc0-latest-datacenter-release-28169341
+  
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -288,10 +290,10 @@ services:
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      #- YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
-      #- YOLOX_INFER_PROTOCOL=http
+      - YOLOX_INFER_PROTOCOL=http
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
       - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
