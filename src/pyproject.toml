@@ -39,14 +39,13 @@ dependencies = [
     "pytest>=8.0.2",
     "pytest-mock>=3.14.0",
     "pytest-cov>=6.0.0",
-    "python>=3.12",
-    "python-build>=1.2.2",
+    "build>=1.2.2",
     "python-docx>=1.1.2",
     "python-dotenv>=1.0.1",
     "python-pptx>=1.0.2",
-    "pytorch==2.4.1",  # https://github.com/pytorch/pytorch/issues/111469
-    "ray-all>=2.37.0",
-    "redis-py>=5.2.1",
+    "torch==2.4.1",  # https://github.com/pytorch/pytorch/issues/111469
+    "ray[all]>=2.37.0",
+    "redis>=5.2.1",
     "requests>=2.28.2",
     "scikit-learn>=1.6.0",
     "scipy>=1.15.1",
