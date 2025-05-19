@@ -2,23 +2,15 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-{% set data = load_setup_py_data() %}
-{% set name = data.get('name', 'nv_ingest') | lower %}
 {% set py_version = environ['CONDA_PY'] %}
 {% set GIT_SHA = environ['GIT_SHA'] %}
-
-{% set version = environ.get('NV_INGEST_RELEASE_VERSION', 'Unknown') %}
-{% if version == 'Unknown' %}
-# Get version from setup.py
-{% set version = data.get('version') %}
-{% endif %}
 
 # Determine Git root, falling back to default path ../../.. if Git is not available or the directory is not a Git repo
 {% set git_root = environ.get('GIT_ROOT', '../../../src') %}
 
 package:
   name: {{ name }}
-  version: {{ version }}
+  version: {{ environ.get('NV_INGEST_VERSION', 'Unknown') }}
 
 source:
   path: {{ git_root }}
