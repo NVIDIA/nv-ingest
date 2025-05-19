@@ -220,20 +220,13 @@ def python_pptx(
     extraction_config: dict,
     execution_trace_log: Optional[List] = None,
 ):
-    """
-    Uses python-pptx to extract text from a PPTX bytestream, while deferring image
-    classification into tables/charts if requested.
-    """
-
-    _ = extract_infographics  # Placeholder for future use
-    _ = execution_trace_log  # Placeholder for future use
+    _ = extract_infographics
+    _ = execution_trace_log
 
     row_data = extraction_config.get("row_data")
     source_id = row_data["source_id"]
 
-    text_depth = extraction_config.get("text_depth", "page")
-    text_depth = TextTypeEnum[text_depth.upper()]
-
+    text_depth = TextTypeEnum[extraction_config.get("text_depth", "page").upper()]
     paragraph_format = extraction_config.get("paragraph_format", "markdown")
     identify_nearby_objects = extraction_config.get("identify_nearby_objects", True)
 
@@ -241,16 +234,19 @@ def python_pptx(
     pptx_extractor_config = extraction_config.get("pptx_extraction_config", {})
     trace_info = extraction_config.get("trace_info", {})
 
-    base_unified_metadata = row_data[metadata_col] if metadata_col in row_data.index else {}
+    base_unified_metadata = row_data.get(metadata_col, {})
     base_source_metadata = base_unified_metadata.get("source_metadata", {})
     source_location = base_source_metadata.get("source_location", "")
     collection_id = base_source_metadata.get("collection_id", "")
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-    presentation = Presentation(pptx_stream)
+    try:
+        presentation = Presentation(pptx_stream)
+    except Exception as e:
+        logger.error("Failed to open PPTX presentation: %s", e)
+        return []
 
-    # Collect source metadata from the core properties of the document.
     last_modified = (
         presentation.core_properties.modified.isoformat()
         if presentation.core_properties.modified
@@ -262,12 +258,11 @@ def python_pptx(
         else datetime.now().isoformat()
     )
     keywords = presentation.core_properties.keywords
-    source_type = DocumentTypeEnum.PPTX
     source_metadata = {
-        "source_name": source_id,  # python-pptx doesn't maintain filename; re-use source_id
+        "source_name": source_id,
         "source_id": source_id,
         "source_location": source_location,
-        "source_type": source_type,
+        "source_type": DocumentTypeEnum.PPTX,
         "collection_id": collection_id,
         "date_created": date_created,
         "last_modified": last_modified,
@@ -277,25 +272,16 @@ def python_pptx(
     }
 
     slide_count = len(presentation.slides)
-
     accumulated_text = []
     extracted_data = []
-
-    # Hold images here for final classification.
-    # Each item is (shape, shape_idx, slide_idx, slide_count, page_nearby_blocks, source_metadata,
-    #   base_unified_metadata)
     pending_images = []
 
     for slide_idx, slide in enumerate(presentation.slides):
-        # Obtain a flat list of shapes (ungrouped) sorted by top then left.
-        try:  # Add try-except around ungroup_shapes and sorting as it might involve accessing shape properties
+        try:
             shapes = sorted(ungroup_shapes(slide.shapes), key=_safe_position)
-        except Exception as e_ungroup:
-            logger.error(
-                f"Error ungrouping or sorting shapes for slide {slide_idx}. Skipping slide. Error: {e_ungroup}",
-                exc_info=True,
-            )
-            continue  # Skip to the next slide
+        except Exception as e:
+            logger.error("Slide %d: Failed to ungroup or sort shapes: %s", slide_idx, e)
+            continue
 
         page_nearby_blocks = {
             "text": {"content": [], "bbox": []},
@@ -304,116 +290,52 @@ def python_pptx(
         }
 
         for shape_idx, shape in enumerate(shapes):
-            block_text = []
-            added_title = added_subtitle = False
+            try:
+                block_text = []
+                added_title = added_subtitle = False
 
-            # ---------------------------------------------
-            # 1) Text Extraction
-            # ---------------------------------------------
-            if extract_text:
-                try:
-                    if not shape.has_text_frame:  # Check here after ensuring shape is processable
-                        continue  # Skip if no text frame for this shape
-
+                # Text extraction
+                if extract_text and shape.has_text_frame:
                     for paragraph_idx, paragraph in enumerate(shape.text_frame.paragraphs):
-                        try:
-                            current_paragraph_text_content = paragraph.text
-                            if (
-                                not isinstance(current_paragraph_text_content, str)
-                                or not current_paragraph_text_content.strip()
-                            ):
-                                continue
+                        if not paragraph.text.strip():
+                            continue
 
-                            for run_idx, run in enumerate(paragraph.runs):
-                                try:
-                                    text_content_from_run = run.text
-                                    if not text_content_from_run or not isinstance(text_content_from_run, str):
-                                        continue
+                        for run_idx, run in enumerate(paragraph.runs):
+                            try:
+                                text = run.text
+                                if not text:
+                                    continue
 
-                                    text = escape_text(text_content_from_run)
-                                    is_header_processed_for_this_run = False
+                                text = escape_text(text)
 
-                                    if paragraph_format == "markdown":
-                                        # Title processing
-                                        if is_title(shape):
-                                            if not added_title:
-                                                text = process_title(shape)
-                                                added_title = True
-                                                is_header_processed_for_this_run = True
-                                            else:
-                                                continue
-                                        # Subtitle processing
-                                        elif is_subtitle(shape) and not is_header_processed_for_this_run:
-                                            if not added_subtitle:
-                                                text = process_subtitle(shape)
-                                                added_subtitle = True
-                                                is_header_processed_for_this_run = True
-                                            else:
-                                                continue
+                                if paragraph_format == "markdown":
+                                    if is_title(shape) and not added_title:
+                                        text = process_title(shape)
+                                        added_title = True
+                                    elif is_subtitle(shape) and not added_subtitle:
+                                        text = process_subtitle(shape)
+                                        added_subtitle = True
+                                    elif is_title(shape) or is_subtitle(shape):
+                                        continue  # already added
 
-                                        # Regular text processing
-                                        if not is_header_processed_for_this_run:
-                                            if run.hyperlink:  # Check if hyperlink object exists
-                                                try:
-                                                    address = run.hyperlink.address  # This can raise KeyError
-                                                    if address:  # Ensure address is not None or empty
-                                                        text = get_hyperlink(text, address)
-                                                except KeyError as ke:
-                                                    if "no relationship with key ''" in str(ke):
-                                                        logger.warning(
-                                                            f"Skipping malformed hyperlink (empty rId) in slide "
-                                                            f"{slide_idx} shape '{getattr(shape, 'name', 'N/A')}', "
-                                                            f"P{paragraph_idx}R{run_idx}. "
-                                                            f"Text: '{text_content_from_run[:30]}...'"
-                                                        )
-                                                    else:
-                                                        logger.error(
-                                                            f"Unexpected KeyError processing hyperlink in slide "
-                                                            f"{slide_idx} shape '{getattr(shape, 'name', 'N/A')}', "
-                                                            f"P{paragraph_idx}R{run_idx}: {ke}. "
-                                                            f"Text: '{text_content_from_run[:30]}...'",
-                                                            exc_info=True,
-                                                        )
-                                                except Exception as he:
-                                                    logger.error(
-                                                        f"Error getting hyperlink address for slide {slide_idx} "
-                                                        f"shape '{getattr(shape, 'name', 'N/A')}', "
-                                                        f"P{paragraph_idx}R{run_idx}: {he}. "
-                                                        f"Text: '{text_content_from_run[:30]}...'",
-                                                        exc_info=True,
-                                                    )
+                                    if run.hyperlink and run.hyperlink.address:
+                                        text = get_hyperlink(text, run.hyperlink.address)
+                                    if is_accent(paragraph.font) or is_accent(run.font):
+                                        text = format_text(text, italic=True)
+                                    elif is_strong(paragraph.font) or is_strong(run.font):
+                                        text = format_text(text, bold=True)
+                                    elif is_underlined(paragraph.font) or is_underlined(run.font):
+                                        text = format_text(text, underline=True)
+                                    if is_list_block(shape):
+                                        text = "  " * paragraph.level + "* " + text
 
-                                            font_para = getattr(paragraph, "font", None)
-                                            font_run = getattr(run, "font", None)
+                                accumulated_text.append(text)
+                                if extract_images and identify_nearby_objects:
+                                    block_text.append(text)
 
-                                            if (font_para and is_accent(font_para)) or (
-                                                font_run and is_accent(font_run)
-                                            ):
-                                                text = format_text(text, italic=True)
-                                            elif (font_para and is_strong(font_para)) or (
-                                                font_run and is_strong(font_run)
-                                            ):
-                                                text = format_text(text, bold=True)
-                                            elif (font_para and is_underlined(font_para)) or (
-                                                font_run and is_underlined(font_run)
-                                            ):
-                                                text = format_text(text, underline=True)
-
-                                        if is_list_block(shape):
-                                            level = getattr(paragraph, "level", 0)
-                                            if not isinstance(level, int) or level < 0:
-                                                level = 0
-                                            text = "  " * level + "* " + text
-
-                                    accumulated_text.append(text)
-
-                                    # For "nearby objects", store block text.
-                                    if extract_images and identify_nearby_objects:
-                                        block_text.append(text)
-
-                                    # If we only want text at SPAN level, flush after each run.
-                                    if text_depth == TextTypeEnum.SPAN:
-                                        text_extraction = _construct_text_metadata(
+                                if text_depth == TextTypeEnum.SPAN:
+                                    extracted_data.append(
+                                        _construct_text_metadata(
                                             presentation,
                                             shape,
                                             accumulated_text,
@@ -427,24 +349,24 @@ def python_pptx(
                                             source_metadata,
                                             base_unified_metadata,
                                         )
-                                        if len(text_extraction) > 0:
-                                            extracted_data.append(text_extraction)
-                                        accumulated_text = []
-                                except Exception as e_run:
-                                    logger.warning(
-                                        f"Failed to process run {run_idx} in slide {slide_idx} "
-                                        f"shape '{getattr(shape, 'name', 'N/A')}' P{paragraph_idx}. "
-                                        f"Error: {e_run}. Run text: '{getattr(run, 'text', 'N/A')[:50]}...'",
-                                        exc_info=True,
                                     )
-                                    continue  # to next run
+                                    accumulated_text = []
 
-                            # Add newlines for separation at line/paragraph level.
-                            if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
-                                accumulated_text.append("\n\n")
+                            except Exception as e:
+                                logger.warning(
+                                    "Slide %d Shape %d Run %d: Failed to process run: %s",
+                                    slide_idx,
+                                    shape_idx,
+                                    run_idx,
+                                    e,
+                                )
 
-                            if text_depth == TextTypeEnum.LINE:
-                                text_extraction = _construct_text_metadata(
+                        if accumulated_text and not accumulated_text[-1].endswith("\n\n"):
+                            accumulated_text.append("\n\n")
+
+                        if text_depth == TextTypeEnum.LINE:
+                            extracted_data.append(
+                                _construct_text_metadata(
                                     presentation,
                                     shape,
                                     accumulated_text,
@@ -458,154 +380,99 @@ def python_pptx(
                                     source_metadata,
                                     base_unified_metadata,
                                 )
-                                if len(text_extraction) > 0:
-                                    extracted_data.append(text_extraction)
-                                accumulated_text = []
-                        except Exception as e_paragraph:
-                            logger.warning(
-                                f"Failed to process paragraph {paragraph_idx} in slide {slide_idx} "
-                                f"shape '{getattr(shape, 'name', 'N/A')}'. Error: {e_paragraph}. "
-                                f"Para text: '{getattr(paragraph, 'text', 'N/A')[:50]}...'",
-                                exc_info=True,
                             )
-                            continue  # to next paragraph
+                            accumulated_text = []
 
                     if text_depth == TextTypeEnum.BLOCK:
-                        text_extraction = _construct_text_metadata(
-                            presentation,
+                        extracted_data.append(
+                            _construct_text_metadata(
+                                presentation,
+                                shape,
+                                accumulated_text,
+                                keywords,
+                                slide_idx,
+                                shape_idx,
+                                -1,
+                                -1,
+                                slide_count,
+                                text_depth,
+                                source_metadata,
+                                base_unified_metadata,
+                            )
+                        )
+                        accumulated_text = []
+
+                if extract_images and identify_nearby_objects and block_text:
+                    page_nearby_blocks["text"]["content"].append("".join(block_text))
+                    page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
+
+                # Image processing (deferred)
+                if extract_images:
+                    try:
+                        process_shape(
                             shape,
-                            accumulated_text,
-                            keywords,
-                            slide_idx,
                             shape_idx,
-                            -1,
-                            -1,
+                            slide_idx,
                             slide_count,
-                            text_depth,
+                            pending_images,
+                            page_nearby_blocks,
                             source_metadata,
                             base_unified_metadata,
                         )
-                        if len(text_extraction) > 0:
-                            extracted_data.append(text_extraction)
-                        accumulated_text = []
-                except Exception as e_shape_text:
-                    logger.error(
-                        f"Error processing text for shape {shape_idx} on slide {slide_idx} "
-                        f"('{getattr(shape, 'name', 'N/A')}'). Error: {e_shape_text}",
-                        exc_info=True,
-                    )
-                    # accumulated_text might be in an inconsistent state here, consider resetting if this was critical
-                    # accumulated_text = [] # Optionally reset if text for this shape is now corrupt
+                    except Exception as e:
+                        logger.warning("Slide %d Shape %d: Failed to process image shape: %s", slide_idx, shape_idx, e)
 
-            if extract_images and identify_nearby_objects and block_text:
-                try:
-                    page_nearby_blocks["text"]["content"].append("".join(block_text))
-                    page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
-                except Exception as e_nearby_text:
-                    logger.warning(
-                        f"Error adding text to page_nearby_blocks for shape {shape_idx} on slide {slide_idx}. "
-                        f"Error: {e_nearby_text}",
-                        exc_info=True,
-                    )
-
-            # ---------------------------------------------
-            # 2) Image Handling (DEFERRED) with nested/group shapes
-            # ---------------------------------------------
-            if extract_images:
-                try:
-                    process_shape(
-                        shape,
-                        shape_idx,
-                        slide_idx,
-                        slide_count,
-                        pending_images,
-                        page_nearby_blocks,
-                        source_metadata,
-                        base_unified_metadata,
-                    )
-                except Exception as e_process_shape_image:
-                    logger.error(
-                        f"Error in process_shape (image handling) for shape {shape_idx} on slide {slide_idx} "
-                        f"('{getattr(shape, 'name', 'N/A')}'). Error: {e_process_shape_image}",
-                        exc_info=True,
-                    )
-
-            # ---------------------------------------------
-            # 3) Table Handling
-            # ---------------------------------------------
-            if extract_tables:  # Moved has_table check inside try block
-                try:
-                    if shape.has_table:  # Check here after ensuring shape is processable
-                        table_extraction = _construct_table_metadata(
-                            shape, slide_idx, slide_count, source_metadata, base_unified_metadata
+                # Table extraction
+                if extract_tables and shape.has_table:
+                    try:
+                        extracted_data.append(
+                            _construct_table_metadata(
+                                shape, slide_idx, slide_count, source_metadata, base_unified_metadata
+                            )
                         )
-                        extracted_data.append(table_extraction)
-                except Exception as e_table:
-                    logger.error(
-                        f"Error processing table for shape {shape_idx} on slide {slide_idx} "
-                        f"('{getattr(shape, 'name', 'N/A')}'). Error: {e_table}",
-                        exc_info=True,
-                    )
-            # End of loop for shapes on a slide
+                    except Exception as e:
+                        logger.warning("Slide %d Shape %d: Failed to extract table: %s", slide_idx, shape_idx, e)
 
-        if extract_text and (text_depth == TextTypeEnum.PAGE) and (len(accumulated_text) > 0):
-            try:
-                # Note: 'shape' here will be the last shape processed on the slide.
-                # This might be okay if _construct_text_metadata only needs its type or a generic reference.
-                # If it needs specific properties of *all* shapes for page-level, this design might need adjustment.
-                text_extraction = _construct_text_metadata(
+            except Exception as e:
+                logger.warning("Slide %d Shape %d: Top-level failure: %s", slide_idx, shape_idx, e)
+
+        if extract_text and text_depth == TextTypeEnum.PAGE and accumulated_text:
+            extracted_data.append(
+                _construct_text_metadata(
                     presentation,
-                    shape,  # Last shape of the slide
+                    None,
                     accumulated_text,
                     keywords,
                     slide_idx,
-                    -1,  # shape_idx for page level
-                    -1,  # paragraph_idx for page level
-                    -1,  # run_idx for page level
+                    -1,
+                    -1,
+                    -1,
                     slide_count,
                     text_depth,
                     source_metadata,
                     base_unified_metadata,
                 )
-                if len(text_extraction) > 0:
-                    extracted_data.append(text_extraction)
-            except Exception as e_page_text:
-                logger.error(
-                    f"Error constructing page-level text metadata for slide {slide_idx}. Error: {e_page_text}",
-                    exc_info=True,
-                )
-            finally:  # Always reset accumulated_text for page level
-                accumulated_text = []
-        # End of loop for slides in presentation
+            )
+            accumulated_text = []
 
-    if extract_text and (text_depth == TextTypeEnum.DOCUMENT) and (len(accumulated_text) > 0):
-        try:
-            # Note: 'shape' here will be the last shape processed in the entire document.
-            # Similar consideration as for page-level text.
-            text_extraction = _construct_text_metadata(
+    if extract_text and text_depth == TextTypeEnum.DOCUMENT and accumulated_text:
+        extracted_data.append(
+            _construct_text_metadata(
                 presentation,
-                shape,  # Last shape of the document
+                None,
                 accumulated_text,
                 keywords,
-                -1,  # slide_idx for document level
-                -1,  # shape_idx for document level
-                -1,  # paragraph_idx for document level
-                -1,  # run_idx for document level
+                -1,
+                -1,
+                -1,
+                -1,
                 slide_count,
                 text_depth,
                 source_metadata,
                 base_unified_metadata,
             )
-            if len(text_extraction) > 0:
-                extracted_data.append(text_extraction)
-        except Exception as e_doc_text:
-            logger.error(f"Error constructing document-level text metadata. Error: {e_doc_text}", exc_info=True)
-        finally:  # Always reset accumulated_text for document level
-            accumulated_text = []
+        )
 
-    # ---------------------------------------------
-    # FINAL STEP: Finalize images (and tables/charts)
-    # ---------------------------------------------
     if extract_images or extract_tables or extract_charts:
         try:
             _finalize_images(
@@ -616,12 +483,8 @@ def python_pptx(
                 extract_charts=extract_charts,
                 trace_info=trace_info,
             )
-        except Exception as e_finalize:
-            logger.critical(  # Use critical if this is a major failure point for output
-                f"Critical error during _finalize_images step. Output might be incomplete or corrupt. "
-                f"Error: {e_finalize}",
-                exc_info=True,
-            )
+        except Exception as e:
+            logger.error("Finalization of images failed: %s", e)
 
     return extracted_data
 
