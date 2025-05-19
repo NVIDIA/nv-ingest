@@ -9,7 +9,7 @@
 {% set git_root = environ.get('GIT_ROOT', '../../../src') %}
 
 package:
-  name: {{ name }}
+  name: nv_ingest
   version: {{ environ.get('NV_INGEST_VERSION', 'Unknown') }}
 
 source:
