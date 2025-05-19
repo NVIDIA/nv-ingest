@@ -72,17 +72,18 @@ fi
 
 if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     echo "Building nv_ingest..."
+    SCRIPT_PATH="$GIT_ROOT/src/nv_ingest/version.py"
+    echo "SCRIPT_PATH: $SCRIPT_PATH"
 
     # Generate the version if not specified
     if [ -z "$RELEASE_VERSION" ]; then
-        # Setting to Unknown will cause the version to be pulled from the nv-ingest setup.py file at conda build time
-        NV_INGEST_RELEASE_VERSION="Unknown"
+        NV_INGEST_SERVICE_VERSION=$(python3 -c "import sys, importlib.util; spec = importlib.util.spec_from_file_location('version', '$SCRIPT_PATH'); version = importlib.util.module_from_spec(spec); spec.loader.exec_module(version); print(version.get_version())")
     else
-        NV_INGEST_RELEASE_VERSION=$RELEASE_VERSION
+        NV_INGEST_SERVICE_VERSION=$RELEASE_VERSION
     fi
 
-    echo "NV_INGEST_VERSION: $NV_INGEST_RELEASE_VERSION"
-    NV_INGEST_RELEASE_VERSION="${NV_INGEST_RELEASE_VERSION}" GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
+    echo "NV_INGEST_SERVICE_VERSION: $NV_INGEST_SERVICE_VERSION"
+    NV_INGEST_SERVICE_VERSION="${NV_INGEST_SERVICE_VERSION}" GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else

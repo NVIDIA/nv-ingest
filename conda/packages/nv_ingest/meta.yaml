@@ -10,7 +10,7 @@
 
 package:
   name: nv_ingest
-  version: {{ environ.get('NV_INGEST_VERSION', 'Unknown') }}
+  version: {{ environ.get('NV_INGEST_SERVICE_VERSION', 'Unknown') }}
 
 source:
   path: {{ git_root }}
