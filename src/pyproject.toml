@@ -71,8 +71,5 @@ homepage = "https://github.com/NVIDIA/nv-ingest"
 repository = "https://github.com/NVIDIA/nv-ingest"
 documentation = "https://docs.nvidia.com/nv-ingest"
 
-[tool.setuptools.packages.find]
-where = ["nv_ingest"]
-
 [tool.setuptools.dynamic]
-version = {attr = "version.get_version"}
+version = {attr = "nv_ingest.version.get_version"}
