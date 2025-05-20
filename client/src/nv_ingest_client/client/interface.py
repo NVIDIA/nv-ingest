@@ -12,15 +12,20 @@ import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any, Tuple
+from typing import Any
+from typing import Callable
 from typing import Dict
+from typing import Iterator
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 from urllib.parse import urlparse
 
 import fsspec
 from nv_ingest_client.client.client import NvIngestClient
+from nv_ingest_client.client.util.processing import get_valid_filename
+from nv_ingest_client.client.util.processing import save_document_results_to_jsonl
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import CaptionTask
@@ -40,8 +45,9 @@ from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.milvus import MilvusOperator
-from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.processing import check_schema
+from nv_ingest_client.util.processing import ensure_directory_with_permissions
+from nv_ingest_client.util.util import filter_function_kwargs
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -63,6 +69,51 @@ def ensure_job_specs(func):
         return func(self, *args, **kwargs)
 
     return wrapper
+
+
+class LazyLoadedList:
+    def __init__(self, filepath: str, expected_len: Optional[int] = None):
+        self.filepath = filepath
+        self._len = expected_len  # Store pre-calculated length
+
+    def __iter__(self) -> Iterator[Any]:
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                for line in f:
+                    yield json.loads(line)
+        except FileNotFoundError:
+            logger.error(f"LazyLoadedList: File not found {self.filepath}")
+            return iter([])
+
+    def __len__(self) -> int:
+        if self._len is not None:
+            return self._len
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                self._len = sum(1 for _ in f)
+            return self._len
+        except FileNotFoundError:
+            self._len = 0
+            return 0
+
+    def __getitem__(self, idx: int) -> Any:
+        try:
+            with open(self.filepath, "r", encoding="utf-8") as f:
+                for i, line in enumerate(f):
+                    if i == idx:
+                        return json.loads(line)
+                raise IndexError(f"Index {idx} out of range for {self.filepath}")
+        except FileNotFoundError:
+            raise IndexError(f"File not found for proxy: {self.filepath}")
+
+    def __repr__(self):
+        return (
+            f"<LazyLoadedList file='{os.path.basename(self.filepath)}', "
+            f"len={self.__len__() if self._len is not None else 'uncached'}>"
+        )
+
+    def get_all_items(self) -> List[Any]:
+        return list(self.__iter__())
 
 
 class Ingestor:
@@ -105,6 +156,8 @@ class Ingestor:
         if self._check_files_local():
             self._job_specs = BatchJobSpec(self._documents)
             self._all_local = True
+
+        self._output_config = None
 
     def _create_client(self, **kwargs) -> None:
         """
@@ -242,9 +295,11 @@ class Ingestor:
 
         return self
 
-    def ingest(
-        self, show_progress: bool = False, return_failures: bool = False, **kwargs: Any
-    ) -> Union[List[Dict[str, Any]], Tuple[List[Dict[str, Any]], List[Tuple[str, str]]]]:  # noqa: E501
+    def ingest(self, show_progress: bool = False, return_failures: bool = False, **kwargs: Any) -> Union[
+        List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
+        List[LazyLoadedList],  # Disk: List of proxies, one per original doc
+        Tuple[Union[List[List[Dict[str, Any]]], List[LazyLoadedList]], List[Tuple[str, str]]],
+    ]:  # noqa: E501
         """
         Ingest documents by submitting jobs and fetching results concurrently.
 
@@ -270,17 +325,76 @@ class Ingestor:
         self._prepare_ingest_run()
 
         # Add jobs locally first
+        if self._job_specs is None:
+            raise RuntimeError("Job specs missing.")
         self._job_ids = self._client.add_job(self._job_specs)
 
-        callback = None
-        pbar = None
-        if show_progress:
-            pbar = tqdm(total=len(self._job_ids), desc="Processing Documents: ", unit="doc")
+        final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
-            def progress_callback(result_data: Dict[str, Any], job_id: str) -> None:
+        def _disk_save_and_create_proxy_callback(
+            full_response_dict: Dict[str, Any],
+            job_id: str,
+        ):
+            source_name = "unknown_source_in_callback"
+            job_spec = self._client._job_index_to_job_spec.get(job_id)
+            if job_spec:
+                source_name = job_spec.source_name
+            else:
+                try:
+                    if full_response_dict and full_response_dict.get("data"):
+                        source_name = full_response_dict["data"][0]["metadata"]["source_metadata"]["source_id"]
+                except (IndexError, KeyError, TypeError):
+                    source_name = f"job_{job_id}"
+
+            try:
+                output_dir = self._output_config["output_directory"]
+
+                doc_response_data = full_response_dict.get("data", [])
+                if not doc_response_data:
+                    logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
+                    if pbar:
+                        pbar.update(1)
+                    return
+
+                clean_source_basename = get_valid_filename(os.path.basename(source_name))
+                jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
+
+                num_items_saved = save_document_results_to_jsonl(
+                    doc_response_data,
+                    jsonl_filepath,
+                    source_name,
+                )
+
+                if num_items_saved > 0:
+                    proxy = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    final_results_payload_list.append(proxy)
+
+            except Exception as e:
+                logger.error(f"Disk save callback error for job {job_id} (source: {source_name}): {e}", exc_info=True)
+            finally:
+                if pbar:
+                    pbar.update(1)
+
+        def _in_memory_accumulation_callback(
+            full_response_dict: Dict[str, Any],
+            job_id: str,
+        ):
+            doc_data = full_response_dict.get("data")
+            if doc_data:
+                final_results_payload_list.append(doc_data)
+            else:
+                logger.warning(f"In-memory callback: No 'data' in response for job {job_id}.")
+                final_results_payload_list.append([])
+            if pbar:
                 pbar.update(1)
 
-            callback = progress_callback
+        pbar = tqdm(total=len(self._job_ids), desc="Processing", unit="doc") if show_progress else None
+        callback: Optional[Callable] = None
+
+        if self._output_config:
+            callback = _disk_save_and_create_proxy_callback
+        else:
+            callback = _in_memory_accumulation_callback
 
         # Default concurrent-processing parameters
         DEFAULT_TIMEOUT: int = 100
@@ -293,13 +407,15 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
-        results_data = self._client.process_jobs_concurrently(
+        _, failures = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
             max_job_retries=max_job_retries,
             completion_callback=callback,
-            return_failures=return_failures,
+            return_failures=True,
+            data_only=False,  # Callback needs full response to get 'data' part
+            stream_to_callback_only=True,  # Don't build the results list.
             verbose=verbose,
             **proc_kwargs,
         )
@@ -307,17 +423,11 @@ class Ingestor:
         if show_progress and pbar:
             pbar.close()
 
-        if return_failures:
-            results, failures = results_data  # type: ignore
-        else:
-            results = results_data  # type: ignore
-            failures = None
-
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(results)
+            self._vdb_bulk_upload.run(final_results_payload_list)
             self._vdb_bulk_upload = None
 
-        return (results, failures) if return_failures else results
+        return (final_results_payload_list, failures) if return_failures else final_results_payload_list
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """
@@ -593,6 +703,17 @@ class Ingestor:
             Returns self for chaining.
         """
         self._vdb_bulk_upload = MilvusOperator(**kwargs)
+
+        return self
+
+    def save_to_disk(
+        self,
+        output_directory: str,
+    ) -> "Ingestor":
+        self._output_config = {
+            "output_directory": output_directory,
+        }
+        ensure_directory_with_permissions(output_directory)
 
         return self
 

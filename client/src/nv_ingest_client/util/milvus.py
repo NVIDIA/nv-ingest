@@ -725,7 +725,7 @@ def write_records_minio(
     """
     for result in records:
         if result is not None:
-            if not isinstance(result, list):
+            if isinstance(result, dict):
                 result = [result]
             for element in result:
                 text = _pull_text(
@@ -824,7 +824,7 @@ def create_bm25_model(
     """
     all_text = []
     for result in records:
-        if not isinstance(result, list):
+        if isinstance(result, dict):
             result = [result]
         for element in result:
             text = _pull_text(
@@ -891,7 +891,7 @@ def stream_insert_milvus(
     count = 0
     for result in records:
         if result is not None:
-            if not isinstance(result, list):
+            if isinstance(result, dict):
                 result = [result]
             for element in result:
                 text = _pull_text(
