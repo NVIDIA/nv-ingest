@@ -83,7 +83,7 @@ if [[ "${BUILD_NV_INGEST}" -eq 1 ]]; then
     fi
 
     echo "NV_INGEST_SERVICE_VERSION: $NV_INGEST_SERVICE_VERSION"
-    NV_INGEST_SERVICE_VERSION="${NV_INGEST_SERVICE_VERSION}" GIT_ROOT="${GIT_ROOT}" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
+    NV_INGEST_SERVICE_VERSION="${NV_INGEST_SERVICE_VERSION}" GIT_ROOT="${GIT_ROOT}/src" GIT_SHA="${GIT_SHA}" conda build "${NV_INGEST_DIR}" \
         -c nvidia/label/dev -c rapidsai -c nvidia -c conda-forge -c pytorch \
         --output-folder "${OUTPUT_DIR}" --no-anaconda-upload
 else
