@@ -9,16 +9,14 @@ from nv_ingest_client.util.milvus import (
     reconstruct_pages,
     add_metadata,
     pandas_file_reader,
-    _pull_text,
     create_nvingest_index_params,
 )
-from nv_ingest_client.util.vdb.milvus import Milvus, _dict_to_params
+from nv_ingest_client.util.vdb.milvus import Milvus, _dict_to_params, _pull_text
 from nv_ingest_client.util.util import ClientConfigSchema
 import pandas as pd
 import unittest
 from nv_ingest_client.util.vdb.adt_vdb import VDB
 import logging
-
 
 
 @pytest.fixture
