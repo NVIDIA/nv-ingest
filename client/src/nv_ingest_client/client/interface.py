@@ -322,6 +322,10 @@ class Ingestor:
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
         """
+        ### TESTING: always save to disk
+        self.save_to_disk("/tmp/processed")
+        ###
+
         self._prepare_ingest_run()
 
         # Add jobs locally first
