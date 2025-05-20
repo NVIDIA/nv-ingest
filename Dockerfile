@@ -69,7 +69,6 @@ WORKDIR /workspace
 
 FROM base AS nv_ingest_install
 # Copy the module code
-COPY setup.py setup.py
 COPY ci ci
 
 # Prevent haystack from sending telemetry data
@@ -97,8 +96,8 @@ COPY tests tests
 COPY data data
 COPY api api
 COPY client client
-COPY src/nv_ingest src/nv_ingest
-RUN rm -rf ./src/nv_ingest/dist ./client/dist ./api/dist
+COPY src src
+RUN rm -rf ./src/nv_ingest/dist ./src/dist ./client/dist ./api/dist
 
 # Install python build from pip, version needed not present in conda
 RUN source activate nv_ingest_runtime \
@@ -116,7 +115,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
 RUN --mount=type=cache,target=/opt/conda/pkgs\
     --mount=type=cache,target=/root/.cache/pip \
     source activate nv_ingest_runtime \
-    && pip install ./dist/*.whl \
+    && pip install ./src/dist/*.whl \
     && pip install ./api/dist/*.whl \
     && pip install ./client/dist/*.whl
 
@@ -126,7 +125,6 @@ RUN rm -rf src
 FROM nv_ingest_install AS runtime
 
 COPY src/microservice_entrypoint.py ./
-COPY pyproject.toml ./
 
 # Copy entrypoint script(s)
 COPY ./docker/scripts/entrypoint.sh /workspace/docker/entrypoint.sh
