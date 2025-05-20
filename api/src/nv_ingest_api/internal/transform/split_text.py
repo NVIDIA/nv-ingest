@@ -118,9 +118,15 @@ def transform_text_split_and_tokenize_internal(
     )
 
     # Filter to documents with text content.
-    bool_index = (df_transform_ledger["document_type"] == ContentTypeEnum.TEXT) & (
-        pd.json_normalize(df_transform_ledger["metadata"])["source_metadata.source_type"].isin(split_source_types)
-    )
+    text_type_condition = df_transform_ledger["document_type"] == ContentTypeEnum.TEXT
+
+    normalized_meta_df = pd.json_normalize(df_transform_ledger["metadata"], errors="ignore")
+    if "source_metadata.source_type" in normalized_meta_df.columns:
+        source_type_condition = normalized_meta_df["source_metadata.source_type"].isin(split_source_types)
+    else:
+        source_type_condition = False
+
+    bool_index = text_type_condition & source_type_condition
     df_filtered: pd.DataFrame = df_transform_ledger.loc[bool_index]
 
     if df_filtered.empty:

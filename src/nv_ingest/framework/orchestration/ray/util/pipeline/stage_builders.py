@@ -489,7 +489,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         "",
     )
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
-    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
 
     config = TextEmbeddingSchema(
         **{
