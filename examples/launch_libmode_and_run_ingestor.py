@@ -35,11 +35,11 @@ def run_ingestor():
         .files("./data/multimodal_test.pdf")
         .extract(
             extract_text=True,
-            extract_tables=True,
-            extract_charts=True,
+            extract_tables=False,
+            extract_charts=False,
             extract_images=True,
             paddle_output_format="markdown",
-            extract_infographics=True,
+            extract_infographics=False,
             text_depth="page",
         )
         # .split()
@@ -69,7 +69,7 @@ def main():
 
     pipeline = None
     try:
-        pipeline = run_pipeline(ingest_config, block=False)
+        pipeline = run_pipeline(ingest_config, block=False, disable_dynamic_scaling=True)
         time.sleep(10)
         run_ingestor()
         # Run other code...
