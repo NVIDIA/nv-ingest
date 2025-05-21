@@ -11,7 +11,10 @@ import logging
 import os
 import shutil
 import tempfile
+import threading
 from concurrent.futures import Future
+from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import as_completed
 from functools import wraps
 from typing import Any
 from typing import Callable
@@ -391,6 +394,41 @@ class Ingestor:
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
+        # Lock for thread-safe appends to final_results_payload_list by I/O tasks
+        results_lock = threading.Lock() if self._output_config else None
+
+        io_executor: Optional[ThreadPoolExecutor] = None
+        io_futures: List[Future] = []
+
+        if self._output_config:
+            io_executor = ThreadPoolExecutor(max_workers=1, thread_name_prefix="IngestorDiskIO")
+
+        def _perform_save_task(doc_data, job_id, source_name):
+            # This function runs in the io_executor
+            try:
+                output_dir = self._output_config["output_directory"]
+                clean_source_basename = get_valid_filename(os.path.basename(source_name))
+                jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
+
+                num_items_saved = save_document_results_to_jsonl(
+                    doc_data,
+                    jsonl_filepath,
+                    source_name,
+                )
+
+                if num_items_saved > 0:
+                    results = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
+                    if results_lock:
+                        with results_lock:
+                            final_results_payload_list.append(results)
+                    else:  # Should not happen if io_executor is used
+                        final_results_payload_list.append(results)
+            except Exception as e_save:
+                logger.error(
+                    f"Disk save I/O task error for job {job_id} (source: {source_name}): {e_save}",
+                    exc_info=True,
+                )
+
         def _disk_save_callback(
             results_data: Dict[str, Any],
             job_id: str,
@@ -406,32 +444,20 @@ class Ingestor:
                 except (IndexError, KeyError, TypeError):
                     source_name = f"{job_id}"
 
-            try:
-                output_dir = self._output_config["output_directory"]
-
-                if not results_data:
-                    logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
-                    if pbar:
-                        pbar.update(1)
-                    return
-
-                clean_source_basename = get_valid_filename(os.path.basename(source_name))
-                jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
-
-                num_items_saved = save_document_results_to_jsonl(
-                    results_data,
-                    jsonl_filepath,
-                    source_name,
-                )
-
-                if num_items_saved > 0:
-                    final_results_payload_list.append(LazyLoadedList(jsonl_filepath, expected_len=num_items_saved))
-
-            except Exception as e:
-                logger.error(f"Disk save callback error for job {job_id} (source: {source_name}): {e}", exc_info=True)
-            finally:
+            if not results_data:
+                logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
                 if pbar:
                     pbar.update(1)
+                return
+
+            if io_executor:
+                future = io_executor.submit(_perform_save_task, results_data, job_id, source_name)
+                io_futures.append(future)
+            else:  # Fallback to blocking save if no I/O pool
+                _perform_save_task(results_data, job_id, source_name)
+
+            if pbar:
+                pbar.update(1)
 
         def _in_memory_callback(
             results_data: Dict[str, Any],
@@ -473,11 +499,19 @@ class Ingestor:
             **proc_kwargs,
         )
 
-        if self._output_config:
-            results = final_results_payload_list
-
         if show_progress and pbar:
             pbar.close()
+
+        if io_executor:
+            for future in as_completed(io_futures):
+                try:
+                    future.result()
+                except Exception as e_io:
+                    logger.error(f"A disk I/O task failed: {e_io}", exc_info=True)
+            io_executor.shutdown(wait=True)
+
+        if self._output_config:
+            results = final_results_payload_list
 
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(results)
