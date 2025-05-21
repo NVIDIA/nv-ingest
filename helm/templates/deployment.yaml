@@ -74,23 +74,9 @@ spec:
             - name: TMPDIR
               value: /scratch/tmp
 
-            {{- if .Values.envVars.INGEST_LOG_LEVEL }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.envVars.INGEST_LOG_LEVEL }}"
-            {{- else }}
-            - name: INGEST_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            {{- end }}
-            - name: CONSOLE_LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-            - name: LOG_LEVEL
-              value: "{{ .Values.logLevel }}"
-
-            {{- if .Values.envVars }}
-            {{- range $k, $v := .Values.envVars }}
-            - name: "{{ $k }}"
-              value: "{{ $v }}"
-            {{- end }}
+            {{- range .Values.env }}
+            - name: {{ .name }}
+              value: {{ .value | quote }}
             {{- end }}
 
             # OpenTelemetry
