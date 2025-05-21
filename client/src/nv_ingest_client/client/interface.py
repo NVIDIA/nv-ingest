@@ -84,6 +84,9 @@ class LazyLoadedList:
         except FileNotFoundError:
             logger.error(f"LazyLoadedList: File not found {self.filepath}")
             return iter([])
+        except json.JSONDecodeError as e:
+            logger.error(f"LazyLoadedList: JSON decode error in {self.filepath} during iteration: {e}")
+            raise
 
     def __len__(self) -> int:
         if self._len is not None:
@@ -95,21 +98,39 @@ class LazyLoadedList:
         except FileNotFoundError:
             self._len = 0
             return 0
+        except Exception as e:
+            logger.error(f"LazyLoadedList: Error calculating len for {self.filepath}: {e}")
+            self._len = 0
+            return 0
 
     def __getitem__(self, idx: int) -> Any:
+        if not isinstance(idx, int):
+            raise TypeError(f"List indices must be integers or slices, not {type(idx).__name__}")
+
+        if idx < 0:
+            length = self.__len__()
+            if length == 0:
+                 raise IndexError(f"Index {idx} out of range for empty list {self.filepath}")
+            idx = length + idx
+            if idx < 0:
+                 raise IndexError(f"Calculated index {idx} (from original {idx-length}) out of range for {self.filepath}")
+
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
                 for i, line in enumerate(f):
                     if i == idx:
-                        return json.loads(line)
+                        try:
+                            return json.loads(line)
+                        except json.JSONDecodeError as e:
+                            raise ValueError(f"Error decoding JSON at index {idx} in {self.filepath}: {e}") from e
                 raise IndexError(f"Index {idx} out of range for {self.filepath}")
         except FileNotFoundError:
-            raise IndexError(f"File not found for proxy: {self.filepath}")
+            raise IndexError(f"File not found, cannot get item at index {idx} from {self.filepath}")
 
     def __repr__(self):
         return (
             f"<LazyLoadedList file='{os.path.basename(self.filepath)}', "
-            f"len={self.__len__() if self._len is not None else 'uncached'}>"
+            f"len={self.__len__() if self._len is not None else '?'}>"
         )
 
     def get_all_items(self) -> List[Any]:

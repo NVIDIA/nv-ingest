@@ -1,5 +1,6 @@
 import json
 import logging
+import os
 import re
 from typing import Any
 from typing import Dict
@@ -33,10 +34,10 @@ def save_document_results_to_jsonl(
     count_items_written = 0
 
     try:
+        os.makedirs(os.path.dirname(jsonl_output_filepath), exist_ok=True)
+
         with open(jsonl_output_filepath, "w", encoding="utf-8") as f_jsonl:
             for extraction_item in doc_response_data:
-                # No media saving logic needed here, just write the item as is.
-                # The 'content' field will retain its base64 data for images/media.
                 f_jsonl.write(json.dumps(extraction_item) + "\n")
                 count_items_written += 1
 
@@ -51,4 +52,4 @@ def save_document_results_to_jsonl(
             f"Failed to save results for '{original_source_name_for_log}' to {jsonl_output_filepath}: {e}",
             exc_info=True,
         )
-        return 0  # Return 0 items on failure
+        return 0

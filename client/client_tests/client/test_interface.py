@@ -5,15 +5,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import io
+import json
 import logging
 import os
 import tempfile
 from concurrent.futures import Future
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import nv_ingest_client.client.interface as module_under_test
 import pytest
 from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client import LazyLoadedList
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
@@ -28,8 +32,6 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.milvus import MilvusOperator
-
-import nv_ingest_client.client.interface as module_under_test
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -563,3 +565,50 @@ def test_save_to_disk_propagates_oserror_from_ensure_dir(ingestor, tmp_path):
         with pytest.raises(OSError, match="Test Permission Denied"):
             ingestor.save_to_disk(output_directory=output_dir_str)
         mock_ensure_dir.assert_called_once_with(output_dir_str)
+
+
+@pytest.fixture
+def create_jsonl_file(tmp_path):
+    def _creator(filename="test_data.jsonl", data=None, content_override=None):
+        filepath = tmp_path / filename
+        if content_override is not None:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content_override)
+        elif data is not None:
+            with open(filepath, "w", encoding="utf-8") as f:
+                for item in data:
+                    f.write(json.dumps(item) + "\n")
+        else:
+            default_data = [
+                {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
+            ]
+            with open(filepath, "w", encoding="utf-8") as f:
+                for item in default_data:
+                    f.write(json.dumps(item) + "\n")
+        return str(filepath)
+    return _creator
+
+
+def test_lazy_list_core_functionality(create_jsonl_file):
+    default_data = [
+        {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
+    ]
+    filepath = create_jsonl_file(data=default_data)
+
+    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
+    assert len(lazy_list_prelen) == 3
+    assert list(lazy_list_prelen) == default_data
+    assert lazy_list_prelen[1] == default_data[1]
+    assert lazy_list_prelen[-1] == default_data[-1]
+    assert f"len=3" in repr(lazy_list_prelen)
+
+    lazy_list_ondemand = LazyLoadedList(filepath)
+    assert lazy_list_ondemand._len is None
+    assert len(lazy_list_ondemand) == 3
+    assert lazy_list_ondemand._len == 3 # Check caching
+    assert list(lazy_list_ondemand) == default_data # Iteration after len calculation
+    assert lazy_list_ondemand[0] == default_data[0]
+    assert f"len=3" in repr(lazy_list_ondemand)
+
+    assert lazy_list_ondemand.get_all_items() == default_data
+    assert isinstance(lazy_list_ondemand.get_all_items(), list)
