@@ -1,0 +1,5 @@
+---
+# Test YAML Document
+messages:
+  greeting: "The quick brown fox jumped over the lazy dog."
+  error: "Something went wrong. Please try again." 

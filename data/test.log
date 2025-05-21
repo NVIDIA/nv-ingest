@@ -1,0 +1,6 @@
+[2024-07-15 10:23:45] [INFO] The application started successfully
+[2024-07-15 10:23:46] [DEBUG] Initializing connection to database
+[2024-07-15 10:23:47] [INFO] User 'test_user' logged in
+[2024-07-15 10:23:50] [WARNING] Low memory detected (15% available)
+[2024-07-15 10:23:55] [ERROR] Failed to connect to external API: Connection timed out
+[2024-07-15 10:24:00] [INFO] Test operation completed

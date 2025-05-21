@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<root>
+  <header>
+    <title>Test XML Document</title>
+    <description>This is a test XML file for document processing</description>
+    <date>2024-07-15</date>
+  </header>
+  <content>
+    <paragraph id="p1">The quick brown fox jumped over the lazy dog.</paragraph>
+    <paragraph id="p2">This is a sample XML document to test the extraction functionality.</paragraph>
+    <items>
+      <item id="1">First test item</item>
+      <item id="2">Second test item</item>
+      <item id="3">Third test item</item>
+    </items>
+  </content>
+  <metadata>
+    <author>Test User</author>
+    <version>1.0</version>
+  </metadata>
+</root>

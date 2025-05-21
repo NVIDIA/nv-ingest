@@ -47,7 +47,23 @@ def documents():
 
 @pytest.fixture
 def text_documents():
-    return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
+    return [
+        "data/test.txt",
+        "data/test.html",
+        "data/test.json",
+        "data/test.md",
+        "data/test.sh",
+        "data/test.log",
+        "data/test.xml",
+        "data/test.yaml",
+        "data/test.yml",
+        "data/test.ini",
+        "data/test.conf",
+        "data/test.cfg",
+        "data/test.tex",
+        "data/test.rst",
+        "data/test.adoc",
+    ]
 
 
 @pytest.fixture
