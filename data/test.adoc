@@ -1,5 +1,4 @@
 = Test AsciiDoc Document
-Test User <test@example.com>
 v1.0, 2024-07-15
 :toc:
 :icons: font
