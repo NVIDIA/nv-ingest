@@ -4,6 +4,7 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import collections
 import glob
 import json
 import logging
@@ -72,10 +73,14 @@ def ensure_job_specs(func):
     return wrapper
 
 
-class LazyLoadedList:
+class LazyLoadedList(collections.abc.Sequence):
     def __init__(self, filepath: str, expected_len: Optional[int] = None):
         self.filepath = filepath
-        self._len = expected_len  # Store pre-calculated length
+        self._len: Optional[int] = expected_len  # Store pre-calculated length
+        self._offsets: Optional[List[int]] = None
+
+        if self._len == 0:
+            self._offsets = []
 
     def __iter__(self) -> Iterator[Any]:
         try:
@@ -89,46 +94,71 @@ class LazyLoadedList:
             logger.error(f"LazyLoadedList: JSON decode error in {self.filepath} during iteration: {e}")
             raise
 
+    def _build_index(self):
+        if self._offsets is not None:
+            return
+
+        self._offsets = []
+        line_count = 0
+        try:
+            with open(self.filepath, "rb") as f:
+                while True:
+                    current_pos = f.tell()
+                    line = f.readline()
+                    if not line:  # End of file
+                        break
+                    self._offsets.append(current_pos)
+                    line_count += 1
+            self._len = line_count
+        except FileNotFoundError:
+            logger.error(f"LazyLoadedList: File not found while building index: {self.filepath}")
+            self._offsets = []
+            self._len = 0
+        except Exception as e:
+            logger.error(f"LazyLoadedList: Error building index for {self.filepath}: {e}", exc_info=True)
+            self._offsets = []
+            self._len = 0
+
     def __len__(self) -> int:
         if self._len is not None:
             return self._len
-        try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
-                self._len = sum(1 for _ in f)
+        if self._offsets is not None:
+            self._len = len(self._offsets)
             return self._len
-        except FileNotFoundError:
-            self._len = 0
-            return 0
-        except Exception as e:
-            logger.error(f"LazyLoadedList: Error calculating len for {self.filepath}: {e}")
-            self._len = 0
-            return 0
+        self._build_index()
+        return self._len if self._len is not None else 0
 
     def __getitem__(self, idx: int) -> Any:
         if not isinstance(idx, int):
             raise TypeError(f"List indices must be integers or slices, not {type(idx).__name__}")
 
+        if self._offsets is None:
+            self._build_index()
+
         if idx < 0:
-            length = self.__len__()
-            if length == 0:
-                raise IndexError(f"Index {idx} out of range for empty list {self.filepath}")
-            idx = length + idx
-            if idx < 0:
-                raise IndexError(
-                    f"Calculated index {idx} (from original {idx-length}) out of range for {self.filepath}"
-                )
+            if self._len is None:
+                self._build_index()
+            if self._len == 0:
+                raise IndexError("Index out of range for empty list")
+            idx = self._len + idx
+
+        if self._offsets is None or not (0 <= idx < len(self._offsets)):
+            if self._offsets is None or self._len == 0:
+                raise IndexError(f"Index {idx} out of range (list is likely empty or file error for {self.filepath})")
+            raise IndexError(f"Index {idx} out of range for {self.filepath} (len: {len(self._offsets)})")
 
         try:
-            with open(self.filepath, "r", encoding="utf-8") as f:
-                for i, line in enumerate(f):
-                    if i == idx:
-                        try:
-                            return json.loads(line)
-                        except json.JSONDecodeError as e:
-                            raise ValueError(f"Error decoding JSON at index {idx} in {self.filepath}: {e}") from e
-                raise IndexError(f"Index {idx} out of range for {self.filepath}")
+            with open(self.filepath, "rb") as f:
+                f.seek(self._offsets[idx])
+                line_bytes = f.readline()
+                return json.loads(line_bytes.decode("utf-8"))
         except FileNotFoundError:
-            raise IndexError(f"File not found, cannot get item at index {idx} from {self.filepath}")
+            raise IndexError(f"File not found when accessing item at index {idx} from {self.filepath}")
+        except json.JSONDecodeError as e:
+            raise ValueError(f"Error decoding JSON at indexed line for index {idx} in {self.filepath}: {e}") from e
+        except Exception as e:
+            logger.error(f"Unexpected error in __getitem__ for index {idx} in {self.filepath}: {e}", exc_info=True)
+            raise
 
     def __repr__(self):
         return (
@@ -182,6 +212,7 @@ class Ingestor:
             self._all_local = True
 
         self._output_config = None
+        self._created_temp_output_dir = None
 
     def _create_client(self, **kwargs) -> None:
         """
@@ -736,8 +767,12 @@ class Ingestor:
 
     def save_to_disk(
         self,
-        output_directory: str,
+        output_directory: Optional[str] = None,
     ) -> "Ingestor":
+        if not output_directory:
+            self._created_temp_output_dir = tempfile.mkdtemp(prefix="ingestor_results_")
+            output_directory = self._created_temp_output_dir
+
         self._output_config = {
             "output_directory": output_directory,
         }
