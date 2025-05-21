@@ -43,6 +43,7 @@ dependencies = [
     "python-docx>=1.1.2",
     "python-dotenv>=1.0.1",
     "python-pptx>=1.0.2",
+    "prometheus-client",
     "torch==2.4.1",
     "ray[all]>=2.37.0",
     "redis>=5.2.1",
