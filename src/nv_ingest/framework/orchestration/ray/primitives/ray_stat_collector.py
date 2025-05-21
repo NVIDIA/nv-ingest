@@ -285,7 +285,7 @@ class RayStatsCollector:
                 q_size_val = queue_actor.qsize()
                 queue_sizes[q_name] = int(q_size_val)
             except Exception as e:
-                logger.error(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
+                logger.warning(f"[StatsCollectNow] Failed to get queue size for '{q_name}': {e}", exc_info=True)
                 queue_sizes[q_name] = 0
                 overall_success = False
 
