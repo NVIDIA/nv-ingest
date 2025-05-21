@@ -46,7 +46,7 @@ from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.milvus import MilvusOperator
 from nv_ingest_client.util.processing import check_schema
-from nv_ingest_client.util.processing import ensure_directory_with_permissions
+from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
 from tqdm import tqdm
 
@@ -322,10 +322,6 @@ class Ingestor:
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
         """
-        ### TESTING: always save to disk
-        self.save_to_disk("/tmp/processed")
-        ###
-
         self._prepare_ingest_run()
 
         # Add jobs locally first
@@ -335,8 +331,8 @@ class Ingestor:
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
-        def _disk_save_and_create_proxy_callback(
-            full_response_dict: Dict[str, Any],
+        def _disk_save_callback(
+            results_data: Dict[str, Any],
             job_id: str,
         ):
             source_name = "unknown_source_in_callback"
@@ -345,16 +341,15 @@ class Ingestor:
                 source_name = job_spec.source_name
             else:
                 try:
-                    if full_response_dict and full_response_dict.get("data"):
-                        source_name = full_response_dict["data"][0]["metadata"]["source_metadata"]["source_id"]
+                    if results_data:
+                        source_name = results_data[0]["metadata"]["source_metadata"]["source_id"]
                 except (IndexError, KeyError, TypeError):
-                    source_name = f"job_{job_id}"
+                    source_name = f"{job_id}"
 
             try:
                 output_dir = self._output_config["output_directory"]
 
-                doc_response_data = full_response_dict.get("data", [])
-                if not doc_response_data:
+                if not results_data:
                     logger.warning(f"No data in response for job {job_id} (source: {source_name}). Skipping save.")
                     if pbar:
                         pbar.update(1)
@@ -364,14 +359,13 @@ class Ingestor:
                 jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
 
                 num_items_saved = save_document_results_to_jsonl(
-                    doc_response_data,
+                    results_data,
                     jsonl_filepath,
                     source_name,
                 )
 
                 if num_items_saved > 0:
-                    proxy = LazyLoadedList(jsonl_filepath, expected_len=num_items_saved)
-                    final_results_payload_list.append(proxy)
+                    final_results_payload_list.append(LazyLoadedList(jsonl_filepath, expected_len=num_items_saved))
 
             except Exception as e:
                 logger.error(f"Disk save callback error for job {job_id} (source: {source_name}): {e}", exc_info=True)
@@ -379,16 +373,10 @@ class Ingestor:
                 if pbar:
                     pbar.update(1)
 
-        def _in_memory_accumulation_callback(
-            full_response_dict: Dict[str, Any],
+        def _in_memory_callback(
+            results_data: Dict[str, Any],
             job_id: str,
         ):
-            doc_data = full_response_dict.get("data")
-            if doc_data:
-                final_results_payload_list.append(doc_data)
-            else:
-                logger.warning(f"In-memory callback: No 'data' in response for job {job_id}.")
-                final_results_payload_list.append([])
             if pbar:
                 pbar.update(1)
 
@@ -396,9 +384,11 @@ class Ingestor:
         callback: Optional[Callable] = None
 
         if self._output_config:
-            callback = _disk_save_and_create_proxy_callback
+            callback = _disk_save_callback
+            stream_to_callback_only = True
         else:
-            callback = _in_memory_accumulation_callback
+            callback = _in_memory_callback
+            stream_to_callback_only = False
 
         # Default concurrent-processing parameters
         DEFAULT_TIMEOUT: int = 100
@@ -411,18 +401,20 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
-        _, failures = self._client.process_jobs_concurrently(
+        results, failures = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
             max_job_retries=max_job_retries,
             completion_callback=callback,
             return_failures=True,
-            data_only=False,  # Callback needs full response to get 'data' part
-            stream_to_callback_only=True,  # Don't build the results list.
+            stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
             **proc_kwargs,
         )
+
+        if self._output_config:
+            results = final_results_payload_list
 
         if show_progress and pbar:
             pbar.close()
@@ -431,7 +423,7 @@ class Ingestor:
             self._vdb_bulk_upload.run(final_results_payload_list)
             self._vdb_bulk_upload = None
 
-        return (final_results_payload_list, failures) if return_failures else final_results_payload_list
+        return (results, failures) if return_failures else results
 
     def ingest_async(self, **kwargs: Any) -> Future:
         """

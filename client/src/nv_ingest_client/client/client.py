@@ -239,7 +239,7 @@ class _ConcurrentProcessor:
         # Execute completion callback if provided
         if self.completion_callback:
             try:
-                self.completion_callback(result_data, job_index)
+                self.completion_callback(result_data.get("data"), job_index)
             except Exception as cb_err:
                 logger.error(f"Error in completion_callback for {job_index}: {cb_err}", exc_info=True)
 
