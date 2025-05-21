@@ -379,7 +379,7 @@ class Ingestor:
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
         """
-        if save_to_disk:
+        if save_to_disk and (not self._output_config):
             self.save_to_disk()
 
         self._prepare_ingest_run()
