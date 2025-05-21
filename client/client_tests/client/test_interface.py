@@ -5,15 +5,19 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
 import io
+import json
 import logging
 import os
 import tempfile
 from concurrent.futures import Future
-from unittest.mock import MagicMock, ANY
+from unittest.mock import ANY
+from unittest.mock import MagicMock
 from unittest.mock import patch
 
+import nv_ingest_client.client.interface as module_under_test
 import pytest
 from nv_ingest_client.client import Ingestor
+from nv_ingest_client.client import LazyLoadedList
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
@@ -28,8 +32,6 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.milvus import MilvusOperator
-
-import nv_ingest_client.client.interface as module_under_test
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -271,7 +273,7 @@ def test_ingest(ingestor, mock_client):
     mock_client.add_job.return_value = job_indices
     # Mock the main processing method to return successful results
     expected_results = [{"result": "success_1"}, {"result": "success_2"}]
-    mock_client.process_jobs_concurrently.return_value = expected_results
+    mock_client.process_jobs_concurrently.return_value = (expected_results, [])
 
     # Store expected arguments used in process_jobs_concurrently
     # Replace with actual values if available from ingestor instance
@@ -296,7 +298,8 @@ def test_ingest(ingestor, mock_client):
         timeout=30,  # Check if the passed timeout is used directly
         max_job_retries=expected_max_retries,
         completion_callback=ANY,  # Usually None or an internal callback
-        return_failures=False,  # Specific to this test case
+        return_failures=True,
+        stream_to_callback_only=False,
         verbose=expected_verbose,
     )
     # Verify the result returned by ingestor matches the mocked result
@@ -346,8 +349,9 @@ def test_ingest_return_failures(ingestor, mock_client):
         timeout=30,
         max_job_retries=expected_max_retries,
         completion_callback=ANY,
-        return_failures=True,  # Specific to this test case
+        return_failures=True,
         # data_only=False, # Removed
+        stream_to_callback_only=False,
         verbose=expected_verbose,
     )
     # Verify the results and failures returned match the mocked tuple
@@ -525,3 +529,86 @@ def test_load_mixed_local_and_remote(mock_fsspec_open, tmp_path):
     assert ingestor._all_local is True
     assert any("local.txt" in path for path in ingestor._documents)
     assert any("remote.txt" in path for path in ingestor._documents)
+
+
+ENSURE_DIR_PATH = "nv_ingest_client.client.interface.ensure_directory_with_permissions"
+
+
+def test_save_to_disk_sets_config_and_calls_ensure_dir(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "test_output")
+
+    with patch(ENSURE_DIR_PATH) as mock_ensure_dir:
+        returned_ingestor = ingestor.save_to_disk(output_directory=output_dir_str)
+
+        assert ingestor._output_config is not None
+        assert ingestor._output_config["output_directory"] == output_dir_str
+        mock_ensure_dir.assert_called_once_with(output_dir_str)
+        assert returned_ingestor is ingestor
+
+
+def test_save_to_disk_config_structure(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "specific_config")
+
+    with patch(ENSURE_DIR_PATH):
+        ingestor.save_to_disk(output_directory=output_dir_str)
+
+    expected_config = {
+        "output_directory": output_dir_str,
+    }
+    assert ingestor._output_config == expected_config
+
+
+def test_save_to_disk_propagates_oserror_from_ensure_dir(ingestor, tmp_path):
+    output_dir_str = str(tmp_path / "restricted_output")
+
+    with patch(ENSURE_DIR_PATH, side_effect=OSError("Test Permission Denied")) as mock_ensure_dir:
+        with pytest.raises(OSError, match="Test Permission Denied"):
+            ingestor.save_to_disk(output_directory=output_dir_str)
+        mock_ensure_dir.assert_called_once_with(output_dir_str)
+
+
+@pytest.fixture
+def create_jsonl_file(tmp_path):
+    def _creator(filename="test_data.jsonl", data=None, content_override=None):
+        filepath = tmp_path / filename
+        if content_override is not None:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(content_override)
+        elif data is not None:
+            with open(filepath, "w", encoding="utf-8") as f:
+                for item in data:
+                    f.write(json.dumps(item) + "\n")
+        else:
+            default_data = [
+                {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
+            ]
+            with open(filepath, "w", encoding="utf-8") as f:
+                for item in default_data:
+                    f.write(json.dumps(item) + "\n")
+        return str(filepath)
+    return _creator
+
+
+def test_lazy_list_core_functionality(create_jsonl_file):
+    default_data = [
+        {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
+    ]
+    filepath = create_jsonl_file(data=default_data)
+
+    lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
+    assert len(lazy_list_prelen) == 3
+    assert list(lazy_list_prelen) == default_data
+    assert lazy_list_prelen[1] == default_data[1]
+    assert lazy_list_prelen[-1] == default_data[-1]
+    assert f"len=3" in repr(lazy_list_prelen)
+
+    lazy_list_ondemand = LazyLoadedList(filepath)
+    assert lazy_list_ondemand._len is None
+    assert len(lazy_list_ondemand) == 3
+    assert lazy_list_ondemand._len == 3 # Check caching
+    assert list(lazy_list_ondemand) == default_data # Iteration after len calculation
+    assert lazy_list_ondemand[0] == default_data[0]
+    assert f"len=3" in repr(lazy_list_ondemand)
+
+    assert lazy_list_ondemand.get_all_items() == default_data
+    assert isinstance(lazy_list_ondemand.get_all_items(), list)
