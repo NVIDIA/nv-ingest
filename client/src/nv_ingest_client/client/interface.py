@@ -350,7 +350,9 @@ class Ingestor:
 
         return self
 
-    def ingest(self, show_progress: bool = False, return_failures: bool = False, **kwargs: Any) -> Union[
+    def ingest(
+        self, show_progress: bool = False, return_failures: bool = False, save_to_disk: bool = True, **kwargs: Any
+    ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
         Tuple[Union[List[List[Dict[str, Any]]], List[LazyLoadedList]], List[Tuple[str, str]]],
@@ -377,6 +379,9 @@ class Ingestor:
         results, failures : tuple (list of dict, list of tuple of str)
             Tuple containing successful results and failure information when `return_failures` is True.
         """
+        if save_to_disk:
+            self.save_to_disk()
+
         self._prepare_ingest_run()
 
         # Add jobs locally first
