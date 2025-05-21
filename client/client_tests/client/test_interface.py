@@ -31,7 +31,7 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
-from nv_ingest_client.util.milvus import MilvusOperator
+from nv_ingest_client.util.vdb.milvus import Milvus
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -220,13 +220,13 @@ def test_store_task_some_args_extra_param(ingestor):
 def test_vdb_upload_task_no_args(ingestor):
     ingestor.vdb_upload()
 
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
 
 
 def test_vdb_upload_task_some_args(ingestor):
     ingestor.vdb_upload(filter_errors=True)
 
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
 
 
 def test_caption_task_no_args(ingestor):
@@ -253,7 +253,7 @@ def test_chain(ingestor):
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[5], FilterTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[6], SplitTask)
     assert isinstance(ingestor._job_specs.job_specs["pdf"][0]._tasks[7], StoreTask)
-    assert isinstance(ingestor._vdb_bulk_upload, MilvusOperator)
+    assert isinstance(ingestor._vdb_bulk_upload, Milvus)
     assert len(ingestor._job_specs.job_specs["pdf"][0]._tasks) == 8
 
 
@@ -579,20 +579,17 @@ def create_jsonl_file(tmp_path):
                 for item in data:
                     f.write(json.dumps(item) + "\n")
         else:
-            default_data = [
-                {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
-            ]
+            default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
             with open(filepath, "w", encoding="utf-8") as f:
                 for item in default_data:
                     f.write(json.dumps(item) + "\n")
         return str(filepath)
+
     return _creator
 
 
 def test_lazy_list_core_functionality(create_jsonl_file):
-    default_data = [
-        {"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}
-    ]
+    default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
     filepath = create_jsonl_file(data=default_data)
 
     lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
@@ -600,15 +597,15 @@ def test_lazy_list_core_functionality(create_jsonl_file):
     assert list(lazy_list_prelen) == default_data
     assert lazy_list_prelen[1] == default_data[1]
     assert lazy_list_prelen[-1] == default_data[-1]
-    assert f"len=3" in repr(lazy_list_prelen)
+    assert "len=3" in repr(lazy_list_prelen)
 
     lazy_list_ondemand = LazyLoadedList(filepath)
     assert lazy_list_ondemand._len is None
     assert len(lazy_list_ondemand) == 3
-    assert lazy_list_ondemand._len == 3 # Check caching
-    assert list(lazy_list_ondemand) == default_data # Iteration after len calculation
+    assert lazy_list_ondemand._len == 3  # Check caching
+    assert list(lazy_list_ondemand) == default_data  # Iteration after len calculation
     assert lazy_list_ondemand[0] == default_data[0]
-    assert f"len=3" in repr(lazy_list_ondemand)
+    assert "len=3" in repr(lazy_list_ondemand)
 
     assert lazy_list_ondemand.get_all_items() == default_data
     assert isinstance(lazy_list_ondemand.get_all_items(), list)

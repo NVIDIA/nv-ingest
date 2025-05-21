@@ -44,10 +44,11 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.util.milvus import MilvusOperator
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
+from nv_ingest_client.util.vdb import VDB
+from nv_ingest_client.util.vdb import available_vdb_ops
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -110,10 +111,12 @@ class LazyLoadedList:
         if idx < 0:
             length = self.__len__()
             if length == 0:
-                 raise IndexError(f"Index {idx} out of range for empty list {self.filepath}")
+                raise IndexError(f"Index {idx} out of range for empty list {self.filepath}")
             idx = length + idx
             if idx < 0:
-                 raise IndexError(f"Calculated index {idx} (from original {idx-length}) out of range for {self.filepath}")
+                raise IndexError(
+                    f"Calculated index {idx} (from original {idx-length}) out of range for {self.filepath}"
+                )
 
         try:
             with open(self.filepath, "r", encoding="utf-8") as f:
@@ -441,8 +444,7 @@ class Ingestor:
             pbar.close()
 
         if self._vdb_bulk_upload:
-            self._vdb_bulk_upload.run(final_results_payload_list)
-            self._vdb_bulk_upload = None
+            self._vdb_bulk_upload.run(results)
 
         return (results, failures) if return_failures else results
 
@@ -493,8 +495,6 @@ class Ingestor:
 
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(combined_future.result())
-            # only upload as part of jobs user specified this action
-            self._vdb_bulk_upload = None
 
         return combined_future
 
@@ -719,7 +719,18 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        self._vdb_bulk_upload = MilvusOperator(**kwargs)
+        vdb_op = kwargs.pop("vdb_op", "milvus")
+        if isinstance(vdb_op, str):
+            vdb_op = available_vdb_ops.get(vdb_op, None)
+            if not vdb_op:
+                raise ValueError(f"Invalid op string: {vdb_op}, Supported ops: {available_vdb_ops.keys()}")
+            vdb_op = vdb_op(**kwargs)
+        elif isinstance(vdb_op, VDB):
+            vdb_op = vdb_op
+        else:
+            raise ValueError(f"Invalid type for op: {type(vdb_op)}, must be type VDB or str.")
+
+        self._vdb_bulk_upload = vdb_op
 
         return self
 
