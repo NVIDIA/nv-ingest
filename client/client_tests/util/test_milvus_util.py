@@ -11,10 +11,12 @@ from nv_ingest_client.util.milvus import (
     reconstruct_pages,
     add_metadata,
     pandas_file_reader,
+    _pull_text,
     create_nvingest_index_params,
 )
 from nv_ingest_client.util.util import ClientConfigSchema
 import pandas as pd
+import logging
 
 
 @pytest.fixture
@@ -264,6 +266,46 @@ def test_metadata_import(metadata, tmp_path):
     metadata.to_parquet(file_name)
     df = pandas_file_reader(file_name)
     pd.testing.assert_frame_equal(df, metadata)
+
+
+def test_pull_text_length_limit(caplog):
+    """Test that _pull_text handles text longer than 65535 characters correctly."""
+    # Create a test element with text longer than 65535 characters
+    long_text = "x" * 65536  # Create text that exceeds the limit
+    test_element = {
+        "document_type": "text",
+        "metadata": {
+            "content": long_text,
+            "embedding": [0.1, 0.2, 0.3],  # Add a valid embedding
+            "source_metadata": {"source_name": "test_file.txt"},
+            "content_metadata": {"page_number": 1},
+        },
+    }
+
+    # Set up logging capture
+    caplog.set_level(logging.WARNING)
+
+    # Call _pull_text with the test element
+    result = _pull_text(
+        element=test_element,
+        enable_text=True,
+        enable_charts=True,
+        enable_tables=True,
+        enable_images=True,
+        enable_infographics=True,
+        enable_audio=True,
+    )
+
+    # Verify that None is returned
+    assert result is None
+
+    # Verify that a warning was logged
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert "Text is too long" in caplog.records[0].message
+    assert "text_length: 65536" in caplog.records[0].message
+    assert "file_name: test_file.txt" in caplog.records[0].message
+    assert "page_number: 1" in caplog.records[0].message
 
 
 @pytest.mark.parametrize(

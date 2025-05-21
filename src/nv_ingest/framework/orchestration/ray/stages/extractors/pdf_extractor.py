@@ -90,10 +90,11 @@ class PDFExtractorStage(RayActorStage):
         logger.debug("Extracted task config: %s", task_config)
 
         # Perform PDF extraction.
+        execution_trace_log = {}
         new_df, extraction_info = _inject_validated_config(
             df_extraction_ledger,
             task_config,
-            execution_trace_log=None,
+            execution_trace_log=execution_trace_log,
             validated_config=self.validated_config,
         )
         logger.info("PDF extraction completed. Extracted %d rows.", len(new_df))
@@ -103,5 +104,10 @@ class PDFExtractorStage(RayActorStage):
         # Optionally, annotate the message with extraction info.
         control_message.set_metadata("pdf_extraction_info", extraction_info)
         logger.info("PDF extraction metadata injected successfully.")
+
+        do_trace_tagging = control_message.get_metadata("config::add_trace_tagging") is True
+        if do_trace_tagging and execution_trace_log:
+            for key, ts in execution_trace_log.items():
+                control_message.set_timestamp(key, ts)
 
         return control_message

@@ -629,6 +629,13 @@ def _pull_text(
             logger.debug(f"failed to find text for entity: {source_name} page: {pg_num} type: {doc_type}")
         # if we do find text but no embedding remove anyway
         text = None
+    if text and len(text) > 65535:
+        logger.warning(
+            f"Text is too long, skipping. It is advised to use SplitTask, to make smaller chunk sizes."
+            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata']['source_name']} "
+            f"page_number: {element['metadata']['content_metadata']['page_number']}"
+        )
+        text = None
     return text
 
 
@@ -743,7 +750,7 @@ def write_records_minio(
                         writer.append_row(record_func(text, element))
 
     writer.commit()
-    print(f"Wrote data to: {writer.batch_files}")
+    logger.debug(f"Wrote data to: {writer.batch_files}")
     return writer
 
 
@@ -767,7 +774,8 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
 
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
-    task_id = utility.do_bulk_insert(collection_name=collection_name, files=writer.batch_files[0])
+    files_to_upload = [_file for file_set in writer.batch_files for _file in file_set]
+    task_id = utility.do_bulk_insert(collection_name=collection_name, files=files_to_upload)
     state = "Pending"
     while state != "Completed":
         task = utility.get_bulk_insert_state(task_id=task_id)

@@ -100,7 +100,7 @@ def _update_infographic_metadata(
         paddle_results = paddle_client.infer(
             data=data_paddle,
             model_name="paddle",
-            stage_name="infographic_data_extraction",
+            stage_name="infographic_extraction",
             max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
