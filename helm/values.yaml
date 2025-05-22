@@ -983,9 +983,10 @@ otelEnvVars:
 zipkinDeployed: true
 
 zipkin:
-  extraEnvs:
-    - name: JAVA_OPTS
-      value: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
+  zipkin:
+    env:
+      - name: JAVA_OPTS
+        value: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
   resources:
     limits:
       cpu: 500m
