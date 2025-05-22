@@ -982,6 +982,18 @@ otelEnvVars:
 ## @param zipkinDeployed [default: true] Whether to deploy Zipkin with OpenTelemetry from this helm chart
 zipkinDeployed: true
 
+zipkin:
+  extraEnvs:
+    - name: JAVA_OPTS
+      value: "-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"
+  resources:
+    limits:
+      cpu: 500m
+      memory: 4.5Gi
+    requests:
+      cpu: 100m
+      memory: 2.5Gi
+
 ## @section Ingress parameters
 ## @param ingress.enabled Enables ingress.
 ## @param ingress.className Specify class name for Ingress.
