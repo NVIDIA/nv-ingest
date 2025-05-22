@@ -1,8 +1,9 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
-
+import multiprocessing
 import threading
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -22,6 +23,35 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 
 logger = logging.getLogger(__name__)
+
+
+class PipelineInterface(ABC):
+    """
+    Abstract base class for pipeline implementations.
+
+    Any concrete pipeline must implement start and stop methods.
+    """
+
+    @abstractmethod
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start the pipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Interval in seconds for monitoring poll (default: 5.0).
+        scaling_poll_interval : float
+            Interval in seconds for scaling decisions (default: 30.0).
+        """
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
+        """
+        Stop the pipeline and perform any necessary cleanup.
+        """
+        pass
 
 
 # --- Configuration Objects ---
@@ -60,6 +90,76 @@ class StatsConfig:
     collection_interval_seconds: float = 10.0
     actor_timeout_seconds: float = 5.0
     queue_timeout_seconds: float = 2.0
+
+
+class RayPipelineSubprocessInterface(PipelineInterface):
+    """
+    Pipeline interface implementation for a subprocess-based Ray pipeline.
+    """
+
+    def __init__(self, process: multiprocessing.Process):
+        """
+        Parameters
+        ----------
+        process : multiprocessing.Process
+            A handle to the running subprocess.
+        """
+        self._process: multiprocessing.Process = process
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start is not supported because the subprocess is assumed to already be running.
+        """
+        pass
+
+    def stop(self) -> None:
+        """
+        Stops the subprocess pipeline by terminating the process if it is still alive.
+        """
+        if self._process.is_alive():
+            self._process.terminate()
+            self._process.join(timeout=5.0)
+
+
+class RayPipelineInterface(PipelineInterface):
+    """
+    Pipeline interface for an in-process RayPipeline instance.
+    """
+
+    def __init__(self, pipeline: "RayPipeline"):
+        """
+        Parameters
+        ----------
+        pipeline : RayPipeline
+            The instantiated pipeline to control.
+        """
+        self._pipeline = pipeline
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Starts the RayPipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Unused here; provided for interface compatibility.
+        scaling_poll_interval : float
+            Unused here; provided for interface compatibility.
+        """
+        self._pipeline.start(monitor_poll_interval, scaling_poll_interval)
+
+    def stop(self) -> None:
+        """
+        Stops the RayPipeline and shuts down Ray.
+        """
+        self._pipeline.stop()
+
+        try:
+            import ray
+
+            ray.shutdown()
+        except Exception:
+            pass
 
 
 class RayPipeline:
@@ -1201,5 +1301,6 @@ class RayPipeline:
 
             # Clear runtime state in topology
             self.topology.clear_runtime_state()
+            del self.topology
 
             logger.info("Pipeline stopped.")

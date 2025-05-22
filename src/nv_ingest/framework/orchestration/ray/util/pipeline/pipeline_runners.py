@@ -3,15 +3,22 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+import multiprocessing
 import os
+import sys
 import time
 from datetime import datetime
-from typing import Union, Tuple
+from typing import Union, Tuple, Optional, TextIO
 
 import ray
 from pydantic import BaseModel, ConfigDict
 
-from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline, ScalingConfig
+from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
+    RayPipeline,
+    ScalingConfig,
+    RayPipelineSubprocessInterface,
+    RayPipelineInterface,
+)
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
 
 logger = logging.getLogger(__name__)
@@ -100,6 +107,79 @@ class PipelineCreationSchema(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
 
+def redirect_os_fds(stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = None):
+    """
+    Redirect OS-level stdout (fd=1) and stderr (fd=2) to the given file-like objects,
+    or to /dev/null if not provided.
+
+    Parameters
+    ----------
+    stdout : Optional[TextIO]
+        Stream to receive OS-level stdout. If None, redirected to /dev/null.
+    stderr : Optional[TextIO]
+        Stream to receive OS-level stderr. If None, redirected to /dev/null.
+    """
+    devnull_fd = os.open(os.devnull, os.O_WRONLY)
+
+    if stdout is not None:
+        os.dup2(stdout.fileno(), 1)
+    else:
+        os.dup2(devnull_fd, 1)
+
+    if stderr is not None:
+        os.dup2(stderr.fileno(), 2)
+    else:
+        os.dup2(devnull_fd, 2)
+
+
+def _run_pipeline_process(
+    ingest_config: PipelineCreationSchema,
+    disable_dynamic_scaling: Optional[bool],
+    dynamic_memory_threshold: Optional[float],
+    raw_stdout: Optional[TextIO] = None,
+    raw_stderr: Optional[TextIO] = None,
+):
+    """
+    Subprocess entrypoint to launch the pipeline. Redirects all output to the provided
+    file-like streams or /dev/null if not specified.
+
+    Parameters
+    ----------
+    ingest_config : PipelineCreationSchema
+        Validated pipeline configuration.
+    disable_dynamic_scaling : Optional[bool]
+        Whether to disable dynamic scaling.
+    dynamic_memory_threshold : Optional[float]
+        Threshold for triggering scaling.
+    raw_stdout : Optional[TextIO]
+        Destination for stdout. Defaults to /dev/null.
+    raw_stderr : Optional[TextIO]
+        Destination for stderr. Defaults to /dev/null.
+    """
+    # Suppress Ray's logging to stderr (if any)
+    os.environ["RAY_LOG_TO_STDERR"] = "0"
+    os.environ["RAY_BACKEND_LOG_LEVEL"] = "error"
+    os.environ["RAY_LOG_DISABLE_STDERR_REDIRECTION"] = "1"
+
+    # Redirect OS-level file descriptors
+    redirect_os_fds(stdout=raw_stdout, stderr=raw_stderr)
+
+    # Redirect Python-level sys.stdout/sys.stderr
+    sys.stdout = raw_stdout or open(os.devnull, "w")
+    sys.stderr = raw_stderr or open(os.devnull, "w")
+
+    try:
+        _launch_pipeline(
+            ingest_config,
+            block=True,
+            disable_dynamic_scaling=disable_dynamic_scaling,
+            dynamic_memory_threshold=dynamic_memory_threshold,
+        )
+    except Exception as e:
+        sys.__stderr__.write(f"Subprocess pipeline run failed: {e}\n")
+        raise
+
+
 def _launch_pipeline(
     ingest_config: PipelineCreationSchema,
     block: bool,
@@ -122,7 +202,7 @@ def _launch_pipeline(
     start_abs = datetime.now()
 
     # Set up the ingestion pipeline
-    setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
+    _ = setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
 
     # Record setup time
     end_setup = start_run = datetime.now()
@@ -159,12 +239,96 @@ def _launch_pipeline(
 def run_pipeline(
     ingest_config: PipelineCreationSchema,
     block: bool = True,
-    disable_dynamic_scaling: bool = None,
-    dynamic_memory_threshold: float = None,
-) -> Union[RayPipeline, float]:
-    pipeline, total_elapsed = _launch_pipeline(ingest_config, block, disable_dynamic_scaling, dynamic_memory_threshold)
+    disable_dynamic_scaling: Optional[bool] = None,
+    dynamic_memory_threshold: Optional[float] = None,
+    run_in_subprocess: bool = False,
+    stdout: Optional[TextIO] = None,
+    stderr: Optional[TextIO] = None,
+) -> Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]:
+    """
+    Launch and manage a pipeline, optionally in a subprocess.
+
+    This function is the primary entry point for executing a Ray pipeline,
+    either within the current process or in a separate Python subprocess.
+    It supports synchronous blocking execution or non-blocking lifecycle management,
+    and allows redirection of output to specified file-like objects.
+
+    Parameters
+    ----------
+    ingest_config : PipelineCreationSchema
+        The validated configuration object used to construct and launch the pipeline.
+    block : bool, default=True
+        If True, blocks until the pipeline completes.
+        If False, returns an interface to control the pipeline externally.
+    disable_dynamic_scaling : Optional[bool], default=None
+        If True, disables dynamic memory scaling. Overrides global configuration if set.
+        If None, uses the default or globally defined behavior.
+    dynamic_memory_threshold : Optional[float], default=None
+        The memory usage threshold (as a float between 0 and 1) that triggers autoscaling,
+        if dynamic scaling is enabled. Defaults to the globally configured value if None.
+    run_in_subprocess : bool, default=False
+        If True, launches the pipeline in a separate Python subprocess using `multiprocessing.Process`.
+        If False, runs the pipeline in the current process.
+    stdout : Optional[TextIO], default=None
+        Optional file-like stream to which subprocess stdout should be redirected.
+        If None, stdout is redirected to /dev/null.
+    stderr : Optional[TextIO], default=None
+        Optional file-like stream to which subprocess stderr should be redirected.
+        If None, stderr is redirected to /dev/null.
+
+    Returns
+    -------
+    Union[RayPipelineInterface, float, RayPipelineSubprocessInterface]
+        - If run in-process with `block=True`: returns elapsed time in seconds (float).
+        - If run in-process with `block=False`: returns a `RayPipelineInterface`.
+        - If run in subprocess with `block=False`: returns a `RayPipelineSubprocessInterface`.
+        - If run in subprocess with `block=True`: returns 0.0.
+
+    Raises
+    ------
+    RuntimeError
+        If the subprocess fails to start or exits with an error.
+    Exception
+        Any other exceptions raised during pipeline launch or configuration.
+    """
+    if run_in_subprocess:
+        logger.info("Launching pipeline in Python subprocess using multiprocessing.")
+
+        process = multiprocessing.Process(
+            target=_run_pipeline_process,
+            args=(
+                ingest_config,
+                disable_dynamic_scaling,
+                dynamic_memory_threshold,
+                stdout,  # raw_stdout
+                stderr,  # raw_stderr
+            ),
+            daemon=False,
+        )
+
+        process.start()
+        interface = RayPipelineSubprocessInterface(process)
+
+        if block:
+            start_time = time.time()
+            logger.info("Waiting for subprocess pipeline to complete...")
+            process.join()
+            logger.info("Pipeline subprocess completed.")
+            return time.time() - start_time
+        else:
+            logger.info(f"Pipeline subprocess started (PID={process.pid})")
+            return interface
+
+    # Run inline
+    pipeline, total_elapsed = _launch_pipeline(
+        ingest_config,
+        block=block,
+        disable_dynamic_scaling=disable_dynamic_scaling,
+        dynamic_memory_threshold=dynamic_memory_threshold,
+    )
 
     if block:
         logger.debug(f"Pipeline execution completed successfully in {total_elapsed:.2f} seconds.")
-
-    return pipeline
+        return total_elapsed
+    else:
+        return RayPipelineInterface(pipeline)
