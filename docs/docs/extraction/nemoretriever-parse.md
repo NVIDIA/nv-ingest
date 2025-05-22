@@ -11,6 +11,9 @@ with [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse).
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 
+Currently, extraction with nemoretriever-parse only supports PDFs, not image files. 
+For more information, see [Troubleshoot Nemo Retriever Extraction](troubleshoot.md).
+
 
 ## Run the NIM Locally by Using Docker Compose
 

@@ -3,35 +3,43 @@
 Before you begin using [NeMo Retriever extraction](overview.md), ensure that you have the hardware for your use case.
 
 
-## Hardware
+## Core and Advanced Pipeline Features
 
-| GPU    | Family      | Memory | Minimum GPUs |
-|--------|-------------|--------|--------------|
-| H100   | SXM or PCIe | 80GB   | 1            |
-| A100   | SXM or PCIe | 80GB   | 1            |
-| A10G   | —           | 24GB   | 1            |
-| L40S   | —           | 48GB   | 1            |
+The Nemo Retriever extraction core pipeline features run on a single A10G or better GPU. 
+The core pipeline features include the following:
 
+- llama3.2-nv-embedqa-1b-v2 — Embedding model for converting text chunks into vectors.
+- nemoretriever-page-elements-v2 — Detects and classifies images on a page as a table, chart or infographic. 
+- nemoretriever-table-structure-v1 — Detects rows, columns, and cells within a table to preserve table structure and convert to Markdown format. 
+- nemoretriever-graphic-elements-v1 — Detects graphic elements within chart images such as titles, legends, axes, and numerical values. 
+- paddleocr — Image OCR model to detect and extract text from images.
+- retrieval — Enables embedding and indexing into Milvus.
 
-The core pipeline requires approximately 150GB disk space. 
-To run the core pipeline and all optional features, you need approximately 210GB disk space.
+Advanced features require additional GPU support and disk space. 
+This includes the following:
 
-
-## Advanced Feature Support
-
-Some advanced features, such as VLM integrations and audio extraction, require additional GPU support and disk space. 
-For more information, refer to [Profile Information](quickstart-guide.md#profile-information).
-
-
-### VLM Integrations
-
-- **nemoretriever-parse VLM NIM** — NeMo Retriever is compatible with [nemoretriever-parse VLM NIM](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. To integrate this NIM into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Nemo Retriever parse requires ~16GB additional disk space.
-- **Llama3.2 Vision VLM NIMs** — NeMo Retriever is compatible with the [Llama3.2 VLM NIMs](https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct/modelcard) for image captioning capabilities. To integrate these NIM into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Image captioning requires ~16GB additional disk space.
+- Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md).
+- `nemoretriever-parse` — Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
+- VLM image captioning — Use [llama 3.2 11B Vision](https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct/modelcard) for experimental image captioning of unstructured images.
 
 
-### Audio Extraction (Early Access)
 
-- **RIVA NIM** — NeMo Retriever can retrieve across audio files by using the [RIVA NIMs](https://docs.nvidia.com/nim/riva/asr/latest/overview.html). To integrate this capability into the nv-ingest pipeline, you need 1 additional GPU (H100, A100, A10G, L40S). Audio extraction requires ~37GB additional disk space.
+## Hardware Requirements
+
+The following are the hardware requirements to run NeMo Retriever Extraction.
+
+| GPU Option                                    | H100        | A100        | A10G   | L40S   |
+|-----------------------------------------------|-------------|-------------|--------|--------|
+| Family                                        | SXM or PCIe | SXM or PCIe | —      | —      |
+| Memory                                        | 80GB        | 80GB        | 24GB   | 48GB   |
+| Core Features Total GPUs                      | 1           | 1           | 1      | 1      |
+| Core Features Total Disk Space                | ~150GB      | ~150GB      | ~150GB | ~150GB |
+| Audio Additional Dedicated GPUs               | 1           | 1           | 1      | 1      |
+| Audio Additional Disk Space                   | ~37GB       | ~37GB       | ~37GB  | ~37GB  |
+| nemoretriever-parse Additional Dedicated GPUs | 1           | 1           | 1      | 1      |
+| nemoretriever-parse Additional Disk Space     | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
+| VLM Additional Dedicated GPUs                 | 1           | 1           | 1      | 1      |
+| VLM Additional Disk Space                     | ~16GB       | ~16GB       | ~16GB  | ~16GB  |
 
 
 
