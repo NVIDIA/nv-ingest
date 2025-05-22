@@ -728,4 +728,10 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.statefuleSet.enabled | bool | `false` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
+| zipkin.extraEnvs[0].name | string | `"JAVA_OPTS"` |  |
+| zipkin.extraEnvs[0].value | string | `"-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"` |  |
+| zipkin.resources.limits.cpu | string | `"500m"` |  |
+| zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
+| zipkin.resources.requests.cpu | string | `"100m"` |  |
+| zipkin.resources.requests.memory | string | `"2.5Gi"` |  |
 | zipkinDeployed | bool | `true` |  |
