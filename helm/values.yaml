@@ -6,6 +6,10 @@ affinity: {}
 ## @param nodeSelector [object] Sets node selectors for the NIM -- for example `nvidia.com/gpu.present: "true"`
 nodeSelector: {}
 
+## @param logLevel Log level of NVIngest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL.
+logLevel: DEFAULT
+
+
 ## @param extraEnvVarsCM [string] [default: ""] A Config map holding Environment variables to include in the NVIngest container
 extraEnvVarsCM: ""
 
@@ -25,7 +29,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.3.0"
+  tag: "25.4.2"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -111,7 +115,7 @@ nemoretriever-page-elements-v2:
   deployed: true
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.2.0"
+    tag: "1.3.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -172,7 +176,7 @@ nemoretriever-graphic-elements-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -233,7 +237,7 @@ nemoretriever-table-structure-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -393,7 +397,7 @@ paddleocr-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/baidu/paddleocr
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -456,7 +460,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.5.0"
+    tag: "1.6.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -521,7 +525,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: "1.5.0"
+    tag: "1.6.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -584,7 +588,7 @@ llama-32-nv-rerankqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-    tag: "1.3.1"
+    tag: "1.5.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
