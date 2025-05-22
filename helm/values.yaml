@@ -9,6 +9,7 @@ nodeSelector: {}
 ## @param logLevel Log level of NVIngest service. Possible values of the variable are TRACE, DEBUG, INFO, WARNING, ERROR, CRITICAL.
 logLevel: DEFAULT
 
+
 ## @param extraEnvVarsCM [string] [default: ""] A Config map holding Environment variables to include in the NVIngest container
 extraEnvVarsCM: ""
 
@@ -28,7 +29,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.3.0"
+  tag: "25.4.2"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
@@ -114,7 +115,7 @@ nemoretriever-page-elements-v2:
   deployed: true
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-page-elements-v2
-    tag: "1.2.0"
+    tag: "1.3.0"
     pullPolicy: IfNotPresent
   podSecurityContext:
     runAsUser: 1000
@@ -175,7 +176,7 @@ nemoretriever-graphic-elements-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -236,7 +237,7 @@ nemoretriever-table-structure-v1:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nemoretriever-table-structure-v1
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -396,7 +397,7 @@ paddleocr-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/baidu/paddleocr
-    tag: "1.2.0"
+    tag: "1.3.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -459,7 +460,7 @@ text-embedding-nim:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/nv-embedqa-e5-v5
-    tag: "1.5.0"
+    tag: "1.6.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -524,7 +525,7 @@ nvidia-nim-llama-32-nv-embedqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2
-    tag: "1.5.0"
+    tag: "1.6.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -587,7 +588,7 @@ llama-32-nv-rerankqa-1b-v2:
   customArgs: []
   image:
     repository: nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2
-    tag: "1.3.1"
+    tag: "1.5.0"
   podSecurityContext:
     runAsUser: 1000
     runAsGroup: 1000
@@ -819,82 +820,113 @@ prometheus:
 
 ## @section Environment Variables
 ## @descriptionStart
-## Define environment variables as key/value dictionary pairs
+## Define environment variables as key/value dictionary pairs. These environment variables configure various aspects
+## of NV-Ingest's behavior including buffer sizes, worker counts, endpoints, protocols, and component configurations.
 ## @descriptionEnd
-## @param envVars [default: sane {}] Adds arbitrary environment variables to the main container using key-value pairs, for example NAME: value
-## @param envVars.INGEST_EDGE_BUFFER_SIZE [default: "64"] Size of the edge buffer for ingestion
-## @param envVars.MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum Ingestion worker processes
-## @param envVars.MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Override this value to specify a differeing REST endpoint host.
-## @param envVars.MESSAGE_CLIENT_PORT [default: "6379"] Override this value to specify a differing REST endpoint port.
-## @param envVars.REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"]
-## @param envVars.NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Override the Timeout of the NVIngest requests.
-## @param envVars.NV_INGEST_MAX_UTIL [default: "48"] Maximum number of CPU cores to utilize for processing. Defaults to number of available CPU cores if not set.
-## @param envVars.MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Override this to the cluster local DNS name of minio
-## @param envVars.MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Override this to publicly routable minio address, default assumes port-forwarding
-## @param envVars.MINIO_BUCKET [default: "nv-ingest"] Override this for specific minio bucket to upload extracted images to
-## @param envVars.PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"]
-## @param envVars.PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"]
-## @param envVars.PADDLE_INFER_PROTOCOL [default: "grpc"] Whether to use the GRPC or HTTP endpoint
-## @param envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"]
-## @param envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"]
-## @param envVars.YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"]
-## @param envVars.YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"]
-## @param envVars.YOLOX_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"]
-## @param envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"]
-## @param envVars.YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"]
-## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"]
-## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"]
-## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Override this for specific VLM caption endpoint
-## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"]
-## @param envVars.AUDIO_GRPC_ENDPOINT [default: "audio:50051"]
-## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"]
-## @param envVars.READY_CHECK_ALL_COMPONENTS [default: "true"]
-## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"]
-envVars:
-  INGEST_EDGE_BUFFER_SIZE: 64
-  MAX_INGEST_PROCESS_WORKERS: 16
-  NV_INGEST_MAX_UTIL: 48
-  MESSAGE_CLIENT_HOST: "nv-ingest-redis-master"
-  MESSAGE_CLIENT_PORT: "6379"
-  REDIS_INGEST_TASK_QUEUE: "ingest_task_queue"
-  NV_INGEST_DEFAULT_TIMEOUT_MS: "1234"
+## @param env [array] List of environment variables to set in the container. Each environment variable is specified as a name/value pair.
+## @param env[].INGEST_EDGE_BUFFER_SIZE [default: "64"] Size of the edge buffer for ingestion
+## @param env[].MAX_INGEST_PROCESS_WORKERS [default: "16"] Maximum number of concurrent ingestion worker processes
+## @param env[].MESSAGE_CLIENT_HOST [default: "nv-ingest-redis-master"] Redis host endpoint for message queue
+## @param env[].MESSAGE_CLIENT_PORT [default: "6379"] Redis port for message queue
+## @param env[].REDIS_INGEST_TASK_QUEUE [default: "ingest_task_queue"] Name of Redis queue for ingest tasks
+## @param env[].NV_INGEST_DEFAULT_TIMEOUT_MS [default: "1234"] Default timeout in milliseconds for NV-Ingest requests
+## @param env[].NV_INGEST_MAX_UTIL [default: "48"] Maximum CPU cores to utilize. Defaults to available cores if not set
+## @param env[].MINIO_INTERNAL_ADDRESS [default: "nv-ingest-minio:9000"] Internal MinIO endpoint
+## @param env[].MINIO_PUBLIC_ADDRESS [default: "http://localhost:9000"] Public MinIO endpoint (default assumes port-forwarding)
+## @param env[].MINIO_BUCKET [default: "nv-ingest"] MinIO bucket name for storing extracted images
+## @param env[].PADDLE_GRPC_ENDPOINT [default: "nv-ingest-paddle:8001"] PaddleOCR gRPC endpoint
+## @param env[].PADDLE_HTTP_ENDPOINT [default: "http://nv-ingest-paddle:8000/v1/infer"] PaddleOCR HTTP endpoint
+## @param env[].PADDLE_INFER_PROTOCOL [default: "grpc"] Protocol to use for PaddleOCR inference (grpc or http)
+## @param env[].NEMORETRIEVER_PARSE_HTTP_ENDPOINT [default: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"] NeMo Retriever parse endpoint
+## @param env[].NEMORETRIEVER_PARSE_INFER_PROTOCOL [default: "http"] Protocol for NeMo Retriever parse inference
+## @param env[].YOLOX_GRPC_ENDPOINT [default: "nemoretriever-page-elements-v2:8001"] YOLOX page elements gRPC endpoint
+## @param env[].YOLOX_HTTP_ENDPOINT [default: "http://nemoretriever-page-elements-v2:8000/v1/infer"] YOLOX page elements HTTP endpoint
+## @param env[].YOLOX_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX page elements inference
+## @param env[].YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT [default: "nemoretriever-graphic-elements-v1:8001"] YOLOX graphic elements gRPC endpoint
+## @param env[].YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT [default: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"] YOLOX graphic elements HTTP endpoint
+## @param env[].YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX graphic elements inference
+## @param env[].YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT [default: "nemoretriever-table-structure-v1:8001"] YOLOX table structure gRPC endpoint
+## @param env[].YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT [default: "http://nemoretriever-table-structure-v1:8000/v1/infer"] YOLOX table structure HTTP endpoint
+## @param env[].YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL [default: "grpc"] Protocol for YOLOX table structure inference
+## @param env[].EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"] Text embedding NIM endpoint
+## @param env[].EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for text embedding
+## @param env[].MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Milvus vector database endpoint
+## @param env[].VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Vision Language Model caption endpoint
+## @param env[].VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"] Model name for image captioning
+## @param env[].AUDIO_GRPC_ENDPOINT [default: "audio:50051"] Audio processing gRPC endpoint
+## @param env[].AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio processing inference
+## @param env[].READY_CHECK_ALL_COMPONENTS [default: "true"] Whether to check readiness of all components on startup
+## @param env[].MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
+env:
+  - name: INGEST_LOG_LEVEL
+    value: "DEFAULT"
+  - name: INGEST_EDGE_BUFFER_SIZE
+    value: "64"
+  - name: MAX_INGEST_PROCESS_WORKERS
+    value: "16"
+  - name: NV_INGEST_MAX_UTIL
+    value: "48"
+  - name: MESSAGE_CLIENT_HOST
+    value: "nv-ingest-redis-master"
+  - name: MESSAGE_CLIENT_PORT
+    value: "6379"
+  - name: REDIS_INGEST_TASK_QUEUE
+    value: "ingest_task_queue"
+  - name: NV_INGEST_DEFAULT_TIMEOUT_MS
+    value: "1234"
+  - name: MINIO_INTERNAL_ADDRESS
+    value: "nv-ingest-minio:9000"
+  - name: MINIO_PUBLIC_ADDRESS
+    value: "http://localhost:9000"
+  - name: MINIO_BUCKET
+    value: "nv-ingest"
+  - name: PADDLE_GRPC_ENDPOINT
+    value: "nv-ingest-paddle:8001"
+  - name: PADDLE_HTTP_ENDPOINT
+    value: "http://nv-ingest-paddle:8000/v1/infer"
+  - name: PADDLE_INFER_PROTOCOL
+    value: "grpc"
+  - name: NEMORETRIEVER_PARSE_HTTP_ENDPOINT
+    value: "http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"
+  - name: NEMORETRIEVER_PARSE_INFER_PROTOCOL
+    value: "http"
+  - name: YOLOX_GRPC_ENDPOINT
+    value: "nemoretriever-page-elements-v2:8001"
+  - name: YOLOX_HTTP_ENDPOINT
+    value: "http://nemoretriever-page-elements-v2:8000/v1/infer"
+  - name: YOLOX_INFER_PROTOCOL
+    value: "grpc"
+  - name: YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT
+    value: "nemoretriever-graphic-elements-v1:8001"
+  - name: YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT
+    value: "http://nemoretriever-graphic-elements-v1:8000/v1/infer"
+  - name: YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL
+    value: "grpc"
+  - name: YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT
+    value: "nemoretriever-table-structure-v1:8001"
+  - name: YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT
+    value: "http://nemoretriever-table-structure-v1:8000/v1/infer"
+  - name: YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL
+    value: "grpc"
+  - name: EMBEDDING_NIM_ENDPOINT
+    value: "http://nv-ingest-embedqa:8000/v1"
+  - name: EMBEDDING_NIM_MODEL_NAME
+    value: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+  - name: MILVUS_ENDPOINT
+    value: "http://nv-ingest-milvus:19530"
+  - name: VLM_CAPTION_ENDPOINT
+    value: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
+  - name: VLM_CAPTION_MODEL_NAME
+    value: "meta/llama-3.2-11b-vision-instruct"
+  - name: AUDIO_GRPC_ENDPOINT
+    value: "audio:50051"
+  - name: AUDIO_INFER_PROTOCOL
+    value: "grpc"
+  - name: COMPONENTS_TO_READY_CHECK
+    value: "ALL"
+  - name: MODEL_PREDOWNLOAD_PATH
+    value: "/workspace/models/"
 
-  MINIO_INTERNAL_ADDRESS: nv-ingest-minio:9000
-  MINIO_PUBLIC_ADDRESS: http://localhost:9000
-  MINIO_BUCKET: nv-ingest
-
-  PADDLE_GRPC_ENDPOINT: nv-ingest-paddle:8001
-  PADDLE_HTTP_ENDPOINT: http://nv-ingest-paddle:8000/v1/infer
-  PADDLE_INFER_PROTOCOL: grpc
-  NEMORETRIEVER_PARSE_HTTP_ENDPOINT: http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions
-  NEMORETRIEVER_PARSE_INFER_PROTOCOL: http
-  YOLOX_GRPC_ENDPOINT: nemoretriever-page-elements-v2:8001
-  YOLOX_HTTP_ENDPOINT: http://nemoretriever-page-elements-v2:8000/v1/infer
-  YOLOX_INFER_PROTOCOL: grpc
-  YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT: nemoretriever-graphic-elements-v1:8001
-  YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT: http://nemoretriever-graphic-elements-v1:8000/v1/infer
-  YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL: grpc
-  YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT: nemoretriever-table-structure-v1:8001
-  YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT: http://nemoretriever-table-structure-v1:8000/v1/infer
-  YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL: grpc
-
-  EMBEDDING_NIM_ENDPOINT: "http://nv-ingest-embedqa:8000/v1"
-  EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
-  MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
-
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
-  VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
-
-  AUDIO_GRPC_ENDPOINT: "audio:50051"
-  AUDIO_INFER_PROTOCOL: "grpc"
-
-  COMPONENTS_TO_READY_CHECK: "ALL"
-  MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
 
 ## @section Open Telemetry
 ## @descriptionStart
@@ -998,6 +1030,7 @@ otelEnvVars:
 
 ## @param zipkinDeployed [default: true] Whether to deploy Zipkin with OpenTelemetry from this helm chart
 zipkinDeployed: true
+
 
 ## @section Ingress parameters
 ## @param ingress.enabled Enables ingress.
