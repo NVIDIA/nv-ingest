@@ -156,11 +156,6 @@ def _run_pipeline_process(
     raw_stderr : Optional[TextIO]
         Destination for stderr. Defaults to /dev/null.
     """
-    # Suppress Ray's logging to stderr (if any)
-    os.environ["RAY_LOG_TO_STDERR"] = "0"
-    os.environ["RAY_BACKEND_LOG_LEVEL"] = "error"
-    os.environ["RAY_LOG_DISABLE_STDERR_REDIRECTION"] = "1"
-
     # Redirect OS-level file descriptors
     redirect_os_fds(stdout=raw_stdout, stderr=raw_stderr)
 

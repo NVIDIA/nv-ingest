@@ -162,7 +162,7 @@ class RayPipelineInterface(PipelineInterface):
             pass
 
 
-class RayPipeline:
+class RayPipeline(PipelineInterface):
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
     Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
