@@ -3,6 +3,19 @@
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
 
 
+## Can't process malformed input files
+
+When you run a job you might see errors similar to the following:
+
+- Failed to process the message
+- Failed to extract image
+- File may be malformed
+- Failed to format paragraph
+
+These errors can occur when your input file is malformed. 
+Verify or fix the format of your input file, and try resubmitting your job.
+
+
 
 ## Can't start new thread error
 
