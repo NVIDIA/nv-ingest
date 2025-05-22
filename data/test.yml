@@ -1,0 +1,8 @@
+---
+# Test YML Document (alternative YAML extension)
+project: test-project
+version: 1.0
+
+notifications:
+  message: "The quick brown fox jumped over the lazy dog."
+... 

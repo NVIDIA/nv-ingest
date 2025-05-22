@@ -32,26 +32,41 @@ ADOBE_CLIENT_ID = os.environ.get("ADOBE_CLIENT_ID", None)
 ADOBE_CLIENT_SECRET = os.environ.get("ADOBE_CLIENT_SECRET", None)
 
 _DEFAULT_EXTRACTOR_MAP = {
+    # Image files
     "bmp": "image",
-    "csv": "pandas",
-    "docx": "python_docx",
-    "excel": "openpyxl",
-    "html": "txt",
     "jpeg": "image",
     "jpg": "image",
-    "parquet": "pandas",
-    "pdf": "pdfium",
     "png": "image",
-    "pptx": "python_pptx",
-    "text": "txt",
     "tiff": "image",
-    "txt": "txt",
-    "xml": "lxml",
-    "mp3": "audio",
-    "wav": "audio",
+    # Text files
+    "html": "txt",
     "json": "txt",
     "md": "txt",
     "sh": "txt",
+    "text": "txt",
+    "txt": "txt",
+    "log": "txt",
+    "yaml": "txt",
+    "yml": "txt",
+    "ini": "txt",
+    "conf": "txt",
+    "cfg": "txt",
+    "tex": "txt",
+    "rst": "txt",
+    "adoc": "txt",
+    # Data files
+    "csv": "pandas",
+    "parquet": "pandas",
+    "excel": "openpyxl",
+    # Document files
+    "docx": "python_docx",
+    "pdf": "pdfium",
+    "pptx": "python_pptx",
+    # Audio files
+    "mp3": "audio",
+    "wav": "audio",
+    # XML files
+    "xml": "lxml",
 }
 
 _Type_Extract_Method_PDF = Literal[
@@ -153,7 +168,24 @@ class ExtractTaskSchema(BaseModel):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
 
         # Skip validation for text-like types, since they do not have 'extract' stages.
-        if document_type in ["txt", "text", "html", "json", "md", "sh"]:
+        if document_type in [
+            "txt",
+            "text",
+            "html",
+            "json",
+            "md",
+            "sh",
+            "log",
+            "xml",
+            "yaml",
+            "yml",
+            "ini",
+            "conf",
+            "cfg",
+            "tex",
+            "rst",
+            "adoc",
+        ]:
             return
 
         valid_methods = set(_Type_Extract_Method_Map[document_type])
