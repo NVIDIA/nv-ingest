@@ -5,6 +5,10 @@ metadata:
   name: {{ include "nv-ingest.fullname" . }}
   labels:
     {{- include "nv-ingest.labels" . | nindent 4 }}
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "7670"
+    prometheus.io/path: "/v1/metrics"
 spec:
   {{- if not .Values.autoscaling.enabled }}
   replicas: {{ .Values.replicaCount }}
@@ -17,6 +21,9 @@ spec:
       {{- with .Values.podAnnotations }}
       annotations:
         {{- toYaml . | nindent 8 }}
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "7670"
+        prometheus.io/path: "/v1/metrics"
       {{- end }}
       labels:
         {{- include "nv-ingest.labels" . | nindent 8 }}

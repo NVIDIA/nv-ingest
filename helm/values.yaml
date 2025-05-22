@@ -801,6 +801,23 @@ redis:
     configmap: |-
       protected-mode no
 
+## @section Prometheus configurations
+## @descriptionStart
+## Include any Prometheus configuration that you'd like with the deployed Prometheus
+## For a complete list of configuration options see: https://github.com/prometheus-community/helm-charts/blob/main/charts/prometheus/values.yaml
+## @descriptionEnd
+## @param prometheus Prometheus configuration options
+## @param prometheus.enabled [default: true] Whether to deploy Prometheus from this helm chart
+## @param prometheus.server.enabled [default: true] Enable the Prometheus server
+## @param prometheus.alertmanager.enabled [default: false] Enable the Prometheus alertmanager
+
+prometheus:
+  enabled: false
+  server:
+    enabled: false
+  alertmanager:
+    enabled: false
+
 ## @section Environment Variables
 ## @descriptionStart
 ## Define environment variables as key/value dictionary pairs. These environment variables configure various aspects
