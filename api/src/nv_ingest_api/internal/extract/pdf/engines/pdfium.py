@@ -562,7 +562,7 @@ def pdfium_extractor(
         rendered_imgs = render_single_pdf_parallel(
             pdf_path=pdf_stream,
             size=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-            max_workers=max(4, pdfium_config.workers_per_progress_engine),
+            max_workers=pdfium_config.workers_per_progress_engine,
             execution_trace_log=execution_trace_log,
         )
 
