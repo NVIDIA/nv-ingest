@@ -40,7 +40,7 @@ dependencies = [
 
 [project.optional-dependencies]
 milvus = [
-    "pymilvus==2.5.8",
+    "pymilvus==2.5.10",
     "pymilvus[bulk_writer,model]",
     "langchain-milvus==0.1.7",
 ]

@@ -60,7 +60,7 @@ dependencies = [
     "pip",
     "llama-index-embeddings-nvidia",
     "opencv-python", # For some reason conda cant solve our req set with py-opencv so we need to use pip
-    "pymilvus>=2.5.0",
+    "pymilvus>=2.5.10",
     "pymilvus[bulk_writer, model]",
     "tritonclient",
     "nvidia-riva-client>=2.18.0",
