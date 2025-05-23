@@ -4,6 +4,7 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+import asyncio
 import collections
 import glob
 import json
@@ -410,11 +411,13 @@ class Ingestor:
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
 
-                num_items_saved = save_document_results_to_jsonl(
-                    doc_data,
-                    jsonl_filepath,
-                    source_name,
-                    ensure_parent_dir_exists=False,
+                num_items_saved = asyncio.run(
+                    save_document_results_to_jsonl(
+                        doc_data,
+                        jsonl_filepath,
+                        source_name,
+                        ensure_parent_dir_exists=False,
+                    )
                 )
 
                 if num_items_saved > 0:

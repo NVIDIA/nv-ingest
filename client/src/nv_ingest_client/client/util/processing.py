@@ -1,3 +1,4 @@
+import aiofiles
 import io
 import json
 import logging
@@ -28,7 +29,7 @@ def get_valid_filename(name: Any) -> str:
     return s
 
 
-def save_document_results_to_jsonl(
+async def save_document_results_to_jsonl(
     doc_response_data: List[Dict[str, Any]],
     jsonl_output_filepath: str,
     original_source_name_for_log: str,
@@ -60,8 +61,8 @@ def save_document_results_to_jsonl(
 
         count_items_written = len(doc_response_data)
 
-        with open(jsonl_output_filepath, "wb") as f_jsonl:
-            f_jsonl.write(full_byte_content)
+        async with aiofiles.open(jsonl_output_filepath, "wb") as f_jsonl:
+            await f_jsonl.write(full_byte_content)
 
         logger.info(
             f"Saved {count_items_written} extraction items for "
