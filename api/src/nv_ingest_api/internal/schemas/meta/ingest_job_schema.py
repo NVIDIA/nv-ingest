@@ -124,6 +124,7 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
     function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
+    segment_audio: Optional[bool] = None
 
 
 class IngestTaskTableExtraction(BaseModelNoExt):
