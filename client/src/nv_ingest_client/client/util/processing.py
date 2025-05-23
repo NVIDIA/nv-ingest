@@ -8,6 +8,15 @@ from typing import Dict
 from typing import List
 from typing import Tuple
 
+try:
+    import orjson as json_lib
+
+    USING_ORJSON = True
+except ImportError:
+    import json as json_lib
+
+    USING_ORJSON = False
+
 logger = logging.getLogger(__name__)
 
 
@@ -43,7 +52,10 @@ def save_document_results_to_jsonl(
 
         with io.BytesIO() as buffer:
             for extraction_item in doc_response_data:
-                buffer.write(json.dumps(extraction_item).encode("utf-8") + b"\n")
+                if USING_ORJSON:
+                    buffer.write(json_lib.dumps(extraction_item) + b"\n")
+                else:
+                    buffer.write(json_lib.dumps(extraction_item).encode("utf-8") + b"\n")
             full_byte_content = buffer.getvalue()
 
         count_items_written = len(doc_response_data)
