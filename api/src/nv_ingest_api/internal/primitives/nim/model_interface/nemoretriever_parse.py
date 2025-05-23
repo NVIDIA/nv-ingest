@@ -120,6 +120,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
             logger.debug("Formatting input for HTTP NemoRetrieverParse model")
             # Prepare payload for HTTP request
 
+            ## TODO: Pss in a list of images to make this more efficient
             if "images" in data:
                 base64_list = [numpy_to_base64(img) for img in data["images"]]
             else:
@@ -198,7 +199,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
                         {
                             "type": "image_url",
                             "image_url": {
-                                "url": f"data:image/png;base64,{b64_img}",
+                                "url": f"data:image/jpeg;base64,{b64_img}",
                             },
                         }
                     ],
