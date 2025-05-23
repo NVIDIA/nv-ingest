@@ -16,7 +16,7 @@ from nv_ingest_api.util.string_processing import generate_url, remove_url_endpoi
 logger = logging.getLogger(__name__)
 
 
-def preprocess_image_for_custom_ocr(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
+def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.

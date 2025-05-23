@@ -12,7 +12,7 @@ from typing import Tuple
 import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import NimClient
-from nv_ingest_api.internal.primitives.nim.model_interface.custom_ocr import CustomOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
     InfographicExtractorSchema,
 )
@@ -61,22 +61,22 @@ def _filter_infographic_images(
 
 def _update_infographic_metadata(
     base64_images: List[str],
-    custom_ocr_client: NimClient,
+    paddle_client: NimClient,
     worker_pool_size: int = 8,  # Not currently used
     trace_info: Optional[Dict] = None,
 ) -> List[Tuple[str, Optional[Any], Optional[Any]]]:
     """
-    Filters base64-encoded images and uses CustomOCR to extract infographic data.
+    Filters base64-encoded images and uses PaddleOCR to extract infographic data.
 
-    For each image that meets the minimum size, calls custom_ocr_client.infer to obtain
+    For each image that meets the minimum size, calls paddle_client.infer to obtain
     (text_predictions, bounding_boxes). Invalid images are marked as skipped.
 
     Parameters
     ----------
     base64_images : List[str]
         List of base64-encoded images.
-    custom_ocr_client : NimClient
-        Client instance for CustomOCR inference.
+    paddle_client : NimClient
+        Client instance for PaddleOCR inference.
     worker_pool_size : int, optional
         Worker pool size (currently not used), by default 8.
     trace_info : Optional[Dict], optional
@@ -88,55 +88,54 @@ def _update_infographic_metadata(
         List of tuples in the same order as base64_images, where each tuple contains:
         (base64_image, text_predictions, bounding_boxes).
     """
-    logger.debug(f"Running infographic extraction using protocol {custom_ocr_client.protocol}")
+    logger.debug(f"Running infographic extraction using protocol {paddle_client.protocol}")
 
     valid_images, valid_indices, results = _filter_infographic_images(base64_images)
-    data_custom_ocr = {"base64_images": valid_images}
+    data_paddle = {"base64_images": valid_images}
 
     # worker_pool_size is not used in current implementation.
     _ = worker_pool_size
 
     try:
-        custom_ocr_results = custom_ocr_client.infer(
-            data=data_custom_ocr,
-            model_name="custom_ocr",
+        paddle_results = paddle_client.infer(
+            data=data_paddle,
+            model_name="paddle",
             stage_name="infographic_extraction",
-            max_batch_size=8,
-            force_max_batch_size=True,
+            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
     except Exception as e:
-        logger.error(f"Error calling custom_ocr_client.infer: {e}", exc_info=True)
+        logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
         raise
 
-    if len(custom_ocr_results) != len(valid_images):
-        raise ValueError(f"Expected {len(valid_images)} custom_ocr results, got {len(custom_ocr_results)}")
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
 
-    for idx, custom_ocr_res in enumerate(custom_ocr_results):
+    for idx, paddle_res in enumerate(paddle_results):
         original_index = valid_indices[idx]
-        # Each custom_ocr_res is expected to be a tuple (text_predictions, bounding_boxes)
-        results[original_index] = (base64_images[original_index], custom_ocr_res[0], custom_ocr_res[1])
+        # Each paddle_res is expected to be a tuple (text_predictions, bounding_boxes)
+        results[original_index] = (base64_images[original_index], paddle_res[0], paddle_res[1])
 
     return results
 
 
 def _create_clients(
-    custom_ocr_endpoints: Tuple[str, str],
-    custom_ocr_protocol: str,
+    paddle_endpoints: Tuple[str, str],
+    paddle_protocol: str,
     auth_token: str,
 ) -> NimClient:
-    custom_ocr_model_interface = CustomOCRModelInterface()
+    paddle_model_interface = PaddleOCRModelInterface()
 
-    logger.debug(f"Inference protocols: custom_ocr={custom_ocr_protocol}")
+    logger.debug(f"Inference protocols: paddle={paddle_protocol}")
 
-    custom_ocr_client = create_inference_client(
-        endpoints=custom_ocr_endpoints,
-        model_interface=custom_ocr_model_interface,
+    paddle_client = create_inference_client(
+        endpoints=paddle_endpoints,
+        model_interface=paddle_model_interface,
         auth_token=auth_token,
-        infer_protocol=custom_ocr_protocol,
+        infer_protocol=paddle_protocol,
     )
 
-    return custom_ocr_client
+    return paddle_client
 
 
 def _meets_infographic_criteria(row: pd.Series) -> bool:
@@ -210,9 +209,9 @@ def extract_infographic_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    custom_ocr_client = _create_clients(
-        endpoint_config.custom_ocr_endpoints,
-        endpoint_config.custom_ocr_infer_protocol,
+    paddle_client = _create_clients(
+        endpoint_config.paddle_endpoints,
+        endpoint_config.paddle_infer_protocol,
         endpoint_config.auth_token,
     )
 
@@ -231,14 +230,14 @@ def extract_infographic_data_from_image_internal(
         # Call bulk update to extract infographic data.
         bulk_results = _update_infographic_metadata(
             base64_images=base64_images,
-            custom_ocr_client=custom_ocr_client,
+            paddle_client=paddle_client,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             trace_info=execution_trace_log,
         )
 
         # Write the extracted results back into the DataFrame.
         for result_idx, df_idx in enumerate(valid_indices):
-            # Unpack result: (base64_image, custom_ocr_bounding_boxes, custom_ocr_text_predictions)
+            # Unpack result: (base64_image, paddle_bounding_boxes, paddle_text_predictions)
             _, _, text_predictions = bulk_results[result_idx]
             table_content = " ".join(text_predictions) if text_predictions else None
             df_extraction_ledger.at[df_idx, "metadata"]["table_metadata"]["table_content"] = table_content
@@ -251,4 +250,4 @@ def extract_infographic_data_from_image_internal(
         raise
 
     finally:
-        custom_ocr_client.close()
+        paddle_client.close()

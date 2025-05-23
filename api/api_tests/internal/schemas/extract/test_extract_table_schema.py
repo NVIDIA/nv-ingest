@@ -11,38 +11,34 @@ from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExt
 ### Tests for TableExtractorConfigSchema ###
 
 
-def test_table_valid_yolox_and_custom_ocr_grpc_only():
-    config = TableExtractorConfigSchema(
-        yolox_endpoints=("grpc_yolox", None), custom_ocr_endpoints=("grpc_custom_ocr", None)
-    )
+def test_table_valid_yolox_and_paddle_grpc_only():
+    config = TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), paddle_endpoints=("grpc_paddle", None))
     assert config.yolox_endpoints == ("grpc_yolox", None)
-    assert config.custom_ocr_endpoints == ("grpc_custom_ocr", None)
+    assert config.paddle_endpoints == ("grpc_paddle", None)
 
 
-def test_table_valid_yolox_and_custom_ocr_http_only():
-    config = TableExtractorConfigSchema(
-        yolox_endpoints=(None, "http_yolox"), custom_ocr_endpoints=(None, "http_custom_ocr")
-    )
+def test_table_valid_yolox_and_paddle_http_only():
+    config = TableExtractorConfigSchema(yolox_endpoints=(None, "http_yolox"), paddle_endpoints=(None, "http_paddle"))
     assert config.yolox_endpoints == (None, "http_yolox")
-    assert config.custom_ocr_endpoints == (None, "http_custom_ocr")
+    assert config.paddle_endpoints == (None, "http_paddle")
 
 
 def test_table_invalid_yolox_both_empty():
     with pytest.raises(ValidationError) as excinfo:
-        TableExtractorConfigSchema(yolox_endpoints=(None, None), custom_ocr_endpoints=("grpc_custom_ocr", None))
+        TableExtractorConfigSchema(yolox_endpoints=(None, None), paddle_endpoints=("grpc_paddle", None))
     assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
 
 
-def test_table_invalid_custom_ocr_both_empty():
+def test_table_invalid_paddle_both_empty():
     with pytest.raises(ValidationError) as excinfo:
-        TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), custom_ocr_endpoints=("  ", '  "  '))
-    assert "Both gRPC and HTTP services cannot be empty for custom_ocr_endpoints." in str(excinfo.value)
+        TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), paddle_endpoints=("  ", '  "  '))
+    assert "Both gRPC and HTTP services cannot be empty for paddle_endpoints." in str(excinfo.value)
 
 
 def test_table_extra_fields_forbidden():
     with pytest.raises(ValidationError):
         TableExtractorConfigSchema(
-            yolox_endpoints=("grpc_service", None), custom_ocr_endpoints=("grpc_custom_ocr", None), extra_field="fail"
+            yolox_endpoints=("grpc_service", None), paddle_endpoints=("grpc_paddle", None), extra_field="fail"
         )
 
 
@@ -58,9 +54,7 @@ def test_table_extractor_schema_defaults():
 
 
 def test_table_extractor_with_config():
-    config = TableExtractorConfigSchema(
-        yolox_endpoints=("grpc_yolox", None), custom_ocr_endpoints=("grpc_custom_ocr", None)
-    )
+    config = TableExtractorConfigSchema(yolox_endpoints=("grpc_yolox", None), paddle_endpoints=("grpc_paddle", None))
     schema = TableExtractorSchema(max_queue_size=20, n_workers=15, raise_on_failure=True, endpoint_config=config)
     assert schema.max_queue_size == 20
     assert schema.n_workers == 15

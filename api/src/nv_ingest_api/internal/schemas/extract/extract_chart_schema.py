@@ -24,8 +24,8 @@ class ChartExtractorConfigSchema(BaseModel):
         A tuple containing the gRPC and HTTP services for the yolox endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
-    custom_ocr_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the custom_ocr endpoint.
+    paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the paddle endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -49,8 +49,8 @@ class ChartExtractorConfigSchema(BaseModel):
     yolox_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
     yolox_infer_protocol: str = ""
 
-    custom_ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    custom_ocr_infer_protocol: str = ""
+    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    paddle_infer_protocol: str = ""
 
     nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
@@ -86,7 +86,7 @@ class ChartExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["yolox_endpoints", "custom_ocr_endpoints"]:
+        for endpoint_name in ["yolox_endpoints", "paddle_endpoints"]:
             grpc_service, http_service = values.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
@@ -117,7 +117,7 @@ class ChartExtractorSchema(BaseModel):
         A flag indicating whether to raise an exception if a failure occurs during chart extraction.
 
     extraction_config: Optional[ChartExtractorConfigSchema], default=None
-        Configuration for the chart extraction stage, including yolox and custom_ocr service endpoints.
+        Configuration for the chart extraction stage, including yolox and paddle service endpoints.
     """
 
     max_queue_size: int = 1

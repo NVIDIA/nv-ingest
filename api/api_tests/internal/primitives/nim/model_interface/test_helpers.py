@@ -16,7 +16,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
     get_version,
     get_model_name,
     is_ready,
-    preprocess_image_for_custom_ocr,
+    preprocess_image_for_paddle,
 )
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
@@ -91,7 +91,7 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
 
     def test_preprocess_image_default_dimension(self):
         """Test image preprocessing with default max dimension."""
-        result, metadata = preprocess_image_for_custom_ocr(self.sample_image)
+        result, metadata = preprocess_image_for_paddle(self.sample_image)
 
         # Check that the result has the correct shape (channel, height, width)
         self.assertEqual(result.shape[0], 3)  # 3 channels
@@ -122,7 +122,7 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
     def test_preprocess_image_custom_dimension(self):
         """Test image preprocessing with custom max dimension."""
         custom_max_dim = 512
-        result, metadata = preprocess_image_for_custom_ocr(self.sample_image, image_max_dimension=custom_max_dim)
+        result, metadata = preprocess_image_for_paddle(self.sample_image, image_max_dimension=custom_max_dim)
 
         # Check that resize was called with the correct scale factor
         expected_scale = custom_max_dim / 200
@@ -136,7 +136,7 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
     def test_preprocess_image_square_image(self):
         """Test preprocessing with a square image."""
         square_image = np.zeros((100, 100, 3), dtype=np.uint8)
-        result, metadata = preprocess_image_for_custom_ocr(square_image)
+        result, metadata = preprocess_image_for_paddle(square_image)
 
         # Scale factor should be based on max dimension (100)
         expected_scale = 960 / 100
@@ -151,7 +151,7 @@ class TestPreprocessImageForPaddle(unittest.TestCase):
     def test_preprocess_image_tall_image(self):
         """Test preprocessing with a tall image (height > width)."""
         tall_image = np.zeros((300, 100, 3), dtype=np.uint8)
-        result, metadata = preprocess_image_for_custom_ocr(tall_image)
+        result, metadata = preprocess_image_for_paddle(tall_image)
 
         # Scale factor should be based on max dimension (300)
         expected_scale = 960 / 300

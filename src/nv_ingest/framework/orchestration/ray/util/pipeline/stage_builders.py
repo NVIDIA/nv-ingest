@@ -213,15 +213,15 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
     yolox_table_structure_grpc, yolox_table_structure_http, yolox_auth, yolox_table_structure_protocol = (
         get_nim_service("yolox_table_structure")
     )
-    custom_ocr_grpc, custom_ocr_http, custom_ocr_auth, custom_ocr_protocol = get_nim_service("custom_ocr")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     table_extractor_config = TableExtractorSchema(
         **{
             "endpoint_config": {
                 "yolox_endpoints": (yolox_table_structure_grpc, yolox_table_structure_http),
                 "yolox_infer_protocol": yolox_table_structure_protocol,
-                "custom_ocr_endpoints": (custom_ocr_grpc, custom_ocr_http),
-                "custom_ocr_infer_protocol": custom_ocr_protocol,
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
             }
         }
@@ -242,15 +242,15 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
     yolox_graphic_elements_grpc, yolox_graphic_elements_http, yolox_auth, yolox_graphic_elements_protocol = (
         get_nim_service("yolox_graphic_elements")
     )
-    custom_ocr_grpc, custom_ocr_http, custom_ocr_auth, custom_ocr_protocol = get_nim_service("custom_ocr")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     chart_extractor_config = ChartExtractorSchema(
         **{
             "endpoint_config": {
                 "yolox_endpoints": (yolox_graphic_elements_grpc, yolox_graphic_elements_http),
                 "yolox_infer_protocol": yolox_graphic_elements_protocol,
-                "custom_ocr_endpoints": (custom_ocr_grpc, custom_ocr_http),
-                "custom_ocr_infer_protocol": custom_ocr_protocol,
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
                 "auth_token": yolox_auth,
             }
         }
@@ -268,14 +268,14 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
 
 
 def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="infographic_extractor"):
-    custom_ocr_grpc, custom_ocr_http, custom_ocr_auth, custom_ocr_protocol = get_nim_service("custom_ocr")
+    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
 
     infographic_content_extractor_config = InfographicExtractorSchema(
         **{
             "endpoint_config": {
-                "custom_ocr_endpoints": (custom_ocr_grpc, custom_ocr_http),
-                "custom_ocr_infer_protocol": custom_ocr_protocol,
-                "auth_token": custom_ocr_auth,
+                "paddle_endpoints": (paddle_grpc, paddle_http),
+                "paddle_infer_protocol": paddle_protocol,
+                "auth_token": paddle_auth,
             }
         }
     )

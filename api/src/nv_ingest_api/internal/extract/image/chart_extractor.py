@@ -16,9 +16,9 @@ import pandas as pd
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_version
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
-from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_custom_ocr_output
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
-from nv_ingest_api.internal.primitives.nim.model_interface.custom_ocr import CustomOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -62,7 +62,7 @@ def _filter_valid_chart_images(
 
 def _run_chart_inference(
     yolox_client: Any,
-    custom_ocr_client: Any,
+    paddle_client: Any,
     valid_arrays: List[np.ndarray],
     valid_images: List[str],
     trace_info: Dict,
@@ -70,10 +70,10 @@ def _run_chart_inference(
     """
     Run concurrent inference for chart extraction using YOLOX and Paddle.
 
-    Returns a tuple of (yolox_results, custom_ocr_results).
+    Returns a tuple of (yolox_results, paddle_results).
     """
     data_yolox = {"images": valid_arrays}
-    data_custom_ocr = {"base64_images": valid_images}
+    data_paddle = {"base64_images": valid_images}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_yolox = executor.submit(
@@ -84,13 +84,12 @@ def _run_chart_inference(
             max_batch_size=8,
             trace_info=trace_info,
         )
-        future_custom_ocr = executor.submit(
-            custom_ocr_client.infer,
-            data=data_custom_ocr,
-            model_name="custom_ocr",
+        future_paddle = executor.submit(
+            paddle_client.infer,
+            data=data_paddle,
+            model_name="paddle",
             stage_name="chart_extraction",
-            max_batch_size=8,
-            force_max_batch_size=True,
+            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
             trace_info=trace_info,
         )
 
@@ -101,16 +100,16 @@ def _run_chart_inference(
             raise
 
         try:
-            custom_ocr_results = future_custom_ocr.result()
+            paddle_results = future_paddle.result()
         except Exception as e:
-            logger.error(f"Error calling custom_ocr_client.infer: {e}", exc_info=True)
+            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
             raise
 
-    return yolox_results, custom_ocr_results
+    return yolox_results, paddle_results
 
 
 def _validate_chart_inference_results(
-    yolox_results: Any, custom_ocr_results: Any, valid_arrays: List[Any], valid_images: List[str]
+    yolox_results: Any, paddle_results: Any, valid_arrays: List[Any], valid_images: List[str]
 ) -> Tuple[List[Any], List[Any]]:
     """
     Ensure inference results are lists and have expected lengths.
@@ -118,21 +117,21 @@ def _validate_chart_inference_results(
     Raises:
       ValueError if results do not match expected types or lengths.
     """
-    if not (isinstance(yolox_results, list) and isinstance(custom_ocr_results, list)):
-        raise ValueError("Expected list results from both yolox_client and custom_ocr_client infer calls.")
+    if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
+        raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
 
     if len(yolox_results) != len(valid_arrays):
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
-    if len(custom_ocr_results) != len(valid_images):
-        raise ValueError(f"Expected {len(valid_images)} custom_ocr results, got {len(custom_ocr_results)}")
-    return yolox_results, custom_ocr_results
+    if len(paddle_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
+    return yolox_results, paddle_results
 
 
 def _merge_chart_results(
     base64_images: List[str],
     valid_indices: List[int],
     yolox_results: List[Any],
-    custom_ocr_results: List[Any],
+    paddle_results: List[Any],
     initial_results: List[Tuple[str, Optional[Dict]]],
 ) -> List[Tuple[str, Optional[Dict]]]:
     """
@@ -141,10 +140,10 @@ def _merge_chart_results(
     For each valid image, processes the results from both inference calls and updates the
     corresponding entry in the results list.
     """
-    for idx, (yolox_res, custom_ocr_res) in enumerate(zip(yolox_results, custom_ocr_results)):
-        # Unpack custom_ocr result into bounding boxes and text predictions.
-        bounding_boxes, text_predictions = custom_ocr_res
-        yolox_elements = join_yolox_graphic_elements_and_custom_ocr_output(yolox_res, bounding_boxes, text_predictions)
+    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
+        # Unpack paddle result into bounding boxes and text predictions.
+        bounding_boxes, text_predictions = paddle_res
+        yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
         original_index = valid_indices[idx]
         initial_results[original_index] = (base64_images[original_index], chart_content)
@@ -154,7 +153,7 @@ def _merge_chart_results(
 def _update_chart_metadata(
     base64_images: List[str],
     yolox_client: Any,
-    custom_ocr_client: Any,
+    paddle_client: Any,
     trace_info: Dict,
     worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Optional[Dict]]]:
@@ -173,28 +172,28 @@ def _update_chart_metadata(
     valid_images, valid_arrays, valid_indices, results = _filter_valid_chart_images(base64_images)
 
     # Run concurrent inference only for valid images.
-    yolox_results, custom_ocr_results = _run_chart_inference(
+    yolox_results, paddle_results = _run_chart_inference(
         yolox_client=yolox_client,
-        custom_ocr_client=custom_ocr_client,
+        paddle_client=paddle_client,
         valid_arrays=valid_arrays,
         valid_images=valid_images,
         trace_info=trace_info,
     )
 
     # Validate that the returned inference results are lists of the expected length.
-    yolox_results, custom_ocr_results = _validate_chart_inference_results(
-        yolox_results, custom_ocr_results, valid_arrays, valid_images
+    yolox_results, paddle_results = _validate_chart_inference_results(
+        yolox_results, paddle_results, valid_arrays, valid_images
     )
 
     # Merge the inference results into the results list.
-    return _merge_chart_results(base64_images, valid_indices, yolox_results, custom_ocr_results, results)
+    return _merge_chart_results(base64_images, valid_indices, yolox_results, paddle_results, results)
 
 
 def _create_clients(
     yolox_endpoints: Tuple[str, str],
     yolox_protocol: str,
-    custom_ocr_endpoints: Tuple[str, str],
-    custom_ocr_protocol: str,
+    paddle_endpoints: Tuple[str, str],
+    paddle_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
     # Obtain yolox_version
@@ -215,9 +214,9 @@ def _create_clients(
         yolox_version = None  # Default to the latest version
 
     yolox_model_interface = YoloxGraphicElementsModelInterface(yolox_version=yolox_version)
-    custom_ocr_model_interface = CustomOCRModelInterface()
+    paddle_model_interface = PaddleOCRModelInterface()
 
-    logger.debug(f"Inference protocols: yolox={yolox_protocol}, custom_ocr={custom_ocr_protocol}")
+    logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")
 
     yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
@@ -226,14 +225,14 @@ def _create_clients(
         infer_protocol=yolox_protocol,
     )
 
-    custom_ocr_client = create_inference_client(
-        endpoints=custom_ocr_endpoints,
-        model_interface=custom_ocr_model_interface,
+    paddle_client = create_inference_client(
+        endpoints=paddle_endpoints,
+        model_interface=paddle_model_interface,
         auth_token=auth_token,
-        infer_protocol=custom_ocr_protocol,
+        infer_protocol=paddle_protocol,
     )
 
-    return yolox_client, custom_ocr_client
+    return yolox_client, paddle_client
 
 
 def extract_chart_data_from_image_internal(
@@ -276,11 +275,11 @@ def extract_chart_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    yolox_client, custom_ocr_client = _create_clients(
+    yolox_client, paddle_client = _create_clients(
         endpoint_config.yolox_endpoints,
         endpoint_config.yolox_infer_protocol,
-        endpoint_config.custom_ocr_endpoints,
-        endpoint_config.custom_ocr_infer_protocol,
+        endpoint_config.paddle_endpoints,
+        endpoint_config.paddle_infer_protocol,
         endpoint_config.auth_token,
     )
 
@@ -324,7 +323,7 @@ def extract_chart_data_from_image_internal(
         bulk_results = _update_chart_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
-            custom_ocr_client=custom_ocr_client,
+            paddle_client=paddle_client,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             trace_info=execution_trace_log,
         )
@@ -345,8 +344,8 @@ def extract_chart_data_from_image_internal(
 
     finally:
         try:
-            if custom_ocr_client is not None:
-                custom_ocr_client.close()
+            if paddle_client is not None:
+                paddle_client.close()
             if yolox_client is not None:
                 yolox_client.close()
 
