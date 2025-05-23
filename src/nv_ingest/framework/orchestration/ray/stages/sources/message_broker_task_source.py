@@ -103,7 +103,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
     # Use the updated config type hint
     def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config, log_to_stdout=False)
+        super().__init__(config, log_to_stdout=True)
         self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
         self._logger.debug(
             "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
@@ -168,11 +168,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         try:
             # Log the payload (with content redacted) if in debug mode
-            if self._logger.isEnabledFor(logging.DEBUG):
+            if True:  # self._logger.isEnabledFor(logging.DEBUG):
                 no_payload = copy.deepcopy(job)
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]
-                self._logger.debug("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
+                self._logger.info("Processed job payload for logging: %s", json.dumps(no_payload, indent=2))
 
             # Validate incoming job structure
             validate_ingest_job(job)

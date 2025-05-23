@@ -11,6 +11,8 @@ import logging
 
 from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.gather import GatherStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.scatter import PDFScatterSchema, PDFScatterStage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
@@ -169,6 +171,24 @@ def add_metadata_injector_stage(pipeline, default_cpu_count, stage_name="metadat
         min_replicas=0,
         max_replicas=1,
     )
+
+    return stage_name
+
+
+def add_pdf_scatter_stage(pipeline, default_cpu_count, stage_name="pdf_scatter"):
+    _ = default_cpu_count  # Placeholder for future use
+
+    config = PDFScatterSchema()
+    pipeline.add_stage(name=stage_name, stage_actor=PDFScatterStage, config=config, min_replicas=0, max_replicas=1)
+
+    return stage_name
+
+
+def add_gather_stage(pipeline, default_cpu_count, stage_name="gather"):
+    _ = default_cpu_count  # Placeholder for future use
+
+    config = {}
+    pipeline.add_stage(name=stage_name, stage_actor=GatherStage, config=config, min_replicas=1, max_replicas=1)
 
     return stage_name
 

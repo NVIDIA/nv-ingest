@@ -19,6 +19,7 @@ import time
 
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
+from nv_ingest.framework.orchestration.ray.util.pipeline.mixins import SingletonStageMixin
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 
 logger = logging.getLogger(__name__)
@@ -310,10 +311,20 @@ class RayPipeline:
         if min_replicas < 0:
             logger.warning(f"Stage '{name}': min_replicas cannot be negative. Overriding to 0.")
             min_replicas = 0
+
+        # Singleton stage check
+        if isinstance(stage_actor, type) and issubclass(stage_actor, SingletonStageMixin):
+            if min_replicas != 1 or max_replicas != 1:
+                logger.warning(
+                    f"Stage '{name}' is a SingletonStageMixin but min/max replicas are not both 1. Clamping to 1."
+                )
+            min_replicas = 1
+            max_replicas = 1
+
         stage_info = StageInfo(
             name=name, callable=stage_actor, config=config, min_replicas=min_replicas, max_replicas=max_replicas
         )
-        self.topology.add_stage(stage_info)  # Delegate
+        self.topology.add_stage(stage_info)
 
         return self
 

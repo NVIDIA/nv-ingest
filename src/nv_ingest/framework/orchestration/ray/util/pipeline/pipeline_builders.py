@@ -33,6 +33,8 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_infographic_extractor_stage,
     add_otel_tracer_stage,
     add_default_drain_stage,
+    add_pdf_scatter_stage,
+    add_gather_stage,
 )
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
@@ -93,6 +95,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     # TODO(Devin): Job counter used a global stats object that isn't ray compatible, need to update.
     # submitted_job_counter_stage = add_submitted_job_counter_stage(pipe, morpheus_pipeline_config, ingest_config)
     metadata_injector_stage_id = add_metadata_injector_stage(pipeline, default_cpu_count)
+    pdf_scatter_stage_id = add_pdf_scatter_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
@@ -103,6 +106,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     docx_extractor_stage_id = add_docx_extractor_stage(pipeline, default_cpu_count)
     pptx_extractor_stage_id = add_pptx_extractor_stage(pipeline, default_cpu_count)
     audio_extractor_stage_id = add_audio_extractor_stage(pipeline, default_cpu_count)
+    post_extraction_gather_stage_id = add_gather_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
     ########################################################################################################
@@ -152,7 +156,8 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     # Add edges
     ###### Intake Stages ########
     pipeline.make_edge(source_stage_id, metadata_injector_stage_id, queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge(metadata_injector_stage_id, pdf_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(metadata_injector_stage_id, pdf_scatter_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(pdf_scatter_stage_id, pdf_extractor_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Document Extractors ########
     pipeline.make_edge(pdf_extractor_stage_id, audio_extractor_stage_id, queue_size=ingest_edge_buffer_size)
@@ -160,9 +165,12 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     pipeline.make_edge(docx_extractor_stage_id, pptx_extractor_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(pptx_extractor_stage_id, image_extractor_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(image_extractor_stage_id, infographic_extraction_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(
+        infographic_extraction_stage_id, post_extraction_gather_stage_id, queue_size=ingest_edge_buffer_size
+    )
 
     ###### Primitive Extractors ########
-    pipeline.make_edge(infographic_extraction_stage_id, table_extraction_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(post_extraction_gather_stage_id, table_extraction_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(table_extraction_stage_id, chart_extraction_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(chart_extraction_stage_id, image_filter_stage_id, queue_size=ingest_edge_buffer_size)
 

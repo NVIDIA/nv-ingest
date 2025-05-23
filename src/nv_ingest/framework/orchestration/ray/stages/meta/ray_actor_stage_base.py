@@ -255,14 +255,15 @@ class RayActorStage(ABC):
         pass  # Must be implemented by concrete subclasses
 
     def _processing_loop(self) -> None:
-        """Core processing routine executed in a dedicated background thread.
+        """
+        Core processing routine executed in a dedicated background thread.
 
         This loop performs the primary work of the actor:
         1.  Continuously attempts to retrieve a `control_message` from the
             `_input_queue`.
         2.  If a message is obtained, it's processed by the `on_data` method.
-        3.  If `on_data` yields a result (`updated_cm`), this result is
-            indefinitely retried to be `put` onto the `_output_queue`.
+        3.  If `on_data` yields one or more results (`updated_cm`), they are
+            retried until successfully `put` onto the `_output_queue`.
         4.  The loop continues as long as the `self._running` flag is `True`.
             This flag is typically controlled by external calls to `start()`
             and `stop()` methods of the actor.
@@ -277,9 +278,8 @@ class RayActorStage(ABC):
           sequence are caught, logged, and relevant error statistics are
           incremented. The loop then continues to the next iteration if
           `self._running` is still `True`.
-        - If `on_data` returns `None`, it's treated as a recoverable incident;
-          a warning is logged, stats are updated, and the loop continues.
-          No output is produced for that specific input message.
+        - If `on_data` returns an empty list, it's treated as a handled message
+          with no output. No warning or error is logged.
         - A critical failure in the `_output_queue.put` (e.g., `RayActorError`
           if the queue actor is dead) will currently lead to indefinite retries.
 
@@ -288,8 +288,7 @@ class RayActorStage(ABC):
         This method updates various keys in `self.stats`, including:
         - `successful_queue_reads`: Incremented when an item is successfully
           read from the input queue.
-        - `errors`: Incremented if `on_data` returns `None` or if an
-          exception occurs during `on_data` or output queuing.
+        - `errors`: Incremented if an exception occurs during `on_data` or output queuing.
         - `processed`: Incremented after processing a control message
         - `successful_queue_writes`: Incremented when an item is successfully
           put onto the output queue.
@@ -312,79 +311,61 @@ class RayActorStage(ABC):
             while self._running:
                 control_message: Optional[Any] = None
                 try:
-                    # Step 1: Attempt to get work from the input queue.
-                    # _read_input() is expected to handle its own timeouts and
-                    # return None if no message is available or if self._running became False.
                     control_message = self._read_input()
-
                     if control_message is None:
-                        # No message from input queue (e.g., timeout or shutting down)
-                        # Loop back to check self._running again.
                         continue
-                    # else: # Implicitly, control_message is not None here
-                    self.stats["successful_queue_reads"] += 1
 
-                    # Mark as busy only when a message is retrieved and about to be processed.
+                    self.stats["successful_queue_reads"] += 1
                     self._active_processing = True
 
-                    # Step 2: Process the retrieved message using subclass-specific logic.
-                    updated_cm: Optional[Any] = self.on_data(control_message)
+                    result = self.on_data(control_message)
+                    results_to_emit = result if isinstance(result, list) else [result]
 
-                    # If there's a valid result and an output queue is configured, attempt to put.
-                    if self._output_queue is not None:
-                        # This loop will retry indefinitely until the item is put successfully
-                        # or an unrecoverable error occurs (which is not explicitly handled to break here).
-                        # TODO(Devin) -- This can be improved, should probably fail at some point?
-                        #                Consider max retries or specific error handling for RayActorError
-                        #                to prevent indefinite blocking if the queue actor is permanently dead.
-                        is_put_successful = False
-                        while not is_put_successful:  # Renamed loop variable for clarity
-                            try:
-                                self._output_queue.put(updated_cm)
-                                self.stats["successful_queue_writes"] += 1
-                                is_put_successful = True  # Exit retry loop on success
-                            except Exception as e_put:  # Broad exception catch for put failures
-                                self._logger.warning(
-                                    f"[{actor_id_str}] Output queue put failed (e.g., full, "
-                                    f"timeout, or actor error), retrying. Error: {e_put}"
-                                )
-                                self.stats["queue_full"] += 1  # Consider renaming if it catches more than "full"
-                                time.sleep(0.1)  # Brief pause before retrying
+                    # If result is an empty list, treat it as a handled message with no output, this can occur for
+                    # things like a gather stage that hasn't accumulated all fragments yet.
+                    if results_to_emit and self._output_queue is not None:
+                        try:
+                            self._output_queue.put_nowait_batch(results_to_emit)
+                            self.stats["successful_queue_writes"] += len(results_to_emit)
+                        except Exception as e_batch:
+                            self._logger.debug(
+                                f"[{actor_id_str}] Batch put failed or unsupported, falling back. Error: {e_batch}"
+                            )
+                            for msg in results_to_emit:
+                                is_put_successful = False
+                                while not is_put_successful:
+                                    try:
+                                        self._output_queue.put(msg)
+                                        self.stats["successful_queue_writes"] += 1
+                                        is_put_successful = True
+                                    except Exception as e_put:
+                                        self._logger.warning(
+                                            f"[{actor_id_str}] Output queue put failed, retrying. Error: {e_put}"
+                                        )
+                                        self.stats["queue_full"] += 1
+                                        time.sleep(0.1)
 
-                    # Step 3: Increment "processed" count after successful processing and output (if any).
-                    # This is the primary path for "successful processing".
                     self.stats["processed"] += 1
 
                 except Exception as e_item_processing:
-                    # Catch exceptions from on_data() or unexpected issues in the item handling block.
                     cm_info_str = f" (message type: {type(control_message).__name__})" if control_message else ""
                     self._logger.exception(
                         f"[{actor_id_str}] Error during processing of item{cm_info_str}: {e_item_processing}"
                     )
                     self.stats["errors"] += 1
-
-                    # If still running, pause briefly to prevent rapid spinning on persistent errors.
                     if self._running:
                         time.sleep(0.1)
                 finally:
-                    # Ensure _active_processing is reset after each item attempt (success, failure, or no item).
                     self._active_processing = False
 
-            # --- Loop Exit Condition Met ---
-            # This point is reached when self._running becomes False.
             self._logger.debug(f"[{actor_id_str}] Graceful exit: self._running is False. Processing loop terminating.")
 
         except Exception as e_outer_loop:
-            # Catches very unexpected errors in the structure of the while loop itself.
             self._logger.exception(
                 f"[{actor_id_str}] Unexpected critical error caused processing loop termination: {e_outer_loop}"
             )
         finally:
-            # This block executes when the processing thread is about to exit,
-            # either due to self._running becoming False or an unhandled critical exception.
             self._logger.debug(f"[{actor_id_str}] Processing loop thread finished.")
-            # Signal that this actor's processing duties are complete.
-            # External monitors (e.g., via a future from stop()) can use this signal.
             self._shutdown_signal_complete = True
 
     @staticmethod
