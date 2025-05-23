@@ -490,7 +490,7 @@ class ResourceConstraintManager:
         final_proposals_this_step = {}
 
         if not room_to_scale_up_to_global_caps:
-            logger.info(
+            logger.debug(
                 "[ConstraintMgr-Proportional] Global scaling beyond effective minimums is RESTRICTED "
                 "as SumOfEffectiveMins likely meets/exceeds a global Core/MaxReplica cap. "
                 "Proposed increases from initial current values will be nullified."
@@ -502,7 +502,7 @@ class ResourceConstraintManager:
                 if val_from_prior_phases > original_current_replicas:
                     final_proposals_this_step[name] = original_current_replicas
                     if val_from_prior_phases != original_current_replicas:
-                        logger.info(
+                        logger.debug(
                             f"[ConstraintMgr-{name}] Proportional: Scaling restricted. "
                             f"Nullified proposed increase from {original_current_replicas} to {val_from_prior_phases}. "
                             f"Setting to {original_current_replicas}."
@@ -618,7 +618,7 @@ class ResourceConstraintManager:
 
         # Apply reduction to the deltas
         if reduction_factor <= 0.001:  # Epsilon for float
-            logger.info(
+            logger.debug(
                 f"[ConstraintMgr-Proportional] Scale-up beyond effective minimums fully constrained by global limits. "
                 f"Reasons: {'; '.join(limiting_reasons) if limiting_reasons else 'None'}. "
                 f"Final ReductionFactor={reduction_factor:.3f}."
@@ -637,7 +637,7 @@ class ResourceConstraintManager:
                 )
 
         elif reduction_factor < 1.0:
-            logger.info(
+            logger.debug(
                 f"[ConstraintMgr-Proportional] Reducing requested scale-up (beyond effective_mins) by "
                 f"factor {reduction_factor:.3f}. "
                 f"Limiting Factors: {'; '.join(limiting_reasons)}."
@@ -654,7 +654,7 @@ class ResourceConstraintManager:
                         f"-> FinalVal={final_value_for_stage}"
                     )
         else:  # reduction_factor is ~1.0, meaning full requested increase (above effective_mins) is allowed
-            logger.info(
+            logger.debug(
                 "[ConstraintMgr-Proportional] Full requested scale-up (beyond effective_mins) "
                 "is permissible by global limits."
             )
@@ -713,7 +713,7 @@ class ResourceConstraintManager:
                     target = max(1, min_r)
                     final_target = min(target, max_r)
                     if final_target > 0:
-                        logger.info(
+                        logger.debug(
                             f"[ConstraintMgr-{name}] Forcing minimum {final_target} replica due to global wake-up."
                         )
                         final_adjustments[name] = final_target
@@ -740,19 +740,19 @@ class ResourceConstraintManager:
         num_queue_actors = num_edges
         total_ray_components_for_info = final_stage_replicas_total + num_queue_actors
 
-        logger.info("[ConstraintMgr] --- Final Decision & Constraint Summary ---")
+        logger.debug("[ConstraintMgr] --- Final Decision & Constraint Summary ---")
 
         # --- I. Overall Pipeline State ---
-        logger.info(f"[ConstraintMgr]   Pipeline Activity: {global_in_flight} tasks in-flight.")
-        logger.info(f"[ConstraintMgr]   Effective Min Replicas (Sum): {sum_of_effective_mins}")
-        logger.info(
+        logger.debug(f"[ConstraintMgr]   Pipeline Activity: {global_in_flight} tasks in-flight.")
+        logger.debug(f"[ConstraintMgr]   Effective Min Replicas (Sum): {sum_of_effective_mins}")
+        logger.debug(
             f"[ConstraintMgr]     └─ Global Scaling Beyond Mins Permitted? {can_globally_scale_beyond_effective_mins}"
         )
 
         # --- II. Final Component Counts ---
-        logger.info(f"[ConstraintMgr]   Final Stage Replicas: {final_stage_replicas_total} (Target for caps)")
-        logger.info(f"[ConstraintMgr]   Queue/Edge Actors   : {num_queue_actors} (Informational)")
-        logger.info(f"[ConstraintMgr]   Total Ray Components: {total_ray_components_for_info} (Informational)")
+        logger.debug(f"[ConstraintMgr]   Final Stage Replicas: {final_stage_replicas_total} (Target for caps)")
+        logger.debug(f"[ConstraintMgr]   Queue/Edge Actors   : {num_queue_actors} (Informational)")
+        logger.debug(f"[ConstraintMgr]   Total Ray Components: {total_ray_components_for_info} (Informational)")
 
         # --- III. Resource Limits & Projected Usage (for Stages) ---
         # Configured Limits
@@ -762,18 +762,18 @@ class ResourceConstraintManager:
         )
         eff_mem_limit_str = f"{self.effective_memory_limit_mb:.1f}MB"
 
-        logger.info("[ConstraintMgr]   Global Limits (Stages):")
-        logger.info(f"[ConstraintMgr]     ├─ MaxTotalReplicas  : {max_r_cfg_str}")
-        logger.info(
+        logger.debug("[ConstraintMgr]   Global Limits (Stages):")
+        logger.debug(f"[ConstraintMgr]     ├─ MaxTotalReplicas  : {max_r_cfg_str}")
+        logger.debug(
             f"[ConstraintMgr]     ├─ CoreBasedRepLimit : {core_based_limit_str} "
             f"(System EffCores: {self.available_cores if self.available_cores is not None else 'N/A'})"
         )
-        logger.info(f"[ConstraintMgr]     └─ EffectiveMemLimit : {eff_mem_limit_str} ")
+        logger.debug(f"[ConstraintMgr]     └─ EffectiveMemLimit : {eff_mem_limit_str} ")
 
         # Usage vs Limits
-        logger.info("[ConstraintMgr]   Projected Usage (Stages):")
-        logger.info(f"[ConstraintMgr]     ├─ Replicas          : {final_stage_replicas_total}")
-        logger.info(
+        logger.debug("[ConstraintMgr]   Projected Usage (Stages):")
+        logger.debug(f"[ConstraintMgr]     ├─ Replicas          : {final_stage_replicas_total}")
+        logger.debug(
             f"[ConstraintMgr]     └─ Memory            : {projected_final_memory_mb:.1f}MB "
             f"(Current: {current_global_memory_usage_mb:.1f}MB)"
         )
@@ -815,20 +815,20 @@ class ResourceConstraintManager:
             )
             unexpected_breaches_details.append(f"MemoryLimit: {status_mem}")
 
-        logger.info("[ConstraintMgr]   Limit Adherence (Stages):")
-        logger.info(f"[ConstraintMgr]     ├─ MaxTotalReplicas  : {status_max_r}")
-        logger.info(f"[ConstraintMgr]     ├─ CoreBasedRepLimit : {status_core_r}")
-        logger.info(f"[ConstraintMgr]     └─ EffectiveMemLimit : {status_mem}")
+        logger.debug("[ConstraintMgr]   Limit Adherence (Stages):")
+        logger.debug(f"[ConstraintMgr]     ├─ MaxTotalReplicas  : {status_max_r}")
+        logger.debug(f"[ConstraintMgr]     ├─ CoreBasedRepLimit : {status_core_r}")
+        logger.debug(f"[ConstraintMgr]     └─ EffectiveMemLimit : {status_mem}")
 
         if unexpected_breaches_details:
-            logger.warning(f"[ConstraintMgr]   └─ UNEXPECTED BREACHES: {'; '.join(unexpected_breaches_details)}")
+            logger.debug(f"[ConstraintMgr]   └─ UNEXPECTED BREACHES: {'; '.join(unexpected_breaches_details)}")
         else:
-            logger.info("[ConstraintMgr]   └─ All hard caps (beyond tolerated minimums/wake-up) appear respected.")
+            logger.debug("[ConstraintMgr]   └─ All hard caps (beyond tolerated minimums/wake-up) appear respected.")
 
         # --- V. Final Decisions Per Stage ---
-        logger.info("[ConstraintMgr]   Final Decisions (Per Stage):")
+        logger.debug("[ConstraintMgr]   Final Decisions (Per Stage):")
         if not final_adjustments:
-            logger.info("[ConstraintMgr]     └─ No stages to adjust.")
+            logger.debug("[ConstraintMgr]     └─ No stages to adjust.")
         else:
             # Determine max stage name length for alignment
             max_name_len = 0
@@ -843,12 +843,12 @@ class ResourceConstraintManager:
                 eff_min_str = f"(EffMin: {min_replicas if orig_prop else 'N/A'})"
 
                 # Basic alignment, can be improved with more sophisticated padding
-                logger.info(
+                logger.debug(
                     f"[ConstraintMgr]     └─ {stage_name:<{max_name_len}} : "
                     f"{count:<3} {pid_proposed_str} {current_str} {eff_min_str}"
                 )
 
-        logger.info("[ConstraintMgr] --- Constraint Summary END ---")
+        logger.debug("[ConstraintMgr] --- Constraint Summary END ---")
 
     # --- Public Method ---
 
@@ -863,7 +863,7 @@ class ResourceConstraintManager:
         Applies all configured constraints to initial replica proposals.
         (Docstring from previous version is fine)
         """
-        logger.info(
+        logger.debug(
             f"[ConstraintMgr] --- Applying Constraints START --- "
             f"GlobalInFlight={global_in_flight}, "
             f"CurrentGlobalMemMB={current_global_memory_usage_mb}, "
@@ -904,7 +904,7 @@ class ResourceConstraintManager:
             current_effective_mins[name] = eff_min
             sum_of_effective_mins += eff_min
 
-        logger.info(
+        logger.debug(
             f"[ConstraintMgr] Calculated Effective Minimums: TotalSum={sum_of_effective_mins}. "
             # f"IndividualMins: {current_effective_mins}" # Can be verbose
         )
@@ -985,5 +985,5 @@ class ResourceConstraintManager:
             can_globally_scale_up_stages,  # Pass this for context in logging
         )
 
-        logger.info("[ConstraintMgr] --- Applying Constraints END ---")
+        logger.debug("[ConstraintMgr] --- Applying Constraints END ---")
         return final_adjustments
