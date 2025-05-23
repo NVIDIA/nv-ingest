@@ -4,14 +4,13 @@
 
 services:
   redis:
-    image: "redis/redis-stack"
+    image: "dockerhub.nvidia.com/redis/redis-stack"
     ports:
       - "6379:6379"
 
   page-elements:
     #image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
-    image: nvcr.io/nvstaging/nim/nemoretriever-page-elements-v2:1.3.1-rc0-latest-datacenter-release-28169341
-  
+    image: nvcr.io/nvstaging/nim/nemoretriever-page-elements-v2:1.3.1-rc0-latest-datacenter-release-28807967
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -322,7 +321,7 @@ services:
               capabilities: [gpu]
 
   otel-collector:
-    image: otel/opentelemetry-collector-contrib:0.91.0
+    image: dockerhub.nvidia.com/otel/opentelemetry-collector-contrib:0.91.0
     hostname: otel-collector
     command: ["--config=/etc/otel-collector-config.yaml"]
     user: "${UID}:${GID}"
@@ -340,14 +339,14 @@ services:
       - zipkin
 
   zipkin:
-    image: openzipkin/zipkin
+    image: dockerhub.nvidia.com/openzipkin/zipkin
     environment:
       JAVA_OPTS: "-Xms4g -Xmx8g -XX:+ExitOnOutOfMemoryError"
     ports:
       - "9411:9411" # Zipkin UI and API
 
   prometheus:
-    image: prom/prometheus:latest
+    image: dockerhub.nvidia.com/prom/prometheus:latest
     command:
       - --web.console.templates=/etc/prometheus/consoles
       - --web.console.libraries=/etc/prometheus/console_libraries
@@ -365,7 +364,7 @@ services:
 
   grafana:
     container_name: grafana-service
-    image: grafana/grafana
+    image: dockerhub.nvidia.com/grafana/grafana
     ports:
       - "3000:3000"
 
@@ -395,7 +394,7 @@ services:
     restart: always
     container_name: minio
     hostname: minio
-    image: minio/minio:RELEASE.2023-03-20T20-16-18Z
+    image: dockerhub.nvidia.com/minio/minio:RELEASE.2023-03-20T20-16-18Z
     environment:
       MINIO_ACCESS_KEY: ${MINIO_ACCESS_KEY:-minioadmin}
       MINIO_SECRET_KEY: ${MINIO_SECRET_KEY:-minioadmin}
@@ -417,7 +416,7 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-standalone
-    image: milvusdb/milvus:v2.5.3-gpu
+    image: dockerhub.nvidia.com/milvusdb/milvus:v2.5.3-gpu
     command: [ "milvus", "run", "standalone" ]
     hostname: milvus
     security_opt:
@@ -453,7 +452,7 @@ services:
     # Turn on to leverage the `vdb_upload` task
     restart: always
     container_name: milvus-attu
-    image: zilliz/attu:v2.3.5
+    image: dockerhub.nvidia.com/zilliz/attu:v2.3.5
     hostname: attu
     environment:
       MILVUS_URL: http://milvus:19530
