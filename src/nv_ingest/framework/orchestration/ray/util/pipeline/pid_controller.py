@@ -358,7 +358,7 @@ class ResourceConstraintManager:
         """
         If current memory exceeds the effective limit, force scale-downs.
 
-        Reduces replicas for all stages with > 1 replica
+        In this simplified version, reduces replicas for all stages with > 1 replica
         by 25% (rounded down), ensuring they don't go below their effective minimum
         or 1 replica. This is done in a single pass.
 

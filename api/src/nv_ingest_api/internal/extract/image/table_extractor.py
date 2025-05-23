@@ -15,10 +15,10 @@ import pandas as pd
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.custom_ocr import CustomOCRModelInterface
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
-from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_paddle_output
-from nv_ingest_api.util.image_processing.table_and_chart import convert_paddle_response_to_psuedo_markdown
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_custom_ocr_output
+from nv_ingest_api.util.image_processing.table_and_chart import convert_custom_ocr_response_to_psuedo_markdown
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxTableStructureModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -60,7 +60,7 @@ def _filter_valid_images(base64_images: List[str]) -> Tuple[List[str], List[np.n
 def _run_inference(
     enable_yolox: bool,
     yolox_client: Any,
-    paddle_client: Any,
+    custom_ocr_client: Any,
     valid_arrays: List[np.ndarray],
     valid_images: List[str],
     trace_info: Optional[Dict] = None,
@@ -68,9 +68,9 @@ def _run_inference(
     """
     Run inference concurrently for YOLOX (if enabled) and Paddle.
 
-    Returns a tuple of (yolox_results, paddle_results).
+    Returns a tuple of (yolox_results, custom_ocr_results).
     """
-    data_paddle = {"base64_images": valid_images}
+    data_custom_ocr = {"base64_images": valid_images}
     if enable_yolox:
         data_yolox = {"images": valid_arrays}
 
@@ -85,12 +85,13 @@ def _run_inference(
                 max_batch_size=8,
                 trace_info=trace_info,
             )
-        future_paddle = executor.submit(
-            paddle_client.infer,
-            data=data_paddle,
-            model_name="paddle",
+        future_custom_ocr = executor.submit(
+            custom_ocr_client.infer,
+            data=data_custom_ocr,
+            model_name="custom_ocr",
             stage_name="table_extraction",
-            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
+            max_batch_size=8,
+            force_max_batch_size=True,
             trace_info=trace_info,
         )
 
@@ -104,17 +105,17 @@ def _run_inference(
             yolox_results = [None] * len(valid_images)
 
         try:
-            paddle_results = future_paddle.result()
+            custom_ocr_results = future_custom_ocr.result()
         except Exception as e:
-            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
+            logger.error(f"Error calling custom_ocr_client.infer: {e}", exc_info=True)
             raise
 
-    return yolox_results, paddle_results
+    return yolox_results, custom_ocr_results
 
 
 def _validate_inference_results(
     yolox_results: Any,
-    paddle_results: Any,
+    custom_ocr_results: Any,
     valid_arrays: List[Any],
     valid_images: List[str],
 ) -> Tuple[List[Any], List[Any]]:
@@ -123,46 +124,46 @@ def _validate_inference_results(
 
     If not, default values are assigned. Raises a ValueError if the lengths do not match.
     """
-    if not isinstance(yolox_results, list) or not isinstance(paddle_results, list):
+    if not isinstance(yolox_results, list) or not isinstance(custom_ocr_results, list):
         logger.warning(
-            "Unexpected result types from inference clients: yolox_results=%s, paddle_results=%s. "
+            "Unexpected result types from inference clients: yolox_results=%s, custom_ocr_results=%s. "
             "Proceeding with available results.",
             type(yolox_results).__name__,
-            type(paddle_results).__name__,
+            type(custom_ocr_results).__name__,
         )
         if not isinstance(yolox_results, list):
             yolox_results = [None] * len(valid_arrays)
-        if not isinstance(paddle_results, list):
-            paddle_results = [(None, None)] * len(valid_images)
+        if not isinstance(custom_ocr_results, list):
+            custom_ocr_results = [(None, None)] * len(valid_images)
 
     if len(yolox_results) != len(valid_arrays):
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
-    if len(paddle_results) != len(valid_images):
-        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
+    if len(custom_ocr_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} custom_ocr results, got {len(custom_ocr_results)}")
 
-    return yolox_results, paddle_results
+    return yolox_results, custom_ocr_results
 
 
 def _update_table_metadata(
     base64_images: List[str],
     yolox_client: Any,
-    paddle_client: Any,
+    custom_ocr_client: Any,
     worker_pool_size: int = 8,  # Not currently used
     enable_yolox: bool = False,
     trace_info: Optional[Dict] = None,
 ) -> List[Tuple[str, Any, Any, Any]]:
     """
     Given a list of base64-encoded images, this function filters out images that do not meet
-    the minimum size requirements and then calls the PaddleOCR model via paddle_client.infer
+    the minimum size requirements and then calls the CustomOCR model via custom_ocr_client.infer
     to extract table data.
 
     For each base64-encoded image, the result is a tuple:
-        (base64_image, yolox_result, paddle_text_predictions, paddle_bounding_boxes)
+        (base64_image, yolox_result, custom_ocr_text_predictions, custom_ocr_bounding_boxes)
 
     Images that do not meet the minimum size are skipped (resulting in placeholders).
-    The paddle_client is expected to handle any necessary batching and concurrency.
+    The custom_ocr_client is expected to handle any necessary batching and concurrency.
     """
-    logger.debug(f"Running table extraction using protocol {paddle_client.protocol}")
+    logger.debug(f"Running table extraction using protocol {custom_ocr_client.protocol}")
 
     # Initialize the results list with default placeholders.
     results: List[Tuple[str, Any, Any, Any]] = [("", None, None, None)] * len(base64_images)
@@ -174,24 +175,24 @@ def _update_table_metadata(
         return results
 
     # Run inference concurrently.
-    yolox_results, paddle_results = _run_inference(
+    yolox_results, custom_ocr_results = _run_inference(
         enable_yolox=enable_yolox,
         yolox_client=yolox_client,
-        paddle_client=paddle_client,
+        custom_ocr_client=custom_ocr_client,
         valid_arrays=valid_arrays,
         valid_images=valid_images,
         trace_info=trace_info,
     )
 
     # Validate that the inference results have the expected structure.
-    yolox_results, paddle_results = _validate_inference_results(
-        yolox_results, paddle_results, valid_arrays, valid_images
+    yolox_results, custom_ocr_results = _validate_inference_results(
+        yolox_results, custom_ocr_results, valid_arrays, valid_images
     )
 
     # Combine results with the original order.
-    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
+    for idx, (yolox_res, custom_ocr_res) in enumerate(zip(yolox_results, custom_ocr_results)):
         original_index = valid_indices[idx]
-        results[original_index] = (base64_images[original_index], yolox_res, paddle_res[0], paddle_res[1])
+        results[original_index] = (base64_images[original_index], yolox_res, custom_ocr_res[0], custom_ocr_res[1])
 
     return results
 
@@ -199,14 +200,14 @@ def _update_table_metadata(
 def _create_clients(
     yolox_endpoints: Tuple[str, str],
     yolox_protocol: str,
-    paddle_endpoints: Tuple[str, str],
-    paddle_protocol: str,
+    custom_ocr_endpoints: Tuple[str, str],
+    custom_ocr_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
     yolox_model_interface = YoloxTableStructureModelInterface()
-    paddle_model_interface = PaddleOCRModelInterface()
+    custom_ocr_model_interface = CustomOCRModelInterface()
 
-    logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")
+    logger.debug(f"Inference protocols: yolox={yolox_protocol}, custom_ocr={custom_ocr_protocol}")
 
     yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
@@ -215,14 +216,14 @@ def _create_clients(
         infer_protocol=yolox_protocol,
     )
 
-    paddle_client = create_inference_client(
-        endpoints=paddle_endpoints,
-        model_interface=paddle_model_interface,
+    custom_ocr_client = create_inference_client(
+        endpoints=custom_ocr_endpoints,
+        model_interface=custom_ocr_model_interface,
         auth_token=auth_token,
-        infer_protocol=paddle_protocol,
+        infer_protocol=custom_ocr_protocol,
     )
 
-    return yolox_client, paddle_client
+    return yolox_client, custom_ocr_client
 
 
 def extract_table_data_from_image_internal(
@@ -262,11 +263,11 @@ def extract_table_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    yolox_client, paddle_client = _create_clients(
+    yolox_client, custom_ocr_client = _create_clients(
         endpoint_config.yolox_endpoints,
         endpoint_config.yolox_infer_protocol,
-        endpoint_config.paddle_endpoints,
-        endpoint_config.paddle_infer_protocol,
+        endpoint_config.custom_ocr_endpoints,
+        endpoint_config.custom_ocr_infer_protocol,
         endpoint_config.auth_token,
     )
 
@@ -309,7 +310,7 @@ def extract_table_data_from_image_internal(
         bulk_results = _update_table_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
-            paddle_client=paddle_client,
+            custom_ocr_client=custom_ocr_client,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             enable_yolox=enable_yolox,
             trace_info=execution_trace_log,
@@ -317,15 +318,15 @@ def extract_table_data_from_image_internal(
 
         # 4) Write the results (bounding_boxes, text_predictions) back
         for row_id, idx in enumerate(valid_indices):
-            # unpack (base64_image, (yolox_predictions, paddle_bounding boxes, paddle_text_predictions))
+            # unpack (base64_image, (yolox_predictions, custom_ocr_bounding boxes, custom_ocr_text_predictions))
             _, cell_predictions, bounding_boxes, text_predictions = bulk_results[row_id]
 
             if table_content_format == TableFormatEnum.SIMPLE:
                 table_content = " ".join(text_predictions)
             elif table_content_format == TableFormatEnum.PSEUDO_MARKDOWN:
-                table_content = convert_paddle_response_to_psuedo_markdown(bounding_boxes, text_predictions)
+                table_content = convert_custom_ocr_response_to_psuedo_markdown(bounding_boxes, text_predictions)
             elif table_content_format == TableFormatEnum.MARKDOWN:
-                table_content = join_yolox_table_structure_and_paddle_output(
+                table_content = join_yolox_table_structure_and_custom_ocr_output(
                     cell_predictions, bounding_boxes, text_predictions
                 )
             else:
@@ -341,4 +342,4 @@ def extract_table_data_from_image_internal(
         raise
     finally:
         yolox_client.close()
-        paddle_client.close()
+        custom_ocr_client.close()

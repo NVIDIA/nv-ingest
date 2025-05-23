@@ -20,8 +20,8 @@ class InfographicExtractorConfigSchema(BaseModel):
     auth_token : Optional[str], default=None
         Authentication token required for secure services.
 
-    paddle_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
-        A tuple containing the gRPC and HTTP services for the paddle endpoint.
+    custom_ocr_endpoints : Tuple[Optional[str], Optional[str]], default=(None, None)
+        A tuple containing the gRPC and HTTP services for the custom_ocr endpoint.
         Either the gRPC or HTTP service can be empty, but not both.
 
     Methods
@@ -42,8 +42,8 @@ class InfographicExtractorConfigSchema(BaseModel):
 
     auth_token: Optional[str] = None
 
-    paddle_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
-    paddle_infer_protocol: str = ""
+    custom_ocr_endpoints: Tuple[Optional[str], Optional[str]] = (None, None)
+    custom_ocr_infer_protocol: str = ""
 
     nim_batch_size: int = 2
     workers_per_progress_engine: int = 5
@@ -79,7 +79,7 @@ class InfographicExtractorConfigSchema(BaseModel):
                 return None
             return service
 
-        for endpoint_name in ["paddle_endpoints"]:
+        for endpoint_name in ["custom_ocr_endpoints"]:
             grpc_service, http_service = values.get(endpoint_name, (None, None))
             grpc_service = clean_service(grpc_service)
             http_service = clean_service(http_service)
@@ -110,7 +110,7 @@ class InfographicExtractorSchema(BaseModel):
         A flag indicating whether to raise an exception if a failure occurs during infographic extraction.
 
     stage_config : Optional[InfographicExtractorConfigSchema], default=None
-        Configuration for the infographic extraction stage, including yolox and paddle service endpoints.
+        Configuration for the infographic extraction stage, including yolox and custom_ocr service endpoints.
     """
 
     max_queue_size: int = 1
