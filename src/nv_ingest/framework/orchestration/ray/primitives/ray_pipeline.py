@@ -1,7 +1,10 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import multiprocessing
+import os
+import signal
 import threading
 from abc import ABC, abstractmethod
 from collections import defaultdict
@@ -114,11 +117,24 @@ class RayPipelineSubprocessInterface(PipelineInterface):
 
     def stop(self) -> None:
         """
-        Stops the subprocess pipeline by terminating the process if it is still alive.
+        Stops the subprocess pipeline. Tries terminate(), then escalates to SIGKILL on the process group if needed.
         """
-        if self._process.is_alive():
+        if not self._process.is_alive():
+            return
+
+        try:
             self._process.terminate()
             self._process.join(timeout=5.0)
+        except Exception as e:
+            logger.warning(f"Failed to terminate process cleanly: {e}")
+
+        if self._process.is_alive():
+            try:
+                pgid = os.getpgid(self._process.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except Exception as e:
+                logger.error(f"Failed to force-kill process group: {e}")
+            self._process.join(timeout=3.0)
 
 
 class RayPipelineInterface(PipelineInterface):
@@ -251,9 +267,16 @@ class RayPipeline(PipelineInterface):
             actor_timeout=self.stats_config.actor_timeout_seconds,
             queue_timeout=self.stats_config.queue_timeout_seconds,
         )
+
         logger.info("RayStatsCollector initialized using StatsConfig.")
 
     # --- Accessor Methods for Stats Collector (and internal use) ---
+
+    def __del__(self):
+        try:
+            self.stop()
+        except Exception as e:
+            logger.error(f"Exception during RayPipeline cleanup: {e}")
 
     def get_stages_info(self) -> List[StageInfo]:
         """Returns a snapshot of the current stage information."""

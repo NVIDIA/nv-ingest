@@ -2,11 +2,14 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import atexit
 import logging
 import multiprocessing
 import os
+import signal
 import sys
 import time
+from ctypes import CDLL, c_int
 from datetime import datetime
 from typing import Union, Tuple, Optional, TextIO
 
@@ -39,6 +42,8 @@ class PipelineCreationSchema(BaseModel):
     Contains all parameters required to set up and execute the pipeline,
     including endpoints, API keys, and processing options.
     """
+
+    arrow_default_memory_pool: str = os.getenv("ARROW_DEFAULT_MEMORY_POOL", "system")
 
     # Audio processing settings
     audio_grpc_endpoint: str = os.getenv("AUDIO_GRPC_ENDPOINT", "grpc.nvcf.nvidia.com:443")
@@ -132,6 +137,40 @@ def redirect_os_fds(stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = 
         os.dup2(devnull_fd, 2)
 
 
+def set_pdeathsig(sig=signal.SIGKILL):
+    libc = CDLL("libc.so.6")
+    PR_SET_PDEATHSIG = 1
+    libc.prctl(PR_SET_PDEATHSIG, c_int(sig))
+
+
+def kill_pipeline_process_group(pid: int):
+    """
+    Kill the process group associated with the given PID, if it exists and is alive.
+
+    Parameters
+    ----------
+    pid : int
+        The PID of the process whose group should be killed.
+    """
+    try:
+        # Get the process group ID
+        pgid = os.getpgid(pid)
+
+        # Check if the group is still alive by sending signal 0
+        os.killpg(pgid, 0)  # Does not kill, just checks if it's alive
+
+        # If no exception, the group is alive — kill it
+        os.killpg(pgid, signal.SIGKILL)
+        print(f"Killed subprocess group {pgid}")
+
+    except ProcessLookupError:
+        print(f"Process group for PID {pid} no longer exists.")
+    except PermissionError:
+        print(f"Permission denied to kill process group for PID {pid}.")
+    except Exception as e:
+        print(f"Failed to kill subprocess group: {e}")
+
+
 def _run_pipeline_process(
     ingest_config: PipelineCreationSchema,
     disable_dynamic_scaling: Optional[bool],
@@ -156,6 +195,10 @@ def _run_pipeline_process(
     raw_stderr : Optional[TextIO]
         Destination for stderr. Defaults to /dev/null.
     """
+    # Set the death signal for the subprocess
+    set_pdeathsig()
+    os.setsid()  # Creates new process group so it can be SIGKILLed as a group
+
     # Redirect OS-level file descriptors
     redirect_os_fds(stdout=raw_stdout, stderr=raw_stderr)
 
@@ -289,7 +332,8 @@ def run_pipeline(
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
 
-        process = multiprocessing.Process(
+        ctx = multiprocessing.get_context("fork")
+        process = ctx.Process(
             target=_run_pipeline_process,
             args=(
                 ingest_config,
@@ -302,6 +346,7 @@ def run_pipeline(
         )
 
         process.start()
+
         interface = RayPipelineSubprocessInterface(process)
 
         if block:
@@ -312,6 +357,8 @@ def run_pipeline(
             return time.time() - start_time
         else:
             logger.info(f"Pipeline subprocess started (PID={process.pid})")
+            atexit.register(lambda: kill_pipeline_process_group(process.pid))
+
             return interface
 
     # Run inline
