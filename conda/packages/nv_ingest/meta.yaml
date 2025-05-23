@@ -64,6 +64,7 @@ requirements:
     - uvicorn
   pip:
     - nvidia-riva-client>=2.18.0
+    - markitdown
 
   test:
     commands:

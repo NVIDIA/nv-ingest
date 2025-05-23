@@ -25,10 +25,11 @@ def _convert_html(row: pd.Series, execution_trace_log: Optional[List[Any]] = Non
     metadata = row.get("metadata")
     html_content = row.get("content")
 
-    html_converter = HtmlConverter()
-    md_content = html_converter.convert_string(html_content=html_content).text_content
+    if html_content:
+        html_converter = HtmlConverter()
+        md_content = html_converter.convert_string(html_content=html_content).text_content
+        metadata["content"] = md_content
 
-    metadata["content"] = md_content
     return [[ContentTypeEnum.TEXT, validate_schema(metadata, MetadataSchema).model_dump(), str(uuid.uuid4())]]
 
 
