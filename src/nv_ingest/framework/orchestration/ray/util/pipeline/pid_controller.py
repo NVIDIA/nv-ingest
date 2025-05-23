@@ -310,8 +310,8 @@ class ResourceConstraintManager:
         self.max_replicas = max_replicas
         self.memory_threshold_mb = memory_threshold
         self.estimated_edge_cost_mb = estimated_edge_cost_mb  # Keep track, though unused
-        self.memory_safety_buffer_fraction = memory_safety_buffer_fraction
-        self.effective_memory_limit_mb = self.memory_threshold_mb * (1.0 - self.memory_safety_buffer_fraction)
+        self.memory_safety_buffer_fraction = memory_safety_buffer_fraction  # Unused
+        self.effective_memory_limit_mb = self.memory_threshold_mb
 
         core_detector = SystemResourceProbe()  # Instantiate the detector
         self.available_cores: Optional[float] = core_detector.get_effective_cores()
@@ -351,16 +351,16 @@ class ResourceConstraintManager:
     def _apply_aggressive_memory_scale_down(
         self,
         current_proposals: Dict[str, int],
-        initial_proposals_meta: Dict[str, StagePIDProposal],
+        initial_proposals_meta: Dict[str, "StagePIDProposal"],  # Assuming StagePIDProposal type hint
         current_global_memory_usage: int,
         pipeline_in_flight_global: int,
     ) -> Dict[str, int]:
         """
         If current memory exceeds the effective limit, force scale-downs.
 
-        Reduces replicas from stages with the highest counts first, respecting
-        their effective minimum replicas, until memory is below the limit or
-        no more reductions are possible.
+        In this simplified version, reduces replicas for all stages with > 1 replica
+        by 25% (rounded down), ensuring they don't go below their effective minimum
+        or 1 replica. This is done in a single pass.
 
         Returns:
             Dict[str, int]: Updated replica proposals after aggressive scale-down.
@@ -377,70 +377,101 @@ class ResourceConstraintManager:
         )
 
         adjusted_proposals = current_proposals.copy()
+        total_memory_reduced = 0.0
+        stages_affected_details = {}  # To store details of changes
 
-        # Identify candidates for scale-down
-        candidates = []
-        for name, current_replicas in adjusted_proposals.items():
+        # Iterate through all proposals to apply the 25% reduction if applicable
+        for name, current_replicas in current_proposals.items():
             proposal_meta = initial_proposals_meta.get(name)
             if not proposal_meta:
                 logger.error(f"[ConstraintMgr] Missing metadata for stage {name} during aggressive scale-down.")
                 continue
 
+            # Determine the effective minimum for this stage (ensuring at least 1)
             effective_min = self._get_effective_min_replicas(name, proposal_meta.metrics, pipeline_in_flight_global)
-            cost_estimate = proposal_meta.conservative_cost_estimate
 
-            if current_replicas > effective_min:
-                candidates.append(
-                    {
-                        "name": name,
-                        "replicas": current_replicas,
-                        "cost": cost_estimate if cost_estimate > 0 else 1e-6,
-                        "effective_min": effective_min,
-                    }
+            # Cost per replica (assuming proposal_meta.conservative_cost_estimate is for ONE replica)
+            # If it's for all current_replicas, you'd divide by current_replicas here.
+            cost_per_replica = float(
+                proposal_meta.conservative_cost_estimate
+                if proposal_meta.conservative_cost_estimate and proposal_meta.conservative_cost_estimate > 0
+                else 1e-6
+            )
+
+            if current_replicas > 1:  # Only consider stages with more than 1 replica
+                # Calculate 25% reduction
+                reduction_amount = math.floor(current_replicas * 0.25)
+
+                # Ensure reduction_amount is at least 1 if current_replicas > 1 and 25% is < 1
+                # (e.g., for 2 or 3 replicas, 25% is 0, but we want to reduce by 1 if possible)
+                if reduction_amount == 0 and current_replicas > 1:
+                    reduction_amount = 1
+
+                if reduction_amount > 0:
+                    proposed_new_replicas = current_replicas - reduction_amount
+
+                    # Ensure new count doesn't go below the effective minimum (which is at least 1)
+                    final_new_replicas = max(effective_min, proposed_new_replicas)
+
+                    # Only apply if this actually results in a reduction
+                    if final_new_replicas < current_replicas:
+                        replicas_actually_reduced = current_replicas - final_new_replicas
+                        memory_saved_for_stage = replicas_actually_reduced * cost_per_replica
+
+                        logger.info(
+                            f"[ConstraintMgr-{name}] Aggressive Scale-Down: Reducing from "
+                            f"{current_replicas} -> {final_new_replicas} "
+                            f"(by {replicas_actually_reduced} replicas, target 25% of "
+                            f"{current_replicas} was {reduction_amount}). "
+                            f"Est. memory saved: {memory_saved_for_stage:.2f}MB."
+                        )
+                        adjusted_proposals[name] = final_new_replicas
+                        total_memory_reduced += memory_saved_for_stage
+                        stages_affected_details[name] = {
+                            "from": current_replicas,
+                            "to": final_new_replicas,
+                            "saved_mem": memory_saved_for_stage,
+                        }
+                    else:
+                        logger.debug(
+                            f"[ConstraintMgr-{name}] Aggressive Scale-Down: No reduction applied. "
+                            f"Current: {current_replicas}, Target 25% reduction: {reduction_amount}, "
+                            f"Proposed: {proposed_new_replicas}, Effective Min: {effective_min}."
+                        )
+                else:
+                    logger.debug(
+                        f"[ConstraintMgr-{name}] Aggressive Scale-Down: Calculated 25% reduction is 0 for "
+                        f"{current_replicas} replicas. No change."
+                    )
+            else:
+                logger.debug(
+                    f"[ConstraintMgr-{name}] Aggressive Scale-Down: Stage has {current_replicas} "
+                    f"replica(s), not eligible for 25% reduction."
                 )
 
-        # Sort candidates: primarily by replica count desc, secondarily by cost desc
-        candidates.sort(key=lambda x: (x["replicas"], x["cost"]), reverse=True)
+        # After applying reductions, check the new memory overrun
+        # This is a projection based on our cost estimates.
+        projected_new_global_memory_usage = current_global_memory_usage - total_memory_reduced
+        new_memory_overrun = projected_new_global_memory_usage - self.effective_memory_limit_mb
 
-        if not candidates:
-            logger.warning("[ConstraintMgr] Aggressive Scale-Down: No eligible stages found to reduce replicas.")
-            return adjusted_proposals
-
-        # Iteratively reduce replicas
-        memory_reduced = 0.0
-        stages_reduced = []
-        while memory_overrun > 0 and candidates:
-            target_stage = candidates[0]
-            name = target_stage["name"]
-            new_replica_count = target_stage["replicas"] - 1
-            mem_saved_this_step = target_stage["cost"]
-
-            logger.debug(
-                f"[ConstraintMgr-{name}] Aggressive Scale-Down: Reducing replica from {target_stage['replicas']} ->"
-                f" {new_replica_count} (saves ~{mem_saved_this_step:.2f}MB)"
-            )
-            adjusted_proposals[name] = new_replica_count
-            memory_overrun -= mem_saved_this_step
-            memory_reduced += mem_saved_this_step
-            stages_reduced.append(name)
-
-            target_stage["replicas"] = new_replica_count
-            if new_replica_count <= target_stage["effective_min"]:
-                candidates.pop(0)
-            else:
-                candidates.sort(key=lambda x: (x["replicas"], x["cost"]), reverse=True)
-
-        if memory_overrun > 0:
+        if not stages_affected_details:
+            logger.warning("[ConstraintMgr] Aggressive Scale-Down: No stages were eligible or changed replicas.")
+        elif new_memory_overrun > 0:
             logger.warning(
-                f"[ConstraintMgr] Aggressive Scale-Down: Completed, but still over memory limit by"
-                f" {memory_overrun:.1f}MB. Reduced total {memory_reduced:.1f}MB from stages:"
-                f" {list(set(stages_reduced))}."
+                f"[ConstraintMgr] Aggressive Scale-Down: Completed. Reduced total {total_memory_reduced:.1f}MB. "
+                f"Stages affected: {len(stages_affected_details)}. "
+                f"Projected memory still over limit by {new_memory_overrun:.1f}MB."
+                # f"Details: {stages_affected_details}" # Potentially too verbose for warning
             )
         else:
             logger.info(
-                f"[ConstraintMgr] Aggressive Scale-Down: Completed. Reduced total {memory_reduced:.1f}MB from stages:"
-                f" {list(set(stages_reduced))}. Projected memory now below limit."
+                f"[ConstraintMgr] Aggressive Scale-Down: Completed. Reduced total {total_memory_reduced:.1f}MB. "
+                f"Stages affected: {len(stages_affected_details)}. "
+                f"Projected memory now below limit (overrun {new_memory_overrun:.1f}MB)."
+                # f"Details: {stages_affected_details}" # Potentially too verbose for info
             )
+        if stages_affected_details:
+            logger.debug(f"[ConstraintMgr] Aggressive Scale-Down Details: {stages_affected_details}")
 
         return adjusted_proposals
 
@@ -737,10 +768,7 @@ class ResourceConstraintManager:
             f"[ConstraintMgr]     ├─ CoreBasedRepLimit : {core_based_limit_str} "
             f"(System EffCores: {self.available_cores if self.available_cores is not None else 'N/A'})"
         )
-        logger.info(
-            f"[ConstraintMgr]     └─ EffectiveMemLimit : {eff_mem_limit_str} "
-            f"(Thresh: {self.memory_threshold_mb:.1f}MB, Safety: {self.memory_safety_buffer_fraction:.2f})"
-        )
+        logger.info(f"[ConstraintMgr]     └─ EffectiveMemLimit : {eff_mem_limit_str} ")
 
         # Usage vs Limits
         logger.info("[ConstraintMgr]   Projected Usage (Stages):")
@@ -856,16 +884,17 @@ class ResourceConstraintManager:
         logger.debug(f"[ConstraintMgr] Intermediate Adjustments (Phase 1 - From PID): {intermediate_adjustments}")
 
         # --- Phase 2: Aggressive Memory Scale-Down (Optional) ---
-        # try:
-        #    intermediate_adjustments = self._apply_aggressive_memory_scale_down(
-        #        intermediate_adjustments, initial_proposals,
-        #        current_global_memory_usage_mb, global_in_flight
-        #    )
-        #    logger.debug(f"[ConstraintMgr] Intermediate Adjustments
-        #    (Phase 2 - After Aggressive Mem Scale-Down): {intermediate_adjustments}")
-        # except Exception as e_agg:
-        #    logger.error(f"[ConstraintMgr] Error during aggressive memory scale-down: {e_agg}", exc_info=True)
-        #    intermediate_adjustments = {name: prop.current_replicas for name, prop in initial_proposals.items()}
+        try:
+            intermediate_adjustments = self._apply_aggressive_memory_scale_down(
+                intermediate_adjustments, initial_proposals, current_global_memory_usage_mb, global_in_flight
+            )
+            logger.debug(
+                "[ConstraintMgr] Intermediate Adjustments (Phase 2 - After Aggressive Mem Scale-Down): "
+                f"{intermediate_adjustments}"
+            )
+        except Exception as e_agg:
+            logger.error(f"[ConstraintMgr] Error during aggressive memory scale-down: {e_agg}", exc_info=True)
+            intermediate_adjustments = {name: prop.current_replicas for name, prop in initial_proposals.items()}
 
         # --- Calculate Current Effective Minimums and Their Sum ---
         current_effective_mins: Dict[str, int] = {}

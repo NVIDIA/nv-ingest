@@ -259,7 +259,7 @@ services:
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_EDGE_BUFFER_SIZE=64
-      - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
+      - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.85
       #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
@@ -280,11 +280,9 @@ services:
       - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
-      # Self-hosted paddle endpoints.
       - CUSTOM_OCR_GRPC_ENDPOINT=
       - CUSTOM_OCR_HTTP_ENDPOINT=http://custom-ocr:8000/infer
       - CUSTOM_OCR_INFER_PROTOCOL=http
-      # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
