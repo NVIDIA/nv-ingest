@@ -26,7 +26,15 @@ class TestAudioExtraction(unittest.TestCase):
         # Create a mock audio client
         self.mock_audio_client = Mock()
 
-        self.mock_audio_client.infer = Mock(return_value=([{"text": "This is a", "start": 0, "end": 5}, {"text": "transcribed audio content", "start": 5, "end": 10}], "This is a transcribed audio content"))
+        self.mock_audio_client.infer = Mock(
+            return_value=(
+                [
+                    {"text": "This is a", "start": 0, "end": 5},
+                    {"text": "transcribed audio content", "start": 5, "end": 10},
+                ],
+                "This is a transcribed audio content",
+            )
+        )
 
         # Common trace info
         self.trace_info = {"request_id": "test-request-123", "timestamp": "2025-03-10T12:00:00Z"}
@@ -80,7 +88,6 @@ class TestAudioExtraction(unittest.TestCase):
 
         # Verify validate_schema was called twice (for audio metadata and metadata)
         self.assertEqual(mock_validate_schema.call_count, 2)
-
 
     @patch(f"{MODULE_UNDER_TEST}.validate_schema")
     def test_extract_from_audio_metadata_valid_segment(self, mock_validate_schema):
@@ -217,7 +224,9 @@ class TestAudioExtraction(unittest.TestCase):
         )
 
         # Configure the DataFrame.apply mock
-        mock_df_apply.return_value = pd.Series([[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]])
+        mock_df_apply.return_value = pd.Series(
+            [[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]]
+        )
 
         # Call the function
         result_df, trace_info = extract_text_from_audio_internal(
@@ -236,7 +245,6 @@ class TestAudioExtraction(unittest.TestCase):
             use_ssl=False,
             ssl_cert=None,
         )
-
 
     @patch(f"{MODULE_UNDER_TEST}.create_audio_inference_client")
     @patch("pandas.DataFrame.apply")
@@ -346,7 +354,9 @@ class TestAudioExtraction(unittest.TestCase):
         task_config = {"params": {"extract_audio_params": {}}}
 
         # Configure the DataFrame.apply mock
-        mock_df_apply.return_value = pd.Series([[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]])
+        mock_df_apply.return_value = pd.Series(
+            [[[ContentTypeEnum.AUDIO, {"audio_metadata": {"audio_transcript": "Test transcript"}}, 12345]]]
+        )
 
         # Call the function with no trace_info
         result_df, trace_info = extract_text_from_audio_internal(df.copy(), task_config, extraction_config, None)
