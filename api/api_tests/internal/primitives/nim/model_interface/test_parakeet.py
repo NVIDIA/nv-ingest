@@ -131,7 +131,7 @@ class TestParakeetClient(unittest.TestCase):
         mock_process_response.assert_called_once_with(mock_response)
 
         # Verify the result is the transcript
-        self.assertEqual(result, "Hello world")
+        self.assertEqual(result,([{"start": 0.0, "end": 1.0, "text": "Hello world"}], "Hello world"))
 
     def test_infer_method_with_none_response(self):
         """Test the infer method when transcribe returns None."""
