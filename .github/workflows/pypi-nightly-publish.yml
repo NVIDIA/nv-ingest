@@ -26,7 +26,7 @@ jobs:
   build:
     runs-on: linux-large-disk
     container:
-      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.10
+      image: rapidsai/ci-conda:cuda12.5.1-ubuntu22.04-py3.12
     steps:
       - name: Determine source branch and release type to use for run
         run: |
@@ -72,6 +72,10 @@ jobs:
         run: |
           cd client && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
 
+      - name: Build nv-ingest service wheel
+        run: |
+          cd src && NV_INGEST_RELEASE_TYPE=${{ env.RELEASE_TYPE }} NV_INGEST_VERSION=${{ env.VERSION }} python -m build
+
       - name: Publish wheels to Artifactory
         env:
           ARTIFACTORY_URL: ${{ secrets.ARTIFACTORY_URL }}
@@ -79,4 +83,5 @@ jobs:
           ARTIFACTORY_PASSWORD: ${{ secrets.ARTIFACTORY_PASSWORD }}
         run: |
           twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD api/dist/* \
-          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/*
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD client/dist/* \
+          && twine upload --repository-url $ARTIFACTORY_URL -u $ARTIFACTORY_USERNAME -p $ARTIFACTORY_PASSWORD src/dist/*

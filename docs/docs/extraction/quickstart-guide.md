@@ -115,7 +115,7 @@ pip install nv-ingest-client==2025.3.10.dev20250310
 
 !!! note
 
-    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(morpheus) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
+    Interacting from the host depends on the appropriate port being exposed from the nv-ingest container to the host as defined in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml#L141). If you prefer, you can disable exposing that port and interact with the NV-Ingest service directly from within its container. To interact within the container run `docker exec -it nv-ingest-nv-ingest-ms-runtime-1 bash`. You'll be in the `/workspace` directory with `DATASET_ROOT` from the .env file mounted at `./data`. The pre-activated `nv_ingest_runtime` conda environment has all the Python client libraries pre-installed and you should see `(nv_ingest_runtime) root@aba77e2a4bde:/workspace#`. From the bash prompt above, you can run the nv-ingest-cli and Python examples described following.
 
 
 ## Step 3: Ingesting Documents
@@ -383,60 +383,27 @@ python src/util/image_viewer.py --file_path ./processed_docs/image/multimodal_te
 
 ## Profile Information
 
-The Nemo Retriever extraction core pipeline profiles run on a single A10G or better GPU. 
-This includes text, table, chart, infographic extraction, embedding and indexing into Milvus. 
-The advanced profiles require additional GPU support. 
-This includes audio extraction and VLM integrations. 
-For more information, refer to [Support Matrix](support-matrix.md).
-
 The values that you specify in the `--profile` option of your `docker compose up` command are explained in the following table. 
 You can specify multiple `--profile` options.
 
-
-| Name                  | Type     | Description                                                       | GPU Requirements | Disk Space Requirements |
-|-----------------------|----------|-------------------------------------------------------------------|-----------------------|-----------------------------------|
-| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus. | [1 GPU](support-matrix.md) total for all core profiles. | ~150GB total for all core profiles. |
-| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | [1 GPU](support-matrix.md) total for all core profiles. | ~150GB total for all core profiles. |
-| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~37GB additional space |
-| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse). For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | [1 additional dedicated GPU](support-matrix.md) | ~16 GB additional space |
-| `vlm`                 | Advanced | Uses llama 3.2 11B VLM for experimental image captioning of unstructured images. | [1 additional dedicated GPU](support-matrix.md) | ~16GB additional space |
-
+| Profile               | Type     | Description                                                       | 
+|-----------------------|----------|-------------------------------------------------------------------| 
+| `retrieval`           | Core     | Enables the embedding NIM and (GPU accelerated) Milvus.           | 
+| `table-structure`     | Core     | Enables the yolox table structure NIM which enhances markdown formatting of extracted table content. This benefits answer generation by downstream LLMs. | 
+| `audio`               | Advanced | Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md). | 
+| `nemoretriever-parse` | Advanced | Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md). | 
+| `vlm`                 | Advanced | Use [llama 3.2 11B Vision](https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct/modelcard) for experimental image captioning of unstructured images. | 
 
 
-## Troubleshooting
+!!! important
 
-### Too Many Open Files Error
-
-In rare cases, when you run a job you might an see an error similar to `too many open files` or `max open file descriptor`. 
-This error occurs when the open file descriptor limit for your service user account is too low.
-To resolve the issue, set or raise the maximum number of open file descriptors (`-n`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
-Before you change the `-n` setting, consider the following:
-
-- Apply the `-n` setting directly to the user (or the Docker container environment) that runs your ingest service.
-- For `-n` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
-
-```bash
-ulimit -n 10,000
-```
-
-### Can't Start New Thread Error
-
-In rare cases, when you run a job you might an see an error similar to `can't start new thread`. 
-This error occurs when the maximum number of processes available to a single user is too low.
-To resolve the issue, set or raise the maximum number of processes (`-u`) by using the [ulimit](https://ss64.com/bash/ulimit.html) command.
-Before you change the `-u` setting, consider the following:
-
-- Apply the `-u` setting directly to the user (or the Docker container environment) that runs your ingest service.
-- For `-u` we recommend 10,000 as a baseline, but you might need to raise or lower it based on your actual usage and system configuration.
-
-```bash
-ulimit -u 10,000
-```
+    Advanced features require additional GPU support and disk space. For more information, refer to [Support Matrix](support-matrix.md).
 
 
 
 ## Related Topics
 
+- [Troubleshoot](troubleshoot.md)
 - [Prerequisites](prerequisites.md)
 - [Support Matrix](support-matrix.md)
 - [Deploy Without Containers (Library Mode)](quickstart-library-mode.md)

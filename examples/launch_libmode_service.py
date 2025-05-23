@@ -5,8 +5,7 @@
 import logging
 import os
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import PipelineCreationSchema
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 
 # Configure the logger
@@ -30,7 +29,7 @@ def main():
     ingest_config = PipelineCreationSchema(**config_data)
 
     try:
-        _, _ = run_pipeline(ingest_config, block=True)
+        _ = run_pipeline(ingest_config, block=True, disable_dynamic_scaling=True)
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     except Exception as e:

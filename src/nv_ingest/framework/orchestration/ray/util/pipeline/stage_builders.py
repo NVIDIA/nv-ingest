@@ -489,7 +489,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         "",
     )
     embedding_nim_endpoint = os.getenv("EMBEDDING_NIM_ENDPOINT", "http://embedding:8000/v1")
-    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/nv-embedqa-e5-v5")
+    embedding_model = os.getenv("EMBEDDING_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-embedqa-1b-v2")
 
     config = TextEmbeddingSchema(
         **{
@@ -581,7 +581,7 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
     task_broker_port = os.environ.get("MESSAGE_CLIENT_PORT", "6379")
 
     client_type = os.environ.get("MESSAGE_CLIENT_TYPE", "redis")
-    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "morpheus_task_queue")
+    task_queue_name = os.environ.get("MESSAGE_CLIENT_QUEUE", "ingest_task_queue")
 
     source_config = MessageBrokerTaskSourceConfig(
         **{

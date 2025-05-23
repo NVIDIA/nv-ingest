@@ -4,38 +4,46 @@ All rights reserved.
 SPDX-License-Identifier: Apache-2.0
 -->
 
-# NVIDIA Ingest: Multi-modal data extraction
+# What is NeMo Retriever Extraction?
 
-NVIDIA-Ingest is a scalable, performance-oriented content and metadata extraction SDK for a variety of input formats. NV-Ingest includes support for parsing PDFs, text files, Microsoft Word and PowerPoint documents, plain images, and audio files. NV-Ingest uses specialized NVIDIA NIMs (self-hosted microservices, or hosted on build.nvidia.com) to find, contextualize, and extract text, tables, charts, and unstructured images that you can use in downstream generative applications.
+NeMo Retriever extraction is a scalable, performance-oriented document content and metadata extraction microservice. 
+NeMo Retriever extraction uses specialized NVIDIA NIM microservices 
+to find, contextualize, and extract text, tables, charts and images that you can use in downstream generative applications.
 
 > [!Note]
-> NVIDIA Ingest is also known as NV-Ingest and [NeMo Retriever extraction](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+> NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-NVIDIA Ingest enables parallelization of the process of splitting documents into pages where contents are classified (as tables, charts, images, text), extracted into discrete content, and further contextualized via optical character recognition (OCR) into a well defined JSON schema. From there, NVIDIA Ingest can optionally manage computation of embeddings for the extracted content, and also optionally manage storing into a vector database, such as [Milvus](https://milvus.io/).
+NeMo Retriever extraction enables parallelization of splitting documents into pages where artifacts are classified (such as text, tables, charts, and images), extracted, and further contextualized through optical character recognition (OCR) into a well defined JSON schema. 
+From there, NeMo Retriever extraction can optionally manage computation of embeddings for the extracted content, 
+and optionally manage storing into a vector database [Milvus](https://milvus.io/).
+
+> [!Note]
+> Cached and Deplot are deprecated. Instead, NeMo Retriever extraction now uses the yolox-graphic-elements NIM. With this change, you should now be able to run NeMo Retriever Extraction on a single 24GB A10G or better GPU. If you want to use the old pipeline, with Cached and Deplot, use the [NeMo Retriever Extraction 24.12.1 release](https://github.com/NVIDIA/nv-ingest/tree/24.12.1).
+
 
 The following diagram shows the Nemo Retriever extraction pipeline.
 
 ![Pipeline Overview](https://docs.nvidia.com/nemo/retriever/extraction/images/overview-extraction.png)
 
 ## Table of Contents
-1. [What NVIDIA-Ingest Is](#what-nvidia-ingest-is)
+1. [What NeMo Retriever Extraction Is](#what-nvidia-ingest-is)
 2. [Prerequisites](#prerequisites)
 3. [Quickstart](#library-mode-quickstart)
-4. [NV Ingest Repository Structure](#nv-ingest-repository-structure)
+4. [GitHub Repository Structure](#nv-ingest-repository-structure)
 5. [Notices](#notices)
 
 
-## What NVIDIA-Ingest Is
+## What NeMo Retriever Extraction Is
 
-NV-Ingest is a library and microservice service that does the following:
+NeMo Retriever Extraction is a library and microservice service that does the following:
 
 - Accept a job specification that contains a document payload and a set of ingestion tasks to perform on that payload.
 - Store the result of each job to retrieve later. The result is a dictionary that contains a list of metadata that describes the objects extracted from the base document, and processing annotations and timing/trace data.
-- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents nv-ingest supports extraction through pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
+- Support multiple methods of extraction for each document type to balance trade-offs between throughput and accuracy. For example, for .pdf documents, extraction is performed by using pdfium, [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), Unstructured.io, and Adobe Content Extraction Services.
 - Support various types of before and after processing operations, including text splitting and chunking, transform and filtering, embedding generation, and image offloading to storage.
 
 
-NV-Ingest supports the following file types:
+NeMo Retriever Extraction supports the following file types:
 
 - `bmp`
 - `docx`
@@ -50,7 +58,16 @@ NV-Ingest supports the following file types:
 - `tiff`
 - `txt`
 
-For more information, see the [full NV Ingest documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
+
+### What NeMo Retriever Extraction Isn't
+
+NeMo Retriever extraction does not do the following:
+
+- Run a static pipeline or fixed set of operations on every submitted document.
+- Act as a wrapper for any specific document parsing library.
+
+
+For more information, see the [full NeMo Retriever Extraction documentation](https://docs.nvidia.com/nemo/retriever/extraction/overview/).
 
 
 ## Prerequisites
@@ -66,17 +83,17 @@ Library mode deployment of nv-ingest requires:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
 - [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
-- Python 3.10
+- Python 3.12
 
 ### Step 1: Prepare Your Environment
 
 Create a fresh Conda environment to install nv-ingest and dependencies.
 
 ```shell
-conda create -y --name nvingest python=3.10 && \
+conda create -y --name nvingest python=3.12 && \
     conda activate nvingest && \
-    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.3.0 nv_ingest_client=25.3.0 nv_ingest_api=25.3.0 && \
-    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client
+    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.4.2 nv_ingest_client=25.4.2 nv_ingest_api=25.4.2 && \
+    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient
 ```
 
 Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -274,9 +291,9 @@ So, according to this whimsical analysis, both the **Giraffe** and the **Cat** a
 > Please also checkout our [demo using a retrieval pipeline on build.nvidia.com](https://build.nvidia.com/nvidia/multimodal-pdf-data-extraction-for-enterprise-rag) to query over document content pre-extracted w/ NVIDIA Ingest.
 
 
-## NV Ingest Repository Structure
+## GitHub Repository Structure
 
-The following is a description of the folders in the nv-ingest repository.
+The following is a description of the folders in the GitHub repository.
 
 - [.devcontainer](https://github.com/NVIDIA/nv-ingest/tree/main/.devcontainer) — VSCode containers for local development
 - [.github](https://github.com/NVIDIA/nv-ingest/tree/main/.github) — GitHub repo configuration files

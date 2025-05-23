@@ -91,6 +91,8 @@ class RayPipeline:
         # --- State ---
         # self.scaling_state: Dict[str, str] = {}
         self.prev_global_memory_usage: Optional[int] = None
+        self._state_lock: threading.Lock = threading.Lock()
+        self._stopping = False
 
         # --- Build Time Config & State ---
         # Use scaling_config for these
@@ -711,8 +713,8 @@ class RayPipeline:
 
     def _execute_queue_flush(self) -> bool:
         """Executes queue flush, using topology for state and structure."""
-        if self.topology.get_is_flushing():  # Check topology state
-            logger.warning("Queue flush requested but already in progress. Ignoring.")
+        if self.topology.get_is_flushing() or self._stopping:  # Check topology state
+            logger.warning("Queue flush requested but already in progress or pipeline is stopping. Ignoring.")
             return False
 
         # Set flushing state in topology
@@ -853,8 +855,9 @@ class RayPipeline:
     def request_queue_flush(self, force: bool = False) -> None:
         """Requests a queue flush, checking topology state."""
         logger.info(f"Manual queue flush requested (force={force}).")
-        if self.topology.get_is_flushing():  # Check topology
-            logger.warning("Flush already in progress.")
+
+        if self.topology.get_is_flushing() or self._stopping:  # Check topology
+            logger.warning("Flush already in progress or pipeline is stopping.")
             return
         if force or self._is_pipeline_quiet():
             # Consider running _execute_queue_flush in a separate thread
@@ -1020,65 +1023,76 @@ class RayPipeline:
 
     def _perform_scaling_and_maintenance(self) -> None:
         """Orchestrates scaling/maintenance using topology and stats collector."""
-        logger.debug("--- Performing Scaling & Maintenance Cycle ---")
+
+        if self._stopping:
+            logger.debug("Pipeline is stopping. Skipping scaling cycle.")
+            return
 
         if not self.dynamic_memory_scaling:
             logger.debug("Dynamic memory scaling disabled. Skipping cycle.")
             return
 
-        cycle_start_time = time.time()
-
-        # Check flushing state via topology
         if self.topology.get_is_flushing():
             logger.debug("Skipping scaling cycle: Queue flush in progress (topology state).")
             return
 
-        # --- Check for quietness for flushing (uses topology state via helper) ---
+        got_lock = self._state_lock.acquire(timeout=0.1)
+        if not got_lock:
+            logger.debug("Could not acquire lock for maintenance; skipping cycle.")
+            return
+
+        cycle_start_time = time.time()
         try:
+            if self._stopping:
+                logger.debug("Pipeline began stopping after acquiring lock. Skipping maintenance logic.")
+                return
+
+            logger.debug("--- Performing Scaling & Maintenance Cycle ---")
+
             if self._is_pipeline_quiet():
                 logger.info("Pipeline quiet, initiating queue flush.")
-                flush_success = self._execute_queue_flush()  # Uses topology internally
+                flush_success = self._execute_queue_flush()
                 logger.info(f"Automatic queue flush completed. Success: {flush_success}")
-                return  # Skip scaling if flush occurred
-        except Exception as e:
-            logger.error(f"Error during quiet check or flush: {e}. Skipping cycle.", exc_info=True)
-            return
+                return
 
-        # --- Get & Validate Stats ---
-        current_stage_stats, global_in_flight, last_update_time, stats_were_successful = (
-            self.stats_collector.get_latest_stats()
-        )
+            # Fast return check if stopping occurred while flushing or checking flush status
+            if self._stopping:
+                return
 
-        last_update_age = time.time() - last_update_time
-        max_stats_age_for_scaling = max(15.0, self._stats_collection_interval_seconds)
-        if not current_stage_stats or not stats_were_successful or last_update_age > max_stats_age_for_scaling:
-            status = "No stats" if not current_stage_stats else "Failed" if not stats_were_successful else "Stale"
-            logger.warning(
-                f"[Scaling] Cannot scale reliably: Stats {status} (Age: {last_update_age:.1f}s). Skipping cycle."
+            current_stage_stats, global_in_flight, last_update_time, stats_were_successful = (
+                self.stats_collector.get_latest_stats()
             )
-            return
 
-        # --- Gather Metrics (uses topology via helper) ---
-        current_stage_metrics = self._gather_controller_metrics(current_stage_stats, global_in_flight)
-        if not current_stage_metrics:
-            logger.error("[Scaling] Failed gather metrics. Skipping.")
-            return
+            last_update_age = time.time() - last_update_time
+            max_age = max(15.0, self._stats_collection_interval_seconds)
+            if not current_stage_stats or not stats_were_successful or last_update_age > max_age:
+                status = "No stats" if not current_stage_stats else "Failed" if not stats_were_successful else "Stale"
+                logger.warning(
+                    f"[Scaling] Cannot scale reliably: Stats {status} (Age: {last_update_age:.1f}s). Skipping cycle."
+                )
+                return
 
-        # --- Get Memory Usage ---
-        current_global_memory_mb = self._get_current_global_memory()
+            current_stage_metrics = self._gather_controller_metrics(current_stage_stats, global_in_flight)
+            if not current_stage_metrics:
+                logger.error("[Scaling] Failed to gather metrics. Skipping.")
+                return
 
-        # --- Calculate Scaling Adjustments (uses topology via helper) ---
-        final_adjustments = self._calculate_scaling_adjustments(
-            current_stage_metrics, global_in_flight, current_global_memory_mb
-        )
+            current_global_memory_mb = self._get_current_global_memory()
+            final_adjustments = self._calculate_scaling_adjustments(
+                current_stage_metrics, global_in_flight, current_global_memory_mb
+            )
+            self.prev_global_memory_usage = current_global_memory_mb
+            self._apply_scaling_actions(final_adjustments)
 
-        # --- Update Memory Usage *After* Decision ---
-        self.prev_global_memory_usage = current_global_memory_mb
+            logger.debug(
+                f"--- Scaling & Maintenance Cycle Complete (Duration: {time.time() - cycle_start_time:.2f}s) ---"
+            )
 
-        # --- Apply Scaling Actions (uses topology via helper) ---
-        self._apply_scaling_actions(final_adjustments)
+        except Exception as e:  # noqa
+            logger.error("Exception during maintenance cycle", exc_info=True)
 
-        logger.debug(f"--- Scaling & Maintenance Cycle Complete (Duration: {time.time() - cycle_start_time:.2f}s) ---")
+        finally:
+            self._state_lock.release()
 
     # --- Lifecycle Methods for Monitoring/Scaling Threads ---
     def _scaling_loop(self, interval: float) -> None:
@@ -1149,39 +1163,43 @@ class RayPipeline:
         """Stops background threads and actors (via topology)."""
         logger.info("Stopping pipeline...")
 
+        if self._stopping:
+            return
+        self._stopping = True
+
         # 1. Stop background threads first
-        self._stop_scaling()
-        self.stats_collector.stop()
+        with self._state_lock:
+            self._stop_scaling()
+            self.stats_collector.stop()
 
-        # 2. Stop actors (using topology)
-        logger.debug("Stopping all stage actors...")
-        stop_refs_map: Dict[ray.ObjectRef, Any] = {}
-        actors_to_kill = []
+            # 2. Stop actors (using topology)
+            logger.debug("Stopping all stage actors...")
+            stop_refs_map: Dict[ray.ObjectRef, Any] = {}
 
-        # Get actors snapshot from topology
-        current_actors = {name: list(actors) for name, actors in self.topology.get_stage_actors().items()}
+            # Get actors snapshot from topology
+            current_actors = {name: list(actors) for name, actors in self.topology.get_stage_actors().items()}
 
-        for stage_name, actors in current_actors.items():
-            for actor in actors:
+            for stage_name, actors in current_actors.items():
+                for actor in actors:
+                    try:
+                        stop_refs_map[actor.stop.remote()] = actor
+                    except Exception as e:
+                        logger.warning(f"Error initiating stop for {actor} in {stage_name}: {e}. Skipping.")
+
+            if stop_refs_map:
+                stop_refs = list(stop_refs_map.keys())
+                logger.debug(f"Waiting up to 60s for {len(stop_refs)} actors to stop gracefully...")
                 try:
-                    stop_refs_map[actor.stop.remote()] = actor
+                    ready, not_ready = ray.wait(stop_refs, num_returns=len(stop_refs), timeout=60.0)
+                    if not_ready:
+                        logger.warning(
+                            f"Timeout waiting for {len(not_ready)} actors to stop. Allowing Ray to clean up."
+                        )
+                    logger.info(f"{len(ready)} actors stopped via stop().")
                 except Exception as e:
-                    logger.warning(f"Error initiating stop for {actor} in {stage_name}: {e}. Will kill.")
+                    logger.error(f"Error during actor stop confirmation: {e}", exc_info=True)
 
-        if stop_refs_map:
-            stop_refs = list(stop_refs_map.keys())
-            logger.debug(f"Waiting up to 60s for {len(stop_refs)} actors to stop gracefully...")
-            try:
-                ready, not_ready = ray.wait(stop_refs, num_returns=len(stop_refs), timeout=60.0)
-                if not_ready:
-                    logger.warning(f"Timeout waiting for {len(not_ready)} actors to stop. Will kill.")
-                    actors_to_kill.extend(stop_refs_map.get(ref) for ref in not_ready if stop_refs_map.get(ref))
-                logger.info(f"{len(ready)} actors stopped via stop().")
-            except Exception as e:
-                logger.error(f"Error during actor stop confirmation: {e}", exc_info=True)
-                actors_to_kill.extend(a for a in stop_refs_map.values() if a not in actors_to_kill)  # Add all on error
+            # Clear runtime state in topology
+            self.topology.clear_runtime_state()
 
-        # Clear runtime state in topology
-        self.topology.clear_runtime_state()
-
-        logger.info("Pipeline stopped.")
+            logger.info("Pipeline stopped.")
