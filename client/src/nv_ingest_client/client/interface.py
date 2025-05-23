@@ -414,6 +414,7 @@ class Ingestor:
                     doc_data,
                     jsonl_filepath,
                     source_name,
+                    ensure_parent_dir_exists=False,
                 )
 
                 if num_items_saved > 0:
@@ -472,6 +473,9 @@ class Ingestor:
         if self._output_config:
             callback = _disk_save_callback
             stream_to_callback_only = True
+
+            output_dir = self._output_config["output_directory"]
+            os.makedirs(output_dir, exist_ok=True)
         else:
             callback = _in_memory_callback
             stream_to_callback_only = False

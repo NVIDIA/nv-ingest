@@ -1,3 +1,4 @@
+import io
 import json
 import logging
 import os
@@ -22,6 +23,7 @@ def save_document_results_to_jsonl(
     doc_response_data: List[Dict[str, Any]],
     jsonl_output_filepath: str,
     original_source_name_for_log: str,
+    ensure_parent_dir_exists: bool = True,
 ) -> Tuple[int, Dict[str, str]]:
     """
     Saves a list of extraction items (for a single source document) to a JSON Lines file.
@@ -34,12 +36,20 @@ def save_document_results_to_jsonl(
     count_items_written = 0
 
     try:
-        os.makedirs(os.path.dirname(jsonl_output_filepath), exist_ok=True)
+        if ensure_parent_dir_exists:
+            parent_dir = os.path.dirname(jsonl_output_filepath)
+            if parent_dir:
+                os.makedirs(parent_dir, exist_ok=True)
 
-        with open(jsonl_output_filepath, "w", encoding="utf-8") as f_jsonl:
+        with io.BytesIO() as buffer:
             for extraction_item in doc_response_data:
-                f_jsonl.write(json.dumps(extraction_item) + "\n")
-                count_items_written += 1
+                buffer.write(json.dumps(extraction_item).encode("utf-8") + b"\n")
+            full_byte_content = buffer.getvalue()
+
+        count_items_written = len(doc_response_data)
+
+        with open(jsonl_output_filepath, "wb") as f_jsonl:
+            f_jsonl.write(full_byte_content)
 
         logger.info(
             f"Saved {count_items_written} extraction items for "
