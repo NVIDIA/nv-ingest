@@ -25,11 +25,13 @@ import logging
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
+from datetime import datetime
 import pandas as pd
 import pypdfium2 as libpdfium
 
 
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
@@ -290,6 +292,7 @@ def _render_page_from_file(
 # ------------------------------------------------------------------ #
 #  Render an entire PDF in parallel – keeps natural page order       #
 # ------------------------------------------------------------------ #
+@traceable_func(trace_name="pdf_extraction::render_single_pdf_parallel")
 def render_single_pdf_parallel(
     pdf_path: str,
     size: Tuple[int, int],
@@ -307,6 +310,9 @@ def render_single_pdf_parallel(
     max_workers = min(max_workers, page_count)
     images: List[Tuple[np.ndarray, Tuple[int, int]]] = [None] * page_count
 
+    for idx in range(page_count):
+        execution_trace_log[f"trace::entry::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
+
     with ProcessPoolExecutor(max_workers=max_workers) as pool:
         futs = [
             pool.submit(_render_page_from_file, pdf_path, idx, size, execution_trace_log)
@@ -315,6 +321,7 @@ def render_single_pdf_parallel(
         for fut in as_completed(futs):
             idx, img, pad = fut.result()
             images[idx] = (img, pad)
+            execution_trace_log[f"trace::exit::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
 
     return images
 
@@ -555,7 +562,7 @@ def pdfium_extractor(
         rendered_imgs = render_single_pdf_parallel(
             pdf_path=pdf_stream,
             size=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-            max_workers=pdfium_config.workers_per_progress_engine,
+            max_workers=max(4, pdfium_config.workers_per_progress_engine),
             execution_trace_log=execution_trace_log,
         )
 

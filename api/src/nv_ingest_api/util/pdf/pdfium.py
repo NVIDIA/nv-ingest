@@ -16,6 +16,7 @@ import pypdfium2 as pdfium
 import pypdfium2.raw as pdfium_c
 from numpy import dtype
 from numpy import ndarray
+from datetime import datetime
 
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.util.image_processing.clustering import (
