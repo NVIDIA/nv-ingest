@@ -74,9 +74,26 @@ class PipelineTopology:
         self._start_cleanup_thread()  # Start background cleanup on init
 
     def __del__(self):
-        """Ensure cleanup thread is stopped when topology object is destroyed."""
-        logger.debug("PipelineTopology destructor called, ensuring cleanup thread is stopped.")
-        self._stop_cleanup_thread()
+        """Ensure cleanup thread is stopped and internal actor references are released."""
+        logger.debug("PipelineTopology destructor called. Cleaning up thread and actor references.")
+
+        # Stop the background cleanup thread
+        try:
+            self._stop_cleanup_thread()
+        except Exception as e:
+            logger.warning(f"Error stopping cleanup thread during __del__: {e}")
+
+        # Clear references to actor handles and shutdown futures
+        try:
+            self._stage_actors.clear()
+            self._edge_queues.clear()
+            self._scaling_state.clear()
+            self._stage_memory_overhead.clear()
+            self._pending_removal_actors.clear()
+            self._stages.clear()
+            self._connections.clear()
+        except Exception as e:
+            logger.warning(f"Error clearing internal state during __del__: {e}")
 
     # --- Lock Context Manager ---
     @contextlib.contextmanager
