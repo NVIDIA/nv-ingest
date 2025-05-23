@@ -56,3 +56,4 @@ dependencies:
       - tritonclient
       - nvidia-riva-client>=2.18.0
       - unstructured-client
+      - markitdown
