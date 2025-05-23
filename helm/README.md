@@ -289,6 +289,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
+| https://prometheus-community.github.io/helm-charts | prometheus | 27.12.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
 | https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
 | oci://registry-1.docker.io/bitnamicharts | redis | 19.1.3 |
@@ -639,6 +640,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | podAnnotations."traffic.sidecar.istio.io/excludeOutboundPorts" | string | `"8007"` |  |
 | podLabels | object | `{}` |  |
 | podSecurityContext.fsGroup | int | `1000` |  |
+| prometheus.alertmanager.enabled | bool | `false` |  |
+| prometheus.enabled | bool | `false` |  |
+| prometheus.server.enabled | bool | `false` |  |
 | readinessProbe.enabled | bool | `false` |  |
 | readinessProbe.failureThreshold | int | `220` |  |
 | readinessProbe.httpGet.path | string | `"/v1/health/ready"` |  |
@@ -728,4 +732,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.statefuleSet.enabled | bool | `false` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
+| zipkin.resources.limits.cpu | string | `"500m"` |  |
+| zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
+| zipkin.resources.requests.cpu | string | `"100m"` |  |
+| zipkin.resources.requests.memory | string | `"2.5Gi"` |  |
+| zipkin.zipkin.extraEnv.JAVA_OPTS | string | `"-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"` |  |
 | zipkinDeployed | bool | `true` |  |
