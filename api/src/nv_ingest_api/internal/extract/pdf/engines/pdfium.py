@@ -17,14 +17,18 @@
 # limitations under the License.
 
 import concurrent.futures
+from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
 from typing import List, Tuple, Optional, Any
 
 import numpy as np
+from datetime import datetime
 import pandas as pd
 import pypdfium2 as libpdfium
 
+
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
+from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
@@ -255,6 +259,71 @@ def _extract_page_images(
     return extracted_images
 
 
+# ------------------------------------------------------------------ #
+#  Render one page – now returns (page_idx, image, padding_offsets)  #
+# ------------------------------------------------------------------ #
+def _render_page_from_file(
+    pdf_path: str,
+    page_idx: int,
+    size: Tuple[int, int],
+    execution_trace_log: Optional[List] = None,
+) -> Tuple[int, np.ndarray, Tuple[int, int]]:
+    """
+    Opens `pdf_path`, renders `page_idx`, and returns
+    (page_idx, image_array, padding_offsets).
+    """
+    doc  = libpdfium.PdfDocument(pdf_path)
+    page = doc.get_page(page_idx)
+
+    arrays, pads = pdfium_pages_to_numpy(
+        [page],
+        scale_tuple=size,
+        padding_tuple=size,
+        trace_info=execution_trace_log,
+    )
+
+    page.close()
+    doc.close()
+    return page_idx, arrays[0], pads[0]
+
+# ------------------------------------------------------------------ #
+#  Render an entire PDF in parallel – keeps natural page order       #
+# ------------------------------------------------------------------ #
+@traceable_func(trace_name="pdf_extraction::render_single_pdf_parallel")
+def render_single_pdf_parallel(
+    pdf_path: str,
+    size: Tuple[int, int],
+    max_workers: int = 8,
+    execution_trace_log: Optional[List] = None,
+) -> List[Tuple[np.ndarray, Tuple[int, int]]]:
+    """
+    Render all pages of `pdf_path` in parallel and return a list of
+    (image_array, padding_offsets) tuples in natural page order.
+    """
+    doc = libpdfium.PdfDocument(pdf_path)
+    page_count = len(doc)
+    doc.close()
+
+    max_workers = min(max_workers, page_count)
+    images: List[Tuple[np.ndarray, Tuple[int, int]]] = [None] * page_count
+
+    for idx in range(page_count):
+        execution_trace_log[f"trace::entry::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
+
+    with ProcessPoolExecutor(max_workers=max_workers) as pool:
+        futs = [
+            pool.submit(_render_page_from_file, pdf_path, idx, size, execution_trace_log)
+            for idx in range(page_count)
+        ]
+        for fut in as_completed(futs):
+            idx, img, pad = fut.result()
+            images[idx] = (img, pad)
+            execution_trace_log[f"trace::exit::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
+
+    return images
+
+
+
 def _extract_page_elements(
     pages: list,
     page_count: int,
@@ -377,6 +446,7 @@ def _extract_page_elements(
     return extracted_page_elements
 
 
+
 def pdfium_extractor(
     pdf_stream,
     extract_text: bool,
@@ -483,6 +553,16 @@ def pdfium_extractor(
     pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
 
+
+    rendered_imgs: Optional[List[Tuple[np.ndarray, Tuple[int, int]]]] = None
+    if (extract_tables or extract_charts or extract_infographics):
+        rendered_imgs = render_single_pdf_parallel(
+            pdf_path=pdf_stream,
+            size=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+            max_workers=pdfium_config.workers_per_progress_engine,
+            execution_trace_log=execution_trace_log,
+        )
+
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
         for page_idx in range(page_count):
@@ -526,13 +606,8 @@ def pdfium_extractor(
 
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts or extract_infographics:
-                image, padding_offsets = pdfium_pages_to_numpy(
-                    [page],
-                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    trace_info=execution_trace_log,
-                )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                image, padding_offsets = rendered_imgs[page_idx]
+                pages_for_tables.append((page_idx, image, padding_offsets))
 
                 # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
                 if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
@@ -601,3 +676,4 @@ def pdfium_extractor(
 
     logger.debug(f"Extracted {len(extracted_data)} items from PDF.")
     return extracted_data
+
