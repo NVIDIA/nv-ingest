@@ -42,7 +42,7 @@ dependencies = [
 milvus = [
     "pymilvus==2.5.10",
     "pymilvus[bulk_writer,model]",
-    "langchain-milvus==0.1.7",
+    "langchain-milvus>=0.1.10",
 ]
 minio = [
     "minio>=7.2.15",
