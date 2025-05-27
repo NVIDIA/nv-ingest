@@ -54,7 +54,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
         export_config_to_env(ingest_config)
 
     current_level = logging.getLogger().getEffectiveLevel()
-    ray.init(
+    ray_context = ray.init(
         namespace="nv_ingest_ray",
         logging_level=current_level,
         ignore_reinit_error=True,
@@ -196,3 +196,5 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     #    pipe.add_edge(sink_stage, otel_tracer_stage)
 
     # pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)
+
+    return ray_context
