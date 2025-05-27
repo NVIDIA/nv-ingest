@@ -7,20 +7,19 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 ## Prerequisites
 
-### Hardware/Software
+Before you the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-## Setup Environment
+## Initial Environment Setup
 
-- First create your namespace
+1. Create your namespace by running the following code.
 
 ```bash
 NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
-- Install the Helm repos
+2. Add the Helm repos by running the following code.
 
 ```bash
 # NVIDIA nemo-microservices NGC repository
@@ -33,7 +32,9 @@ helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oau
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
-- Install the chart
+## Install or Upgrade the Helm Chart
+
+To install or upgrade the Helm chart, run the following code.
 
 ```bash
 helm upgrade \
