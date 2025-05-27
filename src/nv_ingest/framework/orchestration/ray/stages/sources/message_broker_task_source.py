@@ -168,7 +168,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         try:
             # Log the payload (with content redacted) if in debug mode
-            if True:  # self._logger.isEnabledFor(logging.DEBUG):
+            if self._logger.isEnabledFor(logging.DEBUG):
                 no_payload = copy.deepcopy(job)
                 if "content" in no_payload.get("job_payload", {}):
                     no_payload["job_payload"]["content"] = ["[...]"]

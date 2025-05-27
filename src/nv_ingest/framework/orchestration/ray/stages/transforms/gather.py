@@ -51,8 +51,12 @@ class GatherStage(RayActorStage, SingletonStageMixin):
         if any(part is None for part in cache):
             return []  # Still waiting
 
-        # Coalesce and emit
-        dfs = [msg.payload() for msg in cache]
+        # Coalesce and emit, minimizing memory usage
+        dfs = []
+        for msg in cache:
+            dfs.append(msg.payload())
+            msg.payload(pd.DataFrame())  # Clear early
+
         combined_df = pd.concat(dfs, ignore_index=True)
 
         base_msg = cache[0]
@@ -67,4 +71,4 @@ class GatherStage(RayActorStage, SingletonStageMixin):
             f"GatherStage: Assembled {fragment_count} fragments into message with {combined_df.shape[0]} rows"
         )
 
-        return base_msg
+        return [base_msg]

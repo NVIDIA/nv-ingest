@@ -194,7 +194,7 @@ def fragment_pdf(message: IngestControlMessage, pages_per_fragment: int = 10) ->
     return output_messages
 
 
-def create_pdf_fragmenter(pages_per_fragment: int = 10, add_overlap: bool = False, overlap_pages: int = 1):
+def create_pdf_fragmenter(pages_per_fragment: int = 10):
     """
     Factory function to create a PDF fragmenter with specific configuration using pypdfium2.
 
@@ -202,10 +202,6 @@ def create_pdf_fragmenter(pages_per_fragment: int = 10, add_overlap: bool = Fals
     ----------
     pages_per_fragment : int
         Number of pages per fragment
-    add_overlap : bool
-        Whether to add overlapping pages between fragments
-    overlap_pages : int
-        Number of pages to overlap (if add_overlap is True)
 
     Returns
     -------
@@ -233,11 +229,7 @@ def create_pdf_fragmenter(pages_per_fragment: int = 10, add_overlap: bool = Fals
         total_pages = len(pdf)
 
         # Calculate fragments with overlap if requested
-        if add_overlap:
-            effective_pages_per_fragment = pages_per_fragment - overlap_pages
-            num_fragments = (total_pages + effective_pages_per_fragment - 1) // effective_pages_per_fragment
-        else:
-            num_fragments = (total_pages + pages_per_fragment - 1) // pages_per_fragment
+        num_fragments = (total_pages + pages_per_fragment - 1) // pages_per_fragment
 
         if num_fragments == 1:
             pdf.close()
@@ -246,10 +238,7 @@ def create_pdf_fragmenter(pages_per_fragment: int = 10, add_overlap: bool = Fals
         output_messages = []
 
         for fragment_idx in range(num_fragments):
-            if add_overlap and fragment_idx > 0:
-                start_page = fragment_idx * (pages_per_fragment - overlap_pages)
-            else:
-                start_page = fragment_idx * pages_per_fragment
+            start_page = fragment_idx * pages_per_fragment
 
             end_page = min(start_page + pages_per_fragment, total_pages)
 
@@ -271,16 +260,6 @@ def create_pdf_fragmenter(pages_per_fragment: int = 10, add_overlap: bool = Fals
             new_df = payload.copy(deep=True)
             new_metadata = deepcopy(metadata)
             new_metadata["content"] = fragment_base64
-            new_metadata["fragment_info"] = {
-                "fragment_index": fragment_idx,
-                "total_fragments": num_fragments,
-                "start_page": start_page,
-                "end_page": end_page,
-                "total_pages": total_pages,
-                "pages_in_fragment": end_page - start_page,
-                "has_overlap": add_overlap,
-                "overlap_pages": overlap_pages if add_overlap else 0,
-            }
 
             new_df.at[0, "metadata"] = json.dumps(new_metadata) if isinstance(row["metadata"], str) else new_metadata
 

@@ -112,8 +112,6 @@ class PDFScatterSchema(BaseModel):
     """Configuration schema for PdfScatterStage"""
 
     pages_per_fragment: int = Field(default=100, description="Number of pages per fragment")
-    add_overlap: bool = Field(default=False, description="Whether to add overlapping pages between fragments")
-    overlap_pages: int = Field(default=5, description="Number of pages to overlap if add_overlap is True")
     max_fragments: int = Field(default=1000, description="Maximum number of fragments to create")
     metadata: Optional[dict] = Field(default_factory=dict, description="Additional metadata")
 
@@ -143,15 +141,11 @@ class PDFScatterStage(RayActorStage):
         # Create the PDF fragmenter with the configured parameters
         self._pdf_fragmenter = create_pdf_fragmenter(
             pages_per_fragment=config.pages_per_fragment,
-            add_overlap=config.add_overlap,
-            overlap_pages=config.overlap_pages,
         )
 
         logger.info(
             "PdfScatterStage initialized with pages_per_fragment=%d, overlap=%s, overlap_pages=%d",
             config.pages_per_fragment,
-            config.add_overlap,
-            config.overlap_pages,
         )
 
     # TODO(Filter by docutype for slight optimization)
