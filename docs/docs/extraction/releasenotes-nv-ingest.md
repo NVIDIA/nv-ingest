@@ -22,7 +22,7 @@ There are no breaking changes in this version.
 
 ### Upgrade
 
-To upgrade to the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
 
 
 
