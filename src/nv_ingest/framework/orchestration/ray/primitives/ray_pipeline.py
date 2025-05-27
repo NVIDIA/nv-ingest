@@ -2,7 +2,11 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import multiprocessing
+import os
+import signal
 import threading
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -22,6 +26,35 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 
 logger = logging.getLogger(__name__)
+
+
+class PipelineInterface(ABC):
+    """
+    Abstract base class for pipeline implementations.
+
+    Any concrete pipeline must implement start and stop methods.
+    """
+
+    @abstractmethod
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start the pipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Interval in seconds for monitoring poll (default: 5.0).
+        scaling_poll_interval : float
+            Interval in seconds for scaling decisions (default: 30.0).
+        """
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
+        """
+        Stop the pipeline and perform any necessary cleanup.
+        """
+        pass
 
 
 # --- Configuration Objects ---
@@ -62,7 +95,90 @@ class StatsConfig:
     queue_timeout_seconds: float = 2.0
 
 
-class RayPipeline:
+class RayPipelineSubprocessInterface(PipelineInterface):
+    """
+    Pipeline interface implementation for a subprocess-based Ray pipeline.
+    """
+
+    def __init__(self, process: multiprocessing.Process):
+        """
+        Parameters
+        ----------
+        process : multiprocessing.Process
+            A handle to the running subprocess.
+        """
+        self._process: multiprocessing.Process = process
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start is not supported because the subprocess is assumed to already be running.
+        """
+        pass
+
+    def stop(self) -> None:
+        """
+        Stops the subprocess pipeline. Tries terminate(), then escalates to SIGKILL on the process group if needed.
+        """
+        if not self._process.is_alive():
+            return
+
+        try:
+            self._process.terminate()
+            self._process.join(timeout=5.0)
+        except Exception as e:
+            logger.warning(f"Failed to terminate process cleanly: {e}")
+
+        if self._process.is_alive():
+            try:
+                pgid = os.getpgid(self._process.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except Exception as e:
+                logger.error(f"Failed to force-kill process group: {e}")
+            self._process.join(timeout=3.0)
+
+
+class RayPipelineInterface(PipelineInterface):
+    """
+    Pipeline interface for an in-process RayPipeline instance.
+    """
+
+    def __init__(self, pipeline: "RayPipeline"):
+        """
+        Parameters
+        ----------
+        pipeline : RayPipeline
+            The instantiated pipeline to control.
+        """
+        self._pipeline = pipeline
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Starts the RayPipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Unused here; provided for interface compatibility.
+        scaling_poll_interval : float
+            Unused here; provided for interface compatibility.
+        """
+        self._pipeline.start(monitor_poll_interval, scaling_poll_interval)
+
+    def stop(self) -> None:
+        """
+        Stops the RayPipeline and shuts down Ray.
+        """
+        self._pipeline.stop()
+
+        try:
+            import ray
+
+            ray.shutdown()
+        except Exception:
+            pass
+
+
+class RayPipeline(PipelineInterface):
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
     Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
@@ -151,9 +267,16 @@ class RayPipeline:
             actor_timeout=self.stats_config.actor_timeout_seconds,
             queue_timeout=self.stats_config.queue_timeout_seconds,
         )
+
         logger.info("RayStatsCollector initialized using StatsConfig.")
 
     # --- Accessor Methods for Stats Collector (and internal use) ---
+
+    def __del__(self):
+        try:
+            self.stop()
+        except Exception as e:
+            logger.error(f"Exception during RayPipeline cleanup: {e}")
 
     def get_stages_info(self) -> List[StageInfo]:
         """Returns a snapshot of the current stage information."""
@@ -1194,5 +1317,6 @@ class RayPipeline:
 
             # Clear runtime state in topology
             self.topology.clear_runtime_state()
+            del self.topology
 
             logger.info("Pipeline stopped.")
