@@ -7,7 +7,7 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 ## Prerequisites
 
-Before you the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
+Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
 
 ## Initial Environment Setup
