@@ -77,6 +77,7 @@ class _ConcurrentProcessor:
         max_job_retries: Optional[int],
         completion_callback: Optional[Callable[[Dict[str, Any], str], None]],
         fail_on_submit_error: bool,
+        stream_to_callback_only: bool,
         verbose: bool = False,
     ):
         """
@@ -128,6 +129,7 @@ class _ConcurrentProcessor:
         self.max_job_retries = max_job_retries
         self.completion_callback = completion_callback
         self.fail_on_submit_error = fail_on_submit_error
+        self.stream_to_callback_only = stream_to_callback_only
         self.verbose = verbose
 
         # State variables managed across batch cycles
@@ -225,6 +227,8 @@ class _ConcurrentProcessor:
         if is_failed:
             failed_job_spec = self.client._job_index_to_job_spec.get(job_index)
             self.failures.append((f"{job_index}:{failed_job_spec.source_id}", description))
+        elif self.stream_to_callback_only:
+            self.results.append(job_index)
         else:
             self.results.append(result_data.get("data"))
 
@@ -235,7 +239,7 @@ class _ConcurrentProcessor:
         # Execute completion callback if provided
         if self.completion_callback:
             try:
-                self.completion_callback(result_data, job_index)
+                self.completion_callback(result_data.get("data"), job_index)
             except Exception as cb_err:
                 logger.error(f"Error in completion_callback for {job_index}: {cb_err}", exc_info=True)
 
@@ -982,6 +986,7 @@ class NvIngestClient:
         completion_callback: Optional[Callable[[Any, str], None]] = None,
         return_failures: bool = False,
         data_only: bool = True,
+        stream_to_callback_only: bool = False,
         verbose: bool = False,
     ) -> Union[List[Any], Tuple[List[Any], List[Tuple[str, str]]]]:
         """
@@ -1045,6 +1050,7 @@ class NvIngestClient:
             max_job_retries=max_job_retries,
             completion_callback=completion_callback,
             fail_on_submit_error=fail_on_submit_error,
+            stream_to_callback_only=stream_to_callback_only,
             verbose=verbose,
         )
 
