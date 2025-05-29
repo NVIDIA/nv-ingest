@@ -11,8 +11,8 @@ from .extract import ExtractTask
 from .filter import FilterTask
 from .infographic_extraction import InfographicExtractionTask
 from .split import SplitTask
-from .store import StoreTask
 from .store import StoreEmbedTask
+from .store import StoreTask
 from .table_extraction import TableExtractionTask
 from .task_base import Task
 from .task_base import TaskType

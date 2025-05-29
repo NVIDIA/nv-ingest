@@ -107,6 +107,10 @@ class IngestTaskEmbedSchema(BaseModelNoExt):
     model_name: Optional[str] = None
     api_key: Optional[str] = None
     filter_errors: bool = False
+    text_elements_modality: Optional[str] = None
+    image_elements_modality: Optional[str] = None
+    structured_elements_modality: Optional[str] = None
+    audio_elements_modality: Optional[str] = None
 
 
 class IngestTaskVdbUploadSchema(BaseModelNoExt):
@@ -194,6 +198,7 @@ class IngestTaskSchema(BaseModelNoExt):
         validated_task_properties = expected_schema_cls(**task_properties)
         values["type"] = task_type  # ensure type is now always the enum
         values["task_properties"] = validated_task_properties
+
         return values
 
     @field_validator("type", mode="before")

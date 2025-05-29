@@ -12,10 +12,11 @@ import shutil
 import tempfile
 from concurrent.futures import Future
 from functools import wraps
-from typing import Any, Tuple
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
+from typing import Tuple
 from typing import Union
 from urllib.parse import urlparse
 
@@ -39,10 +40,10 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.util.processing import check_schema
+from nv_ingest_client.util.util import filter_function_kwargs
 from nv_ingest_client.util.vdb import VDB
 from nv_ingest_client.util.vdb import available_vdb_ops
-from nv_ingest_client.util.util import filter_function_kwargs
-from nv_ingest_client.util.processing import check_schema
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
