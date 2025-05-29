@@ -151,6 +151,8 @@ sparse = True
 top_k = 5
 model_name="nvidia/llama-3.2-nv-embedqa-1b-v2"
 
+filter_expr = 'content_metadata["department"] == "Engineering"'
+
 queries = ["this is expensive"]
 q_results = []
 for que in queries:
@@ -165,7 +167,7 @@ for que in queries:
                 top_k=top_k, 
                 model_name=model_name, 
                 gpu_search=False, 
-                _filter='content_metadata["department"] == "Engineering"'
+                _filter=filter_expr
             )
         )
 
