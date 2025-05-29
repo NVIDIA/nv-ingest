@@ -109,11 +109,7 @@ The following are the best practices when you work with custom metadata:
 
 ## Use Custom Metadata to Filter Results During Retrieval
 
-You can use custom metadata to filter documents during retrieval operations.
-
-
-### Filter Expression Syntax
-
+You can use custom metadata to filter documents during retrieval operations. 
 Use filter expressions that follow the Milvus boolean expression syntax. 
 For more information, refer to [Filtering Explained](https://milvus.io/docs/boolean.md).
 
