@@ -329,7 +329,7 @@ services:
       - ./config/otel-collector-config.yaml:/etc/otel-collector-config.yaml
     ports:
       - "9988:9988" # Prometheus metrics exposed by the collector
-      - "8889:8889" # Prometheus exporter metrics
+      - "8890:8889" # Prometheus exporter metrics
       - "13133:13133" # health_check extension
       - "9411" # Zipkin receiver
       - "4317:4317" # OTLP gRPC receiver
