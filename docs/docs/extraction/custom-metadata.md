@@ -3,7 +3,7 @@
 You can upload custom metadata for documents during ingestion. 
 By uploading custom metadata you can attach additional information to documents, 
 and use it for filtering results during retrieval operations. 
-For example, you can add author metadata to your documents, and filter by author when you retrieve results.
+For example, you can add author metadata to your documents, and filter by author when you retrieve results. 
 To create filters, you use [Milvus Filtering Expressions](https://milvus.io/docs/boolean.md).
 
 Use this documentation to use custom metadata to filter search results when you work with [NeMo Retriever extraction](overview.md).
@@ -28,22 +28,68 @@ and you can specify different metadata for different documents in the same inges
 
 ### Metadata Structure
 
-You specify custom metadata as a TODO 
+You specify custom metadata as a dataframe or a file (json, csv, or parquet). 
 
-The following example contains metadata fields TODO. 
+The following example contains metadata fields for category, department, and timestamp. 
 You can create whatever metadata is helpful for your scenario.
 
-TODO
-```
+```python
+import pandas as pd
+
+meta_df = pd.DataFrame
+(
+    {
+        "source": ["data/woods_frost.pdf", "data/multimodal_test.pdf"],
+        "category": ["Alpha", "Bravo"],
+        "department": ["Language", "Engineering"],
+        "timestamp": ["2025-05-01T00:00:00", "2025-05-02T00:00:00"]
+    }
+)
+
+# Convert the dataframe to a csv file, 
+# to demonstrate how to ingest a metadata file in a later step.
+
+file_path = "./meta_file.csv"
+meta_df.to_csv(file_path)
 ```
 
 
 ### Example: Add Custom Metadata During Ingestion
 
-The following example adds custom metadata during ingestion.
+The following example adds custom metadata during ingestion. 
+For more information about the `Ingestor` class, see [Use the NV-Ingest Python API](nv-ingest-python-api.md).
+For more information about the `vdb_upload` method, see [Upload Data](data-store.md).
 
-TODO
-```
+```python
+from nv_ingest_client.client import Ingestor
+
+hostname="localhost"
+collection_name = "nv_ingest_collection"
+sparse = True
+
+ingestor = ( 
+    Ingestor(message_client_hostname=hostname)
+        .files(["data/woods_frost.pdf", "data/multimodal_test.pdf"])
+            .extract(
+                extract_text=True,
+                extract_tables=True,
+                extract_charts=True,
+                extract_images=True,
+                text_depth="page"
+            )
+                .embed(text=True, tables=True)
+                    .vdb_upload(
+                        collection_name=collection_name, 
+                        milvus_uri=f"http://{hostname}:19530", 
+                        sparse=sparse, 
+                        minio_endpoint=f"{hostname}:9000", 
+                        dense_dim=2048,
+                        meta_dataframe=file_path, 
+                        meta_source_field="source", 
+                        meta_fields=["category, department, timestamp"]
+                    )
+)
+results = ingestor.ingest_async().result()
 ```
 
 
@@ -83,7 +129,7 @@ filter_expr = 'content_metadata["category"] == "technical"'
 The following example filters results by time range.
 
 ```python
-filter_expr = 'content_metadata["timestamp"] >= "2024-03-01T00:00:00" and content_metadata["timestamp"] <= "2024-03-31T23:59:59"'
+filter_expr = 'content_metadata["timestamp"] >= "2024-03-01T00:00:00" and content_metadata["timestamp"] <= "2025-12-31T00:00:00"'
 ```
 
 The following example filters by category and uses multiple logical operators.
@@ -95,11 +141,39 @@ filter_expr = '(content_metadata["department"] == "engineering" and content_meta
 
 ### Example: Use a Filter Expression in Search
 
-The following example uses a filter expression to narrow results.
+After ingestion is complete, and documents are uploaded to the database with metadata, 
+you can use the `content_metadata` field to filter search results.
 
-TODO
+The following example uses a filter expression to narrow results by department.
 
 ```python
+from nv_ingest_client.util.milvus import nvingest_retrieval
+
+hostname="localhost"
+collection_name = "nv_ingest_collection"
+sparse = True
+top_k = 5
+model_name="nvidia/llama-3.2-nv-embedqa-1b-v2"
+
+queries = ["this is expensive"]
+q_results = []
+for que in queries:
+    q_results
+        .append(
+            nvingest_retrieval(
+                [que], 
+                collection_name, 
+                f"http://{hostname}:19530", 
+                embedding_endpoint=f"http://{hostname}:8012/v1",  
+                hybrid=sparse, 
+                top_k=top_k, 
+                model_name=model_name, 
+                gpu_search=False, 
+                _filter='content_metadata["department"] == "Engineering"'
+            )
+        )
+
+print(f"{q_results}")
 ```
 
 
