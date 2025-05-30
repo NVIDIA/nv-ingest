@@ -6,6 +6,29 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+## Release 25.06
+
+The NeMo Retriever extraction 25.06 release focuses TODO, including the following:
+
+- TODO
+- TODO
+- Added MIG support. For details, see []().
+- Added time slicing support. For details, see []().
+- TODO
+- TODO
+- New notebook for []().
+- New notebook for []().
+
+### Breaking Changes
+
+There are no breaking changes in this version.
+
+### Upgrade
+
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
+
+
+
 ## Release 25.04
 
 The NeMo Retriever extraction 25.04 release focuses on small bug fixes and improvements, including the following:
