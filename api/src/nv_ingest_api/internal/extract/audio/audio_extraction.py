@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 
 @unified_exception_handler
-def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, segment_audio: bool = None) -> Dict:
+def _extract_from_audio(row: pd.Series, audio_client: Any, trace_info: Dict, segment_audio: bool = False) -> Dict:
     """
     Modifies the metadata of a row if the conditions for table extraction are met.
 
@@ -131,16 +131,17 @@ def extract_text_from_audio_internal(
     """
     logger.debug(f"Entering audio extraction stage with {len(df_extraction_ledger)} rows.")
 
+    extract_params = task_config.get("params", {}).get("extract_audio_params", {})
     audio_extraction_config = extraction_config.audio_extraction_config
 
-    grpc_endpoint = task_config.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
-    http_endpoint = task_config.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
-    infer_protocol = task_config.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
-    auth_token = task_config.get("auth_token") or audio_extraction_config.auth_token
-    function_id = task_config.get("function_id") or audio_extraction_config.function_id
-    use_ssl = task_config.get("use_ssl") or audio_extraction_config.use_ssl
-    ssl_cert = task_config.get("ssl_cert") or audio_extraction_config.ssl_cert
-    segment_audio = task_config.get("segment_audio") or audio_extraction_config.segment_audio
+    grpc_endpoint = extract_params.get("grpc_endpoint") or audio_extraction_config.audio_endpoints[0]
+    http_endpoint = extract_params.get("http_endpoint") or audio_extraction_config.audio_endpoints[1]
+    infer_protocol = extract_params.get("infer_protocol") or audio_extraction_config.audio_infer_protocol
+    auth_token = extract_params.get("auth_token") or audio_extraction_config.auth_token
+    function_id = extract_params.get("function_id") or audio_extraction_config.function_id
+    use_ssl = extract_params.get("use_ssl") or audio_extraction_config.use_ssl
+    ssl_cert = extract_params.get("ssl_cert") or audio_extraction_config.ssl_cert
+    segment_audio = extract_params.get("segment_audio") or audio_extraction_config.segment_audio
 
     parakeet_client = create_audio_inference_client(
         (grpc_endpoint, http_endpoint),

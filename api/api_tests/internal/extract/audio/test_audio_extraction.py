@@ -212,7 +212,7 @@ class TestAudioExtraction(unittest.TestCase):
         extraction_config.audio_extraction_config = audio_extraction_config
 
         # Create task config
-        task_config = {}
+        task_config = {"params": {"extract_audio_params": {}}}
 
         # Configure the DataFrame.apply mock to return a Series of updated metadata
         mock_df_apply.return_value = pd.Series(
@@ -271,14 +271,18 @@ class TestAudioExtraction(unittest.TestCase):
 
         # Create task config with custom parameters that should override defaults
         task_config = {
-            "grpc_endpoint": "grpc://custom:50051",
-            "http_endpoint": "http://custom:8080",
-            "infer_protocol": "http",
-            "auth_token": "custom-token",
-            "function_id": "custom-function",
-            "use_ssl": True,
-            "ssl_cert": "custom-cert",
-            "segment_audio": True,
+            "params": {
+                "extract_audio_params": {
+                    "grpc_endpoint": "grpc://custom:50051",
+                    "http_endpoint": "http://custom:8080",
+                    "infer_protocol": "http",
+                    "auth_token": "custom-token",
+                    "function_id": "custom-function",
+                    "use_ssl": True,
+                    "ssl_cert": "custom-cert",
+                    "segment_audio": True,
+                }
+            }
         }
 
         # Call the function
