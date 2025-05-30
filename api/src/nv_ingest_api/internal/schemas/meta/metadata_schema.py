@@ -97,6 +97,8 @@ class ContentMetadataSchema(BaseModelNoExt):
     page_number: int = -1
     hierarchy: ContentHierarchySchema = ContentHierarchySchema()
     subtype: Union[ContentTypeEnum, str] = ""
+    start_time: int = -1
+    end_time: int = -1
 
 
 class TextMetadataSchema(BaseModelNoExt):

@@ -48,6 +48,7 @@ class AudioConfigSchema(BaseModel):
     function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
+    segment_audio: Optional[bool] = None
 
     @root_validator(pre=True)
     def validate_endpoints(cls, values):
