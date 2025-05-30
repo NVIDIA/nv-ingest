@@ -22,7 +22,7 @@ dependencies = [
     "charset-normalizer>=3.4.1",
     "click>=8.1.8",
     "fsspec>=2025.2.0",
-    "httpx==0.27.2",
+    "httpx>=0.28.1",
     "langchain-nvidia-ai-endpoints>=0.3.7",
     "llama-index-embeddings-nvidia==0.1.5",
     "openai~=1.82.0",
