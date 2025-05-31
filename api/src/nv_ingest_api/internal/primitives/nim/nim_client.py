@@ -240,18 +240,24 @@ class NimClient:
         np.ndarray
             The output of the model as a numpy array.
         """
+        if not isinstance(formatted_input, list):
+            formatted_input = [formatted_input]
 
         parameters = kwargs.get("parameters", {})
-        output_names = kwargs.get("outputs", ["output"])
-        dtype = kwargs.get("dtype", "FP32")
-        input_name = kwargs.get("input_name", "input")
+        output_names = kwargs.get("output_names", ["output"])
+        dtypes = kwargs.get("dtypes", ["FP32"])
+        input_names = kwargs.get("input_names", ["input"])
 
-        input_tensors = grpcclient.InferInput(input_name, formatted_input.shape, datatype=dtype)
-        input_tensors.set_data_from_numpy(formatted_input)
+        input_tensors = []
+        for input_name, input_data, dtype in zip(input_names, formatted_input, dtypes):
+            input_tensors.append(grpcclient.InferInput(input_name, input_data.shape, datatype=dtype))
+
+        for idx, input_data in enumerate(formatted_input):
+            input_tensors[idx].set_data_from_numpy(input_data)
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
         response = self.client.infer(
-            model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
+            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
         )
         logger.debug(f"gRPC inference response: {response}")
 
