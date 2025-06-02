@@ -2,6 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
+import queue
 import sys
 import threading
 import time
@@ -14,6 +16,7 @@ from pydantic import BaseModel
 import logging
 
 from ray import get_runtime_context
+from ray.util.queue import Full, Empty
 
 
 def setup_stdout_logging(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
@@ -55,7 +58,6 @@ def external_monitor_actor_shutdown(actor_handle: "RayActorStage", poll_interval
             # Remotely call the actor's method
             if ray.get(actor_handle.is_shutdown_complete.remote()):
                 logger.debug(f"Actor {actor_id_to_monitor} reported shutdown complete.")
-                actor_handle.request_actor_exit.remote()
 
                 return True
         except ray.exceptions.RayActorError:
@@ -196,17 +198,26 @@ class RayActorStage(ABC):
         It uses a timeout to prevent indefinite blocking, allowing the
         processing loop to remain responsive to the `running` flag.
 
+        Note: The queue now stores ObjectRefs instead of raw objects. This method
+        automatically dereferences ObjectRefs using ray.get() to return the actual
+        object to the caller.
+
         Returns
         -------
         Optional[Any]
-            The item read from the queue, or None if the queue is empty after
-            the timeout, the queue is not set, or the actor is not running.
+            The item read from the queue (dereferenced from ObjectRef if applicable),
+            or None if the queue is empty after the timeout, the queue is not set,
+            or the actor is not running.
 
         Raises
         ------
         ValueError
             If `input_queue` is None while the actor's `running` flag is True.
             This indicates a configuration error.
+        ray.exceptions.OwnerDiedError
+            If the object's owner has died and the object cannot be retrieved.
+        ray.exceptions.ObjectReconstructionFailedError
+            If the object cannot be reconstructed after a failure.
         """
         if not self._running:
             return None
@@ -223,12 +234,40 @@ class RayActorStage(ABC):
         try:
             # Perform a non-blocking or short-blocking read from the queue
             # The timeout allows the loop to check self._running periodically
-            return self._input_queue.get(timeout=1.0)
-        except Exception:
+            item_ref = self._input_queue.get(timeout=1.0)
+
+            if item_ref is None:
+                return None
+
+            # Check if the item is an ObjectRef and dereference it
+            if hasattr(item_ref, "__module__") and "ray" in str(type(item_ref)):
+                # This is likely a Ray ObjectRef, dereference it to get the actual object
+                try:
+                    actual_item = ray.get(item_ref)
+                    return actual_item
+                except (
+                    ray.exceptions.OwnerDiedError,
+                    ray.exceptions.ObjectReconstructionFailedError,
+                    ray.exceptions.ObjectFetchTimedOutError,
+                ) as e:
+                    self._logger.error(f"{self._get_actor_id_str()}: Failed to dereference ObjectRef: {e}")
+                    # Re-raise Ray-specific errors so caller can handle them appropriately
+                    raise
+            else:
+                # Not an ObjectRef, return as-is (backward compatibility)
+                return item_ref
+
+        except (queue.Empty, queue.Full, queue.Empty, Full, Empty, asyncio.TimeoutError):
             # Common exceptions include queue.Empty in older Ray versions or
             # custom queue implementations raising timeout errors.
             # Return None to signify no item was retrieved this cycle.
             return None
+
+        except Exception as e:
+            self._logger.error(f"Unhandled exception while reading input queue: {e}")
+            self._logger.exception(f"{self._get_actor_id_str()}: Exception in _read_input: {e}")
+            # Re-raise unhandled exceptions
+            raise
 
     @abstractmethod
     def on_data(self, control_message: Any) -> Optional[Any]:
@@ -332,15 +371,20 @@ class RayActorStage(ABC):
 
                     # If there's a valid result and an output queue is configured, attempt to put.
                     if self._output_queue is not None:
+                        # Put the object in Ray's object store with the queue actor as owner
+                        # This ensures the object survives even if this worker dies
+                        # See: https://docs.ray.io/en/latest/ray-core/fault-tolerance.html
+                        updated_cm_ref = ray.put(updated_cm, _owner=self._output_queue.actor)
+
                         # This loop will retry indefinitely until the item is put successfully
                         # or an unrecoverable error occurs (which is not explicitly handled to break here).
                         # TODO(Devin) -- This can be improved, should probably fail at some point?
                         #                Consider max retries or specific error handling for RayActorError
                         #                to prevent indefinite blocking if the queue actor is permanently dead.
                         is_put_successful = False
-                        while not is_put_successful:  # Renamed loop variable for clarity
+                        while not is_put_successful:
                             try:
-                                self._output_queue.put(updated_cm)
+                                self._output_queue.put(updated_cm_ref)
                                 self.stats["successful_queue_writes"] += 1
                                 is_put_successful = True  # Exit retry loop on success
                             except Exception as e_put:  # Broad exception catch for put failures
@@ -348,7 +392,7 @@ class RayActorStage(ABC):
                                     f"[{actor_id_str}] Output queue put failed (e.g., full, "
                                     f"timeout, or actor error), retrying. Error: {e_put}"
                                 )
-                                self.stats["queue_full"] += 1  # Consider renaming if it catches more than "full"
+                                self.stats["queue_full"] += 1
                                 time.sleep(0.1)  # Brief pause before retrying
 
                     # Step 3: Increment "processed" count after successful processing and output (if any).

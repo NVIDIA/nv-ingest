@@ -422,12 +422,12 @@ class PipelineTopology:
                                         # mysteriously lose control messages.
                                         # This lets the shutdown future complete, but leaves the actor to be killed off
                                         # by ray.actor_exit()
-                                        delay_thread = threading.Thread(
-                                            target=self._delayed_actor_release,
-                                            args=(actor_handle_to_delay, actor_id_str_to_delay, 60),  # 60s delay
-                                            daemon=True,
-                                        )
-                                        delay_thread.start()
+                                        # delay_thread = threading.Thread(
+                                        #    target=self._delayed_actor_release,
+                                        #    args=(actor_handle_to_delay, actor_id_str_to_delay, 60),  # 60s delay
+                                        #    daemon=True,
+                                        # )
+                                        # delay_thread.start()
                                         logger.debug(
                                             f"[TopologyCleanupLoop-{stage_to_update}] Started delayed release thread "
                                             f"for '{actor_id_str_to_delay}'."

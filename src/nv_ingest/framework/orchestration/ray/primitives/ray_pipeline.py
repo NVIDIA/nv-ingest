@@ -345,7 +345,7 @@ class RayPipeline(PipelineInterface):
                     )
                     try:
                         actor = stage.callable.options(
-                            name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
+                            name=actor_name, max_concurrency=10, max_restarts=0  # , lifetime="detached"
                         ).remote(config=stage.config)
                         replicas.append(actor)
                     except Exception as e:
@@ -504,7 +504,7 @@ class RayPipeline(PipelineInterface):
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
             new_actor = stage_info.callable.options(
-                name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
+                name=actor_name, max_concurrency=10, max_restarts=0  # , lifetime="detached"
             ).remote(config=stage_info.config)
 
             return new_actor
