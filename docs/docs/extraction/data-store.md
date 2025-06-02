@@ -12,7 +12,7 @@ NeMo Retriever extraction supports extracting text representations of various fo
 and ingesting to the [Milvus vector database](https://milvus.io/). 
 NeMo Retriever extraction does not store data on disk directly, except through Milvus. 
 The data upload task pulls extraction results to the Python client, 
-and then pushes them to Milvus by using its underlying Minio object store service.
+and then pushes them to Milvus by using its underlying MinIO object store service.
 
 The vector database stores only the extracted text representations of ingested data. 
 It does not store the embeddings for images.
@@ -34,6 +34,10 @@ You can control this by setting `stream=True`.
 If you set `recreate=True`, nv-ingest drops and recreates the collection given as *collection_name*. 
 The Milvus service persists data to disk by using a Docker volume defined in docker-compose.yaml. 
 You can delete all collections by deleting that volume, and then restarting the nv-ingest service.
+
+!!! warning
+
+    When you use the `vdb_upload` task with Milvus, you must expose the ports for the Milvus and MinIO containers to the nv-ingest client. This ensures that the nv-ingest client can connect to both services and perform the `vdb_upload` action.
 
 To upload to Milvus, use code similar to the following.
 
@@ -57,7 +61,6 @@ Ingestor(client=client)
 
 
 ## Upload to a Custom Data Store
-
 
 You can ingest to other data stores by using the `Ingestor.vdb_upload` method; 
 however, you must configure other data stores and connections yourself. 
