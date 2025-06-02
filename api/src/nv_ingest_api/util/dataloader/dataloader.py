@@ -1,4 +1,8 @@
-import ffmpeg
+# SPDX-FileCopyrightText: Copyright (c) 2025, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+# Copyright (c) 2025, NVIDIA CORPORATION.
 import fsspec
 from upath import UPath as Path
 from abc import ABC, abstractmethod
@@ -8,8 +12,17 @@ import subprocess
 import json
 import logging
 import math
+import importlib
 
 logger = logging.getLogger(__name__)
+
+if importlib.util.find_spec("ffmpeg") is None:
+    logger.error(
+        "Unable to load the Dataloader,ffmpeg was not installed, "
+        "please install it using `pip install ffmpeg-python` and `apt-get install ffmpeg`"
+    )
+else:
+    import ffmpeg
 
 
 class LoaderInterface(ABC):
@@ -61,8 +74,8 @@ class MediaInterface(LoaderInterface):
                 bitrate = float(probe["format"]["bit_rate"])
                 file_size = path_file.stat().st_size
                 duration = (file_size * 8) / bitrate
-                num_splits = math.ceil(file_size // (split_interval * 1e6))
-                segment_time = (duration // num_splits) + 1
+                num_splits = math.ceil(file_size / (split_interval * 1e6))
+                segment_time = math.ceil(duration / num_splits)
                 f_in.seek(0)
                 (
                     ffmpeg.input(

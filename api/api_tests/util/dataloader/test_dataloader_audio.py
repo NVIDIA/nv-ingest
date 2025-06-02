@@ -1,3 +1,6 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
 import pytest
 import numpy as np
 import wave
@@ -11,7 +14,7 @@ import json
 import math
 
 
-test_file_size_mb = 300
+test_file_size_mb = 100
 
 
 def create_test_wav(filepath, duration_seconds=6.0, sample_rate=44100, file_size_mb=test_file_size_mb):
@@ -114,7 +117,7 @@ def test_dataloader_wav_chunking(temp_dir):
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
 
-    actual_size_mb = input_wav.stat().st_size / (1024 * 1024)
+    actual_size_mb = input_wav.stat().st_size * 1e-6
 
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
@@ -226,7 +229,7 @@ def test_dataloader_mp3_content(temp_dir):
     # Create output directory for chunks
     chunks_dir = temp_dir / "chunks"
     chunks_dir.mkdir(exist_ok=True)
-    actual_size_mb = input_mp3.stat().st_size / (1024 * 1024)
+    actual_size_mb = input_mp3.stat().st_size * 1e-6
 
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
