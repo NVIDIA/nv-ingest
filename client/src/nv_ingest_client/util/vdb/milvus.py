@@ -259,7 +259,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
 
 
 def create_nvingest_index_params(
-    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = True, local_index: bool = True
+    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = False, local_index: bool = True
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -374,7 +374,7 @@ def create_nvingest_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     recreate_meta: bool = False,
 ) -> CollectionSchema:
@@ -985,7 +985,7 @@ def hybrid_retrieval(
     dense_field: str = "vector",
     sparse_field: str = "sparse",
     output_fields: List[str] = ["text"],
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     local_index: bool = False,
     _filter: str = "",
 ):
@@ -1083,7 +1083,7 @@ def nvingest_retrieval(
     sparse_model_filepath: str = "bm25_model.json",
     model_name: str = None,
     output_fields: List[str] = ["text", "source", "content_metadata"],
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     nv_ranker: bool = False,
     nv_ranker_endpoint: str = None,
     nv_ranker_model_name: str = None,
@@ -1324,7 +1324,11 @@ def recreate_elements(data):
 
 
 def pull_all_milvus(
-    collection_name: str, milvus_uri: str = "http://localhost:19530", write_dir: str = None, batch_size: int = 1000
+    collection_name: str,
+    milvus_uri: str = "http://localhost:19530",
+    write_dir: str = None,
+    batch_size: int = 1000,
+    include_embeddings: bool = False,
 ):
     """
     This function takes the input collection name and pulls all the records
@@ -1341,16 +1345,21 @@ def pull_all_milvus(
         Directory to write the records to. If None, the records will be returned as a list.
     batch_size : int, optional
         The number of records to pull in each batch. Defaults to 1000.
+    include_embeddings : bool, optional
+        Whether to include the embeddings in the output. Defaults to False.
     Returns
     -------
     List
         List of records/files with records from the collection.
     """
     client = MilvusClient(milvus_uri)
+    output_fields = ["source", "content_metadata", "text"]
+    if include_embeddings:
+        output_fields.append("vector")
     iterator = client.query_iterator(
         collection_name=collection_name,
         filter="pk >= 0",
-        output_fields=["source", "content_metadata", "text"],
+        output_fields=output_fields,
         batch_size=batch_size,
         consistency_level=CONSISTENCY,
     )
@@ -1400,7 +1409,7 @@ def embed_index_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     minio_endpoint: str = "localhost:9000",
     enable_text: bool = True,
@@ -1531,7 +1540,7 @@ def reindex_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     minio_endpoint: str = "localhost:9000",
     enable_text: bool = True,
@@ -1680,7 +1689,7 @@ class Milvus(VDB):
         sparse: bool = False,
         recreate: bool = True,
         gpu_index: bool = True,
-        gpu_search: bool = True,
+        gpu_search: bool = False,
         dense_dim: int = 2048,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,
