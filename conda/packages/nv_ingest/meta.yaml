@@ -63,7 +63,7 @@ requirements:
     # - unstructured-client>=0.25.9
     - uvicorn
   pip:
-    - nvidia-riva-client>=2.18.0
+    - nvidia-riva-client==2.20.0
 
   test:
     commands:

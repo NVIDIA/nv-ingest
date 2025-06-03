@@ -47,7 +47,7 @@ class PDFiumConfigSchema(BaseModel):
     yolox_infer_protocol: str = ""
 
     nim_batch_size: int = 4
-    workers_per_progress_engine: int = 5
+    workers_per_progress_engine: int = 8
 
     @model_validator(mode="before")
     @classmethod
@@ -135,7 +135,7 @@ class NemoRetrieverParseConfigSchema(BaseModel):
 
     timeout: float = 300.0
 
-    workers_per_progress_engine: int = 5
+    workers_per_progress_engine: int = 8
 
     @model_validator(mode="before")
     @classmethod

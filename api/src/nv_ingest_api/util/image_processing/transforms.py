@@ -12,8 +12,10 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
+import torch
 from PIL import Image
 from PIL import UnidentifiedImageError
+from torchvision.io import encode_jpeg
 
 from nv_ingest_api.util.converters import bytetools
 
@@ -21,7 +23,8 @@ DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
 logger = logging.getLogger(__name__)
-
+# TODO: Make this configurable for mult processing init functions
+torch.set_num_threads(1)
 
 def scale_image_to_encoding_size(
     base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9
@@ -43,7 +46,7 @@ def scale_image_to_encoding_size(
     -------
     Tuple[str, Tuple[int, int]]
         A tuple containing:
-        - Base64-encoded PNG image string, resized if necessary.
+        - Base64-encoded JPEG image string, resized if necessary.
         - The new size as a tuple (width, height).
 
     Raises
@@ -71,9 +74,9 @@ def scale_image_to_encoding_size(
             new_size = (int(width * reduction_step), int(height * reduction_step))
 
             img_resized = img.resize(new_size, Image.LANCZOS)
-            buffered = io.BytesIO()
-            img_resized.save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            # Convert PIL image to NumPy array before encoding
+            img_array_resized = np.array(img_resized)
+            base64_image = numpy_to_base64(img_array_resized)
 
             # Adjust the reduction step if necessary
             if len(base64_image) > max_base64_size:
@@ -302,12 +305,12 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray) -> str:
+def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     """
-    Converts a NumPy array representing an image to a base64-encoded string.
+    Converts a NumPy array representing an image to a base64-encoded JPEG string using torchvision.
 
-    The function takes a NumPy array, converts it to a PIL image, and then encodes
-    the image as a PNG in a base64 string format. The input array is expected to be in
+    The function takes a NumPy array, converts it to a torch tensor, and then encodes
+    the image as a JPEG in a base64 string format. The input array is expected to be in
     a format that can be converted to a valid image, such as having a shape of (H, W, C)
     where C is the number of channels (e.g., 3 for RGB).
 
@@ -315,11 +318,14 @@ def numpy_to_base64(array: np.ndarray) -> str:
     ----------
     array : np.ndarray
         The input image as a NumPy array. Must have a shape compatible with image data.
+        Can be (H, W) for grayscale or (H, W, C) where C∈{1,3,4}. 4-channel images lose alpha.
+    quality : int, optional
+        JPEG quality (1-100), by default 100
 
     Returns
     -------
     str
-        The base64-encoded string representation of the input NumPy array as a PNG image.
+        The base64-encoded string representation of the input NumPy array as a JPEG image.
 
     Raises
     ------
@@ -335,28 +341,39 @@ def numpy_to_base64(array: np.ndarray) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
-    # If the array represents a grayscale image, drop the redundant axis in
-    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
-    # a grayscale image.
+
+    # Handle grayscale images with shape (H, W, 1)
     if array.ndim == 3 and array.shape[2] == 1:
         array = np.squeeze(array, axis=2)
 
-    # Check if the array is valid and can be converted to an image
-    try:
-        # Convert the NumPy array to a PIL image
-        pil_image = Image.fromarray(array.astype(np.uint8))
-    except Exception as e:
-        raise ValueError(f"Failed to convert NumPy array to image: {e}")
+    # Convert to torch tensor with appropriate shape
+    if array.ndim == 2:  # grayscale
+        tensor = torch.from_numpy(array).unsqueeze(0)  # (1, H, W)
+    elif array.ndim == 3:
+        if array.shape[2] == 4:  # drop alpha channel
+            array = array[..., :3]
+        tensor = torch.from_numpy(array).permute(2, 0, 1)  # (C, H, W)
+    else:
+        raise ValueError(f"Expected (H,W) or (H,W,C); got {array.shape}")
+
+    # Ensure uint8 dtype
+    if tensor.dtype != torch.uint8:
+        tensor = tensor.to(torch.uint8)
 
     try:
-        # Convert the PIL image to a base64-encoded string
-        with BytesIO() as buffer:
-            pil_image.save(buffer, format="PNG")
-            base64_img = bytetools.base64frombytes(buffer.getvalue())
+        # Encode to JPEG using torchvision
+        jpeg_bytes_tensor = encode_jpeg(
+            tensor.contiguous(),
+            quality=quality,
+        )
+        # TODO: Passing a list of tensors is more efficient
+        # So we can make this call on a list of values
+        jpeg_bytes = jpeg_bytes_tensor.cpu().numpy().tobytes()
     except Exception as e:
-        raise RuntimeError(f"Failed to encode image to base64: {e}")
+        raise RuntimeError(f"Failed to encode JPEG with torchvision: {e}")
 
-    return base64_img
+    # Convert to base64
+    return bytetools.base64frombytes(jpeg_bytes)
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:
