@@ -54,6 +54,6 @@ dependencies:
       - pymilvus>=2.5.0
       - pymilvus[bulk_writer, model]
       - tritonclient
-      - nvidia-riva-client>=2.18.0
+      - nvidia-riva-client==2.19.1
       - unstructured-client
       - markitdown
