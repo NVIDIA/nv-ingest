@@ -32,7 +32,7 @@ def pipeline_process():
 
     pipeline = None
     try:
-        pipeline = run_pipeline(config, block=False)
+        pipeline = run_pipeline(config, block=False, run_in_subprocess=True)
         time.sleep(5)  # Allow some warm-up time
         yield pipeline
     except KeyboardInterrupt:
