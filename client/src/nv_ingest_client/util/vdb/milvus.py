@@ -932,6 +932,8 @@ def dense_retrieval(
     dense_field: str = "vector",
     output_fields: List[str] = ["text"],
     _filter: str = "",
+    gpu_search: bool = False,
+    local_index: bool = False,
 ):
     """
     This function takes the input queries and conducts a dense
@@ -963,14 +965,19 @@ def dense_retrieval(
     for query in queries:
         dense_embeddings.append(dense_model.get_query_embedding(query))
 
+    search_params = {}
+    if not gpu_search and not local_index:
+        search_params["params"] = {"ef": top_k}
+
     results = client.search(
         collection_name=collection_name,
         data=dense_embeddings,
         anns_field=dense_field,
         limit=top_k,
         output_fields=output_fields,
-        filter=_filter,
-        consistency_level=CONSISTENCY,
+        # filter=_filter,
+        # consistency_level=CONSISTENCY,
+        search_params=search_params,
     )
     return results
 
@@ -1184,7 +1191,15 @@ def nvingest_retrieval(
         )
     else:
         results = dense_retrieval(
-            queries, collection_name, client, embed_model, top_k, output_fields=output_fields, _filter=_filter
+            queries,
+            collection_name,
+            client,
+            embed_model,
+            top_k,
+            output_fields=output_fields,
+            _filter=_filter,
+            gpu_search=gpu_search,
+            local_index=local_index,
         )
     if nv_ranker:
         rerank_results = []
