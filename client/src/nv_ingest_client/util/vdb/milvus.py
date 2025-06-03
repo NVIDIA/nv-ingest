@@ -620,7 +620,7 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
         logger.info(f"FOUND MORE THAN ONE metadata entry for {element_name}, will use first entry")
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
-        element["metadata"]["content_metadata"][col] = meta_fields.iloc[0][col]
+        element["metadata"]["content_metadata"][col] = str(meta_fields.iloc[0][col])
 
 
 def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:

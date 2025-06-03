@@ -66,9 +66,10 @@ nav:
         - Use the CLI: extraction/nv-ingest_cli.md
         - Use the API: extraction/nv-ingest-python-api.md
         - Split Documents: extraction/chunking.md
+        - Upload Data: extraction/data-store.md
+        - Filter Search Results: extraction/custom-metadata.md
         - Use NeMo Retriever Parse: extraction/nemoretriever-parse.md
         - Use RIVA Audio Processing: extraction/audio.md
-        - Upload Data: extraction/data-store.md
         - Telemetry: extraction/telemetry.md
       - Reference:
         - Generate Your NGC Keys: extraction/ngc-api-key.md

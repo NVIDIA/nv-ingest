@@ -16,6 +16,14 @@ The NeMo Retriever extraction 25.04 release focuses on small bug fixes and impro
 - New notebook for [How to reindex a collection]( https://github.com/NVIDIA/nv-ingest/blob/main/examples/reindex_example.ipynb).
 - Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
 
+### Breaking Changes
+
+There are no breaking changes in this version.
+
+### Upgrade
+
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
+
 
 
 ## Release 25.03
