@@ -38,15 +38,15 @@ class MockControlMessage:
 
 
 # Mocked function to be decorated
-def test_function(control_message):
+def mock_test_function(control_message):
     return "Test Function Executed"
 
 
 # Decorating the test function
-decorated_test_function = latency_logger()(test_function)
+decorated_test_function = latency_logger()(mock_test_function)
 
 # Decorating with custom name
-decorated_test_function_custom_name = latency_logger(name="CustomName")(test_function)
+decorated_test_function_custom_name = latency_logger(name="CustomName")(mock_test_function)
 
 
 @pytest.fixture
