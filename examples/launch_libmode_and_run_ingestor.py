@@ -50,7 +50,7 @@ def run_ingestor():
     )
 
     try:
-        results, _ = ingestor.ingest(show_progress=True, return_failures=True)
+        results, _ = ingestor.ingest(show_progress=False, return_failures=True)
         logger.info("Ingestion completed successfully.")
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")
@@ -71,7 +71,7 @@ def main():
     ingest_config = PipelineCreationSchema(**config_data)
 
     try:
-        _ = run_pipeline(ingest_config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
+        pipeline = run_pipeline(ingest_config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
         time.sleep(10)
         run_ingestor()
         # Run other code...
@@ -80,6 +80,7 @@ def main():
     except Exception as e:
         logger.error(f"Error running pipeline: {e}")
     finally:
+        pipeline.stop()
         logger.info("Shutting down pipeline...")
 
 
