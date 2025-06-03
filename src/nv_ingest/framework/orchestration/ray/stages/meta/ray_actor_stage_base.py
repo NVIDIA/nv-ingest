@@ -505,7 +505,7 @@ class RayActorStage(ABC):
         self._logger.info(f"{actor_id_str}: Starting actor...")
         # --- Initialize Actor State ---
         self._running = True
-        self._shutting_down = False  # Reset shutdown flag on start
+        self._shutting_down = False
         self._shutdown_signal_complete = False
         self.start_time = time.time()
 
