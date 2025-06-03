@@ -8,16 +8,13 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
 ## Release 25.06
 
-The NeMo Retriever extraction 25.06 release focuses TODO, including the following:
+The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and feature expansions, including the following:
 
-- TODO
-- TODO
-- Added MIG support. For details, see []().
-- Added time slicing support. For details, see []().
-- TODO
-- TODO
-- New notebook for []().
-- New notebook for []().
+- Improve reranker accuracy.
+- Helm deployment now has similar throughput performance to docker deployment.
+- Add MIG support. For details, see [Enable NVIDIA GPU MIG](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enable-nvidia-gpu-mig).
+- Add time slicing support. For details, see [Enable GPU time-slicing](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enabling-gpu-time-slicing).
+- New notebook for [How to add metadata to your documents and filter searches](https://github.com/nkmcalli/nv-ingest/blob/main/examples/metadata_and_filtered_search.ipynb).
 
 ### Breaking Changes
 

@@ -28,6 +28,7 @@ This includes the following:
 
 The following are the hardware requirements to run NeMo Retriever Extraction.
 
+
 | GPU Option                                    | H100        | A100        | A10G   | L40S   |
 |-----------------------------------------------|-------------|-------------|--------|--------|
 | Family                                        | SXM or PCIe | SXM or PCIe | —      | —      |
