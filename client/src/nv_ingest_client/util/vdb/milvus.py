@@ -975,8 +975,8 @@ def dense_retrieval(
         anns_field=dense_field,
         limit=top_k,
         output_fields=output_fields,
-        # filter=_filter,
-        # consistency_level=CONSISTENCY,
+        filter=_filter,
+        consistency_level=CONSISTENCY,
         search_params=search_params,
     )
     return results
