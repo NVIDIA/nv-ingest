@@ -36,7 +36,7 @@ _DEFAULT_EXTRACTOR_MAP = {
     "csv": "pandas",
     "docx": "python_docx",
     "excel": "openpyxl",
-    "html": "txt",
+    "html": "markitdown",
     "jpeg": "image",
     "jpg": "image",
     "parquet": "pandas",
@@ -74,10 +74,12 @@ _Type_Extract_Method_Audio = Literal["audio"]
 
 _Type_Extract_Method_Text = Literal["txt"]
 
+_Type_Extract_Method_Html = Literal["markitdown"]
+
 _Type_Extract_Method_Map = {
     "bmp": get_args(_Type_Extract_Method_Image),
     "docx": get_args(_Type_Extract_Method_DOCX),
-    "html": get_args(_Type_Extract_Method_Text),
+    "html": get_args(_Type_Extract_Method_Html),
     "jpeg": get_args(_Type_Extract_Method_Image),
     "jpg": get_args(_Type_Extract_Method_Image),
     "pdf": get_args(_Type_Extract_Method_PDF),
@@ -153,7 +155,7 @@ class ExtractTaskSchema(BaseModel):
         document_type = values.data.get("document_type", "").lower()  # Ensure case-insensitive comparison
 
         # Skip validation for text-like types, since they do not have 'extract' stages.
-        if document_type in ["txt", "text", "html", "json", "md", "sh"]:
+        if document_type in ["txt", "text", "json", "md", "sh"]:
             return
 
         valid_methods = set(_Type_Extract_Method_Map[document_type])
