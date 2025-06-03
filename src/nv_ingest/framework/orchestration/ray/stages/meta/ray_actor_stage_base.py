@@ -58,11 +58,12 @@ def external_monitor_actor_shutdown(actor_handle: "RayActorStage", poll_interval
             # Remotely call the actor's method
             if ray.get(actor_handle.is_shutdown_complete.remote()):
                 logger.debug(f"Actor {actor_id_to_monitor} reported shutdown complete.")
+                actor_handle.request_actor_exit.remote()
 
                 return True
         except ray.exceptions.RayActorError:
             # Actor has died or is otherwise unreachable.
-            # Consider this as shutdown complete for the purpose of the future.
+            # Consider this as a shutdown complete for the future.
             logger.warning(f"Actor {actor_id_to_monitor} became unreachable (RayActorError). Assuming shutdown.")
             return True
         except Exception as e:

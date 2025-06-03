@@ -287,24 +287,6 @@ class PipelineTopology:
             logger.info("[TopologyCleanup] Cleanup thread stopped and joined.")
         self._cleanup_thread = None  # Clear thread object
 
-    @staticmethod
-    def _delayed_actor_release(self, actor_handle_to_release: Any, actor_id_str: str, delay_seconds: int = 60):
-        """
-        Holds a reference to an actor handle for a specified delay, then releases it.
-        This function is intended to be run in a daemon thread.
-
-        Note: this is a bit of a hack
-        """
-        logger.debug(f"[DelayedRelease-{actor_id_str}] Thread started. Holding actor reference for {delay_seconds}s.")
-        # The actor_handle_to_release is kept in scope by being a parameter to this function,
-        # and this function's frame existing for delay_seconds.
-        time.sleep(delay_seconds)
-        logger.info(
-            f"[DelayedRelease-{actor_id_str}] Delay complete. Releasing reference. Actor should now be GC'd by Ray "
-            f"if this was the last ref."
-        )
-        # When this function exits, actor_handle_to_release goes out of scope, dropping the reference.
-
     def _cleanup_loop(self) -> None:
         """
         Background thread for periodically checking shutdown status of actors pending removal.
@@ -417,17 +399,6 @@ class PipelineTopology:
                                         f"'{actor_id_str_to_delay}' discarded from pending set."
                                     )
                                     try:
-                                        # This is a bit of a hack. For some reason Ray likes to cause exceptions on
-                                        # the actor when we let it auto GCS just after pushing to the output queue, and
-                                        # mysteriously lose control messages.
-                                        # This lets the shutdown future complete, but leaves the actor to be killed off
-                                        # by ray.actor_exit()
-                                        # delay_thread = threading.Thread(
-                                        #    target=self._delayed_actor_release,
-                                        #    args=(actor_handle_to_delay, actor_id_str_to_delay, 60),  # 60s delay
-                                        #    daemon=True,
-                                        # )
-                                        # delay_thread.start()
                                         logger.debug(
                                             f"[TopologyCleanupLoop-{stage_to_update}] Started delayed release thread "
                                             f"for '{actor_id_str_to_delay}'."
