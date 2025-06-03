@@ -18,6 +18,7 @@ services:
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=1024
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
