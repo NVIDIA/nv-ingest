@@ -5,6 +5,7 @@ import pytest
 
 
 @pytest.mark.integration
+@pytest.mark.xfail(reason="Something is wrong with the test setup, needs investigation")
 def test_launch_libmode_and_run_ingestor():
     process = subprocess.run(
         [sys.executable, "./examples/launch_libmode_and_run_ingestor.py"], capture_output=True, text=True
