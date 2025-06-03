@@ -5,6 +5,7 @@
 
 import base64
 import io
+import json
 import logging
 import warnings
 from math import log
@@ -20,11 +21,10 @@ import packaging
 import pandas as pd
 import torch
 import torchvision
-from PIL import Image
-
+import tritonclient.grpc as grpcclient
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
+from PIL import Image
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +64,6 @@ YOLOX_GRAPHIC_MIN_SCORE = 0.1
 YOLOX_GRAPHIC_FINAL_SCORE = 0.0
 YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
 
-# TODO(Devin): Legacy items aren't working right for me. Double check these.
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
 YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
 
@@ -121,6 +118,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         min_score: Optional[float] = None,
         final_score: Optional[float] = None,
         class_labels: Optional[List[str]] = None,
+        yolox_model_name: str = "yolox",
     ):
         """
         Initialize the YOLOX model interface.
@@ -136,6 +134,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         self.min_score = min_score
         self.final_score = final_score
         self.class_labels = class_labels
+        self.yolox_model_name = yolox_model_name
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -207,30 +206,62 @@ class YoloxModelInterfaceBase(ModelInterface):
             chunks = []
             i = 0
             while i < len(lst):
-                chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+                chunk_size = max(1, min(2 ** int(log(len(lst) - i, 2)), max_size))
                 chunks.append(lst[i : i + chunk_size])
                 i += chunk_size
             return chunks
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC Yolox model")
-            # Resize images for model input (Yolox expects 1024x1024).
-            resized_images = [
-                resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
-            ]
-            # Chunk the resized images, the original images, and their shapes.
-            resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
-            original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
-            shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
-            batched_inputs = []
-            formatted_batch_data = []
-            for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
-                # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
-                input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
-                batched_inputs.append(input_array)
-                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
-            return batched_inputs, formatted_batch_data
+            if self.yolox_model_name == "yolox_ensemble":
+                b64_images = []
+                for image in data["images"]:
+                    # Convert to uint8 if needed.
+                    if image.dtype != np.uint8:
+                        image = (image * 255).astype(np.uint8)
+                    # Convert the numpy array to a PIL Image.
+                    image_pil = Image.fromarray(image)
+                    original_size = image_pil.size
+
+                    # Save the image to a buffer and encode to base64.
+                    buffered = io.BytesIO()
+                    image_pil.save(buffered, format="PNG")
+                    b64_images.append(base64.b64encode(buffered.getvalue()).decode("utf-8"))
+
+                b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
+                original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+                shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
+
+                batched_inputs = []
+                formatted_batch_data = []
+                for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
+                    input_array = np.array(b64_chunk, dtype=np.object_)
+                    thresholds = np.array([self.conf_threshold, self.iou_threshold], dtype=np.float32)
+                    batched_inputs.append([input_array, thresholds])
+                    formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+
+                return batched_inputs, formatted_batch_data
+
+            else:
+                # Resize images for model input (Yolox expects 1024x1024).
+                resized_images = [
+                    resize_image(image, (self.image_preproc_width, self.image_preproc_height))
+                    for image in data["images"]
+                ]
+                # Chunk the resized images, the original images, and their shapes.
+                resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
+                original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+                shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
+
+                batched_inputs = []
+                formatted_batch_data = []
+                for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
+                    # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
+                    input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
+                    batched_inputs.append(input_array)
+                    formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+                return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
@@ -349,22 +380,31 @@ class YoloxModelInterfaceBase(ModelInterface):
             results = output
 
         elif protocol == "grpc":
-            # For grpc, apply the same NIM postprocessing.
-            pred = postprocess_model_prediction(
-                output,
-                self.num_classes,
-                self.conf_threshold,
-                self.iou_threshold,
-                class_agnostic=False,
-            )
-            results = postprocess_results(
-                pred,
-                original_image_shapes,
-                self.image_preproc_width,
-                self.image_preproc_height,
-                self.class_labels,
-                min_score=self.min_score,
-            )
+            if self.yolox_model_name == "yolox_ensemble":
+                results = []
+                for out in output:
+                    if isinstance(out, bytes):
+                        out = out.decode("utf-8")
+                    if isinstance(out, dict):
+                        continue
+                    results.append(json.loads(out))
+            else:
+                # For grpc, apply the same NIM postprocessing.
+                pred = postprocess_model_prediction(
+                    output,
+                    self.num_classes,
+                    self.conf_threshold,
+                    self.iou_threshold,
+                    class_agnostic=False,
+                )
+                results = postprocess_results(
+                    pred,
+                    original_image_shapes,
+                    self.image_preproc_width,
+                    self.image_preproc_height,
+                    self.class_labels,
+                    min_score=self.min_score,
+                )
 
         inference_results = self.postprocess_annotations(results, **kwargs)
 
@@ -401,18 +441,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_model_name: str = "nemoretriever-page-elements-v2"):
+    def __init__(self, yolox_model_name: str = "yolox"):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if yolox_model_name.endswith("-v1"):
-            num_classes = YOLOX_PAGE_V1_NUM_CLASSES
-            final_score = YOLOX_PAGE_V1_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V1_CLASS_LABELS
-        else:
-            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-            final_score = YOLOX_PAGE_V2_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+        num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+        final_score = YOLOX_PAGE_V2_FINAL_SCORE
+        class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
             image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -424,6 +459,7 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
             min_score=YOLOX_PAGE_MIN_SCORE,
             final_score=final_score,
             class_labels=class_labels,
+            yolox_model_name=yolox_model_name,
         )
 
     def name(
@@ -483,22 +519,13 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_version: Optional[str] = None):
+    def __init__(self, yolox_model_name: str = "yolox"):
         """
         Initialize the yolox-graphic-elements model interface.
         """
-        if yolox_version and (
-            packaging.version.Version(yolox_version) >= packaging.version.Version("1.2.0-rc5")  # gtc release
-        ):
-            image_preproc_width = YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-        else:
-            image_preproc_width = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-
         super().__init__(
-            image_preproc_width=image_preproc_width,
-            image_preproc_height=image_preproc_height,
+            image_preproc_width=YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH,
+            image_preproc_height=YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
             num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
@@ -506,6 +533,7 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
             min_score=YOLOX_GRAPHIC_MIN_SCORE,
             final_score=YOLOX_GRAPHIC_FINAL_SCORE,
             class_labels=YOLOX_GRAPHIC_CLASS_LABELS,
+            yolox_model_name=yolox_model_name,
         )
 
     def name(
@@ -551,7 +579,7 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self):
+    def __init__(self, yolox_model_name: str = "yolox"):
         """
         Initialize the yolox-graphic-elements model interface.
         """
@@ -565,6 +593,7 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             min_score=YOLOX_TABLE_MIN_SCORE,
             final_score=YOLOX_TABLE_FINAL_SCORE,
             class_labels=YOLOX_TABLE_CLASS_LABELS,
+            yolox_model_name=yolox_model_name,
         )
 
     def name(
@@ -1388,14 +1417,14 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def get_yolox_model_name(yolox_http_endpoint, default_model_name="nemoretriever-page-elements-v2"):
+def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
     try:
-        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
-        if not yolox_model_name:
-            logger.warning(
-                "Failed to obtain yolox-page-elements model name from the endpoint. "
-                f"Falling back to '{default_model_name}'."
-            )
+        client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
+        model_index = client.get_model_repository_index(as_json=True)
+        model_names = [x["name"] for x in model_index.get("models", [])]
+        if "yolox_ensemble" in model_names:
+            yolox_model_name = "yolox_ensemble"
+        else:
             yolox_model_name = default_model_name
     except Exception:
         logger.warning(

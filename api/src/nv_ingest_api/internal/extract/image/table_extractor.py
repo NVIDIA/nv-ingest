@@ -4,23 +4,24 @@
 
 import logging
 from concurrent.futures import ThreadPoolExecutor
-from typing import Any, Union
+from typing import Any
 from typing import Dict
 from typing import List
 from typing import Optional
 from typing import Tuple
+from typing import Union
 
 import numpy as np
 import pandas as pd
-
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
-from nv_ingest_api.internal.primitives.nim.model_interface.custom_ocr import CustomOCRModelInterface
-from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
-from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_custom_ocr_output
-from nv_ingest_api.util.image_processing.table_and_chart import convert_custom_ocr_response_to_psuedo_markdown
 from nv_ingest_api.internal.primitives.nim import NimClient
+from nv_ingest_api.internal.primitives.nim.model_interface.custom_ocr import CustomOCRModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxTableStructureModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import get_yolox_model_name
+from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
+from nv_ingest_api.util.image_processing.table_and_chart import convert_custom_ocr_response_to_psuedo_markdown
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_custom_ocr_output
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
 
@@ -80,8 +81,11 @@ def _run_inference(
             future_yolox = executor.submit(
                 yolox_client.infer,
                 data=data_yolox,
-                model_name="yolox",
+                model_name="yolox_ensemble",
                 stage_name="table_extraction",
+                input_names=["INPUT_IMAGES", "THRESHOLDS"],
+                dtypes=["BYTES", "FP32"],
+                output_names=["OUTPUT"],
                 max_batch_size=8,
                 trace_info=trace_info,
             )
@@ -204,7 +208,18 @@ def _create_clients(
     custom_ocr_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
-    yolox_model_interface = YoloxTableStructureModelInterface()
+
+    # Default model name for table/chart/infographics extraction
+    yolox_model_name = "yolox"
+    # Get the gRPC endpoint to determine the model name if needed
+    yolox_grpc_endpoint = yolox_endpoints[0]
+    if yolox_grpc_endpoint:
+        try:
+            yolox_model_name = get_yolox_model_name(yolox_grpc_endpoint, default_model_name=yolox_model_name)
+        except Exception as e:
+            logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
+
+    yolox_model_interface = YoloxTableStructureModelInterface(yolox_model_name=yolox_model_name)
     custom_ocr_model_interface = CustomOCRModelInterface()
 
     logger.debug(f"Inference protocols: yolox={yolox_protocol}, custom_ocr={custom_ocr_protocol}")
