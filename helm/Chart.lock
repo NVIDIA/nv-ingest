@@ -9,8 +9,11 @@ dependencies:
   repository: https://helm.ngc.nvidia.com/nim/nvidia
   version: 1.3.0
 - name: nim-vlm
-  repository: https://helm.ngc.nvidia.com/nvidia/nemo-microservices
-  version: 1.2.0-ea-v2
+  repository: https://helm.ngc.nvidia.com/nvstaging/nim
+  version: 1.2.1
+- name: nim-vlm
+  repository: https://helm.ngc.nvidia.com/nvstaging/nim
+  version: 1.2.1
 - name: nvidia-nim-paddleocr
   repository: https://helm.ngc.nvidia.com/nim/baidu
   version: 1.3.0
@@ -41,5 +44,5 @@ dependencies:
 - name: prometheus
   repository: https://prometheus-community.github.io/helm-charts
   version: 27.12.1
-digest: sha256:f80f9105499c939f6b366ac30274de605b6a80a7a542d11b2b211ae20df3e071
-generated: "2025-05-27T11:55:03.291982661-04:00"
+digest: sha256:1a627785745cf430f671242cbad75996dd4dd6ba824c1e6d7ab1b92b2eb8998d
+generated: "2025-06-04T16:57:56.27035758-04:00"
