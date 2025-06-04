@@ -38,6 +38,10 @@ class LoaderInterface(ABC):
     def split(self, input_path: str, output_dir: str, split_interval: int = 0):
         pass
 
+    @abstractmethod
+    def _get_path_metadata(self, path: str = None):
+        pass
+
 
 def _probe(filename="pipe:", cmd="ffprobe", format=None, file_handle=None, timeout=None, **kwargs):
     args = [cmd, "-show_format", "-show_streams", "-of", "json"]
@@ -63,10 +67,11 @@ class MediaInterface(LoaderInterface):
 
     def split(self, input_path: str, output_dir: str, split_interval: int = 0, split_type: SplitType = SplitType.SIZE):
         """
-        Split a video into smaller chunks of `split_interval` size.
-        input_path: str, path to the video file
+        Split a media file into smaller chunks of `split_interval` size.
+        input_path: str, path to the media file
         output_dir: str, path to the output directory
-        split_interval: int, size of the chunk in MB
+        split_interval: the size of the chunk to split the media file into depending on the split type
+        split_type: SplitType, type of split to perform, either size, time, or frame
         """
         import ffmpeg
         from upath import UPath as Path
@@ -118,6 +123,15 @@ class MediaInterface(LoaderInterface):
         split_interval: int,
         split_type: SplitType,
     ):
+        """
+        Find the number of splits for a media file based on the split type and interval.
+        file_size: int, size of the media file in bytes
+        bitrate: float, bitrate of the media file in bits per second
+        sample_rate: float, sample rate of the media file in samples per second
+        duration: float, duration of the media file in seconds
+        split_interval: int, size of the chunk to split the media file into depending on the split type
+        split_type: SplitType, type of split to perform, either size, time, or frame
+        """
         if split_type == SplitType.SIZE:
             return math.ceil(file_size / (split_interval * 1e6))
         elif split_type == SplitType.TIME:
@@ -129,6 +143,10 @@ class MediaInterface(LoaderInterface):
             raise ValueError(f"Invalid split type: {split_type}")
 
     def _get_path_metadata(self, path: str = None):
+        """
+        Get the metadata for a path.
+        path: str, path to get the metadata for if None, get the metadata for all paths
+        """
         if path:
             return self.path_metadata[path]
         else:
@@ -145,7 +163,17 @@ def process_data(
     split_interval: int = 450,
     files_completed: list[str] = None,
 ):
-
+    """
+    Process the data from the paths and push it to the queue.
+    queue: queue.Queue, queue to push the data to
+    interface: LoaderInterface, interface to use to split the data
+    paths: list[str], list of paths to process
+    output_dir: str, directory to output the split data to
+    thread_stop: threading.Event, event to stop the thread
+    split_type: SplitType, type of split to perform
+    split_interval: int, size of the chunk to split the media file into depending on the split type
+    files_completed: list[str], list of files that have been completed
+    """
     for path in paths:
         if thread_stop:
             return
@@ -167,6 +195,16 @@ def process_data(
 
 
 class DataLoader:
+    """
+    DataLoader is a class that is used to load data from a list of paths and push it to a queue.
+    paths: list[str], list of paths to process
+    output_dir: str, directory to output the split data to
+    split_type: SplitType, type of split to perform
+    split_interval: int, size of the chunk to split the media file into depending on the split type
+    interface: LoaderInterface, interface to use to split the data
+    size: int, size of the queue
+    """
+
     def __init__(
         self,
         paths: list[str],
@@ -194,6 +232,9 @@ class DataLoader:
             return payload
 
     def stop(self):
+        """
+        Reset itertor by stopping the thread and clearing the queue.
+        """
         if self.thread:
             self.thread_stop = True
             self.thread.join()
@@ -229,7 +270,11 @@ class DataLoader:
     def __exit__(self, exc_type, exc_value, traceback):
         self.stop()
 
-    def get_metadata(self, path: str):
+    def get_metadata(self, path: str = None):
+        """
+        Get the metadata for a path.
+        path: str, path to get the metadata for if None, get the metadata for all paths
+        """
         if path:
             return self.interface._get_path_metadata(path)
         else:
