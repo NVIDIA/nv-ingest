@@ -5,6 +5,7 @@
 import logging
 from typing import Callable, Optional, Union, Dict, List, Type, Generator
 
+import ray
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
@@ -46,6 +47,7 @@ def wrap_callable_as_stage(
     """
     trace_name = trace_id or fn.__name__
 
+    @ray.remote
     class LambdaStage(RayActorStage):
         def __init__(self, config: Union[Dict, BaseModel]) -> None:
             validated_config = schema_type(**config) if not isinstance(config, schema_type) else config

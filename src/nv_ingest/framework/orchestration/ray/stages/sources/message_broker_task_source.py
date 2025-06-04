@@ -328,7 +328,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self._active_processing = True
 
                 self._logger.debug("Control message received; processing data")
-                updated_cm = self.on_data(control_message)
 
                 # Block until not paused using the pause event.
                 if self.output_queue is not None:
@@ -341,7 +340,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
                     while True:
                         try:
-                            self.output_queue.put(updated_cm)
+                            self.output_queue.put(control_message)
                             self.stats["successful_queue_writes"] += 1
                             break
                         except Exception:
