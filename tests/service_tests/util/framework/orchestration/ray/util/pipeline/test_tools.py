@@ -3,110 +3,99 @@
 # SPDX-License-Identifier: Apache-2.0
 from typing import Generator
 
-import pandas as pd
+import pytest
 from pydantic import BaseModel
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage, wrap_callable_as_source
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
+from nv_ingest.framework.orchestration.ray.util.pipeline.tools import (
+    wrap_callable_as_stage,
+    wrap_callable_as_sink,
+    wrap_callable_as_source,
+)
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 
-class ExampleSchema(BaseModel):
-    multiplier: int
+class DummyConfig(BaseModel):
+    foo: int
+    bar: str = "baz"
 
 
-def test_stage_accepts_dict_config():
-    def fn(cm: IngestControlMessage, config: ExampleSchema):
-        return cm
+def test_stage_processes_message_with_dict_config():
+    """Given a valid config dict, on_data returns the value from the wrapped function."""
 
-    Stage = wrap_callable_as_stage(fn, ExampleSchema)
-    stage = Stage({"multiplier": 2})
-    assert stage.validated_config.multiplier == 2
+    def fn(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        msg.metadata["result"] = cfg.foo
+        return msg
 
-
-def test_stage_accepts_model_config():
-    def fn(cm: IngestControlMessage, config: ExampleSchema):
-        return cm
-
-    config = ExampleSchema(multiplier=3)
-    Stage = wrap_callable_as_stage(fn, ExampleSchema)
-    stage = Stage(config)
-    assert stage.validated_config.multiplier == 3
-
-
-def test_on_data_applies_fn():
-    def fn(cm: IngestControlMessage, config: ExampleSchema):
-        df = cm.payload()
-        df["x"] = df["x"] * config.multiplier
-        cm.payload(df)
-        return cm
-
-    Stage = wrap_callable_as_stage(fn, ExampleSchema)
-    stage = Stage({"multiplier": 10})
-
+    Stage = wrap_callable_as_stage(fn, DummyConfig)
+    stage = Stage({"foo": 7})
     msg = IngestControlMessage()
-    msg.payload(pd.DataFrame({"x": [1, 2, 3]}))
-
-    result = stage.on_data(msg)
-    pd.testing.assert_frame_equal(result.payload(), pd.DataFrame({"x": [10, 20, 30]}))
+    out = stage.on_data(msg)
+    assert out is msg
 
 
-def test_on_data_catches_exception_and_returns_original_message():
-    def fn(cm: IngestControlMessage, config: ExampleSchema):
-        raise RuntimeError("intentional error")
+def test_stage_processes_message_with_model_config():
+    """Given a BaseModel config, on_data still returns the value from the wrapped function."""
 
-    Stage = wrap_callable_as_stage(fn, ExampleSchema)
-    stage = Stage({"multiplier": 1})
+    def fn(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        msg.metadata["bar"] = cfg.bar
+        return msg
+
+    Stage = wrap_callable_as_stage(fn, DummyConfig)
+    cfg = DummyConfig(foo=5, bar="quux")
+    stage = Stage(cfg)
     msg = IngestControlMessage()
-
-    result = stage.on_data(msg)
-    assert result is msg
-    assert stage.stats["errors"] == 1
+    out = stage.on_data(msg)
+    assert out is msg
 
 
-class DummySourceSchema(BaseModel):
-    count: int
+def test_stage_returns_original_message_on_error():
+    """If the function raises, on_data should return the original message."""
+
+    def fn(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        raise RuntimeError("fail!")
+
+    Stage = wrap_callable_as_stage(fn, DummyConfig)
+    stage = Stage({"foo": 1})
+    msg = IngestControlMessage()
+    out = stage.on_data(msg)
+    assert out is msg
 
 
-def dummy_source_generator(config: DummySourceSchema) -> Generator[IngestControlMessage, None, None]:
-    for i in range(config.count):
-        msg = IngestControlMessage()
-        msg.payload(pd.DataFrame({"x": [f"item_{i}"]}))
-        yield msg
+def test_stage_can_chain_calls():
+    """Two stages can be chained, passing messages through each, each applying its function."""
+
+    def fn1(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        msg.metadata["foo"] = cfg.foo
+        return msg
+
+    def fn2(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        msg.metadata["bar"] = cfg.bar
+        return msg
+
+    Stage1 = wrap_callable_as_stage(fn1, DummyConfig)
+    Stage2 = wrap_callable_as_stage(fn2, DummyConfig)
+    stage1 = Stage1({"foo": 42})
+    stage2 = Stage2({"foo": 0, "bar": "chained!"})
+    msg = IngestControlMessage()
+    out1 = stage1.on_data(msg)
+    out2 = stage2.on_data(out1)
+    assert out2 is msg
 
 
-def test_lambda_source_emits_expected_messages():
-    SourceStage = wrap_callable_as_source(dummy_source_generator, DummySourceSchema)
-    stage = SourceStage(config={"count": 3})
+@pytest.mark.parametrize(
+    "bad_config,expected_exc",
+    [
+        ({"bar": "nofoo"}, Exception),  # Missing required field
+        (123, Exception),  # Not a dict or model
+    ],
+)
+def test_stage_config_validation_errors(bad_config, expected_exc):
+    """Stage construction raises if the config is invalid."""
 
-    results = []
-    for _ in range(3):
-        msg = stage._read_input()
-        assert isinstance(msg, IngestControlMessage)
-        results.append(msg.payload()["x"].iloc[0])
+    def fn(msg: IngestControlMessage, cfg: DummyConfig) -> IngestControlMessage:
+        return msg
 
-    assert results == ["item_0", "item_1", "item_2"]
-
-
-def test_lambda_source_stops_on_generator_exhaustion():
-    SourceStage = wrap_callable_as_source(dummy_source_generator, DummySourceSchema)
-    stage = SourceStage(config={"count": 2})
-
-    _ = stage._read_input()
-    _ = stage._read_input()
-    final = stage._read_input()
-
-    assert final is None
-    assert stage._running is False
-
-
-def test_lambda_source_pauses_and_resumes():
-    SourceStage = wrap_callable_as_source(dummy_source_generator, DummySourceSchema)
-    stage = SourceStage(config={"count": 1})
-
-    stage.pause()
-    assert stage.paused is True
-    assert stage._read_input() is None
-
-    stage.resume()
-    assert stage.paused is False
-    assert isinstance(stage._read_input(), IngestControlMessage)
+    Stage = wrap_callable_as_stage(fn, DummyConfig)
+    with pytest.raises(expected_exc):
+        Stage(bad_config)

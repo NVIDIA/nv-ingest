@@ -47,7 +47,7 @@ class PipelineInterface(ABC):
         Parameters
         ----------
         monitor_poll_interval : float
-            Interval in seconds for monitoring poll (default: 5.0).
+            Interval in seconds for the monitoring poll (default: 5.0).
         scaling_poll_interval : float
             Interval in seconds for scaling decisions (default: 30.0).
         """
