@@ -22,27 +22,27 @@ dependencies = [
     "charset-normalizer>=3.4.1",
     "click>=8.1.8",
     "fsspec>=2025.2.0",
-    "httpx==0.27.2",
+    "httpx>=0.28.1",
     "langchain-nvidia-ai-endpoints>=0.3.7",
     "llama-index-embeddings-nvidia==0.1.5",
-    "openai~=1.68.1",
+    "openai~=1.82.0",
     "pyarrow>=19.0.0",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "pypdfium2>=4.30.1",
     "python-docx>=1.1.2",
     "python-magic>=0.4.27",
-    "python-pptx==0.6.23",
+    "python-pptx>=1.0.2",
     "requests>=2.28.2",
-    "setuptools>=58.2.0",
+    "setuptools>=78.1.1",
     "tqdm>=4.67.1",
 ]
 
 [project.optional-dependencies]
 milvus = [
-    "pymilvus==2.5.8",
+    "pymilvus==2.5.10",
     "pymilvus[bulk_writer,model]",
-    "langchain-milvus==0.1.7",
+    "langchain-milvus>=0.1.10",
 ]
 minio = [
     "minio>=7.2.15",

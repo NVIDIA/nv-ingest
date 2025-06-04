@@ -7,20 +7,19 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 ## Prerequisites
 
-### Hardware/Software
+Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-[Refer to our supported hardware/software configurations here](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-## Setup Environment
+## Initial Environment Setup
 
-- First create your namespace
+1. Create your namespace by running the following code.
 
 ```bash
 NAMESPACE=nv-ingest
 kubectl create namespace ${NAMESPACE}
 ```
 
-- Install the Helm repos
+2. Add the Helm repos by running the following code.
 
 ```bash
 # NVIDIA nemo-microservices NGC repository
@@ -33,7 +32,9 @@ helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oau
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
 ```
 
-- Install the chart
+## Install or Upgrade the Helm Chart
+
+To install or upgrade the Helm chart, run the following code.
 
 ```bash
 helm upgrade \
@@ -289,6 +290,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | alias:nvidia-nim | text-embedding-nim(nvidia-nim-nv-embedqa-e5-v5) | 1.6.0 |
 | alias:nvidia-nim | riva-nim | 1.0.0 |
 | https://open-telemetry.github.io/opentelemetry-helm-charts | opentelemetry-collector | 0.78.1 |
+| https://prometheus-community.github.io/helm-charts | prometheus | 27.12.1 |
 | https://zilliztech.github.io/milvus-helm | milvus | 4.1.11 |
 | https://zipkin.io/zipkin-helm | zipkin | 0.1.2 |
 | oci://registry-1.docker.io/bitnamicharts | redis | 19.1.3 |
@@ -304,15 +306,19 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | autoscaling.minReplicas | int | `1` |  |
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
+| envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
 | envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
 | envVars.EMBEDDING_NIM_MODEL_NAME | string | `"nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
+| envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
+| envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
 | envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
+| envVars.MESSAGE_CLIENT_TYPE | string | `"redis"` |  |
 | envVars.MILVUS_ENDPOINT | string | `"http://nv-ingest-milvus:19530"` |  |
 | envVars.MINIO_BUCKET | string | `"nv-ingest"` |  |
 | envVars.MINIO_INTERNAL_ADDRESS | string | `"nv-ingest-minio:9000"` |  |
@@ -320,6 +326,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.MODEL_PREDOWNLOAD_PATH | string | `"/workspace/models/"` |  |
 | envVars.NEMORETRIEVER_PARSE_HTTP_ENDPOINT | string | `"http://nim-vlm-text-extraction-nemoretriever-parse:8000/v1/chat/completions"` |  |
 | envVars.NEMORETRIEVER_PARSE_INFER_PROTOCOL | string | `"http"` |  |
+| envVars.NEMORETRIEVER_PARSE_MODEL_NAME | string | `"nvidia/nemoretriever-parse"` |  |
 | envVars.NV_INGEST_DEFAULT_TIMEOUT_MS | string | `"1234"` |  |
 | envVars.NV_INGEST_MAX_UTIL | int | `48` |  |
 | envVars.PADDLE_GRPC_ENDPOINT | string | `"nv-ingest-paddle:8001"` |  |
@@ -344,7 +351,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | fullnameOverride | string | `""` |  |
 | image.pullPolicy | string | `"IfNotPresent"` |  |
 | image.repository | string | `"nvcr.io/nvidia/nemo-microservices/nv-ingest"` |  |
-| image.tag | string | `"25.3.0"` |  |
+| image.tag | string | `"25.6.0"` |  |
 | imagePullSecrets[0].name | string | `"ngc-api"` |  |
 | imagePullSecrets[1].name | string | `"ngc-secret"` |  |
 | ingress.annotations | object | `{}` |  |
@@ -374,7 +381,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | llama-32-nv-rerankqa-1b-v2.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
 | llama-32-nv-rerankqa-1b-v2.env[1].value | string | `"1"` |  |
 | llama-32-nv-rerankqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-rerankqa-1b-v2"` |  |
-| llama-32-nv-rerankqa-1b-v2.image.tag | string | `"1.3.1"` |  |
+| llama-32-nv-rerankqa-1b-v2.image.tag | string | `"1.5.0"` |  |
 | llama-32-nv-rerankqa-1b-v2.nim.grpcPort | int | `8001` |  |
 | llama-32-nv-rerankqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
 | llama-32-nv-rerankqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -421,7 +428,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-graphic-elements-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
 | nemoretriever-graphic-elements-v1.env[1].value | string | `"1"` |  |
 | nemoretriever-graphic-elements-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1"` |  |
-| nemoretriever-graphic-elements-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-graphic-elements-v1.image.tag | string | `"1.3.0"` |  |
 | nemoretriever-graphic-elements-v1.nim.grpcPort | int | `8001` |  |
 | nemoretriever-graphic-elements-v1.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-graphic-elements-v1.podSecurityContext.fsGroup | int | `1000` |  |
@@ -447,7 +454,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-page-elements-v2.env[1].value | string | `"1"` |  |
 | nemoretriever-page-elements-v2.image.pullPolicy | string | `"IfNotPresent"` |  |
 | nemoretriever-page-elements-v2.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-page-elements-v2"` |  |
-| nemoretriever-page-elements-v2.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-page-elements-v2.image.tag | string | `"1.3.0"` |  |
 | nemoretriever-page-elements-v2.nim.grpcPort | int | `8001` |  |
 | nemoretriever-page-elements-v2.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-page-elements-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -474,7 +481,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nemoretriever-table-structure-v1.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
 | nemoretriever-table-structure-v1.env[1].value | string | `"1"` |  |
 | nemoretriever-table-structure-v1.image.repository | string | `"nvcr.io/nim/nvidia/nemoretriever-table-structure-v1"` |  |
-| nemoretriever-table-structure-v1.image.tag | string | `"1.2.0"` |  |
+| nemoretriever-table-structure-v1.image.tag | string | `"1.3.0"` |  |
 | nemoretriever-table-structure-v1.nim.grpcPort | int | `8001` |  |
 | nemoretriever-table-structure-v1.nim.logLevel | string | `"INFO"` |  |
 | nemoretriever-table-structure-v1.podSecurityContext.fsGroup | int | `1000` |  |
@@ -505,7 +512,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nim-vlm-image-captioning.env[1].value | string | `"1"` |  |
 | nim-vlm-image-captioning.fullnameOverride | string | `"nim-vlm-image-captioning"` |  |
 | nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"` |  |
-| nim-vlm-image-captioning.image.tag | string | `"latest"` |  |
+| nim-vlm-image-captioning.image.tag | string | `"1.1.1"` |  |
 | nim-vlm-image-captioning.nim.grpcPort | int | `8001` |  |
 | nim-vlm-image-captioning.nim.logLevel | string | `"INFO"` |  |
 | nim-vlm-image-captioning.podSecurityContext.fsGroup | int | `1000` |  |
@@ -552,7 +559,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.env[1].value | string | `"1"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.2-nv-embedqa-1b-v2"` |  |
-| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag | string | `"1.5.0"` |  |
+| nvidia-nim-llama-32-nv-embedqa-1b-v2.image.tag | string | `"1.6.0"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.grpcPort | int | `8001` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.nim.logLevel | string | `"INFO"` |  |
 | nvidia-nim-llama-32-nv-embedqa-1b-v2.podSecurityContext.fsGroup | int | `1000` |  |
@@ -621,7 +628,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | paddleocr-nim.env[1].value | string | `"1"` |  |
 | paddleocr-nim.fullnameOverride | string | `"nv-ingest-paddle"` |  |
 | paddleocr-nim.image.repository | string | `"nvcr.io/nim/baidu/paddleocr"` |  |
-| paddleocr-nim.image.tag | string | `"1.2.0"` |  |
+| paddleocr-nim.image.tag | string | `"1.3.0"` |  |
 | paddleocr-nim.nim.grpcPort | int | `8001` |  |
 | paddleocr-nim.nim.logLevel | string | `"INFO"` |  |
 | paddleocr-nim.podSecurityContext.fsGroup | int | `1000` |  |
@@ -639,6 +646,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | podAnnotations."traffic.sidecar.istio.io/excludeOutboundPorts" | string | `"8007"` |  |
 | podLabels | object | `{}` |  |
 | podSecurityContext.fsGroup | int | `1000` |  |
+| prometheus.alertmanager.enabled | bool | `false` |  |
+| prometheus.enabled | bool | `false` |  |
+| prometheus.server.enabled | bool | `false` |  |
 | readinessProbe.enabled | bool | `false` |  |
 | readinessProbe.failureThreshold | int | `220` |  |
 | readinessProbe.httpGet.path | string | `"/v1/health/ready"` |  |
@@ -711,7 +721,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.env[1].value | string | `"1"` |  |
 | text-embedding-nim.fullnameOverride | string | `"nv-ingest-embedqa"` |  |
 | text-embedding-nim.image.repository | string | `"nvcr.io/nim/nvidia/nv-embedqa-e5-v5"` |  |
-| text-embedding-nim.image.tag | string | `"1.5.0"` |  |
+| text-embedding-nim.image.tag | string | `"1.6.0"` |  |
 | text-embedding-nim.nim.grpcPort | int | `8001` |  |
 | text-embedding-nim.nim.logLevel | string | `"INFO"` |  |
 | text-embedding-nim.podSecurityContext.fsGroup | int | `1000` |  |
@@ -728,4 +738,9 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | text-embedding-nim.statefuleSet.enabled | bool | `false` |  |
 | tmpDirSize | string | `"50Gi"` |  |
 | tolerations | list | `[]` |  |
+| zipkin.resources.limits.cpu | string | `"500m"` |  |
+| zipkin.resources.limits.memory | string | `"4.5Gi"` |  |
+| zipkin.resources.requests.cpu | string | `"100m"` |  |
+| zipkin.resources.requests.memory | string | `"2.5Gi"` |  |
+| zipkin.zipkin.extraEnv.JAVA_OPTS | string | `"-Xms2g -Xmx4g -XX:+ExitOnOutOfMemoryError"` |  |
 | zipkinDeployed | bool | `true` |  |

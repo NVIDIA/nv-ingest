@@ -74,9 +74,26 @@ class PipelineTopology:
         self._start_cleanup_thread()  # Start background cleanup on init
 
     def __del__(self):
-        """Ensure cleanup thread is stopped when topology object is destroyed."""
-        logger.debug("PipelineTopology destructor called, ensuring cleanup thread is stopped.")
-        self._stop_cleanup_thread()
+        """Ensure cleanup thread is stopped and internal actor references are released."""
+        logger.debug("PipelineTopology destructor called. Cleaning up thread and actor references.")
+
+        # Stop the background cleanup thread
+        try:
+            self._stop_cleanup_thread()
+        except Exception as e:
+            logger.warning(f"Error stopping cleanup thread during __del__: {e}")
+
+        # Clear references to actor handles and shutdown futures
+        try:
+            self._stage_actors.clear()
+            self._edge_queues.clear()
+            self._scaling_state.clear()
+            self._stage_memory_overhead.clear()
+            self._pending_removal_actors.clear()
+            self._stages.clear()
+            self._connections.clear()
+        except Exception as e:
+            logger.warning(f"Error clearing internal state during __del__: {e}")
 
     # --- Lock Context Manager ---
     @contextlib.contextmanager
@@ -538,7 +555,7 @@ class PipelineTopology:
             return None
 
     def get_connections(self) -> Dict[str, List[Tuple[str, int]]]:
-        """Returns a shallow copy of the connections dictionary."""
+        """Returns a shallow copy of the connection dictionary."""
         with self._lock:
             # Shallow copy is usually sufficient here as tuples are immutable
             return self._connections.copy()
@@ -554,7 +571,7 @@ class PipelineTopology:
             return len(self._stage_actors.get(stage_name, []))
 
     def get_edge_queues(self) -> Dict[str, Tuple[Any, int]]:
-        """Returns a shallow copy of the edge queues dictionary."""
+        """Returns a shallow copy of the edge queues' dictionary."""
         with self._lock:
             return self._edge_queues.copy()
 
