@@ -76,21 +76,24 @@ def _run_chart_inference(
     data_paddle = {"base64_images": valid_images}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
+        extra_params_yolox = {"force_max_batch_size": True}
         future_yolox = executor.submit(
             yolox_client.infer,
             data=data_yolox,
             model_name="yolox",
             stage_name="chart_extraction",
-            max_batch_size=8,
+            max_batch_size=32,
             trace_info=trace_info,
+            **extra_params_yolox if yolox_client.protocol == "http" else {},
         )
         future_paddle = executor.submit(
             paddle_client.infer,
             data=data_paddle,
             model_name="paddle",
             stage_name="chart_extraction",
-            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
+            max_batch_size=1 if yolox_client.protocol == "http" else 1,  # Paddle is just batch size 1
             trace_info=trace_info,
+            **extra_params_yolox if yolox_client.protocol == "http" else {},
         )
 
         try:

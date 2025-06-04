@@ -184,7 +184,7 @@ class NimClient:
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
-            max_pool_workers = kwargs.pop("max_pool_workers", 16)
+            max_pool_workers = kwargs.pop("max_pool_workers", 1)
 
             # 4. Process each batch concurrently using a thread pool.
             #    We enumerate the batches so that we can later reassemble results in order.
