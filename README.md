@@ -92,8 +92,8 @@ Create a fresh Conda environment to install nv-ingest and dependencies.
 ```shell
 conda create -y --name nvingest python=3.12 && \
     conda activate nvingest && \
-    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.4.2 nv_ingest_client=25.4.2 nv_ingest_api=25.4.2 && \
-    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient markitdown
+    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.6.0 nv_ingest_client=25.6.0 nv_ingest_api=25.6.0 && \
+    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client markitdown
 ```
 
 Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
@@ -126,10 +126,9 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 ```python
 import logging, os, time, sys
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
-    PipelineCreationSchema,
-    start_pipeline_subprocess_morpheus
-)
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -137,9 +136,9 @@ from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 # Start the pipeline subprocess for library mode                       
 config = PipelineCreationSchema()
 
-pipeline_process = start_pipeline_subprocess_morpheus(config)
 # you can configure the subprocesses to log stderr to stdout for debugging purposes
-# pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
+# run_pipeline(config, disable_dynamic_scaling=True, run_in_subprocess=True, stderr=sys.stderr, stdout=sys.stdout)
+run_pipeline(config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
