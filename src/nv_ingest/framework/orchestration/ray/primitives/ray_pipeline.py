@@ -2,8 +2,6 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import importlib
-
 import multiprocessing
 import os
 import signal
@@ -28,6 +26,8 @@ from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import P
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
+from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
+from nv_ingest_api.util.imports.resolve_callable import resolve_callable_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -97,17 +97,6 @@ class StatsConfig:
     collection_interval_seconds: float = 10.0
     actor_timeout_seconds: float = 5.0
     queue_timeout_seconds: float = 2.0
-
-
-def _resolve_callable_from_path(path: str):
-    """
-    Given a module path string like 'my.module:my_func', import and return the callable.
-    """
-    if ":" not in path:
-        raise ValueError(f"Invalid stage path '{path}': expected 'module.sub:callable'")
-    module_path, attr = path.split(":", 1)
-    mod = importlib.import_module(module_path)
-    return getattr(mod, attr)
 
 
 class RayPipelineSubprocessInterface(PipelineInterface):
@@ -459,7 +448,9 @@ class RayPipeline(PipelineInterface):
 
         # Support module path (e.g., "mypkg.mymodule:my_lambda")
         if isinstance(stage_actor, str):
-            resolved_actor = _resolve_callable_from_path(stage_actor)
+            resolved_actor = resolve_callable_from_path(
+                path=stage_actor, signature_schema=ingest_stage_callable_signature
+            )
 
         # Wrap callables
         if isinstance(resolved_actor, FunctionType):
