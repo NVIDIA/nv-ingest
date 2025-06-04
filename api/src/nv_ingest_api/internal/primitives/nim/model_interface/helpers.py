@@ -16,7 +16,7 @@ from nv_ingest_api.util.string_processing import generate_url, remove_url_endpoi
 logger = logging.getLogger(__name__)
 
 
-def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
+def preprocess_image_for_ocr(array: np.ndarray, image_max_dimension: int = 960, normalize: bool = True) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -55,7 +55,10 @@ def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 96
     new_width = int(width * scale_factor)
     resized = cv2.resize(array, (new_width, new_height))
 
-    normalized = normalize_image(resized)
+    if normalize is True:
+        normalized = normalize_image(resized)
+    else:
+        normalized = resized / 255.0
 
     # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
     new_height = (normalized.shape[0] + 31) // 32 * 32

@@ -172,7 +172,7 @@ if __name__ == "__main__":
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
     )
-    paddle_grpc, paddle_http, paddle_auth, paddle_protocol = get_nim_service("paddle")
+    ocr_grpc, ocr_http, ocr_auth, ocr_protocol = get_nim_service("ocr")
 
     model_name = os.environ.get("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
     pdf_extractor_config = {
@@ -201,8 +201,8 @@ if __name__ == "__main__":
         "endpoint_config": {
             "yolox_endpoints": (yolox_graphic_elements_grpc, yolox_graphic_elements_http),
             "yolox_infer_protocol": yolox_graphic_elements_protocol,
-            "paddle_endpoints": (paddle_grpc, paddle_http),
-            "paddle_infer_protocol": paddle_protocol,
+            "ocr_endpoints": (ocr_grpc, ocr_http),
+            "ocr_infer_protocol": ocr_protocol,
             "auth_token": yolox_auth,
         }
     }
@@ -210,8 +210,8 @@ if __name__ == "__main__":
         "endpoint_config": {
             "yolox_endpoints": (yolox_table_structure_grpc, yolox_table_structure_http),
             "yolox_infer_protocol": yolox_table_structure_protocol,
-            "paddle_endpoints": (paddle_grpc, paddle_http),
-            "paddle_infer_protocol": paddle_protocol,
+            "ocr_endpoints": (ocr_grpc, ocr_http),
+            "ocr_infer_protocol": ocr_protocol,
             "auth_token": yolox_auth,
         }
     }
