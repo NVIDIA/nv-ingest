@@ -100,12 +100,17 @@ def _extract_page_elements_using_image_ensemble(
         data = {"images": original_images}
 
         # Perform inference using the NimClient.
+        extra_params = {
+            "force_max_batch_size": True,
+        }
+
         inference_results = yolox_client.infer(
             data,
             model_name="yolox",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
             trace_info=execution_trace_log,
             stage_name="pdf_extraction",
+            **extra_params if yolox_client.protocol == "http" else {},
         )
 
         # Process results: iterate over each image's inference output.
