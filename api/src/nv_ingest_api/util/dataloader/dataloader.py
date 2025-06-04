@@ -13,6 +13,7 @@ import json
 import logging
 import math
 import importlib
+from enum import Enum
 
 logger = logging.getLogger(__name__)
 
@@ -23,6 +24,12 @@ if importlib.util.find_spec("ffmpeg") is None:
     )
 else:
     import ffmpeg
+
+
+class SplitType(Enum):
+    FRAME = "frame"
+    TIME = "time"
+    SIZE = "size"
 
 
 class LoaderInterface(ABC):
@@ -51,7 +58,10 @@ def _probe(filename="pipe:", cmd="ffprobe", format=None, file_handle=None, timeo
 
 class MediaInterface(LoaderInterface):
 
-    def split(self, input_path: str, output_dir: str, split_interval: int = 0):
+    def __init__(self):
+        self.path_metadata = {}
+
+    def split(self, input_path: str, output_dir: str, split_interval: int = 0, split_type: SplitType = SplitType.SIZE):
         """
         Split a video into smaller chunks of `split_interval` size.
         input_path: str, path to the video file
@@ -69,12 +79,20 @@ class MediaInterface(LoaderInterface):
         output_pattern = output_dir / f"{file_name}_chunk_%04d{suffix}"
         num_splits = 0
         try:
-            with fsspec.open(input_path, "rb", encoding="utf-8") as f_in:
+            with fsspec.open(input_path, "rb") as f_in:
                 probe = _probe("pipe:", format=suffix, file_handle=f_in.read())
                 bitrate = float(probe["format"]["bit_rate"])
+                sample_rate = float(probe["streams"][0]["sample_rate"])
                 file_size = path_file.stat().st_size
                 duration = (file_size * 8) / bitrate
-                num_splits = math.ceil(file_size / (split_interval * 1e6))
+                num_splits = self.find_num_splits(file_size, bitrate, sample_rate, duration, split_interval, split_type)
+                self.path_metadata[input_path] = {
+                    "bitrate": bitrate,
+                    "sample_rate": sample_rate,
+                    "file_size": file_size,
+                    "duration": duration,
+                    "num_channels": probe["streams"][0]["channels"],
+                }
                 segment_time = math.ceil(duration / num_splits)
                 f_in.seek(0)
                 (
@@ -86,8 +104,35 @@ class MediaInterface(LoaderInterface):
                 )
         except ffmpeg.Error as e:
             logging.error(f"FFmpeg error for file {input_path}: {e.stderr.decode()}")
+        except ValueError as e:
+            logging.error(f"Error finding number of splits for file {input_path}: {e}")
         files = [str(output_dir / f"{file_name}_chunk_{i:04d}{suffix}") for i in range(int(num_splits))]
         return files
+
+    def find_num_splits(
+        self,
+        file_size: int,
+        bitrate: float,
+        sample_rate: float,
+        duration: float,
+        split_interval: int,
+        split_type: SplitType,
+    ):
+        if split_type == SplitType.SIZE:
+            return math.ceil(file_size / (split_interval * 1e6))
+        elif split_type == SplitType.TIME:
+            return math.ceil(duration / split_interval)
+        elif split_type == SplitType.FRAME:
+            seconds_cap = split_interval / sample_rate
+            return math.ceil(duration / seconds_cap)
+        else:
+            raise ValueError(f"Invalid split type: {split_type}")
+
+    def _get_path_metadata(self, path: str = None):
+        if path:
+            return self.path_metadata[path]
+        else:
+            return self.path_metadata
 
 
 def process_data(
@@ -96,27 +141,29 @@ def process_data(
     paths: list[str],
     output_dir: str,
     thread_stop: threading.Event,
+    split_type: SplitType = SplitType.SIZE,
     split_interval: int = 450,
     files_completed: list[str] = None,
 ):
+
     for path in paths:
         if thread_stop:
             return
-        # check for file size greater than 450MB
-        files = []
-        if path.stat().st_size > (split_interval * 1e6):
-            files = interface.split(path, output_dir, split_interval)
-        # either path or files need to be read and pushed to queue
-        else:
-            files = [path]
-        for file in files:
-            if thread_stop:
-                return
-            with open(file, "rb") as f:
-                queue.put(f.read())
-        files_completed.extend(files)
+        try:
+            # check for file size greater than 450MB
+            files = []
+            files = interface.split(path, output_dir, split_interval, split_type)
+            # either path or files need to be read and pushed to queue
+            for file in files:
+                if thread_stop:
+                    return
+                with open(file, "rb") as f:
+                    queue.put(f.read())
+                files_completed.extend(files)
+        except Exception as e:
+            logging.error(f"Error processing file {path}: {e}")
+            queue.put(RuntimeError(f"Error processing file {path}: {e}"))
     queue.put(StopIteration)
-    return files_completed
 
 
 class DataLoader:
@@ -124,6 +171,7 @@ class DataLoader:
         self,
         paths: list[str],
         output_dir: str,
+        split_type: SplitType = SplitType.SIZE,
         split_interval: int = 450,
         interface: LoaderInterface = None,
         size: int = 2,
@@ -134,12 +182,9 @@ class DataLoader:
         self.paths = [Path(path) for path in paths]
         self.output_dir = output_dir
         self.split_interval = split_interval
-        self.chunk_count = 0
         self.interface = interface
         self.files_completed = []
-
-    def __getitem__(self, index: int):
-        return self.__next__()
+        self.split_type = split_type
 
     def __next__(self):
         payload = self.queue.get()
@@ -156,6 +201,7 @@ class DataLoader:
         while self.queue.qsize() != 0:
             with self.queue.mutex:
                 self.queue.queue.clear()
+        self.files_completed = []
 
     def __iter__(self):
         self.stop()
@@ -168,6 +214,7 @@ class DataLoader:
                 self.paths,
                 self.output_dir,
                 self.thread_stop,
+                self.split_type,
                 self.split_interval,
                 self.files_completed,
             ),
@@ -175,3 +222,15 @@ class DataLoader:
         )
         self.thread.start()
         return self
+
+    def __del__(self):
+        self.stop()
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        self.stop()
+
+    def get_metadata(self, path: str):
+        if path:
+            return self.interface._get_path_metadata(path)
+        else:
+            return self.interface._get_path_metadata()
