@@ -934,6 +934,7 @@ def dense_retrieval(
     _filter: str = "",
     gpu_search: bool = False,
     local_index: bool = False,
+    ef_param: int = 100,
 ):
     """
     This function takes the input queries and conducts a dense
@@ -967,7 +968,7 @@ def dense_retrieval(
 
     search_params = {}
     if not gpu_search and not local_index:
-        search_params["params"] = {"ef": top_k}
+        search_params["params"] = {"ef": ef_param}
 
     results = client.search(
         collection_name=collection_name,
@@ -995,6 +996,7 @@ def hybrid_retrieval(
     gpu_search: bool = False,
     local_index: bool = False,
     _filter: str = "",
+    ef_param: int = 100,
 ):
     """
     This function takes the input queries and conducts a hybrid
@@ -1041,7 +1043,7 @@ def hybrid_retrieval(
         "metric_type": "L2",
     }
     if not gpu_search and not local_index:
-        s_param_1["params"] = {"ef": top_k}
+        s_param_1["params"] = {"ef": ef_param}
 
     # Create search requests for both vector types
     search_param_1 = {
@@ -1099,6 +1101,7 @@ def nvingest_retrieval(
     nv_ranker_top_k: int = 50,
     nv_ranker_max_batch_size: int = 64,
     _filter: str = "",
+    ef_param: int = 200,
     **kwargs,
 ):
     """
@@ -1188,6 +1191,7 @@ def nvingest_retrieval(
             gpu_search=gpu_search,
             local_index=local_index,
             _filter=_filter,
+            ef_param=ef_param,
         )
     else:
         results = dense_retrieval(
@@ -1200,6 +1204,7 @@ def nvingest_retrieval(
             _filter=_filter,
             gpu_search=gpu_search,
             local_index=local_index,
+            ef_param=ef_param,
         )
     if nv_ranker:
         rerank_results = []
