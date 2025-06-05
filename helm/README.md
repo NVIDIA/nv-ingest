@@ -9,7 +9,6 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-
 ## Initial Environment Setup
 
 1. Create your namespace by running the following code.
@@ -27,6 +26,9 @@ helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microse
 
 # NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# NVIDIA NIM Base repository
+helm repo add nim https://helm.ngc.nvidia.com/nim --username='$oauthtoken' --password=<NGC_API_KEY>
 
 # NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
@@ -281,7 +283,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | Repository | Name | Version |
 |------------|------|---------|
 | alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.3.0 |
-| alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
+| alias:nim | nim-vlm-image-captioning(nim-vlm) | 1.2.1 |
+| alias:nim | nim-vlm-text-extraction(nim-vlm) | 1.2.1 |
 | alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.6.0 |
 | alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.5.0 |
 | alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.3.0 |
