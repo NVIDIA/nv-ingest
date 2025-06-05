@@ -17,6 +17,8 @@ dependencies:
   - httpx>=0.28.1
   - isodate>=0.7.2
   - langdetect>=1.0.9
+  - libprotobuf>=21.5
+  - absl-py>=2.3
   - minio>=7.2.12
   - openai>=1.82.0
   - opentelemetry-api>=1.27.0
