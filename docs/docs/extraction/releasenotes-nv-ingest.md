@@ -15,6 +15,9 @@ The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and
 - Add MIG support. For details, see [Enable NVIDIA GPU MIG](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enable-nvidia-gpu-mig).
 - Add time slicing support. For details, see [Enable GPU time-slicing](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enabling-gpu-time-slicing).
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/nkmcalli/nv-ingest/blob/main/examples/metadata_and_filtered_search.ipynb).
+- Upgrade Python version from 3.10 to 3.12
+- Add support for the latest version of the OpenAI API.
+
 
 ### Breaking Changes
 
