@@ -46,7 +46,7 @@ from nv_ingest_api.util.nim import create_inference_client
 
 logger = logging.getLogger(__name__)
 
-YOLOX_MAX_BATCH_SIZE = 8
+YOLOX_MAX_BATCH_SIZE = 16
 
 RAW_FILE_FORMATS = ["jpeg", "jpg", "png", "tiff", "bmp"]
 PREPROC_FILE_FORMATS = ["svg"]

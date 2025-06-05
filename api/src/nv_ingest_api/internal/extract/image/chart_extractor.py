@@ -76,13 +76,15 @@ def _run_chart_inference(
     data_custom_ocr = {"base64_images": valid_images}
 
     with ThreadPoolExecutor(max_workers=2) as executor:
+        extra_params_yolox = {"force_max_batch_size": True}
         future_yolox = executor.submit(
             yolox_client.infer,
             data=data_yolox,
             model_name="yolox",
             stage_name="chart_extraction",
-            max_batch_size=8,
+            max_batch_size=32,
             trace_info=trace_info,
+            **extra_params_yolox if yolox_client.protocol == "http" else {},
         )
         future_custom_ocr = executor.submit(
             custom_ocr_client.infer,

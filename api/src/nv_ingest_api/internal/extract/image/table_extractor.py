@@ -76,14 +76,16 @@ def _run_inference(
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         future_yolox = None
+        extra_params_yolox = {"force_max_batch_size": True}
         if enable_yolox:
             future_yolox = executor.submit(
                 yolox_client.infer,
                 data=data_yolox,
                 model_name="yolox",
                 stage_name="table_extraction",
-                max_batch_size=8,
+                max_batch_size=32,
                 trace_info=trace_info,
+                **extra_params_yolox if yolox_client.protocol == "http" else {},
             )
         future_custom_ocr = executor.submit(
             custom_ocr_client.infer,
@@ -94,7 +96,6 @@ def _run_inference(
             force_max_batch_size=True,
             trace_info=trace_info,
         )
-
         if enable_yolox:
             try:
                 yolox_results = future_yolox.result()
