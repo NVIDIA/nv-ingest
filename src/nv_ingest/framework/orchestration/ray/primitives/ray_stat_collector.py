@@ -40,7 +40,7 @@ class RayStatsCollector:
             - `get_edge_queues() -> Dict[str, Tuple[Any, int]]`
             These methods should return snapshots suitable for iteration.
         interval : float, optional
-            The interval in seconds between stats collection attempts, by default 5.0.
+            The interval in seconds between stat collection attempts, by default 5.0.
         actor_timeout : float, optional
             Timeout in seconds for waiting for stats from a single actor, by default 5.0.
         queue_timeout : float, optional

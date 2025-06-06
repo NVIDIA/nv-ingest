@@ -12,12 +12,12 @@ from nv_ingest_api.util.converters.datetools import remove_tz
 
 # Example functions to test the decorator
 @datetools_exception_handler
-def test_func_raises_exception():
+def mock_test_func_raises_exception():
     raise ValueError("Test exception")
 
 
 @datetools_exception_handler
-def test_func_success():
+def mock_test_func_success():
     return "Success"
 
 
@@ -28,7 +28,7 @@ def test_datetools_exception_handler_with_exception():
     """
     start_time = remove_tz(datetime.now(timezone.utc))
 
-    result = test_func_raises_exception()
+    result = mock_test_func_raises_exception()
 
     # Convert result back to datetime object for comparison
     result_datetime = datetime.fromisoformat(result)
@@ -50,5 +50,5 @@ def test_datetools_exception_handler_without_exception():
     """
     Test the decorator with a function that does not raise an exception.
     """
-    result = test_func_success()
+    result = mock_test_func_success()
     assert result == "Success", "Decorator should not interfere with the function's normal execution"
