@@ -11,6 +11,8 @@ To get started with the basics, try one of the following notebooks:
 
 - [NV-Ingest: CLI Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/cli_client_usage.ipynb)
 - [NV-Ingest: Python Client Quick Start Guide](https://github.com/NVIDIA/nv-ingest/blob/main/client/client_examples/examples/python_client_usage.ipynb)
+- [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/main/examples/metadata_and_filtered_search.ipynb)
+- [How to reindex a collection](https://github.com/NVIDIA/nv-ingest/blob/main/examples/reindex_example.ipynb)
 
 For more advanced scenarios, try one of the following notebooks:
 

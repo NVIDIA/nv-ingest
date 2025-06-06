@@ -24,14 +24,14 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
+      # Login to NGC
+      - name: Log in to NGC Registry
+        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
+
       # Build the Docker image using the Dockerfile
       - name: Build Docker image
         run: |
           docker build --target runtime --build-arg GIT_COMMIT=${GITHUB_SHA} -t ${{ secrets.DOCKER_REGISTRY }}/nv-ingest:${{ env.SHORT_BRANCH_NAME }} .
-
-      # Login to NGC
-      - name: Log in to NGC Registry
-        run: echo "${{ secrets.DOCKER_PASSWORD }}" | docker login nvcr.io --username "\$oauthtoken" --password-stdin
 
       # Push the container to NGC
       - name: Upload nv-ingest container
