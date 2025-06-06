@@ -555,7 +555,7 @@ class PipelineTopology:
             return None
 
     def get_connections(self) -> Dict[str, List[Tuple[str, int]]]:
-        """Returns a shallow copy of the connections dictionary."""
+        """Returns a shallow copy of the connection dictionary."""
         with self._lock:
             # Shallow copy is usually sufficient here as tuples are immutable
             return self._connections.copy()
@@ -571,7 +571,7 @@ class PipelineTopology:
             return len(self._stage_actors.get(stage_name, []))
 
     def get_edge_queues(self) -> Dict[str, Tuple[Any, int]]:
-        """Returns a shallow copy of the edge queues dictionary."""
+        """Returns a shallow copy of the edge queues' dictionary."""
         with self._lock:
             return self._edge_queues.copy()
 
