@@ -281,7 +281,6 @@ services:
       - PADDLE_GRPC_ENDPOINT=paddle:8001
       - PADDLE_HTTP_ENDPOINT=http://paddle:8000/v1/infer
       - PADDLE_INFER_PROTOCOL=grpc
-      #- PADDLE_INFER_PROTOCOL=http
       # build.nvidia.com hosted paddle endpoints.
       #- PADDLE_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- PADDLE_INFER_PROTOCOL=http
@@ -296,11 +295,9 @@ services:
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
       - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
-      #- YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
-      #- YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}

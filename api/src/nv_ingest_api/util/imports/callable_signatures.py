@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 
 
-def ingest_stage_callable_signature(sig: inspect.Signature) -> bool:
+def ingest_stage_callable_signature(sig: inspect.Signature):
     """
     Validates that a callable has the signature:
         (IngestControlMessage, BaseModel) -> IngestControlMessage
@@ -20,13 +20,13 @@ def ingest_stage_callable_signature(sig: inspect.Signature) -> bool:
         If the signature does not match the expected pattern.
     """
     params = list(sig.parameters.values())
+    print(params, flush=True)
 
     if len(params) != 2:
         raise TypeError(f"Expected exactly 2 parameters, got {len(params)}")
 
-    # Optional: Enforce specific parameter names
-    # if params[0].name != "control_message" or params[1].name != "config":
-    #     raise TypeError("Expected parameter names: 'control_message', 'config'")
+    if params[0].name != "control_message" or params[1].name != "stage_config":
+        raise TypeError("Expected parameter names: 'control_message', 'config'")
 
     first_param = params[0].annotation
     second_param = params[1].annotation
@@ -44,7 +44,7 @@ def ingest_stage_callable_signature(sig: inspect.Signature) -> bool:
     if not issubclass(first_param, IngestControlMessage):
         raise TypeError(f"First parameter must be IngestControlMessage, got {first_param}")
 
-    if not (inspect.isclass(second_param) and issubclass(second_param, BaseModel)):
+    if not (issubclass(second_param, BaseModel)):
         raise TypeError(f"Second parameter must be a subclass of BaseModel, got {second_param}")
 
     if not issubclass(return_type, IngestControlMessage):

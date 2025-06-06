@@ -27,7 +27,7 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
 from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
-from nv_ingest_api.util.imports.resolve_callable import resolve_callable_from_path
+from nv_ingest_api.util.imports.dynamic_resolvers import resolve_callable_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -449,7 +449,7 @@ class RayPipeline(PipelineInterface):
         # Support module path (e.g., "mypkg.mymodule:my_lambda")
         if isinstance(stage_actor, str):
             resolved_actor = resolve_callable_from_path(
-                path=stage_actor, signature_schema=ingest_stage_callable_signature
+                callable_path=stage_actor, signature_schema=ingest_stage_callable_signature
             )
 
         # Wrap callables

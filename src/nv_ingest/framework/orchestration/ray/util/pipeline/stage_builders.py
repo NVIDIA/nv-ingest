@@ -9,7 +9,6 @@ import logging
 
 from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
-from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
@@ -40,7 +39,6 @@ from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import I
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
-from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import text_splitter_fn
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
@@ -449,13 +447,9 @@ def add_image_filter_stage(pipeline, default_cpu_count, stage_name="image_filter
 def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitter"):
     config = TextSplitterSchema()
 
-    lambda_split = wrap_callable_as_stage(
-        text_splitter_fn, TextSplitterSchema, required_tasks=["split"], trace_id="text_splitter"
-    )
-
     pipeline.add_stage(
         name=stage_name,
-        stage_actor=lambda_split,
+        stage_actor="nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:text_splitter_fn",
         config=config,
         min_replicas=0,
         max_replicas=int(max(1, (default_cpu_count // 14))),

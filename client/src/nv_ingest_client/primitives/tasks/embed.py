@@ -70,6 +70,7 @@ class EmbedTaskSchema(BaseModel):
         return values
 
     model_config = ConfigDict(extra="forbid")
+    model_config["protected_namespaces"] = ()
 
 
 class EmbedTask(Task):

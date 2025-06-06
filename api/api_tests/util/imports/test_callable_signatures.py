@@ -10,65 +10,95 @@ from nv_ingest_api.internal.primitives.ingest_control_message import IngestContr
 from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
 
 
-# A simple BaseModel subclass for testing
+# --- Test config model ---
 class DummyConfig(BaseModel):
     foo: int = 0
 
 
-# --- Helper functions with various signatures ---
+# --- Helper functions for negative and positive cases ---
 
 
+def valid_stage(control_message: IngestControlMessage, stage_config: DummyConfig) -> IngestControlMessage:
+    return control_message
+
+
+# Mismatched names
+def wrong_param_names(a: IngestControlMessage, b: DummyConfig) -> IngestControlMessage:
+    return a
+
+
+def swapped_param_names(stage_config: DummyConfig, control_message: IngestControlMessage) -> IngestControlMessage:
+    return control_message
+
+
+def correct_types_wrong_param_names(message: IngestControlMessage, config: DummyConfig) -> IngestControlMessage:
+    return message
+
+
+# --- Annotation/Type Failures (existing from your set) ---
 def no_params() -> IngestControlMessage:
-    """Zero-parameter function."""
     return IngestControlMessage()
 
 
-def one_param(a: IngestControlMessage) -> IngestControlMessage:
-    """Only one parameter."""
-    return a
+def one_param(control_message: IngestControlMessage) -> IngestControlMessage:
+    return control_message
 
 
-def missing_first_annotation(a, b: DummyConfig) -> IngestControlMessage:
-    """First parameter lacks annotation."""
-    return a
+def extra_params(control_message: IngestControlMessage, stage_config: DummyConfig, extra: str) -> IngestControlMessage:
+    return control_message
 
 
-def missing_second_annotation(a: IngestControlMessage, b) -> IngestControlMessage:
-    """Second parameter lacks annotation."""
-    return a
+def missing_first_annotation(control_message, stage_config: DummyConfig) -> IngestControlMessage:
+    return control_message
 
 
-def missing_return_annotation(a: IngestControlMessage, b: DummyConfig):
-    """Missing return‐type annotation."""
-    return a
+def missing_second_annotation(control_message: IngestControlMessage, stage_config) -> IngestControlMessage:
+    return control_message
 
 
-def wrong_first_type(a: int, b: DummyConfig) -> IngestControlMessage:
-    """First parameter annotated, but not IngestControlMessage."""
+def missing_return_annotation(control_message: IngestControlMessage, stage_config: DummyConfig):
+    return control_message
+
+
+def wrong_first_type(control_message: int, stage_config: DummyConfig) -> IngestControlMessage:
     return IngestControlMessage()
 
 
-def wrong_second_type(a: IngestControlMessage, b: int) -> IngestControlMessage:
-    """Second parameter annotated, but not a BaseModel subclass."""
-    return a
+def wrong_second_type(control_message: IngestControlMessage, stage_config: int) -> IngestControlMessage:
+    return control_message
 
 
-def wrong_return_type(a: IngestControlMessage, b: DummyConfig) -> int:
-    """Return annotation is not IngestControlMessage."""
-    return 42
+def wrong_return_type(control_message: IngestControlMessage, stage_config: DummyConfig) -> int:
+    return 123
 
 
-def extra_params(a: IngestControlMessage, b: DummyConfig, c: str) -> IngestControlMessage:
-    """Three parameters instead of two."""
-    return a
+# --- TESTS ---
 
 
-def valid_stage(a: IngestControlMessage, b: DummyConfig) -> IngestControlMessage:
-    """Proper two‐parameter signature and return type."""
-    return a
+def test_valid_signature_passes():
+    sig = inspect.signature(valid_stage)
+    assert ingest_stage_callable_signature(sig) is None
 
 
-# --- Test Cases ---
+def test_wrong_param_names():
+    sig = inspect.signature(wrong_param_names)
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+        ingest_stage_callable_signature(sig)
+
+
+def test_swapped_param_names():
+    sig = inspect.signature(swapped_param_names)
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+        ingest_stage_callable_signature(sig)
+
+
+def test_correct_types_wrong_param_names():
+    sig = inspect.signature(correct_types_wrong_param_names)
+    with pytest.raises(TypeError, match="Expected parameter names: 'control_message', 'config'"):
+        ingest_stage_callable_signature(sig)
+
+
+# Existing error cases
 
 
 def test_zero_parameters():
@@ -123,9 +153,3 @@ def test_wrong_return_type():
     sig = inspect.signature(wrong_return_type)
     with pytest.raises(TypeError, match=r"Return type must be IngestControlMessage, got <class 'int'>"):
         ingest_stage_callable_signature(sig)
-
-
-def test_valid_signature_passes():
-    sig = inspect.signature(valid_stage)
-    # Should not raise any exceptions
-    assert ingest_stage_callable_signature(sig) is None
