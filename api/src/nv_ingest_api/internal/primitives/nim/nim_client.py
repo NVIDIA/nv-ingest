@@ -247,9 +247,11 @@ class NimClient:
         input_tensors.set_data_from_numpy(formatted_input)
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
+
         response = self.client.infer(
             model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
         )
+
         logger.debug(f"gRPC inference response: {response}")
 
         if len(outputs) == 1:
