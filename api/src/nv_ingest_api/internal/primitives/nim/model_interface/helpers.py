@@ -16,7 +16,9 @@ from nv_ingest_api.util.string_processing import generate_url, remove_url_endpoi
 logger = logging.getLogger(__name__)
 
 
-def preprocess_image_for_ocr(array: np.ndarray, image_max_dimension: int = 960, normalize: bool = True) -> np.ndarray:
+def preprocess_image_for_ocr(
+    array: np.ndarray, image_max_dimension: int = 960, scale: bool = True, normalize: bool = True, pad: bool = True
+) -> np.ndarray:
     """
     Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
     and transposing it into the required format.
@@ -50,10 +52,16 @@ def preprocess_image_for_ocr(array: np.ndarray, image_max_dimension: int = 960, 
     - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
     """
     height, width = array.shape[:2]
-    scale_factor = image_max_dimension / max(height, width)
-    new_height = int(height * scale_factor)
-    new_width = int(width * scale_factor)
-    resized = cv2.resize(array, (new_width, new_height))
+
+    if scale is True:
+        scale_factor = image_max_dimension / max(height, width)
+        new_height = int(height * scale_factor)
+        new_width = int(width * scale_factor)
+        resized = cv2.resize(array, (new_width, new_height))
+    else:
+        scale_factor = 1.0
+        new_height, new_width = height, width
+        resized = array
 
     if normalize is True:
         normalized = normalize_image(resized)
@@ -61,11 +69,15 @@ def preprocess_image_for_ocr(array: np.ndarray, image_max_dimension: int = 960, 
         normalized = resized / 255.0
 
     # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
-    new_height = (normalized.shape[0] + 31) // 32 * 32
-    new_width = (normalized.shape[1] + 31) // 32 * 32
-    padded, (pad_width, pad_height) = pad_image(
-        normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
-    )
+    if pad is True:
+        new_height = (normalized.shape[0] + 31) // 32 * 32
+        new_width = (normalized.shape[1] + 31) // 32 * 32
+        padded, (pad_width, pad_height) = pad_image(
+            normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
+        )
+    else:
+        pad_width, pad_height = 0, 0
+        padded = normalized
 
     # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
     transposed = padded.transpose((2, 0, 1))
