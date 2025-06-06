@@ -9,6 +9,7 @@ import logging
 
 from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import DefaultDrainSink
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
@@ -445,33 +446,19 @@ def add_image_filter_stage(pipeline, default_cpu_count, stage_name="image_filter
 
 
 def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitter"):
+    _ = default_cpu_count
+
     config = TextSplitterSchema()
 
     pipeline.add_stage(
         name=stage_name,
-        stage_actor="nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:text_splitter_fn",
+        stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
     )
 
     return stage_name
-
-
-# def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitter"):
-#    _ = default_cpu_count
-#
-#    config = TextSplitterSchema()
-#
-#    pipeline.add_stage(
-#        name=stage_name,
-#        stage_actor=TextSplitterStage,
-#        config=config,
-#        min_replicas=0,
-#        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
-#    )
-#
-#    return stage_name
 
 
 def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_caption"):
