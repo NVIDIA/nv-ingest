@@ -645,7 +645,7 @@ llama-32-nv-rerankqa-1b-v2:
 ## @param riva-nim.env [default: []] Environment variables for the container
 riva-nim:
   deployed: false
-  fullnameOverride: riva-nim
+  fullnameOverride: nv-ingest-riva-nim
   customCommand: []
   customArgs: []
   image:
@@ -668,16 +668,18 @@ riva-nim:
     metrics: []
   service:
     type: "ClusterIP"
-    name: riva-nim
-    httpPort: 8000
-    grpcPort: 8001
+    name: nv-ingest-riva-nim
+    httpPort: 9000
+    grpcPort: 50051
     metricsPort: 0  # Generally unused and defaults to 0
   nim:
-    grpcPort: 8001
+    grpcPort: 50051
     logLevel: "INFO"
   env:
     - name: NIM_HTTP_API_PORT
-      value: "8000"
+      value: "9000"
+    - name: NIM_TAGS_SELECTOR
+      value: "name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"
 
 
 ## @section Milvus Deployment parameters
@@ -856,10 +858,11 @@ prometheus:
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
 ## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Endpoint for VLM caption service
 ## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"] Model name for VLM caption service
-## @param envVars.AUDIO_GRPC_ENDPOINT [default: "audio:50051"] gRPC endpoint for audio service
+## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
 ## @param envVars.MODEL_PREDOWNLOAD_PATH [default: "/workspace/models/"] Path for pre-downloading models
+## @param envVars.INSTALL_AUDIO_EXTRACTION_DEPS [default: "true"] Install required libraries for audio processing
 envVars:
   ARROW_DEFAULT_MEMORY_POOL: "system"
   INGEST_LOG_LEVEL: "DEFAULT"
@@ -900,11 +903,12 @@ envVars:
   VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
   VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
 
-  AUDIO_GRPC_ENDPOINT: "audio:50051"
+  AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
 
   COMPONENTS_TO_READY_CHECK: "ALL"
   MODEL_PREDOWNLOAD_PATH: "/workspace/models/"
+  INSTALL_AUDIO_EXTRACTION_DEPS: "true"
 
 ## @section Open Telemetry
 ## @descriptionStart
