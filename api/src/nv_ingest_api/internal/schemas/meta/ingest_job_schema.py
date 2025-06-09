@@ -76,7 +76,7 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     api_key: Optional[str] = None
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
-    caption_model_name: Optional[str] = None
+    model_name: Optional[str] = None
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
