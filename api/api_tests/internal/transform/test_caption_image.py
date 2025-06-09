@@ -30,7 +30,7 @@ def dummy_task_config():
         "api_key": "api_key",
         "prompt": "Describe the image",
         "endpoint_url": "https://fake.endpoint",
-        "image_caption_model_name": "fake_model",
+        "model_name": "fake_model",
     }
 
 
@@ -41,7 +41,7 @@ def dummy_transform_config():
         api_key = "default_api_key"
         prompt = "default_prompt"
         endpoint_url = "https://default.endpoint"
-        image_caption_model_name = "default_model"
+        model_name = "default_model"
 
     return Dummy()
 
@@ -68,7 +68,7 @@ def test_transform_image_create_vlm_caption_internal_happy_path(
         dummy_task_config["prompt"],
         dummy_task_config["api_key"],
         dummy_task_config["endpoint_url"],
-        dummy_task_config["image_caption_model_name"],
+        dummy_task_config["model_name"],
     )
 
     # Assert captions updated correctly in the DataFrame
@@ -120,7 +120,7 @@ def test_transform_image_create_vlm_caption_internal_uses_fallback_config(
         dummy_transform_config.prompt,
         dummy_transform_config.api_key,
         dummy_transform_config.endpoint_url,
-        dummy_transform_config.image_caption_model_name,
+        dummy_transform_config.model_name,
     )
 
     # Assert captions updated correctly
