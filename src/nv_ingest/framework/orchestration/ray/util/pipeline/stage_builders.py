@@ -477,7 +477,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
         **{
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
-            "image_caption_model_name": model_name,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         }
     )
