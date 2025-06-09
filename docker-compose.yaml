@@ -270,8 +270,8 @@ services:
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       # build.nvidia.com hosted nemoretriever-parse
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
+      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
       #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
