@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -382,6 +383,7 @@ def pdfium_extractor(
     extract_text: bool,
     extract_images: bool,
     extract_infographics: bool,
+    extract_page_as_image: bool,
     extract_tables: bool,
     extract_charts: bool,
     extractor_config: dict,
@@ -480,7 +482,7 @@ def pdfium_extractor(
     accumulated_text = []
 
     # Prepare for table/chart extraction
-    pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
+    pages_as_images = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
@@ -525,20 +527,26 @@ def pdfium_extractor(
                 extracted_data.extend(image_data)
 
             # If we want tables or charts, rasterize the page and store it
-            if extract_tables or extract_charts or extract_infographics:
-                image, padding_offsets = pdfium_pages_to_numpy(
-                    [page],
+            if extract_tables or extract_charts or extract_infographics or extract_page_as_image:
+                if extract_page_as_image:
+                    scale_tuple, padding_tuple = None, None
+                else:
                     scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+
+                image, padding_offsets = pdfium_pages_to_numpy(
+                    [page],
+                    scale_tuple=scale_tuple,
+                    padding_tuple=padding_tuple,
                     trace_info=execution_trace_log,
                 )
-                pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
+                pages_as_images.append((page_idx, image[0], padding_offsets[0]))
 
-                # Whenever pages_for_tables hits YOLOX_MAX_BATCH_SIZE, submit a job
-                if len(pages_for_tables) >= YOLOX_MAX_BATCH_SIZE:
+                # Whenever pages_as_images hits YOLOX_MAX_BATCH_SIZE, submit a job
+                if len(pages_as_images) >= YOLOX_MAX_BATCH_SIZE:
                     future = executor.submit(
                         _extract_page_elements,
-                        pages_for_tables[:],  # pass a copy
+                        pages_as_images[:],  # pass a copy
                         page_count,
                         source_metadata,
                         base_unified_metadata,
@@ -552,15 +560,33 @@ def pdfium_extractor(
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
-                    pages_for_tables.clear()
+
+                    for page_idx, page_as_image, _ in pages_as_images:
+                        page_as_base64_image = numpy_to_base64(page_as_image)
+                        text_meta = construct_text_metadata(
+                            [page_as_base64_image],
+                            pdf_metadata.keywords,
+                            page_idx,
+                            -1,
+                            -1,
+                            -1,
+                            page_count,
+                            text_depth,
+                            source_metadata,
+                            base_unified_metadata,
+                            content_type=ContentTypeEnum.PAGE_IMAGE,
+                        )
+                        extracted_data.append(text_meta)
+
+                    pages_as_images.clear()
 
             page.close()
 
-        # After page loop, if we still have leftover pages_for_tables, submit one last job
-        if (extract_tables or extract_charts or extract_infographics) and pages_for_tables:
+        # After page loop, if we still have leftover pages_as_images, submit one last job
+        if (extract_tables or extract_charts or extract_infographics or extract_page_as_image) and pages_as_images:
             future = executor.submit(
                 _extract_page_elements,
-                pages_for_tables[:],
+                pages_as_images[:],
                 page_count,
                 source_metadata,
                 base_unified_metadata,
@@ -574,7 +600,25 @@ def pdfium_extractor(
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
-            pages_for_tables.clear()
+
+            for page_idx, page_as_image, _ in pages_as_images:
+                page_as_base64_image = numpy_to_base64(page_as_image)
+                text_meta = construct_text_metadata(
+                    [page_as_base64_image],
+                    pdf_metadata.keywords,
+                    page_idx,
+                    -1,
+                    -1,
+                    -1,
+                    page_count,
+                    text_depth,
+                    source_metadata,
+                    base_unified_metadata,
+                    content_type=ContentTypeEnum.PAGE_IMAGE,
+                )
+                extracted_data.append(text_meta)
+
+            pages_as_images.clear()
 
         # Wait for all asynchronous jobs to complete.
         for fut in concurrent.futures.as_completed(futures):

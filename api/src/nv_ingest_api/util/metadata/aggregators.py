@@ -148,11 +148,12 @@ def construct_text_metadata(
     delimiter=" ",
     bbox_max_dimensions: Tuple[int, int] = (-1, -1),
     nearby_objects: Optional[Dict[str, Any]] = None,
+    content_type: None | ContentTypeEnum | str = None,
 ):
     extracted_text = delimiter.join(accumulated_text)
 
     content_metadata = {
-        "type": ContentTypeEnum.TEXT,
+        "type": content_type or ContentTypeEnum.TEXT,
         "description": ContentDescriptionEnum.PDF_TEXT,
         "page_number": page_idx,
         "hierarchy": {

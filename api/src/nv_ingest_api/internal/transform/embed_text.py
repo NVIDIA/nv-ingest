@@ -357,6 +357,24 @@ def _get_pandas_audio_content(row, modality="text"):
     return row.get("audio_metadata", {}).get("audio_transcript")
 
 
+def _get_pandas_page_image_content(row, modality="image"):
+    """
+    Extracts page content from a DataFrame row.
+
+    Parameters
+    ----------
+    row : pandas.Series
+        A row containing 'image_metadata' with 'caption'.
+
+    Returns
+    -------
+    str
+        The image caption from the row.
+    """
+    return _format_image_input_string(row.pop("content"))
+
+
+
 # ------------------------------------------------------------------------------
 # Batch Processing Utilities
 # ------------------------------------------------------------------------------
@@ -495,6 +513,7 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
         ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
+        ContentTypeEnum.PAGE_IMAGE: _get_pandas_page_image_content,
     }
     task_type_to_modality = {
         ContentTypeEnum.TEXT: task_config.get("text_elements_modality") or transform_config.text_elements_modality,
@@ -503,6 +522,7 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.IMAGE: task_config.get("image_elements_modality") or transform_config.image_elements_modality,
         ContentTypeEnum.AUDIO: task_config.get("audio_elements_modality") or transform_config.audio_elements_modality,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
+        ContentTypeEnum.PAGE_IMAGE: "image",
     }
 
     def _content_type_getter(row):
