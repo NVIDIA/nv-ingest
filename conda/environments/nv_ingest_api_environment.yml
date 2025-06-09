@@ -13,5 +13,6 @@ dependencies:
   - pytest-cov>=6.0.0
   - python>=3.12
   - python-build>=1.2.2
+  - sckit-learn>=1.7.0
   - setuptools>=58.2.0
   - pip
