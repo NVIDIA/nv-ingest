@@ -13,7 +13,7 @@ def test_image_caption_extraction_schema_defaults():
     assert schema.api_key == "api_key"
     assert schema.endpoint_url.startswith("https://")
     assert schema.prompt.startswith("Caption")
-    assert schema.image_caption_model_name.startswith("meta/")
+    assert schema.model_name.startswith("meta/")
     assert schema.raise_on_failure is False
 
 
@@ -22,13 +22,13 @@ def test_image_caption_extraction_schema_accepts_custom_values():
         api_key="mykey",
         endpoint_url="https://custom.endpoint",
         prompt="Describe this image in detail.",
-        image_caption_model_name="custom/model",
+        model_name="custom/model",
         raise_on_failure=True,
     )
     assert schema.api_key == "mykey"
     assert schema.endpoint_url == "https://custom.endpoint"
     assert schema.prompt == "Describe this image in detail."
-    assert schema.image_caption_model_name == "custom/model"
+    assert schema.model_name == "custom/model"
     assert schema.raise_on_failure is True
 
 
