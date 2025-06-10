@@ -280,14 +280,9 @@ def _format_image_input_string(image_b64: Optional[str]) -> str:
 
 
 def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optional[str]) -> str:
-    if (not text) and (not image_b64):
+    if (not text.strip()) or (not image_b64):
         return
-    if text and image_b64:
-        return f"{text.strip()} {_format_image_input_string(image_b64)}"
-    if text and (not image_b64):
-        return text
-    if (not text) and image_b64:
-        return _format_image_input_string(image_b64)
+    return f"{text.strip()} {_format_image_input_string(image_b64)}"
 
 
 def _get_pandas_text_content(row, modality="text"):
@@ -372,7 +367,6 @@ def _get_pandas_page_image_content(row, modality="image"):
         The image caption from the row.
     """
     return _format_image_input_string(row.pop("content"))
-
 
 
 # ------------------------------------------------------------------------------
