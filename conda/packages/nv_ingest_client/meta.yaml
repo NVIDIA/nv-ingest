@@ -28,10 +28,12 @@ requirements:
     - setuptools>=78.1.1
   run:
     - azure-storage-blob=12.24.0
+    - build>=1.2.2
     - charset-normalizer>=3.4.1
     - click>=8.1.8
     - fsspec>=2025.2.0
     - httpx>=0.28.1
+    - openai~=1.82.0
     - pyarrow>=19.0.0
     - pydantic>=2.0.0
     - pydantic-settings>=2.0.0
