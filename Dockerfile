@@ -58,7 +58,7 @@ SHELL ["/bin/bash", "-c"]
 RUN --mount=type=cache,target=/opt/conda/pkgs \
     --mount=type=cache,target=/root/.cache/pip \
     source activate base \
-    && conda install -y python=3.10.12
+    && conda install -y python=3.12.11
 
 # We must manually remove the Python 3.12.10 package that is included in the miniforge3 installation by default
 RUN rm -rf /opt/conda/pkgs/python-3.12.10*
