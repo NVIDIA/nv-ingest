@@ -14,3 +14,60 @@ jobs:
 
       - uses: actions/setup-python@v3
       - uses: pre-commit/action@v3.0.1
+
+      # We setup conda here due to needing conda-build dependency which isn't availble in pypi
+      # and makes for much easier parsing of the conda meta.yaml files Jinja2 templates
+      - name: Set up Miniconda
+        uses: conda-incubator/setup-miniconda@v3
+        with:
+          miniforge-variant: Miniforge3
+          miniforge-version: latest
+          activate-environment: lean-env
+          auto-update-conda: true
+          auto-activate-base: true
+          environment-file: ""
+          use-mamba: true
+
+      - name: Create empty conda environment
+        run: |
+          conda create -y -n nv-ingest-ci-lean-env python=3.12 --no-default-packages
+        shell: bash
+
+      - name: Install Script dependencies
+        run: |
+          conda activate nv-ingest-ci-lean-env
+          conda install -y conda-build pyyaml toml
+        shell: bash -l {0}
+
+      - name: Compare Conda and PyProject nv-ingest-api dependencies
+        run: |
+          conda activate nv-ingest-ci-lean-env
+
+          NV_INGEST_PROJ=nv_ingest_api
+
+          python scripts/compare_dependencies.py \
+            --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
+            --pyproject ./api/pyproject.toml
+        shell: bash -l {0}
+
+      - name: Compare Conda and PyProject nv-ingest-client dependencies
+        run: |
+          conda activate nv-ingest-ci-lean-env
+
+          NV_INGEST_PROJ=nv_ingest_client
+
+          python scripts/compare_dependencies.py \
+            --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
+            --pyproject ./client/pyproject.toml
+        shell: bash -l {0}
+
+      - name: Compare Conda and PyProject nv-ingest dependencies
+        run: |
+          conda activate nv-ingest-ci-lean-env
+
+          NV_INGEST_PROJ=nv_ingest
+
+          python scripts/compare_dependencies.py \
+            --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
+            --pyproject ./src/pyproject.toml
+        shell: bash -l {0}
