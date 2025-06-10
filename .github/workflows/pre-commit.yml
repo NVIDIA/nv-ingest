@@ -20,7 +20,7 @@ jobs:
       - name: Set up Miniconda
         uses: conda-incubator/setup-miniconda@v3
         with:
-          miniforge-variant: Mambaforge
+          miniforge-variant: Miniforge3
           miniforge-version: latest
           activate-environment: lean-env
           auto-update-conda: true
