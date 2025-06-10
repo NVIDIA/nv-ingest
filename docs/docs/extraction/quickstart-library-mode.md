@@ -18,10 +18,10 @@ Use the following procedure to prepare your environment.
 1. Run the following code to create your NV Ingest Conda environment.
 
     ```
-uv venv --python 3.12 nvingest && \
-  source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.6.0 nv-ingest-api==25.6.0 nv-ingest-client==25.6.0 && \
-  uv pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' "nvidia-riva-client==2.19.1" markitdown unstructured-client
+       uv venv --python 3.12 nvingest && \
+         source nvingest/bin/activate && \
+         uv pip install nv-ingest==25.6.0 nv-ingest-api==25.6.0 nv-ingest-client==25.6.0 && \
+         uv pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' 'milvus-lite==2.4.12' "nvidia-riva-client==2.19.1" markitdown unstructured-client
     ```
 
     !!! tip
