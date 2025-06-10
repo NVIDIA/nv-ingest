@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import argparse
+import os
 import yaml
 import toml
 import re
@@ -84,6 +85,12 @@ def parse_pyproject_toml(pyproject_path):
     try:
         if "project" in pyproject:
             deps.update(normalize_dependency(d) for d in pyproject["project"].get("dependencies", []))
+
+            # Include optional dependencies from the pyproject definition
+            optional_dependencies = pyproject["project"].get("optional-dependencies", {})
+            for key in optional_dependencies:
+                deps.update(normalize_dependency(d) for d in optional_dependencies.get(key, []))
+
         elif "tool" in pyproject and "poetry" in pyproject["tool"]:
             poetry_deps = pyproject["tool"]["poetry"].get("dependencies", {})
             for name, version in poetry_deps.items():
@@ -98,6 +105,18 @@ def parse_pyproject_toml(pyproject_path):
     return deps
 
 
+def load_requirements(path="requirements.txt"):
+    with open(path, "r") as f:
+        lines = f.readlines()
+
+    deps = [
+        line.strip()
+        for line in lines
+        if line.strip() and not line.strip().startswith("#") and not line.strip().startswith("-r")
+    ]
+    return deps
+
+
 def main():
     parser = argparse.ArgumentParser(description="Compare dependencies between meta.yaml and pyproject.toml")
     parser.add_argument("--meta", required=True, help="Path to Conda meta.yaml")
@@ -105,12 +124,37 @@ def main():
 
     args = parser.parse_args()
 
+    # load the Conda project dependencies
     meta_deps = parse_meta_yaml(Path(args.meta))
+    # Certain packages are not available in Conda. So certain packages have requirements.txt
+    # files to file that gap and those deps should be included
+    dir_path = os.path.dirname(args.meta)
+    requirements_path = os.path.join(dir_path, "requirements.txt")
+    conda_pip_requirement_deps = load_requirements(requirements_path)
+    meta_deps.update(normalize_version_syntax(normalize_dependency(d)) for d in conda_pip_requirement_deps)
+
     pyproject_deps = parse_pyproject_toml(Path(args.pyproject))
     pyproject_deps = set(normalize_version_syntax(dep) for dep in pyproject_deps)
 
     only_in_meta = meta_deps - pyproject_deps
     only_in_pyproject = pyproject_deps - meta_deps
+
+    # There are certain dependencies that are not applicable between conda and pyproject.
+    # Ex: Conda defines Python version but PyProjects do not. So that will always cause
+    # a breaking diff in this script so it should be removed.
+    deps_to_ignore = ["python"]
+
+    for dep in only_in_meta.copy():
+        for ignore_dep in deps_to_ignore:
+            if dep.startswith(ignore_dep):
+                print(f"Ignoring Dependency: {dep}")
+                only_in_meta.discard(dep)
+
+    for dep in only_in_pyproject.copy():
+        for ignore_dep in deps_to_ignore:
+            if dep.startswith(ignore_dep):
+                print(f"Ignoring Dependency: {dep}")
+                only_in_pyproject.discard(dep)
 
     print("\nDependencies only in meta.yaml:")
     for dep in sorted(only_in_meta):

@@ -41,7 +41,7 @@ dependencies = [
 [project.optional-dependencies]
 milvus = [
     "pymilvus==2.5.10",
-    "pymilvus[bulk_writer,model]",
+    "pymilvus[bulk_writer,model]==2.5.10",
     "langchain-milvus>=0.1.10",
 ]
 minio = [

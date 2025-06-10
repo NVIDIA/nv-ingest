@@ -19,21 +19,21 @@ build:
   number: 0
   string: py{{ py_version }}_{{ GIT_SHA }}
   script:
+    - pip install -r requirements.txt
     - {{ PYTHON }} -m pip install . --no-deps -vv
 
 requirements:
   build:
     - pip
-    - python=3.12.11
+    - python>=3.12.11
     - setuptools>=78.1.1
   run:
     - azure-storage-blob=12.24.0
-    - build>=1.2.2
     - charset-normalizer>=3.4.1
     - click>=8.1.8
     - fsspec>=2025.2.0
     - httpx>=0.28.1
-    - openai~=1.82.0
+    - minio>=7.2.15
     - pyarrow>=19.0.0
     - pydantic>=2.0.0
     - pydantic-settings>=2.0.0
