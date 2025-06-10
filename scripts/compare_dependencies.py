@@ -129,9 +129,14 @@ def main():
     # Certain packages are not available in Conda. So certain packages have requirements.txt
     # files to file that gap and those deps should be included
     dir_path = os.path.dirname(args.meta)
-    requirements_path = os.path.join(dir_path, "requirements.txt")
-    conda_pip_requirement_deps = load_requirements(requirements_path)
-    meta_deps.update(normalize_version_syntax(normalize_dependency(d)) for d in conda_pip_requirement_deps)
+    requirements_path = Path(os.path.join(dir_path, "requirements.txt"))
+
+    # Not all projects even have a requirements.txt file. Make sure it exists first
+    if requirements_path.exists():
+        conda_pip_requirement_deps = load_requirements(requirements_path)
+        meta_deps.update(normalize_version_syntax(normalize_dependency(d)) for d in conda_pip_requirement_deps)
+    else:
+        print(f"No requirements.txt file exists as: {requirements_path}")
 
     pyproject_deps = parse_pyproject_toml(Path(args.pyproject))
     pyproject_deps = set(normalize_version_syntax(dep) for dep in pyproject_deps)
