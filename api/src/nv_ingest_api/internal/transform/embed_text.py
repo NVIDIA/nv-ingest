@@ -280,7 +280,7 @@ def _format_image_input_string(image_b64: Optional[str]) -> str:
 
 
 def _format_text_image_pair_input_string(text: Optional[str], image_b64: Optional[str]) -> str:
-    if (not text.strip()) or (not image_b64):
+    if (not text) or (not text.strip()) or (not image_b64):
         return
     return f"{text.strip()} {_format_image_input_string(image_b64)}"
 
