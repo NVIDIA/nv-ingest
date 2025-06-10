@@ -254,10 +254,7 @@ Validate that the configuration was applied by running the following code.
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
 
-A sample Helm values file for adjusting k8s request/limit resources are adjusted for MIG can be located at `mig/nv-ingest-mig-values.yaml`.
-Note you can apply multiple Helm values files at deploy time so this should be used in conjunction with your original Helm command
-and appending `-f mig/nv-ingest-mig-values.yaml`. Please note this is only an example file and should be adjusted for your environment
-specific needs.
+You can adjust Kubernetes request and limit resources for MIG by using a Helm values file. To use a MIG values file in conjunction with other values files, append `-f mig/nv-ingest-mig-values.yaml` to your Helm command. For an example Helm values file for MIG settings, refer to [mig/nv-ingest-mig-config.yaml](mig/nv-ingest-mig-config.yaml). This file is only an example, and you should adjust the values for your environment and specific needs.
 
 #### Running Jobs
 
