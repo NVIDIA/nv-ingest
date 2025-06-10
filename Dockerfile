@@ -52,6 +52,14 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
 # Set default shell to bash
 SHELL ["/bin/bash", "-c"]
 
+# Conda's base environment ships with Python version 3.12.10 which has known CVEs.
+# We manually update that base Python version here
+# Install Tini via conda from the conda-forge channel
+RUN --mount=type=cache,target=/opt/conda/pkgs \
+    --mount=type=cache,target=/root/.cache/pip \
+    source activate base \
+    && conda install -y python=3.10.12
+
 # Activate the environment (make it default for subsequent commands)
 RUN echo "source activate nv_ingest_runtime" >> ~/.bashrc
 
