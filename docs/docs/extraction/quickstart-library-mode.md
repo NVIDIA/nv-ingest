@@ -18,7 +18,7 @@ Use the following procedure to prepare your environment.
 1. Run the following code to create your NV Ingest Conda environment.
 
     ```
-    conda create -y --name nvingest python=3.12 && \
+    conda create -y --name nvingest python=3.12.11 && \
     conda activate nvingest && \
     conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.4.2 nv_ingest_client=25.4.2 nv_ingest_api=25.4.2 && \
     pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient

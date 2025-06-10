@@ -24,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python=3.12
+    - python=3.12.11
     - setuptools>=78.1.1
   run:
     - backoff=2.2.1
