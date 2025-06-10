@@ -56,7 +56,7 @@ jobs:
             echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
             exit 1
           fi
-        shell: bash
+        shell: bash -l {0}
 
       - name: Compare Conda and PyProject nv-ingest-client dependencies
         run: |
@@ -75,7 +75,7 @@ jobs:
             echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
             exit 1
           fi
-        shell: bash
+        shell: bash -l {0}
 
       - name: Compare Conda and PyProject nv-ingest dependencies
         run: |
@@ -94,4 +94,4 @@ jobs:
             echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
             exit 1
           fi
-        shell: bash
+        shell: bash -l {0}
