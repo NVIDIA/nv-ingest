@@ -89,16 +89,6 @@ In this case, make sure to remove the following from your helm command:
     --set ngcApiSecret.password="${NGC_API_KEY}" \
 ```
 
-### Minikube Setup
-
-The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
-
-```bash
-minikube start --driver docker --container-runtime docker --gpus all --nodes 3
-minikube addons enable nvidia-gpu-device-plugin
-minikube addons enable storage-provisioner-rancher
-```
-
 ## Usage
 
 Jobs are submitted via the `nv-ingest-cli` command.
@@ -263,6 +253,11 @@ Validate that the configuration was applied by running the following code.
 ```bash
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
+
+A sample Helm values file for adjusting k8s request/limit resources are adjusted for MIG can be located at `mig/nv-ingest-mig-values.yaml`.
+Note you can apply multiple Helm values files at deploy time so this should be used in conjunction with your original Helm command
+and appending `-f mig/nv-ingest-mig-values.yaml`. Please note this is only an example file and should be adjusted for your environment
+specific needs.
 
 #### Executing Jobs
 
