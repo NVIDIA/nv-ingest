@@ -531,8 +531,8 @@ def pdfium_extractor(
                 if extract_page_as_image:
                     scale_tuple, padding_tuple = None, None
                 else:
-                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                    scale_tuple = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT)
+                    padding_tuple = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT)
 
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
