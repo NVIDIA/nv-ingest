@@ -42,7 +42,8 @@ requirements:
     - opentelemetry-sdk>=1.27.0
     - protobuf=5.28.3
     - pydantic>=2.0.0
-    - pypdfium2>=4.30.0
+    - pydantic-settings>=2.0.0
+    - pypdfium2=4.30.1
     - pytest>=8.0.2
     - pytest-mock>=3.14.0
     - python>=3.12
@@ -50,9 +51,6 @@ requirements:
     - python-dotenv>=1.0.1
     - python-magic>=0.4.27
     - python-pptx>=1.0.2
-    - pytorch>=2.4.1  # https://github.com/pytorch/pytorch/issues/111469
-    - ray-all>=2.37.0
-    - redis-py>=5.2.1
     - requests>=2.28.2
     - scipy>=1.15.1
     - setuptools>=78.1.1
@@ -61,8 +59,6 @@ requirements:
     - torchvision
     - tqdm>=4.67.1
     - transformers>=4.47.0
-    # - unstructured-client>=0.25.9
-    - uvicorn
   pip:
     - nvidia-riva-client==2.20.0
     - markitdown
