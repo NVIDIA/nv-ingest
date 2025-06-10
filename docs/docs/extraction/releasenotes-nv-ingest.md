@@ -11,12 +11,13 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and feature expansions, including the following:
 
 - Improve reranker accuracy.
+- Upgrade Python version from 3.10 to 3.12
 - Helm deployment now has similar throughput performance to docker deployment.
+- Add support for the latest version of the OpenAI API.
 - Add MIG support. For details, see [Enable NVIDIA GPU MIG](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enable-nvidia-gpu-mig).
 - Add time slicing support. For details, see [Enable GPU time-slicing](https://github.com/nkmcalli/nv-ingest/blob/main/helm/README.md#enabling-gpu-time-slicing).
+- Add support for RIVA NIM for optional audio extraction. For details, see [helm/values.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/helm/values.yaml).
 - New notebook for [How to add metadata to your documents and filter searches](https://github.com/nkmcalli/nv-ingest/blob/main/examples/metadata_and_filtered_search.ipynb).
-- Upgrade Python version from 3.10 to 3.12
-- Add support for the latest version of the OpenAI API.
 
 
 ### Breaking Changes
@@ -25,7 +26,7 @@ There are no breaking changes in this version.
 
 ### Upgrade
 
-To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/main/helm/values.yaml).
 
 
 
