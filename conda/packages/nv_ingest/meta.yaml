@@ -60,9 +60,6 @@ requirements:
     - torchvision
     - tqdm>=4.67.1
     - transformers>=4.47.0
-  pip:
-    - nvidia-riva-client==2.20.0
-    - markitdown
 
   test:
     commands:
