@@ -30,8 +30,9 @@ if not perf_logger.hasHandlers():
 
 # Initialize your inference API.
 scene_text = SceneTextAPI("rtx_v2")
-
+IDLE_BYTES = 1024 * 1024 * 1024 * 20  # 20GB
 app = FastAPI()
+
 
 
 # Custom JSON encoder to support torch.Tensor and objects with __dict__
@@ -67,6 +68,17 @@ def load_image_as_tensor(image_path):
     image_bytes = read_file(image_path)
     tensor = decode_image(image_bytes, mode=ImageReadMode.RGB)
     return tensor
+
+
+def _maybe_flush():
+    reserved = torch.cuda.memory_reserved()
+    allocated = torch.cuda.memory_allocated()
+    idle = reserved - allocated
+    if idle <= IDLE_BYTES:
+        return                             # cache small enough – skip
+    torch.cuda.synchronize()               # finish in-flight kernels
+    torch.cuda.empty_cache()               # drop idle blocks
+    torch.cuda.ipc_collect()               # clear inter-proc handles
 
 
 def decode_base64_image_torch(data_url: str) -> torch.Tensor:
@@ -109,6 +121,7 @@ class ImageDataset(Dataset):
         return tensor
 
 
+
 @app.post("/infer_single")
 def infer_single(single_item: InferenceRequest):
     try:
@@ -127,6 +140,7 @@ def infer_single(single_item: InferenceRequest):
         inference_end = time.time()
         inference_time = inference_end - inference_start
 
+        _maybe_flush()
         # Log performance metrics using the performance logger.
         perf_logger.info(
             f"Single inference - Data Loading time: {data_loading_time:.4f} s, Inference time: {inference_time:.4f} s"
@@ -176,6 +190,7 @@ def infer(batch: BatchRequest):
             f"Inference: {total_inference_time:.4f}s"
         )
 
+        _maybe_flush()
         return JSONResponse(content=json.loads(json.dumps(outputs, cls=CustomEncoder)))
     except Exception as e:
         return JSONResponse(content={"error": str(e)})
