@@ -2,22 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-build>=1.2.2
-diskcache>=5.6.3
-gunicorn
-h11>=0.16.0
 llama-index-embeddings-nvidia
-markitdown
 nvidia-riva-client==2.20.0
 opencv-python
-prometheus-client
 pymilvus>=2.5.10
 pymilvus[bulk_writer, model]>=2.5.10
-pytest-cov>=6.0.0
-ray[all]>=2.37.0
-torch>=2.4.1
-redis>=5.2.1
-scikit-learn>=1.6.0
-tritonclient
-unstructured-client
-uvicorn

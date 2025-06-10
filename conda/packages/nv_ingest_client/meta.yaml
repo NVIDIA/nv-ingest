@@ -13,7 +13,8 @@ package:
   version: {{ environ.get('NV_INGEST_CLIENT_VERSION', 'Unknown') }}
 
 source:
-  path: {{ git_root }}
+  - path: {{ git_root }}
+  - path: . # Ensure that requirements.txt is present at build time
 
 build:
   number: 0

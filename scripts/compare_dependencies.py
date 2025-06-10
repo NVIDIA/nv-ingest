@@ -147,7 +147,7 @@ def main():
     # There are certain dependencies that are not applicable between conda and pyproject.
     # Ex: Conda defines Python version but PyProjects do not. So that will always cause
     # a breaking diff in this script so it should be removed.
-    deps_to_ignore = ["python", "pip"]
+    deps_to_ignore = ["build", "python", "pip"]
 
     for dep in only_in_meta.copy():
         for ignore_dep in deps_to_ignore:
@@ -160,6 +160,10 @@ def main():
             if dep.startswith(ignore_dep):
                 print(f"Ignoring Dependency: {dep}")
                 only_in_pyproject.discard(dep)
+
+    # Certain dependencies have different names between Conda host and pypi.
+    # Those should be ignored, at least the name here as well
+    # dep_name_map = {"redis", "redis-py"}
 
     print("\nDependencies only in meta.yaml:")
     for dep in sorted(only_in_meta):
