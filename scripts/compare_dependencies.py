@@ -8,14 +8,16 @@ from pathlib import Path
 
 from conda_build.api import render
 
+
 def normalize_dependency(dep):
     """Normalize a dependency to a name=version or name format for comparison"""
-    match = re.match(r'^([a-zA-Z0-9_.\-]+)([><=!\s\d\.\*]*)$', dep.strip())
+    match = re.match(r"^([a-zA-Z0-9_.\-]+)([><=!\s\d\.\*]*)$", dep.strip())
     if match:
         name = match.group(1).lower()
         version = match.group(2).strip()
         return f"{name} {version}".strip()
     return dep.strip().lower()
+
 
 def normalize_version_syntax(dep_string):
     """
@@ -51,7 +53,7 @@ def normalize_version_syntax(dep_string):
     # Else: keep >=, <=, !=, >, < unchanged
 
     return f"{name} {version_spec}".strip()
-    
+
 
 def parse_meta_yaml(meta_path):
     """Uses conda-build to render meta.yaml and extract dependencies."""
@@ -66,7 +68,7 @@ def parse_meta_yaml(meta_path):
     deps = set()
     try:
         meta = yaml.safe_load(meta_str)
-        run_deps = meta['requirements']['run']
+        run_deps = meta["requirements"]["run"]
         deps.update(normalize_dependency(d) for d in run_deps)
     except Exception as e:
         print(f"Error extracting dependencies from rendered meta.yaml: {e}")
@@ -74,30 +76,31 @@ def parse_meta_yaml(meta_path):
 
 
 def parse_pyproject_toml(pyproject_path):
-    with open(pyproject_path, 'r') as f:
+    with open(pyproject_path, "r") as f:
         pyproject = toml.load(f)
 
     deps = set()
     try:
-        if 'project' in pyproject:
-            deps.update(normalize_dependency(d) for d in pyproject['project'].get('dependencies', []))
-        elif 'tool' in pyproject and 'poetry' in pyproject['tool']:
-            poetry_deps = pyproject['tool']['poetry'].get('dependencies', {})
+        if "project" in pyproject:
+            deps.update(normalize_dependency(d) for d in pyproject["project"].get("dependencies", []))
+        elif "tool" in pyproject and "poetry" in pyproject["tool"]:
+            poetry_deps = pyproject["tool"]["poetry"].get("dependencies", {})
             for name, version in poetry_deps.items():
-                if name.lower() == 'python':
+                if name.lower() == "python":
                     continue  # Skip base Python version
                 if isinstance(version, str):
                     deps.add(normalize_dependency(f"{name} {version}"))
-                elif isinstance(version, dict) and 'version' in version:
+                elif isinstance(version, dict) and "version" in version:
                     deps.add(normalize_dependency(f"{name} {version['version']}"))
     except Exception as e:
         print(f"Error parsing pyproject.toml dependencies: {e}")
     return deps
 
+
 def main():
     parser = argparse.ArgumentParser(description="Compare dependencies between meta.yaml and pyproject.toml")
-    parser.add_argument('--meta', required=True, help="Path to Conda meta.yaml")
-    parser.add_argument('--pyproject', required=True, help="Path to pyproject.toml")
+    parser.add_argument("--meta", required=True, help="Path to Conda meta.yaml")
+    parser.add_argument("--pyproject", required=True, help="Path to pyproject.toml")
 
     args = parser.parse_args()
 
@@ -115,6 +118,7 @@ def main():
     print("\nDependencies only in pyproject.toml:")
     for dep in sorted(only_in_pyproject):
         print(f"  {dep}")
+
 
 if __name__ == "__main__":
     main()
