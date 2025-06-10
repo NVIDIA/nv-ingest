@@ -19,6 +19,7 @@ build:
   number: 0
   string: py{{ py_version }}_{{ GIT_SHA }}
   script:
+    - pip install -r requirements.txt
     - {{ PYTHON }} -m pip install . --no-deps -vv
 
 requirements:
