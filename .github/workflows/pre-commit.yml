@@ -47,15 +47,7 @@ jobs:
 
           python scripts/compare_dependencies.py \
             --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
-            --pyproject ./api/pyproject.toml > result.txt
-
-          echo "Comparison Output:"
-          cat result.txt
-
-          if grep -q "Dependencies only in" result.txt; then
-            echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
-            exit 1
-          fi
+            --pyproject ./api/pyproject.toml
         shell: bash -l {0}
 
       - name: Compare Conda and PyProject nv-ingest-client dependencies
@@ -66,15 +58,7 @@ jobs:
 
           python scripts/compare_dependencies.py \
             --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
-            --pyproject ./client/pyproject.toml > result.txt
-
-          echo "Comparison Output:"
-          cat result.txt
-
-          if grep -q "Dependencies only in" result.txt; then
-            echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
-            exit 1
-          fi
+            --pyproject ./client/pyproject.toml
         shell: bash -l {0}
 
       - name: Compare Conda and PyProject nv-ingest dependencies
@@ -85,13 +69,5 @@ jobs:
 
           python scripts/compare_dependencies.py \
             --meta ./conda/packages/${NV_INGEST_PROJ}/meta.yaml \
-            --pyproject ./src/pyproject.toml > result.txt
-
-          echo "Comparison Output:"
-          cat result.txt
-
-          if grep -q "Dependencies only in" result.txt; then
-            echo "::error::Dependency versions do not match for ${NV_INGEST_PROJ} between meta.yaml and pyproject.toml"
-            exit 1
-          fi
+            --pyproject ./src/pyproject.toml
         shell: bash -l {0}

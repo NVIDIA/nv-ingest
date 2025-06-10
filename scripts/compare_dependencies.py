@@ -4,6 +4,7 @@ import argparse
 import yaml
 import toml
 import re
+import sys
 from pathlib import Path
 
 from conda_build.api import render
@@ -118,6 +119,12 @@ def main():
     print("\nDependencies only in pyproject.toml:")
     for dep in sorted(only_in_pyproject):
         print(f"  {dep}")
+
+    if only_in_meta or only_in_pyproject:
+        sys.exit(1)
+
+    print("✅ Dependencies match exactly.")
+    sys.exit(0)
 
 
 if __name__ == "__main__":
