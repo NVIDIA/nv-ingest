@@ -23,7 +23,7 @@ jobs:
           miniforge-variant: Mambaforge
           miniforge-version: latest
           activate-environment: lean-env
-          auto-update-conda: false
+          auto-update-conda: true
           auto-activate-base: true
           environment-file: ""
           use-mamba: true
