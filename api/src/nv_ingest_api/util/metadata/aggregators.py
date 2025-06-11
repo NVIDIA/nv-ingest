@@ -148,12 +148,11 @@ def construct_text_metadata(
     delimiter=" ",
     bbox_max_dimensions: Tuple[int, int] = (-1, -1),
     nearby_objects: Optional[Dict[str, Any]] = None,
-    content_type: None | ContentTypeEnum | str = None,
 ):
     extracted_text = delimiter.join(accumulated_text)
 
     content_metadata = {
-        "type": content_type or ContentTypeEnum.TEXT,
+        "type": ContentTypeEnum.TEXT,
         "description": ContentDescriptionEnum.PDF_TEXT,
         "page_number": page_idx,
         "hierarchy": {
@@ -202,6 +201,7 @@ def construct_image_metadata_from_base64(
     page_count: int,
     source_metadata: Dict[str, Any],
     base_unified_metadata: Dict[str, Any],
+    content_type: None | ContentTypeEnum | str = None,
 ) -> List[Any]:
     """
     Extracts image data from a base64-encoded image string, decodes the image to get
@@ -243,7 +243,7 @@ def construct_image_metadata_from_base64(
 
     # Construct content metadata
     content_metadata: Dict[str, Any] = {
-        "type": ContentTypeEnum.IMAGE,
+        "type": content_type or ContentTypeEnum.IMAGE,
         "description": ContentDescriptionEnum.PDF_IMAGE,
         "page_number": page_idx,
         "hierarchy": {
