@@ -567,7 +567,7 @@ def _pull_text(
     verify_emb = verify_embedding(element)
     if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
-        pg_num = element["metadata"]["content_metadata"].get("page_number")
+        pg_num = element["metadata"]["content_metadata"].get("page_number", None)
         doc_type = element["document_type"]
         if not verify_emb:
             logger.debug(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
@@ -578,8 +578,8 @@ def _pull_text(
     if text and len(text) > 65535:
         logger.warning(
             f"Text is too long, skipping. It is advised to use SplitTask, to make smaller chunk sizes."
-            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata']['source_name']} "
-            f"page_number: {element['metadata']['content_metadata']['page_number']}"
+            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata'].get('source_name', None)} "
+            f"page_number: {element['metadata']['content_metadata'].get('page_number', None)}"
         )
         text = None
     return text
