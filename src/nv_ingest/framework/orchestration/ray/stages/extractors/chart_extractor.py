@@ -59,10 +59,6 @@ class ChartExtractorStage(RayActorStage):
         IngestControlMessage
             The updated message with the extracted chart data and extraction info in metadata.
         """
-        for task in control_message.get_tasks():
-            if (task.type == "embed") and (task.properties["structured_elements_modality"] == "image"):
-                return control_message
-
         logger.info("ChartExtractorStage.on_data: Starting chart extraction.")
         # Extract the DataFrame payload.
         df_payload = control_message.payload()

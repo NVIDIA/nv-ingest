@@ -32,10 +32,6 @@ class InfographicExtractorStage(RayActorStage):
     @filter_by_task(required_tasks=["infographic_data_extract"])
     @nv_ingest_node_failure_try_except(annotation_id="infographic_extraction", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
-        for task in control_message.get_tasks():
-            if (task.type == "embed") and (task.properties["structured_elements_modality"] == "image"):
-                return control_message
-
         # Extract DataFrame payload
         df_ledger = control_message.payload()
 
