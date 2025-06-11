@@ -366,7 +366,7 @@ def _get_pandas_page_image_content(row, modality="image"):
     str
         The image caption from the row.
     """
-    return _format_image_input_string(row.pop("content"))
+    return _format_image_input_string(row.get("content"))
 
 
 # ------------------------------------------------------------------------------
