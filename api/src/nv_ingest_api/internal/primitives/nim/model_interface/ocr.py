@@ -129,8 +129,16 @@ class OCRModelInterface(ModelInterface):
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC OCR model (batched).")
             processed: List[np.ndarray] = []
+
+            max_length = max(max(img.shape[:2]) for img in images)
+
             for img in images:
-                arr, _dims = preprocess_image_for_ocr(img, scale=False, normalize=False, pad=False)
+                arr, _dims = preprocess_image_for_ocr(
+                    img,
+                    target_height=max_length,
+                    target_width=max_length,
+                    pad_how="bottom_right",
+                )
                 dims.append(_dims)
                 arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
@@ -382,8 +390,6 @@ class OCRModelInterface(ModelInterface):
                 text_predictions,
                 dimensions,
                 img_index=i,
-                scale_coordinates=False,
-                shift_coordinates=False,
             )
 
             results.append([bounding_boxes, text_predictions])
@@ -396,8 +402,8 @@ class OCRModelInterface(ModelInterface):
         text_predictions: List[str],
         dims: Optional[List[Dict[str, Any]]] = None,
         img_index: int = 0,
-        scale_coordinates: bool = True,
-        shift_coordinates: bool = True,
+        scale_coordinates: bool = False,
+        shift_coordinates: bool = False,
     ) -> Tuple[List[Any], List[str]]:
         """
         Convert bounding boxes with normalized coordinates to pixel cooridnates by using
