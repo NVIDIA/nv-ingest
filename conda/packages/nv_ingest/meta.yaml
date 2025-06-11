@@ -24,8 +24,8 @@ build:
 requirements:
   build:
     - pip
-    - python=3.12
-    - setuptools>=58.2.0
+    - python=3.12.11
+    - setuptools>=78.1.1
   run:
     - azure-core>=1.32.0
     - click>=8.1.7
@@ -40,6 +40,7 @@ requirements:
     - opentelemetry-api>=1.27.0
     - opentelemetry-exporter-otlp>=1.27.0
     - opentelemetry-sdk>=1.27.0
+    - protobuf=5.28.3
     - pydantic>=2.0.0
     - pypdfium2>=4.30.0
     - pytest>=8.0.2
@@ -49,12 +50,12 @@ requirements:
     - python-dotenv>=1.0.1
     - python-magic>=0.4.27
     - python-pptx>=1.0.2
-    - pytorch==2.4.1  # https://github.com/pytorch/pytorch/issues/111469
+    - pytorch>=2.4.1  # https://github.com/pytorch/pytorch/issues/111469
     - ray-all>=2.37.0
     - redis-py>=5.2.1
     - requests>=2.28.2
     - scipy>=1.15.1
-    - setuptools>=58.2.0
+    - setuptools>=78.1.1
     - tabulate>=0.9.0
     - torchaudio
     - torchvision
@@ -63,7 +64,8 @@ requirements:
     # - unstructured-client>=0.25.9
     - uvicorn
   pip:
-    - nvidia-riva-client>=2.18.0
+    - nvidia-riva-client==2.20.0
+    - markitdown
 
   test:
     commands:

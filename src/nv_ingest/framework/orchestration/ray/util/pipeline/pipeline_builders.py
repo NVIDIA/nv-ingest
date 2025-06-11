@@ -19,6 +19,7 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_image_extractor_stage,
     add_docx_extractor_stage,
     add_audio_extractor_stage,
+    add_html_extractor_stage,
     add_image_dedup_stage,
     add_image_filter_stage,
     add_table_extractor_stage,
@@ -55,7 +56,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
         export_config_to_env(ingest_config)
 
     current_level = logging.getLogger().getEffectiveLevel()
-    ray.init(
+    ray_context = ray.init(
         namespace="nv_ingest_ray",
         logging_level=current_level,
         ignore_reinit_error=True,
@@ -106,6 +107,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     docx_extractor_stage_id = add_docx_extractor_stage(pipeline, default_cpu_count)
     pptx_extractor_stage_id = add_pptx_extractor_stage(pipeline, default_cpu_count)
     audio_extractor_stage_id = add_audio_extractor_stage(pipeline, default_cpu_count)
+    html_extractor_stage_id = add_html_extractor_stage(pipeline, default_cpu_count)
     post_extraction_gather_stage_id = add_gather_stage(pipeline, default_cpu_count)
     ########################################################################################################
 
@@ -168,6 +170,8 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     # pipeline.make_edge(
     #    infographic_extraction_stage_id, post_extraction_gather_stage_id, queue_size=ingest_edge_buffer_size
     # )
+    pipeline.make_edge(image_extractor_stage_id, html_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(html_extractor_stage_id, infographic_extraction_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Extractors ########
     # pipeline.make_edge(post_extraction_gather_stage_id, table_extraction_stage_id, queue_size=ingest_edge_buffer_size)
@@ -203,3 +207,5 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     #    pipe.add_edge(sink_stage, otel_tracer_stage)
 
     # pipe.add_edge(otel_tracer_stage, completed_job_counter_stage)
+
+    return ray_context

@@ -25,6 +25,7 @@ from nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extract
 from nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor import PDFExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor import PPTXExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor import TableExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor import HtmlExtractorStage
 
 from nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector import MetadataInjectionStage
 from nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup import ImageDedupStage
@@ -51,6 +52,7 @@ from nv_ingest_api.internal.schemas.extract.extract_image_schema import ImageCon
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_pptx_schema import PPTXExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_html_schema import HtmlExtractorSchema
 from nv_ingest_api.internal.schemas.mutate.mutate_image_dedup_schema import ImageDedupSchema
 from nv_ingest_api.internal.schemas.store.store_embedding_schema import EmbeddingStorageSchema
 from nv_ingest_api.internal.schemas.store.store_image_schema import ImageStorageModuleSchema
@@ -403,6 +405,19 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
     return stage_name
 
 
+def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extractor"):
+
+    pipeline.add_stage(
+        name=stage_name,
+        stage_actor=HtmlExtractorStage,
+        config=HtmlExtractorSchema(),
+        min_replicas=0,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+    )
+
+    return stage_name
+
+
 def add_otel_tracer_stage(pipeline, default_cpu_count, stage_name="otel_tracer"):
     _ = default_cpu_count  # Placeholder for future use
     otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
@@ -484,7 +499,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
         **{
             "api_key": auth_token,
             "endpoint_url": endpoint_url,
-            "image_caption_model_name": model_name,
+            "model_name": model_name,
             "prompt": "Caption the content of this image:",
         }
     )
