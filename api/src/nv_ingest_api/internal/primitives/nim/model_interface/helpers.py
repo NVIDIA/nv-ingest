@@ -39,8 +39,6 @@ def preprocess_image_for_ocr(
     """
     height, width = array.shape[:2]
 
-    array = array / 255.0
-
     padded, (pad_width, pad_height) = pad_image(
         array,
         target_height=target_height,
@@ -49,6 +47,8 @@ def preprocess_image_for_ocr(
         dtype=np.float32,
         how=pad_how,
     )
+
+    padded = padded / 255.0
 
     # NemoRetriever-OCR NIM (GRPC) requires input to be (channel, height, width).
     transposed = padded.transpose((2, 0, 1))

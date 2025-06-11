@@ -390,6 +390,7 @@ class OCRModelInterface(ModelInterface):
                 text_predictions,
                 dimensions,
                 img_index=i,
+                scale_coordinates=False,
             )
 
             results.append([bounding_boxes, text_predictions])
@@ -402,8 +403,8 @@ class OCRModelInterface(ModelInterface):
         text_predictions: List[str],
         dims: Optional[List[Dict[str, Any]]] = None,
         img_index: int = 0,
-        scale_coordinates: bool = False,
-        shift_coordinates: bool = False,
+        scale_coordinates: bool = True,
+        shift_coordinates: bool = True,
     ) -> Tuple[List[Any], List[str]]:
         """
         Convert bounding boxes with normalized coordinates to pixel cooridnates by using
