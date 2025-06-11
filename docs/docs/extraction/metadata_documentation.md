@@ -179,5 +179,3 @@ This schema relies on several enums defined in `nv_ingest_api.internal.enums.com
 *   `StatusEnum`: Defines processing statuses (e.g., `SUCCESS`, `FAILURE`, `PROCESSING`, `INFO`, `WARNING`).
 *   `DocumentTypeEnum`: Defines types of source documents (e.g., `PDF`, `DOCX`, `TXT`, `URL`, `PNG`, `MP3`).
 *   `TaskTypeEnum`: Defines types of processing tasks (e.g., `EXTRACTION`, `EMBEDDING`, `STORAGE`).
-
-This documentation should serve as a reference for understanding and working with the metadata structures within the NVIDIA Ingest Framework.
