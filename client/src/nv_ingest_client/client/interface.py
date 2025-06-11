@@ -314,6 +314,9 @@ class Ingestor:
             results = results_data  # type: ignore
             failures = None
 
+        if len(failures) > 0:
+            raise RuntimeError(f"Failed to ingest documents: {failures}")
+
         if self._vdb_bulk_upload:
             self._vdb_bulk_upload.run(results)
 
