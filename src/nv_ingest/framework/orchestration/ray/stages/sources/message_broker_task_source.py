@@ -304,14 +304,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         return control_message
 
-    def on_data(self, control_message: any) -> any:
-        """
-        Process the control message.
-        For this source stage, no additional processing is done, so simply return it.
-        """
-        self._logger.debug("on_data: Received control message for processing")
-        return control_message
-
     # In the processing loop, instead of checking a boolean, we wait on the event.
     def _processing_loop(self) -> None:
         """
@@ -336,7 +328,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self._active_processing = True
 
                 self._logger.debug("Control message received; processing data")
-                updated_cm = self.on_data(control_message)
 
                 # Block until not paused using the pause event.
                 if self.output_queue is not None:
@@ -349,7 +340,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
                     while True:
                         try:
-                            self.output_queue.put(updated_cm)
+                            self.output_queue.put(control_message)
                             self.stats["successful_queue_writes"] += 1
                             break
                         except Exception:

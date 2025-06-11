@@ -46,7 +46,7 @@ def run_ingestor():
             text_depth="page",
         )
         .split(chunk_size=1024, chunk_overlap=150)
-        # .embed()
+        .embed()
     )
 
     try:
