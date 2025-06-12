@@ -38,15 +38,15 @@ class MockControlMessage:
 
 
 # Mocked function to be decorated
-def test_function(control_message):
+def mock_test_function(control_message):
     return "Test Function Executed"
 
 
 # Decorating the test function
-decorated_test_function = latency_logger()(test_function)
+decorated_test_function = latency_logger()(mock_test_function)
 
 # Decorating with custom name
-decorated_test_function_custom_name = latency_logger(name="CustomName")(test_function)
+decorated_test_function_custom_name = latency_logger(name="CustomName")(mock_test_function)
 
 
 @pytest.fixture
@@ -60,7 +60,7 @@ def test_latency_logger_without_existing_metadata(mock_logging, control_message)
 
     assert result == "Test Function Executed"
     assert not mock_logging.debug.called  # No existing ts_send, no log about "since ts_send"
-    assert control_message.filter_timestamp("latency::test_function::elapsed_time")
+    assert control_message.filter_timestamp("latency::mock_test_function::elapsed_time")
 
 
 def test_latency_logger_with_custom_name(control_message):
