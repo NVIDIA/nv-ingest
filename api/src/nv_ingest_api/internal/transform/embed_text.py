@@ -342,7 +342,13 @@ def _get_pandas_image_content(row, modality="text"):
     str
         The image caption from the row.
     """
-    return row.get("image_metadata", {}).get("caption")
+    subtype = row.get("content_metadata", {}).get("subtype")
+    if subtype == "page_image":
+        content = row.get("image_metadata", {}).get("text")
+    else:
+        content = row.get("image_metadata", {}).get("caption")
+
+    return content
 
 
 def _get_pandas_audio_content(row, modality="text"):
@@ -507,7 +513,6 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.IMAGE: _get_pandas_image_content,
         ContentTypeEnum.AUDIO: _get_pandas_audio_content,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
-        ContentTypeEnum.PAGE_IMAGE: _get_pandas_page_image_content,
     }
     task_type_to_modality = {
         ContentTypeEnum.TEXT: task_config.get("text_elements_modality") or transform_config.text_elements_modality,
@@ -516,7 +521,6 @@ def transform_create_text_embeddings_internal(
         ContentTypeEnum.IMAGE: task_config.get("image_elements_modality") or transform_config.image_elements_modality,
         ContentTypeEnum.AUDIO: task_config.get("audio_elements_modality") or transform_config.audio_elements_modality,
         ContentTypeEnum.VIDEO: lambda x: None,  # Not supported yet.
-        ContentTypeEnum.PAGE_IMAGE: "image",
     }
 
     def _content_type_getter(row):

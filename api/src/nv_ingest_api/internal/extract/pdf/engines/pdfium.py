@@ -529,6 +529,7 @@ def pdfium_extractor(
 
             # Full page image extraction
             if extract_page_as_image:
+                page_text = _extract_page_text(page)
                 image, _ = pdfium_pages_to_numpy([page], trace_info=execution_trace_log)
                 base64_image = numpy_to_base64(image[0])
                 image_meta = construct_image_metadata_from_base64(
@@ -537,7 +538,8 @@ def pdfium_extractor(
                     page_count,
                     source_metadata,
                     base_unified_metadata,
-                    content_type=ContentTypeEnum.PAGE_IMAGE,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
                 )
                 extracted_data.append(image_meta)
 

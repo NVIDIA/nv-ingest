@@ -201,7 +201,8 @@ def construct_image_metadata_from_base64(
     page_count: int,
     source_metadata: Dict[str, Any],
     base_unified_metadata: Dict[str, Any],
-    content_type: None | ContentTypeEnum | str = None,
+    subtype: None | ContentTypeEnum | str = "",
+    text: str = "",
 ) -> List[Any]:
     """
     Extracts image data from a base64-encoded image string, decodes the image to get
@@ -243,7 +244,7 @@ def construct_image_metadata_from_base64(
 
     # Construct content metadata
     content_metadata: Dict[str, Any] = {
-        "type": content_type or ContentTypeEnum.IMAGE,
+        "type": ContentTypeEnum.IMAGE,
         "description": ContentDescriptionEnum.PDF_IMAGE,
         "page_number": page_idx,
         "hierarchy": {
@@ -253,6 +254,7 @@ def construct_image_metadata_from_base64(
             "line": -1,
             "span": -1,
         },
+        "subtype": subtype or "",
     }
 
     # Construct image metadata
@@ -260,7 +262,7 @@ def construct_image_metadata_from_base64(
         "image_type": DocumentTypeEnum.PNG,
         "structured_image_type": ContentTypeEnum.UNKNOWN,
         "caption": "",
-        "text": "",
+        "text": text,
         "image_location": bbox,
         "image_location_max_dimensions": (width, height),
         "height": height,
