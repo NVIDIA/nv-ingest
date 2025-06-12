@@ -17,6 +17,7 @@ services:
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=1024
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
@@ -97,6 +98,7 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
+      - NIM_MANIFEST_PROFILE=5824334ac3aae1550333eca1d2287f51be0b25e1690a8141392ee48946ec14dc
         #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
@@ -281,7 +283,7 @@ services:
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
-      - OCR_INFER_PROTOCOL=grpc
+      - OCR_INFER_PROTOCOL=http
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- OCR_INFER_PROTOCOL=http
@@ -289,7 +291,7 @@ services:
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      - YOLOX_INFER_PROTOCOL=http
       # build.nvidia.com hosted endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
@@ -361,7 +363,7 @@ services:
     volumes:
       - ./config/prometheus.yaml:/etc/prometheus/prometheus-config.yaml
     ports:
-      - "9090:9090"
+      - "6090:9090"
 
   grafana:
     container_name: grafana-service
