@@ -10,6 +10,12 @@ There are two ways that NV Ingest chunks text:
 - Token-based splitting by using the `split` task.
 
 
+!!! warning
+
+    NeMo Retriever extraction is designed to process language and language-length strings. If you submit a document that contains extremely long, or non-language text strings, such as a DNA sequence, errors or unexpected results occur.
+
+
+
 ## Extraction Text Depth
 
 You can use the `text_depth` parameter to specify how extracted text is chunked together by the extractor. 

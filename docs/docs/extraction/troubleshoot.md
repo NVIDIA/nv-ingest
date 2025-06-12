@@ -3,6 +3,14 @@
 Use this documentation to troubleshoot issues that arise when you use [NeMo Retriever extraction](overview.md).
 
 
+## Can't process long, non-language text strings
+
+NeMo Retriever extraction is designed to process language and language-length strings. 
+If you submit a document that contains extremely long, or non-language text strings, 
+such as a DNA sequence, errors or unexpected results occur.
+
+
+
 ## Can't process malformed input files
 
 When you run a job you might see errors similar to the following:
