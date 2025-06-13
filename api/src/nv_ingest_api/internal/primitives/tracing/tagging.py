@@ -71,45 +71,54 @@ def traceable(trace_name=None):
             else:
                 raise ValueError("traceable decorator could not find a message argument with 'has_metadata()'")
 
-            messages = message_arg if isinstance(message_arg, list) else [message_arg]
+            messages_in = message_arg if isinstance(message_arg, list) else [message_arg]
 
             trace_prefix = trace_name if trace_name else func.__name__
 
-            for msg in messages:
-                if not hasattr(msg, "has_metadata"):
-                    continue
+            try:
+                for msg in messages_in:
+                    if not hasattr(msg, "has_metadata"):
+                        continue
 
-                do_trace_tagging = (
-                    msg.has_metadata("config::add_trace_tagging")
-                    and msg.get_metadata("config::add_trace_tagging") is True
-                )
+                    do_trace_tagging = (
+                        msg.has_metadata("config::add_trace_tagging")
+                        and msg.get_metadata("config::add_trace_tagging") is True
+                    )
 
-                if do_trace_tagging:
-                    ts_send = msg.get_timestamp("latency::ts_send")
-                    ts_entry = datetime.now()
-                    msg.set_timestamp(f"trace::entry::{trace_prefix}", ts_entry)
-                    if ts_send:
-                        msg.set_timestamp(f"trace::entry::{trace_prefix}_channel_in", ts_send)
-                        msg.set_timestamp(f"trace::exit::{trace_prefix}_channel_in", ts_fetched)
+                    if do_trace_tagging:
+                        ts_send = msg.get_timestamp("latency::ts_send")
+                        ts_entry = datetime.now()
+                        msg.set_timestamp(f"trace::entry::{trace_prefix}", ts_entry)
+                        if ts_send:
+                            msg.set_timestamp(f"trace::entry::{trace_prefix}_channel_in", ts_send)
+                            msg.set_timestamp(f"trace::exit::{trace_prefix}_channel_in", ts_fetched)
+            except Exception as e:
+                print(f"Error in traceable decorator for: {messages_in}\n{e}")
 
             # Call the decorated function
-            result = func(*args, **kwargs)
+            messages_out = func(*args, **kwargs)
 
-            for msg in messages:
-                if not hasattr(msg, "has_metadata"):
-                    continue
+            if not isinstance(messages_out, list):
+                messages_out = [messages_out]
 
-                do_trace_tagging = (
-                    msg.has_metadata("config::add_trace_tagging")
-                    and msg.get_metadata("config::add_trace_tagging") is True
-                )
+            try:
+                for msg in messages_out:
+                    if not hasattr(msg, "has_metadata"):
+                        continue
 
-                if do_trace_tagging:
-                    ts_exit = datetime.now()
-                    msg.set_timestamp(f"trace::exit::{trace_prefix}", ts_exit)
-                    msg.set_timestamp("latency::ts_send", ts_exit)
+                    do_trace_tagging = (
+                        msg.has_metadata("config::add_trace_tagging")
+                        and msg.get_metadata("config::add_trace_tagging") is True
+                    )
 
-            return result
+                    if do_trace_tagging:
+                        ts_exit = datetime.now()
+                        msg.set_timestamp(f"trace::exit::{trace_prefix}", ts_exit)
+                        msg.set_timestamp("latency::ts_send", ts_exit)
+            except Exception as e:  # pylint: disable=broad-except
+                print(f"Error in traceable decorator for: {messages_out}\n{e}")  # t
+
+            return messages_out
 
         return wrapper_trace_tagging
 

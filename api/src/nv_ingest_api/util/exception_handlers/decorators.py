@@ -89,12 +89,33 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
 
                     # Success annotation
                     logger.debug(f"async_wrapper for {func_name}: Annotating success.")
-                    annotate_task_result(
-                        control_message=result if result is not None else control_message,
-                        # Annotate result if func returns it, else original message
-                        result=TaskResultStatus.SUCCESS,
-                        task_id=annotation_id,
-                    )
+
+                    messages_to_annotate_success = []
+                    if result is not None:
+                        if isinstance(result, list):
+                            messages_to_annotate_success.extend(result)
+                        else:
+                            messages_to_annotate_success.append(result)
+                    else:
+                        # If func returns None, consider annotating the original input message
+                        messages_to_annotate_success.append(control_message)
+
+                    for msg_to_annotate in messages_to_annotate_success:
+                        if hasattr(msg_to_annotate, "set_metadata") and hasattr(
+                            msg_to_annotate, "get_metadata"
+                        ):  # Check for message-like object
+                            annotate_task_result(
+                                control_message=msg_to_annotate,
+                                result=TaskResultStatus.SUCCESS,
+                                task_id=annotation_id,
+                            )
+                        elif msg_to_annotate is not None:  # Avoid warning for None items if func returned [None]
+                            logger.warning(
+                                f"async_wrapper for {func_name}:"
+                                f" Cannot annotate success on item of type {type(msg_to_annotate)}, "
+                                f"not a recognized message object."
+                            )
+
                     logger.debug(f"async_wrapper for {func_name}: Success annotation done. Returning result.")
                     return result
 
@@ -170,12 +191,31 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
 
                     # Success annotation
                     logger.debug(f"sync_wrapper for {func_name}: Annotating success.")
-                    annotate_task_result(
-                        control_message=result if result is not None else control_message,
-                        # Annotate result or original message
-                        result=TaskResultStatus.SUCCESS,
-                        task_id=annotation_id,
-                    )
+
+                    messages_to_annotate_success = []
+                    if result is not None:
+                        if isinstance(result, list):
+                            messages_to_annotate_success.extend(result)
+                        else:
+                            messages_to_annotate_success.append(result)
+                    else:
+                        messages_to_annotate_success.append(control_message)
+
+                    for msg_to_annotate in messages_to_annotate_success:
+                        if hasattr(msg_to_annotate, "set_metadata") and hasattr(
+                            msg_to_annotate, "get_metadata"
+                        ):  # Check for message-like object
+                            annotate_task_result(
+                                control_message=msg_to_annotate,
+                                result=TaskResultStatus.SUCCESS,
+                                task_id=annotation_id,
+                            )
+                        elif msg_to_annotate is not None:  # Avoid warning for None items if func returned [None]
+                            logger.warning(
+                                f"sync_wrapper for {func_name}: Cannot annotate success on item of type"
+                                f" {type(msg_to_annotate)}, not a recognized message object."
+                            )
+
                     logger.debug(f"sync_wrapper for {func_name}: Success annotation done. Returning result.")
                     return result
 
