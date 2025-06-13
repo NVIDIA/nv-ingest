@@ -354,7 +354,7 @@ class Ingestor:
         return self
 
     def ingest(
-        self, show_progress: bool = False, return_failures: bool = False, save_to_disk: bool = True, **kwargs: Any
+        self, show_progress: bool = False, return_failures: bool = False, save_to_disk: bool = False, **kwargs: Any
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
