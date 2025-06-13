@@ -294,13 +294,16 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
+        if self._vdb_bulk_upload:
+            return_failures = True
+
         results_data = self._client.process_jobs_concurrently(
             job_indices=self._job_ids,
             job_queue_id=self._job_queue_id,
             timeout=timeout,
             max_job_retries=max_job_retries,
             completion_callback=callback,
-            return_failures=True,
+            return_failures=return_failures,
             verbose=verbose,
             **proc_kwargs,
         )
