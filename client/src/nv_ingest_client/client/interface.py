@@ -300,7 +300,7 @@ class Ingestor:
             timeout=timeout,
             max_job_retries=max_job_retries,
             completion_callback=callback,
-            return_failures=return_failures,
+            return_failures=True,
             verbose=verbose,
             **proc_kwargs,
         )
