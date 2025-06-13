@@ -173,7 +173,7 @@ def transform_image_create_vlm_caption_internal(
     api_key: str = task_config.get("api_key") or transform_config.api_key
     prompt: str = task_config.get("prompt") or transform_config.prompt
     endpoint_url: str = task_config.get("endpoint_url") or transform_config.endpoint_url
-    model_name: str = task_config.get("image_caption_model_name") or transform_config.image_caption_model_name
+    model_name: str = task_config.get("model_name") or transform_config.model_name
 
     # Create a mask for rows where the content type is "image".
     df_mask: pd.Series = df_transform_ledger["metadata"].apply(

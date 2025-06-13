@@ -12,15 +12,17 @@ The main class in the nv-ingest API is `Ingestor`.
 The `Ingestor` class provides an interface for building, managing, and running data ingestion jobs, enabling for chainable task additions and job state tracking. 
 The following table describes methods of the `Ingestor` class.
 
-| Method | Description |
-| ------ | ----------- |
-| `files` | Add document paths for processing. |
-| `load` | Ensure files are locally accessible (downloads if needed). |
-| `extract` | Add an extraction task (text, tables, charts). |
-| `split` | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
-| `embed` | Generate embeddings from extracted content. |
-| `caption` | Extract captions from images within the document. |
-| `ingest` | Submit jobs and retrieve results synchronously. |
+| Method       | Description                       |
+|--------------|-----------------------------------|
+| `caption`    | Extract captions from images within the document. |
+| `embed`      | Generate embeddings from extracted content. |
+| `extract`    | Add an extraction task (text, tables, charts). |
+| `files`      | Add document paths for processing. |
+| `ingest`     | Submit jobs and retrieve results synchronously. |
+| `load`       | Ensure files are locally accessible (downloads if needed). |
+| `split`      | Split documents into smaller sections for processing. For more information, refer to [Split Documents](chunking.md). |
+| `vdb_upload` | Pushes extraction results to Milvus vector database. For more information, refer to [Data Upload](data-store.md). |
+
 
 ## Quick Start: Extracting PDFs
 

@@ -2,7 +2,11 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import multiprocessing
+import os
+import signal
 import threading
+from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
 
@@ -22,6 +26,35 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 
 logger = logging.getLogger(__name__)
+
+
+class PipelineInterface(ABC):
+    """
+    Abstract base class for pipeline implementations.
+
+    Any concrete pipeline must implement start and stop methods.
+    """
+
+    @abstractmethod
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start the pipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Interval in seconds for monitoring poll (default: 5.0).
+        scaling_poll_interval : float
+            Interval in seconds for scaling decisions (default: 30.0).
+        """
+        pass
+
+    @abstractmethod
+    def stop(self) -> None:
+        """
+        Stop the pipeline and perform any necessary cleanup.
+        """
+        pass
 
 
 # --- Configuration Objects ---
@@ -62,7 +95,90 @@ class StatsConfig:
     queue_timeout_seconds: float = 2.0
 
 
-class RayPipeline:
+class RayPipelineSubprocessInterface(PipelineInterface):
+    """
+    Pipeline interface implementation for a subprocess-based Ray pipeline.
+    """
+
+    def __init__(self, process: multiprocessing.Process):
+        """
+        Parameters
+        ----------
+        process : multiprocessing.Process
+            A handle to the running subprocess.
+        """
+        self._process: multiprocessing.Process = process
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Start is not supported because the subprocess is assumed to already be running.
+        """
+        pass
+
+    def stop(self) -> None:
+        """
+        Stops the subprocess pipeline. Tries terminate(), then escalates to SIGKILL on the process group if needed.
+        """
+        if not self._process.is_alive():
+            return
+
+        try:
+            self._process.terminate()
+            self._process.join(timeout=5.0)
+        except Exception as e:
+            logger.warning(f"Failed to terminate process cleanly: {e}")
+
+        if self._process.is_alive():
+            try:
+                pgid = os.getpgid(self._process.pid)
+                os.killpg(pgid, signal.SIGKILL)
+            except Exception as e:
+                logger.error(f"Failed to force-kill process group: {e}")
+            self._process.join(timeout=3.0)
+
+
+class RayPipelineInterface(PipelineInterface):
+    """
+    Pipeline interface for an in-process RayPipeline instance.
+    """
+
+    def __init__(self, pipeline: "RayPipeline"):
+        """
+        Parameters
+        ----------
+        pipeline : RayPipeline
+            The instantiated pipeline to control.
+        """
+        self._pipeline = pipeline
+
+    def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
+        """
+        Starts the RayPipeline.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float
+            Unused here; provided for interface compatibility.
+        scaling_poll_interval : float
+            Unused here; provided for interface compatibility.
+        """
+        self._pipeline.start(monitor_poll_interval, scaling_poll_interval)
+
+    def stop(self) -> None:
+        """
+        Stops the RayPipeline and shuts down Ray.
+        """
+        self._pipeline.stop()
+
+        try:
+            import ray
+
+            ray.shutdown()
+        except Exception:
+            pass
+
+
+class RayPipeline(PipelineInterface):
     """
     A structured pipeline supporting dynamic scaling and queue flushing.
     Uses PIDController and ResourceConstraintManager. Supports optional GUI display.
@@ -151,9 +267,16 @@ class RayPipeline:
             actor_timeout=self.stats_config.actor_timeout_seconds,
             queue_timeout=self.stats_config.queue_timeout_seconds,
         )
+
         logger.info("RayStatsCollector initialized using StatsConfig.")
 
     # --- Accessor Methods for Stats Collector (and internal use) ---
+
+    def __del__(self):
+        try:
+            self.stop()
+        except Exception as e:
+            logger.error(f"Exception during RayPipeline cleanup: {e}")
 
     def get_stages_info(self) -> List[StageInfo]:
         """Returns a snapshot of the current stage information."""
@@ -516,7 +639,9 @@ class RayPipeline:
         """
         current_count = len(current_replicas)
         num_to_remove = current_count - target_count
-        logger.info(f"[ScaleDown-{stage_name}] Scaling down from {current_count} to {target_count} (-{num_to_remove}).")
+        logger.debug(
+            f"[ScaleDown-{stage_name}] Scaling down from {current_count} to {target_count} (-{num_to_remove})."
+        )
 
         # Basic validation
         if num_to_remove <= 0:
@@ -564,7 +689,7 @@ class RayPipeline:
             logger.warning(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
 
         total_attempted = len(actors_to_remove)
-        logger.info(
+        logger.debug(
             f"[ScaleDown-{stage_name}] Scale down initiation process complete for {total_attempted} actors "
             f"(Skipped/Failed Initiation: {stop_initiation_failures}). Topology cleanup will handle final removal."
         )
@@ -647,9 +772,6 @@ class RayPipeline:
         # Activity check
         is_quiet = global_in_flight <= self.quiet_period_threshold
 
-        if is_quiet:
-            logger.info(f"Pipeline IS quiet. In-Flight: {global_in_flight} <= Threshold: {self.quiet_period_threshold}")
-
         return is_quiet
 
     def _wait_for_pipeline_drain(self, timeout_seconds: int) -> bool:
@@ -670,7 +792,6 @@ class RayPipeline:
                 return False
 
             # --- Trigger immediate stats collection via the collector instance ---
-            drain_stats = {}
             drain_success = False
             collection_error = None
 
@@ -689,19 +810,18 @@ class RayPipeline:
                     if not collection_error
                     else f"Collection Error: {type(collection_error).__name__}"
                 )
-                logger.info(
-                    f"[DrainWait] Check at {elapsed_time:.1f}s: Global In-Flight={global_in_flight} ({status_msg})"
+                logger.debug(
+                    f"[Drain] Check at {elapsed_time:.1f}s: Global In-Flight={global_in_flight} ({status_msg})"
                 )
                 last_in_flight = global_in_flight
 
             # --- Check for successful drain ---
             # Requires BOTH in-flight=0 AND the collection reporting it was successful
             if global_in_flight == 0 and drain_success and not collection_error:
-                logger.info(f"Pipeline confirmed drained (In-Flight=0) in {elapsed_time:.1f}s.")
                 return True
             elif global_in_flight == 0:  # Saw zero, but collection wasn't fully successful
                 logger.warning(
-                    "[DrainWait] In-Flight reached 0, but stats collection had errors/timeouts."
+                    "[Drain] In-Flight reached 0, but stats collection had errors/timeouts."
                     " Cannot confirm drain yet."
                 )
 
@@ -719,7 +839,6 @@ class RayPipeline:
 
         # Set flushing state in topology
         self.topology.set_flushing(True)
-        logger.info("--- Starting Queue Flush ---")
         overall_success = False
         source_actors_paused = []
         pause_refs = []
@@ -734,7 +853,7 @@ class RayPipeline:
             current_connections = self.topology.get_connections()
 
             # --- 1. Pause Source Stages (using snapshots) ---
-            logger.info("Pausing source stages...")
+            logger.debug("Pausing source stages...")
             pause_timeout = 60.0
             for stage in current_stages:
                 if stage.is_source:
@@ -747,22 +866,22 @@ class RayPipeline:
                             except Exception as e:
                                 logger.error(f"Failed sending pause to {actor}: {e}")
             if pause_refs:
-                logger.info(f"Waiting up to {pause_timeout}s for {len(pause_refs)} sources to pause...")
+                logger.debug(f"Waiting up to {pause_timeout}s for {len(pause_refs)} sources to pause...")
                 try:
                     ray.get(pause_refs, timeout=pause_timeout)
-                    logger.info(f"{len(pause_refs)} sources acknowledged pause.")
+                    logger.debug(f"{len(pause_refs)} sources acknowledged pause.")
                 except GetTimeoutError:
                     logger.warning(f"Timeout waiting for {len(pause_refs)} sources to pause.")
                 except Exception as e:
                     logger.error(f"Error waiting for sources pause: {e}. Proceeding cautiously.")
 
             # --- 2. Wait for Drain ---
-            logger.info("Waiting for pipeline to drain...")
+            logger.debug("Waiting for pipeline to drain...")
             if not self._wait_for_pipeline_drain(self.queue_flush_drain_timeout_seconds):
                 raise RuntimeError("Pipeline drain failed or timed out, aborting flush.")
 
             # --- 3. Create New Queues (using snapshot) ---
-            logger.info("Creating new replacement queues...")
+            logger.debug("Creating new replacement queues...")
             new_edge_queues_map = {}
             for queue_name, (_, queue_size) in current_edge_queues.items():
                 try:
@@ -775,7 +894,7 @@ class RayPipeline:
                     raise RuntimeError(f"Failed to create new queue '{queue_name}'.") from e
 
             # --- 4. Re-wire Actors to New Queues (using snapshots) ---
-            logger.info("Re-wiring actors to new queues...")
+            logger.debug("Re-wiring actors to new queues...")
             wiring_refs = []
             wiring_timeout = 120.0
             for from_stage_name, conns in current_connections.items():
@@ -811,7 +930,7 @@ class RayPipeline:
                     raise RuntimeError("Actor re-wiring failed.") from e
 
             # --- 5. Update Topology State (Commit Point) ---
-            logger.info("Committing new queues to pipeline topology.")
+            logger.debug("Committing new queues to pipeline topology.")
             self.topology.set_edge_queues(new_edge_queues_map)  # Commit the change
             overall_success = True
 
@@ -822,7 +941,7 @@ class RayPipeline:
         finally:
             # --- 6. Resume Source Stages (Always attempt) ---
             if source_actors_paused:
-                logger.info(f"Attempting to resume {len(source_actors_paused)} source actors...")
+                logger.debug(f"Attempting to resume {len(source_actors_paused)} source actors...")
                 resume_timeout = 30.0
                 resume_refs = []
                 for actor in source_actors_paused:
@@ -831,10 +950,10 @@ class RayPipeline:
                     except Exception as e:
                         logger.error(f"Failed sending resume to {actor}: {e}")
                 if resume_refs:
-                    logger.info(f"Waiting up to {resume_timeout}s for {len(resume_refs)} actors to resume...")
+                    logger.debug(f"Waiting up to {resume_timeout}s for {len(resume_refs)} actors to resume...")
                     try:
                         ray.get(resume_refs, timeout=resume_timeout)
-                        logger.info(f"{len(resume_refs)} sources resumed.")
+                        logger.debug(f"{len(resume_refs)} sources resumed.")
                     except GetTimeoutError:
                         logger.warning(f"Timeout waiting for {len(resume_refs)} sources to resume.")
                     except Exception as e:
@@ -843,9 +962,6 @@ class RayPipeline:
             # Update flush timestamp only on success
             if overall_success:
                 self._last_queue_flush_time = time.time()
-                logger.info("--- Queue Flush Completed Successfully ---")
-            else:
-                logger.error("--- Queue Flush Failed ---")
 
             # Reset flushing state in topology
             self.topology.set_flushing(False)
@@ -977,7 +1093,7 @@ class RayPipeline:
 
             if target_replica_count != current_count:
                 stages_needing_action.append((stage_name, target_replica_count))
-                logger.info(
+                logger.debug(
                     f"[ScalingApply-{stage_name}] Action: Current={current_count}, "
                     f"Target={target_replica_count} (Min={stage_info.min_replicas}, Max={stage_info.max_replicas})"
                 )
@@ -1019,7 +1135,7 @@ class RayPipeline:
         completed = sum(1 for r in action_results.values() if r["status"] == "completed")
         errors = sum(1 for r in action_results.values() if r["status"] == "error")
         timeouts = sum(1 for r in action_results.values() if r["status"] == "timeout")
-        logger.info(f"[ScalingApply] Summary: {completed} completed, {errors} errors, {timeouts} timeouts.")
+        logger.debug(f"[ScalingApply] Summary: {completed} completed, {errors} errors, {timeouts} timeouts.")
 
     def _perform_scaling_and_maintenance(self) -> None:
         """Orchestrates scaling/maintenance using topology and stats collector."""
@@ -1050,9 +1166,9 @@ class RayPipeline:
             logger.debug("--- Performing Scaling & Maintenance Cycle ---")
 
             if self._is_pipeline_quiet():
-                logger.info("Pipeline quiet, initiating queue flush.")
+                logger.info("[Drain] Pipeline quiet, initiating queue flush.")
                 flush_success = self._execute_queue_flush()
-                logger.info(f"Automatic queue flush completed. Success: {flush_success}")
+                logger.info(f"[Drain] Automatic queue flush completed. Success: {flush_success}")
                 return
 
             # Fast return check if stopping occurred while flushing or checking flush status
@@ -1201,5 +1317,6 @@ class RayPipeline:
 
             # Clear runtime state in topology
             self.topology.clear_runtime_state()
+            del self.topology
 
             logger.info("Pipeline stopped.")
