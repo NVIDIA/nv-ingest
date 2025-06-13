@@ -145,6 +145,60 @@ class NimClient:
         """Attempt to set the max batch size for the model if it is not already set, ensuring thread safety."""
         self._fetch_max_batch_size(model_name, model_version)
 
+    @traceable_func(trace_name="{stage_name}::{model_name}::_determine_batch_size")
+    def _determine_batch_size(self, model_name: str, **kwargs) -> int:
+        """Determine the effective batch size for inference."""
+        batch_size = self._fetch_max_batch_size(model_name)
+        max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
+        force_requested_batch_size = kwargs.get("force_max_batch_size", False)
+        return (
+            min(batch_size, max_requested_batch_size)
+            if not force_requested_batch_size
+            else max_requested_batch_size
+        )
+
+    @traceable_func(trace_name="{stage_name}::{model_name}::_prepare_and_format_data")
+    def _prepare_and_format_data(self, data: dict, max_batch_size: int, model_name: str, **kwargs):
+        """Prepare data and format it into batches for inference."""
+        # Note: **kwargs is only here to support trace_info from the decorator.
+        prepared_data = self.model_interface.prepare_data_for_inference(data)
+        return self.model_interface.format_input(
+            prepared_data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
+        )
+
+    @traceable_func(trace_name="{stage_name}::{model_name}::_execute_inference")
+    def _execute_inference(self, formatted_batches, formatted_batch_data, model_name: str, **kwargs):
+        """Execute inference on formatted batches."""
+        max_pool_workers = kwargs.pop("max_pool_workers", 16)
+        results = [None] * len(formatted_batches)
+        with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
+            futures = []
+            for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
+                future = executor.submit(
+                    self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
+                )
+                futures.append((idx, future))
+            for idx, future in futures:
+                results[idx] = future.result()
+        return results
+
+    @traceable_func(trace_name="{stage_name}::{model_name}::_process_inference_results")
+    def _process_inference_results(self, results, **kwargs):
+        """Process and coalesce inference results."""
+        all_results = []
+        for parsed_output, batch_data in results:
+            batch_results = self.model_interface.process_inference_results(
+                parsed_output,
+                original_image_shapes=batch_data.get("original_image_shapes"),
+                protocol=self.protocol,
+                **kwargs,
+            )
+            if isinstance(batch_results, list):
+                all_results.extend(batch_results)
+            else:
+                all_results.append(batch_results)
+        return all_results
+
     @traceable_func(trace_name="{stage_name}::{model_name}")
     def infer(self, data: dict, model_name: str, **kwargs) -> Any:
         """
@@ -157,7 +211,7 @@ class NimClient:
         model_name : str
             The model name.
         kwargs : dict
-            Additional parameters for inference.
+            Additional parameters for inference, including `trace_info` for tracing.
 
         Returns
         -------
@@ -165,54 +219,23 @@ class NimClient:
             The processed inference results, coalesced in the same order as the input images.
         """
         try:
-            # 1. Retrieve or default to the model's maximum batch size.
-            batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.get("force_max_batch_size", False)
-            max_batch_size = (
-                min(batch_size, max_requested_batch_size)
-                if not force_requested_batch_size
-                else max_requested_batch_size
+            max_batch_size = self._determine_batch_size(model_name=model_name, **kwargs)
+
+            # Create a copy of kwargs and remove max_batch_size to avoid the TypeError.
+            prepare_kwargs = kwargs.copy()
+            prepare_kwargs.pop("max_batch_size", None)
+            formatted_batches, formatted_batch_data = self._prepare_and_format_data(
+                data=data, max_batch_size=max_batch_size, model_name=model_name, **prepare_kwargs
             )
 
-            # 2. Prepare data for inference.
-            data = self.model_interface.prepare_data_for_inference(data)
-
-            # 3. Format the input based on protocol.
-            formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
+            results = self._execute_inference(
+                formatted_batches=formatted_batches,
+                formatted_batch_data=formatted_batch_data,
+                model_name=model_name,
+                **kwargs,
             )
 
-            # Check for a custom maximum pool worker count, and remove it from kwargs.
-            max_pool_workers = kwargs.pop("max_pool_workers", 16)
-
-            # 4. Process each batch concurrently using a thread pool.
-            #    We enumerate the batches so that we can later reassemble results in order.
-            results = [None] * len(formatted_batches)
-            with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                futures = []
-                for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
-                    future = executor.submit(
-                        self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
-                    )
-                    futures.append((idx, future))
-                for idx, future in futures:
-                    results[idx] = future.result()
-
-            # 5. Process the parsed outputs for each batch using its corresponding batch_data.
-            #    As the batches are in order, we coalesce their outputs accordingly.
-            all_results = []
-            for parsed_output, batch_data in results:
-                batch_results = self.model_interface.process_inference_results(
-                    parsed_output,
-                    original_image_shapes=batch_data.get("original_image_shapes"),
-                    protocol=self.protocol,
-                    **kwargs,
-                )
-                if isinstance(batch_results, list):
-                    all_results.extend(batch_results)
-                else:
-                    all_results.append(batch_results)
+            all_results = self._process_inference_results(results=results, **kwargs)
 
         except Exception as err:
             error_str = f"Error during NimClient inference [{self.model_interface.name()}, {self.protocol}]: {err}"
