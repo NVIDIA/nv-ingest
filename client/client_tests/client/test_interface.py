@@ -282,6 +282,7 @@ def test_ingest(ingestor, mock_client):
     expected_verbose = getattr(ingestor, "_verbose", False)
     # Assume ingestor stores the indices after calling add_job, or gets them passed in
     ingestor._job_indices = job_indices  # Simulate ingestor storing indices
+    ingestor._output_conig = None
 
     # Act
     result = ingestor.ingest(timeout=30)  # timeout=30 is passed to process_jobs_concurrently
@@ -333,6 +334,7 @@ def test_ingest_return_failures(ingestor, mock_client):
     expected_max_retries = getattr(ingestor, "_max_retries", None)
     expected_verbose = getattr(ingestor, "_verbose", False)
     ingestor._job_indices = job_indices  # Simulate ingestor storing indices
+    ingestor._output_conig = None
 
     # Act
     results, failures = ingestor.ingest(timeout=30, return_failures=True)  # Pass return_failures=True
