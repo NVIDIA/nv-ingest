@@ -571,23 +571,6 @@ def pdfium_extractor(
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
-
-                    for page_idx, page_as_image, _ in pages_for_tables:
-                        page_as_base64_image = numpy_to_base64(page_as_image)
-                        text_meta = construct_text_metadata(
-                            [page_as_base64_image],
-                            pdf_metadata.keywords,
-                            page_idx,
-                            -1,
-                            -1,
-                            -1,
-                            page_count,
-                            text_depth,
-                            source_metadata,
-                            base_unified_metadata,
-                        )
-                        extracted_data.append(text_meta)
-
                     pages_for_tables.clear()
 
             page.close()
@@ -610,22 +593,6 @@ def pdfium_extractor(
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
-
-            for page_idx, page_as_image, _ in pages_for_tables:
-                page_as_base64_image = numpy_to_base64(page_as_image)
-                text_meta = construct_text_metadata(
-                    [page_as_base64_image],
-                    pdf_metadata.keywords,
-                    page_idx,
-                    -1,
-                    -1,
-                    -1,
-                    page_count,
-                    text_depth,
-                    source_metadata,
-                    base_unified_metadata,
-                )
-                extracted_data.append(text_meta)
 
             pages_for_tables.clear()
 
