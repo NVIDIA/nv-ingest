@@ -2,6 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+from datetime import datetime
 import logging
 import pandas as pd
 from typing import Any
@@ -9,8 +10,15 @@ from pydantic import BaseModel
 import ray
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest_api.internal.enums.common import DocumentTypeEnum, ContentTypeEnum
+from nv_ingest_api.internal.enums.common import (
+    DocumentTypeEnum,
+    ContentTypeEnum,
+    AccessLevelEnum,
+    TextTypeEnum,
+    LanguageEnum,
+)
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentHierarchySchema
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
@@ -61,27 +69,83 @@ class MetadataInjectionStage(RayActorStage):
                 # Convert document type to content type using enums.
                 content_type = doc_type_to_content_type(DocumentTypeEnum(row["document_type"]))
                 # Check if metadata is missing or doesn't contain 'content'
-                if "metadata" not in row or not isinstance(row["metadata"], dict) or "content" not in row["metadata"]:
+                if (
+                    "metadata" not in row
+                    or not isinstance(row["metadata"], dict)
+                    or "content" not in row["metadata"].keys()
+                ):
                     update_required = True
-                    row["metadata"] = {
-                        "content": row.get("content"),
-                        "content_metadata": {
-                            "type": content_type.name.lower(),
-                        },
-                        "error_metadata": None,
-                        "audio_metadata": (
-                            None if content_type != ContentTypeEnum.AUDIO else {"audio_type": row["document_type"]}
-                        ),
-                        "image_metadata": (
-                            None if content_type != ContentTypeEnum.IMAGE else {"image_type": row["document_type"]}
-                        ),
-                        "source_metadata": {
-                            "source_id": row.get("source_id"),
-                            "source_name": row.get("source_name"),
-                            "source_type": row["document_type"],
-                        },
-                        "text_metadata": (None if content_type != ContentTypeEnum.TEXT else {"text_type": "document"}),
+
+                    # Initialize default structures based on MetaDataSchema
+                    default_source_metadata = {
+                        "source_id": row.get("source_id"),
+                        "source_name": row.get("source_name"),
+                        "source_type": row["document_type"],
+                        "source_location": "",
+                        "collection_id": "",
+                        "date_created": datetime.now().isoformat(),
+                        "last_modified": datetime.now().isoformat(),
+                        "summary": "",
+                        "partition_id": -1,
+                        "access_level": AccessLevelEnum.UNKNOWN.value,
                     }
+
+                    default_content_metadata = {
+                        "type": content_type.name.lower(),
+                        "page_number": -1,
+                        "description": "",
+                        "hierarchy": ContentHierarchySchema().model_dump(),
+                        "subtype": "",
+                        "start_time": -1,
+                        "end_time": -1,
+                    }
+
+                    default_audio_metadata = None
+                    if content_type == ContentTypeEnum.AUDIO:
+                        default_audio_metadata = {
+                            "audio_type": row["document_type"],
+                            "audio_transcript": "",
+                        }
+
+                    default_image_metadata = None
+                    if content_type == ContentTypeEnum.IMAGE:
+                        default_image_metadata = {
+                            "image_type": row["document_type"],
+                            "structured_image_type": ContentTypeEnum.NONE.value,
+                            "caption": "",
+                            "text": "",
+                            "image_location": (0, 0, 0, 0),
+                            "image_location_max_dimensions": (0, 0),
+                            "uploaded_image_url": "",
+                            "width": 0,
+                            "height": 0,
+                        }
+
+                    default_text_metadata = None
+                    if content_type == ContentTypeEnum.TEXT:
+                        default_text_metadata = {
+                            "text_type": TextTypeEnum.DOCUMENT.value,
+                            "summary": "",
+                            "keywords": "",
+                            "language": LanguageEnum.UNKNOWN.value,
+                            "text_location": (0, 0, 0, 0),
+                            "text_location_max_dimensions": (0, 0, 0, 0),
+                        }
+
+                    row["metadata"] = {
+                        "content": row["content"],
+                        "content_metadata": default_content_metadata,
+                        "error_metadata": None,
+                        "audio_metadata": default_audio_metadata,
+                        "image_metadata": default_image_metadata,
+                        "source_metadata": default_source_metadata,
+                        "text_metadata": default_text_metadata,
+                    }
+                    logger.info(
+                        f"METADATA_INJECTOR_DEBUG: Rebuilt metadata for source_id='{row.get('source_id', 'N/A')}'. "
+                        f"Metadata keys: {list(row['metadata'].keys())}."
+                        f"'content' present: {'content' in row['metadata']}"
+                    )
             except Exception as inner_e:
                 logger.exception("Failed to process row during metadata injection")
                 raise inner_e

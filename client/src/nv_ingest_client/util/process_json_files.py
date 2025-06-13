@@ -27,12 +27,12 @@ def ingest_json_results_to_blob(result_content):
                 y0 = float("inf")
             return page, x0, y0
 
-        data.sort(key=sorting_key)
+        sorted_data = sorted(data, key=sorting_key)
 
         # Initialize the blob string
         blob = []
 
-        for entry in data:
+        for entry in sorted_data:
             document_type = entry.get("document_type", "")
 
             if document_type == "structured":
