@@ -294,6 +294,7 @@ class Ingestor:
 
         proc_kwargs = filter_function_kwargs(self._client.process_jobs_concurrently, **kwargs)
 
+        _return_failures = return_failures
         if self._vdb_bulk_upload:
             return_failures = True
 
@@ -315,10 +316,14 @@ class Ingestor:
             results, failures = results_data  # type: ignore
         else:
             results = results_data  # type: ignore
-            failures = None
 
         if self._vdb_bulk_upload:
+            if len(failures) > 0:
+                raise RuntimeError(f"Failed to ingest documents, unable to complete vdb bulk upload: {failures}")
+
             self._vdb_bulk_upload.run(results)
+
+        return_failures = _return_failures
 
         return (results, failures) if return_failures else results
 
