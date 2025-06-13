@@ -52,6 +52,8 @@ class ContentDescriptionEnum(str, Enum):
         Description for image extracted from PDF document.
     PDF_INFOGRAPHIC : str
         Description for structured infographic extracted from PDF document.
+    PDF_PAGE_IMAGE : str
+        Description for a full-page image rendered from a PDF document.
     PDF_TABLE : str
         Description for structured table extracted from PDF document.
     PDF_TEXT : str
@@ -70,6 +72,7 @@ class ContentDescriptionEnum(str, Enum):
     PDF_CHART: str = "Structured chart extracted from PDF document."
     PDF_IMAGE: str = "Image extracted from PDF document."
     PDF_INFOGRAPHIC: str = "Structured infographic extracted from PDF document."
+    PDF_PAGE_IMAGE: str = "Full-page image rendered from a PDF document."
     PDF_TABLE: str = "Structured table extracted from PDF document."
     PDF_TEXT: str = "Unstructured text from PDF document."
     PPTX_IMAGE: str = "Image extracted from PPTX presentation."
@@ -94,6 +97,8 @@ class ContentTypeEnum(str, Enum):
         Represents image content.
     INFO_MSG : str
         Represents an informational message.
+    PAGE_IMAGE : str
+        Represents a full-page image rendered from a document.
     STRUCTURED : str
         Represents structured content.
     TEXT : str
@@ -111,6 +116,7 @@ class ContentTypeEnum(str, Enum):
     INFOGRAPHIC: str = "infographic"
     INFO_MSG: str = "info_message"
     NONE: str = "none"
+    PAGE_IMAGE: str = "page_image"
     STRUCTURED: str = "structured"
     TABLE: str = "table"
     TEXT: str = "text"
