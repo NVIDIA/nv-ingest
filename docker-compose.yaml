@@ -16,8 +16,9 @@ services:
       - "8002:8002"
     user: root
     environment:
+      - OMP_NUM_THREADS=1
       - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_CUDA_MEMORY_POOL_MB=1024
+      - NIM_TRITON_CUDA_MEMORY_POOL_SIZE=1024
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
@@ -50,6 +51,7 @@ services:
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
+      - OMP_NUM_THREADS=1
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
@@ -71,6 +73,7 @@ services:
       - "8008:8002"
     user: root
     environment:
+      - OMP_NUM_THREADS=1
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
@@ -297,10 +300,10 @@ services:
       #- YOLOX_INFER_PROTOCOL=http
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
-      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
-      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
