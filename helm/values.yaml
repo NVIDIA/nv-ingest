@@ -28,7 +28,7 @@ nameOverride: ""
 image:
   pullPolicy: IfNotPresent
   repository: "nvcr.io/nvidia/nemo-microservices/nv-ingest"
-  tag: "25.6.1"
+  tag: "25.6.2"
 
 ## @section Pod Configuration
 ## @param podAnnotations [object] Sets additional annotations on the main deployment pods
