@@ -143,7 +143,7 @@ class LambdaScatterStage(RayActorStage):
 class PDFScatterSchema(BaseModel):
     """Configuration schema for PdfScatterStage"""
 
-    pages_per_fragment: int = Field(default=500, description="Number of pages per fragment")
+    pages_per_fragment: int = Field(default=100, description="Number of pages per fragment")
     max_fragments: int = Field(default=1000, description="Maximum number of fragments to create")
     metadata: Optional[dict] = Field(default_factory=dict, description="Additional metadata")
 

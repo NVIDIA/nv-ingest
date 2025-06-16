@@ -162,7 +162,8 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     pipeline.make_edge(pdf_scatter_stage_id, pdf_extractor_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Document Extractors ########
-    pipeline.make_edge(pdf_extractor_stage_id, audio_extractor_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(pdf_extractor_stage_id, post_extraction_gather_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(post_extraction_gather_stage_id, audio_extractor_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(audio_extractor_stage_id, docx_extractor_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(docx_extractor_stage_id, pptx_extractor_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(pptx_extractor_stage_id, image_extractor_stage_id, queue_size=ingest_edge_buffer_size)
@@ -190,10 +191,10 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
 
     ###### Primitive Storage ########
     pipeline.make_edge(image_storage_stage_id, embedding_storage_stage_id, queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge(embedding_storage_stage_id, post_extraction_gather_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(embedding_storage_stage_id, broker_response_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Response and Telemetry ########
-    pipeline.make_edge(post_extraction_gather_stage_id, broker_response_stage_id, queue_size=ingest_edge_buffer_size)
+    # pipeline.make_edge(post_extraction_gather_stage_id, broker_response_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(broker_response_stage_id, otel_tracer_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(otel_tracer_stage_id, drain_id, queue_size=ingest_edge_buffer_size)
 
