@@ -92,7 +92,7 @@ Create a fresh Conda environment to install nv-ingest and dependencies.
 ```shell
 uv venv --python 3.12 nvingest && \
   source nvingest/bin/activate && \
-  uv pip install nv-ingest==25.6.1 nv-ingest-api==25.6.1 nv-ingest-client==25.6.1
+  uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
 ```
 
 Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
