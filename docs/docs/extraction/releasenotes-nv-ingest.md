@@ -6,14 +6,38 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
-## Release 25.04
+## Release 25.6.2
+
+The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and feature expansions, including the following:
+
+- Improve reranker accuracy.
+- Upgrade Python version from 3.10 to 3.12
+- Helm deployment now has similar throughput performance to docker deployment.
+- Add support for the latest version of the OpenAI API.
+- Add MIG support. For details, see [Enable NVIDIA GPU MIG](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/helm/README.md#enable-nvidia-gpu-mig).
+- Add time slicing support. For details, see [Enable GPU time-slicing](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/helm/README.md#enabling-gpu-time-slicing).
+- Add support for RIVA NIM for optional audio extraction. For details, see [helm/values.yaml](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/helm/values.yaml).
+- New notebook for [How to add metadata to your documents and filter searches](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/examples/metadata_and_filtered_search.ipynb).
+
+
+### Breaking Changes
+
+There are no breaking changes in this version.
+
+### Upgrade
+
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/25.6.2/helm/values.yaml).
+
+
+
+## Release 25.4.2
 
 The NeMo Retriever extraction 25.04 release focuses on small bug fixes and improvements, including the following:
 
 - Fixed a known issue where large text file ingestion failed.
 - The REST service is now more resilient, and recovers from worker failures and connection errors.
 - Various improvements on the client side to reduce retry rates, and improve overall quality of life.
-- New notebook for [How to reindex a collection]( https://github.com/NVIDIA/nv-ingest/blob/main/examples/reindex_example.ipynb).
+- New notebook for [How to reindex a collection]( https://github.com/NVIDIA/nv-ingest/blob/release/25.4.2/examples/reindex_example.ipynb).
 - Expanded chunking documentation. For more information, refer to [Split Documents](chunking.md).
 
 ### Breaking Changes
@@ -22,11 +46,11 @@ There are no breaking changes in this version.
 
 ### Upgrade
 
-To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/main/helm).
+To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/tree/release/25.4.2/helm).
 
 
 
-## Release 25.03
+## Release 25.3.0
 
 The NeMo Retriever extraction 25.03 release includes accuracy improvements, feature expansions, and throughput improvements.
 
@@ -39,11 +63,6 @@ The NeMo Retriever extraction 25.03 release includes accuracy improvements, feat
 - Added support for Llama-3.2 VLM for Image Captioning capability.
 - docX, pptx, jpg, png support for image detection & extraction.
 - Deprecated DePlot and CACHED NIMs.
-<!-- - Integrated with nemoretriever-parse NIM for state-of-the-art text extraction -->
-<!-- - Integrated with new NVIDIA NIMs -->
-<!--   - Nemoretriever-table-structure-v1 -->
-<!--   - Nemoretriever-graphic-elements-v1 -->
-<!--   - Nemoretriever-page-elements-v2 -->
 
 
 
