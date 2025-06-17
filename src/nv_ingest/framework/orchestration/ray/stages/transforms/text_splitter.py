@@ -1,11 +1,14 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
 import logging
 from typing import Any
 import ray
 
-# Assume these imports come from your project:
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
-from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type
+from nv_ingest_api.internal.primitives.ingest_control_message import remove_task_by_type, IngestControlMessage
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal
@@ -72,3 +75,45 @@ class TextSplitterStage(RayActorStage):
         logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
 
         return message
+
+
+def text_splitter_fn(control_message: IngestControlMessage, stage_config: TextSplitterSchema) -> IngestControlMessage:
+    """
+    Process an incoming IngestControlMessage by splitting and tokenizing its text.
+
+    Parameters
+    ----------
+    control_message : IngestControlMessage
+        The incoming message containing the payload DataFrame.
+
+    stage_config : BaseModel
+        The stage level configuration object
+
+    Returns
+    -------
+    IngestControlMessage
+        The updated message with its payload transformed.
+    """
+
+    # Extract the DataFrame payload.
+    df_payload = control_message.payload()
+    logger.debug("Extracted payload with %d rows.", len(df_payload))
+
+    # Remove the "split" task to obtain task-specific configuration.
+    task_config = remove_task_by_type(control_message, "split")
+    logger.debug("Extracted task config: %s", task_config)
+
+    # Transform the DataFrame (split text and tokenize).
+    df_updated = transform_text_split_and_tokenize_internal(
+        df_transform_ledger=df_payload,
+        task_config=task_config,
+        transform_config=stage_config,
+        execution_trace_log=None,
+    )
+    logger.info("TextSplitterStage.on_data: Transformation complete. Updated payload has %d rows.", len(df_updated))
+
+    # Update the message payload.
+    control_message.payload(df_updated)
+    logger.info("TextSplitterStage.on_data: Finished processing, returning updated message.")
+
+    return control_message
