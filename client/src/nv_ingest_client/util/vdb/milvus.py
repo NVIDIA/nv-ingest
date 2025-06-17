@@ -1521,7 +1521,7 @@ def embed_index_collection(
 
 def reindex_collection(
     vdb_op: VDB = None,
-    current_collection_name: str = None,
+    collection_name: str = None,
     new_collection_name: str = None,
     write_dir: str = None,
     embedding_endpoint: str = None,
@@ -1562,7 +1562,7 @@ def reindex_collection(
 
     Parameters
     ----------
-        current_collection_name (str): The name of the current Milvus collection.
+        collection_name (str): The name of the current Milvus collection.
         new_collection_name (str, optional): The name of the new Milvus collection. Defaults to None.
         write_dir (str, optional): The directory to write the pulled records to. Defaults to None.
         embedding_endpoint (str, optional): The endpoint for the NVIDIA embedding service. Defaults to None.
@@ -1600,8 +1600,8 @@ def reindex_collection(
         kwargs = locals().copy()
         kwargs.pop("vdb_op", None)
         return vdb_op.reindex(**kwargs)
-    new_collection_name = new_collection_name if new_collection_name else current_collection_name
-    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir, query_batch_size)
+    new_collection_name = new_collection_name if new_collection_name else collection_name
+    pull_results = pull_all_milvus(collection_name, milvus_uri, write_dir, query_batch_size)
     embed_index_collection(
         pull_results,
         new_collection_name,
