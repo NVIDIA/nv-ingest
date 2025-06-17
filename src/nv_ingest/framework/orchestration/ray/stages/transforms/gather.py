@@ -9,13 +9,12 @@ import pandas as pd
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.framework.orchestration.ray.util.pipeline.mixins import SingletonStageMixin
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
 
 
 @ray.remote
-class GatherStage(RayActorStage, SingletonStageMixin):
+class GatherStage(RayActorStage):
     """
     A Ray actor stage that gathers fragments produced by scatter stages.
 
@@ -109,13 +108,12 @@ class GatherStage(RayActorStage, SingletonStageMixin):
             if msg is not None and hasattr(msg, "payload") and callable(msg.payload):
                 df_payload = msg.payload()
                 self._logger.info(
-                    f"GatherStage.on_data: Appending payload from fragment {idx} (ID: {getattr(msg, 'id', 'N/A')}). "
+                    f"GatherStage.on_data: Appending payload from fragment {idx} (ID: {fragment_id}). "
                     f"Payload type: {type(df_payload)}, Shape: {getattr(df_payload, 'shape', 'N/A')}"
                 )
                 dfs.append(df_payload)
                 self._logger.info(
-                    f"GatherStage.on_data: Clearing payload for fragment {idx} (ID: {getattr(msg, 'id', 'N/A')}) "
-                    f"to save memory."
+                    f"GatherStage.on_data: Clearing payload for fragment {idx} (ID: {fragment_id}) " f"to save memory."
                 )
                 msg.payload(pd.DataFrame())  # Clear early
             else:

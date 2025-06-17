@@ -2,6 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
+import asyncio
+import queue
 import sys
 import threading
 import time
@@ -14,6 +16,7 @@ from pydantic import BaseModel
 import logging
 
 from ray import get_runtime_context
+from ray.util.queue import Full, Empty
 
 
 def setup_stdout_logging(name: str = __name__, level: int = logging.INFO) -> logging.Logger:
@@ -223,12 +226,40 @@ class RayActorStage(ABC):
         try:
             # Perform a non-blocking or short-blocking read from the queue
             # The timeout allows the loop to check self._running periodically
-            return self._input_queue.get(timeout=1.0)
-        except Exception:
+            item_ref = self._input_queue.get(timeout=1.0)
+
+            if item_ref is None:
+                return None
+
+            # Check if the item is an ObjectRef and dereference it
+            if hasattr(item_ref, "__module__") and "ray" in str(type(item_ref)):
+                # This is likely a Ray ObjectRef, dereference it to get the actual object
+                try:
+                    actual_item = ray.get(item_ref)
+                    return actual_item
+                except (
+                    ray.exceptions.OwnerDiedError,
+                    ray.exceptions.ObjectReconstructionFailedError,
+                    ray.exceptions.ObjectFetchTimedOutError,
+                ) as e:
+                    self._logger.error(f"{self._get_actor_id_str()}: Failed to dereference ObjectRef: {e}")
+                    # Re-raise Ray-specific errors so caller can handle them appropriately
+                    raise
+            else:
+                # Not an ObjectRef, return as-is (backward compatibility)
+                return item_ref
+
+        except (queue.Empty, queue.Full, queue.Empty, Full, Empty, asyncio.TimeoutError):
             # Common exceptions include queue.Empty in older Ray versions or
             # custom queue implementations raising timeout errors.
             # Return None to signify no item was retrieved this cycle.
             return None
+
+        except Exception as e:
+            self._logger.error(f"Unhandled exception while reading input queue: {e}")
+            self._logger.exception(f"{self._get_actor_id_str()}: Exception in _read_input: {e}")
+            # Re-raise unhandled exceptions
+            raise
 
     @abstractmethod
     def on_data(self, control_message: Any) -> Optional[Any]:
@@ -324,26 +355,20 @@ class RayActorStage(ABC):
                     # If result is an empty list, treat it as a handled message with no output, this can occur for
                     # things like a gather stage that hasn't accumulated all fragments yet.
                     if results_to_emit and self._output_queue is not None:
-                        try:
-                            self._output_queue.put_nowait_batch(results_to_emit)
-                            self.stats["successful_queue_writes"] += len(results_to_emit)
-                        except Exception as e_batch:
-                            self._logger.debug(
-                                f"[{actor_id_str}] Batch put failed or unsupported, falling back. Error: {e_batch}"
-                            )
-                            for msg in results_to_emit:
-                                is_put_successful = False
-                                while not is_put_successful:
-                                    try:
-                                        self._output_queue.put(msg)
-                                        self.stats["successful_queue_writes"] += 1
-                                        is_put_successful = True
-                                    except Exception as e_put:
-                                        self._logger.warning(
-                                            f"[{actor_id_str}] Output queue put failed, retrying. Error: {e_put}"
-                                        )
-                                        self.stats["queue_full"] += 1
-                                        time.sleep(0.1)
+                        for msg in results_to_emit:
+                            is_put_successful = False
+                            while not is_put_successful:
+                                try:
+                                    msg_ref = ray.put(msg, _owner=self._output_queue.actor)
+                                    self._output_queue.put(msg_ref)
+                                    self.stats["successful_queue_writes"] += 1
+                                    is_put_successful = True
+                                except Exception as e_put:
+                                    self._logger.warning(
+                                        f"[{actor_id_str}] Output queue put failed, retrying. Error: {e_put}"
+                                    )
+                                    self.stats["queue_full"] += 1
+                                    time.sleep(0.1)
 
                     self.stats["processed"] += 1
 

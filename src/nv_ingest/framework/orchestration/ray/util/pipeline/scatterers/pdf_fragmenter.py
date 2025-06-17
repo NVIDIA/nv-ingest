@@ -197,7 +197,7 @@ def fragment_pdf(message: IngestControlMessage, pages_per_fragment: int = 10) ->
 
 
 def create_pdf_fragmenter(
-    pages_per_fragment: int = 10, actor_logger: Optional[logging.Logger] = None
+    pages_per_fragment: int, actor_logger: Optional[logging.Logger] = None
 ) -> Callable[[IngestControlMessage], List[IngestControlMessage]]:
     """
     Factory function to create a PDF fragmenter with specific configuration using pypdfium2.
@@ -214,6 +214,7 @@ def create_pdf_fragmenter(
     Callable[[IngestControlMessage], List[IngestControlMessage]]
         A configured PDF fragmenter function that will use the provided logger.
     """
+
     # Use a default logger if none is provided, though this won't be visible in Ray actor stdout by default.
     # The primary expectation is that PDFScatterStage will pass its self._logger.
     effective_logger = actor_logger if actor_logger else logging.getLogger(__name__ + ".create_pdf_fragmenter_default")
