@@ -10,6 +10,7 @@ services:
 
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -18,7 +19,8 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+        #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
       # NIM OpenTelemetry Settings
@@ -42,6 +44,7 @@ services:
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -50,7 +53,8 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+        #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
     deploy:
@@ -64,6 +68,7 @@ services:
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8006:8000"
       - "8007:8001"
@@ -72,7 +77,8 @@ services:
     environment:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+        #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
     deploy:

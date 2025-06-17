@@ -34,8 +34,8 @@ def infer_microservice(
             model_name,
             parameters={"input_type": input_type, "truncate": truncate},
             outputs=["embeddings"],
-            dtype="BYTES",
-            input_name="text",
+            dtypes=["BYTES"],
+            input_names=["text"],
             batch_size=batch_size,
         )
     else:
