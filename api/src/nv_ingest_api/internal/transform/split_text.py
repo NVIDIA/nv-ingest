@@ -31,12 +31,16 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
         metadata = row.metadata if hasattr(row, "metadata") and isinstance(row.metadata, dict) else {}
         metadata = copy.deepcopy(metadata)
 
-        if row["document_type"] == ContentTypeEnum.AUDIO:
+        if row.document_type == ContentTypeEnum.AUDIO:
             metadata["audio_metadata"]["audio_transcript"] = text
+            documents.append(
+                {"document_type": ContentTypeEnum.AUDIO.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
         else:
             metadata["content"] = text
-
-        documents.append({"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())})
+            documents.append(
+                {"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
 
     return documents
 
