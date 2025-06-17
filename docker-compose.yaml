@@ -33,6 +33,7 @@ services:
       # Triton OpenTelemetry Settings
       - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
       - TRITON_OTEL_RATE=1
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -57,6 +58,7 @@ services:
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -81,6 +83,7 @@ services:
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
