@@ -450,7 +450,9 @@ def test_pdfium_extractor_happy_path(
     # Mock return values
     mock_construct_text_metadata.return_value = "text_meta"
     mock_extract_images.return_value = ["image_meta"]
-    mock_pages_to_numpy.return_value = ([MagicMock()], [MagicMock()])
+    # Create a dummy page object that can be pickled, instead of a MagicMock
+    dummy_rendered_page = (0, np.zeros((10, 10, 3), dtype=np.uint8), (0, 0))
+    mock_pages_to_numpy.return_value = ([dummy_rendered_page], [MagicMock()])
     mock_extract_elements.return_value = ["table_chart_meta"]
 
     # Call
