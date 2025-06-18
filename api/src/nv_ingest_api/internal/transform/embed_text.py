@@ -344,7 +344,7 @@ def _get_pandas_image_content(row, modality="text"):
     """
     subtype = row.get("content_metadata", {}).get("subtype")
     if subtype == "page_image":
-        content = row.get("image_metadata", {}).get("text")
+        content = _format_image_input_string(row.get("content"))
     else:
         content = row.get("image_metadata", {}).get("caption")
 
@@ -356,23 +356,6 @@ def _get_pandas_audio_content(row, modality="text"):
     A pandas UDF used to select extracted audio transcription to be used to create embeddings.
     """
     return row.get("audio_metadata", {}).get("audio_transcript")
-
-
-def _get_pandas_page_image_content(row, modality="image"):
-    """
-    Extracts page content from a DataFrame row.
-
-    Parameters
-    ----------
-    row : pandas.Series
-        A row containing 'image_metadata' with 'caption'.
-
-    Returns
-    -------
-    str
-        The image caption from the row.
-    """
-    return _format_image_input_string(row.get("content"))
 
 
 # ------------------------------------------------------------------------------
