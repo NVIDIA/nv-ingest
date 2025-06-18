@@ -45,8 +45,7 @@ def _get_max_workers() -> int:
         return max(1, num_workers)
     except (ValueError, TypeError) as e:
         logger.warning(
-            "Failed to parse environment variables for worker calculation. "
-            "Defaulting to 1 worker. Error: %s",
+            "Failed to parse environment variables for worker calculation. " "Defaulting to 1 worker. Error: %s",
             e,
         )
         # Fallback to 1 worker in case of parsing errors.
