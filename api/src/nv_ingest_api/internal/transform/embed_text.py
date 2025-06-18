@@ -343,10 +343,20 @@ def _get_pandas_image_content(row, modality="text"):
         The image caption from the row.
     """
     subtype = row.get("content_metadata", {}).get("subtype")
-    if subtype == "page_image":
-        content = _format_image_input_string(row.get("content"))
-    else:
-        content = row.get("image_metadata", {}).get("caption")
+    if modality == "text":
+        if subtype == "page_image":
+            content = row.get("image_metadata", {}).get("text")
+        else:
+            content = row.get("image_metadata", {}).get("caption")
+    elif modality == "image":
+        content = row.get("content")
+    elif modality == "text_image":
+        if subtype == "page_image":
+            text = row.get("image_metadata", {}).get("text")
+        else:
+            text = row.get("image_metadata", {}).get("caption")
+        image = row.get("content")
+        content = _format_text_image_pair_input_string(text, image)
 
     return content
 
