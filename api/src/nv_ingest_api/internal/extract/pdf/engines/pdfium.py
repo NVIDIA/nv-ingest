@@ -48,6 +48,7 @@ from nv_ingest_api.util.pdf.pdfium import (
     extract_image_like_objects_from_pdfium_page,
 )
 from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
 logger = logging.getLogger(__name__)
@@ -532,6 +533,8 @@ def pdfium_extractor(
                 page_text = _extract_page_text(page)
                 image, _ = pdfium_pages_to_numpy([page], trace_info=execution_trace_log)
                 base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
                 image_meta = construct_image_metadata_from_base64(
                     base64_image,
                     page_idx,
