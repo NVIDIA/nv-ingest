@@ -10,18 +10,19 @@ services:
 
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
-    shm_size: 16gb
+      #shm_size: 16gb
     ports:
       - "8000:8000"
       - "8001:8001"
       - "8002:8002"
     user: root
     environment:
+      - CUDA_VISIBLE_DEVICES=0
       - NIM_HTTP_API_PORT=8000
+      - NIM_TRITON_CUDA_MEMORY_POOL_SIZE=1024
       - NIM_TRITON_LOG_VERBOSE=1
         #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
-      - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
       # NIM OpenTelemetry Settings
       - NIM_ENABLE_OTEL=0
@@ -30,6 +31,7 @@ services:
       - NIM_OTEL_METRICS_EXPORTER=console
       - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - NIM_ENABLE_OTEL=true
+      - OMP_NUM_THREADS=1
       # Triton OpenTelemetry Settings
       - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
       - TRITON_OTEL_RATE=1
@@ -44,7 +46,7 @@ services:
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
-    shm_size: 16gb
+      #shm_size: 16gb
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -57,6 +59,7 @@ services:
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -68,7 +71,7 @@ services:
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
-    shm_size: 16gb
+      #shm_size: 16gb
     ports:
       - "8006:8000"
       - "8007:8001"
@@ -81,6 +84,7 @@ services:
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MODEL_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -287,7 +291,7 @@ services:
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
-      - OCR_INFER_PROTOCOL=grpc
+      - OCR_INFER_PROTOCOL=http
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- OCR_INFER_PROTOCOL=http
@@ -295,16 +299,16 @@ services:
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=grpc
+      - YOLOX_INFER_PROTOCOL=http
       # build.nvidia.com hosted endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
-      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
-      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}

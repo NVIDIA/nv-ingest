@@ -15,6 +15,7 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
+import backoff
 import cv2
 import numpy as np
 import packaging
@@ -23,8 +24,11 @@ import torch
 import torchvision
 import tritonclient.grpc as grpcclient
 from nv_ingest_api.internal.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
-from PIL import Image
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
+from nv_ingest_api.util.converters import bytetools
+
 
 logger = logging.getLogger(__name__)
 
@@ -199,7 +203,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         # Helper functions to chunk a list into sublists of length up to chunk_size.
         def chunk_list(lst: list, chunk_size: int) -> List[list]:
-            return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
+            return [lst[i : i + chunk_size] for i in range(0, len(lst), max(1, chunk_size))]
 
         def chunk_list_geometrically(lst: list, max_size: int) -> List[list]:
             # TRT engine in Yolox NIM (gRPC) only allows a batch size in powers of 2.
@@ -220,14 +224,8 @@ class YoloxModelInterfaceBase(ModelInterface):
                     # Convert to uint8 if needed.
                     if image.dtype != np.uint8:
                         image = (image * 255).astype(np.uint8)
-                    # Convert the numpy array to a PIL Image.
-                    image_pil = Image.fromarray(image)
-                    original_size = image_pil.size
-
-                    # Save the image to a buffer and encode to base64.
-                    buffered = io.BytesIO()
-                    image_pil.save(buffered, format="PNG")
-                    b64_images.append(base64.b64encode(buffered.getvalue()).decode("utf-8"))
+                    # Convert the numpy array to base64
+                    b64_images.append(numpy_to_base64(image))
 
                 b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
                 original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
@@ -270,23 +268,18 @@ class YoloxModelInterfaceBase(ModelInterface):
                 # Convert to uint8 if needed.
                 if image.dtype != np.uint8:
                     image = (image * 255).astype(np.uint8)
-                # Convert the numpy array to a PIL Image.
-                image_pil = Image.fromarray(image)
-                original_size = image_pil.size
-
-                # Save the image to a buffer and encode to base64.
-                buffered = io.BytesIO()
-                image_pil.save(buffered, format="PNG")
-                image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
+                # Convert the numpy array to base64
+                image_b64 = numpy_to_base64(image)
 
                 # Scale the image if necessary.
-                scaled_image_b64, new_size = scale_image_to_encoding_size(
-                    image_b64, max_base64_size=self.nim_max_image_size
-                )
-                if new_size != original_size:
-                    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
+                #scaled_image_b64, new_size = scale_image_to_encoding_size(
+                #    image_b64, max_base64_size=self.nim_max_image_size
+                #)
+                #if new_size != original_size:
+                #    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
+                #content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
+                content_list.append({"type": "image_url", "url": f"data:image/png;base64,{image_b64}"})
 
             # Chunk the payload content, the original images, and their shapes.
             content_chunks = chunk_list(content_list, max_batch_size)
@@ -1416,7 +1409,8 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
 
     return bbox_dict
 
-
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
 def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
     try:
         client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)

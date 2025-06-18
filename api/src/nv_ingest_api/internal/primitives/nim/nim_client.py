@@ -170,7 +170,7 @@ class NimClient:
             max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
             force_requested_batch_size = kwargs.get("force_max_batch_size", False)
             max_batch_size = (
-                min(batch_size, max_requested_batch_size)
+                max(1, min(batch_size, max_requested_batch_size))
                 if not force_requested_batch_size
                 else max_requested_batch_size
             )
