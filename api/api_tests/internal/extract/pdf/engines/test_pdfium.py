@@ -83,7 +83,7 @@ def test_extract_page_elements_happy_path(dummy_pages):
             dummy_pages,
             yolox_client=mock_yolox_client,
             yolox_model_name="yolox",
-            execution_trace_log=["dummy_trace"],
+            execution_trace_log={"dummy_trace": 0},
         )
 
         # Assert yolox_client called once
@@ -91,7 +91,7 @@ def test_extract_page_elements_happy_path(dummy_pages):
             {"images": [dummy_pages[0][1], dummy_pages[1][1]]},
             model_name="yolox",
             max_batch_size=module_under_test.YOLOX_MAX_BATCH_SIZE,
-            trace_info=["dummy_trace"],
+            trace_info={"dummy_trace": 0},
             stage_name="pdf_content_extractor",
         )
 
@@ -462,7 +462,7 @@ def test_pdfium_extractor_happy_path(
         extract_tables=True,
         extract_charts=True,
         extractor_config=dummy_extractor_config,
-        execution_trace_log=[],
+        execution_trace_log={},
     )
 
     # Validations

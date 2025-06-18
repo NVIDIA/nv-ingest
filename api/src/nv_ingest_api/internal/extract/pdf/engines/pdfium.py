@@ -20,13 +20,11 @@ import concurrent.futures
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import logging
 from typing import List, Tuple, Optional, Any, Union
-import os
 
 import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
 from datetime import datetime
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
@@ -133,7 +131,6 @@ def _extract_page_elements_using_image_ensemble(
 
     logger.debug(f"Extracted {len(page_elements)} page elements.")
     return page_elements
-
 
 
 # Handle individual page element extraction and model inference
@@ -394,7 +391,7 @@ def _render_page_from_file(
     Opens `pdf_source`, renders `page_idx`, and returns
     (page_idx, image_array, padding_offsets).
     """
-    doc  = libpdfium.PdfDocument(pdf_source)
+    doc = libpdfium.PdfDocument(pdf_source)
     page = doc.get_page(page_idx)
 
     arrays, pads = pdfium_pages_to_numpy(
@@ -407,6 +404,7 @@ def _render_page_from_file(
     page.close()
     doc.close()
     return page_idx, arrays[0], pads[0]
+
 
 # ------------------------------------------------------------------ #
 #  Render an entire PDF in parallel – keeps natural page order       #
@@ -433,16 +431,12 @@ def render_single_pdf_parallel(
             execution_trace_log[f"trace::entry::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
 
     with ProcessPoolExecutor(max_workers=max_workers) as pool:
-        futs = [
-            pool.submit(_render_page_from_file, pdf_source, idx, size)
-            for idx in range(page_count)
-        ]
+        futs = [pool.submit(_render_page_from_file, pdf_source, idx, size) for idx in range(page_count)]
         for fut in as_completed(futs):
             idx, img, pad = fut.result()
             images[idx] = (img, pad)
             if execution_trace_log is not None:
                 execution_trace_log[f"trace::exit::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
-
 
     return images
 
@@ -526,7 +520,7 @@ def pdfium_extractor(
         pdfium_config = pdfium_config_raw
     else:
         raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
-    
+
     logger.debug("Extracting PDF with pdfium backend.")
     source_id = row_data["source_id"]
 
