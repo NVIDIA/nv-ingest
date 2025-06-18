@@ -349,7 +349,7 @@ def _get_pandas_image_content(row, modality="text"):
         else:
             content = row.get("image_metadata", {}).get("caption")
     elif modality == "image":
-        content = row.get("content")
+        content = _format_image_input_string(row.get("content"))
     elif modality == "text_image":
         if subtype == "page_image":
             text = row.get("image_metadata", {}).get("text")
@@ -358,6 +358,8 @@ def _get_pandas_image_content(row, modality="text"):
         image = row.get("content")
         content = _format_text_image_pair_input_string(text, image)
 
+    # A workaround to save memory.
+    row["content"] = ""
     return content
 
 
