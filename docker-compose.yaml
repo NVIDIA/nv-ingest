@@ -290,7 +290,7 @@ services:
       # Self-hosted ocr endpoints.
       - OCR_GRPC_ENDPOINT=ocr:8001
       - OCR_HTTP_ENDPOINT=http://ocr:8000/v1/infer
-      - OCR_INFER_PROTOCOL=http
+      - OCR_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted ocr endpoints.
       #- OCR_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/baidu/paddleocr
       #- OCR_INFER_PROTOCOL=http
@@ -298,16 +298,16 @@ services:
       # Self-hosted redis endpoints.
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
-      - YOLOX_INFER_PROTOCOL=http
+      - YOLOX_INFER_PROTOCOL=grpc
       # build.nvidia.com hosted endpoints.
       #- YOLOX_HTTP_ENDPOINT=https://ai.api.nvidia.com/v1/cv/nvidia/nv-yolox-page-elements-v1
       #- YOLOX_INFER_PROTOCOL=http
       - YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT=graphic-elements:8001
       - YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT=http://graphic-elements:8000/v1/infer
-      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=http
+      - YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL=grpc
       - YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT=table-structure:8001
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
-      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=http
+      - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
       - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}

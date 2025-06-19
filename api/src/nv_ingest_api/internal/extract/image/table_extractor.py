@@ -80,9 +80,12 @@ def _run_inference(
             future_yolox = executor.submit(
                 yolox_client.infer,
                 data=data_yolox,
-                model_name="yolox",
+                model_name="yolox_ensemble",
                 stage_name="table_extraction",
                 max_batch_size=8,
+                input_names=["INPUT_IMAGES", "THRESHOLDS"],
+                dtypes=["BYTES", "FP32"],
+                output_names=["OUTPUT"],
                 trace_info=trace_info,
             )
         future_ocr = executor.submit(
@@ -200,8 +203,9 @@ def _create_clients(
     ocr_endpoints: Tuple[str, str],
     ocr_protocol: str,
     auth_token: str,
+    yolox_model_name: str = "yolox_ensemble",
 ) -> Tuple[NimClient, NimClient]:
-    yolox_model_interface = YoloxTableStructureModelInterface()
+    yolox_model_interface = YoloxTableStructureModelInterface(yolox_model_name=yolox_model_name)
     ocr_model_interface = OCRModelInterface()
 
     logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")

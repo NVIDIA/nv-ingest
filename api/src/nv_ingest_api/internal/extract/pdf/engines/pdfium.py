@@ -28,7 +28,6 @@ from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
-    get_yolox_model_name,
     YoloxPageElementsModelInterface,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
@@ -54,7 +53,7 @@ logger = logging.getLogger(__name__)
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     yolox_client,
-    yolox_model_name: str = "yolox",
+    yolox_model_name: str = "yolox_ensemble",
     execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
@@ -270,7 +269,7 @@ def _extract_page_elements(
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
-    yolox_model_name: str = "yolox",
+    yolox_model_name: str = "yolox_ensemble",
     execution_trace_log=None,
 ) -> list:
     """
@@ -478,17 +477,6 @@ def pdfium_extractor(
     pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
 
-    # Default model name for table/chart/infographics extraction
-    yolox_model_name = "yolox"
-    if extract_tables or extract_charts or extract_infographics:
-        # Get the gRPC endpoint to determine the model name if needed
-        yolox_grpc_endpoint = pdfium_config.yolox_endpoints[0]
-        if yolox_grpc_endpoint:
-            try:
-                yolox_model_name = get_yolox_model_name(yolox_grpc_endpoint, default_model_name=yolox_model_name)
-            except Exception as e:
-                logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
-
     with concurrent.futures.ThreadPoolExecutor(max_workers=pdfium_config.workers_per_progress_engine) as executor:
         # PAGE LOOP
         for page_idx in range(page_count):
@@ -532,16 +520,10 @@ def pdfium_extractor(
 
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts or extract_infographics:
-                if yolox_model_name == "yolox":
-                    scale_tuple = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT)
-                    padding_tuple = (YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT)
-                else:
-                    scale_tuple = padding_tuple = None
-
                 image, padding_offsets = pdfium_pages_to_numpy(
                     [page],
-                    scale_tuple=scale_tuple,
-                    padding_tuple=padding_tuple,
+                    scale_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
+                    padding_tuple=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
                     trace_info=execution_trace_log,
                 )
                 pages_for_tables.append((page_idx, image[0], padding_offsets[0]))
@@ -561,7 +543,6 @@ def pdfium_extractor(
                         pdfium_config.yolox_endpoints,
                         pdfium_config.yolox_infer_protocol,
                         pdfium_config.auth_token,
-                        yolox_model_name,
                         execution_trace_log=execution_trace_log,
                     )
                     futures.append(future)
@@ -584,7 +565,6 @@ def pdfium_extractor(
                 pdfium_config.yolox_endpoints,
                 pdfium_config.yolox_infer_protocol,
                 pdfium_config.auth_token,
-                yolox_model_name,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
