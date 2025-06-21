@@ -12,18 +12,19 @@ from typing import Optional
 from typing import Tuple
 
 import numpy as np
-import torch
-from torchvision.io import encode_jpeg
 from PIL import Image
 from PIL import UnidentifiedImageError
 
 from nv_ingest_api.util.converters import bytetools
 
+import cv2  # OpenCV for image encoding
+
+# Limit OpenCV to a single thread to avoid CPU over-subscription in multiprocessing contexts
+cv2.setNumThreads(1)
+
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
-# TODO: Make this configurable for mult processing init functions
-torch.set_num_threads(1)
 logger = logging.getLogger(__name__)
 
 
@@ -308,72 +309,68 @@ def normalize_image(
 
 def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     """
-    Converts a NumPy array representing an image to a base64-encoded JPEG string using torchvision.
-
-    The function takes a NumPy array, converts it to a torch tensor, and then encodes
-    the image as a JPEG in a base64 string format. The input array is expected to be in
-    a format that can be converted to a valid image, such as having a shape of (H, W, C)
-    where C is the number of channels (e.g., 3 for RGB).
+    Convert a NumPy image array to a base64-encoded JPEG **without** relying on PyTorch/
+    torchvision. The encoding is performed with OpenCV (`cv2.imencode`).
 
     Parameters
     ----------
     array : np.ndarray
-        The input image as a NumPy array. Must have a shape compatible with image data.
-        Can be (H, W) for grayscale or (H, W, C) where C∈{1,3,4}. 4-channel images lose alpha.
+        Image data either as (H, W) grayscale or (H, W, C) where C∈{1,3,4}. If an alpha
+        channel is present (C==4) it is discarded. Images with three channels are assumed
+        to be in **RGB** order and are internally converted to **BGR** because OpenCV
+        expects BGR for colour JPEG encoding.
     quality : int, optional
-        JPEG quality (1-100), by default 100
+        JPEG quality factor in range [0, 100] (higher means better quality & larger
+        size). Default is 100.
 
     Returns
     -------
     str
-        The base64-encoded string representation of the input NumPy array as a JPEG image.
+        Base64-encoded JPEG representation of the input image.
 
     Raises
     ------
     ValueError
-        If the input array cannot be converted into a valid image format.
+        If the input array shape is unsupported or its dtype cannot be converted to the
+        required `uint8`.
     RuntimeError
-        If there is an issue during the image conversion or base64 encoding process.
-
-    Examples
-    --------
-    >>> array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
-    >>> encoded_str = numpy_to_base64(array)
-    >>> isinstance(encoded_str, str)
-    True
+        If OpenCV fails to encode the image.
     """
 
-    # Handle grayscale images with shape (H, W, 1)
     if array.ndim == 3 and array.shape[2] == 1:
+        # Collapse single-channel third dimension -> (H, W)
         array = np.squeeze(array, axis=2)
 
-    # Convert to torch tensor with appropriate shape
-    if array.ndim == 2:  # grayscale
-        tensor = torch.from_numpy(array).unsqueeze(0)  # (1, H, W)
+    if array.ndim == 2:  # Grayscale
+        img_bgr = array
     elif array.ndim == 3:
-        if array.shape[2] == 4:  # drop alpha channel
+        channels = array.shape[2]
+        if channels == 4:
+            # Drop alpha and convert RGBA -> BGR
             array = array[..., :3]
-        tensor = torch.from_numpy(array).permute(2, 0, 1)  # (C, H, W)
+            img_bgr = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+        elif channels == 3:
+            # RGB -> BGR
+            img_bgr = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+        else:
+            raise ValueError(f"Unsupported channel count {channels}; expected 1, 3, or 4.")
     else:
-        raise ValueError(f"Expected (H,W) or (H,W,C); got {array.shape}")
+        raise ValueError(f"Unsupported array shape {array.shape}; expected (H,W) or (H,W,C).")
 
-    # Ensure uint8 dtype
-    if tensor.dtype != torch.uint8:
-        tensor = tensor.to(torch.uint8)
+    # Ensure data type is uint8 as required by OpenCV JPEG encoder
+    if img_bgr.dtype != np.uint8:
+        if np.issubdtype(img_bgr.dtype, np.floating):
+            img_bgr = (255 * np.clip(img_bgr, 0.0, 1.0)).astype(np.uint8)
+        else:
+            img_bgr = img_bgr.astype(np.uint8)
 
-    try:
-        # Encode to JPEG using torchvision
-        jpeg_bytes_tensor = encode_jpeg(
-            tensor.contiguous(),
-            quality=quality,
-        )
-        # TODO: Passing a list of tensors is more efficient
-        # So we can make this call on a list of values
-        jpeg_bytes = jpeg_bytes_tensor.cpu().numpy().tobytes()
-    except Exception as e:
-        raise RuntimeError(f"Failed to encode JPEG with torchvision: {e}")
+    # Encode to JPEG via OpenCV
+    encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
+    success, encoded_image = cv2.imencode(".jpg", img_bgr, encode_params)
+    if not success:
+        raise RuntimeError("OpenCV failed to encode image to JPEG.")
 
-    # Convert to base64
+    jpeg_bytes = encoded_image.tobytes()
     return bytetools.base64frombytes(jpeg_bytes)
 
 
