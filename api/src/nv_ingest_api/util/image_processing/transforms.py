@@ -2,29 +2,50 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import base64
-import io
 import logging
-from io import BytesIO
 from math import ceil
 from math import floor
 from typing import Optional
 from typing import Tuple
 
+import cv2
 import numpy as np
-from PIL import Image
-from PIL import UnidentifiedImageError
 
 from nv_ingest_api.util.converters import bytetools
 
+# Configure OpenCV to use a single thread for image processing
+cv2.setNumThreads(1)
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
 logger = logging.getLogger(__name__)
 
 
+def _resize_image_opencv(
+    array: np.ndarray, target_size: Tuple[int, int], interpolation=cv2.INTER_LANCZOS4
+) -> np.ndarray:
+    """
+    Resizes a NumPy array representing an image using OpenCV.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The input image as a NumPy array.
+    target_size : Tuple[int, int]
+        The target size as (width, height).
+    interpolation : int, optional
+        OpenCV interpolation method. Defaults to cv2.INTER_LANCZOS4.
+
+    Returns
+    -------
+    np.ndarray
+        The resized image as a NumPy array.
+    """
+    return cv2.resize(array, target_size, interpolation=interpolation)
+
+
 def scale_image_to_encoding_size(
-    base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9
+    base64_image: str, max_base64_size: int = 180_000, initial_reduction: float = 0.9, format: str = "PNG", **kwargs
 ) -> Tuple[str, Tuple[int, int]]:
     """
     Decodes a base64-encoded image, resizes it if needed, and re-encodes it as base64.
@@ -38,12 +59,19 @@ def scale_image_to_encoding_size(
         Maximum allowable size for the base64-encoded image, by default 180,000 characters.
     initial_reduction : float, optional
         Initial reduction step for resizing, by default 0.9.
+    format : str, optional
+        The image format to use for encoding. Supported formats are "PNG" and "JPEG".
+        Defaults to "PNG".
+    **kwargs
+        Additional keyword arguments passed to the format-specific encoding function.
+        For JPEG: quality (int, default=100) - JPEG quality (1-100).
+        For PNG: compression (int, default=3) - PNG compression level (0-9).
 
     Returns
     -------
     Tuple[str, Tuple[int, int]]
         A tuple containing:
-        - Base64-encoded PNG image string, resized if necessary.
+        - Base64-encoded image string in the specified format, resized if necessary.
         - The new size as a tuple (width, height).
 
     Raises
@@ -52,12 +80,11 @@ def scale_image_to_encoding_size(
         If the image cannot be resized below the specified max_base64_size.
     """
     try:
-        # Decode the base64 image and open it as a PIL image
-        image_data = base64.b64decode(base64_image)
-        img = Image.open(io.BytesIO(image_data)).convert("RGB")
+        # Decode the base64 image using OpenCV (returns RGB format)
+        img_array = base64_to_numpy(base64_image)
 
-        # Initial image size
-        original_size = img.size
+        # Initial image size (height, width, channels) -> (width, height)
+        original_size = (img_array.shape[1], img_array.shape[0])
 
         # Check initial size
         if len(base64_image) <= max_base64_size:
@@ -66,14 +93,17 @@ def scale_image_to_encoding_size(
         # Initial reduction step
         reduction_step = initial_reduction
         new_size = original_size
+        current_img = img_array.copy()
+
         while len(base64_image) > max_base64_size:
-            width, height = img.size
+            width, height = new_size
             new_size = (int(width * reduction_step), int(height * reduction_step))
 
-            img_resized = img.resize(new_size, Image.LANCZOS)
-            buffered = io.BytesIO()
-            img_resized.save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
+            # Resize the image using OpenCV
+            current_img = _resize_image_opencv(img_array, new_size)
+
+            # Re-encode as base64 using the specified format
+            base64_image = numpy_to_base64(current_img, format=format, **kwargs)
 
             # Adjust the reduction step if necessary
             if len(base64_image) > max_base64_size:
@@ -90,36 +120,39 @@ def scale_image_to_encoding_size(
         raise
 
 
-def ensure_base64_is_png(base64_image: str) -> str:
+def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs) -> str:
     """
-    Ensures the given base64-encoded image is in PNG format. Converts to PNG if necessary.
+    Ensures the given base64-encoded image is in the specified format. Converts if necessary.
 
     Parameters
     ----------
     base64_image : str
         Base64-encoded image string.
+    target_format : str, optional
+        The target image format. Supported formats are "PNG" and "JPEG". Defaults to "PNG".
+    **kwargs
+        Additional keyword arguments passed to the format-specific encoding function.
+        For JPEG: quality (int, default=100) - JPEG quality (1-100).
+        For PNG: compression (int, default=3) - PNG compression level (0-9).
 
     Returns
     -------
     str
-        Base64-encoded PNG image string.
+        Base64-encoded image string in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If there is an error during format conversion.
     """
     try:
-        # Decode the base64 string and load the image
-        image_data = base64.b64decode(base64_image)
-        image = Image.open(io.BytesIO(image_data))
-
-        # Check if the image is already in PNG format
-        if image.format != "PNG":
-            # Convert the image to PNG
-            buffered = io.BytesIO()
-            image.convert("RGB").save(buffered, format="PNG")
-            base64_image = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
-        return base64_image
+        # Decode the base64 image using OpenCV (returns RGB format)
+        img_array = base64_to_numpy(base64_image)
+        # Re-encode in the target format
+        return numpy_to_base64(img_array, format=target_format, **kwargs)
     except Exception as e:
-        logger.error(f"Error ensuring PNG format: {e}")
-        return None
+        logger.error(f"Error converting image to {target_format} format: {e}")
+        raise ValueError(f"Failed to convert image to {target_format} format: {e}")
 
 
 def pad_image(
@@ -302,66 +335,187 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray) -> str:
+def _preprocess_numpy_array(array: np.ndarray) -> np.ndarray:
     """
-    Converts a NumPy array representing an image to a base64-encoded string.
-
-    The function takes a NumPy array, converts it to a PIL image, and then encodes
-    the image as a PNG in a base64 string format. The input array is expected to be in
-    a format that can be converted to a valid image, such as having a shape of (H, W, C)
-    where C is the number of channels (e.g., 3 for RGB).
+    Preprocesses a NumPy array for image encoding by ensuring proper format and data type.
+    Also handles color space conversion for OpenCV encoding.
 
     Parameters
     ----------
     array : np.ndarray
-        The input image as a NumPy array. Must have a shape compatible with image data.
+        The input image as a NumPy array.
 
     Returns
     -------
-    str
-        The base64-encoded string representation of the input NumPy array as a PNG image.
+    np.ndarray
+        The preprocessed array in uint8 format, ready for OpenCV encoding (BGR color order for color images).
 
     Raises
     ------
     ValueError
         If the input array cannot be converted into a valid image format.
+    """
+    # Check if the array is valid and can be converted to an image
+    try:
+        # If the array represents a grayscale image, drop the redundant axis in
+        # (h, w, 1). cv2 expects (h, w) for grayscale.
+        if array.ndim == 3 and array.shape[2] == 1:
+            array = np.squeeze(array, axis=2)
+
+        # Ensure uint8 data type
+        processed_array = array.astype(np.uint8)
+
+        # OpenCV uses BGR color order, so convert RGB to BGR if needed
+        if processed_array.ndim == 3 and processed_array.shape[2] == 3:
+            # Assume input is RGB and convert to BGR for OpenCV
+            processed_array = cv2.cvtColor(processed_array, cv2.COLOR_RGB2BGR)
+
+        return processed_array
+    except Exception as e:
+        raise ValueError(f"Failed to preprocess NumPy array for image encoding: {e}")
+
+
+def _encode_opencv_jpeg(array: np.ndarray, *, quality: int = 100) -> bytes:
+    """NumPy array -> JPEG bytes using OpenCV."""
+    ok, buf = cv2.imencode(".jpg", array, [int(cv2.IMWRITE_JPEG_QUALITY), quality])
+    if not ok:
+        raise RuntimeError("cv2.imencode failed")
+    return buf.tobytes()
+
+
+def _encode_opencv_png(array: np.ndarray, *, compression: int = 3) -> bytes:
+    """NumPy array -> PNG bytes using OpenCV."""
+    ok, buf = cv2.imencode(".png", array, [cv2.IMWRITE_PNG_COMPRESSION, compression])
+    if not ok:
+        raise RuntimeError("cv2.imencode(.png) failed")
+    return buf.tobytes()
+
+
+def numpy_to_base64_png(array: np.ndarray) -> str:
+    """
+    Converts a preprocessed NumPy array representing an image to a base64-encoded PNG string using OpenCV.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The preprocessed input image as a NumPy array. Must have a shape compatible with image data.
+
+    Returns
+    -------
+    str
+        The base64-encoded PNG string representation of the input NumPy array.
+
+    Raises
+    ------
+    RuntimeError
+        If there is an issue during the image conversion or base64 encoding process.
+    """
+    try:
+        # Encode to PNG bytes using OpenCV
+        png_bytes = _encode_opencv_png(array)
+
+        # Convert to base64
+        base64_img = bytetools.base64frombytes(png_bytes)
+    except Exception as e:
+        raise RuntimeError(f"Failed to encode image to base64 PNG: {e}")
+
+    return base64_img
+
+
+def numpy_to_base64_jpeg(array: np.ndarray, quality: int = 100) -> str:
+    """
+    Converts a preprocessed NumPy array representing an image to a base64-encoded JPEG string using OpenCV.
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The preprocessed input image as a NumPy array. Must have a shape compatible with image data.
+    quality : int, optional
+        JPEG quality (1-100), by default 100. Higher values mean better quality but larger file size.
+
+    Returns
+    -------
+    str
+        The base64-encoded JPEG string representation of the input NumPy array.
+
+    Raises
+    ------
+    RuntimeError
+        If there is an issue during the image conversion or base64 encoding process.
+    """
+    try:
+        # Encode to JPEG bytes using OpenCV
+        jpeg_bytes = _encode_opencv_jpeg(array, quality=quality)
+
+        # Convert to base64
+        base64_img = bytetools.base64frombytes(jpeg_bytes)
+    except Exception as e:
+        raise RuntimeError(f"Failed to encode image to base64 JPEG: {e}")
+
+    return base64_img
+
+
+def numpy_to_base64(array: np.ndarray, format: str = "PNG", **kwargs) -> str:
+    """
+    Converts a NumPy array representing an image to a base64-encoded string.
+
+    The function takes a NumPy array, preprocesses it, and then encodes
+    the image in the specified format as a base64 string. The input array is expected
+    to be in a format that can be converted to a valid image, such as having a shape
+    of (H, W, C) where C is the number of channels (e.g., 3 for RGB).
+
+    Parameters
+    ----------
+    array : np.ndarray
+        The input image as a NumPy array. Must have a shape compatible with image data.
+    format : str, optional
+        The image format to use for encoding. Supported formats are "PNG" and "JPEG".
+        Defaults to "PNG".
+    **kwargs
+        Additional keyword arguments passed to the format-specific encoding function.
+        For JPEG: quality (int, default=100) - JPEG quality (1-100).
+
+    Returns
+    -------
+    str
+        The base64-encoded string representation of the input NumPy array in the specified format.
+
+    Raises
+    ------
+    ValueError
+        If the input array cannot be converted into a valid image format, or if an
+        unsupported format is specified.
     RuntimeError
         If there is an issue during the image conversion or base64 encoding process.
 
     Examples
     --------
     >>> array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
-    >>> encoded_str = numpy_to_base64(array)
+    >>> encoded_str = numpy_to_base64(array, format="PNG")
     >>> isinstance(encoded_str, str)
     True
+    >>> encoded_str_jpeg = numpy_to_base64(array, format="JPEG", quality=90)
+    >>> isinstance(encoded_str_jpeg, str)
+    True
     """
-    # If the array represents a grayscale image, drop the redundant axis in
-    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
-    # a grayscale image.
-    if array.ndim == 3 and array.shape[2] == 1:
-        array = np.squeeze(array, axis=2)
+    # Centralized preprocessing of the numpy array
+    processed_array = _preprocess_numpy_array(array)
 
-    # Check if the array is valid and can be converted to an image
-    try:
-        # Convert the NumPy array to a PIL image
-        pil_image = Image.fromarray(array.astype(np.uint8))
-    except Exception as e:
-        raise ValueError(f"Failed to convert NumPy array to image: {e}")
+    format = format.upper()
 
-    try:
-        # Convert the PIL image to a base64-encoded string
-        with BytesIO() as buffer:
-            pil_image.save(buffer, format="PNG")
-            base64_img = bytetools.base64frombytes(buffer.getvalue())
-    except Exception as e:
-        raise RuntimeError(f"Failed to encode image to base64: {e}")
-
-    return base64_img
+    if format == "PNG":
+        return numpy_to_base64_png(processed_array)
+    elif format == "JPEG" or format == "JPG":
+        quality = kwargs.get("quality", 100)
+        return numpy_to_base64_jpeg(processed_array, quality=quality)
+    else:
+        raise ValueError(f"Unsupported format: {format}. Supported formats are 'PNG' and 'JPEG'.")
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:
     """
-    Convert a base64-encoded image string to a NumPy array.
+    Convert a base64-encoded image string to a NumPy array using OpenCV.
+    Returns images in RGB format for consistency.
 
     Parameters
     ----------
@@ -371,37 +525,86 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
     Returns
     -------
     numpy.ndarray
-        NumPy array representation of the decoded image.
+        NumPy array representation of the decoded image in RGB format (for color images).
+        Grayscale images are returned as-is.
 
     Raises
     ------
     ValueError
         If the base64 string is invalid or cannot be decoded into an image.
-    ImportError
-        If required libraries are not installed.
 
     Examples
     --------
     >>> base64_str = '/9j/4AAQSkZJRgABAQAAAQABAAD/2wBD...'
     >>> img_array = base64_to_numpy(base64_str)
+    >>> # img_array is now in RGB format (for color images)
     """
     try:
-        # Decode the base64 string
-        image_data = base64.b64decode(base64_string)
-    except (base64.binascii.Error, ValueError) as e:
+        # Decode the base64 string to bytes using bytetools
+        image_bytes = bytetools.bytesfrombase64(base64_string)
+    except Exception as e:
         raise ValueError("Invalid base64 string") from e
 
     try:
-        # Convert the bytes into a BytesIO object
-        image_bytes = BytesIO(image_data)
+        # Create numpy buffer from bytes and decode using OpenCV
+        buf = np.frombuffer(image_bytes, dtype=np.uint8)
+        img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+        if img is None:
+            raise ValueError("OpenCV failed to decode image")
 
-        # Open the image using PIL
-        image = Image.open(image_bytes)
-        image.load()
-    except UnidentifiedImageError as e:
+        # Convert BGR to RGB for consistent processing (OpenCV loads as BGR)
+        # Only convert if it's a 3-channel color image
+        if img.ndim == 3 and img.shape[2] == 3:
+            img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+
+    except Exception as e:
         raise ValueError("Unable to decode image from base64 string") from e
 
-    # Convert the image to a NumPy array
-    image_array = np.array(image)
+    return img
 
-    return image_array
+
+def scale_numpy_image(
+    img_arr: np.ndarray, scale_tuple: Optional[Tuple[int, int]] = None, interpolation=cv2.INTER_LANCZOS4
+) -> np.ndarray:
+    """
+    Scales a NumPy image array using OpenCV with aspect ratio preservation.
+
+    This function provides OpenCV-based image scaling that mimics PIL's thumbnail behavior
+    by maintaining aspect ratio and scaling to fit within the specified dimensions.
+
+    Parameters
+    ----------
+    img_arr : np.ndarray
+        The input image as a NumPy array.
+    scale_tuple : Optional[Tuple[int, int]], optional
+        A tuple (width, height) to resize the image to. If provided, the image
+        will be resized to fit within these dimensions while maintaining aspect ratio
+        (similar to PIL's thumbnail method). Defaults to None.
+    interpolation : int, optional
+        OpenCV interpolation method. Defaults to cv2.INTER_LANCZOS4.
+
+    Returns
+    -------
+    np.ndarray
+        A NumPy array representing the scaled image data.
+    """
+    # Apply scaling using OpenCV if specified
+    if scale_tuple:
+        # Get current dimensions
+        current_height, current_width = img_arr.shape[:2]
+        target_width, target_height = scale_tuple
+
+        # Calculate scaling factor to maintain aspect ratio (similar to PIL's thumbnail)
+        scale_w = target_width / current_width
+        scale_h = target_height / current_height
+        scale_factor = min(scale_w, scale_h)
+
+        # Calculate new dimensions
+        new_width = int(current_width * scale_factor)
+        new_height = int(current_height * scale_factor)
+
+        # Resize using OpenCV
+        img_arr = _resize_image_opencv(img_arr, (new_width, new_height), interpolation)
+
+    # Ensure we return a copy
+    return img_arr.copy()

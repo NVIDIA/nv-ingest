@@ -2,9 +2,7 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-
-import base64
-import io
+import os
 import logging
 import warnings
 from math import log
@@ -20,11 +18,11 @@ import packaging
 import pandas as pd
 import torch
 import torchvision
-from PIL import Image
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
+from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
 logger = logging.getLogger(__name__)
 
@@ -35,6 +33,7 @@ YOLOX_PAGE_MIN_SCORE = 0.1
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
+YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
 # yolox-page-elements-v1 contants
 YOLOX_PAGE_V1_NUM_CLASSES = 4
@@ -239,15 +238,11 @@ class YoloxModelInterfaceBase(ModelInterface):
                 # Convert to uint8 if needed.
                 if image.dtype != np.uint8:
                     image = (image * 255).astype(np.uint8)
-                # Convert the numpy array to a PIL Image.
-                image_pil = Image.fromarray(image)
-                original_size = image_pil.size
 
-                # Save the image to a buffer and encode to base64.
-                buffered = io.BytesIO()
-                image_pil.save(buffered, format="PNG")
-                image_b64 = base64.b64encode(buffered.getvalue()).decode("utf-8")
-
+                # Get original size directly from numpy array (width, height)
+                original_size = (image.shape[1], image.shape[0])
+                # Convert numpy array directly to base64 using OpenCV
+                image_b64 = numpy_to_base64(image, format="PNG")
                 # Scale the image if necessary.
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
                     image_b64, max_base64_size=self.nim_max_image_size
