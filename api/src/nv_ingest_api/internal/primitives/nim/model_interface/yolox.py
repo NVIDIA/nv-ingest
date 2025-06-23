@@ -242,7 +242,7 @@ class YoloxModelInterfaceBase(ModelInterface):
                 # Get original size directly from numpy array (width, height)
                 original_size = (image.shape[1], image.shape[0])
                 # Convert numpy array directly to base64 using OpenCV
-                image_b64 = numpy_to_base64(image, format="PNG")
+                image_b64 = numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT)
                 # Scale the image if necessary.
                 scaled_image_b64, new_size = scale_image_to_encoding_size(
                     image_b64, max_base64_size=self.nim_max_image_size

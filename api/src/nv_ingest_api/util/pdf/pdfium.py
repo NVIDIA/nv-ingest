@@ -21,6 +21,7 @@ from nv_ingest_api.util.image_processing.clustering import (
 )
 from nv_ingest_api.util.image_processing.transforms import pad_image, numpy_to_base64, crop_image, scale_numpy_image
 from nv_ingest_api.util.metadata.aggregators import Base64Image
+from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YOLOX_PAGE_IMAGE_FORMAT
 
 logger = logging.getLogger(__name__)
 
@@ -242,7 +243,7 @@ def extract_simple_images_from_pdfium_page(page, max_depth):
         try:
             # Attempt to retrieve the image bitmap
             image_numpy: np.ndarray = pdfium_try_get_bitmap_as_numpy(obj)  # noqa
-            image_base64: str = numpy_to_base64(image_numpy)
+            image_base64: str = numpy_to_base64(image_numpy, format=YOLOX_PAGE_IMAGE_FORMAT)
             image_bbox = obj.get_pos()
             image_size = obj.get_size()
             if image_size[0] < 10 and image_size[1] < 10:

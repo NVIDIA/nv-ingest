@@ -47,46 +47,191 @@ def non_image_base64():
     return base64.b64encode(b"This is not an image").decode("utf-8")
 
 
-def test_numpy_to_base64_valid_rgba_image():
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_numpy_to_base64_valid_rgba_image(format):
     array = np.random.randint(0, 255, (100, 100, 4), dtype=np.uint8)
-    result = numpy_to_base64(array)
+    result = numpy_to_base64(array, format=format)
 
     assert isinstance(result, str)
     assert len(result) > 0
 
 
-def test_numpy_to_base64_valid_rgb_image():
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_numpy_to_base64_valid_rgb_image(format):
     array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
-    result = numpy_to_base64(array)
+    result = numpy_to_base64(array, format=format)
 
     assert isinstance(result, str)
     assert len(result) > 0
 
 
-def test_numpy_to_base64_grayscale_redundant_axis():
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_numpy_to_base64_grayscale_redundant_axis(format):
     array = np.random.randint(0, 255, (100, 100, 1), dtype=np.uint8)
-    result = numpy_to_base64(array)
+    result = numpy_to_base64(array, format=format)
 
     assert isinstance(result, str)
     assert len(result) > 0
+
+
+def test_numpy_to_base64_format_validation():
+    """Test that the output format matches the requested format."""
+    array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+
+    # Test PNG format
+    png_result = numpy_to_base64(array, format="PNG")
+    png_decoded = base64.b64decode(png_result)
+    png_image = Image.open(io.BytesIO(png_decoded))
+    assert png_image.format == "PNG"
+
+    # Test JPEG format
+    jpeg_result = numpy_to_base64(array, format="JPEG")
+    jpeg_decoded = base64.b64decode(jpeg_result)
+    jpeg_image = Image.open(io.BytesIO(jpeg_decoded))
+    assert jpeg_image.format == "JPEG"
+
+
+@pytest.mark.parametrize("format_input", ["png", "PNG", "jpeg", "JPEG", "jpg", "JPG"])
+def test_numpy_to_base64_case_insensitive_format(format_input):
+    """Test that format parameter is case-insensitive."""
+    array = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+    result = numpy_to_base64(array, format=format_input)
+
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+    # Verify the actual format
+    decoded = base64.b64decode(result)
+    image = Image.open(io.BytesIO(decoded))
+    if format_input.upper() in ["PNG"]:
+        assert image.format == "PNG"
+    elif format_input.upper() in ["JPEG", "JPG"]:
+        assert image.format == "JPEG"
+
+
+def test_numpy_to_base64_invalid_format():
+    """Test that invalid format raises ValueError."""
+    array = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+
+    with pytest.raises(ValueError, match="Unsupported format: BMP"):
+        numpy_to_base64(array, format="BMP")
+
+    with pytest.raises(ValueError, match="Unsupported format: GIF"):
+        numpy_to_base64(array, format="GIF")
+
+
+@pytest.mark.parametrize("quality", [1, 25, 50, 75, 90, 100])
+def test_numpy_to_base64_jpeg_quality_parameter(quality):
+    """Test JPEG quality parameter with various values."""
+    array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
+    result = numpy_to_base64(array, format="JPEG", quality=quality)
+
+    assert isinstance(result, str)
+    assert len(result) > 0
+
+    # Verify it's actually JPEG
+    decoded = base64.b64decode(result)
+    image = Image.open(io.BytesIO(decoded))
+    assert image.format == "JPEG"
+
+
+def test_numpy_to_base64_jpeg_quality_comparison():
+    """Test that different JPEG quality values produce different sizes (generally)."""
+    array = np.random.randint(0, 255, (200, 200, 3), dtype=np.uint8)
+
+    # Generate images with different quality levels
+    low_quality = numpy_to_base64(array, format="JPEG", quality=10)
+    high_quality = numpy_to_base64(array, format="JPEG", quality=95)
+
+    # Higher quality should generally produce larger base64 strings
+    assert len(high_quality) > len(low_quality)
+
+
+def test_numpy_to_base64_default_parameters():
+    """Test that default parameters work as expected."""
+    array = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+
+    # Test default format (should be PNG)
+    result = numpy_to_base64(array)
+    decoded = base64.b64decode(result)
+    image = Image.open(io.BytesIO(decoded))
+    assert image.format == "PNG"
+
+    # Test default quality for JPEG (should be 100)
+    jpeg_result = numpy_to_base64(array, format="JPEG")
+    jpeg_explicit_quality = numpy_to_base64(array, format="JPEG", quality=100)
+    assert jpeg_result == jpeg_explicit_quality
+
+
+def test_numpy_to_base64_roundtrip_consistency():
+    """Test that numpy -> base64 -> numpy produces consistent results."""
+    original_array = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+
+    # Test PNG roundtrip (lossless)
+    png_base64 = numpy_to_base64(original_array, format="PNG")
+    recovered_png = base64_to_numpy(png_base64)
+
+    # For PNG, should be identical (lossless compression)
+    assert recovered_png.shape == original_array.shape
+    np.testing.assert_array_equal(recovered_png, original_array)
+
+    # Test JPEG roundtrip (lossy - check shape but not exact values)
+    jpeg_base64 = numpy_to_base64(original_array, format="JPEG", quality=95)
+    recovered_jpeg = base64_to_numpy(jpeg_base64)
+    np.testing.assert_almost_equal(recovered_jpeg, original_array, decimal=2)
+
+    # JPEG is lossy, so just check shape consistency
+    assert recovered_jpeg.shape == original_array.shape
+
+
+def test_numpy_to_base64_different_array_dtypes():
+    """Test that different numpy array dtypes are handled correctly."""
+    # Test uint8 (standard)
+    array_uint8 = np.random.randint(0, 255, (50, 50, 3), dtype=np.uint8)
+    result_uint8 = numpy_to_base64(array_uint8, format="PNG")
+    assert isinstance(result_uint8, str) and len(result_uint8) > 0
+
+    # Test float32 (should be converted internally)
+    array_float32 = np.random.rand(50, 50, 3).astype(np.float32)
+    result_float32 = numpy_to_base64(array_float32, format="PNG")
+    assert isinstance(result_float32, str) and len(result_float32) > 0
+
+    # Test float64 (should be converted internally)
+    array_float64 = np.random.rand(50, 50, 3).astype(np.float64)
+    result_float64 = numpy_to_base64(array_float64, format="PNG")
+    assert isinstance(result_float64, str) and len(result_float64) > 0
+
+
+def test_numpy_to_base64_grayscale_2d_array():
+    """Test grayscale image as 2D array (no channel dimension)."""
+    array_2d = np.random.randint(0, 255, (50, 50), dtype=np.uint8)
+
+    result_png = numpy_to_base64(array_2d, format="PNG")
+    assert isinstance(result_png, str) and len(result_png) > 0
+
+    result_jpeg = numpy_to_base64(array_2d, format="JPEG")
+    assert isinstance(result_jpeg, str) and len(result_jpeg) > 0
 
 
 # Tests for base64_to_numpy
-def test_base64_to_numpy_valid(valid_base64_image):
-    img_array = base64_to_numpy(valid_base64_image)
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_base64_to_numpy_valid(valid_base64_image, format):
+    img_array = base64_to_numpy(valid_base64_image, format=format)
     assert isinstance(img_array, np.ndarray)
     assert img_array.shape[0] == 64  # Height
     assert img_array.shape[1] == 64  # Width
 
 
-def test_base64_to_numpy_invalid_string(corrupted_base64_image):
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_base64_to_numpy_invalid_string(corrupted_base64_image, format):
     with pytest.raises(ValueError, match="Invalid base64 string"):
-        base64_to_numpy(corrupted_base64_image)
+        base64_to_numpy(corrupted_base64_image, format=format)
 
 
-def test_base64_to_numpy_non_image(non_image_base64):
+@pytest.mark.parametrize("format", ["PNG", "JPEG"])
+def test_base64_to_numpy_non_image(non_image_base64, format):
     with pytest.raises(ValueError, match="Unable to decode image from base64 string"):
-        base64_to_numpy(non_image_base64)
+        base64_to_numpy(non_image_base64, format=format)
 
 
 def test_base64_to_numpy_import_error(monkeypatch, valid_base64_image):
@@ -216,7 +361,7 @@ def test_ensure_base64_is_png_invalid_base64():
 
 
 def test_ensure_base64_is_png_non_image_base64_data():
-    # Provide valid base64 data that isn’t an image
+    # Provide valid base64 data that isn't an image
     non_image_base64 = base64.b64encode(b"This is not an image").decode("utf-8")
 
     result = ensure_base64_is_png(non_image_base64)
