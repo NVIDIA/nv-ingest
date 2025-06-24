@@ -63,7 +63,7 @@ def get_nim_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
