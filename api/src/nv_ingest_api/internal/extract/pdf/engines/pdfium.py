@@ -385,9 +385,9 @@ def pdfium_extractor(
     extract_text: bool,
     extract_images: bool,
     extract_infographics: bool,
-    extract_page_as_image: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
