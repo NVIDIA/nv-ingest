@@ -52,7 +52,7 @@ jobs:
           else
 
             echo "Setting VERSION to $(date +'%y.%m.%d'). DEFAULT"
-            echo "VERSION=$(date +'%y.%m.%d').dev$(date +'%y%m%d')" >> $GITHUB_ENV
+            echo "VERSION=$(date +'%y.%m.%d')" >> $GITHUB_ENV
           fi
 
       - name: Checkout code
