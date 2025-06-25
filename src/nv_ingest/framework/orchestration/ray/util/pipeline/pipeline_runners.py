@@ -331,6 +331,10 @@ def run_pipeline(
     """
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
+        if (ingest_config.ngc_api_key is None or ingest_config.ngc_api_key == "") and (
+            ingest_config.nvidia_build_api_key is None or ingest_config.nvidia_build_api_key == ""
+        ):
+            logger.warning("NGC_API_KEY or NVIDIA_BUILD_API_KEY are not set. NIM Related functions will not work.")
 
         ctx = multiprocessing.get_context("fork")
         process = ctx.Process(

@@ -1,16 +1,23 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+import json
 
 import pytest
 import pandas as pd
 import ray
 
-
 from nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector import MetadataInjectionStage
-from nv_ingest_api.internal.enums.common import DocumentTypeEnum
+from nv_ingest_api.internal.enums.common import (
+    DocumentTypeEnum,
+    ContentTypeEnum,
+    AccessLevelEnum,
+    LanguageEnum,
+    TextTypeEnum,
+)
 from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage
 from nv_ingest_api.util.converters.type_mappings import doc_type_to_content_type
+from nv_ingest_api.internal.schemas.meta.metadata_schema import ContentHierarchySchema
 
 
 # Initialize Ray once at the module level
@@ -45,7 +52,7 @@ class TestIngestControlMessage(IngestControlMessage):
 class TestMetadataInjectionStage:
     """Test class for MetadataInjectionStage."""
 
-    @pytest.fixture(autouse=True)
+    @pytest.fixture(scope="function", autouse=True)
     def setup(self):
         """
         Set up the test environment before each test.
@@ -147,16 +154,34 @@ class TestMetadataInjectionStage:
         expected_type = doc_type_to_content_type(DocumentTypeEnum("pdf")).name.lower()
         assert isinstance(metadata, dict)
         assert metadata["content"] == "pdf content"
-        assert metadata["content_metadata"]["type"] == expected_type
+
+        # Assert content_metadata defaults
+        cm = metadata["content_metadata"]
+        assert cm["type"] == expected_type
+        assert cm["page_number"] == -1
+        assert cm["description"] == ""
+        assert isinstance(cm["hierarchy"], dict)
+        assert cm["hierarchy"] == ContentHierarchySchema().model_dump()
+        assert cm["subtype"] == ""
+        assert cm["start_time"] == -1
+        assert cm["end_time"] == -1
+
         assert metadata["error_metadata"] is None
-        # For non-image and non-text types, image_metadata and text_metadata should be None
         assert metadata["image_metadata"] is None
         assert metadata["text_metadata"] is None
-        assert metadata["source_metadata"] == {
-            "source_id": 10,
-            "source_name": "PDF_Source",
-            "source_type": "pdf",
-        }
+
+        # Assert source_metadata defaults
+        sm = metadata["source_metadata"]
+        assert sm["source_id"] == 10
+        assert sm["source_name"] == "PDF_Source"
+        assert sm["source_type"] == "pdf"
+        assert sm["source_location"] == ""
+        assert sm["collection_id"] == ""
+        assert isinstance(sm["date_created"], str) and sm["date_created"]
+        assert isinstance(sm["last_modified"], str) and sm["last_modified"]
+        assert sm["summary"] == ""
+        assert sm["partition_id"] == -1
+        assert sm["access_level"] == AccessLevelEnum.UNKNOWN.value
 
     def test_update_required_non_dict_metadata(self):
         """
@@ -193,17 +218,45 @@ class TestMetadataInjectionStage:
 
         expected_type = doc_type_to_content_type(DocumentTypeEnum("png")).name.lower()
         assert metadata["content"] == "image content"
-        assert metadata["content_metadata"]["type"] == expected_type
+
+        # Assert content_metadata defaults
+        cm = metadata["content_metadata"]
+        assert cm["type"] == expected_type
+        assert cm["page_number"] == -1
+        assert cm["description"] == ""
+        assert cm["hierarchy"] == ContentHierarchySchema().model_dump()
+        assert cm["subtype"] == ""
+        assert cm["start_time"] == -1
+        assert cm["end_time"] == -1
+
         assert metadata["error_metadata"] is None
-        # For an image, image_metadata should be set
-        assert metadata["image_metadata"] == {"image_type": "png"}
-        # text_metadata should remain None
+
+        # Assert image_metadata defaults for image type
+        im = metadata["image_metadata"]
+        assert im["image_type"] == "png"
+        assert im["structured_image_type"] == ContentTypeEnum.NONE.value
+        assert im["caption"] == ""
+        assert im["text"] == ""
+        assert im["image_location"] == (0, 0, 0, 0)
+        assert im["image_location_max_dimensions"] == (0, 0)
+        assert im["uploaded_image_url"] == ""
+        assert im["width"] == 0
+        assert im["height"] == 0
+
         assert metadata["text_metadata"] is None
-        assert metadata["source_metadata"] == {
-            "source_id": 20,
-            "source_name": "Image_Source",
-            "source_type": "png",
-        }
+
+        # Assert source_metadata defaults
+        sm = metadata["source_metadata"]
+        assert sm["source_id"] == 20
+        assert sm["source_name"] == "Image_Source"
+        assert sm["source_type"] == "png"
+        assert sm["source_location"] == ""
+        assert sm["collection_id"] == ""
+        assert isinstance(sm["date_created"], str) and sm["date_created"]
+        assert isinstance(sm["last_modified"], str) and sm["last_modified"]
+        assert sm["summary"] == ""
+        assert sm["partition_id"] == -1
+        assert sm["access_level"] == AccessLevelEnum.UNKNOWN.value
 
     def test_update_required_missing_content_in_metadata(self):
         """
@@ -241,17 +294,105 @@ class TestMetadataInjectionStage:
 
         expected_type = doc_type_to_content_type(DocumentTypeEnum("text")).name.lower()
         assert metadata["content"] == "textual content"
-        assert metadata["content_metadata"]["type"] == expected_type
-        # For text content, text_metadata should be set
-        assert metadata["text_metadata"] == {"text_type": "document"}
-        # image_metadata should be None
+
+        # Assert content_metadata defaults
+        cm = metadata["content_metadata"]
+        assert cm["type"] == expected_type
+        assert cm["page_number"] == -1
+        assert cm["description"] == ""
+        assert cm["hierarchy"] == ContentHierarchySchema().model_dump()
+        assert cm["subtype"] == ""
+        assert cm["start_time"] == -1
+        assert cm["end_time"] == -1
+
+        # Assert text_metadata defaults for text type
+        tm = metadata["text_metadata"]
+        assert tm["text_type"] == TextTypeEnum.DOCUMENT.value
+        assert tm["summary"] == ""
+        assert tm["keywords"] == ""
+        assert tm["language"] == LanguageEnum.UNKNOWN.value
+        assert tm["text_location"] == (0, 0, 0, 0)
+        assert tm["text_location_max_dimensions"] == (0, 0, 0, 0)
+
         assert metadata["image_metadata"] is None
         assert metadata["error_metadata"] is None
-        assert metadata["source_metadata"] == {
-            "source_id": 30,
-            "source_name": "Text_Source",
-            "source_type": "text",
-        }
+
+        # Assert source_metadata defaults
+        sm = metadata["source_metadata"]
+        assert sm["source_id"] == 30
+        assert sm["source_name"] == "Text_Source"
+        assert sm["source_type"] == "text"
+        assert sm["source_location"] == ""
+        assert sm["collection_id"] == ""
+        assert isinstance(sm["date_created"], str) and sm["date_created"]
+        assert isinstance(sm["last_modified"], str) and sm["last_modified"]
+        assert sm["summary"] == ""
+        assert sm["partition_id"] == -1
+        assert sm["access_level"] == AccessLevelEnum.UNKNOWN.value
+
+    def test_audio_document_type(self):
+        """
+        Test that audio content types generate the correct metadata structure.
+
+        This test verifies that when processing a row with an audio document type,
+        the MetadataInjectionStage correctly sets up the audio-specific metadata
+        while leaving other content-type-specific metadata as None.
+
+        Returns
+        -------
+        None
+        """
+        # Test with an audio document type
+        df = pd.DataFrame(
+            [
+                {
+                    "document_type": "mp3",
+                    "content": "audio content",
+                    "source_id": 40,
+                    "source_name": "Audio_Source",
+                }
+            ]
+        )
+        msg = TestIngestControlMessage(df)
+        # Call the remote method and get the result
+        result = ray.get(self.actor_ref.on_data.remote(msg))
+        updated_df = result.payload()
+        metadata = updated_df.loc[0, "metadata"]
+
+        expected_type = doc_type_to_content_type(DocumentTypeEnum("mp3")).name.lower()
+        assert metadata["content"] == "audio content"
+
+        # Assert content_metadata defaults
+        cm = metadata["content_metadata"]
+        assert cm["type"] == expected_type
+        assert cm["page_number"] == -1
+        assert cm["description"] == ""
+        assert cm["hierarchy"] == ContentHierarchySchema().model_dump()
+        assert cm["subtype"] == ""
+        assert cm["start_time"] == -1
+        assert cm["end_time"] == -1
+
+        # Assert audio_metadata defaults for audio type
+        am = metadata["audio_metadata"]
+        assert am["audio_type"] == "mp3"
+        assert am["audio_transcript"] == ""
+
+        assert metadata["image_metadata"] is None
+        assert metadata["text_metadata"] is None
+        assert metadata["error_metadata"] is None
+
+        # Assert source_metadata defaults
+        sm = metadata["source_metadata"]
+        assert sm["source_id"] == 40
+        assert sm["source_name"] == "Audio_Source"
+        assert sm["source_type"] == "mp3"
+        assert sm["source_location"] == ""
+        assert sm["collection_id"] == ""
+        assert isinstance(sm["date_created"], str) and sm["date_created"]
+        assert isinstance(sm["last_modified"], str) and sm["last_modified"]
+        assert sm["summary"] == ""
+        assert sm["partition_id"] == -1
+        assert sm["access_level"] == AccessLevelEnum.UNKNOWN.value
 
     def test_empty_dataframe(self):
         """
@@ -291,7 +432,7 @@ class TestMetadataInjectionStage:
         df = pd.DataFrame(
             [
                 {
-                    "document_type": "invalid",  # This value is not valid for DocumentTypeEnum
+                    "document_type": "invalid",
                     "content": "content",
                     "source_id": 3,
                     "source_name": "SourceX",
@@ -303,43 +444,16 @@ class TestMetadataInjectionStage:
         msg = ray.get(self.actor_ref.on_data.remote(msg))
         is_failed = msg.get_metadata("cm_failed", False)
         assert is_failed
+        # Add more specific check for decorator's failure annotation
+        failure_reason = msg.get_metadata("cm_failed_reason", "")
+        assert "Error in on_data" in failure_reason  # General check for error origin
 
-    def test_audio_document_type(self):
-        """
-        Test that audio content types generate the correct metadata structure.
-
-        This test verifies that when processing a row with an audio document type,
-        the MetadataInjectionStage correctly sets up the audio-specific metadata
-        while leaving other content-type-specific metadata as None.
-
-        Returns
-        -------
-        None
-        """
-        # Test with an audio document type
-        df = pd.DataFrame(
-            [
-                {
-                    "document_type": "mp3",  # Assuming mp3 maps to AUDIO in your enum
-                    "content": "audio content",
-                    "source_id": 40,
-                    "source_name": "Audio_Source",
-                }
-            ]
-        )
-        msg = TestIngestControlMessage(df)
-        # Call the remote method and get the result
-        result = ray.get(self.actor_ref.on_data.remote(msg))
-        updated_df = result.payload()
-        metadata = updated_df.loc[0, "metadata"]
-
-        expected_type = doc_type_to_content_type(DocumentTypeEnum("mp3")).name.lower()
-        assert metadata["content"] == "audio content"
-        assert metadata["content_metadata"]["type"] == expected_type
-        # For audio, audio_metadata should be set
-        assert metadata["audio_metadata"] == {"audio_type": "mp3"}
-        # Other type-specific metadata should be None
-        assert metadata["image_metadata"] is None
-        assert metadata["text_metadata"] is None
-        assert metadata["error_metadata"] is None
-        assert metadata["source_metadata"]["source_type"] == "mp3"
+        found_detailed_annotation = False
+        for key, value in msg.get_metadata().items():
+            if isinstance(key, str) and key.startswith("annotation::") and isinstance(value, dict):
+                if value.get("task_id") == "metadata_injector" and value.get("task_result") == "FAILURE":
+                    found_detailed_annotation = True
+                    # Optionally, assert specific details from the value if needed
+                    # For example: assert "invalid" in value.get("message", "").lower()
+                    break
+        assert found_detailed_annotation, "Detailed failure annotation from metadata_injector not found or incorrect."

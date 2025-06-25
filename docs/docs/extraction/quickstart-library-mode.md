@@ -6,8 +6,8 @@ Library mode depends on NIMs that are already self-hosted, or, by default, NIMs 
 To get started using [NeMo Retriever extraction](overview.md) in library mode, you need the following:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
-- [Conda Python environment and package manager](https://github.com/conda-forge/miniforge)
-- [Python version 3.10](https://www.python.org/downloads/release/python-3100/)
+- Python 3.12
+- We strongly advise using an isolated Python virtual env, such as provided by [uv](https://docs.astral.sh/uv/getting-started/installation/) or [conda](https://github.com/conda-forge/miniforge)
 
 
 
@@ -18,10 +18,9 @@ Use the following procedure to prepare your environment.
 1. Run the following code to create your NV Ingest Conda environment.
 
     ```
-    conda create -y --name nvingest python=3.12 && \
-    conda activate nvingest && \
-    conda install -y -c rapidsai -c conda-forge -c nvidia nv_ingest=25.4.2 nv_ingest_client=25.4.2 nv_ingest_api=25.4.2 && \
-    pip install opencv-python llama-index-embeddings-nvidia pymilvus 'pymilvus[bulk_writer, model]' milvus-lite nvidia-riva-client unstructured-client tritonclient
+       uv venv --python 3.12 nvingest && \
+         source nvingest/bin/activate && \
+         uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
     ```
 
     !!! tip
@@ -70,20 +69,17 @@ On a 4 CPU core low end laptop, the following code should take about 10 seconds.
 ```python
 import logging, os, time, sys
 
-from nv_ingest.framework.orchestration.morpheus.util.pipeline.pipeline_runners import (
-    PipelineCreationSchema,
-    start_pipeline_subprocess_morpheus
-)
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import PipelineCreationSchema
+from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
 from nv_ingest_client.client import Ingestor, NvIngestClient
 from nv_ingest_api.util.message_brokers.simple_message_broker import SimpleClient
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
 
-# Start the pipeline subprocess for library mode                       
+# Start the pipeline subprocess for library mode
 config = PipelineCreationSchema()
 
-pipeline_process = start_pipeline_subprocess_morpheus(config)
-# you can configure the subprocesses to log stderr to stdout for debugging purposes
-# pipeline_process = start_pipeline_subprocess(config, stderr=sys.stderr, stdout=sys.stdout)
+run_pipeline(config, block=False, disable_dynamic_scaling=True, run_in_subprocess=True)
 
 client = NvIngestClient(
     message_client_allocator=SimpleClient,
