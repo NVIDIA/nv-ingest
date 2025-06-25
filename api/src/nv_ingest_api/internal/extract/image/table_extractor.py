@@ -92,6 +92,9 @@ def _run_inference(
             stage_name="table_extraction",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
             trace_info=trace_info,
+            input_names=["input", "merge_levels"],
+            dtypes=["FP32", "BYTES"],
+            merge_level="word",
         )
 
         if enable_yolox:

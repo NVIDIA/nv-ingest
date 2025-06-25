@@ -91,6 +91,9 @@ def _run_chart_inference(
             stage_name="chart_extraction",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
             trace_info=trace_info,
+            input_names=["input", "merge_levels"],
+            dtypes=["FP32", "BYTES"],
+            merge_level="paragraph",
         )
 
         try:
@@ -142,7 +145,7 @@ def _merge_chart_results(
     """
     for idx, (yolox_res, ocr_res) in enumerate(zip(yolox_results, ocr_results)):
         # Unpack ocr result into bounding boxes and text predictions.
-        bounding_boxes, text_predictions = ocr_res
+        bounding_boxes, text_predictions, _ = ocr_res
         yolox_elements = join_yolox_graphic_elements_and_ocr_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
         original_index = valid_indices[idx]

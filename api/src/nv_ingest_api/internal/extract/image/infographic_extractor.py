@@ -18,6 +18,7 @@ from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
 )
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 from nv_ingest_api.util.nim import create_inference_client
+from nv_ingest_api.util.image_processing.table_and_chart import reorder_boxes
 
 logger = logging.getLogger(__name__)
 
@@ -103,6 +104,9 @@ def _update_infographic_metadata(
             stage_name="infographic_extraction",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
             trace_info=trace_info,
+            input_names=["input", "merge_levels"],
+            dtypes=["FP32", "BYTES"],
+            merge_level="paragraph",
         )
     except Exception as e:
         logger.error(f"Error calling ocr_client.infer: {e}", exc_info=True)
@@ -113,7 +117,9 @@ def _update_infographic_metadata(
 
     for idx, ocr_res in enumerate(ocr_results):
         original_index = valid_indices[idx]
-        # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes)
+        # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes, conf_scores).
+        ocr_res = reorder_boxes(*ocr_res)
+
         results[original_index] = (base64_images[original_index], ocr_res[0], ocr_res[1])
 
     return results
