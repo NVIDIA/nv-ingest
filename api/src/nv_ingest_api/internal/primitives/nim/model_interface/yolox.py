@@ -124,7 +124,7 @@ class YoloxModelInterfaceBase(ModelInterface):
         min_score: Optional[float] = None,
         final_score: Optional[float] = None,
         class_labels: Optional[List[str]] = None,
-        yolox_model_name: str = "yolox",
+        yolox_model_name: str = "yolox_ensemble",
     ):
         """
         Initialize the YOLOX model interface.

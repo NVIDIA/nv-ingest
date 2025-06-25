@@ -11,8 +11,7 @@ from math import floor
 from typing import Optional
 from typing import Tuple
 
-import torch
-from torchvision.io import encode_jpeg
+import cv2
 import numpy as np
 from PIL import Image
 from PIL import UnidentifiedImageError
@@ -21,8 +20,6 @@ from nv_ingest_api.util.converters import bytetools
 
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
-
-torch.set_num_threads(1)
 
 logger = logging.getLogger(__name__)
 
@@ -353,39 +350,30 @@ def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
-
     # Handle grayscale images with shape (H, W, 1)
     if array.ndim == 3 and array.shape[2] == 1:
         array = np.squeeze(array, axis=2)
 
     # Convert to torch tensor with appropriate shape
     if array.ndim == 2:  # grayscale
-        tensor = torch.from_numpy(array).unsqueeze(0)  # (1, H, W)
+        array = array.unsqueeze(0)  # (1, H, W)
     elif array.ndim == 3:
         if array.shape[2] == 4:  # drop alpha channel
             array = array[..., :3]
-        tensor = torch.from_numpy(array).permute(2, 0, 1)  # (C, H, W)
     else:
         raise ValueError(f"Expected (H,W) or (H,W,C); got {array.shape}")
 
     # Ensure uint8 dtype
-    if tensor.dtype != torch.uint8:
-        tensor = tensor.to(torch.uint8)
+    if array.dtype != np.uint8:
+        array = array.astype(np.uint8)
 
     try:
-        # Encode to JPEG using torchvision
-        jpeg_bytes_tensor = encode_jpeg(
-            tensor.contiguous(),
-            quality=quality,
-        )
-        # TODO: Passing a list of tensors is more efficient
-        # So we can make this call on a list of values
-        jpeg_bytes = jpeg_bytes_tensor.cpu().numpy().tobytes()
+        _, jpeg_bytes = cv2.imencode(".jpg", array, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        jpeg_base64 = bytetools.base64frombytes(jpeg_bytes)
     except Exception as e:
-        raise RuntimeError(f"Failed to encode JPEG with torchvision: {e}")
+        raise RuntimeError(f"Failed to encode JPEG: {e}")
 
-    # Convert to base64
-    return bytetools.base64frombytes(jpeg_bytes)
+    return jpeg_base64
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:
