@@ -30,6 +30,8 @@ from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 from nv_ingest_api.util.converters import bytetools
 
 
+cv2.setNumThreads(1)
+
 logger = logging.getLogger(__name__)
 
 # yolox-page-elements-v1 and v2 common contants
@@ -272,13 +274,13 @@ class YoloxModelInterfaceBase(ModelInterface):
                 image_b64 = numpy_to_base64(image)
 
                 # Scale the image if necessary.
-                #scaled_image_b64, new_size = scale_image_to_encoding_size(
+                # scaled_image_b64, new_size = scale_image_to_encoding_size(
                 #    image_b64, max_base64_size=self.nim_max_image_size
-                #)
-                #if new_size != original_size:
+                # )
+                # if new_size != original_size:
                 #    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
-                #content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
+                # content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
                 content_list.append({"type": "image_url", "url": f"data:image/png;base64,{image_b64}"})
 
             # Chunk the payload content, the original images, and their shapes.
@@ -1408,6 +1410,7 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
             bbox_dict[k][:, [1, 3]] = np.add(bbox_dict[k][:, [1, 3]], delta, casting="unsafe")
 
     return bbox_dict
+
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
