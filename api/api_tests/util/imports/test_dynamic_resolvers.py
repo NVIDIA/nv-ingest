@@ -1,6 +1,7 @@
 # SPDX-FileCopyrightText: Copyright (c) 2024-25, NVIDIA CORPORATION & AFFILIATES.
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
+
 import inspect
 import types
 import pytest
@@ -195,3 +196,86 @@ def test_resolve_callable_from_path_with_str_schema_checker_operator_add():
         assert fn(5, 6) == 11
     finally:
         del sys.modules["checker_mod"]
+
+
+def test_resolve_callable_from_path_with_bad_schema_type():
+    with pytest.raises(TypeError):
+        resolve_callable_from_path("os:getcwd", 123)
+
+
+# Tests for allowed_base_paths security feature
+
+
+def test_resolve_obj_from_path_allowed():
+    """Test that an object is resolved when its path is in the allowed list."""
+    obj = resolve_obj_from_path("os:getcwd", allowed_base_paths=["os"])
+    import os
+
+    assert obj == os.getcwd
+
+
+def test_resolve_obj_from_path_allowed_submodule():
+    """Test that an object in a submodule is resolved when the base path is allowed."""
+    obj = resolve_obj_from_path("os.path:join", allowed_base_paths=["os"])
+    import os.path
+
+    assert obj == os.path.join
+
+
+def test_resolve_obj_from_path_denied():
+    """Test that an ImportError is raised when the path is not in the allowed list."""
+    with pytest.raises(ImportError, match="is not in the list of allowed base paths"):
+        resolve_obj_from_path("sys:executable", allowed_base_paths=["os"])
+
+
+def test_resolve_obj_from_path_no_restrictions():
+    """Test that the resolver works without restrictions if no allowed paths are given."""
+    obj = resolve_obj_from_path("os:getcwd")
+    import os
+
+    assert obj == os.getcwd
+
+
+def test_resolve_callable_from_path_allowed():
+    """Test resolving a callable from an allowed path."""
+    func = resolve_callable_from_path("os:getcwd", [], allowed_base_paths=["os"])
+    import os
+
+    assert func == os.getcwd
+
+
+def test_resolve_callable_from_path_denied():
+    """Test that resolving a callable from a disallowed path fails."""
+    with pytest.raises(ImportError, match="is not in the list of allowed base paths"):
+        resolve_callable_from_path("sys:getdefaultencoding", [], allowed_base_paths=["os"])
+
+
+def test_resolve_callable_with_disallowed_schema_path(dummy_module):
+    """Test that resolution fails if the signature schema is from a disallowed path."""
+    callable_path = "os:access"
+    schema_path = "dummy_mod:sig_checker_good"  # Disallowed path
+    with pytest.raises(ImportError, match="is not in the list of allowed base paths"):
+        resolve_callable_from_path(callable_path, schema_path, allowed_base_paths=["os"])
+
+
+def test_resolve_callable_with_allowed_schema_path():
+    """Test that resolution succeeds if the signature schema is from an allowed path."""
+    # We need a checker that actually matches the function signature.
+    # Let's check os.access(path, mode, ...)
+    mod = types.ModuleType("checker_mod_allowed")
+
+    def access_checker(sig):
+        params = list(sig.parameters.keys())
+        if "path" not in params or "mode" not in params:
+            raise TypeError("Signature mismatch")
+
+    mod.access_checker = access_checker
+    sys.modules["checker_mod_allowed"] = mod
+
+    try:
+        callable_path = "os:access"
+        schema_path = "checker_mod_allowed:access_checker"
+        func = resolve_callable_from_path(callable_path, schema_path, allowed_base_paths=["os", "checker_mod_allowed"])
+        assert callable(func)
+    finally:
+        del sys.modules["checker_mod_allowed"]

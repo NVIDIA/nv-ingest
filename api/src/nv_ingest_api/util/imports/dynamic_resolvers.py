@@ -4,16 +4,28 @@
 
 import importlib
 import inspect
-from typing import Callable, Union, List
+from typing import Callable, Union, List, Optional
 
 
-def resolve_obj_from_path(path: str) -> object:
+def resolve_obj_from_path(path: str, allowed_base_paths: Optional[List[str]] = None) -> object:
     """
     Import and return an object from a string path of the form 'module.sub:attr'.
+
+    To enhance security, this function can restrict imports to a list of allowed base module paths.
     """
     if ":" not in path:
         raise ValueError(f"Invalid path '{path}': expected format 'module.sub:attr'")
     module_path, attr_name = path.split(":", 1)
+
+    # Security check: only allow imports from specified base paths if provided.
+    if allowed_base_paths:
+        is_allowed = any(module_path == base or module_path.startswith(base + ".") for base in allowed_base_paths)
+        if not is_allowed:
+            raise ImportError(
+                f"Module '{module_path}' is not in the list of allowed base paths. "
+                f"Allowed paths: {allowed_base_paths}"
+            )
+
     try:
         mod = importlib.import_module(module_path)
     except ModuleNotFoundError as e:
@@ -28,6 +40,7 @@ def resolve_obj_from_path(path: str) -> object:
 def resolve_callable_from_path(
     callable_path: str,
     signature_schema: Union[List[str], Callable[[inspect.Signature], None], str],
+    allowed_base_paths: Optional[List[str]] = None,
 ) -> Callable:
     """
     Import and return a callable from a module path string like 'module.submodule:callable_name',
@@ -42,6 +55,10 @@ def resolve_callable_from_path(
             - A list of parameter names to require.
             - A callable that takes an inspect.Signature and raises on failure.
             - A string path to such a callable ('module.sub:schema_checker').
+    allowed_base_paths : Optional[List[str]]
+        An optional list of base module paths from which imports are allowed.
+        If provided, both the callable and any signature schema specified by path
+        must reside within one of these paths.
 
     Returns
     -------
@@ -53,20 +70,21 @@ def resolve_callable_from_path(
     ValueError
         If the path is not correctly formatted.
     ImportError
-        If the module cannot be imported.
+        If the module cannot be imported or is not in the allowed paths.
     AttributeError
         If the attribute does not exist in the module.
     TypeError
         If the resolved attribute is not callable or the signature does not match.
     """
-    obj = resolve_obj_from_path(callable_path)
+    obj = resolve_obj_from_path(callable_path, allowed_base_paths=allowed_base_paths)
     if not callable(obj):
         raise TypeError(f"Object '{callable_path}' is not callable")
 
     # Load/check signature_schema
     schema_checker = signature_schema
     if isinstance(signature_schema, str):
-        schema_checker = resolve_obj_from_path(signature_schema)
+        # When loading the schema checker, apply the same security restrictions.
+        schema_checker = resolve_obj_from_path(signature_schema, allowed_base_paths=allowed_base_paths)
 
     sig = inspect.signature(obj)
     if isinstance(schema_checker, list):
