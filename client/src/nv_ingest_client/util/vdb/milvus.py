@@ -520,7 +520,7 @@ def cleanup_records(
     cleaned_records = []
     for result in records:
         if result is not None:
-            if not isinstance(result, list):
+            if isinstance(result, dict):
                 result = [result]
             for element in result:
                 text = _pull_text(
@@ -567,7 +567,7 @@ def _pull_text(
     verify_emb = verify_embedding(element)
     if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
-        pg_num = element["metadata"]["content_metadata"].get("page_number")
+        pg_num = element["metadata"]["content_metadata"].get("page_number", None)
         doc_type = element["document_type"]
         if not verify_emb:
             logger.debug(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
@@ -578,8 +578,8 @@ def _pull_text(
     if text and len(text) > 65535:
         logger.warning(
             f"Text is too long, skipping. It is advised to use SplitTask, to make smaller chunk sizes."
-            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata']['source_name']} "
-            f"page_number: {element['metadata']['content_metadata']['page_number']}"
+            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata'].get('source_name', None)} "
+            f"page_number: {element['metadata']['content_metadata'].get('page_number', None)}"
         )
         text = None
     return text
@@ -747,7 +747,7 @@ def create_bm25_model(
     """
     all_text = []
     for result in records:
-        if not isinstance(result, list):
+        if isinstance(result, dict):
             result = [result]
         for element in result:
             text = _pull_text(
@@ -1550,7 +1550,7 @@ def embed_index_collection(
 
 def reindex_collection(
     vdb_op: VDB = None,
-    current_collection_name: str = None,
+    collection_name: str = None,
     new_collection_name: str = None,
     write_dir: str = None,
     embedding_endpoint: str = None,
@@ -1591,7 +1591,7 @@ def reindex_collection(
 
     Parameters
     ----------
-        current_collection_name (str): The name of the current Milvus collection.
+        collection_name (str): The name of the current Milvus collection.
         new_collection_name (str, optional): The name of the new Milvus collection. Defaults to None.
         write_dir (str, optional): The directory to write the pulled records to. Defaults to None.
         embedding_endpoint (str, optional): The endpoint for the NVIDIA embedding service. Defaults to None.
@@ -1629,8 +1629,8 @@ def reindex_collection(
         kwargs = locals().copy()
         kwargs.pop("vdb_op", None)
         return vdb_op.reindex(**kwargs)
-    new_collection_name = new_collection_name if new_collection_name else current_collection_name
-    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir, query_batch_size)
+    new_collection_name = new_collection_name if new_collection_name else collection_name
+    pull_results = pull_all_milvus(collection_name, milvus_uri, write_dir, query_batch_size)
     embed_index_collection(
         pull_results,
         new_collection_name,

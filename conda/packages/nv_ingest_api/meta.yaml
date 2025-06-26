@@ -24,7 +24,7 @@ build:
 requirements:
   build:
     - pip
-    - python=3.12
+    - python=3.12.11
     - setuptools>=78.1.1
   run:
     - azure-core>=1.32.0
@@ -34,6 +34,7 @@ requirements:
     - isodate>=0.7.2
     - langdetect>=1.0.9
     - openai>=1.82.0
+    - protobuf=5.28.3
     - pydantic>=2.0.0
     - pypdfium2>=4.30.0
     - pytest>=8.0.2

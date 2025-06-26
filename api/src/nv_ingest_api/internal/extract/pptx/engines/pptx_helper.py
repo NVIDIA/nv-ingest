@@ -105,7 +105,7 @@ def _finalize_images(
             logger.warning(f"Unable to process shape image: {e}")
 
     # If you want table/chart detection for these images, do it now
-    # (similar to docx approach). This might use your YOLO or other method:
+    # (similar to docx approach). This might use your YOLO or another method:
     detection_map = defaultdict(list)  # image_idx -> list of CroppedImageWithContent
     if extract_tables or extract_charts:
         try:
@@ -407,7 +407,7 @@ def python_pptx(
                     page_nearby_blocks["text"]["bbox"].append(get_bbox(shape_object=shape))
 
                 # Image processing (deferred)
-                if extract_images:
+                if extract_images or extract_tables or extract_charts:
                     try:
                         process_shape(
                             shape,
