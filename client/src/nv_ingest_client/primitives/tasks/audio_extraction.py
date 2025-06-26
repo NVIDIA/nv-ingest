@@ -26,6 +26,7 @@ class AudioExtractionSchema(BaseModel):
     function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
+    segment_audio: Optional[bool] = None
 
     model_config = ConfigDict(extra="forbid")
     model_config["protected_namespaces"] = ()
@@ -40,6 +41,7 @@ class AudioExtractionTask(Task):
         function_id: Optional[str] = None,
         use_ssl: bool = None,
         ssl_cert: str = None,
+        segment_audio: bool = None,
     ) -> None:
         super().__init__()
 
@@ -49,6 +51,7 @@ class AudioExtractionTask(Task):
         self._function_id = function_id
         self._use_ssl = use_ssl
         self._ssl_cert = ssl_cert
+        self._segment_audio = segment_audio
 
     def __str__(self) -> str:
         """
@@ -69,6 +72,8 @@ class AudioExtractionTask(Task):
             info += f"  use_ssl: {self._use_ssl}\n"
         if self._ssl_cert:
             info += "  ssl_cert: [redacted]\n"
+        if self._segment_audio:
+            info += f"  segment_audio: {self._segment_audio}\n"
 
         return info
 
@@ -95,5 +100,8 @@ class AudioExtractionTask(Task):
 
         if self._ssl_cert:
             task_properties["ssl_cert"] = self._ssl_cert
+
+        if self._segment_audio:
+            task_properties["segment_audio"] = self._segment_audio
 
         return {"type": "audio_data_extract", "task_properties": task_properties}
