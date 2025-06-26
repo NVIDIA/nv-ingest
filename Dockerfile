@@ -62,7 +62,7 @@ RUN --mount=type=cache,target=/opt/conda/pkgs \
     && mamba install -y -c conda-forge tini
 
 # Ensure dynamically linked libraries in the conda environment are found at runtime
-ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:/opt/conda/envs/nv_ingest_runtime/lib/python3.12/site-packages/milvus_lite/lib:$LD_LIBRARY_PATH
+ENV LD_LIBRARY_PATH=/opt/conda/envs/nv_ingest_runtime/lib:$LD_LIBRARY_PATH
 
 # Set the working directory in the container
 WORKDIR /workspace
