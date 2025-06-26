@@ -10,6 +10,8 @@ from typing import Tuple
 
 import cv2
 import numpy as np
+from io import BytesIO
+from PIL import Image
 
 from nv_ingest_api.util.converters import bytetools
 
@@ -98,6 +100,8 @@ def scale_image_to_encoding_size(
         while len(base64_image) > max_base64_size:
             width, height = new_size
             new_size = (int(width * reduction_step), int(height * reduction_step))
+            if new_size[0] < 1 or new_size[1] < 1:
+                raise ValueError("Image cannot be resized further without becoming too small.")
 
             # Resize the image using OpenCV
             current_img = _resize_image_opencv(img_array, new_size)
@@ -109,10 +113,6 @@ def scale_image_to_encoding_size(
             if len(base64_image) > max_base64_size:
                 reduction_step *= 0.95  # Reduce size further if needed
 
-            # Safety check
-            if new_size[0] < 1 or new_size[1] < 1:
-                raise Exception("Image cannot be resized further without becoming too small.")
-
         return base64_image, new_size
 
     except Exception as e:
@@ -120,9 +120,39 @@ def scale_image_to_encoding_size(
         raise
 
 
+def _detect_base64_image_format(base64_string: str) -> Optional[str]:
+    """
+    Detects the format of a base64-encoded image using Pillow.
+
+    Parameters
+    ----------
+    base64_string : str
+        Base64-encoded image string.
+
+    Returns
+    -------
+    The detected format ("PNG", "JPEG", "UNKNOWN")
+    """
+    try:
+        image_bytes = bytetools.bytesfrombase64(base64_string)
+    except Exception as e:
+        logger.error(f"Invalid base64 string: {e}")
+        raise ValueError(f"Invalid base64 string: {e}") from e
+
+    try:
+        with Image.open(BytesIO(image_bytes)) as img:
+            return img.format.upper()
+    except ImportError:
+        raise ImportError("Pillow library not available")
+    except Exception as e:
+        logger.error(f"Error detecting image format: {e}")
+        return "UNKNOWN"
+
+
 def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs) -> str:
     """
     Ensures the given base64-encoded image is in the specified format. Converts if necessary.
+    Skips conversion if the image is already in the target format.
 
     Parameters
     ----------
@@ -145,14 +175,29 @@ def ensure_base64_format(base64_image: str, target_format: str = "PNG", **kwargs
     ValueError
         If there is an error during format conversion.
     """
+    target_format = target_format.upper()
+    if target_format == "JPG":
+        target_format = "JPEG"
+
+    current_format = _detect_base64_image_format(base64_image)
+    if current_format == "UNKNOWN":
+        raise ValueError(
+            f"Unable to decode image from base64 string: {base64_image}, because current format could not be detected."
+        )
+    if current_format == target_format:
+        logger.debug(f"Image already in {target_format} format, skipping conversion")
+        return base64_image
+
     try:
         # Decode the base64 image using OpenCV (returns RGB format)
         img_array = base64_to_numpy(base64_image)
         # Re-encode in the target format
         return numpy_to_base64(img_array, format=target_format, **kwargs)
+    except ImportError as e:
+        raise e
     except Exception as e:
         logger.error(f"Error converting image to {target_format} format: {e}")
-        raise ValueError(f"Failed to convert image to {target_format} format: {e}")
+        raise ValueError(f"Failed to convert image to {target_format} format: {e}") from e
 
 
 def pad_image(
@@ -545,9 +590,9 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
     except Exception as e:
         raise ValueError("Invalid base64 string") from e
 
+    # Create numpy buffer from bytes and decode using OpenCV
+    buf = np.frombuffer(image_bytes, dtype=np.uint8)
     try:
-        # Create numpy buffer from bytes and decode using OpenCV
-        buf = np.frombuffer(image_bytes, dtype=np.uint8)
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
         if img is None:
             raise ValueError("OpenCV failed to decode image")
@@ -556,10 +601,13 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
         # Only convert if it's a 3-channel color image
         if img.ndim == 3 and img.shape[2] == 3:
             img = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-
+    except ImportError:
+        raise
     except Exception as e:
         raise ValueError("Unable to decode image from base64 string") from e
 
+    # Convert to numpy array
+    img = np.array(img)
     return img
 
 
@@ -602,6 +650,14 @@ def scale_numpy_image(
         # Calculate new dimensions
         new_width = int(current_width * scale_factor)
         new_height = int(current_height * scale_factor)
+
+        # Validate dimensions before resizing
+        if new_width <= 0 or new_height <= 0:
+            raise ValueError(
+                f"Calculated dimensions are invalid: {new_width}x{new_height}. "
+                f"Original: {current_width}x{current_height}, target: {target_width}x{target_height}, "
+                f"scale_factor: {scale_factor}"
+            )
 
         # Resize using OpenCV
         img_arr = _resize_image_opencv(img_arr, (new_width, new_height), interpolation)
