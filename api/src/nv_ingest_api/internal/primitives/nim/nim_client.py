@@ -167,8 +167,8 @@ class NimClient:
         try:
             # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.get("force_max_batch_size", False)
+            max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
+            force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
             max_batch_size = (
                 min(batch_size, max_requested_batch_size)
                 if not force_requested_batch_size
@@ -180,7 +180,11 @@ class NimClient:
 
             # 3. Format the input based on protocol.
             formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
+                data,
+                protocol=self.protocol,
+                max_batch_size=max_batch_size,
+                model_name=model_name,
+                **kwargs,
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
