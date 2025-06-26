@@ -1,0 +1,9 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+llama-index-embeddings-nvidia
+nvidia-riva-client==2.20.0
+opencv-python
+pymilvus>=2.5.10
+pymilvus[bulk_writer, model]>=2.5.10

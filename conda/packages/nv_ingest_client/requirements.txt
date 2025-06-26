@@ -1,0 +1,10 @@
+# SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION & AFFILIATES.
+# All rights reserved.
+# SPDX-License-Identifier: Apache-2.0
+
+langchain-nvidia-ai-endpoints>=0.3.7
+langchain-milvus>=0.1.10
+llama-index-embeddings-nvidia==0.1.5
+openai>=1.82.0,<1.83.0
+pymilvus==2.5.10
+pymilvus[bulk_writer,model]==2.5.10
