@@ -20,7 +20,6 @@ def ingest_stage_callable_signature(sig: inspect.Signature):
         If the signature does not match the expected pattern.
     """
     params = list(sig.parameters.values())
-    print(params, flush=True)
 
     if len(params) != 2:
         raise TypeError(f"Expected exactly 2 parameters, got {len(params)}")
