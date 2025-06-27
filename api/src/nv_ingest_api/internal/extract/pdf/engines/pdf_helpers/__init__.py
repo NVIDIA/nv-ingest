@@ -43,6 +43,7 @@ def _work_extract_pdf(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log=None,
 ) -> Any:
@@ -53,14 +54,15 @@ def _work_extract_pdf(
     extract_method = extractor_config["extract_method"]
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
     return extractor_fn(
-        pdf_stream,
-        extract_text,
-        extract_images,
-        extract_infographics,
-        extract_tables,
-        extract_charts,
-        extractor_config,
-        execution_trace_log,
+        pdf_stream=pdf_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extract_page_as_image=extract_page_as_image,
+        extractor_config=extractor_config,
+        execution_trace_log=execution_trace_log,
     )
 
 
@@ -97,6 +99,7 @@ def _orchestrate_row_extraction(
         extract_tables = params.pop("extract_tables", False)
         extract_charts = params.pop("extract_charts", False)
         extract_infographics = params.pop("extract_infographics", False)
+        extract_page_as_image = params.pop("extract_page_as_image", False)
         extract_method = params.get("extract_method", "pdfium")
     except KeyError as e:
         raise ValueError(f"Missing required extraction flag: {e}")
@@ -137,6 +140,7 @@ def _orchestrate_row_extraction(
         extract_text=extract_text,
         extract_images=extract_images,
         extract_infographics=extract_infographics,
+        extract_page_as_image=extract_page_as_image,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
         extractor_config=extractor_config,
