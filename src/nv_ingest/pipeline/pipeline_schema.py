@@ -4,7 +4,7 @@
 
 from enum import Enum
 from typing import Dict, Any, List, Literal, Optional
-from pydantic import BaseModel, Field, Extra, root_validator
+from pydantic import BaseModel, Field, Extra, root_validator, field_validator
 
 
 class PipelinePhase(int, Enum):
@@ -148,6 +148,14 @@ class PipelineConfig(BaseModel):
 
     stages: List[StageConfig] = Field(..., description="List of all stages in the pipeline.")
     edges: List[EdgeConfig] = Field(..., description="List of all edges connecting the stages.")
+
+    @field_validator("stages", "edges")
+    @classmethod
+    def check_not_empty(cls, v: list) -> list:
+        """Validates that the list is not empty."""
+        if not v:
+            raise ValueError("list must not be empty")
+        return v
 
     class Config:
         extra = Extra.forbid
