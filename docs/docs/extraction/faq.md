@@ -57,8 +57,7 @@ You can set those directly in `docker-compose.yaml`, or in an [environment varia
 
 ### Library Mode
 
-For [library mode](quickstart-library-mode.md), you should set the environment variables `NVIDIA_BUILD_API_KEY` and `NVIDIA_API_KEY`. 
-For more information, refer to [Generate Your NGC Keys](ngc-api-key.md).
+For production environments, you should use the provided Helm charts. For [library mode](quickstart-library-mode.md), you should set the environment variable `NVIDIA_API_KEY`. This is because the NeMo Retriever containers and the NeMo Retriever services running inside them do not have access to the environment variables on the host machine where you run the `docker compose` command. Setting the variables in the `.env` file ensures that they are passed into the containers and available to the services that need them.
 
 For advanced scenarios, you might want to use library mode with self-hosted NIM instances. 
 You can set custom endpoints for each NIM. 

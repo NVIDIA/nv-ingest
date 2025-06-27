@@ -63,7 +63,7 @@ Instead of running NV-Ingest locally, you can use NVCF to perform inference by u
 1. Set the authentication token in the `.env` file.
 
     ```
-    NVIDIA_BUILD_API_KEY=nvapi-...
+    NVIDIA_API_KEY=nvapi-...
     ```
 
 2. Modify `docker-compose.yaml` to use the hosted `nemoretriever-parse` service.
