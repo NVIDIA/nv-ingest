@@ -20,7 +20,7 @@ from nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor impo
 from nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor import ImageExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor import InfographicExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor import PDFExtractorStage
-from nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor import PPTXExtractorStage
+from nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor import pptx_extractor_udf
 from nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor import TableExtractorStage
 from nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor import HtmlExtractorStage
 
@@ -340,18 +340,20 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
 
     pptx_extractor_config = {
         "pptx_extraction_config": {
+            "auth_token": yolox_auth,
             "yolox_endpoints": (yolox_grpc, yolox_http),
             "yolox_infer_protocol": yolox_protocol,
-            "auth_token": yolox_auth,
         }
     }
 
     pipeline.add_stage(
         name=stage_name,
-        stage_actor=PPTXExtractorStage,
+        stage_actor=pptx_extractor_udf,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
         max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        trace_id="pptx_extractor",
+        required_tasks=[("extract", {"document_type": "pptx"})],
     )
 
     return stage_name
