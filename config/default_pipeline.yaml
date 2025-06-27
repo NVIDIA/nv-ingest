@@ -1,0 +1,274 @@
+# Default Ingestion Pipeline Configuration
+# This file replicates the static pipeline defined in pipeline_builders.py
+
+name: "default_pipeline"
+stages:
+  # Source
+  - name: "source_stage"
+    type: "source"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source.MessageBrokerTaskSourceStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+
+  # Pre-processing
+  - name: "metadata_injector"
+    type: "stage"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector.MetadataInjectionStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "source_stage"
+
+  # Primitive Extraction
+  - name: "pdf_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor.PDFExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.33
+  - name: "audio_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor.AudioExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+  - name: "docx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor.DocxExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "pptx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor.PPTXExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "image_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor.ImageExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "html_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor.HtmlExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "infographic_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor.InfographicExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "table_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor.TableExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.14
+  - name: "chart_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor.ChartExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.14
+
+  # Post-processing / Mutators
+  - name: "image_filter"
+    type: "stage"
+    phase: 2  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter.ImageFilterStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+  - name: "image_dedup"
+    type: "stage"
+    phase: 2  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup.ImageDedupStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+    runs_after:
+      - "image_filter"
+
+  # Transforms and Synthesis
+  - name: "text_splitter"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter.TextSplitterStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 0.07
+  - name: "text_embedder"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed.TextEmbeddingTransformStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1.0
+    runs_after:
+      - "text_splitter"
+  - name: "image_caption"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption.ImageCaptionTransformStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+
+  # Storage and Output
+  - name: "image_storage"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage.ImageStorageStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+  - name: "embedding_storage"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings.EmbeddingStorageStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+  - name: "broker_response"
+    type: "sink"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink.MessageBrokerTaskSinkStage"
+    config: {}
+    replicas:
+      cpu_count_min: 1
+      cpu_count_max: 1
+    runs_after:
+      - "embedding_storage"
+      - "image_storage"
+
+  # Telemetry and Drain
+  - name: "otel_tracer"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer.OpenTelemetryTracerStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_percent_max: 1
+    runs_after:
+      - "broker_response"
+  - name: "drain"
+    type: "sink"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain.DefaultDrainSink"
+    config: {}
+    replicas:
+      cpu_count_min: 1
+      cpu_count_max: 1
+    runs_after:
+      - "otel_tracer"
+
+edges:
+  # Intake
+  - from: "source_stage"
+    to: "metadata_injector"
+    queue_size: 32
+
+  # Document Extractors
+  - from: "metadata_injector"
+    to: "pdf_extractor"
+    queue_size: 32
+  - from: "pdf_extractor"
+    to: "audio_extractor"
+    queue_size: 32
+  - from: "audio_extractor"
+    to: "docx_extractor"
+    queue_size: 32
+  - from: "docx_extractor"
+    to: "pptx_extractor"
+    queue_size: 32
+  - from: "pptx_extractor"
+    to: "image_extractor"
+    queue_size: 32
+  - from: "image_extractor"
+    to: "html_extractor"
+    queue_size: 32
+  - from: "html_extractor"
+    to: "infographic_extractor"
+    queue_size: 32
+
+  # Primitive Extractors
+  - from: "infographic_extractor"
+    to: "table_extractor"
+    queue_size: 32
+  - from: "table_extractor"
+    to: "chart_extractor"
+    queue_size: 32
+  - from: "chart_extractor"
+    to: "image_filter"
+    queue_size: 32
+
+  # Primitive Mutators
+  - from: "image_filter"
+    to: "image_dedup"
+    queue_size: 32
+  - from: "image_dedup"
+    to: "text_splitter"
+    queue_size: 32
+
+  # Primitive Transforms
+  - from: "text_splitter"
+    to: "text_embedder"
+    queue_size: 32
+  - from: "text_embedder"
+    to: "image_caption"
+    queue_size: 32
+  - from: "image_caption"
+    to: "image_storage"
+    queue_size: 32
+
+  # Primitive Storage
+  - from: "image_storage"
+    to: "embedding_storage"
+    queue_size: 32
+  - from: "embedding_storage"
+    to: "broker_response"
+    queue_size: 32
+
+  # Response and Telemetry
+  - from: "broker_response"
+    to: "otel_tracer"
+    queue_size: 32
+  - from: "otel_tracer"
+    to: "drain"
+    queue_size: 32
