@@ -1,0 +1,41 @@
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: normal;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Lt.woff2);
+  font-weight: light;
+}
+
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: italic;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_LtIt.woff2);
+  font-weight: light;
+}
+
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: normal;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Rg.woff2);
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: italic;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_It.woff2);
+  font-weight: normal;
+}
+
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: normal;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_Bd.woff2);
+  font-weight: bold;
+}
+
+@font-face {
+  font-family: "NVIDIA Sans";
+  font-style: italic;
+  src: url(https://brand-assets.cne.ngc.nvidia.com/assets/fonts/nvidia-sans/1.0.0/NVIDIASans_BdIt.woff2);
+  font-weight: bold;
+}
