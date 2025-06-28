@@ -1,0 +1,38 @@
+nv\_ingest\_api.internal.primitives package
+===========================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.primitives.nim
+   nv_ingest_api.internal.primitives.tracing
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.primitives.control\_message\_task module
+-----------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.control_message_task
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.primitives.ingest\_control\_message module
+-------------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.primitives.ingest_control_message
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.primitives
+   :members:
+   :undoc-members:
+   :show-inheritance:

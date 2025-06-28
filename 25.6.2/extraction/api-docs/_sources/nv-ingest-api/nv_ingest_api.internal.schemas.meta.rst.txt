@@ -1,0 +1,37 @@
+nv\_ingest\_api.internal.schemas.meta package
+=============================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.schemas.meta.base\_model\_noext module
+---------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.meta.base_model_noext
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.schemas.meta.ingest\_job\_schema module
+----------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.meta.ingest_job_schema
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest\_api.internal.schemas.meta.metadata\_schema module
+-------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.schemas.meta.metadata_schema
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.schemas.meta
+   :members:
+   :undoc-members:
+   :show-inheritance:

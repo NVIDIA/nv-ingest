@@ -1,0 +1,21 @@
+nv\_ingest.framework.util.telemetry package
+===========================================
+
+Submodules
+----------
+
+nv\_ingest.framework.util.telemetry.global\_stats module
+--------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.util.telemetry.global_stats
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.util.telemetry
+   :members:
+   :undoc-members:
+   :show-inheritance:
