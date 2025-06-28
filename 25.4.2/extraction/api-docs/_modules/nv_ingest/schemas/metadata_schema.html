@@ -1,0 +1,937 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.schemas.metadata_schema &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/schemas/metadata_schema';</script>
+    <link rel="icon" href="../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.schemas.metadata_schema</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.schemas.metadata_schema</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">datetime</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetime</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">enum</span><span class="w"> </span><span class="kn">import</span> <span class="n">Enum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">field_validator</span><span class="p">,</span> <span class="n">model_validator</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.schemas.base_model_noext</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModelNoExt</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.util.converters</span><span class="w"> </span><span class="kn">import</span> <span class="n">datetools</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="c1"># Do we want types and similar items to be enums or just strings?</span>
+<div class="viewcode-block" id="SourceTypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.SourceTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SourceTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">PDF</span> <span class="o">=</span> <span class="s2">&quot;pdf&quot;</span>
+    <span class="n">DOCX</span> <span class="o">=</span> <span class="s2">&quot;docx&quot;</span>
+    <span class="n">PPTX</span> <span class="o">=</span> <span class="s2">&quot;pptx&quot;</span>
+    <span class="n">source_type_1</span> <span class="o">=</span> <span class="s2">&quot;source_type_1&quot;</span>
+    <span class="n">source_type_2</span> <span class="o">=</span> <span class="s2">&quot;source_type_2&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="AccessLevelEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.AccessLevelEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AccessLevelEnum</span><span class="p">(</span><span class="nb">int</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">LEVEL_1</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">LEVEL_2</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">LEVEL_3</span> <span class="o">=</span> <span class="mi">3</span></div>
+
+
+
+<div class="viewcode-block" id="ContentTypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ContentTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">AUDIO</span> <span class="o">=</span> <span class="s2">&quot;audio&quot;</span>
+    <span class="n">EMBEDDING</span> <span class="o">=</span> <span class="s2">&quot;embedding&quot;</span>
+    <span class="n">IMAGE</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span>
+    <span class="n">INFO_MSG</span> <span class="o">=</span> <span class="s2">&quot;info_message&quot;</span>
+    <span class="n">STRUCTURED</span> <span class="o">=</span> <span class="s2">&quot;structured&quot;</span>
+    <span class="n">TEXT</span> <span class="o">=</span> <span class="s2">&quot;text&quot;</span>
+    <span class="n">UNSTRUCTURED</span> <span class="o">=</span> <span class="s2">&quot;unstructured&quot;</span>
+    <span class="n">VIDEO</span> <span class="o">=</span> <span class="s2">&quot;video&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="StdContentDescEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.StdContentDescEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StdContentDescEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">DOCX_IMAGE</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from DOCX document.&quot;</span>
+    <span class="n">DOCX_TABLE</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from DOCX document.&quot;</span>
+    <span class="n">DOCX_TEXT</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from DOCX document.&quot;</span>
+    <span class="n">PDF_CHART</span> <span class="o">=</span> <span class="s2">&quot;Structured chart extracted from PDF document.&quot;</span>
+    <span class="n">PDF_IMAGE</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from PDF document.&quot;</span>
+    <span class="n">PDF_INFOGRAPHIC</span> <span class="o">=</span> <span class="s2">&quot;Structured infographic extracted from PDF document.&quot;</span>
+    <span class="n">PDF_TABLE</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from PDF document.&quot;</span>
+    <span class="n">PDF_TEXT</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from PDF document.&quot;</span>
+    <span class="n">PPTX_IMAGE</span> <span class="o">=</span> <span class="s2">&quot;Image extracted from PPTX presentation.&quot;</span>
+    <span class="n">PPTX_TABLE</span> <span class="o">=</span> <span class="s2">&quot;Structured table extracted from PPTX presentation.&quot;</span>
+    <span class="n">PPTX_TEXT</span> <span class="o">=</span> <span class="s2">&quot;Unstructured text from PPTX presentation.&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TextTypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.TextTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TextTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">BLOCK</span> <span class="o">=</span> <span class="s2">&quot;block&quot;</span>
+    <span class="n">BODY</span> <span class="o">=</span> <span class="s2">&quot;body&quot;</span>
+    <span class="n">DOCUMENT</span> <span class="o">=</span> <span class="s2">&quot;document&quot;</span>
+    <span class="n">HEADER</span> <span class="o">=</span> <span class="s2">&quot;header&quot;</span>
+    <span class="n">LINE</span> <span class="o">=</span> <span class="s2">&quot;line&quot;</span>
+    <span class="n">NEARBY_BLOCK</span> <span class="o">=</span> <span class="s2">&quot;nearby_block&quot;</span>
+    <span class="n">OTHER</span> <span class="o">=</span> <span class="s2">&quot;other&quot;</span>
+    <span class="n">PAGE</span> <span class="o">=</span> <span class="s2">&quot;page&quot;</span>
+    <span class="n">SPAN</span> <span class="o">=</span> <span class="s2">&quot;span&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="LanguageEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.LanguageEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">LanguageEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">AF</span> <span class="o">=</span> <span class="s2">&quot;af&quot;</span>
+    <span class="n">AR</span> <span class="o">=</span> <span class="s2">&quot;ar&quot;</span>
+    <span class="n">BG</span> <span class="o">=</span> <span class="s2">&quot;bg&quot;</span>
+    <span class="n">BN</span> <span class="o">=</span> <span class="s2">&quot;bn&quot;</span>
+    <span class="n">CA</span> <span class="o">=</span> <span class="s2">&quot;ca&quot;</span>
+    <span class="n">CS</span> <span class="o">=</span> <span class="s2">&quot;cs&quot;</span>
+    <span class="n">CY</span> <span class="o">=</span> <span class="s2">&quot;cy&quot;</span>
+    <span class="n">DA</span> <span class="o">=</span> <span class="s2">&quot;da&quot;</span>
+    <span class="n">DE</span> <span class="o">=</span> <span class="s2">&quot;de&quot;</span>
+    <span class="n">EL</span> <span class="o">=</span> <span class="s2">&quot;el&quot;</span>
+    <span class="n">EN</span> <span class="o">=</span> <span class="s2">&quot;en&quot;</span>
+    <span class="n">ES</span> <span class="o">=</span> <span class="s2">&quot;es&quot;</span>
+    <span class="n">ET</span> <span class="o">=</span> <span class="s2">&quot;et&quot;</span>
+    <span class="n">FA</span> <span class="o">=</span> <span class="s2">&quot;fa&quot;</span>
+    <span class="n">FI</span> <span class="o">=</span> <span class="s2">&quot;fi&quot;</span>
+    <span class="n">FR</span> <span class="o">=</span> <span class="s2">&quot;fr&quot;</span>
+    <span class="n">GU</span> <span class="o">=</span> <span class="s2">&quot;gu&quot;</span>
+    <span class="n">HE</span> <span class="o">=</span> <span class="s2">&quot;he&quot;</span>
+    <span class="n">HI</span> <span class="o">=</span> <span class="s2">&quot;hi&quot;</span>
+    <span class="n">HR</span> <span class="o">=</span> <span class="s2">&quot;hr&quot;</span>
+    <span class="n">HU</span> <span class="o">=</span> <span class="s2">&quot;hu&quot;</span>
+    <span class="n">ID</span> <span class="o">=</span> <span class="s2">&quot;id&quot;</span>
+    <span class="n">IT</span> <span class="o">=</span> <span class="s2">&quot;it&quot;</span>
+    <span class="n">JA</span> <span class="o">=</span> <span class="s2">&quot;ja&quot;</span>
+    <span class="n">KN</span> <span class="o">=</span> <span class="s2">&quot;kn&quot;</span>
+    <span class="n">KO</span> <span class="o">=</span> <span class="s2">&quot;ko&quot;</span>
+    <span class="n">LT</span> <span class="o">=</span> <span class="s2">&quot;lt&quot;</span>
+    <span class="n">LV</span> <span class="o">=</span> <span class="s2">&quot;lv&quot;</span>
+    <span class="n">MK</span> <span class="o">=</span> <span class="s2">&quot;mk&quot;</span>
+    <span class="n">ML</span> <span class="o">=</span> <span class="s2">&quot;ml&quot;</span>
+    <span class="n">MR</span> <span class="o">=</span> <span class="s2">&quot;mr&quot;</span>
+    <span class="n">NE</span> <span class="o">=</span> <span class="s2">&quot;ne&quot;</span>
+    <span class="n">NL</span> <span class="o">=</span> <span class="s2">&quot;nl&quot;</span>
+    <span class="n">NO</span> <span class="o">=</span> <span class="s2">&quot;no&quot;</span>
+    <span class="n">PA</span> <span class="o">=</span> <span class="s2">&quot;pa&quot;</span>
+    <span class="n">PL</span> <span class="o">=</span> <span class="s2">&quot;pl&quot;</span>
+    <span class="n">PT</span> <span class="o">=</span> <span class="s2">&quot;pt&quot;</span>
+    <span class="n">RO</span> <span class="o">=</span> <span class="s2">&quot;ro&quot;</span>
+    <span class="n">RU</span> <span class="o">=</span> <span class="s2">&quot;ru&quot;</span>
+    <span class="n">SK</span> <span class="o">=</span> <span class="s2">&quot;sk&quot;</span>
+    <span class="n">SL</span> <span class="o">=</span> <span class="s2">&quot;sl&quot;</span>
+    <span class="n">SO</span> <span class="o">=</span> <span class="s2">&quot;so&quot;</span>
+    <span class="n">SQ</span> <span class="o">=</span> <span class="s2">&quot;sq&quot;</span>
+    <span class="n">SV</span> <span class="o">=</span> <span class="s2">&quot;sv&quot;</span>
+    <span class="n">SW</span> <span class="o">=</span> <span class="s2">&quot;sw&quot;</span>
+    <span class="n">TA</span> <span class="o">=</span> <span class="s2">&quot;ta&quot;</span>
+    <span class="n">TE</span> <span class="o">=</span> <span class="s2">&quot;te&quot;</span>
+    <span class="n">TH</span> <span class="o">=</span> <span class="s2">&quot;th&quot;</span>
+    <span class="n">TL</span> <span class="o">=</span> <span class="s2">&quot;tl&quot;</span>
+    <span class="n">TR</span> <span class="o">=</span> <span class="s2">&quot;tr&quot;</span>
+    <span class="n">UK</span> <span class="o">=</span> <span class="s2">&quot;uk&quot;</span>
+    <span class="n">UR</span> <span class="o">=</span> <span class="s2">&quot;ur&quot;</span>
+    <span class="n">VI</span> <span class="o">=</span> <span class="s2">&quot;vi&quot;</span>
+    <span class="n">ZH_CN</span> <span class="o">=</span> <span class="s2">&quot;zh-cn&quot;</span>
+    <span class="n">ZH_TW</span> <span class="o">=</span> <span class="s2">&quot;zh-tw&quot;</span>
+    <span class="n">UNKNOWN</span> <span class="o">=</span> <span class="s2">&quot;unknown&quot;</span>
+
+<div class="viewcode-block" id="LanguageEnum.has_value">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.LanguageEnum.has_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="ImageTypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ImageTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImageTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">BMP</span> <span class="o">=</span> <span class="s2">&quot;bmp&quot;</span>
+    <span class="n">GIF</span> <span class="o">=</span> <span class="s2">&quot;gif&quot;</span>
+    <span class="n">JPEG</span> <span class="o">=</span> <span class="s2">&quot;jpeg&quot;</span>
+    <span class="n">PNG</span> <span class="o">=</span> <span class="s2">&quot;png&quot;</span>
+    <span class="n">TIFF</span> <span class="o">=</span> <span class="s2">&quot;tiff&quot;</span>
+
+    <span class="n">image_type_1</span> <span class="o">=</span> <span class="s2">&quot;image_type_1&quot;</span>  <span class="c1"># until classifier developed</span>
+    <span class="n">image_type_2</span> <span class="o">=</span> <span class="s2">&quot;image_type_2&quot;</span>  <span class="c1"># until classifier developed</span>
+
+<div class="viewcode-block" id="ImageTypeEnum.has_value">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ImageTypeEnum.has_value">[docs]</a>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">has_value</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">value</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">value</span> <span class="ow">in</span> <span class="bp">cls</span><span class="o">.</span><span class="n">_value2member_map_</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TableFormatEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.TableFormatEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TableFormatEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">HTML</span> <span class="o">=</span> <span class="s2">&quot;html&quot;</span>
+    <span class="n">IMAGE</span> <span class="o">=</span> <span class="s2">&quot;image&quot;</span>
+    <span class="n">LATEX</span> <span class="o">=</span> <span class="s2">&quot;latex&quot;</span>
+    <span class="n">MARKDOWN</span> <span class="o">=</span> <span class="s2">&quot;markdown&quot;</span>
+    <span class="n">PSEUDO_MARKDOWN</span> <span class="o">=</span> <span class="s2">&quot;pseudo_markdown&quot;</span>
+    <span class="n">SIMPLE</span> <span class="o">=</span> <span class="s2">&quot;simple&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TaskTypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.TaskTypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TaskTypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">CAPTION</span> <span class="o">=</span> <span class="s2">&quot;caption&quot;</span>
+    <span class="n">EMBED</span> <span class="o">=</span> <span class="s2">&quot;embed&quot;</span>
+    <span class="n">EXTRACT</span> <span class="o">=</span> <span class="s2">&quot;extract&quot;</span>
+    <span class="n">FILTER</span> <span class="o">=</span> <span class="s2">&quot;filter&quot;</span>
+    <span class="n">SPLIT</span> <span class="o">=</span> <span class="s2">&quot;split&quot;</span>
+    <span class="n">TRANSFORM</span> <span class="o">=</span> <span class="s2">&quot;transform&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="StatusEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.StatusEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">StatusEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">ERROR</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;error&quot;</span>
+    <span class="n">SUCCESS</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;success&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ContentSubtypeEnum">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ContentSubtypeEnum">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentSubtypeEnum</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">Enum</span><span class="p">):</span>
+    <span class="n">TABLE</span> <span class="o">=</span> <span class="s2">&quot;table&quot;</span>
+    <span class="n">CHART</span> <span class="o">=</span> <span class="s2">&quot;chart&quot;</span>
+    <span class="n">INFOGRAPHIC</span> <span class="o">=</span> <span class="s2">&quot;infographic&quot;</span></div>
+
+
+
+<span class="c1"># Sub schemas</span>
+<div class="viewcode-block" id="SourceMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.SourceMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">SourceMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Schema for the knowledge base file from which content</span>
+<span class="sd">    and metadata is extracted.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="n">source_location</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">source_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">SourceTypeEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="n">collection_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">date_created</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+    <span class="n">last_modified</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="n">datetime</span><span class="o">.</span><span class="n">now</span><span class="p">()</span><span class="o">.</span><span class="n">isoformat</span><span class="p">()</span>
+    <span class="n">summary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">partition_id</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">access_level</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">AccessLevelEnum</span><span class="p">,</span> <span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+
+<div class="viewcode-block" id="SourceMetadataSchema.validate_fields">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.SourceMetadataSchema.validate_fields">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;date_created&quot;</span><span class="p">,</span> <span class="s2">&quot;last_modified&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_fields</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">field_value</span><span class="p">):</span>
+        <span class="n">datetools</span><span class="o">.</span><span class="n">validate_iso8601</span><span class="p">(</span><span class="n">field_value</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">field_value</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="NearbyObjectsSubSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.NearbyObjectsSubSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NearbyObjectsSubSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Schema to hold related extracted object</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">content</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">bbox</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">tuple</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="nb">type</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span></div>
+
+
+
+<div class="viewcode-block" id="NearbyObjectsSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.NearbyObjectsSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NearbyObjectsSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Schema to hold types of related extracted objects.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">text</span><span class="p">:</span> <span class="n">NearbyObjectsSubSchema</span> <span class="o">=</span> <span class="n">NearbyObjectsSubSchema</span><span class="p">()</span>
+    <span class="n">images</span><span class="p">:</span> <span class="n">NearbyObjectsSubSchema</span> <span class="o">=</span> <span class="n">NearbyObjectsSubSchema</span><span class="p">()</span>
+    <span class="n">structured</span><span class="p">:</span> <span class="n">NearbyObjectsSubSchema</span> <span class="o">=</span> <span class="n">NearbyObjectsSubSchema</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="ContentHierarchySchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ContentHierarchySchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentHierarchySchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Schema for the extracted content hierarchy.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">page_count</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">page</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">block</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">line</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">span</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">nearby_objects</span><span class="p">:</span> <span class="n">NearbyObjectsSchema</span> <span class="o">=</span> <span class="n">NearbyObjectsSchema</span><span class="p">()</span></div>
+
+
+
+<div class="viewcode-block" id="ContentMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ContentMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ContentMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Data extracted from a source; generally Text or Image.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nb">type</span><span class="p">:</span> <span class="n">ContentTypeEnum</span>
+    <span class="n">description</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">page_number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="o">-</span><span class="mi">1</span>
+    <span class="n">hierarchy</span><span class="p">:</span> <span class="n">ContentHierarchySchema</span> <span class="o">=</span> <span class="n">ContentHierarchySchema</span><span class="p">()</span>
+    <span class="n">subtype</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ContentSubtypeEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="TextMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.TextMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TextMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">text_type</span><span class="p">:</span> <span class="n">TextTypeEnum</span>
+    <span class="n">summary</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">keywords</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">language</span><span class="p">:</span> <span class="n">LanguageEnum</span> <span class="o">=</span> <span class="s2">&quot;en&quot;</span>  <span class="c1"># default to Unknown? Maybe do some kind of heuristic check</span>
+    <span class="n">text_location</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">text_location_max_dimensions</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="ImageMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ImageMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ImageMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">image_type</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">ImageTypeEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span>
+    <span class="n">structured_image_type</span><span class="p">:</span> <span class="n">ImageTypeEnum</span> <span class="o">=</span> <span class="n">ImageTypeEnum</span><span class="o">.</span><span class="n">image_type_1</span>
+    <span class="n">caption</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">text</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">image_location</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">image_location_max_dimensions</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">uploaded_image_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">width</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">height</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+<div class="viewcode-block" id="ImageMetadataSchema.validate_image_type">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ImageMetadataSchema.validate_image_type">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;image_type&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">validate_image_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">v</span><span class="p">,</span> <span class="p">(</span><span class="n">ImageTypeEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">)):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;image_type must be a string or ImageTypeEnum&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">v</span></div>
+
+
+<div class="viewcode-block" id="ImageMetadataSchema.clamp_non_negative">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ImageMetadataSchema.clamp_non_negative">[docs]</a>
+    <span class="nd">@field_validator</span><span class="p">(</span><span class="s2">&quot;width&quot;</span><span class="p">,</span> <span class="s2">&quot;height&quot;</span><span class="p">)</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">clamp_non_negative</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">v</span><span class="p">,</span> <span class="n">field</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">v</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">field</span><span class="o">.</span><span class="n">field_name</span><span class="si">}</span><span class="s2"> is negative; clamping to 0. Original value: </span><span class="si">{</span><span class="n">v</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">return</span> <span class="n">v</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="TableMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.TableMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">TableMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">caption</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_format</span><span class="p">:</span> <span class="n">TableFormatEnum</span>
+    <span class="n">table_content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_content_format</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TableFormatEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_location</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">table_location_max_dimensions</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">uploaded_image_uri</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="ChartMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ChartMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ChartMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">caption</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_format</span><span class="p">:</span> <span class="n">TableFormatEnum</span>
+    <span class="n">table_content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_content_format</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">TableFormatEnum</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">table_location</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">table_location_max_dimensions</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+    <span class="n">uploaded_image_uri</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="AudioMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.AudioMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">AudioMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">audio_transcript</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">audio_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span></div>
+
+
+
+<span class="c1"># TODO consider deprecating this in favor of info msg...</span>
+<div class="viewcode-block" id="ErrorMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.ErrorMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">ErrorMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">task</span><span class="p">:</span> <span class="n">TaskTypeEnum</span>
+    <span class="n">status</span><span class="p">:</span> <span class="n">StatusEnum</span>
+    <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">error_msg</span><span class="p">:</span> <span class="nb">str</span></div>
+
+
+
+<div class="viewcode-block" id="InfoMessageMetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.InfoMessageMetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">InfoMessageMetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">task</span><span class="p">:</span> <span class="n">TaskTypeEnum</span>
+    <span class="n">status</span><span class="p">:</span> <span class="n">StatusEnum</span>
+    <span class="n">message</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="nb">filter</span><span class="p">:</span> <span class="nb">bool</span></div>
+
+
+
+<span class="c1"># Main metadata schema</span>
+<div class="viewcode-block" id="MetadataSchema">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.MetadataSchema">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">MetadataSchema</span><span class="p">(</span><span class="n">BaseModelNoExt</span><span class="p">):</span>
+    <span class="n">content</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">content_url</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="n">embedding</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">source_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">SourceMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">content_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ContentMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">audio_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">AudioMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">text_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TextMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">image_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ImageMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">table_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">TableMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">chart_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ChartMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">error_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">ErrorMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">info_message_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">InfoMessageMetadataSchema</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">debug_metadata</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">raise_on_failure</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+
+<div class="viewcode-block" id="MetadataSchema.check_metadata_type">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.MetadataSchema.check_metadata_type">[docs]</a>
+    <span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">check_metadata_type</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">values</span><span class="p">):</span>
+        <span class="n">content_type</span> <span class="o">=</span> <span class="n">values</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;type&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">content_type</span> <span class="o">!=</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">AUDIO</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s2">&quot;audio_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">content_type</span> <span class="o">!=</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">IMAGE</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s2">&quot;image_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">content_type</span> <span class="o">!=</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">TEXT</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s2">&quot;text_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">if</span> <span class="n">content_type</span> <span class="o">!=</span> <span class="n">ContentTypeEnum</span><span class="o">.</span><span class="n">STRUCTURED</span><span class="p">:</span>
+            <span class="n">values</span><span class="p">[</span><span class="s2">&quot;table_metadata&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="n">values</span></div>
+</div>
+
+
+
+<div class="viewcode-block" id="validate_metadata">
+<a class="viewcode-back" href="../../../nv-ingest/nv_ingest.schemas.html#nv_ingest.schemas.metadata_schema.validate_metadata">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">validate_metadata</span><span class="p">(</span><span class="n">metadata</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">MetadataSchema</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validates the given metadata dictionary against the MetadataSchema.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    - metadata: A dictionary representing metadata to be validated.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    - An instance of MetadataSchema if validation is successful.</span>
+
+<span class="sd">    Raises:</span>
+<span class="sd">    - ValidationError: If the metadata does not conform to the schema.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">return</span> <span class="n">MetadataSchema</span><span class="p">(</span><span class="o">**</span><span class="n">metadata</span><span class="p">)</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

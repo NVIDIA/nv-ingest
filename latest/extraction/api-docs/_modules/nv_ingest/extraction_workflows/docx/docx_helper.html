@@ -1,0 +1,598 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest.extraction_workflows.docx.docx_helper &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest/extraction_workflows/docx/docx_helper';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest.extraction_workflows.docx.docx_helper</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest.extraction_workflows.docx.docx_helper</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="c1"># Copyright (c) 2024, NVIDIA CORPORATION.</span>
+<span class="c1">#</span>
+<span class="c1"># Licensed under the Apache License, Version 2.0 (the &quot;License&quot;);</span>
+<span class="c1"># you may not use this file except in compliance with the License.</span>
+<span class="c1"># You may obtain a copy of the License at</span>
+<span class="c1">#</span>
+<span class="c1">#     http://www.apache.org/licenses/LICENSE-2.0</span>
+<span class="c1">#</span>
+<span class="c1"># Unless required by applicable law or agreed to in writing, software</span>
+<span class="c1"># distributed under the License is distributed on an &quot;AS IS&quot; BASIS,</span>
+<span class="c1"># WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.</span>
+<span class="c1"># See the License for the specific language governing permissions and</span>
+<span class="c1"># limitations under the License.</span>
+
+<span class="c1"># pylint: disable=too-many-locals</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Helper function for docx extraction</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pathlib</span><span class="w"> </span><span class="kn">import</span> <span class="n">Path</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">IO</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.extraction_workflows.docx.docxreader</span><span class="w"> </span><span class="kn">import</span> <span class="n">DocxReader</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.schemas.metadata_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">AccessLevelEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.schemas.metadata_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">SourceTypeEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest.schemas.metadata_schema</span><span class="w"> </span><span class="kn">import</span> <span class="n">TextTypeEnum</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="python_docx">
+<a class="viewcode-back" href="../../../../nv-ingest/nv_ingest.extraction_workflows.docx.html#nv_ingest.extraction_workflows.docx.docx_helper.python_docx">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">python_docx</span><span class="p">(</span>
+    <span class="n">docx</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Path</span><span class="p">,</span> <span class="n">IO</span><span class="p">],</span>
+    <span class="n">extract_text</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_images</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_tables</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="n">extract_charts</span><span class="p">:</span> <span class="nb">bool</span><span class="p">,</span>
+    <span class="o">**</span><span class="n">kwargs</span>
+<span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Helper function that use python-docx to extract text from a bytestream document</span>
+
+<span class="sd">    A document has three levels - document, paragraphs and runs. To align with the</span>
+<span class="sd">    pdf extraction paragraphs are aliased as block. python-docx leaves the page number</span>
+<span class="sd">    and line number to the renderer so we assume that the entire document is a single</span>
+<span class="sd">    page.</span>
+
+<span class="sd">    Run level parsing has been skipped but can be added as needed.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    docx:</span>
+<span class="sd">        Bytestream</span>
+<span class="sd">    extract_text : bool</span>
+<span class="sd">        Specifies whether to extract text.</span>
+<span class="sd">    extract_images : bool</span>
+<span class="sd">        Specifies whether to extract images.</span>
+<span class="sd">    extract_tables : bool</span>
+<span class="sd">        Specifies whether to extract tables.</span>
+<span class="sd">    extract_charts : bool</span>
+<span class="sd">        Specifies whether to extract charts.</span>
+<span class="sd">    **kwargs</span>
+<span class="sd">        The keyword arguments are used for additional extraction parameters.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        A string of extracted text.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Extracting docx with python-docx backend&quot;</span><span class="p">)</span>
+
+    <span class="n">row_data</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;row_data&quot;</span><span class="p">)</span>
+    <span class="c1"># get source_id</span>
+    <span class="n">source_id</span> <span class="o">=</span> <span class="n">row_data</span><span class="p">[</span><span class="s2">&quot;source_id&quot;</span><span class="p">]</span>
+    <span class="c1"># get text_depth</span>
+    <span class="n">text_depth</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;text_depth&quot;</span><span class="p">,</span> <span class="s2">&quot;document&quot;</span><span class="p">)</span>
+    <span class="n">text_depth</span> <span class="o">=</span> <span class="n">TextTypeEnum</span><span class="p">(</span><span class="n">text_depth</span><span class="p">)</span>
+    <span class="c1"># get base metadata</span>
+    <span class="n">metadata_col</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata_column&quot;</span><span class="p">,</span> <span class="s2">&quot;metadata&quot;</span><span class="p">)</span>
+
+    <span class="n">docx_extractor_config</span> <span class="o">=</span> <span class="n">kwargs</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;docx_extraction_config&quot;</span><span class="p">,</span> <span class="p">{})</span>
+
+    <span class="n">base_unified_metadata</span> <span class="o">=</span> <span class="n">row_data</span><span class="p">[</span><span class="n">metadata_col</span><span class="p">]</span> <span class="k">if</span> <span class="n">metadata_col</span> <span class="ow">in</span> <span class="n">row_data</span><span class="o">.</span><span class="n">index</span> <span class="k">else</span> <span class="p">{}</span>
+
+    <span class="c1"># get base source_metadata</span>
+    <span class="n">base_source_metadata</span> <span class="o">=</span> <span class="n">base_unified_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;source_metadata&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="c1"># get source_location</span>
+    <span class="n">source_location</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;source_location&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># get collection_id (assuming coming in from source_metadata...)</span>
+    <span class="n">collection_id</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;collection_id&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+    <span class="c1"># get partition_id (assuming coming in from source_metadata...)</span>
+    <span class="n">partition_id</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;partition_id&quot;</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span>
+    <span class="c1"># get access_level (assuming coming in from source_metadata...)</span>
+    <span class="n">access_level</span> <span class="o">=</span> <span class="n">base_source_metadata</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;access_level&quot;</span><span class="p">,</span> <span class="n">AccessLevelEnum</span><span class="o">.</span><span class="n">LEVEL_1</span><span class="p">)</span>
+
+    <span class="c1"># python-docx doesn&#39;t maintain filename; re-use source_id</span>
+    <span class="n">source_metadata</span> <span class="o">=</span> <span class="p">{</span>
+        <span class="s2">&quot;source_name&quot;</span><span class="p">:</span> <span class="n">source_id</span><span class="p">,</span>
+        <span class="s2">&quot;source_id&quot;</span><span class="p">:</span> <span class="n">source_id</span><span class="p">,</span>
+        <span class="s2">&quot;source_location&quot;</span><span class="p">:</span> <span class="n">source_location</span><span class="p">,</span>
+        <span class="s2">&quot;source_type&quot;</span><span class="p">:</span> <span class="n">SourceTypeEnum</span><span class="o">.</span><span class="n">DOCX</span><span class="p">,</span>
+        <span class="s2">&quot;collection_id&quot;</span><span class="p">:</span> <span class="n">collection_id</span><span class="p">,</span>
+        <span class="s2">&quot;partition_id&quot;</span><span class="p">:</span> <span class="n">partition_id</span><span class="p">,</span>
+        <span class="s2">&quot;access_level&quot;</span><span class="p">:</span> <span class="n">access_level</span><span class="p">,</span>
+        <span class="s2">&quot;summary&quot;</span><span class="p">:</span> <span class="s2">&quot;&quot;</span><span class="p">,</span>
+    <span class="p">}</span>
+
+    <span class="c1"># Extract data from the document using python-docx</span>
+    <span class="n">doc</span> <span class="o">=</span> <span class="n">DocxReader</span><span class="p">(</span><span class="n">docx</span><span class="p">,</span> <span class="n">source_metadata</span><span class="p">,</span> <span class="n">extraction_config</span><span class="o">=</span><span class="n">docx_extractor_config</span><span class="p">)</span>
+    <span class="n">extracted_data</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">extract_data</span><span class="p">(</span>
+        <span class="n">base_unified_metadata</span><span class="p">,</span> <span class="n">text_depth</span><span class="p">,</span> <span class="n">extract_text</span><span class="p">,</span> <span class="n">extract_charts</span><span class="p">,</span> <span class="n">extract_tables</span><span class="p">,</span> <span class="n">extract_images</span>
+    <span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">extracted_data</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
