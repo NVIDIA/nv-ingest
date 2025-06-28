@@ -1,0 +1,29 @@
+nv\_ingest.modules.injectors package
+====================================
+
+Submodules
+----------
+
+nv\_ingest.modules.injectors.metadata\_injector module
+------------------------------------------------------
+
+.. automodule:: nv_ingest.modules.injectors.metadata_injector
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.modules.injectors.task\_injection module
+---------------------------------------------------
+
+.. automodule:: nv_ingest.modules.injectors.task_injection
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.modules.injectors
+   :members:
+   :show-inheritance:
+   :undoc-members:
