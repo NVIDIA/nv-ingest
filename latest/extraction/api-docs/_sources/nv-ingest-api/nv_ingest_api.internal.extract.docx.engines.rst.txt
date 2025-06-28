@@ -1,0 +1,18 @@
+nv\_ingest\_api.internal.extract.docx.engines package
+=====================================================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest_api.internal.extract.docx.engines.docxreader_helpers
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.docx.engines
+   :members:
+   :undoc-members:
+   :show-inheritance:
