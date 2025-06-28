@@ -1,0 +1,29 @@
+nv\_ingest.stages.filters package
+=================================
+
+Submodules
+----------
+
+nv\_ingest.stages.filters.image\_dedup module
+---------------------------------------------
+
+.. automodule:: nv_ingest.stages.filters.image_dedup
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.stages.filters.image\_filter module
+----------------------------------------------
+
+.. automodule:: nv_ingest.stages.filters.image_filter
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.stages.filters
+   :members:
+   :show-inheritance:
+   :undoc-members:

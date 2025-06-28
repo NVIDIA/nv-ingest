@@ -1,0 +1,29 @@
+nv\_ingest.modules.sinks package
+================================
+
+Submodules
+----------
+
+nv\_ingest.modules.sinks.message\_broker\_task\_sink module
+-----------------------------------------------------------
+
+.. automodule:: nv_ingest.modules.sinks.message_broker_task_sink
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.modules.sinks.vdb\_task\_sink module
+-----------------------------------------------
+
+.. automodule:: nv_ingest.modules.sinks.vdb_task_sink
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.modules.sinks
+   :members:
+   :show-inheritance:
+   :undoc-members:

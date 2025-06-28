@@ -1,0 +1,21 @@
+nv\_ingest\_api.internal.extract.audio package
+==============================================
+
+Submodules
+----------
+
+nv\_ingest\_api.internal.extract.audio.audio\_extraction module
+---------------------------------------------------------------
+
+.. automodule:: nv_ingest_api.internal.extract.audio.audio_extraction
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest_api.internal.extract.audio
+   :members:
+   :undoc-members:
+   :show-inheritance:
