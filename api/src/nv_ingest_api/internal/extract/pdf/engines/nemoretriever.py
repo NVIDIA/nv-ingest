@@ -40,6 +40,7 @@ from nv_ingest_api.internal.schemas.meta.metadata_schema import validate_metadat
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+    YOLOX_PAGE_IMAGE_FORMAT,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import NemoRetrieverParseConfigSchema
 from nv_ingest_api.util.metadata.aggregators import (
@@ -355,7 +356,7 @@ def nemoretriever_parse_extractor(
                 img_numpy = crop_image(page_image, transformed_bbox)
 
                 if img_numpy is not None:
-                    base64_img = numpy_to_base64(img_numpy)
+                    base64_img = numpy_to_base64(img_numpy, format=YOLOX_PAGE_IMAGE_FORMAT)
                     image = Base64Image(
                         image=base64_img,
                         bbox=transformed_bbox,

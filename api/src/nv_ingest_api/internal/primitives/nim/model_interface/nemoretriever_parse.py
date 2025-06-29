@@ -120,6 +120,7 @@ class NemoRetrieverParseModelInterface(ModelInterface):
             logger.debug("Formatting input for HTTP NemoRetrieverParse model")
             # Prepare payload for HTTP request
 
+            ## TODO: Ask @Edward Kim if we want to switch to JPEG/PNG here
             if "images" in data:
                 base64_list = [numpy_to_base64(img) for img in data["images"]]
             else:
