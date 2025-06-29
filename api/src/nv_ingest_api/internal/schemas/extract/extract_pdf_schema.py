@@ -4,12 +4,52 @@
 
 
 import logging
-from typing import Optional
-from typing import Tuple
-
-from pydantic import model_validator, ConfigDict, BaseModel
+import os
+from typing import Optional, Tuple
+from pydantic import model_validator, ConfigDict, BaseModel, Field
 
 logger = logging.getLogger(__name__)
+
+
+def _get_max_workers() -> int:
+    """
+    Calculates the number of workers for parallel processing.
+
+    The number of workers can be set directly via the `NV_INGEST_WORKERS_PER_PROGRESS_ENGINE`
+    environment variable. If this variable is set, its value is used.
+
+    If the variable is not set, the calculation distributes all available CPU cores evenly
+    among the number of concurrent processes defined by the `NV_INGEST_MAX_UTIL`
+    environment variable.
+
+    The minimum number of workers is 1.
+
+    Returns
+    -------
+    int
+        The calculated number of workers, with a minimum of 1.
+    """
+    try:
+        # Check if the number of workers is set directly via an environment variable.
+        max_workers_env = os.environ.get("NV_INGEST_WORKERS_PER_PROGRESS_ENGINE")
+        if max_workers_env is not None:
+            return max(1, int(max_workers_env))
+
+        cpu_count = max(1, os.cpu_count())
+        # NV_INGEST_MAX_UTIL is the number of concurrent processes, defaulting to 1.
+        # Ensure nv_ingest_max_util is at least 1 to avoid division by zero.
+        nv_ingest_max_util = max(1, int(os.environ.get("NV_INGEST_MAX_UTIL", "1")))
+        # Distribute all available cpu_count workers among the processes.
+        num_workers = int(cpu_count / nv_ingest_max_util)
+        # Ensure a minimum of 1 worker.
+        return max(1, num_workers)
+    except (ValueError, TypeError) as e:
+        logger.warning(
+            "Failed to parse environment variables for worker calculation. " "Defaulting to 1 worker. Error: %s",
+            e,
+        )
+        # Fallback to 1 worker in case of parsing errors.
+        return 1
 
 
 class PDFiumConfigSchema(BaseModel):
@@ -47,7 +87,7 @@ class PDFiumConfigSchema(BaseModel):
     yolox_infer_protocol: str = ""
 
     nim_batch_size: int = 4
-    workers_per_progress_engine: int = 5
+    workers_per_progress_engine: int = Field(default_factory=_get_max_workers)
 
     @model_validator(mode="before")
     @classmethod
