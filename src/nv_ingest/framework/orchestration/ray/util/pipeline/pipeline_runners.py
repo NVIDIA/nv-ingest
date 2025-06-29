@@ -297,16 +297,16 @@ def run_pipeline(
         The validated configuration object used to construct and launch the pipeline.
     block : bool, default=True
         If True, blocks until the pipeline completes.
-        If False, returns an interface to control the pipeline externally.
+        If False, return an interface to control the pipeline externally.
     disable_dynamic_scaling : Optional[bool], default=None
         If True, disables dynamic memory scaling. Overrides global configuration if set.
-        If None, uses the default or globally defined behavior.
+        If None, use the default or globally defined behavior.
     dynamic_memory_threshold : Optional[float], default=None
         The memory usage threshold (as a float between 0 and 1) that triggers autoscaling,
         if dynamic scaling is enabled. Defaults to the globally configured value if None.
     run_in_subprocess : bool, default=False
         If True, launches the pipeline in a separate Python subprocess using `multiprocessing.Process`.
-        If False, runs the pipeline in the current process.
+        If False, run the pipeline in the current process.
     stdout : Optional[TextIO], default=None
         Optional file-like stream to which subprocess stdout should be redirected.
         If None, stdout is redirected to /dev/null.
