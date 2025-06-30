@@ -50,8 +50,10 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
 6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
     Use the following command when deploying with docker;
-    `docker compose --profile retrieval --profile table-structure up`
-    And the following series of commands when deploying with podman
+    ```shell
+    docker compose --profile retrieval --profile table-structure up
+    ```
+    and the following series of commands when deploying with podman
     ```shell
     podman-compose -f podman-compose.yaml up -d
     podman-compose -f podman-compose-retrieval.yaml up -d
@@ -62,7 +64,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have [configured log levels to be verbose](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml). It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [docker-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/docker-compose.yaml).
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -80,7 +82,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Observe the started containers with `docker ps`:
+9. Observe the started containers with `docker ps`:
 
     ```
     CONTAINER ID   IMAGE                                                                                                  COMMAND                  CREATED          STATUS                   PORTS                                                                                                                                                                                                                                                                                                       NAMES
