@@ -51,6 +51,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `docker compose --profile retrieval --profile table-structure up`
+    ```shell
+    podman-compose -f podman-compose.yaml up -d
+    podman-compose -f podman-compose-retrieval.yaml up -d
+    podman-compose -f podman-compose-misc.yaml up table-structure -d
+    ```
 
     !!! tip
 
