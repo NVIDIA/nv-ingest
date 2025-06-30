@@ -26,7 +26,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     ```shell
     # This is required to access pre-built containers and NIM microservices
-    $ docker login nvcr.io
+    $ <docker OR podman> login nvcr.io
     Username: $oauthtoken
     Password: <Your Key>
     ```
@@ -49,8 +49,9 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     `sudo nvidia-ctk runtime configure --runtime=docker --set-as-default`
 
 6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
-
+    Use the following command when deploying with docker;
     `docker compose --profile retrieval --profile table-structure up`
+    And the following series of commands when deploying with podman
     ```shell
     podman-compose -f podman-compose.yaml up -d
     podman-compose -f podman-compose-retrieval.yaml up -d
