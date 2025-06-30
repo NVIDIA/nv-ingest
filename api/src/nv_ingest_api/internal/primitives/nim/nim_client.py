@@ -151,11 +151,7 @@ class NimClient:
         batch_size = self._fetch_max_batch_size(model_name)
         max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
         force_requested_batch_size = kwargs.get("force_max_batch_size", False)
-        return (
-            min(batch_size, max_requested_batch_size)
-            if not force_requested_batch_size
-            else max_requested_batch_size
-        )
+        return min(batch_size, max_requested_batch_size) if not force_requested_batch_size else max_requested_batch_size
 
     @traceable_func(trace_name="{stage_name}::{model_name}::_prepare_and_format_data")
     def _prepare_and_format_data(self, data: dict, max_batch_size: int, model_name: str, **kwargs):
@@ -219,7 +215,10 @@ class NimClient:
             The processed inference results, coalesced in the same order as the input images.
         """
         try:
-            max_batch_size = self._determine_batch_size(model_name=model_name, **kwargs)
+            if model_name in ["yolox", "yolox_ensemble"]:
+                max_batch_size = 32
+            else:
+                max_batch_size = self._determine_batch_size(model_name=model_name, **kwargs)
 
             # Create a copy of kwargs and remove max_batch_size to avoid the TypeError.
             prepare_kwargs = kwargs.copy()

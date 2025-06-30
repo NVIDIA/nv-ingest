@@ -27,7 +27,6 @@ import pypdfium2 as libpdfium
 import tempfile
 import os
 from datetime import datetime
-from nv_ingest_api.internal.primitives.tracing.tagging import traceable_func
 
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
@@ -134,7 +133,6 @@ def _extract_page_elements_using_image_ensemble(
 
     logger.debug(f"Extracted {len(page_elements)} page elements.")
     return page_elements
-
 
 
 # Handle individual page element extraction and model inference
@@ -395,7 +393,7 @@ def _render_page_from_file(
     Opens `pdf_path`, renders `page_idx`, and returns
     (page_idx, image_array, padding_offsets).
     """
-    doc  = libpdfium.PdfDocument(pdf_path)
+    doc = libpdfium.PdfDocument(pdf_path)
     page = doc.get_page(page_idx)
 
     arrays, pads = pdfium_pages_to_numpy(
@@ -408,6 +406,7 @@ def _render_page_from_file(
     page.close()
     doc.close()
     return page_idx, arrays[0], pads[0]
+
 
 # ------------------------------------------------------------------ #
 #  Render an entire PDF in parallel – keeps natural page order       #
@@ -434,16 +433,12 @@ def render_single_pdf_parallel(
             execution_trace_log[f"trace::entry::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
 
     with ProcessPoolExecutor(max_workers=max_workers) as pool:
-        futs = [
-            pool.submit(_render_page_from_file, pdf_path, idx, size)
-            for idx in range(page_count)
-        ]
+        futs = [pool.submit(_render_page_from_file, pdf_path, idx, size) for idx in range(page_count)]
         for fut in as_completed(futs):
             idx, img, pad = fut.result()
             images[idx] = (img, pad)
             if execution_trace_log is not None:
                 execution_trace_log[f"trace::exit::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
-
 
     return images
 
@@ -451,16 +446,16 @@ def render_single_pdf_parallel(
 def _handle_pdf_stream(pdf_stream) -> Tuple[str, Optional[tempfile.NamedTemporaryFile]]:
     """
     Handle pdf_stream as either a file path or stream.
-    
+
     Parameters
     ----------
     pdf_stream : str or bytes or file-like
         Either a file path string, bytes, or file-like object containing PDF data.
-        
+
     Returns
     -------
     Tuple[str, Optional[tempfile.NamedTemporaryFile]]
-        A tuple of (pdf_path, temp_file), where temp_file is None if pdf_stream was 
+        A tuple of (pdf_path, temp_file), where temp_file is None if pdf_stream was
         already a file path, or a NamedTemporaryFile instance if we had to create one.
     """
     try:
@@ -469,9 +464,9 @@ def _handle_pdf_stream(pdf_stream) -> Tuple[str, Optional[tempfile.NamedTemporar
             return pdf_stream, None
         else:
             # pdf_stream is a stream/bytes, save to temporary file
-            temp_file = tempfile.NamedTemporaryFile(suffix='.pdf', delete=False)
+            temp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
             try:
-                if hasattr(pdf_stream, 'read'):
+                if hasattr(pdf_stream, "read"):
                     temp_file.write(pdf_stream.read())
                 else:
                     temp_file.write(pdf_stream)
@@ -599,7 +594,7 @@ def pdfium_extractor(
         rendered_imgs = render_single_pdf_parallel(
             pdf_path=pdf_path,
             size=(YOLOX_PAGE_IMAGE_PREPROC_WIDTH, YOLOX_PAGE_IMAGE_PREPROC_HEIGHT),
-            max_workers=pdfium_config.workers_per_progress_engine,
+            max_workers=4,
             execution_trace_log=execution_trace_log,
         )
 

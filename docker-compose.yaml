@@ -16,9 +16,9 @@ services:
       - "8002:8002"
     user: root
     environment:
-      - OMP_NUM_THREADS=1
+      - OMP_NUM_THREADS=4
       - NIM_HTTP_API_PORT=8000
-      - NIM_TRITON_CUDA_MEMORY_POOL_SIZE=1024
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=1024
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
@@ -249,7 +249,7 @@ services:
       # Simple Broker
       - "7671:7671"
       # Ray Dashboards
-      - "8265:8265"
+      - "6265:8265"
     cap_add:
       - sys_nice
     environment:
