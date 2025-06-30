@@ -126,7 +126,7 @@ class OCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
-        merge_level = kwargs.pop("merge_level", "word")
+        merge_level = kwargs.pop("merge_level", "paragraph")
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC OCR model (batched).")
@@ -181,7 +181,7 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                payload = {"input": input_chunk}
+                payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
 
@@ -307,18 +307,21 @@ class OCRModelInterface(ModelInterface):
             text_detections = item.get("text_detections", [])
             text_predictions = []
             bounding_boxes = []
+            conf_scores = []
             for td in text_detections:
                 text_predictions.append(td["text_prediction"]["text"])
                 bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
+                conf_scores.append(td["text_prediction"]["confidence"])
 
-            bounding_boxes, text_predictions = self._postprocess_ocr_response(
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
+                conf_scores,
                 dimensions,
                 img_index=item_idx,
             )
 
-            results.append([bounding_boxes, text_predictions])
+            results.append([bounding_boxes, text_predictions, conf_scores])
 
         return results
 

@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import backoff
 import numpy as np
@@ -17,8 +18,8 @@ logger = logging.getLogger(__name__)
 
 def preprocess_image_for_ocr(
     array: np.ndarray,
-    target_height: int,
-    target_width: int,
+    target_height: Optional[int] = None,
+    target_width: Optional[int] = None,
     pad_how: str = "bottom_right",
 ) -> np.ndarray:
     """
@@ -38,6 +39,12 @@ def preprocess_image_for_ocr(
         A preprocessed image with the shape (channels, height, width).
     """
     height, width = array.shape[:2]
+
+    if target_height is None:
+        target_height = height
+
+    if target_width is None:
+        target_width = width
 
     padded, (pad_width, pad_height) = pad_image(
         array,
