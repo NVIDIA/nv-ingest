@@ -29,7 +29,7 @@ class TestNimClientGrpc(unittest.TestCase):
         test_input = np.array([1, 2, 3]).astype(np.float32)
 
         # Test single output
-        result = client._grpc_infer(test_input, "test_model", outputs=["output1"])
+        result = client._grpc_infer(test_input, "test_model", output_names=["output1"])
         self.assertIsInstance(result, np.ndarray)
         np.testing.assert_array_equal(result, test_input)
 
@@ -39,7 +39,7 @@ class TestNimClientGrpc(unittest.TestCase):
         self.assertEqual(last_call_args[1]["outputs"][0].name(), "output1")
 
         # Test multiple outputs
-        result = client._grpc_infer(test_input, "test_model", outputs=["output1", "output2"])
+        result = client._grpc_infer(test_input, "test_model", output_names=["output1", "output2"])
         self.assertIsInstance(result, list)
         self.assertEqual(len(result), 2)
         np.testing.assert_array_equal(result[0], test_input)

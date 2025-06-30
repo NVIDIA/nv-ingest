@@ -55,7 +55,7 @@ def dummy_extractor_config():
             },
         },
         "text_depth": "page",
-        "paddle_output_format": "markdown",
+        "table_output_format": "markdown",
         "extract_images_method": "simple",
         "extract_images_params": {},
         "pdfium_config": {"workers_per_progress_engine": 2, "yolox_endpoints": ("grpc", "http")},
@@ -327,7 +327,7 @@ def test_extract_page_elements_happy_path2(
         extract_tables=True,
         extract_charts=False,
         extract_infographics=False,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
         auth_token="dummy_token",
@@ -371,7 +371,7 @@ def test_extract_page_elements_fallback_to_default_model(
         extract_tables=False,
         extract_charts=True,
         extract_infographics=False,
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
     )
@@ -402,7 +402,7 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
         extract_tables=False,
         extract_charts=False,
         extract_infographics=False,  # all False => should be skipped
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", None),
         yolox_infer_protocol="http",
     )
@@ -512,7 +512,7 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
             extractor_config={"row_data": {"source_id": "abc"}, "text_depth": "invalid_depth"},
         )
 
-    with pytest.raises(ValueError, match="Invalid paddle_output_format: invalid_format"):
+    with pytest.raises(ValueError, match="Invalid table_output_format: invalid_format"):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
             True,
@@ -520,7 +520,7 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
             True,
             True,
             True,
-            extractor_config={"row_data": {"source_id": "abc"}, "paddle_output_format": "invalid_format"},
+            extractor_config={"row_data": {"source_id": "abc"}, "table_output_format": "invalid_format"},
         )
 
 

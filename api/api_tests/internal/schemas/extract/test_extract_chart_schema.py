@@ -13,41 +13,41 @@ from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExt
 
 def test_valid_yolox_only():
     config = ChartExtractorConfigSchema(
-        yolox_endpoints=("grpc_service", None), paddle_endpoints=("grpc_paddle", "http_paddle")
+        yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", "http_ocr")
     )
     assert config.yolox_endpoints == ("grpc_service", None)
-    assert config.paddle_endpoints == ("grpc_paddle", "http_paddle")
+    assert config.ocr_endpoints == ("grpc_ocr", "http_ocr")
 
 
-def test_valid_paddle_only():
-    config = ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), paddle_endpoints=(None, "http_paddle"))
-    assert config.paddle_endpoints == (None, "http_paddle")
+def test_valid_ocr_only():
+    config = ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=(None, "http_ocr"))
+    assert config.ocr_endpoints == (None, "http_ocr")
 
 
 def test_both_endpoints_provided():
     config = ChartExtractorConfigSchema(
-        yolox_endpoints=("grpc_service", "http_service"), paddle_endpoints=("grpc_paddle", "http_paddle")
+        yolox_endpoints=("grpc_service", "http_service"), ocr_endpoints=("grpc_ocr", "http_ocr")
     )
     assert config.yolox_endpoints == ("grpc_service", "http_service")
-    assert config.paddle_endpoints == ("grpc_paddle", "http_paddle")
+    assert config.ocr_endpoints == ("grpc_ocr", "http_ocr")
 
 
 def test_invalid_yolox_empty():
     with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=(None, None), paddle_endpoints=("grpc_paddle", None))
+        ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=("grpc_ocr", None))
     assert "Both gRPC and HTTP services cannot be empty for yolox_endpoints." in str(excinfo.value)
 
 
-def test_invalid_paddle_empty():
+def test_invalid_ocr_empty():
     with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), paddle_endpoints=("  ", '   "  '))
-    assert "Both gRPC and HTTP services cannot be empty for paddle_endpoints." in str(excinfo.value)
+        ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=("  ", '   "  '))
+    assert "Both gRPC and HTTP services cannot be empty for ocr_endpoints." in str(excinfo.value)
 
 
 def test_extra_fields_forbidden_in_chart_extractor_config():
     with pytest.raises(ValidationError):
         ChartExtractorConfigSchema(
-            yolox_endpoints=("grpc_service", None), paddle_endpoints=("grpc_paddle", None), extra_field="should_fail"
+            yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", None), extra_field="should_fail"
         )
 
 
@@ -64,7 +64,7 @@ def test_valid_extractor_defaults():
 
 def test_valid_extractor_with_config():
     endpoint_config = ChartExtractorConfigSchema(
-        yolox_endpoints=("grpc_service", None), paddle_endpoints=("grpc_paddle", None)
+        yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", None)
     )
     schema = ChartExtractorSchema(
         max_queue_size=20, n_workers=15, raise_on_failure=True, endpoint_config=endpoint_config
