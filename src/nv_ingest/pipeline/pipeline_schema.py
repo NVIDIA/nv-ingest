@@ -140,12 +140,18 @@ class PipelineConfig(BaseModel):
 
     Attributes
     ----------
+    name : str
+        The name of the pipeline.
+    description : str
+        A description of the pipeline.
     stages : List[StageConfig]
         A list of all stage configurations in the pipeline.
     edges : List[EdgeConfig]
         A list of all edge configurations that define the pipeline's topology.
     """
 
+    name: str = Field(..., description="The name of the pipeline.")
+    description: str = Field(..., description="A description of the pipeline.")
     stages: List[StageConfig] = Field(..., description="List of all stages in the pipeline.")
     edges: List[EdgeConfig] = Field(..., description="List of all edges connecting the stages.")
 

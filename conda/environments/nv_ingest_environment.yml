@@ -49,6 +49,7 @@ dependencies:
   - uvicorn
   - pip
   - pip:
+      - envyaml
       - llama-index-embeddings-nvidia
       - milvus-lite==2.4.12
       - opencv-python # For some reason conda cant solve our req set with py-opencv so we need to use pip

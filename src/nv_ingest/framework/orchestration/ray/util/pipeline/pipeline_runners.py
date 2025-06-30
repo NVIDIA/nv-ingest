@@ -22,7 +22,8 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipelineSubprocessInterface,
     RayPipelineInterface,
 )
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
+from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
+from nv_ingest.pipeline.config_loaders import load_pipeline_config
 
 logger = logging.getLogger(__name__)
 
@@ -236,19 +237,27 @@ def _launch_pipeline(
         dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
     )
 
-    pipeline = RayPipeline(scaling_config=scaling_config)
     start_abs = datetime.now()
 
-    # Set up the ingestion pipeline
-    _ = setup_ingestion_pipeline(pipeline, ingest_config.model_dump())
+    _ = scaling_config
+    # Load the pipeline configuration from the YAML file.
+    pipeline_config = load_pipeline_config(ingest_config.config_path)
+
+    # Build the IngestPipeline from the loaded configuration.
+    ingest_pipeline = IngestPipeline(pipeline_config)
+    ingest_pipeline.build()
+
+    # Get the underlying Ray pipeline instance.
+    pipeline = ingest_pipeline.pipeline
 
     # Record setup time
-    end_setup = start_run = datetime.now()
+    end_setup = datetime.now()
     setup_elapsed = (end_setup - start_abs).total_seconds()
     logger.info(f"Pipeline setup completed in {setup_elapsed:.2f} seconds")
 
     # Run the pipeline
-    logger.debug("Running pipeline")
+    start_run = datetime.now()
+    logger.info("Starting pipeline run")
     pipeline.start()
 
     if block:

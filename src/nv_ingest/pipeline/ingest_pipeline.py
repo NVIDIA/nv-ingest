@@ -5,13 +5,13 @@
 import logging
 import inspect
 import math
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-import yaml
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
 from nv_ingest.pipeline.pipeline_schema import PipelineConfig
+from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
 from nv_ingest_api.util.imports.dynamic_resolvers import resolve_callable_from_path
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
@@ -30,41 +30,27 @@ class IngestPipeline:
     4. Providing a simple interface to start and stop the pipeline.
     """
 
-    def __init__(self, config_path: str, pipeline: Optional[RayPipeline] = None):
+    def __init__(self, config: PipelineConfig, system_resource_probe: SystemResourceProbe = None):
         """
-        Initializes the IngestPipeline with a path to a YAML configuration file.
+        Initializes the IngestPipeline with a configuration.
 
-        Parameters
-        ----------
-        config_path : str
-            The path to the pipeline's YAML configuration file.
-        pipeline : Optional[RayPipeline], optional
-            An existing RayPipeline instance to build upon. If None, a new one is created.
+        Args:
+            config: The validated pipeline configuration object.
+            system_resource_probe: An optional probe for system resources.
         """
-        self.config_path = config_path
-        self._config: PipelineConfig = self._load_config(config_path)
-        self._pipeline: RayPipeline = pipeline or RayPipeline()
-        self._stage_configs: Dict[str, BaseModel] = {}
-        self._system_resource_probe = SystemResourceProbe()
+        self._config: PipelineConfig = config
+        self._pipeline: RayPipeline = RayPipeline()
+        self._system_resource_probe = system_resource_probe or SystemResourceProbe()
+        logger.info("Ingestion pipeline initialized with config.")
 
-    def _load_config(self, config_path: str) -> PipelineConfig:
-        """
-        Loads and validates the YAML configuration file against the Pydantic schema.
+    @property
+    def config(self) -> PipelineConfig:
+        return self._config
 
-        Parameters
-        ----------
-        config_path : str
-            The path to the YAML file.
-
-        Returns
-        -------
-        PipelineConfig
-            The validated configuration object.
-        """
-        logger.info(f"Loading pipeline configuration from: {config_path}")
-        with open(config_path, "r") as f:
-            config_dict = yaml.safe_load(f)
-        return PipelineConfig(**config_dict)
+    @property
+    def pipeline(self) -> RayPipeline:
+        """Returns the underlying RayPipeline instance."""
+        return self._pipeline
 
     def _resolve_config_schema(self, actor_class: Any) -> Any:
         """
@@ -97,13 +83,13 @@ class IngestPipeline:
                 continue
 
             # Resolve the actor class from the provided path
-            actor_class = resolve_callable_from_path(stage_config.actor)
+            actor_class = resolve_callable_from_path(
+                stage_config.actor, signature_schema=ingest_stage_callable_signature
+            )
 
             # Resolve the stage's config schema and create an instance of it
             config_schema = self._resolve_config_schema(actor_class)
             config_instance = config_schema(**stage_config.config) if config_schema else None
-            if config_instance:
-                self._stage_configs[stage_config.name] = config_instance
 
             # Determine the method to add the stage to the pipeline (add_stage or add_sink)
             add_method = getattr(self._pipeline, f"add_{stage_config.type}", None)

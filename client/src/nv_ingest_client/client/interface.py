@@ -394,7 +394,7 @@ class Ingestor:
 
         final_results_payload_list: Union[List[List[Dict[str, Any]]], List[LazyLoadedList]] = []
 
-        # Lock for thread-safe appends to final_results_payload_list by I/O tasks
+        # Lock for thread-safe appending to final_results_payload_list by I/O tasks
         results_lock = threading.Lock() if self._output_config else None
 
         io_executor: Optional[ThreadPoolExecutor] = None

@@ -4,15 +4,23 @@
 
 import logging
 import uuid
+import inspect
 from typing import Callable, Optional, Union, Dict, List, Type
 
 import ray
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
+from nv_ingest_api.util.imports.callable_signatures import (
+    ingest_stage_callable_signature,
+    ingest_sink_callable_signature,
+    ingest_source_callable_signature,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +62,7 @@ def wrap_callable_as_stage(
     - Only `.remote(config)` and `.options(...)` (chained with `.remote(config)`) are supported.
       All other class/actor patterns will raise `NotImplementedError`.
     """
+    ingest_stage_callable_signature(inspect.signature(fn))
     trace_name = trace_id or fn.__name__
 
     def make_actor_class():
@@ -199,5 +208,222 @@ def wrap_callable_as_stage(
 
         # For testing or introspection only.
         # actor_class = staticmethod(make_actor_class)
+
+    return StageProxy
+
+
+def wrap_callable_as_sink(
+    fn: Callable[[object, BaseModel], None],
+    schema_type: Type[BaseModel],
+    *,
+    required_tasks: Optional[List[str]] = None,
+    trace_id: Optional[str] = None,
+):
+    """
+    Factory to wrap a user-supplied function into a Ray actor sink, returning a proxy
+    for unique, isolated dynamic actor creation.
+
+    Parameters
+    ----------
+    fn : Callable[[IngestControlMessage, BaseModel], None]
+        The processing function to be wrapped in the Ray actor. It should not return anything.
+    schema_type : Type[BaseModel]
+        Pydantic schema used to validate and pass the stage config.
+    required_tasks : Optional[List[str]], optional
+        Task names this stage should filter on. If None, no filtering is applied.
+    trace_id : Optional[str], optional
+        Optional name for trace annotation; defaults to the function name.
+
+    Returns
+    -------
+    StageProxy : object
+        A factory-like proxy exposing `.remote()` and `.options()` for Ray-idiomatic
+        actor creation. Direct instantiation or class method use is not supported.
+    """
+    ingest_sink_callable_signature(inspect.signature(fn))
+    trace_name = trace_id or fn.__name__
+
+    def make_actor_class():
+        """
+        Dynamically constructs a unique Ray actor class for every call.
+        """
+        class_name = f"LambdaSink_{fn.__name__}_{uuid.uuid4().hex[:8]}"
+
+        def __init__(self, config: Union[Dict, BaseModel]) -> None:
+            """
+            Parameters
+            ----------
+            config : Union[Dict, BaseModel]
+                Stage configuration, validated against `schema_type`.
+            """
+            validated_config = schema_type(**config) if not isinstance(config, schema_type) else config
+            super(new_class, self).__init__(validated_config, log_to_stdout=True)
+            self.validated_config = validated_config
+            self._logger.info(f"{self.__class__.__name__} initialized with validated config.")
+
+        @traceable(trace_name)
+        @nv_ingest_node_failure_try_except(annotation_id=trace_name, raise_on_failure=False)
+        @filter_by_task(required_tasks=required_tasks) if required_tasks else (lambda f: f)
+        def on_data(self, control_message):
+            """
+            Processes a control message using the wrapped function.
+            """
+            try:
+                fn(control_message, self.validated_config)
+            except Exception as e:
+                self._logger.exception(f"{self.__class__.__name__} failed: {e}")
+                self.stats["errors"] += 1
+
+        class_dict = {
+            "__init__": __init__,
+            "on_data": on_data,
+        }
+        bases = (RayActorSinkStage,)
+        new_class = type(class_name, bases, class_dict)
+        return new_class
+
+    class StageProxy:
+        """
+        Factory/proxy for dynamic Ray actor creation; not itself a Ray actor.
+        """
+
+        @staticmethod
+        def remote(config):
+            """
+            Instantiate a Ray actor with a unique dynamic class and name.
+            """
+            _ActorClass = ray.remote(make_actor_class())
+            unique_name = f"{fn.__name__}_{str(uuid.uuid4())[:8]}"
+            return _ActorClass.options(name=unique_name).remote(config)
+
+        @staticmethod
+        def options(*args, **kwargs):
+            """
+            Return a Ray actor class with the specified options set.
+            """
+            ActorClass = ray.remote(make_actor_class())
+            if "name" not in kwargs:
+                kwargs["name"] = f"{fn.__name__}_{str(uuid.uuid4())[:8]}"
+            return ActorClass.options(*args, **kwargs)
+
+        def __new__(cls, *a, **k):
+            raise NotImplementedError("StageProxy is a factory, not a Ray actor or class. Use .remote() or .options().")
+
+        def __call__(self, *a, **k):
+            raise NotImplementedError("StageProxy is a factory, not a Ray actor or class. Use .remote() or .options().")
+
+        def __getattr__(self, name):
+            if name in {"remote", "options"}:
+                return getattr(self, name)
+            raise NotImplementedError(
+                f"StageProxy does not implement '{name}'. Only .remote() and .options() are available."
+            )
+
+    return StageProxy
+
+
+def wrap_callable_as_source(
+    fn: Callable[[BaseModel], object],
+    schema_type: Type[BaseModel],
+    *,
+    trace_id: Optional[str] = None,
+):
+    """
+    Factory to wrap a user-supplied function into a Ray actor source, returning a proxy
+    for unique, isolated dynamic actor creation.
+
+    Parameters
+    ----------
+    fn : Callable[[BaseModel], object]
+        The processing function to be wrapped in the Ray actor. It takes the config and returns data.
+    schema_type : Type[BaseModel]
+        Pydantic schema used to validate and pass the stage config.
+    trace_id : Optional[str], optional
+        Optional name for trace annotation; defaults to the function name.
+
+    Returns
+    -------
+    StageProxy : object
+        A factory-like proxy exposing `.remote()` and `.options()` for Ray-idiomatic
+        actor creation. Direct instantiation or class method use is not supported.
+    """
+    ingest_source_callable_signature(inspect.signature(fn))
+    trace_name = trace_id or fn.__name__
+
+    def make_actor_class():
+        """
+        Dynamically constructs a unique Ray actor class for every call.
+        """
+        class_name = f"LambdaSource_{fn.__name__}_{uuid.uuid4().hex[:8]}"
+
+        def __init__(self, config: Union[Dict, BaseModel]) -> None:
+            """
+            Parameters
+            ----------
+            config : Union[Dict, BaseModel]
+                Stage configuration, validated against `schema_type`.
+            """
+            validated_config = schema_type(**config) if not isinstance(config, schema_type) else config
+            super(new_class, self).__init__(validated_config, log_to_stdout=True)
+            self.validated_config = validated_config
+            self._logger.info(f"{self.__class__.__name__} initialized with validated config.")
+
+        @traceable(trace_name)
+        @nv_ingest_node_failure_try_except(annotation_id=trace_name, raise_on_failure=False)
+        def _read_input(self):
+            """
+            Reads input using the wrapped function.
+            """
+            try:
+                return fn(self.validated_config)
+            except Exception as e:
+                self._logger.exception(f"{self.__class__.__name__} failed: {e}")
+                self.stats["errors"] += 1
+                return None  # Or handle stop iteration
+
+        class_dict = {
+            "__init__": __init__,
+            "_read_input": _read_input,
+        }
+        bases = (RayActorSourceStage,)
+        new_class = type(class_name, bases, class_dict)
+        return new_class
+
+    class StageProxy:
+        """
+        Factory/proxy for dynamic Ray actor creation; not itself a Ray actor.
+        """
+
+        @staticmethod
+        def remote(config):
+            """
+            Instantiate a Ray actor with a unique dynamic class and name.
+            """
+            _ActorClass = ray.remote(make_actor_class())
+            unique_name = f"{fn.__name__}_{str(uuid.uuid4())[:8]}"
+            return _ActorClass.options(name=unique_name).remote(config)
+
+        @staticmethod
+        def options(*args, **kwargs):
+            """
+            Return a Ray actor class with the specified options set.
+            """
+            ActorClass = ray.remote(make_actor_class())
+            if "name" not in kwargs:
+                kwargs["name"] = f"{fn.__name__}_{str(uuid.uuid4())[:8]}"
+            return ActorClass.options(*args, **kwargs)
+
+        def __new__(cls, *a, **k):
+            raise NotImplementedError("StageProxy is a factory, not a Ray actor or class. Use .remote() or .options().")
+
+        def __call__(self, *a, **k):
+            raise NotImplementedError("StageProxy is a factory, not a Ray actor or class. Use .remote() or .options().")
+
+        def __getattr__(self, name):
+            if name in {"remote", "options"}:
+                return getattr(self, name)
+            raise NotImplementedError(
+                f"StageProxy does not implement '{name}'. Only .remote() and .options() are available."
+            )
 
     return StageProxy
