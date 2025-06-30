@@ -5,16 +5,17 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorConfigSchema, ChartExtractorSchema
+from nv_ingest_api.internal.schemas.extract.extract_chart_schema import (
+    ChartExtractorConfigSchema,
+    ChartExtractorSchema,
+)
 
 
 ### Tests for ChartExtractorConfigSchema ###
 
 
 def test_valid_yolox_only():
-    config = ChartExtractorConfigSchema(
-        yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", "http_ocr")
-    )
+    config = ChartExtractorConfigSchema(yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", "http_ocr"))
     assert config.yolox_endpoints == ("grpc_service", None)
     assert config.ocr_endpoints == ("grpc_ocr", "http_ocr")
 
@@ -26,7 +27,8 @@ def test_valid_ocr_only():
 
 def test_both_endpoints_provided():
     config = ChartExtractorConfigSchema(
-        yolox_endpoints=("grpc_service", "http_service"), ocr_endpoints=("grpc_ocr", "http_ocr")
+        yolox_endpoints=("grpc_service", "http_service"),
+        ocr_endpoints=("grpc_ocr", "http_ocr"),
     )
     assert config.yolox_endpoints == ("grpc_service", "http_service")
     assert config.ocr_endpoints == ("grpc_ocr", "http_ocr")
@@ -47,7 +49,9 @@ def test_invalid_ocr_empty():
 def test_extra_fields_forbidden_in_chart_extractor_config():
     with pytest.raises(ValidationError):
         ChartExtractorConfigSchema(
-            yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", None), extra_field="should_fail"
+            yolox_endpoints=("grpc_service", None),
+            ocr_endpoints=("grpc_ocr", None),
+            extra_field="should_fail",
         )
 
 
@@ -67,7 +71,10 @@ def test_valid_extractor_with_config():
         yolox_endpoints=("grpc_service", None), ocr_endpoints=("grpc_ocr", None)
     )
     schema = ChartExtractorSchema(
-        max_queue_size=20, n_workers=15, raise_on_failure=True, endpoint_config=endpoint_config
+        max_queue_size=20,
+        n_workers=15,
+        raise_on_failure=True,
+        endpoint_config=endpoint_config,
     )
     assert schema.max_queue_size == 20
     assert schema.n_workers == 15
