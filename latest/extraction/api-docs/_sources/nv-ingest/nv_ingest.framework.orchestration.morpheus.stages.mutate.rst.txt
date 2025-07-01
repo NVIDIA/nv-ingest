@@ -1,0 +1,29 @@
+nv\_ingest.framework.orchestration.morpheus.stages.mutate package
+=================================================================
+
+Submodules
+----------
+
+nv\_ingest.framework.orchestration.morpheus.stages.mutate.image\_dedup module
+-----------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.stages.mutate.image_dedup
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+nv\_ingest.framework.orchestration.morpheus.stages.mutate.image\_filter module
+------------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.stages.mutate.image_filter
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.orchestration.morpheus.stages.mutate
+   :members:
+   :undoc-members:
+   :show-inheritance:

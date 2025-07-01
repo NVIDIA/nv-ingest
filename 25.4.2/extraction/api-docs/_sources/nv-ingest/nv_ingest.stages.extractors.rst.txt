@@ -1,0 +1,21 @@
+nv\_ingest.stages.extractors package
+====================================
+
+Submodules
+----------
+
+nv\_ingest.stages.extractors.image\_extractor\_stage module
+-----------------------------------------------------------
+
+.. automodule:: nv_ingest.stages.extractors.image_extractor_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.stages.extractors
+   :members:
+   :show-inheritance:
+   :undoc-members:
