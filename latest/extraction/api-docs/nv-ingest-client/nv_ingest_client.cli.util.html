@@ -1,0 +1,1203 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    <title>nv_ingest_client.cli.util package &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = 'nv-ingest-client/nv_ingest_client.cli.util';</script>
+    <link rel="icon" href="../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="nv_ingest_client.client package" href="nv_ingest_client.client.html" />
+    <link rel="prev" title="nv_ingest_client.cli package" href="nv_ingest_client.cli.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+    <button class="pst-navbar-icon sidebar-toggle secondary-toggle" aria-label="On this page">
+      <span class="fa-solid fa-outdent"></span>
+    </button>
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="current nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 current active has-children"><a class="reference internal" href="modules.html">nv_ingest_client</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l2 current active has-children"><a class="reference internal" href="nv_ingest_client.html">nv_ingest_client package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l3 current active has-children"><a class="reference internal" href="nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details open="open"><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul class="current">
+<li class="toctree-l4 current active"><a class="current reference internal" href="#">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="modules.html" class="nav-link">nv_ingest_client</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_client.html" class="nav-link">nv_ingest_client package</a></li>
+    
+    
+    <li class="breadcrumb-item"><a href="nv_ingest_client.cli.html" class="nav-link">nv_ingest_client.cli package</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_client.cli.util package</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <section id="nv-ingest-client-cli-util-package">
+<h1>nv_ingest_client.cli.util package<a class="headerlink" href="#nv-ingest-client-cli-util-package" title="Link to this heading">#</a></h1>
+<section id="submodules">
+<h2>Submodules<a class="headerlink" href="#submodules" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_client.cli.util.click">
+<span id="nv-ingest-client-cli-util-click-module"></span><h2>nv_ingest_client.cli.util.click module<a class="headerlink" href="#module-nv_ingest_client.cli.util.click" title="Link to this heading">#</a></h2>
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.ClientType">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">ClientType</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#ClientType"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.ClientType" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.ClientType.KAFKA">
+<span class="sig-name descname"><span class="pre">KAFKA</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'KAFKA'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.ClientType.KAFKA" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.ClientType.REDIS">
+<span class="sig-name descname"><span class="pre">REDIS</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'REDIS'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.ClientType.REDIS" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.ClientType.REST">
+<span class="sig-name descname"><span class="pre">REST</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'REST'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.ClientType.REST" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py class">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">LogLevel</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#LogLevel"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel" title="Link to this definition">#</a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">str</span></code>, <code class="xref py py-class docutils literal notranslate"><span class="pre">Enum</span></code></p>
+<p>An enumeration.</p>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel.CRITICAL">
+<span class="sig-name descname"><span class="pre">CRITICAL</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'CRITICAL'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel.CRITICAL" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel.DEBUG">
+<span class="sig-name descname"><span class="pre">DEBUG</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'DEBUG'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel.DEBUG" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel.ERROR">
+<span class="sig-name descname"><span class="pre">ERROR</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'ERROR'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel.ERROR" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel.INFO">
+<span class="sig-name descname"><span class="pre">INFO</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'INFO'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel.INFO" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.LogLevel.WARNING">
+<span class="sig-name descname"><span class="pre">WARNING</span></span><em class="property"><span class="w"> </span><span class="p"><span class="pre">=</span></span><span class="w"> </span><span class="pre">'WARNING'</span></em><a class="headerlink" href="#nv_ingest_client.cli.util.click.LogLevel.WARNING" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.click_match_and_validate_files">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">click_match_and_validate_files</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#click_match_and_validate_files"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.click_match_and_validate_files" title="Link to this definition">#</a></dt>
+<dd><p>Matches and validates files based on the provided file source patterns.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>value</strong> (<em>list</em><em> of </em><em>str</em>) – A list containing file source patterns to match against.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list of matching file paths if any matches are found; otherwise, None.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of str or None</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.click_validate_batch_size">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">click_validate_batch_size</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#click_validate_batch_size"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.click_validate_batch_size" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.click_validate_file_exists">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">click_validate_file_exists</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#click_validate_file_exists"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.click_validate_file_exists" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.click_validate_task">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">click_validate_task</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">value</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#click_validate_task"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.click_validate_task" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.debug_print_click_options">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">debug_print_click_options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">ctx</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#debug_print_click_options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.debug_print_click_options" title="Link to this definition">#</a></dt>
+<dd><p>Retrieves all options from the Click context and pretty prints them.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>ctx</strong> (<em>click.Context</em>) – The Click context object from which to retrieve the command options.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.click.pre_process_dataset">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.click.</span></span><span class="sig-name descname"><span class="pre">pre_process_dataset</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dataset_json</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">shuffle_dataset</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/click.html#pre_process_dataset"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.click.pre_process_dataset" title="Link to this definition">#</a></dt>
+<dd><p>Loads a dataset from a JSON file and optionally shuffles the list of files contained within.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dataset_json</strong> (<em>str</em>) – The path to the dataset JSON file.</p></li>
+<li><p><strong>shuffle_dataset</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to shuffle the dataset before processing. Defaults to True.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The list of files from the dataset, possibly shuffled.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_client.cli.util.processing">
+<span id="nv-ingest-client-cli-util-processing-module"></span><h2>nv_ingest_client.cli.util.processing module<a class="headerlink" href="#module-nv_ingest_client.cli.util.processing" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.check_schema">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">check_schema</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">schema</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Type</span><span class="p"><span class="pre">[</span></span><span class="pre">BaseModel</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">dict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_id</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">original_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">BaseModel</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#check_schema"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.check_schema" title="Link to this definition">#</a></dt>
+<dd></dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.create_and_process_jobs">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">create_and_process_jobs</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient" title="nv_ingest_client.client.client.NvIngestClient"><span class="pre">NvIngestClient</span></a></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">output_directory</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">timeout</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">fail_on_error</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">save_images_separately</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#create_and_process_jobs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.create_and_process_jobs" title="Link to this definition">#</a></dt>
+<dd><p>Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.</p>
+<p>This function creates job specifications (JobSpecs) for a list of files, submits the jobs to the
+client, and processes the results asynchronously. It handles job retries for timeouts, logs failures,
+and limits the number of JobSpecs in memory to <cite>batch_size * 2</cite>. Progress is reported on a per-file basis,
+including the pages processed per second.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>files</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – A list of file paths to be processed. Each file is used to create a job, which is then submitted to the client.</p></li>
+<li><p><strong>client</strong> (<a class="reference internal" href="nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient" title="nv_ingest_client.client.client.NvIngestClient"><em>NvIngestClient</em></a>) – An instance of NvIngestClient used to submit jobs and fetch results asynchronously.</p></li>
+<li><p><strong>tasks</strong> (<em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – A dictionary of tasks to be added to each job. The keys represent task names, and the values represent task
+configurations. Tasks may include “split”, “extract”, “store”, “caption”, etc.</p></li>
+<li><p><strong>output_directory</strong> (<em>str</em>) – The directory path where the processed job results will be saved. If an empty string or None is provided,
+results will not be saved.</p></li>
+<li><p><strong>batch_size</strong> (<em>int</em>) – The number of jobs to process in each batch. Memory is limited to <cite>batch_size * 2</cite> jobs at any time.</p></li>
+<li><p><strong>timeout</strong> (<em>int</em><em>, </em><em>optional</em>) – The timeout in seconds for each job to complete before it is retried. Default is 10 seconds.</p></li>
+<li><p><strong>fail_on_error</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, the function will raise an error and stop processing when encountering an unrecoverable error.
+If False, the function logs the error and continues processing other jobs. Default is False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><p>A tuple containing:
+- <cite>total_files</cite> (int): The total number of files processed.
+- <cite>trace_times</cite> (Dict[str, List[float]]): A dictionary mapping job IDs to a list of trace times for</p>
+<blockquote>
+<div><p>diagnostic purposes.</p>
+</div></blockquote>
+<ul class="simple">
+<li><p><cite>total_pages_processed</cite> (int): The total number of pages processed from the files.</p></li>
+<li><p><cite>trace_ids</cite>  (Dict[str, str]): A dictionary mapping a source file to its correlating trace_id</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[int, Dict[str, List[float]], int]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If <cite>fail_on_error</cite> is True and an error occurs during job submission or processing, a <cite>RuntimeError</cite> is raised.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The function limits the number of JobSpecs in memory to <cite>batch_size * 2</cite> for efficient resource management.</p></li>
+<li><p>It manages job retries for timeouts and logs decoding or processing errors.</p></li>
+<li><p>The progress bar reports progress on a per-file basis and shows the pages processed per second.</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<p>Suppose we have a list of files and tasks to process:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">files</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;file1.txt&quot;</span><span class="p">,</span> <span class="s2">&quot;file2.pdf&quot;</span><span class="p">,</span> <span class="s2">&quot;file3.docx&quot;</span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">client</span> <span class="o">=</span> <span class="n">NvIngestClient</span><span class="p">()</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">tasks</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;split&quot;</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="s2">&quot;extract&quot;</span><span class="p">:</span> <span class="o">...</span><span class="p">,</span> <span class="s2">&quot;store&quot;</span><span class="p">:</span> <span class="o">...</span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">output_directory</span> <span class="o">=</span> <span class="s2">&quot;/path/to/output&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">batch_size</span> <span class="o">=</span> <span class="mi">5</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">total_files</span><span class="p">,</span> <span class="n">trace_times</span><span class="p">,</span> <span class="n">total_pages_processed</span> <span class="o">=</span> <span class="n">create_and_process_jobs</span><span class="p">(</span>
+<span class="gp">... </span>    <span class="n">files</span><span class="p">,</span> <span class="n">client</span><span class="p">,</span> <span class="n">tasks</span><span class="p">,</span> <span class="n">output_directory</span><span class="p">,</span> <span class="n">batch_size</span>
+<span class="gp">... </span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed </span><span class="si">{</span><span class="n">total_files</span><span class="si">}</span><span class="s2"> files, </span><span class="si">{</span><span class="n">total_pages_processed</span><span class="si">}</span><span class="s2"> pages.&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, the function processes the files, submits jobs, fetches results, handles retries for
+timeouts, and logs failures. The number of files and pages processed is printed.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><a class="reference internal" href="#nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration" title="nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">generate_job_batch_for_iteration</span></code></a></dt><dd><p>Function to generate job batches for processing.</p>
+</dd>
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">handle_future_result</span></code></dt><dd><p>Function to process and handle the result of completed future jobs.</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.format_validation_error">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">format_validation_error</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">e</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ValidationError</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_id</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">original_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#format_validation_error"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.format_validation_error" title="Link to this definition">#</a></dt>
+<dd><p>Formats validation errors with appropriate highlights and returns a detailed error message.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">generate_job_batch_for_iteration</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">client</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">pbar</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">tasks</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">processed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">batch_size</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">retry_job_ids</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">fail_on_error</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Tuple</span><span class="p"><span class="pre">[</span></span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">str</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#generate_job_batch_for_iteration"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration" title="Link to this definition">#</a></dt>
+<dd><p>Generates a batch of job specifications for the current iteration of file processing.
+This function handles retrying failed jobs and creating new jobs for unprocessed files.
+The job specifications are then submitted for processing.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>client</strong> (<em>Any</em>) – The client object used to submit jobs asynchronously.</p></li>
+<li><p><strong>pbar</strong> (<em>Any</em>) – The progress bar object to update the progress as jobs are processed.</p></li>
+<li><p><strong>files</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – The list of file paths to be processed.</p></li>
+<li><p><strong>tasks</strong> (<em>Dict</em>) – A dictionary of tasks to be executed as part of the job specifications.</p></li>
+<li><p><strong>processed</strong> (<em>int</em>) – The number of files that have been processed so far.</p></li>
+<li><p><strong>batch_size</strong> (<em>int</em>) – The maximum number of jobs to process in one batch.</p></li>
+<li><p><strong>retry_job_ids</strong> (<em>List</em><em>[</em><em>str</em><em>]</em>) – A list of job IDs that need to be retried due to previous failures.</p></li>
+<li><p><strong>fail_on_error</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to raise an error and stop processing if job specifications are missing, by default False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing:
+- job_ids (List[str]): The list of job IDs created or retried in this iteration.
+- job_id_map_updates (Dict[str, str]): A dictionary mapping job IDs to their corresponding file names.
+- processed (int): The updated number of files processed.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Tuple[List[str], Dict[str, str], int]</p>
+</dd>
+<dt class="field-even">Raises<span class="colon">:</span></dt>
+<dd class="field-even"><p><strong>RuntimeError</strong> – If <cite>fail_on_error</cite> is True and there are missing job specifications, a RuntimeError is raised.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.get_valid_filename">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">get_valid_filename</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#get_valid_filename"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.get_valid_filename" title="Link to this definition">#</a></dt>
+<dd><p>Taken from <a class="github reference external" href="https://github.com/django/django/blob/main/django/utils/text.py">django/django</a>.
+Return the given string converted to a string that can be used for a clean
+filename. Remove leading and trailing spaces; convert other spaces to
+underscores; and remove anything that is not an alphanumeric, dash,
+underscore, or dot.
+&gt;&gt;&gt; get_valid_filename(“john’s portrait in 2004.jpg”)
+‘johns_portrait_in_2004.jpg’</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.highlight_error_in_original">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">highlight_error_in_original</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">original_str</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">task_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">error_detail</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">str</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#highlight_error_in_original"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.highlight_error_in_original" title="Link to this definition">#</a></dt>
+<dd><p>Highlights the error-causing text in the original JSON string based on the error type.</p>
+<p>This function identifies errors in the original JSON string and highlights the specific
+part of the string responsible for the error. It handles two main types of errors:
+- For ‘extra fields’ errors, it highlights the extra field that caused the issue.
+- For ‘missing fields’ errors, it appends a clear message indicating the missing field.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_str</strong> (<em>str</em>) – The original JSON string that caused the error. The function will modify and return this
+string with the problematic fields highlighted.</p></li>
+<li><p><strong>task_name</strong> (<em>str</em>) – The name of the task associated with the error. This is included in the error message when
+highlighting missing fields.</p></li>
+<li><p><strong>error_detail</strong> (<em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em>) – A dictionary containing details about the error. The dictionary should contain the following keys:
+- ‘type’ (str): The type of error (e.g., “value_error.extra”, “value_error.missing”).
+- ‘loc’ (List[Any]): A list of keys/indices indicating the location of the error in the JSON structure.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The original string with the error-causing field highlighted. If the error is related to
+extra fields, the problematic field is highlighted in blue and bold. If the error is due
+to missing fields, a message indicating the missing field is appended to the string.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>str</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The function uses the <cite>style</cite> method (assumed to be defined elsewhere, likely from a
+terminal or text formatting library) to apply color and bold formatting to the highlighted text.</p></li>
+<li><p>The ‘loc’ key in <cite>error_detail</cite> is a list that represents the path to the error-causing field in the JSON.</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<p>Suppose there is an error in the original JSON string due to an extra field:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">original_str</span> <span class="o">=</span> <span class="s1">&#39;{&quot;name&quot;: &quot;file1.txt&quot;, &quot;extra_field&quot;: &quot;some_value&quot;}&#39;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">task_name</span> <span class="o">=</span> <span class="s2">&quot;validate_document&quot;</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">error_detail</span> <span class="o">=</span> <span class="p">{</span>
+<span class="gp">... </span>    <span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;value_error.extra&quot;</span><span class="p">,</span>
+<span class="gp">... </span>    <span class="s2">&quot;loc&quot;</span><span class="p">:</span> <span class="p">[</span><span class="s2">&quot;extra_field&quot;</span><span class="p">]</span>
+<span class="gp">... </span><span class="p">}</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">highlighted_str</span> <span class="o">=</span> <span class="n">highlight_error_in_original</span><span class="p">(</span><span class="n">original_str</span><span class="p">,</span> <span class="n">task_name</span><span class="p">,</span> <span class="n">error_detail</span><span class="p">)</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="nb">print</span><span class="p">(</span><span class="n">highlighted_str</span><span class="p">)</span>
+<span class="go">{&quot;name&quot;: &quot;file1.txt&quot;, &quot;extra_field&quot;: &quot;some_value&quot;}  # The &#39;extra_field&#39; will be highlighted</span>
+</pre></div>
+</div>
+<p>In this case, the function will highlight the <cite>extra_field</cite> in blue and bold in the returned string.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">style</span></code></dt><dd><p>Function used to apply formatting to the error-causing text (e.g., coloring or bolding).</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.organize_documents_by_type">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">organize_documents_by_type</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">response_data</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">Any</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#organize_documents_by_type"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.organize_documents_by_type" title="Link to this definition">#</a></dt>
+<dd><p>Organize documents by their content type.</p>
+<p>This function takes a list of response documents, extracts the content type from
+each document’s metadata, and organizes the documents into a dictionary, where the
+keys are content types and the values are lists of documents belonging to each type.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>response_data</strong> (<em>List</em><em>[</em><em>Dict</em><em>[</em><em>str</em><em>, </em><em>Any</em><em>]</em><em>]</em>) – A list of documents, where each document is represented as a dictionary.
+Each dictionary must contain a ‘metadata’ field that may be either a JSON
+string or a dictionary. The metadata is expected to have a “content_metadata”
+field containing the document’s type.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A dictionary mapping document types (as strings) to lists of documents.
+Each key represents a document type, and the associated value is a list of
+documents that belong to that type.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>Dict[str, List[Dict[str, Any]]]</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>The ‘metadata’ field of each document can be either a JSON string or a
+dictionary. If it is a string, it will be parsed into a dictionary.</p></li>
+<li><p>The function assumes that each document has a valid “content_metadata” field,
+which contains a “type” key that indicates the document’s type.</p></li>
+<li><p>If a document type is encountered for the first time, a new entry is created
+in the result dictionary, and subsequent documents of the same type are added
+to the corresponding list.</p></li>
+</ul>
+<p class="rubric">Examples</p>
+<p>Suppose <cite>response_data</cite> contains the following structure:</p>
+<div class="doctest highlight-default notranslate"><div class="highlight"><pre><span></span><span class="gp">&gt;&gt;&gt; </span><span class="n">response_data</span> <span class="o">=</span> <span class="p">[</span>
+<span class="gp">... </span>    <span class="p">{</span><span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;report&quot;</span><span class="p">}}},</span>
+<span class="gp">... </span>    <span class="p">{</span><span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="s1">&#39;{&quot;content_metadata&quot;: {&quot;type&quot;: &quot;summary&quot;}}&#39;</span><span class="p">},</span>
+<span class="gp">... </span>    <span class="p">{</span><span class="s2">&quot;metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">:</span> <span class="p">{</span><span class="s2">&quot;type&quot;</span><span class="p">:</span> <span class="s2">&quot;report&quot;</span><span class="p">}}}</span>
+<span class="gp">... </span><span class="p">]</span>
+<span class="gp">&gt;&gt;&gt; </span><span class="n">organize_documents_by_type</span><span class="p">(</span><span class="n">response_data</span><span class="p">)</span>
+<span class="go">{&#39;report&#39;: [{&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;report&#39;}}},</span>
+<span class="go">            {&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;report&#39;}}}],</span>
+<span class="go"> &#39;summary&#39;: [{&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;summary&#39;}}}]}</span>
+</pre></div>
+</div>
+<p>In this example, the documents are organized into two types: “report” and “summary”.</p>
+<div class="admonition seealso">
+<p class="admonition-title">See also</p>
+<dl class="simple">
+<dt><code class="xref py py-obj docutils literal notranslate"><span class="pre">json.loads</span></code></dt><dd><p>Used to parse metadata if it is a JSON string.</p>
+</dd>
+</dl>
+</div>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.process_response">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">process_response</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">response</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stage_elapsed_times</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#process_response"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.process_response" title="Link to this definition">#</a></dt>
+<dd><p>Process the response to extract trace data and calculate elapsed time for each stage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>response</strong> (<em>dict</em>) – The response dictionary containing trace information for processing stages.</p></li>
+<li><p><strong>stage_elapsed_times</strong> (<em>defaultdict</em><em>(</em><em>list</em><em>)</em>) – A defaultdict to accumulate elapsed times for each processing stage.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The function iterates over trace data in the response, identifying entry and exit times for
+each stage, and calculates the elapsed time which is then appended to the respective stage in
+<cite>stage_elapsed_times</cite>.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.report_overall_speed">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">report_overall_speed</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">total_pages_processed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">start_time_ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">total_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#report_overall_speed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.report_overall_speed" title="Link to this definition">#</a></dt>
+<dd><p>Reports the overall processing speed based on the number of pages and files processed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>total_pages_processed</strong> (<em>int</em>) – The total number of pages processed.</p></li>
+<li><p><strong>start_time_ns</strong> (<em>int</em>) – The nanosecond timestamp marking the start of processing.</p></li>
+<li><p><strong>total_files</strong> (<em>int</em>) – The total number of files processed.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function calculates the total elapsed time from the start of processing and reports the throughput
+in terms of pages and files processed per second.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.report_stage_statistics">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">report_stage_statistics</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_elapsed_times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">defaultdict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">total_trace_elapsed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">abs_elapsed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#report_stage_statistics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.report_stage_statistics" title="Link to this definition">#</a></dt>
+<dd><p>Reports the statistics for each processing stage, including average, median, total time spent,
+and their respective percentages of the total processing time.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>stage_elapsed_times</strong> (<em>defaultdict</em><em>(</em><em>list</em><em>)</em>) – A defaultdict containing lists of elapsed times for each processing stage, in nanoseconds.</p></li>
+<li><p><strong>total_trace_elapsed</strong> (<em>float</em>) – The total elapsed time across all processing stages, in nanoseconds.</p></li>
+<li><p><strong>abs_elapsed</strong> (<em>float</em>) – The absolute elapsed time from the start to the end of processing, in nanoseconds.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function logs the average, median, and total time for each stage, along with the percentage of total
+computation.
+It also calculates and logs the unresolved time, if any, that is not accounted for by the recorded stages.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.report_statistics">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">report_statistics</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">start_time_ns</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">stage_elapsed_times</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">defaultdict</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">total_pages_processed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">total_files</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">None</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#report_statistics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.report_statistics" title="Link to this definition">#</a></dt>
+<dd><p>Aggregates and reports statistics for the entire processing session.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>start_time_ns</strong> (<em>int</em>) – The nanosecond timestamp marking the start of the processing.</p></li>
+<li><p><strong>stage_elapsed_times</strong> (<em>defaultdict</em><em>(</em><em>list</em><em>)</em>) – A defaultdict where each key is a processing stage and each value is a list
+of elapsed times in nanoseconds for that stage.</p></li>
+<li><p><strong>total_pages_processed</strong> (<em>int</em>) – The total number of pages processed during the session.</p></li>
+<li><p><strong>total_files</strong> (<em>int</em>) – The total number of files processed during the session.</p></li>
+</ul>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function calculates the absolute elapsed time from the start of processing to the current
+time and the total time taken by all stages.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.processing.save_response_data">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.processing.</span></span><span class="sig-name descname"><span class="pre">save_response_data</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">response</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">output_directory</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">images_to_disk</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/processing.html#save_response_data"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.processing.save_response_data" title="Link to this definition">#</a></dt>
+<dd><p>Save the response data into categorized metadata JSON files and optionally save images to disk.</p>
+<p>This function processes the response data, organizes it based on document
+types, and saves the organized data into a specified output directory as JSON
+files. If ‘images_to_disk’ is True and the document type is ‘image’, it decodes
+and writes base64 encoded images to disk.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>response</strong> (<em>dict</em>) – A dictionary containing the API response data. It must contain a “data”
+field, which is expected to be a list of document entries. Each document
+entry should contain metadata, which includes information about the
+document’s source.</p></li>
+<li><p><strong>output_directory</strong> (<em>str</em>) – The path to the directory where the JSON metadata files should be saved.
+Subdirectories will be created based on the document types, and the
+metadata files will be stored within these subdirectories.</p></li>
+<li><p><strong>images_to_disk</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, base64 encoded images in the ‘metadata.content’ field will be
+decoded and saved to disk.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>This function does not return any values. It writes output to the filesystem.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>None</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<ul class="simple">
+<li><p>If ‘images_to_disk’ is True and ‘doc_type’ is ‘image’, images will be decoded
+and saved to the disk with appropriate file types based on ‘metadata.image_metadata.image_type’.</p></li>
+</ul>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_client.cli.util.system">
+<span id="nv-ingest-client-cli-util-system-module"></span><h2>nv_ingest_client.cli.util.system module<a class="headerlink" href="#module-nv_ingest_client.cli.util.system" title="Link to this heading">#</a></h2>
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.system.configure_logging">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.system.</span></span><span class="sig-name descname"><span class="pre">configure_logging</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logger</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">log_level</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/system.html#configure_logging"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.system.configure_logging" title="Link to this definition">#</a></dt>
+<dd><p>Configures the logging level based on a log_level string.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>log_level</strong> (<em>str</em>) – The logging level as a string, expected to be one of
+‘DEBUG’, ‘INFO’, ‘WARNING’, ‘ERROR’, ‘CRITICAL’.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.system.ensure_directory_with_permissions">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.system.</span></span><span class="sig-name descname"><span class="pre">ensure_directory_with_permissions</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">directory_path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/system.html#ensure_directory_with_permissions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.system.ensure_directory_with_permissions" title="Link to this definition">#</a></dt>
+<dd><p>Ensures that a directory exists and the current user has read/write permissions.
+If the directory does not exist, attempts to create it after checking the parent directory for write permission.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><p><strong>directory_path</strong> (<em>str</em>) – The path to the directory to check or create.</p>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the directory exists and has the correct permissions, or if it was successfully created.
+False if the directory cannot be created or does not have the correct permissions.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="nv_ingest_client.cli.util.system.has_permissions">
+<span class="sig-prename descclassname"><span class="pre">nv_ingest_client.cli.util.system.</span></span><span class="sig-name descname"><span class="pre">has_permissions</span></span><span class="sig-paren">(</span>
+
+<dl>
+<dd><em class="sig-param"><span class="n"><span class="pre">path</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">read</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+<dd><em class="sig-param"><span class="n"><span class="pre">write</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>,</dd>
+</dl>
+
+<span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">bool</span></span></span><a class="reference internal" href="../_modules/nv_ingest_client/cli/util/system.html#has_permissions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#nv_ingest_client.cli.util.system.has_permissions" title="Link to this definition">#</a></dt>
+<dd><p>Checks if the current user has specified permissions on a path.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>path</strong> (<em>str</em>) – The filesystem path to check permissions on.</p></li>
+<li><p><strong>read</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to check for read permission.</p></li>
+<li><p><strong>write</strong> (<em>bool</em><em>, </em><em>optional</em>) – Whether to check for write permission.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>True if the path has the specified permissions, False otherwise.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>bool</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-nv_ingest_client.cli.util.tasks">
+<span id="nv-ingest-client-cli-util-tasks-module"></span><h2>nv_ingest_client.cli.util.tasks module<a class="headerlink" href="#module-nv_ingest_client.cli.util.tasks" title="Link to this heading">#</a></h2>
+</section>
+<section id="module-nv_ingest_client.cli.util">
+<span id="module-contents"></span><h2>Module contents<a class="headerlink" href="#module-nv_ingest_client.cli.util" title="Link to this heading">#</a></h2>
+</section>
+</section>
+
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+    <a class="left-prev"
+       href="nv_ingest_client.cli.html"
+       title="previous page">
+      <i class="fa-solid fa-angle-left"></i>
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">previous</p>
+        <p class="prev-next-title">nv_ingest_client.cli package</p>
+      </div>
+    </a>
+    <a class="right-next"
+       href="nv_ingest_client.client.html"
+       title="next page">
+      <div class="prev-next-info">
+        <p class="prev-next-subtitle">next</p>
+        <p class="prev-next-title">nv_ingest_client.client package</p>
+      </div>
+      <i class="fa-solid fa-angle-right"></i>
+    </a>
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+
+              
+                <dialog id="pst-secondary-sidebar-modal"></dialog>
+                <div id="pst-secondary-sidebar" class="bd-sidebar-secondary bd-toc"><div class="sidebar-secondary-items sidebar-secondary__inner">
+
+
+  <div class="sidebar-secondary-item">
+<div
+    id="pst-page-navigation-heading-2"
+    class="page-toc tocsection onthispage">
+    <i class="fa-solid fa-list"></i> On this page
+  </div>
+  <nav class="bd-toc-nav page-toc" aria-labelledby="pst-page-navigation-heading-2">
+    <ul class="visible nav section-nav flex-column">
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#submodules">Submodules</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.cli.util.click">nv_ingest_client.cli.util.click module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.ClientType"><code class="docutils literal notranslate"><span class="pre">ClientType</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.ClientType.KAFKA"><code class="docutils literal notranslate"><span class="pre">KAFKA</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.ClientType.REDIS"><code class="docutils literal notranslate"><span class="pre">REDIS</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.ClientType.REST"><code class="docutils literal notranslate"><span class="pre">REST</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel"><code class="docutils literal notranslate"><span class="pre">LogLevel</span></code></a><ul class="nav section-nav flex-column">
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel.CRITICAL"><code class="docutils literal notranslate"><span class="pre">CRITICAL</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel.DEBUG"><code class="docutils literal notranslate"><span class="pre">DEBUG</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel.ERROR"><code class="docutils literal notranslate"><span class="pre">ERROR</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel.INFO"><code class="docutils literal notranslate"><span class="pre">INFO</span></code></a></li>
+<li class="toc-h4 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.LogLevel.WARNING"><code class="docutils literal notranslate"><span class="pre">WARNING</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.click_match_and_validate_files"><code class="docutils literal notranslate"><span class="pre">click_match_and_validate_files()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.click_validate_batch_size"><code class="docutils literal notranslate"><span class="pre">click_validate_batch_size()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.click_validate_file_exists"><code class="docutils literal notranslate"><span class="pre">click_validate_file_exists()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.click_validate_task"><code class="docutils literal notranslate"><span class="pre">click_validate_task()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.debug_print_click_options"><code class="docutils literal notranslate"><span class="pre">debug_print_click_options()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.click.pre_process_dataset"><code class="docutils literal notranslate"><span class="pre">pre_process_dataset()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.cli.util.processing">nv_ingest_client.cli.util.processing module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.check_schema"><code class="docutils literal notranslate"><span class="pre">check_schema()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.create_and_process_jobs"><code class="docutils literal notranslate"><span class="pre">create_and_process_jobs()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.format_validation_error"><code class="docutils literal notranslate"><span class="pre">format_validation_error()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration"><code class="docutils literal notranslate"><span class="pre">generate_job_batch_for_iteration()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.get_valid_filename"><code class="docutils literal notranslate"><span class="pre">get_valid_filename()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.highlight_error_in_original"><code class="docutils literal notranslate"><span class="pre">highlight_error_in_original()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.organize_documents_by_type"><code class="docutils literal notranslate"><span class="pre">organize_documents_by_type()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.process_response"><code class="docutils literal notranslate"><span class="pre">process_response()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.report_overall_speed"><code class="docutils literal notranslate"><span class="pre">report_overall_speed()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.report_stage_statistics"><code class="docutils literal notranslate"><span class="pre">report_stage_statistics()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.report_statistics"><code class="docutils literal notranslate"><span class="pre">report_statistics()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.processing.save_response_data"><code class="docutils literal notranslate"><span class="pre">save_response_data()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.cli.util.system">nv_ingest_client.cli.util.system module</a><ul class="nav section-nav flex-column">
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.system.configure_logging"><code class="docutils literal notranslate"><span class="pre">configure_logging()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.system.ensure_directory_with_permissions"><code class="docutils literal notranslate"><span class="pre">ensure_directory_with_permissions()</span></code></a></li>
+<li class="toc-h3 nav-item toc-entry"><a class="reference internal nav-link" href="#nv_ingest_client.cli.util.system.has_permissions"><code class="docutils literal notranslate"><span class="pre">has_permissions()</span></code></a></li>
+</ul>
+</li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.cli.util.tasks">nv_ingest_client.cli.util.tasks module</a></li>
+<li class="toc-h2 nav-item toc-entry"><a class="reference internal nav-link" href="#module-nv_ingest_client.cli.util">Module contents</a></li>
+</ul>
+  </nav></div>
+
+</div></div>
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

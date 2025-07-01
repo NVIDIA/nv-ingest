@@ -1,0 +1,1192 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_client.cli.util.processing &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_client/cli/util/processing';</script>
+    <link rel="icon" href="../../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_client.cli.util.processing</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_client.cli.util.processing</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">base64</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">io</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">re</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">collections</span><span class="w"> </span><span class="kn">import</span> <span class="n">defaultdict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">as_completed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">statistics</span><span class="w"> </span><span class="kn">import</span> <span class="n">mean</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">statistics</span><span class="w"> </span><span class="kn">import</span> <span class="n">median</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Type</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">click</span><span class="w"> </span><span class="kn">import</span> <span class="n">style</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.client</span><span class="w"> </span><span class="kn">import</span> <span class="n">NvIngestClient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">handle_future_result</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">estimate_page_count</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">PIL</span><span class="w"> </span><span class="kn">import</span> <span class="n">Image</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">BaseModel</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">pydantic</span><span class="w"> </span><span class="kn">import</span> <span class="n">ValidationError</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">tqdm</span><span class="w"> </span><span class="kn">import</span> <span class="n">tqdm</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="highlight_error_in_original">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.highlight_error_in_original">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">highlight_error_in_original</span><span class="p">(</span><span class="n">original_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">error_detail</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Highlights the error-causing text in the original JSON string based on the error type.</span>
+
+<span class="sd">    This function identifies errors in the original JSON string and highlights the specific</span>
+<span class="sd">    part of the string responsible for the error. It handles two main types of errors:</span>
+<span class="sd">    - For &#39;extra fields&#39; errors, it highlights the extra field that caused the issue.</span>
+<span class="sd">    - For &#39;missing fields&#39; errors, it appends a clear message indicating the missing field.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    original_str : str</span>
+<span class="sd">        The original JSON string that caused the error. The function will modify and return this</span>
+<span class="sd">        string with the problematic fields highlighted.</span>
+
+<span class="sd">    task_name : str</span>
+<span class="sd">        The name of the task associated with the error. This is included in the error message when</span>
+<span class="sd">        highlighting missing fields.</span>
+
+<span class="sd">    error_detail : Dict[str, Any]</span>
+<span class="sd">        A dictionary containing details about the error. The dictionary should contain the following keys:</span>
+<span class="sd">        - &#39;type&#39; (str): The type of error (e.g., &quot;value_error.extra&quot;, &quot;value_error.missing&quot;).</span>
+<span class="sd">        - &#39;loc&#39; (List[Any]): A list of keys/indices indicating the location of the error in the JSON structure.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    str</span>
+<span class="sd">        The original string with the error-causing field highlighted. If the error is related to</span>
+<span class="sd">        extra fields, the problematic field is highlighted in blue and bold. If the error is due</span>
+<span class="sd">        to missing fields, a message indicating the missing field is appended to the string.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The function uses the `style` method (assumed to be defined elsewhere, likely from a</span>
+<span class="sd">      terminal or text formatting library) to apply color and bold formatting to the highlighted text.</span>
+<span class="sd">    - The &#39;loc&#39; key in `error_detail` is a list that represents the path to the error-causing field in the JSON.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Suppose there is an error in the original JSON string due to an extra field:</span>
+
+<span class="sd">    &gt;&gt;&gt; original_str = &#39;{&quot;name&quot;: &quot;file1.txt&quot;, &quot;extra_field&quot;: &quot;some_value&quot;}&#39;</span>
+<span class="sd">    &gt;&gt;&gt; task_name = &quot;validate_document&quot;</span>
+<span class="sd">    &gt;&gt;&gt; error_detail = {</span>
+<span class="sd">    ...     &quot;type&quot;: &quot;value_error.extra&quot;,</span>
+<span class="sd">    ...     &quot;loc&quot;: [&quot;extra_field&quot;]</span>
+<span class="sd">    ... }</span>
+<span class="sd">    &gt;&gt;&gt; highlighted_str = highlight_error_in_original(original_str, task_name, error_detail)</span>
+<span class="sd">    &gt;&gt;&gt; print(highlighted_str)</span>
+<span class="sd">    {&quot;name&quot;: &quot;file1.txt&quot;, &quot;extra_field&quot;: &quot;some_value&quot;}  # The &#39;extra_field&#39; will be highlighted</span>
+
+<span class="sd">    In this case, the function will highlight the `extra_field` in blue and bold in the returned string.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    style : Function used to apply formatting to the error-causing text (e.g., coloring or bolding).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">error_type</span> <span class="o">=</span> <span class="n">error_detail</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
+    <span class="n">error_location</span> <span class="o">=</span> <span class="s2">&quot;-&gt;&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="nb">map</span><span class="p">(</span><span class="nb">str</span><span class="p">,</span> <span class="n">error_detail</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">]))</span>
+    <span class="k">if</span> <span class="n">error_type</span> <span class="o">==</span> <span class="s2">&quot;value_error.extra&quot;</span><span class="p">:</span>
+        <span class="n">error_key</span> <span class="o">=</span> <span class="n">error_detail</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">highlighted_key</span> <span class="o">=</span> <span class="n">style</span><span class="p">(</span><span class="n">error_key</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">highlighted_str</span> <span class="o">=</span> <span class="n">original_str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">error_key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="n">highlighted_key</span><span class="p">)</span>
+    <span class="k">elif</span> <span class="n">error_type</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;value_error.missing&quot;</span><span class="p">,</span> <span class="s2">&quot;value_error.any_str.min_length&quot;</span><span class="p">]:</span>
+        <span class="n">missing_message</span> <span class="o">=</span> <span class="n">style</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;&#39;</span><span class="si">{</span><span class="n">error_location</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">highlighted_str</span> <span class="o">=</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">original_str</span><span class="si">}</span><span class="se">\n</span><span class="s2">(Schema Error): Missing required parameter for task &#39;</span><span class="si">{</span><span class="n">task_name</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot; </span><span class="si">{</span><span class="n">missing_message</span><span class="si">}</span><span class="se">\n</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">original_str</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">error_key</span> <span class="o">=</span> <span class="n">error_detail</span><span class="p">[</span><span class="s2">&quot;loc&quot;</span><span class="p">][</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">highlighted_key</span> <span class="o">=</span> <span class="n">style</span><span class="p">(</span><span class="n">error_key</span><span class="p">,</span> <span class="n">fg</span><span class="o">=</span><span class="s2">&quot;blue&quot;</span><span class="p">,</span> <span class="n">bold</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">highlighted_str</span> <span class="o">=</span> <span class="n">original_str</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="sa">f</span><span class="s1">&#39;&quot;</span><span class="si">{</span><span class="n">error_key</span><span class="si">}</span><span class="s1">&quot;&#39;</span><span class="p">,</span> <span class="n">highlighted_key</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">highlighted_str</span></div>
+
+
+
+<div class="viewcode-block" id="format_validation_error">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.format_validation_error">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">format_validation_error</span><span class="p">(</span><span class="n">e</span><span class="p">:</span> <span class="n">ValidationError</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">original_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Formats validation errors with appropriate highlights and returns a detailed error message.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">error_messages</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">error</span> <span class="ow">in</span> <span class="n">e</span><span class="o">.</span><span class="n">errors</span><span class="p">():</span>
+        <span class="n">error_message</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;(Schema Error): </span><span class="si">{</span><span class="n">error</span><span class="p">[</span><span class="s1">&#39;msg&#39;</span><span class="p">]</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">highlighted_str</span> <span class="o">=</span> <span class="n">highlight_error_in_original</span><span class="p">(</span><span class="n">original_str</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">error</span><span class="p">)</span>
+        <span class="n">error_messages</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">error_message</span><span class="si">}</span><span class="se">\n</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="n">highlighted_str</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="s2">&quot;</span><span class="se">\n</span><span class="s2">&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">error_messages</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="check_schema">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.check_schema">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">check_schema</span><span class="p">(</span><span class="n">schema</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">BaseModel</span><span class="p">],</span> <span class="n">options</span><span class="p">:</span> <span class="nb">dict</span><span class="p">,</span> <span class="n">task_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">original_str</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">BaseModel</span><span class="p">:</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">schema</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+    <span class="k">except</span> <span class="n">ValidationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="n">error_message</span> <span class="o">=</span> <span class="n">format_validation_error</span><span class="p">(</span><span class="n">e</span><span class="p">,</span> <span class="n">task_id</span><span class="p">,</span> <span class="n">original_str</span><span class="p">)</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="n">error_message</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">e</span></div>
+
+
+
+<div class="viewcode-block" id="report_stage_statistics">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.report_stage_statistics">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">report_stage_statistics</span><span class="p">(</span><span class="n">stage_elapsed_times</span><span class="p">:</span> <span class="n">defaultdict</span><span class="p">,</span> <span class="n">total_trace_elapsed</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">abs_elapsed</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reports the statistics for each processing stage, including average, median, total time spent,</span>
+<span class="sd">    and their respective percentages of the total processing time.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    stage_elapsed_times : defaultdict(list)</span>
+<span class="sd">        A defaultdict containing lists of elapsed times for each processing stage, in nanoseconds.</span>
+<span class="sd">    total_trace_elapsed : float</span>
+<span class="sd">        The total elapsed time across all processing stages, in nanoseconds.</span>
+<span class="sd">    abs_elapsed : float</span>
+<span class="sd">        The absolute elapsed time from the start to the end of processing, in nanoseconds.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This function logs the average, median, and total time for each stage, along with the percentage of total</span>
+<span class="sd">    computation.</span>
+<span class="sd">    It also calculates and logs the unresolved time, if any, that is not accounted for by the recorded stages.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">for</span> <span class="n">stage</span><span class="p">,</span> <span class="n">times</span> <span class="ow">in</span> <span class="n">stage_elapsed_times</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="n">times</span><span class="p">:</span>
+            <span class="n">avg_time</span> <span class="o">=</span> <span class="n">mean</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+            <span class="n">med_time</span> <span class="o">=</span> <span class="n">median</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+            <span class="n">total_stage_time</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">times</span><span class="p">)</span>
+            <span class="n">percent_of_total</span> <span class="o">=</span> <span class="p">(</span><span class="n">total_stage_time</span> <span class="o">/</span> <span class="n">total_trace_elapsed</span> <span class="o">*</span> <span class="mi">100</span><span class="p">)</span> <span class="k">if</span> <span class="n">total_trace_elapsed</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">stage</span><span class="si">}</span><span class="s2">: Avg: </span><span class="si">{</span><span class="n">avg_time</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms, Median: </span><span class="si">{</span><span class="n">med_time</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms, &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;Total Time: </span><span class="si">{</span><span class="n">total_stage_time</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms, Total % of Trace Computation: </span><span class="si">{</span><span class="n">percent_of_total</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
+            <span class="p">)</span>
+
+    <span class="n">unresolved_time</span> <span class="o">=</span> <span class="n">abs_elapsed</span> <span class="o">-</span> <span class="n">total_trace_elapsed</span>
+    <span class="k">if</span> <span class="n">unresolved_time</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">percent_unresolved</span> <span class="o">=</span> <span class="n">unresolved_time</span> <span class="o">/</span> <span class="n">abs_elapsed</span> <span class="o">*</span> <span class="mi">100</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;Unresolved time: </span><span class="si">{</span><span class="n">unresolved_time</span><span class="w"> </span><span class="o">/</span><span class="w"> </span><span class="mf">1e6</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> ms, Percent of Total Elapsed: </span><span class="si">{</span><span class="n">percent_unresolved</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">%&quot;</span>
+        <span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;No unresolved time detected. Trace times account for the entire elapsed duration.&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="report_overall_speed">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.report_overall_speed">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">report_overall_speed</span><span class="p">(</span><span class="n">total_pages_processed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">start_time_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">total_files</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Reports the overall processing speed based on the number of pages and files processed.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    total_pages_processed : int</span>
+<span class="sd">        The total number of pages processed.</span>
+<span class="sd">    start_time_ns : int</span>
+<span class="sd">        The nanosecond timestamp marking the start of processing.</span>
+<span class="sd">    total_files : int</span>
+<span class="sd">        The total number of files processed.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This function calculates the total elapsed time from the start of processing and reports the throughput</span>
+<span class="sd">    in terms of pages and files processed per second.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">total_elapsed_time_ns</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time_ns</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time_ns</span>
+    <span class="n">total_elapsed_time_s</span> <span class="o">=</span> <span class="n">total_elapsed_time_ns</span> <span class="o">/</span> <span class="mi">1_000_000_000</span>  <span class="c1"># Convert nanoseconds to seconds</span>
+
+    <span class="n">throughput_pages</span> <span class="o">=</span> <span class="n">total_pages_processed</span> <span class="o">/</span> <span class="n">total_elapsed_time_s</span>  <span class="c1"># pages/sec</span>
+    <span class="n">throughput_files</span> <span class="o">=</span> <span class="n">total_files</span> <span class="o">/</span> <span class="n">total_elapsed_time_s</span>  <span class="c1"># files/sec</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Processed </span><span class="si">{</span><span class="n">total_files</span><span class="si">}</span><span class="s2"> files in </span><span class="si">{</span><span class="n">total_elapsed_time_s</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2"> seconds.&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Total pages processed: </span><span class="si">{</span><span class="n">total_pages_processed</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Throughput (Pages/sec): </span><span class="si">{</span><span class="n">throughput_pages</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Throughput (Files/sec): </span><span class="si">{</span><span class="n">throughput_files</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="report_statistics">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.report_statistics">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">report_statistics</span><span class="p">(</span>
+    <span class="n">start_time_ns</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">stage_elapsed_times</span><span class="p">:</span> <span class="n">defaultdict</span><span class="p">,</span>
+    <span class="n">total_pages_processed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">total_files</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Aggregates and reports statistics for the entire processing session.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    start_time_ns : int</span>
+<span class="sd">        The nanosecond timestamp marking the start of the processing.</span>
+<span class="sd">    stage_elapsed_times : defaultdict(list)</span>
+<span class="sd">        A defaultdict where each key is a processing stage and each value is a list</span>
+<span class="sd">        of elapsed times in nanoseconds for that stage.</span>
+<span class="sd">    total_pages_processed : int</span>
+<span class="sd">        The total number of pages processed during the session.</span>
+<span class="sd">    total_files : int</span>
+<span class="sd">        The total number of files processed during the session.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This function calculates the absolute elapsed time from the start of processing to the current</span>
+<span class="sd">    time and the total time taken by all stages.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">abs_elapsed</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time_ns</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time_ns</span>
+    <span class="n">total_trace_elapsed</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">times</span><span class="p">)</span> <span class="k">for</span> <span class="n">times</span> <span class="ow">in</span> <span class="n">stage_elapsed_times</span><span class="o">.</span><span class="n">values</span><span class="p">())</span>
+    <span class="n">report_stage_statistics</span><span class="p">(</span><span class="n">stage_elapsed_times</span><span class="p">,</span> <span class="n">total_trace_elapsed</span><span class="p">,</span> <span class="n">abs_elapsed</span><span class="p">)</span>
+    <span class="n">report_overall_speed</span><span class="p">(</span><span class="n">total_pages_processed</span><span class="p">,</span> <span class="n">start_time_ns</span><span class="p">,</span> <span class="n">total_files</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="process_response">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.process_response">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">process_response</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">stage_elapsed_times</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process the response to extract trace data and calculate elapsed time for each stage.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    response : dict</span>
+<span class="sd">        The response dictionary containing trace information for processing stages.</span>
+<span class="sd">    stage_elapsed_times : defaultdict(list)</span>
+<span class="sd">        A defaultdict to accumulate elapsed times for each processing stage.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The function iterates over trace data in the response, identifying entry and exit times for</span>
+<span class="sd">    each stage, and calculates the elapsed time which is then appended to the respective stage in</span>
+<span class="sd">    `stage_elapsed_times`.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">trace_data</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;trace&quot;</span><span class="p">,</span> <span class="p">{})</span>
+    <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">entry_time</span> <span class="ow">in</span> <span class="n">trace_data</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="k">if</span> <span class="s2">&quot;entry&quot;</span> <span class="ow">in</span> <span class="n">key</span><span class="p">:</span>
+            <span class="n">exit_key</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;entry&quot;</span><span class="p">,</span> <span class="s2">&quot;exit&quot;</span><span class="p">)</span>
+            <span class="n">exit_time</span> <span class="o">=</span> <span class="n">trace_data</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">exit_key</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">exit_time</span><span class="p">:</span>
+                <span class="n">stage_name</span> <span class="o">=</span> <span class="n">key</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;::&quot;</span><span class="p">)[</span><span class="mi">2</span><span class="p">]</span>
+                <span class="n">elapsed_time</span> <span class="o">=</span> <span class="n">exit_time</span> <span class="o">-</span> <span class="n">entry_time</span>
+                <span class="n">stage_elapsed_times</span><span class="p">[</span><span class="n">stage_name</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">elapsed_time</span><span class="p">)</span></div>
+
+
+
+<div class="viewcode-block" id="organize_documents_by_type">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.organize_documents_by_type">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">organize_documents_by_type</span><span class="p">(</span><span class="n">response_data</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]])</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">]]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Organize documents by their content type.</span>
+
+<span class="sd">    This function takes a list of response documents, extracts the content type from</span>
+<span class="sd">    each document&#39;s metadata, and organizes the documents into a dictionary, where the</span>
+<span class="sd">    keys are content types and the values are lists of documents belonging to each type.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    response_data : List[Dict[str, Any]]</span>
+<span class="sd">        A list of documents, where each document is represented as a dictionary.</span>
+<span class="sd">        Each dictionary must contain a &#39;metadata&#39; field that may be either a JSON</span>
+<span class="sd">        string or a dictionary. The metadata is expected to have a &quot;content_metadata&quot;</span>
+<span class="sd">        field containing the document&#39;s type.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Dict[str, List[Dict[str, Any]]]</span>
+<span class="sd">        A dictionary mapping document types (as strings) to lists of documents.</span>
+<span class="sd">        Each key represents a document type, and the associated value is a list of</span>
+<span class="sd">        documents that belong to that type.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The &#39;metadata&#39; field of each document can be either a JSON string or a</span>
+<span class="sd">      dictionary. If it is a string, it will be parsed into a dictionary.</span>
+
+<span class="sd">    - The function assumes that each document has a valid &quot;content_metadata&quot; field,</span>
+<span class="sd">      which contains a &quot;type&quot; key that indicates the document&#39;s type.</span>
+
+<span class="sd">    - If a document type is encountered for the first time, a new entry is created</span>
+<span class="sd">      in the result dictionary, and subsequent documents of the same type are added</span>
+<span class="sd">      to the corresponding list.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Suppose `response_data` contains the following structure:</span>
+
+<span class="sd">    &gt;&gt;&gt; response_data = [</span>
+<span class="sd">    ...     {&quot;metadata&quot;: {&quot;content_metadata&quot;: {&quot;type&quot;: &quot;report&quot;}}},</span>
+<span class="sd">    ...     {&quot;metadata&quot;: &#39;{&quot;content_metadata&quot;: {&quot;type&quot;: &quot;summary&quot;}}&#39;},</span>
+<span class="sd">    ...     {&quot;metadata&quot;: {&quot;content_metadata&quot;: {&quot;type&quot;: &quot;report&quot;}}}</span>
+<span class="sd">    ... ]</span>
+<span class="sd">    &gt;&gt;&gt; organize_documents_by_type(response_data)</span>
+<span class="sd">    {&#39;report&#39;: [{&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;report&#39;}}},</span>
+<span class="sd">                {&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;report&#39;}}}],</span>
+<span class="sd">     &#39;summary&#39;: [{&#39;metadata&#39;: {&#39;content_metadata&#39;: {&#39;type&#39;: &#39;summary&#39;}}}]}</span>
+
+<span class="sd">    In this example, the documents are organized into two types: &quot;report&quot; and &quot;summary&quot;.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    json.loads : Used to parse metadata if it is a JSON string.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">doc_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="k">for</span> <span class="n">document</span> <span class="ow">in</span> <span class="n">response_data</span><span class="p">:</span>
+        <span class="n">doc_meta</span> <span class="o">=</span> <span class="n">document</span><span class="p">[</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">doc_meta</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">doc_meta</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">doc_meta</span><span class="p">)</span>
+        <span class="n">doc_content_metadata</span> <span class="o">=</span> <span class="n">doc_meta</span><span class="p">[</span><span class="s2">&quot;content_metadata&quot;</span><span class="p">]</span>
+        <span class="n">doc_type</span> <span class="o">=</span> <span class="n">doc_content_metadata</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">doc_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">doc_map</span><span class="p">:</span>
+            <span class="n">doc_map</span><span class="p">[</span><span class="n">doc_type</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">doc_map</span><span class="p">[</span><span class="n">doc_type</span><span class="p">]</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">document</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">doc_map</span></div>
+
+
+
+<div class="viewcode-block" id="save_response_data">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.save_response_data">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">save_response_data</span><span class="p">(</span><span class="n">response</span><span class="p">,</span> <span class="n">output_directory</span><span class="p">,</span> <span class="n">images_to_disk</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Save the response data into categorized metadata JSON files and optionally save images to disk.</span>
+
+<span class="sd">    This function processes the response data, organizes it based on document</span>
+<span class="sd">    types, and saves the organized data into a specified output directory as JSON</span>
+<span class="sd">    files. If &#39;images_to_disk&#39; is True and the document type is &#39;image&#39;, it decodes</span>
+<span class="sd">    and writes base64 encoded images to disk.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    response : dict</span>
+<span class="sd">        A dictionary containing the API response data. It must contain a &quot;data&quot;</span>
+<span class="sd">        field, which is expected to be a list of document entries. Each document</span>
+<span class="sd">        entry should contain metadata, which includes information about the</span>
+<span class="sd">        document&#39;s source.</span>
+
+<span class="sd">    output_directory : str</span>
+<span class="sd">        The path to the directory where the JSON metadata files should be saved.</span>
+<span class="sd">        Subdirectories will be created based on the document types, and the</span>
+<span class="sd">        metadata files will be stored within these subdirectories.</span>
+
+<span class="sd">    images_to_disk : bool, optional</span>
+<span class="sd">        If True, base64 encoded images in the &#39;metadata.content&#39; field will be</span>
+<span class="sd">        decoded and saved to disk.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    None</span>
+<span class="sd">        This function does not return any values. It writes output to the filesystem.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - If &#39;images_to_disk&#39; is True and &#39;doc_type&#39; is &#39;image&#39;, images will be decoded</span>
+<span class="sd">      and saved to the disk with appropriate file types based on &#39;metadata.image_metadata.image_type&#39;.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="s2">&quot;data&quot;</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">response</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="ow">not</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]):</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Data is not in the response or response.data is empty&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">response_data</span> <span class="o">=</span> <span class="n">response</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">response_data</span><span class="p">,</span> <span class="nb">list</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">len</span><span class="p">(</span><span class="n">response_data</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Response data is not a list or the list is empty.&quot;</span><span class="p">)</span>
+        <span class="k">return</span>
+
+    <span class="n">doc_meta_base</span> <span class="o">=</span> <span class="n">response_data</span><span class="p">[</span><span class="mi">0</span><span class="p">][</span><span class="s2">&quot;metadata&quot;</span><span class="p">]</span>
+    <span class="n">source_meta</span> <span class="o">=</span> <span class="n">doc_meta_base</span><span class="p">[</span><span class="s2">&quot;source_metadata&quot;</span><span class="p">]</span>
+    <span class="n">doc_name</span> <span class="o">=</span> <span class="n">source_meta</span><span class="p">[</span><span class="s2">&quot;source_id&quot;</span><span class="p">]</span>
+    <span class="n">clean_doc_name</span> <span class="o">=</span> <span class="n">get_valid_filename</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">basename</span><span class="p">(</span><span class="n">doc_name</span><span class="p">))</span>
+    <span class="n">output_name</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">clean_doc_name</span><span class="si">}</span><span class="s2">.metadata.json&quot;</span>
+
+    <span class="n">doc_map</span> <span class="o">=</span> <span class="n">organize_documents_by_type</span><span class="p">(</span><span class="n">response_data</span><span class="p">)</span>
+    <span class="k">for</span> <span class="n">doc_type</span><span class="p">,</span> <span class="n">documents</span> <span class="ow">in</span> <span class="n">doc_map</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">doc_type_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">output_directory</span><span class="p">,</span> <span class="n">doc_type</span><span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">exists</span><span class="p">(</span><span class="n">doc_type_path</span><span class="p">):</span>
+            <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">doc_type_path</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">doc_type</span> <span class="ow">in</span> <span class="p">(</span><span class="s2">&quot;image&quot;</span><span class="p">,</span> <span class="s2">&quot;structured&quot;</span><span class="p">)</span> <span class="ow">and</span> <span class="n">images_to_disk</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">doc</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">documents</span><span class="p">):</span>
+                <span class="n">meta</span> <span class="o">=</span> <span class="n">doc</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;metadata&quot;</span><span class="p">,</span> <span class="p">{})</span>
+                <span class="n">image_content</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;content&quot;</span><span class="p">)</span>
+                <span class="k">if</span> <span class="n">doc_type</span> <span class="o">==</span> <span class="s2">&quot;image&quot;</span><span class="p">:</span>
+                    <span class="n">image_type</span> <span class="o">=</span> <span class="n">meta</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;image_metadata&quot;</span><span class="p">,</span> <span class="p">{})</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;image_type&quot;</span><span class="p">,</span> <span class="s2">&quot;png&quot;</span><span class="p">)</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">image_type</span> <span class="o">=</span> <span class="s2">&quot;png&quot;</span>
+
+                <span class="k">if</span> <span class="n">image_content</span> <span class="ow">and</span> <span class="n">image_type</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;png&quot;</span><span class="p">,</span> <span class="s2">&quot;svg&quot;</span><span class="p">,</span> <span class="s2">&quot;jpeg&quot;</span><span class="p">,</span> <span class="s2">&quot;jpg&quot;</span><span class="p">,</span> <span class="s2">&quot;tiff&quot;</span><span class="p">}:</span>
+                    <span class="k">try</span><span class="p">:</span>
+                        <span class="c1"># Decode the base64 content</span>
+                        <span class="n">image_data</span> <span class="o">=</span> <span class="n">base64</span><span class="o">.</span><span class="n">b64decode</span><span class="p">(</span><span class="n">image_content</span><span class="p">)</span>
+                        <span class="n">image</span> <span class="o">=</span> <span class="n">Image</span><span class="o">.</span><span class="n">open</span><span class="p">(</span><span class="n">io</span><span class="o">.</span><span class="n">BytesIO</span><span class="p">(</span><span class="n">image_data</span><span class="p">))</span>
+
+                        <span class="c1"># Define the output file path</span>
+                        <span class="n">image_ext</span> <span class="o">=</span> <span class="s2">&quot;jpg&quot;</span> <span class="k">if</span> <span class="n">image_type</span> <span class="o">==</span> <span class="s2">&quot;jpeg&quot;</span> <span class="k">else</span> <span class="n">image_type</span>
+                        <span class="n">image_filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">clean_doc_name</span><span class="si">}</span><span class="s2">_</span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2">.</span><span class="si">{</span><span class="n">image_ext</span><span class="si">}</span><span class="s2">&quot;</span>
+                        <span class="n">image_output_path</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">doc_type_path</span><span class="p">,</span> <span class="s2">&quot;media&quot;</span><span class="p">,</span> <span class="n">image_filename</span><span class="p">)</span>
+
+                        <span class="c1"># Ensure the media directory exists</span>
+                        <span class="n">os</span><span class="o">.</span><span class="n">makedirs</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">dirname</span><span class="p">(</span><span class="n">image_output_path</span><span class="p">),</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+                        <span class="c1"># Save the image to disk</span>
+                        <span class="n">image</span><span class="o">.</span><span class="n">save</span><span class="p">(</span><span class="n">image_output_path</span><span class="p">,</span> <span class="nb">format</span><span class="o">=</span><span class="n">image_ext</span><span class="o">.</span><span class="n">upper</span><span class="p">())</span>
+
+                        <span class="c1"># Update the metadata content with the image path</span>
+                        <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;content&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+                        <span class="n">meta</span><span class="p">[</span><span class="s2">&quot;content_url&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">realpath</span><span class="p">(</span><span class="n">image_output_path</span><span class="p">)</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Saved image to </span><span class="si">{</span><span class="n">image_output_path</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                    <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to save image </span><span class="si">{</span><span class="n">i</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">clean_doc_name</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="c1"># Write the metadata JSON file</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">doc_type_path</span><span class="p">,</span> <span class="n">output_name</span><span class="p">),</span> <span class="s2">&quot;w&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">f</span><span class="o">.</span><span class="n">write</span><span class="p">(</span><span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">documents</span><span class="p">,</span> <span class="n">indent</span><span class="o">=</span><span class="mi">2</span><span class="p">))</span></div>
+
+
+
+<div class="viewcode-block" id="generate_job_batch_for_iteration">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.generate_job_batch_for_iteration">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_job_batch_for_iteration</span><span class="p">(</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">pbar</span><span class="p">:</span> <span class="n">Any</span><span class="p">,</span>
+    <span class="n">files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">tasks</span><span class="p">:</span> <span class="n">Dict</span><span class="p">,</span>
+    <span class="n">processed</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">retry_job_ids</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">fail_on_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="nb">int</span><span class="p">]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generates a batch of job specifications for the current iteration of file processing.</span>
+<span class="sd">    This function handles retrying failed jobs and creating new jobs for unprocessed files.</span>
+<span class="sd">    The job specifications are then submitted for processing.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    client : Any</span>
+<span class="sd">        The client object used to submit jobs asynchronously.</span>
+<span class="sd">    pbar : Any</span>
+<span class="sd">        The progress bar object to update the progress as jobs are processed.</span>
+<span class="sd">    files : List[str]</span>
+<span class="sd">        The list of file paths to be processed.</span>
+<span class="sd">    tasks : Dict</span>
+<span class="sd">        A dictionary of tasks to be executed as part of the job specifications.</span>
+<span class="sd">    processed : int</span>
+<span class="sd">        The number of files that have been processed so far.</span>
+<span class="sd">    batch_size : int</span>
+<span class="sd">        The maximum number of jobs to process in one batch.</span>
+<span class="sd">    retry_job_ids : List[str]</span>
+<span class="sd">        A list of job IDs that need to be retried due to previous failures.</span>
+<span class="sd">    fail_on_error : bool, optional</span>
+<span class="sd">        Whether to raise an error and stop processing if job specifications are missing, by default False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Tuple[List[str], Dict[str, str], int]</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">        - job_ids (List[str]): The list of job IDs created or retried in this iteration.</span>
+<span class="sd">        - job_id_map_updates (Dict[str, str]): A dictionary mapping job IDs to their corresponding file names.</span>
+<span class="sd">        - processed (int): The updated number of files processed.</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If `fail_on_error` is True and there are missing job specifications, a RuntimeError is raised.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">job_indices</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">job_index_map_updates</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">cur_job_count</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">if</span> <span class="n">retry_job_ids</span><span class="p">:</span>
+        <span class="n">job_indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">retry_job_ids</span><span class="p">)</span>
+        <span class="n">cur_job_count</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">job_indices</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">cur_job_count</span> <span class="o">&lt;</span> <span class="n">batch_size</span><span class="p">)</span> <span class="ow">and</span> <span class="p">(</span><span class="n">processed</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)):</span>
+        <span class="n">new_job_count</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">batch_size</span> <span class="o">-</span> <span class="n">cur_job_count</span><span class="p">,</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span> <span class="o">-</span> <span class="n">processed</span><span class="p">)</span>
+        <span class="n">batch_files</span> <span class="o">=</span> <span class="n">files</span><span class="p">[</span><span class="n">processed</span> <span class="p">:</span> <span class="n">processed</span> <span class="o">+</span> <span class="n">new_job_count</span><span class="p">]</span>  <span class="c1"># noqa: E203</span>
+
+        <span class="n">new_job_indices</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">create_jobs_for_batch</span><span class="p">(</span><span class="n">batch_files</span><span class="p">,</span> <span class="n">tasks</span><span class="p">)</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_job_indices</span><span class="p">)</span> <span class="o">!=</span> <span class="n">new_job_count</span><span class="p">:</span>
+            <span class="n">missing_jobs</span> <span class="o">=</span> <span class="n">new_job_count</span> <span class="o">-</span> <span class="nb">len</span><span class="p">(</span><span class="n">new_job_indices</span><span class="p">)</span>
+            <span class="n">error_msg</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;Missing </span><span class="si">{</span><span class="n">missing_jobs</span><span class="si">}</span><span class="s2"> job specs -- this is likely due to bad reads or file corruption&quot;</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">fail_on_error</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">RuntimeError</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+
+            <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">missing_jobs</span><span class="p">)</span>
+
+        <span class="n">job_index_map_updates</span> <span class="o">=</span> <span class="p">{</span><span class="n">job_index</span><span class="p">:</span> <span class="n">file</span> <span class="k">for</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">file</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">new_job_indices</span><span class="p">,</span> <span class="n">batch_files</span><span class="p">)}</span>
+        <span class="n">processed</span> <span class="o">+=</span> <span class="n">new_job_count</span>
+        <span class="n">_</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">submit_job_async</span><span class="p">(</span><span class="n">new_job_indices</span><span class="p">,</span> <span class="s2">&quot;morpheus_task_queue&quot;</span><span class="p">)</span>
+        <span class="n">job_indices</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span><span class="n">new_job_indices</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">job_indices</span><span class="p">,</span> <span class="n">job_index_map_updates</span><span class="p">,</span> <span class="n">processed</span></div>
+
+
+
+<div class="viewcode-block" id="create_and_process_jobs">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.create_and_process_jobs">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">create_and_process_jobs</span><span class="p">(</span>
+    <span class="n">files</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span>
+    <span class="n">client</span><span class="p">:</span> <span class="n">NvIngestClient</span><span class="p">,</span>
+    <span class="n">tasks</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">],</span>
+    <span class="n">output_directory</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span>
+    <span class="n">timeout</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span>
+    <span class="n">fail_on_error</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="n">save_images_separately</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+<span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">float</span><span class="p">]],</span> <span class="nb">int</span><span class="p">,</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Process a list of files, creating and submitting jobs for each file, then fetch and handle the results.</span>
+
+<span class="sd">    This function creates job specifications (JobSpecs) for a list of files, submits the jobs to the</span>
+<span class="sd">    client, and processes the results asynchronously. It handles job retries for timeouts, logs failures,</span>
+<span class="sd">    and limits the number of JobSpecs in memory to `batch_size * 2`. Progress is reported on a per-file basis,</span>
+<span class="sd">    including the pages processed per second.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    files : List[str]</span>
+<span class="sd">        A list of file paths to be processed. Each file is used to create a job, which is then submitted to the client.</span>
+
+<span class="sd">    client : NvIngestClient</span>
+<span class="sd">        An instance of NvIngestClient used to submit jobs and fetch results asynchronously.</span>
+
+<span class="sd">    tasks : Dict[str, Any]</span>
+<span class="sd">        A dictionary of tasks to be added to each job. The keys represent task names, and the values represent task</span>
+<span class="sd">        configurations. Tasks may include &quot;split&quot;, &quot;extract&quot;, &quot;store&quot;, &quot;caption&quot;, etc.</span>
+
+<span class="sd">    output_directory : str</span>
+<span class="sd">        The directory path where the processed job results will be saved. If an empty string or None is provided,</span>
+<span class="sd">        results will not be saved.</span>
+
+<span class="sd">    batch_size : int</span>
+<span class="sd">        The number of jobs to process in each batch. Memory is limited to `batch_size * 2` jobs at any time.</span>
+
+<span class="sd">    timeout : int, optional</span>
+<span class="sd">        The timeout in seconds for each job to complete before it is retried. Default is 10 seconds.</span>
+
+<span class="sd">    fail_on_error : bool, optional</span>
+<span class="sd">        If True, the function will raise an error and stop processing when encountering an unrecoverable error.</span>
+<span class="sd">        If False, the function logs the error and continues processing other jobs. Default is False.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    Tuple[int, Dict[str, List[float]], int]</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">        - `total_files` (int): The total number of files processed.</span>
+<span class="sd">        - `trace_times` (Dict[str, List[float]]): A dictionary mapping job IDs to a list of trace times for</span>
+<span class="sd">          diagnostic purposes.</span>
+<span class="sd">        - `total_pages_processed` (int): The total number of pages processed from the files.</span>
+<span class="sd">        - `trace_ids`  (Dict[str, str]): A dictionary mapping a source file to its correlating trace_id</span>
+
+<span class="sd">    Raises</span>
+<span class="sd">    ------</span>
+<span class="sd">    RuntimeError</span>
+<span class="sd">        If `fail_on_error` is True and an error occurs during job submission or processing, a `RuntimeError` is raised.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    - The function limits the number of JobSpecs in memory to `batch_size * 2` for efficient resource management.</span>
+<span class="sd">    - It manages job retries for timeouts and logs decoding or processing errors.</span>
+<span class="sd">    - The progress bar reports progress on a per-file basis and shows the pages processed per second.</span>
+
+<span class="sd">    Examples</span>
+<span class="sd">    --------</span>
+<span class="sd">    Suppose we have a list of files and tasks to process:</span>
+
+<span class="sd">    &gt;&gt;&gt; files = [&quot;file1.txt&quot;, &quot;file2.pdf&quot;, &quot;file3.docx&quot;]</span>
+<span class="sd">    &gt;&gt;&gt; client = NvIngestClient()</span>
+<span class="sd">    &gt;&gt;&gt; tasks = {&quot;split&quot;: ..., &quot;extract&quot;: ..., &quot;store&quot;: ...}</span>
+<span class="sd">    &gt;&gt;&gt; output_directory = &quot;/path/to/output&quot;</span>
+<span class="sd">    &gt;&gt;&gt; batch_size = 5</span>
+<span class="sd">    &gt;&gt;&gt; total_files, trace_times, total_pages_processed = create_and_process_jobs(</span>
+<span class="sd">    ...     files, client, tasks, output_directory, batch_size</span>
+<span class="sd">    ... )</span>
+<span class="sd">    &gt;&gt;&gt; print(f&quot;Processed {total_files} files, {total_pages_processed} pages.&quot;)</span>
+
+<span class="sd">    In this example, the function processes the files, submits jobs, fetches results, handles retries for</span>
+<span class="sd">    timeouts, and logs failures. The number of files and pages processed is printed.</span>
+
+<span class="sd">    See Also</span>
+<span class="sd">    --------</span>
+<span class="sd">    generate_job_batch_for_iteration : Function to generate job batches for processing.</span>
+<span class="sd">    handle_future_result : Function to process and handle the result of completed future jobs.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">total_files</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">)</span>
+    <span class="n">total_pages_processed</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">trace_times</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">trace_ids</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">list</span><span class="p">)</span>
+    <span class="n">failed_jobs</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">retry_job_ids</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="n">job_id_map</span> <span class="o">=</span> <span class="p">{}</span>
+    <span class="n">retry_counts</span> <span class="o">=</span> <span class="n">defaultdict</span><span class="p">(</span><span class="nb">int</span><span class="p">)</span>
+    <span class="n">file_page_counts</span> <span class="o">=</span> <span class="p">{</span><span class="n">file</span><span class="p">:</span> <span class="n">estimate_page_count</span><span class="p">(</span><span class="n">file</span><span class="p">)</span> <span class="k">for</span> <span class="n">file</span> <span class="ow">in</span> <span class="n">files</span><span class="p">}</span>
+
+    <span class="n">start_time_ns</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">time_ns</span><span class="p">()</span>
+    <span class="k">with</span> <span class="n">tqdm</span><span class="p">(</span><span class="n">total</span><span class="o">=</span><span class="n">total_files</span><span class="p">,</span> <span class="n">desc</span><span class="o">=</span><span class="s2">&quot;Processing files&quot;</span><span class="p">,</span> <span class="n">unit</span><span class="o">=</span><span class="s2">&quot;file&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">pbar</span><span class="p">:</span>
+        <span class="n">processed</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">while</span> <span class="p">(</span><span class="n">processed</span> <span class="o">&lt;</span> <span class="nb">len</span><span class="p">(</span><span class="n">files</span><span class="p">))</span> <span class="ow">or</span> <span class="n">retry_job_ids</span><span class="p">:</span>
+            <span class="c1"># Process new batch of files or retry failed job IDs</span>
+            <span class="n">job_ids</span><span class="p">,</span> <span class="n">job_id_map_updates</span><span class="p">,</span> <span class="n">processed</span> <span class="o">=</span> <span class="n">generate_job_batch_for_iteration</span><span class="p">(</span>
+                <span class="n">client</span><span class="p">,</span> <span class="n">pbar</span><span class="p">,</span> <span class="n">files</span><span class="p">,</span> <span class="n">tasks</span><span class="p">,</span> <span class="n">processed</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">,</span> <span class="n">retry_job_ids</span><span class="p">,</span> <span class="n">fail_on_error</span>
+            <span class="p">)</span>
+            <span class="n">job_id_map</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">job_id_map_updates</span><span class="p">)</span>
+            <span class="n">retry_job_ids</span> <span class="o">=</span> <span class="p">[]</span>
+
+            <span class="n">futures_dict</span> <span class="o">=</span> <span class="n">client</span><span class="o">.</span><span class="n">fetch_job_result_async</span><span class="p">(</span><span class="n">job_ids</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">,</span> <span class="n">data_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures_dict</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+                <span class="n">retry</span> <span class="o">=</span> <span class="kc">False</span>
+                <span class="n">job_id</span> <span class="o">=</span> <span class="n">futures_dict</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+                <span class="n">source_name</span> <span class="o">=</span> <span class="n">job_id_map</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">future_response</span><span class="p">,</span> <span class="n">trace_id</span> <span class="o">=</span> <span class="n">handle_future_result</span><span class="p">(</span><span class="n">future</span><span class="p">,</span> <span class="n">futures_dict</span><span class="p">)</span>
+                    <span class="n">trace_ids</span><span class="p">[</span><span class="n">source_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">trace_id</span>
+
+                    <span class="k">if</span> <span class="n">output_directory</span><span class="p">:</span>
+                        <span class="n">save_response_data</span><span class="p">(</span><span class="n">future_response</span><span class="p">,</span> <span class="n">output_directory</span><span class="p">,</span> <span class="n">images_to_disk</span><span class="o">=</span><span class="n">save_images_separately</span><span class="p">)</span>
+
+                    <span class="n">total_pages_processed</span> <span class="o">+=</span> <span class="n">file_page_counts</span><span class="p">[</span><span class="n">source_name</span><span class="p">]</span>
+                    <span class="n">elapsed_time</span> <span class="o">=</span> <span class="p">(</span><span class="n">time</span><span class="o">.</span><span class="n">time_ns</span><span class="p">()</span> <span class="o">-</span> <span class="n">start_time_ns</span><span class="p">)</span> <span class="o">/</span> <span class="mf">1e9</span>
+                    <span class="n">pages_per_sec</span> <span class="o">=</span> <span class="n">total_pages_processed</span> <span class="o">/</span> <span class="n">elapsed_time</span> <span class="k">if</span> <span class="n">elapsed_time</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+                    <span class="n">pbar</span><span class="o">.</span><span class="n">set_postfix</span><span class="p">(</span><span class="n">pages_per_sec</span><span class="o">=</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">pages_per_sec</span><span class="si">:</span><span class="s2">.2f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                    <span class="n">process_response</span><span class="p">(</span><span class="n">future_response</span><span class="p">,</span> <span class="n">trace_times</span><span class="p">)</span>
+
+                <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
+                    <span class="n">source_name</span> <span class="o">=</span> <span class="n">job_id_map</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+                    <span class="n">retry_counts</span><span class="p">[</span><span class="n">source_name</span><span class="p">]</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">retry_job_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_id</span><span class="p">)</span>  <span class="c1"># Add job_id back to retry list</span>
+                    <span class="n">retry</span> <span class="o">=</span> <span class="kc">True</span>
+                <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">source_name</span> <span class="o">=</span> <span class="n">job_id_map</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Decoding while processing </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">) </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">failed_jobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">source_name</span> <span class="o">=</span> <span class="n">job_id_map</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error while processing &#39;</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">&#39; - (</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">):</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">failed_jobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+                    <span class="n">source_name</span> <span class="o">=</span> <span class="n">job_id_map</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unhandled error while processing </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">) </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="n">failed_jobs</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">::</span><span class="si">{</span><span class="n">source_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="c1"># Don&#39;t update progress bar if we&#39;re going to retry the job</span>
+                    <span class="k">if</span> <span class="ow">not</span> <span class="n">retry</span><span class="p">:</span>
+                        <span class="n">pbar</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">total_files</span><span class="p">,</span> <span class="n">trace_times</span><span class="p">,</span> <span class="n">total_pages_processed</span><span class="p">,</span> <span class="n">trace_ids</span></div>
+
+
+
+<div class="viewcode-block" id="get_valid_filename">
+<a class="viewcode-back" href="../../../../nv-ingest-client/nv_ingest_client.cli.util.html#nv_ingest_client.cli.util.processing.get_valid_filename">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">get_valid_filename</span><span class="p">(</span><span class="n">name</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Taken from https://github.com/django/django/blob/main/django/utils/text.py.</span>
+<span class="sd">    Return the given string converted to a string that can be used for a clean</span>
+<span class="sd">    filename. Remove leading and trailing spaces; convert other spaces to</span>
+<span class="sd">    underscores; and remove anything that is not an alphanumeric, dash,</span>
+<span class="sd">    underscore, or dot.</span>
+<span class="sd">    &gt;&gt;&gt; get_valid_filename(&quot;john&#39;s portrait in 2004.jpg&quot;)</span>
+<span class="sd">    &#39;johns_portrait_in_2004.jpg&#39;</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">name</span><span class="p">)</span><span class="o">.</span><span class="n">strip</span><span class="p">()</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot; &quot;</span><span class="p">,</span> <span class="s2">&quot;_&quot;</span><span class="p">)</span>
+    <span class="n">s</span> <span class="o">=</span> <span class="n">re</span><span class="o">.</span><span class="n">sub</span><span class="p">(</span><span class="sa">r</span><span class="s2">&quot;(?u)[^-\w.]&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="n">s</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">s</span> <span class="ow">in</span> <span class="p">{</span><span class="s2">&quot;&quot;</span><span class="p">,</span> <span class="s2">&quot;.&quot;</span><span class="p">,</span> <span class="s2">&quot;..&quot;</span><span class="p">}:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Could not derive file name from &#39;</span><span class="si">%s</span><span class="s2">&#39;&quot;</span> <span class="o">%</span> <span class="n">name</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">s</span></div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>

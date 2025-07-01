@@ -1,0 +1,1251 @@
+
+
+<!DOCTYPE html>
+
+
+<html lang="en" data-content_root="../../../" >
+
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>nv_ingest_client.client.client &#8212; nv-ingest</title>
+  
+  
+  
+  <script data-cfasync="false">
+    document.documentElement.dataset.mode = localStorage.getItem("mode") || "";
+    document.documentElement.dataset.theme = localStorage.getItem("theme") || "";
+  </script>
+  <!--
+    this give us a css class that will be invisible only if js is disabled
+  -->
+  <noscript>
+    <style>
+      .pst-js-only { display: none !important; }
+
+    </style>
+  </noscript>
+  
+  <!-- Loaded before other Sphinx assets -->
+  <link href="../../../_static/styles/theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+<link href="../../../_static/styles/pydata-sphinx-theme.css?digest=8878045cc6db502f8baf" rel="stylesheet" />
+
+    <link rel="stylesheet" type="text/css" href="../../../_static/pygments.css?v=8f2a1f02" />
+    <link rel="stylesheet" type="text/css" href="../../../_static/styles/nvidia-sphinx-theme.css?v=d0aa047a" />
+  
+  <!-- So that users can add custom icons -->
+  <script src="../../../_static/scripts/fontawesome.js?digest=8878045cc6db502f8baf"></script>
+  <!-- Pre-loaded scripts that we'll load fully later -->
+  <link rel="preload" as="script" href="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf" />
+<link rel="preload" as="script" href="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf" />
+
+    <script src="../../../_static/documentation_options.js?v=be04dab6"></script>
+    <script src="../../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <script>DOCUMENTATION_OPTIONS.pagename = '_modules/nv_ingest_client/client/client';</script>
+    <link rel="icon" href="../../../_static/favicon.png"/>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1"/>
+  <meta name="docsearch:language" content="en"/>
+  <meta name="docsearch:version" content="" />
+
+
+  </head>
+  
+  
+  <body data-bs-spy="scroll" data-bs-target=".bd-toc-nav" data-offset="180" data-bs-root-margin="0px 0px -60%" data-default-mode="">
+
+  
+  
+  <div id="pst-skip-link" class="skip-link d-print-none"><a href="#main-content">Skip to main content</a></div>
+  
+  <div id="pst-scroll-pixel-helper"></div>
+  
+  <button type="button" class="btn rounded-pill" id="pst-back-to-top">
+    <i class="fa-solid fa-arrow-up"></i>Back to top</button>
+
+  
+  <dialog id="pst-search-dialog">
+    
+<form class="bd-search d-flex align-items-center"
+      action="../../../search.html"
+      method="get">
+  <i class="fa-solid fa-magnifying-glass"></i>
+  <input type="search"
+         class="form-control"
+         name="q"
+         placeholder="Search the docs ..."
+         aria-label="Search the docs ..."
+         autocomplete="off"
+         autocorrect="off"
+         autocapitalize="off"
+         spellcheck="false"/>
+  <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd>K</kbd></span>
+</form>
+  </dialog>
+
+  <div class="pst-async-banner-revealer d-none">
+  <aside id="bd-header-version-warning" class="d-none d-print-none" aria-label="Version warning"></aside>
+</div>
+
+  
+    <header class="bd-header navbar navbar-expand-lg bd-navbar d-print-none">
+<div class="bd-header__inner bd-page-width">
+  <button class="pst-navbar-icon sidebar-toggle primary-toggle" aria-label="Site navigation">
+    <span class="fa-solid fa-bars"></span>
+  </button>
+  
+  
+  <div class="col-lg-3 navbar-header-items__start">
+    
+      <div class="navbar-item">
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a></div>
+    
+  </div>
+  
+  <div class="col-lg-9 navbar-header-items">
+    
+    
+    <div class="navbar-header-items__end">
+      
+        <div class="navbar-item navbar-persistent--container">
+          
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+        </div>
+      
+      
+        <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+      
+    </div>
+    
+  </div>
+  
+  
+    <div class="navbar-persistent--mobile">
+
+<button class="btn search-button-field search-button__button pst-js-only" title="Search" aria-label="Search" data-bs-placement="bottom" data-bs-toggle="tooltip">
+ <i class="fa-solid fa-magnifying-glass"></i>
+ <span class="search-button__default-text">Search</span>
+ <span class="search-button__kbd-shortcut"><kbd class="kbd-shortcut__modifier">Ctrl</kbd>+<kbd class="kbd-shortcut__modifier">K</kbd></span>
+</button>
+    </div>
+  
+
+  
+</div>
+
+    </header>
+  
+
+  <div class="bd-container">
+    <div class="bd-container__inner bd-page-width">
+      
+      
+      
+      <dialog id="pst-primary-sidebar-modal"></dialog>
+      <div id="pst-primary-sidebar" class="bd-sidebar-primary bd-sidebar">
+        
+
+
+
+  
+    
+  
+
+<a class="navbar-brand logo" href="../../../index.html">
+  
+  
+  
+  
+  
+    
+    
+      
+    
+    
+    <img src="../../../_static/nvidia-logo-horiz-rgb-blk-for-screen.svg" class="logo__image only-light" alt="nv-ingest - Home"/>
+    <img src="../../../_static/nvidia-logo-horiz-rgb-wht-for-screen.svg" class="logo__image only-dark pst-js-only" alt="nv-ingest - Home"/>
+  
+  
+    <p class="title logo__title">nv-ingest</p>
+  
+</a>
+
+
+  
+  <div class="sidebar-header-items sidebar-primary__section">
+    
+    
+    
+    
+      <div class="sidebar-header-items__end">
+        
+          <div class="navbar-item">
+
+<button class="btn btn-sm nav-link pst-navbar-icon theme-switch-button pst-js-only" aria-label="Color mode" data-bs-title="Color mode"  data-bs-placement="bottom" data-bs-toggle="tooltip">
+  <i class="theme-switch fa-solid fa-sun                fa-lg" data-mode="light" title="Light"></i>
+  <i class="theme-switch fa-solid fa-moon               fa-lg" data-mode="dark"  title="Dark"></i>
+  <i class="theme-switch fa-solid fa-circle-half-stroke fa-lg" data-mode="auto"  title="System Settings"></i>
+</button></div>
+        
+      </div>
+    
+  </div>
+  
+    <div class="sidebar-primary-items__start sidebar-primary__section">
+        <div class="sidebar-primary-item">
+
+
+
+<nav class="bd-docs-nav bd-links"
+     aria-label="Table of Contents">
+  <p class="bd-links__title" role="heading" aria-level="1">Table of Contents</p>
+  <div class="bd-toc-item navbar-nav"><p aria-level="2" class="caption" role="heading"><span class="caption-text">NV-Ingest Packages</span></p>
+<ul class="nav bd-sidenav">
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest-api/modules.html">nv_ingest_api</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest-api/nv_ingest_api.html">nv_ingest_api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-api/nv_ingest_api.primitives.html">nv_ingest_api.primitives package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest-client/modules.html">nv_ingest_client</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.html">nv_ingest_client package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.cli.html">nv_ingest_client.cli package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.cli.util.html">nv_ingest_client.cli.util package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.client.html">nv_ingest_client.client package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.html">nv_ingest_client.message_clients package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.rest.html">nv_ingest_client.message_clients.rest package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.message_clients.simple.html">nv_ingest_client.message_clients.simple package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.html">nv_ingest_client.primitives package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.jobs.html">nv_ingest_client.primitives.jobs package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.primitives.tasks.html">nv_ingest_client.primitives.tasks package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.schemas.html">nv_ingest_client.schemas package</a></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.util.html">nv_ingest_client.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest-client/nv_ingest_client.util.file_processing.html">nv_ingest_client.util.file_processing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+<li class="toctree-l1 has-children"><a class="reference internal" href="../../../nv-ingest/modules.html">nv_ingest</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l2 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.html">nv_ingest package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.api.html">nv_ingest.api package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.api.v1.html">nv_ingest.api.v1 package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.html">nv_ingest.extraction_workflows package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.docx.html">nv_ingest.extraction_workflows.docx package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.image.html">nv_ingest.extraction_workflows.image package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.pdf.html">nv_ingest.extraction_workflows.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.extraction_workflows.pptx.html">nv_ingest.extraction_workflows.pptx package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.html">nv_ingest.modules package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.extractors.html">nv_ingest.modules.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.filters.html">nv_ingest.modules.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.injectors.html">nv_ingest.modules.injectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.sinks.html">nv_ingest.modules.sinks package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.sources.html">nv_ingest.modules.sources package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.storages.html">nv_ingest.modules.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.telemetry.html">nv_ingest.modules.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.modules.transforms.html">nv_ingest.modules.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.schemas.html">nv_ingest.schemas package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.schemas.message_brokers.html">nv_ingest.schemas.message_brokers package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.html">nv_ingest.service package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.impl.html">nv_ingest.service.impl package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.service.meta.html">nv_ingest.service.meta package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.html">nv_ingest.stages package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.embeddings.html">nv_ingest.stages.embeddings package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.extractors.html">nv_ingest.stages.extractors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.filters.html">nv_ingest.stages.filters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.nim.html">nv_ingest.stages.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.storages.html">nv_ingest.stages.storages package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.stages.transforms.html">nv_ingest.stages.transforms package</a></li>
+</ul>
+</details></li>
+<li class="toctree-l3 has-children"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.html">nv_ingest.util package</a><details><summary><span class="toctree-toggle" role="presentation"><i class="fa-solid fa-chevron-down"></i></span></summary><ul>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.converters.html">nv_ingest.util.converters package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.detectors.html">nv_ingest.util.detectors package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.exception_handlers.html">nv_ingest.util.exception_handlers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.flow_control.html">nv_ingest.util.flow_control package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.image_processing.html">nv_ingest.util.image_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.logging.html">nv_ingest.util.logging package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.message_brokers.html">nv_ingest.util.message_brokers package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.modules.html">nv_ingest.util.modules package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.morpheus.html">nv_ingest.util.morpheus package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.multi_processing.html">nv_ingest.util.multi_processing package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.nim.html">nv_ingest.util.nim package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.pdf.html">nv_ingest.util.pdf package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.pipeline.html">nv_ingest.util.pipeline package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.schema.html">nv_ingest.util.schema package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.telemetry.html">nv_ingest.util.telemetry package</a></li>
+<li class="toctree-l4"><a class="reference internal" href="../../../nv-ingest/nv_ingest.util.tracing.html">nv_ingest.util.tracing package</a></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</details></li>
+</ul>
+</div>
+</nav></div>
+    </div>
+  
+  
+  <div class="sidebar-primary-items__end sidebar-primary__section">
+  </div>
+
+
+
+      </div>
+      
+      <main id="main-content" class="bd-main" role="main">
+        
+        
+          <div class="bd-content">
+            <div class="bd-article-container">
+              
+              <div class="bd-header-article d-print-none">
+<div class="header-article-items header-article__inner">
+  
+    <div class="header-article-items__start">
+      
+        <div class="header-article-item">
+
+<nav aria-label="Breadcrumb" class="d-print-none">
+  <ul class="bd-breadcrumbs">
+    
+    <li class="breadcrumb-item breadcrumb-home">
+      <a href="../../../index.html" class="nav-link" aria-label="Home">
+        <i class="fa-solid fa-home"></i>
+      </a>
+    </li>
+    
+    <li class="breadcrumb-item"><a href="../../index.html" class="nav-link">Module code</a></li>
+    
+    <li class="breadcrumb-item active" aria-current="page"><span class="ellipsis">nv_ingest_client.client.client</span></li>
+  </ul>
+</nav>
+</div>
+      
+    </div>
+  
+  
+</div>
+</div>
+              
+              
+              
+                
+<div id="searchbox"></div>
+                <article class="bd-article">
+                  
+  <h1>Source code for nv_ingest_client.client.client</h1><div class="highlight"><pre>
+<span></span><span class="c1"># SPDX-FileCopyrightText: Copyright (c) 2024, NVIDIA CORPORATION &amp; AFFILIATES.</span>
+<span class="c1"># All rights reserved.</span>
+<span class="c1"># SPDX-License-Identifier: Apache-2.0</span>
+
+
+<span class="c1"># pylint: disable=broad-except</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">concurrent.futures</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">json</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">logging</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">math</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">time</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">traceback</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">Future</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">concurrent.futures</span><span class="w"> </span><span class="kn">import</span> <span class="n">as_completed</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Any</span><span class="p">,</span> <span class="n">Type</span><span class="p">,</span> <span class="n">Callable</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Dict</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">List</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Optional</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Tuple</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">typing</span><span class="w"> </span><span class="kn">import</span> <span class="n">Union</span>
+
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.message_clients</span><span class="w"> </span><span class="kn">import</span> <span class="n">MessageBrokerClientBase</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.message_clients.rest.rest_client</span><span class="w"> </span><span class="kn">import</span> <span class="n">RestClient</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">BatchJobSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobSpec</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.jobs</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobState</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.jobs</span><span class="w"> </span><span class="kn">import</span> <span class="n">JobStateEnum</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">Task</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">TaskType</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">is_valid_task_type</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.primitives.tasks</span><span class="w"> </span><span class="kn">import</span> <span class="n">task_factory</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">handle_future_result</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.processing</span><span class="w"> </span><span class="kn">import</span> <span class="n">IngestJobFailure</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">nv_ingest_client.util.util</span><span class="w"> </span><span class="kn">import</span> <span class="n">create_job_specs_for_batch</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="DataDecodeException">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.DataDecodeException">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">DataDecodeException</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Exception raised for errors in decoding data.</span>
+
+<span class="sd">    Attributes:</span>
+<span class="sd">        message -- explanation of the error</span>
+<span class="sd">        data -- the data that failed to decode, optionally</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">message</span><span class="o">=</span><span class="s2">&quot;Data decoding error&quot;</span><span class="p">,</span> <span class="n">data</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">message</span> <span class="o">=</span> <span class="n">message</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">data</span> <span class="o">=</span> <span class="n">data</span>
+        <span class="nb">super</span><span class="p">()</span><span class="o">.</span><span class="fm">__init__</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">message</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">data</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="vm">__class__</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">message</span><span class="si">}</span><span class="s2">, Data=</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">data</span><span class="si">}</span><span class="s2">)&quot;</span></div>
+
+
+
+<div class="viewcode-block" id="NvIngestClient">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient">[docs]</a>
+<span class="k">class</span><span class="w"> </span><span class="nc">NvIngestClient</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A client class for interacting with the nv-ingest service, supporting custom client allocators.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">message_client_allocator</span><span class="p">:</span> <span class="n">Type</span><span class="p">[</span><span class="n">MessageBrokerClientBase</span><span class="p">]</span> <span class="o">=</span> <span class="n">RestClient</span><span class="p">,</span>
+        <span class="n">message_client_hostname</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;localhost&quot;</span><span class="p">,</span>
+        <span class="n">message_client_port</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="mi">7670</span><span class="p">,</span>
+        <span class="n">message_client_kwargs</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">msg_counter_id</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;nv-ingest-message-id&quot;</span><span class="p">,</span>
+        <span class="n">worker_pool_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Initializes the NvIngestClient with a client allocator, REST configuration, a message counter ID,</span>
+<span class="sd">        and a worker pool for parallel processing.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        message_client_allocator : Callable[..., RestClient]</span>
+<span class="sd">            A callable that when called returns an instance of the client used for communication.</span>
+<span class="sd">        message_client_hostname : str, optional</span>
+<span class="sd">            The hostname of the REST server. Defaults to &quot;localhost&quot;.</span>
+<span class="sd">        message_client_port : int, optional</span>
+<span class="sd">            The port number of the REST server. Defaults to 7670.</span>
+<span class="sd">        msg_counter_id : str, optional</span>
+<span class="sd">            The key for tracking message counts. Defaults to &quot;nv-ingest-message-id&quot;.</span>
+<span class="sd">        worker_pool_size : int, optional</span>
+<span class="sd">            The number of worker processes in the pool. Defaults to 1.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_message_id</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message_client_hostname</span> <span class="o">=</span> <span class="n">message_client_hostname</span> <span class="ow">or</span> <span class="s2">&quot;localhost&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message_client_port</span> <span class="o">=</span> <span class="n">message_client_port</span> <span class="ow">or</span> <span class="mi">7670</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message_counter_id</span> <span class="o">=</span> <span class="n">msg_counter_id</span> <span class="ow">or</span> <span class="s2">&quot;nv-ingest-message-id&quot;</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message_client_kwargs</span> <span class="o">=</span> <span class="n">message_client_kwargs</span> <span class="ow">or</span> <span class="p">{}</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Instantiate NvIngestClient:</span><span class="se">\n</span><span class="si">%s</span><span class="s2">&quot;</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_message_client</span> <span class="o">=</span> <span class="n">message_client_allocator</span><span class="p">(</span>
+            <span class="n">host</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_message_client_hostname</span><span class="p">,</span>
+            <span class="n">port</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">_message_client_port</span><span class="p">,</span>
+            <span class="o">**</span><span class="bp">self</span><span class="o">.</span><span class="n">_message_client_kwargs</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Initialize the worker pool with the specified size</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_worker_pool</span> <span class="o">=</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">worker_pool_size</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_telemetry</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a string representation of the NvIngestClient configuration and runtime state.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            A string representation of the client showing the Redis configuration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">info</span> <span class="o">=</span> <span class="s2">&quot;NvIngestClient:</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">info</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; message_client_host: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_message_client_hostname</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+        <span class="n">info</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot; message_client_port: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_message_client_port</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span>
+
+        <span class="k">return</span> <span class="n">info</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_generate_job_index</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generates a unique job ID by combining a UUID with an incremented value from Redis.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            A unique job ID in the format of &quot;&lt;UUID&gt;_&lt;Redis incremented value&gt;&quot;.  IF the client</span>
+<span class="sd">            is a RedisClient. In the case of a RestClient it is simply the UUID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">job_index</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_current_message_id</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_current_message_id</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="k">return</span> <span class="n">job_index</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_pop_job_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JobState</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Deletes the job with the specified ID from the job tracking dictionary.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        job_index : str</span>
+<span class="sd">            The ID of the job to delete.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span><span class="n">job_index</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span><span class="o">.</span><span class="n">pop</span><span class="p">(</span><span class="n">job_index</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">job_state</span>
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_get_and_check_job_state</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">job_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">required_state</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">JobStateEnum</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">JobStateEnum</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">JobState</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">required_state</span> <span class="ow">and</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">required_state</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="n">required_state</span> <span class="o">=</span> <span class="p">[</span><span class="n">required_state</span><span class="p">]</span>
+        <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">job_index</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">job_state</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Job with ID </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2"> does not exist in JobStates: </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">required_state</span> <span class="ow">and</span> <span class="p">(</span><span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">required_state</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;Job with ID </span><span class="si">{</span><span class="n">job_state</span><span class="o">.</span><span class="n">job_spec</span><span class="o">.</span><span class="n">job_id</span><span class="si">}</span><span class="s2"> has invalid state &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">job_state</span><span class="o">.</span><span class="n">state</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">required_state</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">job_state</span>
+
+<div class="viewcode-block" id="NvIngestClient.job_count">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.job_count">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">job_count</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span><span class="p">)</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_add_single_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_spec</span><span class="p">:</span> <span class="n">JobSpec</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">job_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_generate_job_index</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_job_states</span><span class="p">[</span><span class="n">job_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">JobState</span><span class="p">(</span><span class="n">job_spec</span><span class="o">=</span><span class="n">job_spec</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">job_index</span>
+
+<div class="viewcode-block" id="NvIngestClient.add_job">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.add_job">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_job</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_spec</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="n">BatchJobSpec</span><span class="p">,</span> <span class="n">JobSpec</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]]:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_spec</span><span class="p">,</span> <span class="n">JobSpec</span><span class="p">):</span>
+            <span class="n">job_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_single_job</span><span class="p">(</span><span class="n">job_spec</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_spec</span>
+
+            <span class="k">return</span> <span class="n">job_index</span>
+        <span class="k">elif</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_spec</span><span class="p">,</span> <span class="n">BatchJobSpec</span><span class="p">):</span>
+            <span class="n">job_indexes</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">_</span><span class="p">,</span> <span class="n">job_specs</span> <span class="ow">in</span> <span class="n">job_spec</span><span class="o">.</span><span class="n">job_specs</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">for</span> <span class="n">job</span> <span class="ow">in</span> <span class="n">job_specs</span><span class="p">:</span>
+                    <span class="n">job_index</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_add_single_job</span><span class="p">(</span><span class="n">job</span><span class="p">)</span>
+                    <span class="n">job_indexes</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_index</span><span class="p">)</span>
+                    <span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_index</span><span class="p">]</span> <span class="o">=</span> <span class="n">job</span>
+            <span class="k">return</span> <span class="n">job_indexes</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected type: </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">job_spec</span><span class="p">)</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NvIngestClient.create_job">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.create_job">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_job</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">payload</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">source_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">source_name</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">document_type</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">tasks</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">list</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">extended_options</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">dict</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a new job with the specified parameters and adds it to the job tracking dictionary.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        job_id : uuid.UUID, optional</span>
+<span class="sd">            The unique identifier for the job. If not provided, a new UUID will be generated.</span>
+<span class="sd">        payload : dict</span>
+<span class="sd">            The payload associated with the job. Defaults to an empty dictionary if not provided.</span>
+<span class="sd">        tasks : list, optional</span>
+<span class="sd">            A list of tasks to be associated with the job.</span>
+<span class="sd">        document_type : str</span>
+<span class="sd">            The type of document to be processed.</span>
+<span class="sd">        source_id : str</span>
+<span class="sd">            The source identifier for the job.</span>
+<span class="sd">        source_name : str</span>
+<span class="sd">            The unique name of the job&#39;s source data.</span>
+<span class="sd">        extended_options : dict, optional</span>
+<span class="sd">            Additional options for job creation.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        str</span>
+<span class="sd">            The job ID as a string.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If a job with the specified `job_id` already exists.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">document_type</span> <span class="o">=</span> <span class="n">document_type</span> <span class="ow">or</span> <span class="n">source_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;.&quot;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+        <span class="n">job_spec</span> <span class="o">=</span> <span class="n">JobSpec</span><span class="p">(</span>
+            <span class="n">payload</span><span class="o">=</span><span class="n">payload</span> <span class="ow">or</span> <span class="p">{},</span>
+            <span class="n">tasks</span><span class="o">=</span><span class="n">tasks</span><span class="p">,</span>
+            <span class="n">document_type</span><span class="o">=</span><span class="n">document_type</span><span class="p">,</span>
+            <span class="n">source_id</span><span class="o">=</span><span class="n">source_id</span><span class="p">,</span>
+            <span class="n">source_name</span><span class="o">=</span><span class="n">source_name</span><span class="p">,</span>
+            <span class="n">extended_options</span><span class="o">=</span><span class="n">extended_options</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_job</span><span class="p">(</span><span class="n">job_spec</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">job_id</span></div>
+
+
+<div class="viewcode-block" id="NvIngestClient.add_task">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.add_task">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">add_task</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">task</span><span class="p">:</span> <span class="n">Task</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">required_state</span><span class="o">=</span><span class="n">JobStateEnum</span><span class="o">.</span><span class="n">PENDING</span><span class="p">)</span>
+
+        <span class="n">job_state</span><span class="o">.</span><span class="n">job_spec</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">task</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="NvIngestClient.create_task">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.create_task">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_task</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">job_index</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">int</span><span class="p">],</span>
+        <span class="n">task_type</span><span class="p">:</span> <span class="n">TaskType</span><span class="p">,</span>
+        <span class="n">task_params</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Creates a task of the specified type with given parameters and associates it with the existing job.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        job_index: Union[str, int]</span>
+<span class="sd">            The unique identifier of the job to which the task will be added. This can be either a string or an integer.</span>
+<span class="sd">        task_type : TaskType</span>
+<span class="sd">            The type of the task to be created, defined as an enum value.</span>
+<span class="sd">        task_params : dict</span>
+<span class="sd">            A dictionary containing parameters for the task.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If the job with the specified `job_id` does not exist or if an attempt is made to modify a job after its</span>
+<span class="sd">            submission.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">task_params</span> <span class="o">=</span> <span class="n">task_params</span> <span class="ow">or</span> <span class="p">{}</span>
+
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">task_factory</span><span class="p">(</span><span class="n">task_type</span><span class="p">,</span> <span class="o">**</span><span class="n">task_params</span><span class="p">))</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_job_result</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="n">data_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetches the job result from a message client, handling potential errors and state changes.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            job_index (str): The identifier of the job.</span>
+<span class="sd">            timeout (float): Timeout for the fetch operation in seconds.</span>
+<span class="sd">            data_only (bool): If True, only returns the data part of the job result.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Tuple[Dict, str]: The job result, job ID, and trace_id.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If there is an error in decoding the job result.</span>
+<span class="sd">            TimeoutError: If the fetch operation times out.</span>
+<span class="sd">            Exception: For all other unexpected issues.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span>
+                <span class="n">job_index</span><span class="p">,</span> <span class="n">required_state</span><span class="o">=</span><span class="p">[</span><span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">,</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED_ASYNC</span><span class="p">]</span>
+            <span class="p">)</span>
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_message_client</span><span class="o">.</span><span class="n">fetch_message</span><span class="p">(</span><span class="n">job_state</span><span class="o">.</span><span class="n">job_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">response</span><span class="o">.</span><span class="n">response_code</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">PROCESSING</span>
+                    <span class="n">response_json</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">loads</span><span class="p">(</span><span class="n">response</span><span class="o">.</span><span class="n">response</span><span class="p">)</span>
+                    <span class="k">if</span> <span class="n">data_only</span><span class="p">:</span>
+                        <span class="n">response_json</span> <span class="o">=</span> <span class="n">response_json</span><span class="p">[</span><span class="s2">&quot;data&quot;</span><span class="p">]</span>
+
+                    <span class="k">return</span> <span class="n">response_json</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">job_state</span><span class="o">.</span><span class="n">trace_id</span>
+                <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error decoding job result for job ID </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error decoding job result: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span> <span class="kn">from</span><span class="w"> </span><span class="nn">err</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="c1"># Only pop once we know we&#39;ve successfully decoded the response or errored out</span>
+                    <span class="n">_</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_pop_job_state</span><span class="p">(</span><span class="n">job_index</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">TimeoutError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Timeout: No response within </span><span class="si">{</span><span class="n">timeout</span><span class="si">}</span><span class="s2"> seconds for job ID </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error while fetching job result for job ID </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Unexpected error while fetching job result for job ID </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">raise</span>
+
+    <span class="c1"># The Pythonic invocation and the CLI invocation approach currently have different approaches to timeouts</span>
+    <span class="c1"># This distinction is made obvious by provided two separate functions. One for &quot;_cli&quot; and one for</span>
+    <span class="c1"># direct Python use. This is the &quot;_cli&quot; approach</span>
+<div class="viewcode-block" id="NvIngestClient.fetch_job_result_cli">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.fetch_job_result_cli">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_job_result_cli</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_ids</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span> <span class="n">data_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_ids</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_ids</span><span class="p">]</span>
+
+        <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_fetch_job_result</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">data_only</span><span class="p">)</span> <span class="k">for</span> <span class="n">job_id</span> <span class="ow">in</span> <span class="n">job_ids</span><span class="p">]</span></div>
+
+
+    <span class="c1"># Nv-Ingest jobs are often &quot;long running&quot;. Therefore after</span>
+    <span class="c1"># submission we intermittently check if the job is completed.</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">_fetch_job_result_wait</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">60</span><span class="p">,</span> <span class="n">data_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span><span class="p">):</span>
+        <span class="k">while</span> <span class="kc">True</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">_fetch_job_result</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">data_only</span><span class="p">)]</span>
+            <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="s2">&quot;Job still processing ... aka HTTP 202 received&quot;</span><span class="p">)</span>
+
+    <span class="c1"># This is the direct Python approach function for retrieving jobs which handles the timeouts directly</span>
+    <span class="c1"># in the function itself instead of expecting the user to handle it themselves</span>
+<div class="viewcode-block" id="NvIngestClient.fetch_job_result">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.fetch_job_result">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_job_result</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">job_ids</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span>
+        <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">100</span><span class="p">,</span>
+        <span class="n">max_retries</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="nb">int</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">retry_delay</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+        <span class="n">completion_callback</span><span class="p">:</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Callable</span><span class="p">[[</span><span class="n">Dict</span><span class="p">,</span> <span class="nb">str</span><span class="p">],</span> <span class="kc">None</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="n">return_failures</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Union</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">Tuple</span><span class="p">[</span><span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">],</span> <span class="nb">str</span><span class="p">]],</span> <span class="n">List</span><span class="p">[</span><span class="n">Tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="nb">str</span><span class="p">]]]]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetches job results for multiple job IDs concurrently with individual timeouts and retry logic.</span>
+
+<span class="sd">        Args:</span>
+<span class="sd">            job_ids (Union[str, List[str]]): A job ID or list of job IDs to fetch results for.</span>
+<span class="sd">            timeout (float): Timeout for each fetch operation, in seconds.</span>
+<span class="sd">            max_retries (Optional[int]): Maximum number of retries for jobs that are not ready yet.</span>
+<span class="sd">            retry_delay (float): Delay between retry attempts, in seconds.</span>
+<span class="sd">            verbose (bool): If True, logs additional information.</span>
+<span class="sd">            completion_callback (Optional[Callable[[Dict, str], None]]): A callback function that is executed each time</span>
+<span class="sd">             a job result is successfully fetched. It receives two arguments: the job result (a dict) and the job ID.</span>
+<span class="sd">            return_failures (bool): If True, returns a separate list of failed jobs.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">          - If `return_failures=False`: List[Tuple[Optional[Dict], str]]</span>
+<span class="sd">            - A list of tuples, each containing the job result (or None on failure) and the job ID.</span>
+<span class="sd">          - If `return_failures=True`: Tuple[List[Tuple[Optional[Dict], str]], List[Tuple[str, str]]]</span>
+<span class="sd">            - A tuple of:</span>
+<span class="sd">              - List of successful job results.</span>
+<span class="sd">              - List of failures containing job ID and error message.</span>
+
+<span class="sd">        Raises:</span>
+<span class="sd">            ValueError: If there is an error in decoding the job result.</span>
+<span class="sd">            TimeoutError: If the fetch operation times out.</span>
+<span class="sd">            Exception: For all other unexpected issues.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_ids</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_ids</span><span class="p">]</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">failures</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">def</span><span class="w"> </span><span class="nf">fetch_with_retries</span><span class="p">(</span><span class="n">job_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">retries</span> <span class="o">=</span> <span class="mi">0</span>
+            <span class="k">while</span> <span class="p">(</span><span class="n">max_retries</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">)</span> <span class="ow">or</span> <span class="p">(</span><span class="n">retries</span> <span class="o">&lt;</span> <span class="n">max_retries</span><span class="p">):</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="c1"># Attempt to fetch the job result</span>
+                    <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_fetch_job_result</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">data_only</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="n">result</span><span class="p">,</span> <span class="n">job_id</span>
+                <span class="k">except</span> <span class="ne">TimeoutError</span><span class="p">:</span>
+                    <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
+                        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+                            <span class="sa">f</span><span class="s2">&quot;Job </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2"> is not ready. Retrying </span><span class="si">{</span><span class="n">retries</span><span class="w"> </span><span class="o">+</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2">/</span><span class="si">{</span><span class="n">max_retries</span><span class="w"> </span><span class="k">if</span><span class="w"> </span><span class="n">max_retries</span><span class="w"> </span><span class="k">else</span><span class="w"> </span><span class="s1">&#39;∞&#39;</span><span class="si">}</span><span class="s2"> &quot;</span>
+                            <span class="sa">f</span><span class="s2">&quot;after </span><span class="si">{</span><span class="n">retry_delay</span><span class="si">}</span><span class="s2"> seconds.&quot;</span>
+                        <span class="p">)</span>
+                    <span class="n">retries</span> <span class="o">+=</span> <span class="mi">1</span>
+                    <span class="n">time</span><span class="o">.</span><span class="n">sleep</span><span class="p">(</span><span class="n">retry_delay</span><span class="p">)</span>  <span class="c1"># Wait before retrying</span>
+                <span class="k">except</span> <span class="p">(</span><span class="ne">RuntimeError</span><span class="p">,</span> <span class="ne">Exception</span><span class="p">)</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Error while fetching result for job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                    <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">job_id</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Max retries exceeded for job </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">return</span> <span class="kc">None</span><span class="p">,</span> <span class="n">job_id</span>
+
+        <span class="c1"># Use ThreadPoolExecutor to fetch results concurrently</span>
+        <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">()</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="n">futures</span> <span class="o">=</span> <span class="p">{</span><span class="n">executor</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="n">fetch_with_retries</span><span class="p">,</span> <span class="n">job_id</span><span class="p">):</span> <span class="n">job_id</span> <span class="k">for</span> <span class="n">job_id</span> <span class="ow">in</span> <span class="n">job_ids</span><span class="p">}</span>
+
+            <span class="c1"># Collect results as futures complete</span>
+            <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">futures</span><span class="p">):</span>
+                <span class="n">job_id</span> <span class="o">=</span> <span class="n">futures</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">result</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">handle_future_result</span><span class="p">(</span><span class="n">future</span><span class="p">,</span> <span class="n">timeout</span><span class="o">=</span><span class="n">timeout</span><span class="p">)</span>
+
+                    <span class="c1"># Append a tuple of (result data, job_id). (Using result.get(&quot;data&quot;) if result is valid.)</span>
+                    <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">result</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;data&quot;</span><span class="p">))</span>
+                    <span class="c1"># Run the callback if provided and the result is valid</span>
+                    <span class="k">if</span> <span class="n">completion_callback</span> <span class="ow">and</span> <span class="n">result</span><span class="p">:</span>
+                        <span class="n">completion_callback</span><span class="p">(</span><span class="n">result</span><span class="p">,</span> <span class="n">job_id</span><span class="p">)</span>
+                <span class="k">except</span> <span class="n">concurrent</span><span class="o">.</span><span class="n">futures</span><span class="o">.</span><span class="n">TimeoutError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Timeout while fetching result for job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+                    <span class="n">failures</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="n">json</span><span class="o">.</span><span class="n">JSONDecodeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Decoding error while processing job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+                    <span class="n">failures</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="ne">RuntimeError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Error while processing job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+                    <span class="n">failures</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">except</span> <span class="n">IngestJobFailure</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Error while processing job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="o">.</span><span class="n">description</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+                    <span class="n">failures</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="p">,</span> <span class="n">e</span><span class="o">.</span><span class="n">annotations</span><span class="p">))</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+                    <span class="n">error_msg</span> <span class="o">=</span> <span class="p">(</span>
+                        <span class="sa">f</span><span class="s2">&quot;Error while fetching result for job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">: &quot;</span>
+                        <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span>
+                    <span class="p">)</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="n">error_msg</span><span class="p">)</span>
+                    <span class="n">failures</span><span class="o">.</span><span class="n">append</span><span class="p">((</span><span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span><span class="o">.</span><span class="n">source_id</span><span class="p">,</span> <span class="nb">str</span><span class="p">(</span><span class="n">e</span><span class="p">)))</span>
+                <span class="k">finally</span><span class="p">:</span>
+                    <span class="c1"># Clean up the job spec mapping</span>
+                    <span class="k">del</span> <span class="bp">self</span><span class="o">.</span><span class="n">_job_index_to_job_spec</span><span class="p">[</span><span class="n">job_id</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="n">return_failures</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">results</span><span class="p">,</span> <span class="n">failures</span>
+
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_ensure_submitted</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_ids</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]):</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_ids</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_ids</span><span class="p">]</span>  <span class="c1"># Ensure job_ids is always a list</span>
+
+        <span class="n">submission_futures</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">job_id</span> <span class="ow">in</span> <span class="n">job_ids</span><span class="p">:</span>
+            <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span>
+                <span class="n">job_id</span><span class="p">,</span>
+                <span class="n">required_state</span><span class="o">=</span><span class="p">[</span><span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED</span><span class="p">,</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED_ASYNC</span><span class="p">],</span>
+            <span class="p">)</span>
+            <span class="k">if</span> <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">==</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED_ASYNC</span><span class="p">:</span>
+                <span class="n">submission_futures</span><span class="p">[</span><span class="n">job_state</span><span class="o">.</span><span class="n">future</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_state</span>
+
+        <span class="k">for</span> <span class="n">future</span> <span class="ow">in</span> <span class="n">as_completed</span><span class="p">(</span><span class="n">submission_futures</span><span class="o">.</span><span class="n">keys</span><span class="p">()):</span>
+            <span class="n">job_state</span> <span class="o">=</span> <span class="n">submission_futures</span><span class="p">[</span><span class="n">future</span><span class="p">]</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">trace_id</span> <span class="o">=</span> <span class="n">future</span><span class="o">.</span><span class="n">result</span><span class="p">()[</span><span class="mi">0</span><span class="p">]</span>  <span class="c1"># Trace_id from `submit_job` endpoint submission</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">future</span> <span class="o">=</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="NvIngestClient.fetch_job_result_async">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.fetch_job_result_async">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">fetch_job_result_async</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">job_ids</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">timeout</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mi">10</span><span class="p">,</span> <span class="n">data_only</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Future</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Fetches job results for a list or a single job ID asynchronously and returns a mapping of futures to job IDs.</span>
+
+<span class="sd">        Parameters:</span>
+<span class="sd">            job_ids (Union[str, List[str]]): A single job ID or a list of job IDs.</span>
+<span class="sd">            timeout (float): Timeout for fetching each job result, in seconds.</span>
+<span class="sd">            data_only (bool): Whether to return only the data part of the job result.</span>
+
+<span class="sd">        Returns:</span>
+<span class="sd">            Dict[Future, str]: A dictionary mapping each future to its corresponding job ID.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_ids</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_ids</span><span class="p">]</span>  <span class="c1"># Ensure job_ids is always a list</span>
+
+        <span class="c1"># Make sure all jobs have actually been submitted before launching fetches.</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_ensure_submitted</span><span class="p">(</span><span class="n">job_ids</span><span class="p">)</span>
+
+        <span class="n">future_to_job_id</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">job_id</span> <span class="ow">in</span> <span class="n">job_ids</span><span class="p">:</span>
+            <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span><span class="n">job_id</span><span class="p">)</span>
+            <span class="n">future</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker_pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">fetch_job_result_cli</span><span class="p">,</span> <span class="n">job_id</span><span class="p">,</span> <span class="n">timeout</span><span class="p">,</span> <span class="n">data_only</span><span class="p">)</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">future</span> <span class="o">=</span> <span class="n">future</span>
+            <span class="n">future_to_job_id</span><span class="p">[</span><span class="n">future</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_id</span>
+
+        <span class="k">return</span> <span class="n">future_to_job_id</span></div>
+
+
+    <span class="k">def</span><span class="w"> </span><span class="nf">_submit_job</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">job_index</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+        <span class="n">job_queue_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Optional</span><span class="p">[</span><span class="n">Dict</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Submits a job to a specified job queue and optionally waits for a response if blocking is True.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        job_index : str</span>
+<span class="sd">            The unique identifier of the job to be submitted.</span>
+<span class="sd">        job_queue_id : str</span>
+<span class="sd">            The ID of the job queue where the job will be submitted.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Optional[Dict]</span>
+<span class="sd">            The job result if blocking is True and a result is available before the timeout, otherwise None.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        Exception</span>
+<span class="sd">            If submitting the job fails.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span>
+            <span class="n">job_index</span><span class="p">,</span> <span class="n">required_state</span><span class="o">=</span><span class="p">[</span><span class="n">JobStateEnum</span><span class="o">.</span><span class="n">PENDING</span><span class="p">,</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED_ASYNC</span><span class="p">]</span>
+        <span class="p">)</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">message</span> <span class="o">=</span> <span class="n">json</span><span class="o">.</span><span class="n">dumps</span><span class="p">(</span><span class="n">job_state</span><span class="o">.</span><span class="n">job_spec</span><span class="o">.</span><span class="n">to_dict</span><span class="p">())</span>
+
+            <span class="n">response</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_message_client</span><span class="o">.</span><span class="n">submit_message</span><span class="p">(</span><span class="n">job_queue_id</span><span class="p">,</span> <span class="n">message</span><span class="p">,</span> <span class="n">for_nv_ingest</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+            <span class="n">x_trace_id</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">trace_id</span>
+            <span class="n">transaction_id</span> <span class="o">=</span> <span class="n">response</span><span class="o">.</span><span class="n">transaction_id</span>
+            <span class="n">job_id</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span> <span class="k">if</span> <span class="n">transaction_id</span> <span class="ow">is</span> <span class="kc">None</span> <span class="k">else</span> <span class="n">transaction_id</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s1">&#39;&quot;&#39;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Submitted job </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2"> to queue </span><span class="si">{</span><span class="n">job_queue_id</span><span class="si">}</span><span class="s2"> and got back job ID </span><span class="si">{</span><span class="n">job_id</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">job_id</span> <span class="o">=</span> <span class="n">job_id</span>
+
+            <span class="c1"># Free up memory -- payload should never be used again, and we don&#39;t want to keep it around.</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">job_spec</span><span class="o">.</span><span class="n">payload</span> <span class="o">=</span> <span class="kc">None</span>
+
+            <span class="k">return</span> <span class="n">x_trace_id</span>
+        <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">err</span><span class="p">:</span>
+            <span class="n">traceback</span><span class="o">.</span><span class="n">print_exc</span><span class="p">()</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">error</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Failed to submit job </span><span class="si">{</span><span class="n">job_index</span><span class="si">}</span><span class="s2"> to queue </span><span class="si">{</span><span class="n">job_queue_id</span><span class="si">}</span><span class="s2">: </span><span class="si">{</span><span class="n">err</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">FAILED</span>
+            <span class="k">raise</span>
+
+<div class="viewcode-block" id="NvIngestClient.submit_job">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.submit_job">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_job</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">job_indices</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">job_queue_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span> <span class="n">batch_size</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">10</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="n">Union</span><span class="p">[</span><span class="n">Dict</span><span class="p">,</span> <span class="kc">None</span><span class="p">]]:</span>
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_indices</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_indices</span><span class="p">]</span>
+
+        <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">total_batches</span> <span class="o">=</span> <span class="n">math</span><span class="o">.</span><span class="n">ceil</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">job_indices</span><span class="p">)</span> <span class="o">/</span> <span class="n">batch_size</span><span class="p">)</span>
+
+        <span class="n">submission_errors</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">batch_num</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">total_batches</span><span class="p">):</span>
+            <span class="n">batch_start</span> <span class="o">=</span> <span class="n">batch_num</span> <span class="o">*</span> <span class="n">batch_size</span>
+            <span class="n">batch_end</span> <span class="o">=</span> <span class="n">batch_start</span> <span class="o">+</span> <span class="n">batch_size</span>
+            <span class="n">batch</span> <span class="o">=</span> <span class="n">job_indices</span><span class="p">[</span><span class="n">batch_start</span><span class="p">:</span><span class="n">batch_end</span><span class="p">]</span>
+
+            <span class="c1"># Submit each batch of jobs</span>
+            <span class="k">for</span> <span class="n">job_id</span> <span class="ow">in</span> <span class="n">batch</span><span class="p">:</span>
+                <span class="k">try</span><span class="p">:</span>
+                    <span class="n">x_trace_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_submit_job</span><span class="p">(</span><span class="n">job_id</span><span class="p">,</span> <span class="n">job_queue_id</span><span class="p">)</span>
+                <span class="k">except</span> <span class="ne">Exception</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>  <span class="c1"># Even if one fails, we should continue with the rest of the batch.</span>
+                    <span class="n">submission_errors</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">e</span><span class="p">)</span>
+                    <span class="k">continue</span>
+                <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">x_trace_id</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">submission_errors</span><span class="p">:</span>
+            <span class="n">error_msg</span> <span class="o">=</span> <span class="nb">str</span><span class="p">(</span><span class="n">submission_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">submission_errors</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">error_msg</span> <span class="o">+=</span> <span class="sa">f</span><span class="s2">&quot;... [</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">submission_errors</span><span class="p">)</span><span class="w"> </span><span class="o">-</span><span class="w"> </span><span class="mi">1</span><span class="si">}</span><span class="s2"> more messages truncated]&quot;</span>
+            <span class="k">raise</span> <span class="nb">type</span><span class="p">(</span><span class="n">submission_errors</span><span class="p">[</span><span class="mi">0</span><span class="p">])(</span><span class="n">error_msg</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">results</span></div>
+
+
+<div class="viewcode-block" id="NvIngestClient.submit_job_async">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.submit_job_async">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">submit_job_async</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">job_indices</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]],</span> <span class="n">job_queue_id</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Dict</span><span class="p">[</span><span class="n">Future</span><span class="p">,</span> <span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Asynchronously submits one or more jobs to a specified job queue using a thread pool.</span>
+<span class="sd">        This method handles both single job ID or a list of job IDs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        job_indices : Union[str, List[str]]</span>
+<span class="sd">            A single job ID or a list of job IDs to be submitted.</span>
+<span class="sd">        job_queue_id : str</span>
+<span class="sd">            The ID of the job queue where the jobs will be submitted.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Dict[Future, str]</span>
+<span class="sd">            A dictionary mapping futures to their respective job IDs for later retrieval of outcomes.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        - This method queues the jobs for asynchronous submission and returns a mapping of futures to job IDs.</span>
+<span class="sd">        - It does not wait for any of the jobs to complete.</span>
+<span class="sd">        - Ensure that each job is in the proper state before submission.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">job_indices</span><span class="p">,</span> <span class="nb">str</span><span class="p">):</span>
+            <span class="n">job_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">job_indices</span><span class="p">]</span>  <span class="c1"># Convert single job_id to a list</span>
+
+        <span class="n">future_to_job_index</span> <span class="o">=</span> <span class="p">{}</span>
+        <span class="k">for</span> <span class="n">job_index</span> <span class="ow">in</span> <span class="n">job_indices</span><span class="p">:</span>
+            <span class="n">job_state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_get_and_check_job_state</span><span class="p">(</span><span class="n">job_index</span><span class="p">,</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">PENDING</span><span class="p">)</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">state</span> <span class="o">=</span> <span class="n">JobStateEnum</span><span class="o">.</span><span class="n">SUBMITTED_ASYNC</span>
+
+            <span class="n">future</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_worker_pool</span><span class="o">.</span><span class="n">submit</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">submit_job</span><span class="p">,</span> <span class="n">job_index</span><span class="p">,</span> <span class="n">job_queue_id</span><span class="p">)</span>
+            <span class="n">job_state</span><span class="o">.</span><span class="n">future</span> <span class="o">=</span> <span class="n">future</span>
+            <span class="n">future_to_job_index</span><span class="p">[</span><span class="n">future</span><span class="p">]</span> <span class="o">=</span> <span class="n">job_index</span>
+
+        <span class="k">return</span> <span class="n">future_to_job_index</span></div>
+
+
+<div class="viewcode-block" id="NvIngestClient.create_jobs_for_batch">
+<a class="viewcode-back" href="../../../nv-ingest-client/nv_ingest_client.client.html#nv_ingest_client.client.client.NvIngestClient.create_jobs_for_batch">[docs]</a>
+    <span class="k">def</span><span class="w"> </span><span class="nf">create_jobs_for_batch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">files_batch</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">],</span> <span class="n">tasks</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Any</span><span class="p">])</span> <span class="o">-&gt;</span> <span class="n">List</span><span class="p">[</span><span class="nb">str</span><span class="p">]:</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Create and submit job specifications (JobSpecs) for a batch of files, returning the job IDs.</span>
+<span class="sd">        This function takes a batch of files, processes each file to extract its content and type,</span>
+<span class="sd">        creates a job specification (JobSpec) for each file, and adds tasks from the provided task</span>
+<span class="sd">        list. It then submits the jobs to the client and collects their job IDs.</span>
+
+<span class="sd">        Parameters</span>
+<span class="sd">        ----------</span>
+<span class="sd">        files_batch : List[str]</span>
+<span class="sd">            A list of file paths to be processed. Each file is assumed to be in a format compatible</span>
+<span class="sd">            with the `extract_file_content` function, which extracts the file&#39;s content and type.</span>
+<span class="sd">        tasks : Dict[str, Any]</span>
+<span class="sd">            A dictionary of tasks to be added to each job. The keys represent task names, and the</span>
+<span class="sd">            values represent task specifications or configurations. Standard tasks include &quot;split&quot;,</span>
+<span class="sd">            &quot;extract&quot;, &quot;store&quot;, &quot;caption&quot;, &quot;dedup&quot;, &quot;filter&quot;, &quot;embed&quot;.</span>
+
+<span class="sd">        Returns</span>
+<span class="sd">        -------</span>
+<span class="sd">        Tuple[List[JobSpec], List[str]]</span>
+<span class="sd">            A Tuple containing the list of JobSpecs and list of job IDs corresponding to the submitted jobs.</span>
+<span class="sd">            Each job ID is returned by the client&#39;s `add_job` method.</span>
+
+<span class="sd">        Raises</span>
+<span class="sd">        ------</span>
+<span class="sd">        ValueError</span>
+<span class="sd">            If there is an error extracting the file content or type from any of the files, a</span>
+<span class="sd">            ValueError will be logged, and the corresponding file will be skipped.</span>
+
+<span class="sd">        Notes</span>
+<span class="sd">        -----</span>
+<span class="sd">        - The function assumes that a utility function `extract_file_content` is defined elsewhere,</span>
+<span class="sd">          which extracts the content and type from the provided file paths.</span>
+<span class="sd">        - For each file, a `JobSpec` is created with relevant metadata, including document type and</span>
+<span class="sd">          file content. Various tasks are conditionally added based on the provided `tasks` dictionary.</span>
+<span class="sd">        - The job specification includes tracing options with a timestamp (in nanoseconds) for</span>
+<span class="sd">          diagnostic purposes.</span>
+
+<span class="sd">        Examples</span>
+<span class="sd">        --------</span>
+<span class="sd">        Suppose you have a batch of files and tasks to process:</span>
+<span class="sd">        &gt;&gt;&gt; files_batch = [&quot;file1.txt&quot;, &quot;file2.pdf&quot;]</span>
+<span class="sd">        &gt;&gt;&gt; tasks = {&quot;split&quot;: ..., &quot;extract_txt&quot;: ..., &quot;store&quot;: ...}</span>
+<span class="sd">        &gt;&gt;&gt; client = NvIngestClient()</span>
+<span class="sd">        &gt;&gt;&gt; job_ids = client.create_job_specs_for_batch(files_batch, tasks)</span>
+<span class="sd">        &gt;&gt;&gt; print(job_ids)</span>
+<span class="sd">        [&#39;job_12345&#39;, &#39;job_67890&#39;]</span>
+
+<span class="sd">        In this example, jobs are created and submitted for the files in `files_batch`, with the</span>
+<span class="sd">        tasks in `tasks` being added to each job specification. The returned job IDs are then</span>
+<span class="sd">        printed.</span>
+
+<span class="sd">        See Also</span>
+<span class="sd">        --------</span>
+<span class="sd">        create_job_specs_for_batch: Function that creates job specifications for a batch of files.</span>
+<span class="sd">        JobSpec : The class representing a job specification.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">tasks</span><span class="p">,</span> <span class="nb">dict</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;`tasks` must be a dictionary of task names -&gt; task specifications.&quot;</span><span class="p">)</span>
+
+        <span class="n">job_specs</span> <span class="o">=</span> <span class="n">create_job_specs_for_batch</span><span class="p">(</span><span class="n">files_batch</span><span class="p">)</span>
+
+        <span class="n">job_ids</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="k">for</span> <span class="n">job_spec</span> <span class="ow">in</span> <span class="n">job_specs</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Tasks: </span><span class="si">{</span><span class="n">tasks</span><span class="o">.</span><span class="n">keys</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">tasks</span><span class="p">:</span>
+                <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Task: </span><span class="si">{</span><span class="n">task</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+            <span class="n">file_type</span> <span class="o">=</span> <span class="n">job_spec</span><span class="o">.</span><span class="n">document_type</span>
+
+            <span class="n">seen_tasks</span> <span class="o">=</span> <span class="nb">set</span><span class="p">()</span>  <span class="c1"># For tracking tasks and rejecting duplicate tasks.</span>
+
+            <span class="k">for</span> <span class="n">task_name</span><span class="p">,</span> <span class="n">task_config</span> <span class="ow">in</span> <span class="n">tasks</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+                <span class="k">if</span> <span class="n">task_name</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="o">.</span><span class="n">startswith</span><span class="p">(</span><span class="s2">&quot;extract_&quot;</span><span class="p">):</span>
+                    <span class="n">task_file_type</span> <span class="o">=</span> <span class="n">task_name</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;_&quot;</span><span class="p">,</span> <span class="mi">1</span><span class="p">)[</span><span class="mi">1</span><span class="p">]</span>
+                    <span class="k">if</span> <span class="n">file_type</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span> <span class="o">!=</span> <span class="n">task_file_type</span><span class="o">.</span><span class="n">lower</span><span class="p">():</span>
+                        <span class="k">continue</span>
+                <span class="k">elif</span> <span class="ow">not</span> <span class="n">is_valid_task_type</span><span class="p">(</span><span class="n">task_name</span><span class="o">.</span><span class="n">upper</span><span class="p">()):</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Invalid task type: &#39;</span><span class="si">{</span><span class="n">task_name</span><span class="si">}</span><span class="s2">&#39;&quot;</span><span class="p">)</span>
+
+                <span class="k">if</span> <span class="nb">str</span><span class="p">(</span><span class="n">task_config</span><span class="p">)</span> <span class="ow">in</span> <span class="n">seen_tasks</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Duplicate task detected: </span><span class="si">{</span><span class="n">task_name</span><span class="si">}</span><span class="s2"> with config </span><span class="si">{</span><span class="n">task_config</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+                <span class="n">job_spec</span><span class="o">.</span><span class="n">add_task</span><span class="p">(</span><span class="n">task_config</span><span class="p">)</span>
+
+                <span class="n">seen_tasks</span><span class="o">.</span><span class="n">add</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">task_config</span><span class="p">))</span>
+
+            <span class="n">job_id</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">add_job</span><span class="p">(</span><span class="n">job_spec</span><span class="p">)</span>
+            <span class="n">job_ids</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">job_id</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">job_ids</span></div>
+</div>
+
+</pre></div>
+
+                </article>
+              
+              
+              
+              
+              
+                <footer class="prev-next-footer d-print-none">
+                  
+<div class="prev-next-area">
+</div>
+                </footer>
+              
+            </div>
+            
+            
+
+<div class="bd-sidebar-secondary"></div>
+
+
+              
+            
+
+          </div>
+          <footer class="bd-footer-content">
+            
+          </footer>
+        
+      </main>
+    </div>
+  </div>
+  
+  <!-- Scripts loaded after <body> so the DOM is not blocked -->
+  <script defer src="../../../_static/scripts/bootstrap.js?digest=8878045cc6db502f8baf"></script>
+<script defer src="../../../_static/scripts/pydata-sphinx-theme.js?digest=8878045cc6db502f8baf"></script>
+
+  <footer class="bd-footer">
+<div class="bd-footer__inner bd-page-width">
+  
+    <div class="footer-items__start">
+      
+        <div class="footer-item">
+<a class="footer-brand logo" href="https://www.nvidia.com">
+  <img src="../../../_static/nvidia-logo-horiz-rgb-1c-blk-for-screen.svg" class="logo__image only-light" alt="NVIDIA"/>
+  <img src="../../../_static/nvidia-logo-horiz-rgb-1c-wht-for-screen.svg" class="logo__image only-dark" alt="NVIDIA"/>
+</a></div>
+      
+        <div class="footer-item">
+
+<div class="footer-links">
+  
+  
+  
+  
+  
+</div>
+</div>
+      
+        <div class="footer-item">
+
+
+
+
+  <p class="copyright">
+    
+      Copyright © 2025, Nvidia.
+      <br/>
+    
+  </p>
+</div>
+      
+    </div>
+  
+  
+  
+</div>
+
+  </footer>
+  </body>
+</html>
