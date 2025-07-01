@@ -177,7 +177,7 @@ services:
       - nemoretriever-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/meta/llama-3.2-11b-vision-instruct}:${VLM_TAG:-1.1.1}
+    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1}:${VLM_TAG:-1.1.1}
     ports:
       - "8018:8000"
     user: root
@@ -299,7 +299,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
-      - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
+      - VLM_CAPTION_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking

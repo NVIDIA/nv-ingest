@@ -20,7 +20,7 @@ This includes the following:
 
 - Audio extraction — Use [Riva](https://docs.nvidia.com/deeplearning/riva/user-guide/docs/index.html) for processing audio files. For more information, refer to [Audio Processing](nemoretriever-parse.md).
 - `nemoretriever-parse` — Use [nemoretriever-parse](https://build.nvidia.com/nvidia/nemoretriever-parse), which adds state-of-the-art text and table extraction. For more information, refer to [Use Nemo Retriever Extraction with nemoretriever-parse](nemoretriever-parse.md).
-- VLM image captioning — Use [llama 3.2 11B Vision](https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct/modelcard) for experimental image captioning of unstructured images.
+- VLM image captioning — Use [llama 3.2 11B Vision](https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/modelcard) for experimental image captioning of unstructured images.
 
 
 
