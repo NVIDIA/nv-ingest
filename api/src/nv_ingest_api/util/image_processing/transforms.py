@@ -17,6 +17,11 @@ from PIL import UnidentifiedImageError
 
 from nv_ingest_api.util.converters import bytetools
 
+import cv2  # OpenCV for image encoding
+
+# Limit OpenCV to a single thread to avoid CPU over-subscription in multiprocessing contexts
+cv2.setNumThreads(1)
+
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
@@ -302,61 +307,71 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray) -> str:
+def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     """
-    Converts a NumPy array representing an image to a base64-encoded string.
-
-    The function takes a NumPy array, converts it to a PIL image, and then encodes
-    the image as a PNG in a base64 string format. The input array is expected to be in
-    a format that can be converted to a valid image, such as having a shape of (H, W, C)
-    where C is the number of channels (e.g., 3 for RGB).
+    Convert a NumPy image array to a base64-encoded JPEG **without** relying on PyTorch/
+    torchvision. The encoding is performed with OpenCV (`cv2.imencode`).
 
     Parameters
     ----------
     array : np.ndarray
-        The input image as a NumPy array. Must have a shape compatible with image data.
+        Image data either as (H, W) grayscale or (H, W, C) where C∈{1,3,4}. If an alpha
+        channel is present (C==4) it is discarded. Images with three channels are assumed
+        to be in **RGB** order and are internally converted to **BGR** because OpenCV
+        expects BGR for colour JPEG encoding.
+    quality : int, optional
+        JPEG quality factor in range [0, 100] (higher means better quality & larger
+        size). Default is 100.
 
     Returns
     -------
     str
-        The base64-encoded string representation of the input NumPy array as a PNG image.
+        Base64-encoded JPEG representation of the input image.
 
     Raises
     ------
     ValueError
-        If the input array cannot be converted into a valid image format.
+        If the input array shape is unsupported or its dtype cannot be converted to the
+        required `uint8`.
     RuntimeError
-        If there is an issue during the image conversion or base64 encoding process.
-
-    Examples
-    --------
-    >>> array = np.random.randint(0, 255, (100, 100, 3), dtype=np.uint8)
-    >>> encoded_str = numpy_to_base64(array)
-    >>> isinstance(encoded_str, str)
-    True
+        If OpenCV fails to encode the image.
     """
-    # If the array represents a grayscale image, drop the redundant axis in
-    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
-    # a grayscale image.
+
     if array.ndim == 3 and array.shape[2] == 1:
+        # Collapse single-channel third dimension -> (H, W)
         array = np.squeeze(array, axis=2)
 
-    # Check if the array is valid and can be converted to an image
-    try:
-        # Convert the NumPy array to a PIL image
-        pil_image = Image.fromarray(array.astype(np.uint8))
-    except Exception as e:
-        raise ValueError(f"Failed to convert NumPy array to image: {e}")
+    if array.ndim == 2:  # Grayscale
+        img_bgr = array
+    elif array.ndim == 3:
+        channels = array.shape[2]
+        if channels == 4:
+            # Drop alpha and convert RGBA -> BGR
+            array = array[..., :3]
+            img_bgr = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+        elif channels == 3:
+            # RGB -> BGR
+            img_bgr = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+        else:
+            raise ValueError(f"Unsupported channel count {channels}; expected 1, 3, or 4.")
+    else:
+        raise ValueError(f"Unsupported array shape {array.shape}; expected (H,W) or (H,W,C).")
 
-    try:
-        # Convert the PIL image to a base64-encoded string
-        with BytesIO() as buffer:
-            pil_image.save(buffer, format="PNG")
-            base64_img = bytetools.base64frombytes(buffer.getvalue())
-    except Exception as e:
-        raise RuntimeError(f"Failed to encode image to base64: {e}")
+    # Ensure data type is uint8 as required by OpenCV JPEG encoder
+    if img_bgr.dtype != np.uint8:
+        if np.issubdtype(img_bgr.dtype, np.floating):
+            img_bgr = (255 * np.clip(img_bgr, 0.0, 1.0)).astype(np.uint8)
+        else:
+            img_bgr = img_bgr.astype(np.uint8)
 
-    return base64_img
+    # Encode to JPEG via OpenCV
+    encode_params = [int(cv2.IMWRITE_JPEG_QUALITY), int(quality)]
+    success, encoded_image = cv2.imencode(".jpg", img_bgr, encode_params)
+    if not success:
+        raise RuntimeError("OpenCV failed to encode image to JPEG.")
+
+    jpeg_bytes = encoded_image.tobytes()
+    return bytetools.base64frombytes(jpeg_bytes)
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:
