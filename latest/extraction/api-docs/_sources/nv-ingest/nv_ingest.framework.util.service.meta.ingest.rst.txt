@@ -1,0 +1,21 @@
+nv\_ingest.framework.util.service.meta.ingest package
+=====================================================
+
+Submodules
+----------
+
+nv\_ingest.framework.util.service.meta.ingest.ingest\_service\_meta module
+--------------------------------------------------------------------------
+
+.. automodule:: nv_ingest.framework.util.service.meta.ingest.ingest_service_meta
+   :members:
+   :undoc-members:
+   :show-inheritance:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.framework.util.service.meta.ingest
+   :members:
+   :undoc-members:
+   :show-inheritance:
