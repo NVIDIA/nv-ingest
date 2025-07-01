@@ -39,6 +39,7 @@ from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_so
 from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import ImageStorageStage
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.llm_text_splitter import llm_text_splitter_fn
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
@@ -56,6 +57,7 @@ from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema imp
 from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema import ImageFilterSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.internal.schemas.transform.transform_llm_text_splitter_schema import LLMTextSplitterSchema
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logger = logging.getLogger(__name__)
@@ -458,6 +460,31 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         config=config,
         min_replicas=0,
         max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+    )
+
+    return stage_name
+
+
+def add_llm_text_splitter_stage(pipeline, default_cpu_count, stage_name="llm_text_splitter"):
+    """Adds the advanced LLM Text Splitter stage to the pipeline."""
+    llm_endpoint = os.getenv("LLM_SPLITTER_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
+    model_name = os.getenv("LLM_SPLITTER_MODEL_NAME", "meta/llama-3.1-8b-instruct")
+    api_key_env_var = os.getenv("LLM_SPLITTER_API_KEY_ENV_VAR", "NVIDIA_API_KEY")
+
+    config = LLMTextSplitterSchema(
+        llm_endpoint=llm_endpoint,
+        llm_model_name=model_name,
+        llm_api_key_env_var=api_key_env_var,
+    )
+
+    pipeline.add_stage(
+        name=stage_name,
+        stage_actor=llm_text_splitter_fn,
+        config=config,
+        min_replicas=0,
+        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        trace_id="llm_text_splitter",
+        required_tasks=["split"],
     )
 
     return stage_name
