@@ -16,7 +16,7 @@ import uuid
 import ray
 from ray.exceptions import GetTimeoutError
 from ray.util.queue import Queue as RayQueue
-from typing import Dict, Optional, List, Tuple, Any
+from typing import Dict, Optional, List, Tuple, Any, Union
 from pydantic import BaseModel
 import concurrent.futures
 import logging
@@ -134,8 +134,9 @@ class RayPipelineSubprocessInterface(PipelineInterface):
 
         if self._process.is_alive():
             try:
-                pgid = os.getpgid(self._process.pid)
-                os.killpg(pgid, signal.SIGKILL)
+                if self._process.pid:
+                    pgid = os.getpgid(self._process.pid)
+                    os.killpg(pgid, signal.SIGKILL)
             except Exception as e:
                 logger.error(f"Failed to force-kill process group: {e}")
             self._process.join(timeout=3.0)
@@ -439,6 +440,8 @@ class RayPipeline(PipelineInterface):
         config: BaseModel,
         min_replicas: int = 0,
         max_replicas: int = 1,
+        required_tasks: Optional[List[Union[str, Tuple[Any, ...]]]] = None,
+        trace_id: Optional[str] = None,
     ) -> "RayPipeline":
         if min_replicas < 0:
             logger.warning(f"Stage '{name}': min_replicas cannot be negative. Overriding to 0.")
@@ -455,7 +458,12 @@ class RayPipeline(PipelineInterface):
         # Wrap callables
         if isinstance(resolved_actor, FunctionType):
             schema_type = type(config)
-            resolved_actor = wrap_callable_as_stage(resolved_actor, schema_type)
+            resolved_actor = wrap_callable_as_stage(
+                resolved_actor,
+                schema_type,
+                required_tasks=required_tasks,
+                trace_id=trace_id or name,
+            )
 
         stage_info = StageInfo(
             name=name,

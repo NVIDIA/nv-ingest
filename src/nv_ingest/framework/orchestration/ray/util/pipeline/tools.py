@@ -4,7 +4,7 @@
 
 import logging
 import uuid
-from typing import Callable, Optional, Union, Dict, List, Type
+from typing import Callable, Optional, Union, Dict, List, Type, Tuple, Any
 
 import ray
 from pydantic import BaseModel
@@ -21,7 +21,7 @@ def wrap_callable_as_stage(
     fn: Callable[[object, BaseModel], object],
     schema_type: Type[BaseModel],
     *,
-    required_tasks: Optional[List[str]] = None,
+    required_tasks: Optional[List[Union[str, Tuple[Any, ...]]]] = None,
     trace_id: Optional[str] = None,
 ):
     """
@@ -34,8 +34,9 @@ def wrap_callable_as_stage(
         The processing function to be wrapped in the Ray actor.
     schema_type : Type[BaseModel]
         Pydantic schema used to validate and pass the stage config.
-    required_tasks : Optional[List[str]], optional
-        Task names this stage should filter on. If None, no filtering is applied.
+    required_tasks : Optional[List[Union[str, Tuple[Any, ...]]]], optional
+        Task names (and optional properties) this stage should filter on.
+        If None, no filtering is applied.
     trace_id : Optional[str], optional
         Optional name for trace annotation; defaults to the function name.
 
