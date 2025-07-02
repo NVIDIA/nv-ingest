@@ -5,7 +5,8 @@ Use this documentation to get started using [NeMo Retriever extraction](overview
 
 ## Step 1: Starting Containers
 
-This example demonstrates how to use the provided [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml) to start all needed services with a few commands.
+This example demonstrates how to use the provided [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml) to start all needed services with a few commands. Podman is the recommended container platform for running this project on Windows as it offers a free and open-source container solution, whereas Docker requires a commercial license for certain use cases.
+
 
 !!! warning
 
