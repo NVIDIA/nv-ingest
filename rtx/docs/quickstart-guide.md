@@ -22,17 +22,24 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
    
     `cd nv-ingest`.
 
-3. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
+3. Install podman compose
+    ```
+    # conda not required but makes it easy to create a fresh Python environment
+    conda create --name podman python=3.12.11
+    conda activate podman
+    pip install podman-compose>=1.1.0
+    ```
+
+4. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
 
     ```shell
-    $ pip install podman-compose
     # This is required to access pre-built containers and NIM microservices
     $ podman login nvcr.io
     Username: $oauthtoken
     Password: <Your Key>
     ```
    
-4. Create a .env file that contains your NVIDIA Build API key.
+5. Create a .env file that contains your NVIDIA Build API key.
 
     !!! note
 
@@ -45,11 +52,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
    
-5. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers:
+6. Make sure NVIDIA is set as your default container runtime before running the podman compose command. For Podman, NVIDIA recommends using [CDI](https://docs.nvidia.com/datacenter/cloud-native/container-toolkit/latest/install-guide.html#configuring-podman) for accessing NVIDIA devices in containers:
 
     `sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml`
 
-6. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
+7. Start core services. This example uses the table-structure profile.  For more information about other profiles, see [Profile Information](#profile-information).
 
     `podman-compose -f rtx/podman-compose.yaml --env-file .env --profile retrieval --profile table-structure up`
 
@@ -57,7 +64,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
         By default, we have configured log levels to be verbose. It's possible to observe service startup proceeding. You will notice a lot of log messages. Disable verbose logging by configuring `NIM_TRITON_LOG_VERBOSE=0` for each NIM in [podman-compose.yaml](https://github.com/NVIDIA/nv-ingest/blob/main/rtx/podman-compose.yaml).
 
-7. When core services have fully started, `nvidia-smi` should show processes like the following:
+8. When core services have fully started, `nvidia-smi` should show processes like the following:
 
     ```
     # If it's taking > 1m for `nvidia-smi` to return, the bus will likely be busy setting up the models.
@@ -75,7 +82,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     +---------------------------------------------------------------------------------------+
     ```
 
-8. Observe the started containers with `podman ps`:
+9. Observe the started containers with `podman ps`:
 
     ```
     CONTAINER ID  IMAGE                                                       COMMAND               CREATED         STATUS                   PORTS                                                                                                                                                          NAMES
