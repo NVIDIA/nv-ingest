@@ -3,8 +3,6 @@
 # SPDX-License-Identifier: Apache-2.0
 
 
-import base64
-import io
 import json
 import logging
 import warnings
@@ -18,16 +16,13 @@ from typing import Tuple
 import backoff
 import cv2
 import numpy as np
-import packaging
 import pandas as pd
 import torch
 import torchvision
 import tritonclient.grpc as grpcclient
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
-from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
-from nv_ingest_api.util.converters import bytetools
 
 
 cv2.setNumThreads(1)
@@ -237,7 +232,9 @@ class YoloxModelInterfaceBase(ModelInterface):
                 formatted_batch_data = []
                 for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
                     input_array = np.array(b64_chunk, dtype=np.object_)
-                    thresholds = np.array([self.conf_threshold, self.iou_threshold], dtype=np.float32)
+                    thresholds = np.tile([self.conf_threshold, self.iou_threshold], (input_array.shape[0], 1)).astype(
+                        np.float32
+                    )
                     batched_inputs.append([input_array, thresholds])
                     formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
 
