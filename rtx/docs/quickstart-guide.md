@@ -25,7 +25,7 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 3. [Generate API keys](ngc-api-key.md) and authenticate with NGC with the `podman login` command:
 
     ```shell
-    pip install podman-compose
+    $ pip install podman-compose
     # This is required to access pre-built containers and NIM microservices
     $ podman login nvcr.io
     Username: $oauthtoken
@@ -277,51 +277,54 @@ You should notice output indicating document processing status followed by a bre
 ```
 None of PyTorch, TensorFlow >= 2.0, or Flax have been found. Models won't be available and only tokenizers, configuration and file/data utilities can be used.
 [nltk_data] Downloading package punkt_tab to
-[nltk_data]     /raid/jdyer/miniforge3/envs/nv-ingest-
-[nltk_data]     dev/lib/python3.10/site-
+[nltk_data]     /home/akberr/miniconda3/envs/nv-ingest-
+[nltk_data]     dev/lib/python3.12/site-
 [nltk_data]     packages/llama_index/core/_static/nltk_cache...
 [nltk_data]   Package punkt_tab is already up-to-date!
 INFO:nv_ingest_client.nv_ingest_cli:Processing 1 documents.
 INFO:nv_ingest_client.nv_ingest_cli:Output will be written to: ./processed_docs
-Processing files: 100%|█████████████████████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:02<00:00,  2.34s/file, pages_per_sec=1.28]
-INFO:nv_ingest_client.cli.util.processing:message_broker_task_source: Avg: 2.39 ms, Median: 2.39 ms, Total Time: 2.39 ms, Total % of Trace Computation: 0.06%
-INFO:nv_ingest_client.cli.util.processing:broker_source_network_in: Avg: 9.51 ms, Median: 9.51 ms, Total Time: 9.51 ms, Total % of Trace Computation: 0.25%
-INFO:nv_ingest_client.cli.util.processing:job_counter: Avg: 1.47 ms, Median: 1.47 ms, Total Time: 1.47 ms, Total % of Trace Computation: 0.04%
-INFO:nv_ingest_client.cli.util.processing:job_counter_channel_in: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:metadata_injection: Avg: 3.52 ms, Median: 3.52 ms, Total Time: 3.52 ms, Total % of Trace Computation: 0.09%
-INFO:nv_ingest_client.cli.util.processing:metadata_injection_channel_in: Avg: 0.16 ms, Median: 0.16 ms, Total Time: 0.16 ms, Total % of Trace Computation: 0.00%
-INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor: Avg: 475.64 ms, Median: 163.77 ms, Total Time: 2378.21 ms, Total % of Trace Computation: 62.73%
-INFO:nv_ingest_client.cli.util.processing:pdf_content_extractor_channel_in: Avg: 0.31 ms, Median: 0.31 ms, Total Time: 0.31 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:image_content_extractor: Avg: 0.67 ms, Median: 0.67 ms, Total Time: 0.67 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:image_content_extractor_channel_in: Avg: 0.21 ms, Median: 0.21 ms, Total Time: 0.21 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:docx_content_extractor: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:docx_content_extractor_channel_in: Avg: 0.20 ms, Median: 0.20 ms, Total Time: 0.20 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor: Avg: 0.68 ms, Median: 0.68 ms, Total Time: 0.68 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:pptx_content_extractor_channel_in: Avg: 0.46 ms, Median: 0.46 ms, Total Time: 0.46 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:audio_data_extraction: Avg: 1.08 ms, Median: 1.08 ms, Total Time: 1.08 ms, Total % of Trace Computation: 0.03%
-INFO:nv_ingest_client.cli.util.processing:audio_data_extraction_channel_in: Avg: 0.20 ms, Median: 0.20 ms, Total Time: 0.20 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:dedup_images: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:dedup_images_channel_in: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:filter_images: Avg: 0.59 ms, Median: 0.59 ms, Total Time: 0.59 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:filter_images_channel_in: Avg: 0.57 ms, Median: 0.57 ms, Total Time: 0.57 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:table_data_extraction: Avg: 240.75 ms, Median: 240.75 ms, Total Time: 481.49 ms, Total % of Trace Computation: 12.70%
-INFO:nv_ingest_client.cli.util.processing:table_data_extraction_channel_in: Avg: 0.38 ms, Median: 0.38 ms, Total Time: 0.38 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:chart_data_extraction: Avg: 300.54 ms, Median: 299.94 ms, Total Time: 901.62 ms, Total % of Trace Computation: 23.78%
-INFO:nv_ingest_client.cli.util.processing:chart_data_extraction_channel_in: Avg: 0.23 ms, Median: 0.23 ms, Total Time: 0.23 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:infographic_data_extraction: Avg: 0.77 ms, Median: 0.77 ms, Total Time: 0.77 ms, Total % of Trace Computation: 0.02%
-INFO:nv_ingest_client.cli.util.processing:infographic_data_extraction_channel_in: Avg: 0.25 ms, Median: 0.25 ms, Total Time: 0.25 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:caption_ext: Avg: 0.55 ms, Median: 0.55 ms, Total Time: 0.55 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:caption_ext_channel_in: Avg: 0.51 ms, Median: 0.51 ms, Total Time: 0.51 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:embed_text: Avg: 1.21 ms, Median: 1.21 ms, Total Time: 1.21 ms, Total % of Trace Computation: 0.03%
-INFO:nv_ingest_client.cli.util.processing:embed_text_channel_in: Avg: 0.21 ms, Median: 0.21 ms, Total Time: 0.21 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:store_embedding_minio: Avg: 0.32 ms, Median: 0.32 ms, Total Time: 0.32 ms, Total % of Trace Computation: 0.01%
-INFO:nv_ingest_client.cli.util.processing:store_embedding_minio_channel_in: Avg: 1.18 ms, Median: 1.18 ms, Total Time: 1.18 ms, Total % of Trace Computation: 0.03%
-INFO:nv_ingest_client.cli.util.processing:message_broker_task_sink_channel_in: Avg: 0.42 ms, Median: 0.42 ms, Total Time: 0.42 ms, Total % of Trace Computation: 0.01%
+Processing files: 100%|█████████████████████████████████████████████████████████████████████████████████████████████| 1/1 [00:53<00:00, 53.10s/file, pages_per_sec=0.06]
+INFO:nv_ingest_client.cli.util.processing:message_broker_task_source: Avg: 65.27 ms, Median: 65.27 ms, Total Time: 65.27 ms, Total % of Trace Computation: 0.11%
+INFO:nv_ingest_client.cli.util.processing:broker_source_network_in: Avg: 27.57 ms, Median: 27.57 ms, Total Time: 27.57 ms, Total % of Trace Computation: 0.05%
+INFO:nv_ingest_client.cli.util.processing:metadata_injector: Avg: 94.48 ms, Median: 94.48 ms, Total Time: 94.48 ms, Total % of Trace Computation: 0.16%
+INFO:nv_ingest_client.cli.util.processing:metadata_injector_channel_in: Avg: 35061.50 ms, Median: 35061.50 ms, Total Time: 35061.50 ms, Total % of Trace Computation: 60.85%
+INFO:nv_ingest_client.cli.util.processing:pdf_extraction: Avg: 897.85 ms, Median: 186.52 ms, Total Time: 4489.25 ms, Total % of Trace Computation: 7.79%
+INFO:nv_ingest_client.cli.util.processing:pdf_extraction_channel_in: Avg: 4997.63 ms, Median: 4997.63 ms, Total Time: 4997.63 ms, Total % of Trace Computation: 8.67%
+INFO:nv_ingest_client.cli.util.processing:audio_extractor: Avg: 0.07 ms, Median: 0.07 ms, Total Time: 0.07 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:audio_extractor_channel_in: Avg: 429.84 ms, Median: 429.84 ms, Total Time: 429.84 ms, Total % of Trace Computation: 0.75%
+INFO:nv_ingest_client.cli.util.processing:docx_extractor: Avg: 0.08 ms, Median: 0.08 ms, Total Time: 0.08 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:docx_extractor_channel_in: Avg: 475.31 ms, Median: 475.31 ms, Total Time: 475.31 ms, Total % of Trace Computation: 0.82%
+INFO:nv_ingest_client.cli.util.processing:pptx_extractor: Avg: 0.11 ms, Median: 0.11 ms, Total Time: 0.11 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:pptx_extractor_channel_in: Avg: 506.23 ms, Median: 506.23 ms, Total Time: 506.23 ms, Total % of Trace Computation: 0.88%
+INFO:nv_ingest_client.cli.util.processing:image_extraction: Avg: 0.06 ms, Median: 0.06 ms, Total Time: 0.06 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:image_extraction_channel_in: Avg: 460.53 ms, Median: 460.53 ms, Total Time: 460.53 ms, Total % of Trace Computation: 0.80%
+INFO:nv_ingest_client.cli.util.processing:html_extractor: Avg: 0.06 ms, Median: 0.06 ms, Total Time: 0.06 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:html_extractor_channel_in: Avg: 456.82 ms, Median: 456.82 ms, Total Time: 456.82 ms, Total % of Trace Computation: 0.79%
+INFO:nv_ingest_client.cli.util.processing:infographic_extraction: Avg: 0.05 ms, Median: 0.05 ms, Total Time: 0.05 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:infographic_extraction_channel_in: Avg: 493.51 ms, Median: 493.51 ms, Total Time: 493.51 ms, Total % of Trace Computation: 0.86%
+INFO:nv_ingest_client.cli.util.processing:table_extraction: Avg: 785.79 ms, Median: 785.79 ms, Total Time: 1571.57 ms, Total % of Trace Computation: 2.73%
+INFO:nv_ingest_client.cli.util.processing:table_extraction_channel_in: Avg: 471.89 ms, Median: 471.89 ms, Total Time: 471.89 ms, Total % of Trace Computation: 0.82%
+INFO:nv_ingest_client.cli.util.processing:chart_extraction: Avg: 1395.97 ms, Median: 1410.31 ms, Total Time: 4187.90 ms, Total % of Trace Computation: 7.27%
+INFO:nv_ingest_client.cli.util.processing:chart_extraction_channel_in: Avg: 575.46 ms, Median: 575.46 ms, Total Time: 575.46 ms, Total % of Trace Computation: 1.00%
+INFO:nv_ingest_client.cli.util.processing:image_filter: Avg: 0.03 ms, Median: 0.03 ms, Total Time: 0.03 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:image_filter_channel_in: Avg: 488.90 ms, Median: 488.90 ms, Total Time: 488.90 ms, Total % of Trace Computation: 0.85%
+INFO:nv_ingest_client.cli.util.processing:image_deduplication: Avg: 0.03 ms, Median: 0.03 ms, Total Time: 0.03 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:image_deduplication_channel_in: Avg: 444.60 ms, Median: 444.60 ms, Total Time: 444.60 ms, Total % of Trace Computation: 0.77%
+INFO:nv_ingest_client.cli.util.processing:text_splitter: Avg: 0.03 ms, Median: 0.03 ms, Total Time: 0.03 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:text_splitter_channel_in: Avg: 472.41 ms, Median: 472.41 ms, Total Time: 472.41 ms, Total % of Trace Computation: 0.82%
+INFO:nv_ingest_client.cli.util.processing:text_embedding: Avg: 0.07 ms, Median: 0.07 ms, Total Time: 0.07 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:text_embedding_channel_in: Avg: 482.48 ms, Median: 482.48 ms, Total Time: 482.48 ms, Total % of Trace Computation: 0.84%
+INFO:nv_ingest_client.cli.util.processing:image_captioning: Avg: 0.03 ms, Median: 0.03 ms, Total Time: 0.03 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:image_captioning_channel_in: Avg: 455.90 ms, Median: 455.90 ms, Total Time: 455.90 ms, Total % of Trace Computation: 0.79%
+INFO:nv_ingest_client.cli.util.processing:image_storage: Avg: 0.04 ms, Median: 0.04 ms, Total Time: 0.04 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:image_storage_channel_in: Avg: 451.04 ms, Median: 451.04 ms, Total Time: 451.04 ms, Total % of Trace Computation: 0.78%
+INFO:nv_ingest_client.cli.util.processing:embedding_storage: Avg: 0.04 ms, Median: 0.04 ms, Total Time: 0.04 ms, Total % of Trace Computation: 0.00%
+INFO:nv_ingest_client.cli.util.processing:embedding_storage_channel_in: Avg: 463.37 ms, Median: 463.37 ms, Total Time: 463.37 ms, Total % of Trace Computation: 0.80%
 INFO:nv_ingest_client.cli.util.processing:No unresolved time detected. Trace times account for the entire elapsed duration.
-INFO:nv_ingest_client.cli.util.processing:Processed 1 files in 2.34 seconds.
+INFO:nv_ingest_client.cli.util.processing:Processed 1 files in 53.11 seconds.
 INFO:nv_ingest_client.cli.util.processing:Total pages processed: 3
-INFO:nv_ingest_client.cli.util.processing:Throughput (Pages/sec): 1.28
-INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.43
+INFO:nv_ingest_client.cli.util.processing:Throughput (Pages/sec): 0.06
+INFO:nv_ingest_client.cli.util.processing:Throughput (Files/sec): 0.02
 ```
 
 ## Step 4: Inspecting and Consuming Results
