@@ -9,6 +9,7 @@ import threading
 from abc import ABC, abstractmethod
 from collections import defaultdict
 from dataclasses import dataclass
+from types import FunctionType
 
 import psutil
 import uuid
@@ -24,6 +25,9 @@ import time
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
+from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
+from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
+from nv_ingest_api.util.imports.dynamic_resolvers import resolve_callable_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +47,7 @@ class PipelineInterface(ABC):
         Parameters
         ----------
         monitor_poll_interval : float
-            Interval in seconds for monitoring poll (default: 5.0).
+            Interval in seconds for the monitoring poll (default: 5.0).
         scaling_poll_interval : float
             Interval in seconds for scaling decisions (default: 30.0).
         """
@@ -270,7 +274,7 @@ class RayPipeline(PipelineInterface):
 
         logger.info("RayStatsCollector initialized using StatsConfig.")
 
-    # --- Accessor Methods for Stats Collector (and internal use) ---
+    # --- Accessor Methods for Stat Collector (and internal use) ---
 
     def __del__(self):
         try:
@@ -428,15 +432,39 @@ class RayPipeline(PipelineInterface):
         return self
 
     def add_stage(
-        self, *, name: str, stage_actor: Any, config: BaseModel, min_replicas: int = 0, max_replicas: int = 1
+        self,
+        *,
+        name: str,
+        stage_actor: Any,
+        config: BaseModel,
+        min_replicas: int = 0,
+        max_replicas: int = 1,
     ) -> "RayPipeline":
         if min_replicas < 0:
             logger.warning(f"Stage '{name}': min_replicas cannot be negative. Overriding to 0.")
             min_replicas = 0
+
+        resolved_actor = stage_actor
+
+        # Support module path (e.g., "mypkg.mymodule:my_lambda")
+        if isinstance(stage_actor, str):
+            resolved_actor = resolve_callable_from_path(
+                callable_path=stage_actor, signature_schema=ingest_stage_callable_signature
+            )
+
+        # Wrap callables
+        if isinstance(resolved_actor, FunctionType):
+            schema_type = type(config)
+            resolved_actor = wrap_callable_as_stage(resolved_actor, schema_type)
+
         stage_info = StageInfo(
-            name=name, callable=stage_actor, config=config, min_replicas=min_replicas, max_replicas=max_replicas
+            name=name,
+            callable=resolved_actor,
+            config=config,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
         )
-        self.topology.add_stage(stage_info)  # Delegate
+        self.topology.add_stage(stage_info)
 
         return self
 

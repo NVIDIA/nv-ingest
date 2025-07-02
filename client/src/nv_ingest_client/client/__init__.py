@@ -4,5 +4,6 @@
 
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.client.interface import Ingestor
+from nv_ingest_client.client.interface import LazyLoadedList
 
-__all__ = ["NvIngestClient", "Ingestor"]
+__all__ = ["NvIngestClient", "Ingestor", "LazyLoadedList"]

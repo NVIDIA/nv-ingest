@@ -39,7 +39,7 @@ def infer_microservice(
             batch_size=batch_size,
         )
     else:
-        embedding_endpoint = f"{embedding_endpoint}/v1/embeddings"
+        embedding_endpoint = f"{embedding_endpoint}/embeddings"
         client = NimClient(
             model_interface=EmbeddingModelInterface(),
             protocol="http",

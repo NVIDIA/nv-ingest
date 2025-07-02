@@ -9,7 +9,6 @@ This documentation contains documentation for the NV-Ingest Helm charts.
 
 Before you install the Helm charts, be sure you meet the hardware and software prerequisites. Refer to the [supported configurations](https://github.com/NVIDIA/nv-ingest?tab=readme-ov-file#hardware).
 
-
 ## Initial Environment Setup
 
 1. Create your namespace by running the following code.
@@ -27,6 +26,9 @@ helm repo add nemo-microservices https://helm.ngc.nvidia.com/nvidia/nemo-microse
 
 # NVIDIA NIM NGC repository
 helm repo add nvidia-nim https://helm.ngc.nvidia.com/nim/nvidia --username='$oauthtoken' --password=<NGC_API_KEY>
+
+# NVIDIA NIM Base repository
+helm repo add nim https://helm.ngc.nvidia.com/nim --username='$oauthtoken' --password=<NGC_API_KEY>
 
 # NVIDIA NIM baidu NGC repository
 helm repo add baidu-nim https://helm.ngc.nvidia.com/nim/baidu --username='$oauthtoken' --password=<YOUR API KEY>
@@ -83,16 +85,6 @@ In this case, make sure to remove the following from your helm command:
     --set ngcImagePullSecret.password="${NGC_API_KEY}" \
     --set ngcApiSecret.create=true \
     --set ngcApiSecret.password="${NGC_API_KEY}" \
-```
-
-### Minikube Setup
-
-The PVC setup for minikube requires a little bit more configuration. Please follow the steps below if you are using minikube.
-
-```bash
-minikube start --driver docker --container-runtime docker --gpus all --nodes 3
-minikube addons enable nvidia-gpu-device-plugin
-minikube addons enable storage-provisioner-rancher
 ```
 
 ## Usage
@@ -259,7 +251,9 @@ Validate that the configuration was applied by running the following code.
 kubectl logs -n gpu-operator -l app=nvidia-mig-manager -c nvidia-mig-manager
 ```
 
-#### Executing Jobs
+You can adjust Kubernetes request and limit resources for MIG by using a Helm values file. To use a MIG values file in conjunction with other values files, append `-f mig/nv-ingest-mig-values.yaml` to your Helm command. For an example Helm values file for MIG settings, refer to [mig/nv-ingest-mig-config.yaml](mig/nv-ingest-mig-config.yaml). This file is only an example, and you should adjust the values for your environment and specific needs.
+
+#### Running Jobs
 
 Here is a sample invocation of a PDF extraction task using the port forward above:
 
@@ -281,7 +275,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | Repository | Name | Version |
 |------------|------|---------|
 | alias:baidu-nim | paddleocr-nim(nvidia-nim-paddleocr) | 1.3.0 |
-| alias:nemo-microservices | nim-vlm-text-extraction(nim-vlm) | 1.2.0-ea-v2 |
+| alias:nim | nim-vlm-image-captioning(nim-vlm) | 1.2.1 |
+| alias:nim | nim-vlm-text-extraction(nim-vlm) | 1.2.1 |
 | alias:nvidia-nim | nvidia-nim-llama-32-nv-embedqa-1b-v2 | 1.6.0 |
 | alias:nvidia-nim | llama-32-nv-rerankqa-1b-v2(nvidia-nim-llama-32-nv-rerankqa-1b-v2) | 1.5.0 |
 | alias:nvidia-nim | nemoretriever-graphic-elements-v1(nvidia-nim-nemoretriever-graphic-elements-v1) | 1.3.0 |
@@ -307,7 +302,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | containerArgs | list | `[]` |  |
 | containerSecurityContext | object | `{}` |  |
 | envVars.ARROW_DEFAULT_MEMORY_POOL | string | `"system"` |  |
-| envVars.AUDIO_GRPC_ENDPOINT | string | `"audio:50051"` |  |
+| envVars.AUDIO_GRPC_ENDPOINT | string | `"nv-ingest-riva-nim:50051"` |  |
 | envVars.AUDIO_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.COMPONENTS_TO_READY_CHECK | string | `"ALL"` |  |
 | envVars.EMBEDDING_NIM_ENDPOINT | string | `"http://nv-ingest-embedqa:8000/v1"` |  |
@@ -315,6 +310,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.INGEST_DYNAMIC_MEMORY_THRESHOLD | float | `0.8` |  |
 | envVars.INGEST_EDGE_BUFFER_SIZE | int | `64` |  |
 | envVars.INGEST_LOG_LEVEL | string | `"DEFAULT"` |  |
+| envVars.INSTALL_AUDIO_EXTRACTION_DEPS | string | `"true"` |  |
 | envVars.MAX_INGEST_PROCESS_WORKERS | int | `16` |  |
 | envVars.MESSAGE_CLIENT_HOST | string | `"nv-ingest-redis-master"` |  |
 | envVars.MESSAGE_CLIENT_PORT | string | `"6379"` |  |
@@ -680,20 +676,22 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | riva-nim.customCommand | list | `[]` |  |
 | riva-nim.deployed | bool | `false` |  |
 | riva-nim.env[0].name | string | `"NIM_HTTP_API_PORT"` |  |
-| riva-nim.env[0].value | string | `"8000"` |  |
-| riva-nim.fullnameOverride | string | `"riva-nim"` |  |
+| riva-nim.env[0].value | string | `"9000"` |  |
+| riva-nim.env[1].name | string | `"NIM_TAGS_SELECTOR"` |  |
+| riva-nim.env[1].value | string | `"name=parakeet-1-1b-ctc-riva-en-us,mode=ofl"` |  |
+| riva-nim.fullnameOverride | string | `"nv-ingest-riva-nim"` |  |
 | riva-nim.image.repository | string | `"nvcr.io/nim/nvidia/riva-asr"` |  |
 | riva-nim.image.tag | string | `"1.3.0"` |  |
-| riva-nim.nim.grpcPort | int | `8001` |  |
+| riva-nim.nim.grpcPort | int | `50051` |  |
 | riva-nim.nim.logLevel | string | `"INFO"` |  |
 | riva-nim.podSecurityContext.fsGroup | int | `1000` |  |
 | riva-nim.podSecurityContext.runAsGroup | int | `1000` |  |
 | riva-nim.podSecurityContext.runAsUser | int | `1000` |  |
 | riva-nim.replicaCount | int | `1` |  |
-| riva-nim.service.grpcPort | int | `8001` |  |
-| riva-nim.service.httpPort | int | `8000` |  |
+| riva-nim.service.grpcPort | int | `50051` |  |
+| riva-nim.service.httpPort | int | `9000` |  |
 | riva-nim.service.metricsPort | int | `0` |  |
-| riva-nim.service.name | string | `"riva-nim"` |  |
+| riva-nim.service.name | string | `"nv-ingest-riva-nim"` |  |
 | riva-nim.service.type | string | `"ClusterIP"` |  |
 | riva-nim.serviceAccount.create | bool | `false` |  |
 | riva-nim.serviceAccount.name | string | `""` |  |

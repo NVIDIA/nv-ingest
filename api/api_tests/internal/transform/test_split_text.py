@@ -108,7 +108,7 @@ def test_split_into_chunks_empty_text():
 
 
 def test_build_split_documents_skips_empty_chunks():
-    row = SimpleNamespace(metadata={"existing": "value"})
+    row = SimpleNamespace(document_type="text", metadata={"existing": "value"})
     chunks = ["  ", None, "", "Valid chunk"]
 
     documents = module_under_test._build_split_documents(row, chunks)
@@ -121,7 +121,7 @@ def test_build_split_documents_skips_empty_chunks():
 
 def test_build_split_documents_handles_no_metadata():
     # Row without metadata attribute
-    row = SimpleNamespace()
+    row = SimpleNamespace(document_type="text")
     chunks = ["Chunk A", "Chunk B"]
 
     documents = module_under_test._build_split_documents(row, chunks)

@@ -279,12 +279,12 @@ services:
       - MESSAGE_CLIENT_TYPE=redis
       - MINIO_BUCKET=${MINIO_BUCKET:-nv-ingest}
       # build.nvidia.com hosted nemoretriever-parse
-      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
-      #- NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
+      # - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=https://integrate.api.nvidia.com/v1/chat/completions
+      - NEMORETRIEVER_PARSE_HTTP_ENDPOINT=http://nemoretriever-parse:8000/v1/chat/completions
       - NEMORETRIEVER_PARSE_INFER_PROTOCOL=http
       #- NEMORETRIEVER_PARSE_MODEL_NAME=nvidia/nemoretriever-parse
       - NGC_API_KEY=${NGC_API_KEY:-ngcapikey}
-      - NVIDIA_BUILD_API_KEY=${NVIDIA_BUILD_API_KEY:-${NGC_API_KEY:-ngcapikey}}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NV_INGEST_MAX_UTIL=${NV_INGEST_MAX_UTIL:-48}
       - OTEL_EXPORTER_OTLP_ENDPOINT=otel-collector:4317
       # Self-hosted ocr endpoints.

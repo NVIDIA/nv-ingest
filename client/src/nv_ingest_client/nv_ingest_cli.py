@@ -28,10 +28,10 @@ from nv_ingest_client.cli.util.click import click_validate_task
 from nv_ingest_client.cli.util.processing import create_and_process_jobs
 from nv_ingest_client.cli.util.processing import report_statistics
 from nv_ingest_client.cli.util.system import configure_logging
-from nv_ingest_client.cli.util.system import ensure_directory_with_permissions
 from nv_ingest_client.client import NvIngestClient
 from nv_ingest_client.util.dataset import get_dataset_files
 from nv_ingest_client.util.dataset import get_dataset_statistics
+from nv_ingest_client.util.system import ensure_directory_with_permissions
 
 try:
     NV_INGEST_VERSION = version("nv_ingest")
@@ -124,7 +124,7 @@ Tasks and Options:
 - caption: Attempts to extract captions for unstructured images extracted from documents.
     Options:
       - api_key (str): API key for captioning service.
-      Default: os.environ(NVIDIA_BUILD_API_KEY).'
+      Default: os.environ(NVIDIA_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
       Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
       - prompt (str): Prompt for captioning service.

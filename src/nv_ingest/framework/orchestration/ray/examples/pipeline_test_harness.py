@@ -63,7 +63,7 @@ def get_nim_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -155,7 +155,7 @@ if __name__ == "__main__":
     logger.info("Environment variables set.")
 
     image_caption_endpoint_url = "https://integrate.api.nvidia.com/v1/chat/completions"
-    image_caption_model_name = "meta/llama-3.2-11b-vision-instruct"
+    model_name = "meta/llama-3.2-11b-vision-instruct"
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     (
         yolox_table_structure_grpc,
@@ -228,7 +228,7 @@ if __name__ == "__main__":
     image_caption_config = {
         "api_key": yolox_auth,
         "endpoint_url": image_caption_endpoint_url,
-        "image_caption_model_name": image_caption_model_name,
+        "model_name": model_name,
         "prompt": "Caption the content of this image:",
     }
     logger.info("Service configuration retrieved from get_nim_service and environment variables.")

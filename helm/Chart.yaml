@@ -28,18 +28,18 @@ dependencies:
     alias: nemoretriever-table-structure-v1
     condition: nemoretriever-table-structure-v1.deployed
 
-  # # VLM for image captioning.
-  # # This same chart can power several different underlying VLM models. Configure in values.yaml
-  # - name: nim-vlm
-  #   repository: "alias:nvidia-nim"
-  #   version: 1.2.0-ea-v2
-  #   alias: nim-vlm-image-captioning
-  #   condition: nim-vlm-image-captioning.deployed
+  # VLM for image captioning.
+  # This same chart can power several different underlying VLM models. Configure in values.yaml
+  - name: nim-vlm
+    repository: "alias:nim"
+    version: 1.2.1
+    alias: nim-vlm-image-captioning
+    condition: nim-vlm-image-captioning.deployed
 
   # VLM for text extraction. Same helm chart as image captioning VLM with different NIM engine; eclair vs llama vision
   - name: nim-vlm
-    repository: "alias:nemo-microservices"
-    version: 1.2.0-ea-v2
+    repository: "alias:nim"
+    version: 1.2.1
     alias: nim-vlm-text-extraction
     condition: nim-vlm-text-extraction.deployed
 
