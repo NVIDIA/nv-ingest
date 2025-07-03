@@ -199,11 +199,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=PDFExtractorStage,
-        config=extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 3))),  # 33% of available CPU cores
+        name=stage_name, stage_actor=PDFExtractorStage, config=extractor_config, min_replicas=0, max_replicas=8
     )
 
     return stage_name
@@ -228,11 +224,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=TableExtractorStage,
-        config=table_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        name=stage_name, stage_actor=TableExtractorStage, config=table_extractor_config, min_replicas=0, max_replicas=2
     )
 
     return stage_name
@@ -257,11 +249,7 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=ChartExtractorStage,
-        config=chart_extractor_config,
-        min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        name=stage_name, stage_actor=ChartExtractorStage, config=chart_extractor_config, min_replicas=0, max_replicas=2
     )
 
     return stage_name
@@ -285,7 +273,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -307,7 +295,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -329,7 +317,7 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -351,7 +339,7 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -390,7 +378,7 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -455,7 +443,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,  # 7% of available CPU cores
     )
 
     return stage_name
@@ -517,7 +505,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,  # 7% of available CPU cores
     )
 
     return stage_name
