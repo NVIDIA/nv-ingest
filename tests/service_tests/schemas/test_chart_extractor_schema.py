@@ -13,27 +13,27 @@ def test_valid_config_with_grpc_only():
     config = ChartExtractorConfigSchema(
         auth_token="valid_token",
         yolox_endpoints=("grpc://yolox_service", None),
-        paddle_endpoints=("grpc://paddle_service", None),
+        ocr_endpoints=("grpc://ocr_service", None),
     )
     assert config.auth_token == "valid_token"
     assert config.yolox_endpoints == ("grpc://yolox_service", None)
-    assert config.paddle_endpoints == ("grpc://paddle_service", None)
+    assert config.ocr_endpoints == ("grpc://ocr_service", None)
 
 
 def test_valid_config_with_http_only():
     config = ChartExtractorConfigSchema(
         auth_token="valid_token",
         yolox_endpoints=(None, "http://yolox_service"),
-        paddle_endpoints=(None, "http://paddle_service"),
+        ocr_endpoints=(None, "http://ocr_service"),
     )
     assert config.auth_token == "valid_token"
     assert config.yolox_endpoints == (None, "http://yolox_service")
-    assert config.paddle_endpoints == (None, "http://paddle_service")
+    assert config.ocr_endpoints == (None, "http://ocr_service")
 
 
 def test_invalid_config_with_empty_services():
     with pytest.raises(ValidationError) as excinfo:
-        ChartExtractorConfigSchema(yolox_endpoints=(None, None), paddle_endpoints=(None, None))
+        ChartExtractorConfigSchema(yolox_endpoints=(None, None), ocr_endpoints=(None, None))
     assert "Both gRPC and HTTP services cannot be empty" in str(excinfo.value)
 
 
@@ -41,17 +41,17 @@ def test_valid_config_with_both_grpc_and_http():
     config = ChartExtractorConfigSchema(
         auth_token="another_token",
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-        paddle_endpoints=("grpc://paddle_service", "http://paddle_service"),
+        ocr_endpoints=("grpc://ocr_service", "http://ocr_service"),
     )
     assert config.auth_token == "another_token"
     assert config.yolox_endpoints == ("grpc://yolox_service", "http://yolox_service")
-    assert config.paddle_endpoints == ("grpc://paddle_service", "http://paddle_service")
+    assert config.ocr_endpoints == ("grpc://ocr_service", "http://ocr_service")
 
 
 def test_invalid_auth_token_none():
     config = ChartExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", None),
-        paddle_endpoints=("grpc://paddle_service", None),
+        ocr_endpoints=("grpc://ocr_service", None),
     )
     assert config.auth_token is None
 
@@ -75,7 +75,7 @@ def test_chart_extractor_schema_defaults():
 def test_chart_extractor_schema_with_custom_values():
     stage_config = ChartExtractorConfigSchema(
         yolox_endpoints=("grpc://yolox_service", "http://yolox_service"),
-        paddle_endpoints=(None, "http://paddle_service"),
+        ocr_endpoints=(None, "http://ocr_service"),
     )
     config = ChartExtractorSchema(max_queue_size=10, n_workers=5, raise_on_failure=True)
     assert config.max_queue_size == 10

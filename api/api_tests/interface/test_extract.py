@@ -977,18 +977,18 @@ def test_extract_infographic_data_from_image_integration():
     )
 
     # Pull configuration values from the environment first
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8010")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8010")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
-    # Construct the paddle endpoints tuple
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    # Construct the ocr endpoints tuple
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the schema values to the function's expected arguments
     integration_args = {
-        "paddle_endpoints": paddle_endpoints,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_endpoints": ocr_endpoints,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 
@@ -1099,22 +1099,22 @@ def test_extract_table_data_from_image_integration():
     _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8001/v1/infer")
     _YOLOX_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
 
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
 
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Construct the endpoint tuples
     yolox_endpoints = (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT)
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the values to the function's expected arguments
     integration_args = {
         "yolox_endpoints": yolox_endpoints,
-        "paddle_endpoints": paddle_endpoints,
+        "ocr_endpoints": ocr_endpoints,
         "yolox_protocol": _YOLOX_PROTOCOL,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 
@@ -1229,22 +1229,22 @@ def test_extract_chart_data_from_image_integration():
     _YOLOX_HTTP_ENDPOINT = os.getenv("INGEST_YOLOX_HTTP_ENDPOINT", "http://127.0.0.1:8003/v1/infer")
     _YOLOX_PROTOCOL = os.getenv("INGEST_YOLOX_PROTOCOL", "http")
 
-    _PADDLE_GRPC_ENDPOINT = os.getenv("INGEST_PADDLE_GRPC_ENDPOINT", None)
-    _PADDLE_HTTP_ENDPOINT = os.getenv("INGEST_PADDLE_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
-    _PADDLE_PROTOCOL = os.getenv("INGEST_PADDLE_PROTOCOL", "http")
+    _OCR_GRPC_ENDPOINT = os.getenv("INGEST_OCR_GRPC_ENDPOINT", None)
+    _OCR_HTTP_ENDPOINT = os.getenv("INGEST_OCR_HTTP_ENDPOINT", "http://127.0.0.1:8009/v1/infer")
+    _OCR_PROTOCOL = os.getenv("INGEST_OCR_PROTOCOL", "http")
 
     _AUTH_TOKEN = os.getenv("INGEST_AUTH_TOKEN", None)
 
     # Construct the endpoint tuples
     yolox_endpoints = (_YOLOX_GRPC_ENDPOINT, _YOLOX_HTTP_ENDPOINT)
-    paddle_endpoints = (_PADDLE_GRPC_ENDPOINT, _PADDLE_HTTP_ENDPOINT)
+    ocr_endpoints = (_OCR_GRPC_ENDPOINT, _OCR_HTTP_ENDPOINT)
 
     # Explicitly map the values to the function's expected arguments
     integration_args = {
         "yolox_endpoints": yolox_endpoints,
-        "paddle_endpoints": paddle_endpoints,
+        "ocr_endpoints": ocr_endpoints,
         "yolox_protocol": _YOLOX_PROTOCOL,
-        "paddle_protocol": _PADDLE_PROTOCOL,
+        "ocr_protocol": _OCR_PROTOCOL,
         "auth_token": _AUTH_TOKEN,
     }
 

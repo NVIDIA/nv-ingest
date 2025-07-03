@@ -263,7 +263,7 @@ def _extract_page_elements(
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
-    paddle_output_format: str,
+    table_output_format: str,
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
@@ -292,7 +292,7 @@ def _extract_page_elements(
         Flag indicating whether to extract charts.
     extract_infographics : bool
         Flag indicating whether to extract infographics.
-    paddle_output_format : str
+    table_output_format : str
         Format to use for table content.
     yolox_endpoints : Tuple[Optional[str], Optional[str]]
         A tuple containing the gRPC and HTTP endpoints for the YOLOX service.
@@ -351,7 +351,7 @@ def _extract_page_elements(
 
             # Set content format for tables
             if page_element.type_string == "table":
-                page_element.content_format = paddle_output_format
+                page_element.content_format = table_output_format
 
             # Construct metadata for the page element
             page_element_meta = construct_page_element_metadata(
@@ -407,13 +407,13 @@ def pdfium_extractor(
             f"Invalid text_depth: {text_depth_str}. Valid options: {list(TextTypeEnum.__members__.keys())}"
         )
 
-    # Validate and extract paddle_output_format
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    # Validate and extract table_output_format
+    table_output_format_str = extractor_config.get("table_output_format", "pseudo_markdown")
     try:
-        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+        table_output_format = TableFormatEnum[table_output_format_str.upper()]
     except KeyError:
         raise ValueError(
-            f"Invalid paddle_output_format: {paddle_output_format_str}. "
+            f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
 
@@ -545,7 +545,7 @@ def pdfium_extractor(
                         extract_tables,
                         extract_charts,
                         extract_infographics,
-                        paddle_output_format,
+                        table_output_format,
                         pdfium_config.yolox_endpoints,
                         pdfium_config.yolox_infer_protocol,
                         pdfium_config.auth_token,
@@ -567,7 +567,7 @@ def pdfium_extractor(
                 extract_tables,
                 extract_charts,
                 extract_infographics,
-                paddle_output_format,
+                table_output_format,
                 pdfium_config.yolox_endpoints,
                 pdfium_config.yolox_infer_protocol,
                 pdfium_config.auth_token,
