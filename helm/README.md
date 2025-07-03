@@ -329,8 +329,8 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | envVars.PADDLE_HTTP_ENDPOINT | string | `"http://nv-ingest-paddle:8000/v1/infer"` |  |
 | envVars.PADDLE_INFER_PROTOCOL | string | `"grpc"` |  |
 | envVars.REDIS_INGEST_TASK_QUEUE | string | `"ingest_task_queue"` |  |
-| envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"` |  |
-| envVars.VLM_CAPTION_MODEL_NAME | string | `"meta/llama-3.2-11b-vision-instruct"` |  |
+| envVars.VLM_CAPTION_ENDPOINT | string | `"https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"` |  |
+| envVars.VLM_CAPTION_MODEL_NAME | string | `"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT | string | `"nemoretriever-graphic-elements-v1:8001"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT | string | `"http://nemoretriever-graphic-elements-v1:8000/v1/infer"` |  |
 | envVars.YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL | string | `"grpc"` |  |
@@ -507,7 +507,7 @@ You can also use NV-Ingest's Python client API to interact with the service runn
 | nim-vlm-image-captioning.env[1].name | string | `"NIM_TRITON_MODEL_BATCH_SIZE"` |  |
 | nim-vlm-image-captioning.env[1].value | string | `"1"` |  |
 | nim-vlm-image-captioning.fullnameOverride | string | `"nim-vlm-image-captioning"` |  |
-| nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"` |  |
+| nim-vlm-image-captioning.image.repository | string | `"nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"` |  |
 | nim-vlm-image-captioning.image.tag | string | `"1.1.1"` |  |
 | nim-vlm-image-captioning.nim.grpcPort | int | `8001` |  |
 | nim-vlm-image-captioning.nim.logLevel | string | `"INFO"` |  |
