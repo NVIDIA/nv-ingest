@@ -220,14 +220,23 @@ class RayActorStage(ABC):
                 raise ValueError("Input queue not set while running")
             return None  # Should not happen if self._running is False, but defensive check
 
+        item: Optional[Any] = None
         try:
-            # Perform a non-blocking or short-blocking read from the queue
-            # The timeout allows the loop to check self._running periodically
-            return self._input_queue.get(timeout=1.0)
+            item = self._input_queue.get(timeout=1.0)
+
+            if item is None:
+                return None
+
+            if isinstance(item, ray.ObjectRef):
+                deserialized_object = ray.get(item)
+                del item
+                return deserialized_object
+
+            return item
+
         except Exception:
-            # Common exceptions include queue.Empty in older Ray versions or
-            # custom queue implementations raising timeout errors.
-            # Return None to signify no item was retrieved this cycle.
+            if item is not None and isinstance(item, ray.ObjectRef):
+                del item
             return None
 
     @abstractmethod
@@ -328,28 +337,41 @@ class RayActorStage(ABC):
                     self._active_processing = True
 
                     # Step 2: Process the retrieved message using subclass-specific logic.
-                    updated_cm: Optional[Any] = self.on_data(control_message)
+                    updated_cm = self.on_data(control_message)
 
                     # If there's a valid result and an output queue is configured, attempt to put.
-                    if self._output_queue is not None:
-                        # This loop will retry indefinitely until the item is put successfully
-                        # or an unrecoverable error occurs (which is not explicitly handled to break here).
-                        # TODO(Devin) -- This can be improved, should probably fail at some point?
-                        #                Consider max retries or specific error handling for RayActorError
-                        #                to prevent indefinite blocking if the queue actor is permanently dead.
-                        is_put_successful = False
-                        while not is_put_successful:  # Renamed loop variable for clarity
-                            try:
-                                self._output_queue.put(updated_cm)
-                                self.stats["successful_queue_writes"] += 1
-                                is_put_successful = True  # Exit retry loop on success
-                            except Exception as e_put:  # Broad exception catch for put failures
-                                self._logger.warning(
-                                    f"[{actor_id_str}] Output queue put failed (e.g., full, "
-                                    f"timeout, or actor error), retrying. Error: {e_put}"
-                                )
-                                self.stats["queue_full"] += 1  # Consider renaming if it catches more than "full"
-                                time.sleep(0.1)  # Brief pause before retrying
+                    if self._output_queue is not None and updated_cm is not None:
+                        object_ref_to_put = None  # Ensure var exists for the finally block
+                        try:
+                            # Get the handle of the queue actor to set it as the owner.
+                            # This decouples the object's lifetime from this actor.
+                            owner_actor = self._output_queue.actor
+
+                            # Put the object into Plasma, transferring ownership.
+                            object_ref_to_put = ray.put(updated_cm, _owner=owner_actor)
+
+                            # Now that the object is safely in Plasma, we can delete the large local copy.
+                            del updated_cm
+
+                            # This loop will retry indefinitely until the ObjectRef is put successfully.
+                            is_put_successful = False
+                            while not is_put_successful:
+                                try:
+                                    self._output_queue.put(object_ref_to_put)
+                                    self.stats["successful_queue_writes"] += 1
+                                    is_put_successful = True  # Exit retry loop on success
+                                except Exception as e_put:
+                                    self._logger.warning(
+                                        f"[{actor_id_str}] Output queue put failed (e.g., full, "
+                                        f"timeout, or actor error), retrying. Error: {e_put}"
+                                    )
+                                    self.stats["queue_full"] += 1
+                                    time.sleep(0.1)  # Brief pause before retrying
+                        finally:
+                            # After the operation, delete the local ObjectRef.
+                            # The primary reference is now held by the queue actor.
+                            if object_ref_to_put is not None:
+                                del object_ref_to_put
 
                     # Step 3: Increment "processed" count after successful processing and output (if any).
                     # This is the primary path for "successful processing".
@@ -369,6 +391,11 @@ class RayActorStage(ABC):
                 finally:
                     # Ensure _active_processing is reset after each item attempt (success, failure, or no item).
                     self._active_processing = False
+
+                    # Explicitly delete the reference to the control message to aid garbage collection.
+                    # This is important for large messages, as it helps release memory and ObjectRefs sooner.
+                    if control_message is not None:
+                        del control_message
 
             # --- Loop Exit Condition Met ---
             # This point is reached when self._running becomes False.
