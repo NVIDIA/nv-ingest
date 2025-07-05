@@ -105,7 +105,7 @@ def get_nim_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -135,7 +135,7 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -463,7 +463,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
 
 def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_caption"):
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -495,7 +495,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
 
 def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embedding"):
     api_key = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",

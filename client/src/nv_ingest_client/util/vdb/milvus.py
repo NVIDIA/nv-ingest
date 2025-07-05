@@ -1163,7 +1163,7 @@ def nvingest_retrieval(
     from llama_index.embeddings.nvidia import NVIDIAEmbedding
 
     client_config = ClientConfigSchema()
-    nvidia_api_key = client_config.nvidia_build_api_key
+    nvidia_api_key = client_config.nvidia_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
@@ -1296,7 +1296,7 @@ def nv_rerank(
     # reranker = NVIDIARerank(base_url=reranker_endpoint, nvidia_api_key=nvidia_api_key, top_n=top_k)
     reranker_endpoint = reranker_endpoint if reranker_endpoint else client_config.nv_ranker_nim_endpoint
     model_name = model_name if model_name else client_config.nv_ranker_nim_model_name
-    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
     headers = {"accept": "application/json", "Content-Type": "application/json"}
     if nvidia_api_key:
         headers["Authorization"] = f"Bearer {nvidia_api_key}"
@@ -1487,7 +1487,7 @@ def embed_index_collection(
         **kwargs: Additional keyword arguments for customization.
     """
     client_config = ClientConfigSchema()
-    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name

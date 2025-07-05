@@ -174,9 +174,9 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     pipeline.make_edge(image_dedup_stage_id, text_splitter_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Transforms ########
-    pipeline.make_edge(text_splitter_stage_id, embed_extractions_stage_id, queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge(embed_extractions_stage_id, image_caption_stage_id, queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge(image_caption_stage_id, image_storage_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(text_splitter_stage_id, image_caption_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_caption_stage_id, embed_extractions_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(embed_extractions_stage_id, image_storage_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Storage ########
     pipeline.make_edge(image_storage_stage_id, embedding_storage_stage_id, queue_size=ingest_edge_buffer_size)
