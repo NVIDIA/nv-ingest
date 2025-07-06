@@ -550,7 +550,7 @@ def transform_create_text_embeddings_internal(
 
     for content_type, content_getter in pandas_content_extractor.items():
         if not content_getter:
-            logger.debug(f"Skipping unsupported content type: {content_type}")
+            logger.warning(f"Skipping text_embedding generation for unsupported content type: {content_type}")
             continue
 
         # Get rows matching the content type
