@@ -4,20 +4,21 @@
 # Copyright (c) 2024, NVIDIA CORPORATION.
 
 import base64
+import inspect
 import io
+import logging
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import pandas as pd
-from typing import Any, Dict, List, Optional
-import logging
-
-from nv_ingest_api.internal.extract.pdf.engines import (
-    adobe_extractor,
-    llama_parse_extractor,
-    nemoretriever_parse_extractor,
-    pdfium_extractor,
-    tika_extractor,
-    unstructured_io_extractor,
-)
+from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
+from nv_ingest_api.internal.extract.pdf.engines import llama_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
+from nv_ingest_api.internal.extract.pdf.engines import tika_extractor
+from nv_ingest_api.internal.extract.pdf.engines import unstructured_io_extractor
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 # Import extraction functions for different engines.
@@ -53,17 +54,24 @@ def _work_extract_pdf(
 
     extract_method = extractor_config["extract_method"]
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
-    return extractor_fn(
+
+    extractor_fn_args = dict(
         pdf_stream=pdf_stream,
         extract_text=extract_text,
         extract_images=extract_images,
         extract_infographics=extract_infographics,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
-        extract_page_as_image=extract_page_as_image,
         extractor_config=extractor_config,
         execution_trace_log=execution_trace_log,
     )
+
+    if "extract_page_as_image" in inspect.signature(extractor_fn).parameters:
+        extractor_fn_args["extract_page_as_image"] = extract_page_as_image
+    elif extract_page_as_image:
+        logger.warning(f"`extract_page_as_image` is set to True, but {extract_method} does not support it.")
+
+    return extractor_fn(**extractor_fn_args)
 
 
 @unified_exception_handler
