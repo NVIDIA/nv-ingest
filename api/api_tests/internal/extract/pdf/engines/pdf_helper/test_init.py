@@ -4,11 +4,13 @@
 
 import base64
 import io
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
+import nv_ingest_api.internal.extract.pdf.engines.pdf_helpers as module_under_test
 import pandas as pd
 import pytest
-from unittest.mock import patch, MagicMock
 from nv_ingest_api.internal.extract.pdf.engines.pdf_helpers import _orchestrate_row_extraction
-import nv_ingest_api.internal.extract.pdf.engines.pdf_helpers as module_under_test
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -166,14 +168,13 @@ def test_work_extract_pdf_dispatches_to_correct_extractor(dummy_pdf_stream, meth
             extract_infographics=True,
             extract_tables=True,
             extract_charts=True,
-            extract_page_as_image=True,
             extractor_config=extractor_config,
             execution_trace_log={"step": "test"},
         )
         assert result == "mock_result"
 
 
-@patch(f"{MODULE_UNDER_TEST}.pdfium_extractor")
+@patch(f"{MODULE_UNDER_TEST}.pdfium_extractor", autospec=True)
 def test_work_extract_pdf_defaults_to_pdfium(mock_pdfium_extractor, dummy_pdf_stream):
     # Arrange
     mock_pdfium_extractor.return_value = "default_pdfium_result"
