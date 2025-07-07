@@ -60,6 +60,20 @@ logger = logging.getLogger(__name__)
 DEFAULT_JOB_QUEUE_ID = "ingest_task_queue"
 
 
+def get_max_filename_length(path="."):
+    return os.pathconf(path, "PC_NAME_MAX")
+
+
+def safe_filename(base_dir, filename, suffix=""):
+    max_name = os.pathconf(base_dir, "PC_NAME_MAX")
+    # Account for suffix (like ".jsonl") in the allowed length
+    allowed = max_name - len(suffix)
+    # If filename too long, truncate and append suffix
+    if len(filename) > allowed:
+        filename = filename[:allowed]
+    return filename + suffix
+
+
 def ensure_job_specs(func):
     """Decorator to ensure _job_specs is initialized before calling task methods."""
 
@@ -408,7 +422,9 @@ class Ingestor:
             try:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
-                jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
+                file_name, file_ext = os.path.splitext(clean_source_basename)
+                file_suffix = f".{file_ext}.results.jsonl"
+                jsonl_filepath = safe_filename(output_dir, file_name, file_suffix)
 
                 num_items_saved = save_document_results_to_jsonl(
                     doc_data,

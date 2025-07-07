@@ -7,7 +7,6 @@ import os
 import signal
 import threading
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from dataclasses import dataclass
 from types import FunctionType
 
@@ -348,9 +347,9 @@ class RayPipeline(PipelineInterface):
                         f" for '{stage.name}'"
                     )
                     try:
-                        actor = stage.callable.options(
-                            name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
-                        ).remote(config=stage.config)
+                        actor = stage.callable.options(name=actor_name, max_concurrency=1, max_restarts=0).remote(
+                            config=stage.config
+                        )
                         replicas.append(actor)
                     except Exception as e:
                         logger.error(f"[Build-Actors] Failed create actor '{actor_name}': {e}", exc_info=True)
@@ -531,9 +530,9 @@ class RayPipeline(PipelineInterface):
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            new_actor = stage_info.callable.options(
-                name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
-            ).remote(config=stage_info.config)
+            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=1, max_restarts=0).remote(
+                config=stage_info.config
+            )
 
             return new_actor
         except Exception as e:
@@ -662,8 +661,8 @@ class RayPipeline(PipelineInterface):
 
     def _handle_scale_down(self, stage_name: str, current_replicas: List[Any], target_count: int) -> None:
         """
-        Handles scaling down: initiates stop on actors, registers handles with
-        the topology for pending removal if stop was successfully initiated.
+        Handles scaling down: initiates stop on actors and marks them for removal
+        by the topology's garbage collection mechanism.
         """
         current_count = len(current_replicas)
         num_to_remove = current_count - target_count
@@ -671,56 +670,24 @@ class RayPipeline(PipelineInterface):
             f"[ScaleDown-{stage_name}] Scaling down from {current_count} to {target_count} (-{num_to_remove})."
         )
 
-        # Basic validation
         if num_to_remove <= 0:
-            logger.warning(f"[ScaleDown-{stage_name}] Invalid num_to_remove {num_to_remove}. Aborting.")
             return
 
-        # Identify actors to remove (last N)
+        # Select actors to remove (e.g., the most recently added)
         actors_to_remove = current_replicas[-num_to_remove:]
-        logger.debug(f"[ScaleDown-{stage_name}] Identified {len(actors_to_remove)} actors for removal.")
 
-        actors_to_register_map: Dict[str, List[Tuple[Any, ray.ObjectRef]]] = defaultdict(list)
-        stop_initiation_failures = 0
+        logger.info(f"[ScaleDown-{stage_name}] Selected {len(actors_to_remove)} actors for removal.")
 
+        # Signal each actor to stop and mark it for removal by the topology.
+        # The topology's cleanup thread will handle polling and final removal.
         for actor in actors_to_remove:
-            actor_id_str = str(actor)
             try:
-                # Call stop(), which now returns shutdown future
-                shutdown_future = actor.stop.remote()
-                actors_to_register_map[stage_name].append((actor, shutdown_future))
-                logger.debug(f"[ScaleDown-{stage_name}] Submitted stop() call for actor '{actor_id_str}'.")
+                actor.stop.remote()  # Signal the actor's loop to stop
+                self.topology.mark_actor_for_removal(stage_name, actor)
             except Exception as e:
-                logger.error(
-                    f"[ScaleDown-{stage_name}] Error submitting stop() for actor '{actor_id_str}': "
-                    f"{e}. Cannot register.",
-                    exc_info=False,
-                )
-                stop_initiation_failures += 1
+                logger.error(f"[ScaleDown-{stage_name}] Failed to initiate stop for actor {actor}: {e}")
 
-        # Register actors pending removal (with their shutdown futures)
-        if actors_to_register_map:
-            num_registered = sum(len(v) for v in actors_to_register_map.values())
-            logger.debug(
-                f"[ScaleDown-{stage_name}] Registering {num_registered} "
-                f"actor handles with topology for shutdown monitoring."
-            )
-            try:
-                self.topology.register_actors_pending_removal(actors_to_register_map)
-            except Exception as e:
-                logger.error(
-                    f"[ScaleDown-{stage_name}] CRITICAL - Failed to register actors pending removal with topology: {e}",
-                    exc_info=True,
-                )
-                self.topology.update_scaling_state(stage_name, "Error")
-        elif actors_to_remove:
-            logger.warning(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
-
-        total_attempted = len(actors_to_remove)
-        logger.debug(
-            f"[ScaleDown-{stage_name}] Scale down initiation process complete for {total_attempted} actors "
-            f"(Skipped/Failed Initiation: {stop_initiation_failures}). Topology cleanup will handle final removal."
-        )
+        logger.debug(f"[ScaleDown-{stage_name}] Scale down initiation complete for {len(actors_to_remove)} actors.")
 
     def _scale_stage(self, stage_name: str, new_replica_count: int) -> None:
         """Orchestrates scaling using topology for state and info."""
@@ -765,6 +732,8 @@ class RayPipeline(PipelineInterface):
 
     def _is_pipeline_quiet(self) -> bool:
         """Checks if pipeline is quiet using topology state and stats collector."""
+
+        return False  # TODO: disabled for debugging
 
         # Check topology state first
         if self.topology.get_is_flushing():
@@ -893,6 +862,7 @@ class RayPipeline(PipelineInterface):
                                 source_actors_paused.append(actor)
                             except Exception as e:
                                 logger.error(f"Failed sending pause to {actor}: {e}")
+
             if pause_refs:
                 logger.debug(f"Waiting up to {pause_timeout}s for {len(pause_refs)} sources to pause...")
                 try:
@@ -1274,77 +1244,94 @@ class RayPipeline(PipelineInterface):
 
     # --- Pipeline Start/Stop ---
     def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
-        """Starts actors (via topology) and background threads."""
-        # Check topology for actors (indicates built)
-        if not self.topology.get_stage_actors():
+        """
+        Starts the pipeline actors and background monitoring threads.
+
+        Assumes the pipeline has already been built via the `build()` method.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float, optional
+            This parameter is currently unused but is kept for interface compatibility.
+        scaling_poll_interval : float, optional
+            The interval in seconds for the autoscaling and maintenance thread to run, by default 30.0.
+        """
+        if not self.topology.get_all_actors():
             logger.error("Cannot start: Pipeline not built or has no actors.")
             return
 
         logger.info("Starting pipeline execution...")
-        start_refs = []
-        # Get actors from topology
-        actors_to_start = [actor for actors in self.topology.get_stage_actors().values() for actor in actors]
 
-        for actor in actors_to_start:
-            start_refs.append(actor.start.remote())
-
-        if start_refs:
-            logger.debug(f"Waiting for {len(start_refs)} actors to start...")
+        # Start all actors
+        actors_to_start = self.topology.get_all_actors()
+        start_futures = [actor.start.remote() for actor in actors_to_start]
+        if start_futures:
+            logger.debug(f"Waiting for {len(start_futures)} actors to start...")
             try:
-                ray.get(start_refs, timeout=60.0)
-                logger.info(f"{len(start_refs)} actors started.")
+                ray.get(start_futures, timeout=60.0)
+                logger.info(f"{len(start_futures)} actors started.")
             except Exception as e:
                 logger.error(f"Error/Timeout starting actors: {e}", exc_info=True)
                 self.stop()  # Attempt cleanup
-
                 raise RuntimeError("Pipeline start failed: actors did not start.") from e
 
+        # Start background threads
+        self.topology.start_cleanup_thread()
         self.stats_collector.start()
         self._start_scaling(poll_interval=scaling_poll_interval)
+
         logger.info("Pipeline started successfully.")
 
     def stop(self) -> None:
-        """Stops background threads and actors (via topology)."""
+        """
+        Stops the pipeline and all associated actors and threads.
+
+        This method performs a graceful shutdown by:
+        1.  Stopping the autoscaling and statistics collection threads.
+        2.  Signaling all actors to stop and waiting for confirmation.
+        3.  Stopping the topology cleanup thread.
+        4.  Clearing all runtime state from the topology.
+        """
         logger.info("Stopping pipeline...")
 
         if self._stopping:
+            logger.warning("Stop already in progress.")
             return
         self._stopping = True
 
-        # 1. Stop background threads first
-        with self._state_lock:
-            self._stop_scaling()
-            self.stats_collector.stop()
+        # 1. Stop background threads first to prevent new actions
+        self._stop_scaling()
+        self.stats_collector.stop()
 
-            # 2. Stop actors (using topology)
-            logger.debug("Stopping all stage actors...")
-            stop_refs_map: Dict[ray.ObjectRef, Any] = {}
+        # 2. Stop all actors and wait for them
+        logger.debug("Stopping all actors in the topology...")
+        all_actors = self.topology.get_all_actors()
+        if all_actors:
+            stop_futures = [actor.stop.remote() for actor in all_actors]
+            try:
+                ready, not_ready = ray.wait(stop_futures, num_returns=len(stop_futures), timeout=60.0)
+                if not_ready:
+                    logger.warning(
+                        f"Timeout waiting for {len(not_ready)} actors to stop. " f"Proceeding with shutdown."
+                    )
+                logger.info(f"{len(ready)} actors confirmed stop.")
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during actor shutdown: {e}", exc_info=True)
 
-            # Get actors snapshot from topology
-            current_actors = {name: list(actors) for name, actors in self.topology.get_stage_actors().items()}
+        # 3. Stop the topology cleanup thread now that actors are stopped
+        self.topology.stop_cleanup_thread()
 
-            for stage_name, actors in current_actors.items():
-                for actor in actors:
-                    try:
-                        stop_refs_map[actor.stop.remote()] = actor
-                    except Exception as e:
-                        logger.warning(f"Error initiating stop for {actor} in {stage_name}: {e}. Skipping.")
+        # 4. Clear all state and references
+        logger.debug("Clearing pipeline topology runtime state.")
+        self.topology.clear_runtime_state()
 
-            if stop_refs_map:
-                stop_refs = list(stop_refs_map.keys())
-                logger.debug(f"Waiting up to 60s for {len(stop_refs)} actors to stop gracefully...")
-                try:
-                    ready, not_ready = ray.wait(stop_refs, num_returns=len(stop_refs), timeout=60.0)
-                    if not_ready:
-                        logger.warning(
-                            f"Timeout waiting for {len(not_ready)} actors to stop. Allowing Ray to clean up."
-                        )
-                    logger.info(f"{len(ready)} actors stopped via stop().")
-                except Exception as e:
-                    logger.error(f"Error during actor stop confirmation: {e}", exc_info=True)
+        self._stopping = False
+        logger.info("Pipeline stopped successfully.")
 
-            # Clear runtime state in topology
-            self.topology.clear_runtime_state()
-            del self.topology
+    def __enter__(self) -> "RayPipeline":
+        """Enter the runtime context related to this object."""
+        return self
 
-            logger.info("Pipeline stopped.")
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """Exit the runtime context related to this object."""
+        self.stop()
