@@ -6,9 +6,7 @@ import logging
 import math
 from dataclasses import dataclass
 
-import numpy as np
-from collections import deque
-from typing import Dict, Any, Deque, List, Tuple, Optional
+from typing import Dict, Any, List, Tuple, Optional
 
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
@@ -16,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DEFAULT_STAGE_COST_MB = 5000.0  # Fallback memory cost
+DEFAULT_STAGE_COST_MB = 10_000.0  # Fallback memory cost
 
 
 @dataclass
@@ -46,9 +44,7 @@ class PIDController:
         kp: float,
         ki: float,
         kd: float,  # Currently unused in delta calculation
-        stage_cost_estimates: Dict[str, int],  # Static estimates (MB)
         target_queue_depth: int = 0,
-        window_size: int = 10,
         penalty_factor: float = 0.0005,
         error_boost_factor: float = 1.5,
     ):
@@ -64,16 +60,10 @@ class PIDController:
         kd : float
             Derivative gain. Reacts to the rate of change of the error.
             (Currently set to 0 in internal calculations).
-        stage_cost_estimates : Dict[str, int]
-            Static estimated memory cost (in MB) per replica for each stage.
-            Used as a fallback and minimum for dynamic estimates.
         target_queue_depth : int, optional
             Default target queue depth for stages if not specified in metrics,
             by default 0. The PID loop tries to drive the queue depth towards
             this value.
-        window_size : int, optional
-            Number of recent samples used for dynamic memory cost estimation
-            per replica, by default 10.
         penalty_factor : float, optional
             Multiplier applied to the number of consecutive idle cycles for a
             stage. The resulting penalty effectively lowers the target queue
@@ -90,16 +80,11 @@ class PIDController:
         self.error_boost_factor = error_boost_factor
 
         # Per-Stage State
-        self.stage_cost_estimates = {
-            name: float(max(cost, 1.0)) for name, cost in stage_cost_estimates.items()  # Ensure float and min 1MB
-        }
         self.integral_error: Dict[str, float] = {}
         self.prev_error: Dict[str, float] = {}
-        self.memory_history: Dict[str, Deque[float]] = {}  # Per-replica memory history (MB)
         self.idle_cycles: Dict[str, int] = {}
 
         # Per-Stage Config
-        self.window_size = window_size
         self.penalty_factor = penalty_factor
 
     # --- Private Methods ---
@@ -110,48 +95,7 @@ class PIDController:
             logger.debug(f"[PID-{stage}] Initializing state.")
             self.integral_error[stage] = 0.0
             self.prev_error[stage] = 0.0
-            self.memory_history[stage] = deque(maxlen=self.window_size)
             self.idle_cycles[stage] = 0
-            # Ensure static cost estimate exists, provide default if missing
-            if stage not in self.stage_cost_estimates:
-                logger.warning(f"[PID-{stage}] Missing static cost estimate. Using default {DEFAULT_STAGE_COST_MB}MB.")
-                self.stage_cost_estimates[stage] = DEFAULT_STAGE_COST_MB
-
-    def _get_conservative_cost_estimate(self, stage: str) -> float:
-        """
-        Estimates dynamic memory cost, using static estimate as a floor/max.
-
-        Returns the maximum of the recent average dynamic cost per replica
-        and the static estimate provided during initialization. This provides
-        a conservative value for resource projection.
-
-        Parameters
-        ----------
-        stage : str
-            The name of the stage.
-
-        Returns
-        -------
-        float
-            The conservative memory cost estimate in MB per replica.
-        """
-        static_cost = self.stage_cost_estimates.get(stage, DEFAULT_STAGE_COST_MB)
-        memory_samples = self.memory_history.get(stage)
-
-        # Use numpy.mean if samples exist, otherwise fallback to static
-        if memory_samples and len(memory_samples) > 0:
-            try:
-                dynamic_avg = float(np.mean(memory_samples))
-                # Use max(dynamic, static) for projection, enforce min 1MB
-                cost = max(dynamic_avg, static_cost, 1.0)
-                return cost
-            except Exception as e:
-                logger.error(
-                    f"[PID-{stage}] Error calculating mean of memory samples: {e}. Falling back to static cost.",
-                    exc_info=False,
-                )
-                return max(static_cost, 1.0)  # Fallback safely
-        return max(static_cost, 1.0)  # Fallback to static estimate if no history
 
     # --- Public Method ---
 
@@ -167,8 +111,8 @@ class PIDController:
         ----------
         stage_metrics : Dict[str, Dict[str, Any]]
             Dictionary mapping stage names to their current metrics. Expected keys
-            per stage: 'replicas', 'queue_depth'. Optional: 'memory_usage',
-            'target_queue_depth', 'processing', 'min_replicas', 'max_replicas'.
+            per stage: 'replicas', 'queue_depth', 'ema_memory_per_replica'.
+            Optional: 'target_queue_depth', 'processing', 'min_replicas', 'max_replicas'.
 
         Returns
         -------
@@ -185,16 +129,9 @@ class PIDController:
 
             # --- Extract data and calculate current memory state ---
             replicas = metrics.get("replicas", 0)
-            # Start with static cost as initial guess if no memory_usage provided
-            initial_cost_guess = self.stage_cost_estimates.get(stage, DEFAULT_STAGE_COST_MB)
-            memory_usage = metrics.get("memory_usage", initial_cost_guess * max(replicas, 1))
-            # Calculate memory per replica safely (avoid division by zero)
-            current_memory_per_replica = memory_usage / max(replicas, 1.0)
-
-            # Update memory history *before* calculating the conservative cost for *this* cycle's proposal
-            self.memory_history[stage].append(current_memory_per_replica)
-            # Recalculate conservative cost *after* updating history for the proposal
-            conservative_cost = self._get_conservative_cost_estimate(stage)
+            # The conservative cost is now the EMA memory passed in from the stats collector.
+            # Fallback to a default if not present.
+            conservative_cost = metrics.get("ema_memory_per_replica", DEFAULT_STAGE_COST_MB)
 
             # --- PID Calculation ---
             queue_depth = metrics.get("queue_depth", 0)
@@ -296,7 +233,6 @@ class ResourceConstraintManager:
         self,
         max_replicas: int,
         memory_threshold: int,
-        estimated_edge_cost_mb: int,
         memory_safety_buffer_fraction: float,
     ):
         """
@@ -309,7 +245,6 @@ class ResourceConstraintManager:
 
         self.max_replicas = max_replicas
         self.memory_threshold_mb = memory_threshold
-        self.estimated_edge_cost_mb = estimated_edge_cost_mb  # Keep track, though unused
         self.memory_safety_buffer_fraction = memory_safety_buffer_fraction  # Unused
         self.effective_memory_limit_mb = self.memory_threshold_mb
 

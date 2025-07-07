@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+import psutil
 
 import click
 import logging
@@ -174,6 +175,13 @@ def add_metadata_injector_stage(pipeline, default_cpu_count, stage_name="metadat
 
 
 def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extractor"):
+    # Calculate max_replicas based on system memory
+    total_memory_gb = psutil.virtual_memory().total / (1024**3)
+    # Assuming each replica can use up to 10GB, and we allocate 75% of memory to this stage
+    allocatable_memory_for_stage_gb = total_memory_gb * 0.50
+    max_replicas = int(allocatable_memory_for_stage_gb / 10)
+    max_replicas = max(1, max_replicas)  # Ensure at least 1 replica
+
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
@@ -203,7 +211,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
         stage_actor=PDFExtractorStage,
         config=extractor_config,
         min_replicas=0,
-        max_replicas=8,
+        max_replicas=max_replicas,
     )
 
     return stage_name

@@ -7,6 +7,8 @@ import threading
 import time
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Optional
+import os
+import psutil
 
 import ray
 import ray.actor
@@ -388,6 +390,97 @@ class RayActorStage(ABC):
             # External monitors (e.g., via a future from stop()) can use this signal.
             self._shutdown_signal_complete = True
 
+    def _get_memory_usage_mb(self) -> float:
+        """
+        Gets the total memory usage of the current actor process (RSS).
+
+        Returns
+        -------
+        float
+            The memory usage in megabytes (MB).
+        """
+        try:
+            pid = os.getpid()
+            process = psutil.Process(pid)
+            # rss is the Resident Set Size, which is the non-swapped physical memory a process has used.
+            memory_bytes = process.memory_info().rss
+            return memory_bytes / (1024 * 1024)
+        except Exception as e:
+            self._logger.warning(f"[{self._actor_id_str}] Could not retrieve process memory usage: {e}")
+            return 0.0
+
+    @ray.method(num_returns=1)
+    def get_stats(self) -> Dict[str, Any]:
+        """
+        Retrieves performance statistics for the actor.
+
+        Calculates the approximate processing rate since the last call to
+        `get_stats` or since `start()`.
+
+        Returns
+        -------
+        Dict[str, Any]
+            A dictionary containing statistics:
+              - 'processed' (int): Total items processed since the actor started.
+              - 'elapsed' (float): Total time in seconds since the actor started.
+              - 'active_processing' (bool): Whether the actor was actively
+                                            processing an item in `on_data`
+                                            at the moment this method was called.
+              - 'processing_rate_cps' (float): Calculated items processed per
+                                               second during the last interval.
+                                               Can be zero if no items were
+                                               processed or the interval was too short.
+              - 'memory_mb' (float): The total memory usage of the current actor process (RSS) in megabytes (MB).
+        """
+        # If the actor is not running, return the last known stats to ensure this
+        # call is non-blocking during shutdown.
+        if not self._running:
+            stats_copy = self.stats.copy()
+            stats_copy["active_processing"] = False  # It's not active if not running
+            stats_copy["memory_mb"] = self._get_memory_usage_mb()
+            return stats_copy
+
+        current_time: float = time.time()
+        current_processed: int = self.stats.get("processed", 0)
+        is_active: bool = self._active_processing
+        delta_processed = 0
+
+        processing_rate_cps: float = 0.0  # Default rate
+
+        # Calculate rate only if actor has started and stats have been initialized
+        if self._last_stats_time is not None and self.start_time is not None:
+            delta_time: float = current_time - self._last_stats_time
+            # Use the processed count captured at the start of this method call
+            delta_processed: int = current_processed - self._last_processed_count
+
+            # Calculate rate if time has advanced and items were processed
+            # Use a small epsilon for delta_time to avoid division by zero
+            if delta_time > 0.001 and delta_processed >= 0:
+                processing_rate_cps = delta_processed / delta_time
+            # If delta_processed is negative (e.g., due to counter reset or race), report 0 rate.
+
+        # Update state for the *next* interval calculation AFTER computing the current rate
+        self._last_stats_time = current_time
+        self._last_processed_count = current_processed  # Store the count used in *this* interval calculation
+
+        # Calculate total elapsed time
+        elapsed: float = (current_time - self.start_time) if self.start_time else 0.0
+
+        # Compile and return the statistics dictionary
+        return {
+            "active_processing": is_active,  # Return the state captured at the beginning
+            "delta_processed": delta_processed,
+            "elapsed": elapsed,
+            "errors": self.stats.get("errors", 0),
+            "failed": self.stats.get("failed", 0),
+            "processed": current_processed,
+            "processing_rate_cps": processing_rate_cps,
+            "queue_full": self.stats.get("queue_full", 0),
+            "successful_queue_reads": self.stats.get("successful_queue_reads", 0),
+            "successful_queue_writes": self.stats.get("successful_queue_writes", 0),
+            "memory_mb": self._get_memory_usage_mb(),
+        }
+
     @ray.method(num_returns=1)
     def start(self) -> bool:
         """
@@ -442,75 +535,6 @@ class RayActorStage(ABC):
         Raises RayActorError if the actor process has terminated.
         """
         return self._shutdown_signal_complete
-
-    @ray.method(num_returns=1)
-    def get_stats(self) -> Dict[str, Any]:
-        """
-        Retrieves performance statistics for the actor.
-
-        Calculates the approximate processing rate since the last call to
-        `get_stats` or since `start()`.
-
-        Returns
-        -------
-        Dict[str, Any]
-            A dictionary containing statistics:
-              - 'processed' (int): Total items processed since the actor started.
-              - 'elapsed' (float): Total time in seconds since the actor started.
-              - 'active_processing' (bool): Whether the actor was actively
-                                            processing an item in `on_data`
-                                            at the moment this method was called.
-              - 'processing_rate_cps' (float): Calculated items processed per
-                                               second during the last interval.
-                                               Can be zero if no items were
-                                               processed or the interval was too short.
-        """
-        # If the actor is not running, return the last known stats to ensure this
-        # call is non-blocking during shutdown.
-        if not self._running:
-            stats_copy = self.stats.copy()
-            stats_copy["active_processing"] = False  # It's not active if not running
-            return stats_copy
-
-        current_time: float = time.time()
-        current_processed: int = self.stats.get("processed", 0)
-        is_active: bool = self._active_processing
-        delta_processed = 0
-
-        processing_rate_cps: float = 0.0  # Default rate
-
-        # Calculate rate only if actor has started and stats have been initialized
-        if self._last_stats_time is not None and self.start_time is not None:
-            delta_time: float = current_time - self._last_stats_time
-            # Use the processed count captured at the start of this method call
-            delta_processed: int = current_processed - self._last_processed_count
-
-            # Calculate rate if time has advanced and items were processed
-            # Use a small epsilon for delta_time to avoid division by zero
-            if delta_time > 0.001 and delta_processed >= 0:
-                processing_rate_cps = delta_processed / delta_time
-            # If delta_processed is negative (e.g., due to counter reset or race), report 0 rate.
-
-        # Update state for the *next* interval calculation AFTER computing the current rate
-        self._last_stats_time = current_time
-        self._last_processed_count = current_processed  # Store the count used in *this* interval calculation
-
-        # Calculate total elapsed time
-        elapsed: float = (current_time - self.start_time) if self.start_time else 0.0
-
-        # Compile and return the statistics dictionary
-        return {
-            "active_processing": is_active,  # Return the state captured at the beginning
-            "delta_processed": delta_processed,
-            "elapsed": elapsed,
-            "errors": self.stats.get("errors", 0),
-            "failed": self.stats.get("failed", 0),
-            "processed": current_processed,
-            "processing_rate_cps": processing_rate_cps,
-            "queue_full": self.stats.get("queue_full", 0),
-            "successful_queue_reads": self.stats.get("successful_queue_reads", 0),
-            "successful_queue_writes": self.stats.get("successful_queue_writes", 0),
-        }
 
     @ray.method(num_returns=1)
     def set_input_queue(self, queue_handle: Any) -> bool:
