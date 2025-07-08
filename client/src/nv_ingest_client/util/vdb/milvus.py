@@ -117,7 +117,7 @@ def write_meta_collection(
             "embedding_dim": dense_dim,
             "sparse_model": sparse_model,
         },
-        "user_fields": [field.name for field in fields],
+        "user_fields": [{"name": field.name, "type": field.datatype} for field in fields],
     }
     client = MilvusClient(milvus_uri)
     client.insert(collection_name=meta_collection_name, data=data)
