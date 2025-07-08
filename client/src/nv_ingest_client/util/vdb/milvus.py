@@ -12,6 +12,7 @@ from functools import partial
 import json
 import os
 import numpy as np
+import ast
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -623,7 +624,9 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
         field = meta_fields.iloc[0][col]
-        if isinstance(field, (np.int32, np.int64)):
+        if isinstance(field, str) and field[0] == "[":
+            field = ast.literal_eval(field)
+        elif isinstance(field, (np.int32, np.int64)):
             field = int(field)
         elif isinstance(field, (np.float32, np.float64)):
             field = float(field)
