@@ -14,7 +14,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 # --- Constants ---
-DEFAULT_STAGE_COST_MB = 10_000.0  # Fallback memory cost
+DEFAULT_STAGE_COST_MB = 5_000.0  # Fallback memory cost
 
 
 @dataclass
