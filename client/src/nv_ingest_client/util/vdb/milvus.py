@@ -11,6 +11,7 @@ import pandas as pd
 from functools import partial
 import json
 import os
+import numpy as np
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -231,7 +232,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
     schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=dense_dim)
     schema.add_field(field_name="source", datatype=DataType.JSON)
-    schema.add_field(field_name="content_metadata", datatype=DataType.JSON)
+    schema.add_field(field_name="content_metadata", datatype=DataType.JSON, nullable=True)
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
     elif sparse:
@@ -486,11 +487,12 @@ def _format_sparse_embedding(sparse_vector: csr_array):
 
 
 def _record_dict(text, element, sparse_vector: csr_array = None):
+    element["metadata"].pop("content")
     record = {
         "text": text,
-        "vector": element["metadata"]["embedding"],
-        "source": element["metadata"]["source_metadata"],
-        "content_metadata": element["metadata"]["content_metadata"],
+        "vector": element["metadata"].pop("embedding"),
+        "source": element["metadata"].pop("source_metadata"),
+        "content_metadata": element["metadata"],
     }
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
@@ -620,7 +622,14 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
         logger.info(f"FOUND MORE THAN ONE metadata entry for {element_name}, will use first entry")
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
-        element["metadata"]["content_metadata"][col] = str(meta_fields.iloc[0][col])
+        field = meta_fields.iloc[0][col]
+        if isinstance(field, (np.int32, np.int64)):
+            field = int(field)
+        elif isinstance(field, (np.float32, np.float64)):
+            field = float(field)
+        elif isinstance(field, (np.bool_)):
+            field = bool(field)
+        element["metadata"][col] = field
 
 
 def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
