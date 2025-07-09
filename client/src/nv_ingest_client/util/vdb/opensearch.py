@@ -4,7 +4,6 @@ import logging
 from nv_ingest_client.util.vdb.adt_vdb import VDB
 import opensearchpy as opensearch
 from nv_ingest_client.util.util import ClientConfigSchema
-from sentence_transformers.sparse_encoder import SparseEncoder
 
 logger = logging.getLogger(__name__)
 
@@ -19,8 +18,6 @@ class OpenSearch(VDB):
         self.verify_certs = kwargs.get("verify_certs", False)
         self.http_compress = kwargs.get("http_compress", False)
         self.dense_dim = kwargs.get("dense_dim", 2048)
-        self.sparse = kwargs.get("sparse", False)
-        self.sparse_model = kwargs.get("sparse_model", None)
         self.index_name = kwargs.get("index_name", "nv_ingest_test")
         self.enable_text = kwargs.get("enable_text", True)
         self.enable_charts = kwargs.get("enable_charts", True)
@@ -28,9 +25,6 @@ class OpenSearch(VDB):
         self.enable_images = kwargs.get("enable_images", True)
         self.enable_infographics = kwargs.get("enable_infographics", True)
         self.enable_audio = kwargs.get("enable_audio", True)
-        self.sparse_model_name = kwargs.get(
-            "sparse_model_name", "opensearch-project/opensearch-neural-sparse-encoding-v1"
-        )
         super().__init__(**kwargs)
 
         self.client = opensearch.OpenSearch(
@@ -41,15 +35,11 @@ class OpenSearch(VDB):
             verify_certs=self.verify_certs,
         )
 
-        self.sparse_model = None
-        if self.sparse:
-            self.sparse_model = SparseEncoder(self.sparse_model_name)
-
     def create_index(self, **kwargs):
         recreate = kwargs.get("recreate", False)
-        exists = self.client.indices.exists(index=self.index_name)
+        exists = self.client.indices.exists(index=f"{self.index_name}_dense")
         if recreate and exists:
-            self.client.indices.delete(index=self.index_name)
+            self.client.indices.delete(index=f"{self.index_name}_dense")
             exists = False
         if not exists:
             index_body = {
@@ -75,10 +65,8 @@ class OpenSearch(VDB):
                     }
                 },
             }
-            # if self.sparse:
-            #     index_body['mappings']['properties']['sparse'] = {'type': "rank_features"}
 
-            self.client.indices.create(index=self.index_name, body=index_body)
+            self.client.indices.create(index=f"{self.index_name}_dense", body=index_body)
 
     def write_to_index(self, records: list, **kwargs):
         count = 0
@@ -86,17 +74,12 @@ class OpenSearch(VDB):
             for record in record_set:
                 transform_record = self.transform_record(record)
                 if transform_record:
-                    if self.sparse:
-                        sparse_embedding = self.sparse_model.encode_document(transform_record["text"])
-                        transform_record["sparse"] = transform_sparse_vector_to_dict(
-                            self.sparse_model, sparse_embedding
-                        )
-                    self.client.index(index=self.index_name, body=transform_record, id=count)
+                    self.client.index(index=f"{self.index_name}_dense", body=transform_record, id=count)
                     count += 1
 
     def retrieval(self, queries: list, **kwargs):
         client_config = ClientConfigSchema()
-        index_name = kwargs.get("index_name", self.index_name)
+        index_name = kwargs.get("index_name", f"{self.index_name}_dense")
         top_k = kwargs.get("top_k", 10)
         nvidia_api_key = kwargs.get("nvidia_api_key" or client_config.nvidia_api_key)
         # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
@@ -108,17 +91,9 @@ class OpenSearch(VDB):
         results = []
         for query in queries:
             embedding = dense_model.get_query_embedding(query)
-            sparse_embedding = None
-            if self.sparse:
-                sparse_embedding = transform_sparse_vector_to_dict(
-                    self.sparse_model, self.sparse_model.encode_query(query)
-                )
 
             query_body = {
                 "query": {
-                    "hybrid": {
-                        "query": {"match": {"text": query}},
-                    },
                     "knn": {
                         "dense": {
                             "vector": embedding,
@@ -127,12 +102,12 @@ class OpenSearch(VDB):
                     },
                 }
             }
-            if self.sparse:
-                query_body["query"]["knn"]["sparse"] = {
-                    "vector": sparse_embedding,
-                    "k": top_k,
-                }
-            response = [hit["_source"] for hit in self.client.search(index=index_name, body=query_body)["hits"]["hits"]]
+            response = [
+                hit["_source"]
+                for hit in self.client.search(index=f"{index_name}_dense", body=query_body)["hits"]["hits"]
+            ]
+            for res in response:
+                res.pop("dense")
             results.append(response)
         return results
 
@@ -161,10 +136,6 @@ class OpenSearch(VDB):
             }
         else:
             return None
-
-
-def transform_sparse_vector_to_dict(sparse_model, sparse_vector):
-    return {token: score for token, score in sparse_model.decode(sparse_vector)}
 
 
 def verify_embedding(element):

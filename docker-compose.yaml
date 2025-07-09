@@ -462,3 +462,38 @@ services:
       - "milvus"
     profiles:
       - retrieval
+
+
+  opensearch:
+    image: opensearchproject/opensearch:3.1.0
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m -XX:MaxDirectMemorySize=10g"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD="myStrongPassword123@456"
+      - DISABLE_SECURITY_PLUGIN=true
+    volumes:
+      - ./.volumes/opensearch:/usr/share/opensearch/data
+    healthcheck:
+      test: [ "CMD", "curl", "-f", "http://localhost:9200" ]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    profiles:
+      - retrieval
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:latest
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: 'true'
+    depends_on:
+      - opensearch
