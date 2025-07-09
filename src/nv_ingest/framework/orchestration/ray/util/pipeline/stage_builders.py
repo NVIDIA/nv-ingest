@@ -2,10 +2,8 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-# TODO(Devin)
-# flake8: noqa
 import os
-
+import psutil
 import click
 import logging
 
@@ -13,6 +11,7 @@ from nv_ingest.framework.orchestration.ray.stages.sinks.default_drain import Def
 from nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer import OpenTelemetryTracerStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.gather import GatherStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.scatter import PDFScatterSchema, PDFScatterStage
+from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
 from nv_ingest.framework.schemas.framework_otel_tracer_schema import OpenTelemetryTracerSchema
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import InfographicExtractorSchema
 
@@ -43,7 +42,6 @@ from nv_ingest.framework.orchestration.ray.stages.storage.image_storage import I
 from nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings import EmbeddingStorageStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.image_caption import ImageCaptionTransformStage
 from nv_ingest.framework.orchestration.ray.stages.transforms.text_embed import TextEmbeddingTransformStage
-from nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter import TextSplitterStage
 from nv_ingest.framework.schemas.framework_metadata_injector_schema import MetadataInjectorSchema
 from nv_ingest_api.internal.schemas.extract.extract_audio_schema import AudioExtractorSchema
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
@@ -109,7 +107,7 @@ def get_nim_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -139,7 +137,7 @@ def get_audio_retrieval_service(env_var_prefix):
         "",
     )
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -196,6 +194,16 @@ def add_gather_stage(pipeline, default_cpu_count, stage_name="gather"):
 
 
 def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extractor"):
+    # Heuristic: Determine max_replicas based on system memory, capped by CPU cores.
+    total_memory_mb = psutil.virtual_memory().total / (1024**2)
+
+    # Allocate up to 75% of memory to this stage, using a 10GB high watermark per worker.
+    allocatable_memory_for_stage_mb = total_memory_mb * 0.75
+    memory_based_replicas = int(allocatable_memory_for_stage_mb / 10_000.0)
+
+    # Cap the number of replicas by the number of available CPU cores.
+    max_replicas = max(1, min(memory_based_replicas, default_cpu_count))
+
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
@@ -225,7 +233,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
         stage_actor=PDFExtractorStage,
         config=extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 3))),  # 33% of available CPU cores
+        max_replicas=max_replicas,
     )
 
     return stage_name
@@ -254,7 +262,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -283,7 +291,7 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -307,7 +315,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -329,7 +337,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -351,7 +359,7 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -373,7 +381,7 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -399,7 +407,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
         min_replicas=0,
-        max_replicas=1,  # Audio extraction is a heavy IO bound operation with minimal CPU usage
+        max_replicas=1,
     )
 
     return stage_name
@@ -412,7 +420,7 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -477,7 +485,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -485,7 +493,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
 
 def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_caption"):
     auth_token = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -493,7 +501,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
     )
 
     endpoint_url = os.environ.get("VLM_CAPTION_ENDPOINT", "localhost:5000")
-    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
+    model_name = os.environ.get("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
 
     config = ImageCaptionExtractionSchema(
         **{
@@ -517,7 +525,7 @@ def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_capti
 
 def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embedding"):
     api_key = os.environ.get(
-        "NVIDIA_BUILD_API_KEY",
+        "NVIDIA_API_KEY",
         "",
     ) or os.environ.get(
         "NGC_API_KEY",
@@ -539,7 +547,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name

@@ -23,15 +23,12 @@ class RayActorSourceStage(RayActorStage, ABC):
         super().__init__(config, log_to_stdout=log_to_stdout)
         self.paused = False
 
+    def on_data(self, IngestControlMessage):
+        return NotImplemented("Source stages do not implement on_data().")
+
     @ray.method(num_returns=1)
     def set_input_queue(self, queue_handle: Any) -> bool:
         raise NotImplementedError("Source stages do not support an input queue.")
-
-    def get_input(self) -> Any:
-        """
-        Source stages must implement get_input() to fetch control messages from an external source.
-        """
-        pass
 
     @abstractmethod
     def _read_input(self) -> Any:
