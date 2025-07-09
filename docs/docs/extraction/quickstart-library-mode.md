@@ -31,19 +31,17 @@ Use the following procedure to prepare your environment.
 
     !!! note
 
-        If you use an NGC personal key, then you should provide the same value for all keys, but you must specify each environment variable individually. In the past, you could create an API key. If you have an API key, you can still use that. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md) and [Environment Configuration Variables](environment-config.md).
+        If you have an NGC API key, you can use it here. For more information, refer to [Generate Your NGC Keys](ngc-api-key.md) and [Environment Configuration Variables](environment-config.md).
 
     - To set your variables, use the following code.
 
         ```
-        export NVIDIA_BUILD_API_KEY=nvapi-<your key>
         export NVIDIA_API_KEY=nvapi-<your key>
         ```
     - To add your variables to an .env file, include the following.
 
         ```
-        NVIDIA_BUILD_API_KEY=nvapi-<your key>
-        NVIDIA_API_KEY=nvapi-<your key>    
+        NVIDIA_API_KEY=nvapi-<your key>
         ```
 
 
@@ -185,7 +183,7 @@ retrieved_docs = nvingest_retrieval(
 extract = retrieved_docs[0][0]["entity"]["text"]
 client = OpenAI(
   base_url = "https://integrate.api.nvidia.com/v1",
-  api_key = os.environ["NVIDIA_BUILD_API_KEY"]
+  api_key = os.environ["NVIDIA_API_KEY"]
 )
 
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"

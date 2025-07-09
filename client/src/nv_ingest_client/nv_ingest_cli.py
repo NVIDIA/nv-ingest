@@ -124,9 +124,9 @@ Tasks and Options:
 - caption: Attempts to extract captions for unstructured images extracted from documents.
     Options:
       - api_key (str): API key for captioning service.
-      Default: os.environ(NVIDIA_BUILD_API_KEY).'
+      Default: os.environ(NVIDIA_API_KEY).'
       - endpoint_url (str): Endpoint URL for captioning service.
-      Default: 'https://build.nvidia.com/meta/llama-3.2-11b-vision-instruct'.
+      Default: 'https://build.nvidia.com/nvidia/llama-3.1-nemotron-nano-vl-8b-v1'.
       - prompt (str): Prompt for captioning service.
       Default: 'Caption the content of this image:'.
 \b

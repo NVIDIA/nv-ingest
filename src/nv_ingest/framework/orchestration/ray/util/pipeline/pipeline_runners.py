@@ -22,9 +22,7 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipelineSubprocessInterface,
     RayPipelineInterface,
 )
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import (
-    setup_ingestion_pipeline,
-)
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
 
 logger = logging.getLogger(__name__)
 
@@ -67,15 +65,14 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT",
-        "https://integrate.api.nvidia.com/v1/chat/completions",
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
     )
     nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
     nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
-    nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
+    nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
 
     # Observability settings
     otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
@@ -90,9 +87,9 @@ class PipelineCreationSchema(BaseModel):
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
         "VLM_CAPTION_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
+        "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
     )
-    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
+    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
 
     # YOLOX image processing settings
     yolox_graphic_elements_http_endpoint: str = os.getenv(
@@ -103,15 +100,13 @@ class PipelineCreationSchema(BaseModel):
 
     # YOLOX page elements settings
     yolox_http_endpoint: str = os.getenv(
-        "YOLOX_HTTP_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2",
+        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
     )
     yolox_infer_protocol: str = os.getenv("YOLOX_INFER_PROTOCOL", "http")
 
     # YOLOX table structure settings
     yolox_table_structure_http_endpoint: str = os.getenv(
-        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT",
-        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1",
+        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
     )
     yolox_table_structure_infer_protocol: str = os.getenv("YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL", "http")
 
@@ -239,8 +234,7 @@ def _launch_pipeline(
     dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
 
     scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling,
-        dynamic_memory_threshold=dynamic_memory_threshold,
+        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
     )
 
     pipeline = RayPipeline(scaling_config=scaling_config)
@@ -339,9 +333,9 @@ def run_pipeline(
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
         if (ingest_config.ngc_api_key is None or ingest_config.ngc_api_key == "") and (
-            ingest_config.nvidia_build_api_key is None or ingest_config.nvidia_build_api_key == ""
+            ingest_config.nvidia_api_key is None or ingest_config.nvidia_api_key == ""
         ):
-            logger.warning("NGC_API_KEY or NVIDIA_BUILD_API_KEY are not set. NIM Related functions will not work.")
+            logger.warning("NGC_API_KEY or NVIDIA_API_KEY are not set. NIM Related functions will not work.")
 
         ctx = multiprocessing.get_context("fork")
         process = ctx.Process(
