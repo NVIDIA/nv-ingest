@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
-
+import psutil
 import click
 import logging
 
@@ -174,6 +174,16 @@ def add_metadata_injector_stage(pipeline, default_cpu_count, stage_name="metadat
 
 
 def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extractor"):
+    # Heuristic: Determine max_replicas based on system memory, capped by CPU cores.
+    total_memory_mb = psutil.virtual_memory().total / (1024**2)
+
+    # Allocate up to 75% of memory to this stage, using a 10GB high watermark per worker.
+    allocatable_memory_for_stage_mb = total_memory_mb * 0.75
+    memory_based_replicas = int(allocatable_memory_for_stage_mb / 10_000.0)
+
+    # Cap the number of replicas by the number of available CPU cores.
+    max_replicas = max(1, min(memory_based_replicas, default_cpu_count))
+
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
         get_nim_service("nemoretriever_parse")
@@ -203,7 +213,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
         stage_actor=PDFExtractorStage,
         config=extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 3))),  # 33% of available CPU cores
+        max_replicas=max_replicas,
     )
 
     return stage_name
@@ -232,7 +242,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -261,7 +271,7 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 7))),  # 14% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -285,7 +295,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -307,7 +317,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -329,7 +339,7 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -351,7 +361,7 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -377,7 +387,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
         stage_actor=AudioExtractorStage,
         config=audio_extractor_config,
         min_replicas=0,
-        max_replicas=1,  # Audio extraction is a heavy IO bound operation with minimal CPU usage
+        max_replicas=1,
     )
 
     return stage_name
@@ -390,7 +400,7 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=1,
     )
 
     return stage_name
@@ -455,7 +465,7 @@ def add_text_splitter_stage(pipeline, default_cpu_count, stage_name="text_splitt
         stage_actor=TextSplitterStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
@@ -517,7 +527,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
+        max_replicas=2,
     )
 
     return stage_name
