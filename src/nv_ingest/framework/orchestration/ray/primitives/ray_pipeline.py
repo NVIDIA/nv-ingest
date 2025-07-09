@@ -69,8 +69,8 @@ class ScalingConfig:
 
     dynamic_memory_scaling: bool = True
     dynamic_memory_threshold: float = 0.75
-    pid_kp: float = 0.1
-    pid_ki: float = 0.001
+    pid_kp: float = 0.2
+    pid_ki: float = 0.01
     pid_kd: float = 0.0
     pid_ema_alpha: float = 0.1
     pid_target_queue_depth: int = 0

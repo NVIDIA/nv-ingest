@@ -4,7 +4,6 @@
 
 import os
 import psutil
-
 import click
 import logging
 
@@ -175,12 +174,15 @@ def add_metadata_injector_stage(pipeline, default_cpu_count, stage_name="metadat
 
 
 def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extractor"):
-    # Calculate max_replicas based on system memory
-    total_memory_gb = psutil.virtual_memory().total / (1024**3)
-    # Assuming each replica can use up to 10GB, and we allocate 75% of memory to this stage
-    allocatable_memory_for_stage_gb = total_memory_gb * 0.75
-    max_replicas = int(allocatable_memory_for_stage_gb / 10)
-    max_replicas = max(1, max_replicas)  # Ensure at least 1 replica
+    # Heuristic: Determine max_replicas based on system memory, capped by CPU cores.
+    total_memory_mb = psutil.virtual_memory().total / (1024**2)
+
+    # Allocate up to 75% of memory to this stage, using a 10GB high watermark per worker.
+    allocatable_memory_for_stage_mb = total_memory_mb * 0.75
+    memory_based_replicas = int(allocatable_memory_for_stage_mb / 10_000.0)
+
+    # Cap the number of replicas by the number of available CPU cores.
+    max_replicas = max(1, min(memory_based_replicas, default_cpu_count))
 
     yolox_grpc, yolox_http, yolox_auth, yolox_protocol = get_nim_service("yolox")
     nemoretriever_parse_grpc, nemoretriever_parse_http, nemoretriever_parse_auth, nemoretriever_parse_protocol = (
