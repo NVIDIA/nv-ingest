@@ -22,7 +22,9 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipelineSubprocessInterface,
     RayPipelineInterface,
 )
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import setup_ingestion_pipeline
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_builders import (
+    setup_ingestion_pipeline,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -65,7 +67,8 @@ class PipelineCreationSchema(BaseModel):
 
     # NeMo Retriever settings
     nemoretriever_parse_http_endpoint: str = os.getenv(
-        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT", "https://integrate.api.nvidia.com/v1/chat/completions"
+        "NEMORETRIEVER_PARSE_HTTP_ENDPOINT",
+        "https://integrate.api.nvidia.com/v1/chat/completions",
     )
     nemoretriever_parse_infer_protocol: str = os.getenv("NEMORETRIEVER_PARSE_INFER_PROTOCOL", "http")
     nemoretriever_parse_model_name: str = os.getenv("NEMORETRIEVER_PARSE_MODEL_NAME", "nvidia/nemoretriever-parse")
@@ -86,7 +89,8 @@ class PipelineCreationSchema(BaseModel):
 
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
-        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
+        "VLM_CAPTION_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
     )
     vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
 
@@ -99,13 +103,15 @@ class PipelineCreationSchema(BaseModel):
 
     # YOLOX page elements settings
     yolox_http_endpoint: str = os.getenv(
-        "YOLOX_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        "YOLOX_HTTP_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2",
     )
     yolox_infer_protocol: str = os.getenv("YOLOX_INFER_PROTOCOL", "http")
 
     # YOLOX table structure settings
     yolox_table_structure_http_endpoint: str = os.getenv(
-        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+        "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1",
     )
     yolox_table_structure_infer_protocol: str = os.getenv("YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL", "http")
 
@@ -233,7 +239,8 @@ def _launch_pipeline(
     dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
 
     scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
+        dynamic_memory_scaling=dynamic_memory_scaling,
+        dynamic_memory_threshold=dynamic_memory_threshold,
     )
 
     pipeline = RayPipeline(scaling_config=scaling_config)
