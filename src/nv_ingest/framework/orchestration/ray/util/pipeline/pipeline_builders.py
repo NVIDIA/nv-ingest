@@ -26,7 +26,7 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.stage_builders import (
     add_chart_extractor_stage,
     add_image_caption_stage,
     add_text_splitter_stage,
-    add_llm_text_splitter_stage,
+    add_structural_text_splitter_stage,
     add_text_embedding_stage,
     add_embedding_storage_stage,
     add_image_storage_stage,
@@ -123,7 +123,7 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
     ## Transforms and data synthesis
     ########################################################################################################
     text_splitter_stage_id = add_text_splitter_stage(pipeline, default_cpu_count)
-    llm_text_splitter_stage_id = add_llm_text_splitter_stage(pipeline, default_cpu_count)
+    structural_text_splitter_stage_id = add_structural_text_splitter_stage(pipeline, default_cpu_count)
 
     embed_extractions_stage_id = add_text_embedding_stage(pipeline, default_cpu_count)
 
@@ -174,10 +174,10 @@ def setup_ingestion_pipeline(pipeline: RayPipeline, ingest_config: Dict[str, Any
 
     ###### Primitive Mutators ########
     pipeline.make_edge(image_filter_stage_id, image_dedup_stage_id, queue_size=ingest_edge_buffer_size)
-    pipeline.make_edge(image_dedup_stage_id, llm_text_splitter_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(image_dedup_stage_id, structural_text_splitter_stage_id, queue_size=ingest_edge_buffer_size)
 
     ###### Primitive Transforms ########
-    pipeline.make_edge(llm_text_splitter_stage_id, embed_extractions_stage_id, queue_size=ingest_edge_buffer_size)
+    pipeline.make_edge(structural_text_splitter_stage_id, embed_extractions_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(embed_extractions_stage_id, image_caption_stage_id, queue_size=ingest_edge_buffer_size)
     pipeline.make_edge(image_caption_stage_id, image_storage_stage_id, queue_size=ingest_edge_buffer_size)
 

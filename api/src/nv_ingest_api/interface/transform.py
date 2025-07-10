@@ -14,9 +14,11 @@ from nv_ingest_api.internal.enums.common import DocumentTypeEnum
 from nv_ingest_api.internal.schemas.transform.transform_image_caption_schema import ImageCaptionExtractionSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
+from nv_ingest_api.internal.schemas.transform.transform_structural_text_splitter_schema import StructuralTextSplitterSchema
 from nv_ingest_api.internal.transform.caption_image import transform_image_create_vlm_caption_internal
 from nv_ingest_api.internal.transform.embed_text import transform_create_text_embeddings_internal
 from nv_ingest_api.internal.transform.split_text import transform_text_split_and_tokenize_internal
+from nv_ingest_api.internal.transform.structural_split_text import transform_text_split_structural_internal
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 
@@ -373,6 +375,179 @@ def transform_text_split_and_tokenize(
     )
 
     result = transform_text_split_and_tokenize_internal(
+        df_transform_ledger=inputs,
+        task_config=task_config,
+        transform_config=transform_config,
+        execution_trace_log=None,
+    )
+
+    return result
+
+
+@unified_exception_handler
+def transform_text_split_structural(
+    *,
+    inputs: Union[pd.DataFrame, str, List[str]],
+    markdown_headers: Optional[List[str]] = None,
+    max_chunk_size_tokens: Optional[int] = None,
+    enable_llm_enhancement: Optional[bool] = None,
+    llm_endpoint: Optional[str] = None,
+    llm_model_name: Optional[str] = None,
+    llm_api_key_env_var: Optional[str] = None,
+    split_source_types: Optional[List[str]] = None,
+) -> pd.DataFrame:
+    """
+    Transform text documents by splitting them on markdown headers to preserve hierarchical structure.
+
+    This function splits documents primarily by markdown headers (e.g., #, ##, ###) to maintain
+    document structure. Optionally, it can use an LLM to find logical split points for sections
+    that exceed the maximum token limit.
+
+    The function accepts input in one of two forms:
+
+    1. A pandas DataFrame that already follows the required structure:
+
+       Required DataFrame Structure:
+           - source_name (str): Identifier for the source document.
+           - source_id (str): Unique identifier for the document.
+           - content (str): The document content (typically as a base64-encoded string).
+           - document_type (str): For plain text, set to DocumentTypeEnum.TXT.
+           - metadata (dict): Must contain:
+               * content: The original text content.
+               * content_metadata: A dictionary with a key "type" (e.g., "text").
+               * source_metadata: A dictionary with source-specific metadata (e.g., file path, timestamps).
+               * Other keys (audio_metadata, image_metadata, etc.) set to None or empty as appropriate.
+               * raise_on_failure: Boolean (typically False).
+
+    2. A plain text string or a list of plain text strings.
+       In this case, the function converts each text into a BytesIO object (encoding it as UTF-8)
+       and then uses the helper function `build_dataframe_from_files` to construct a DataFrame where:
+           - source_name and source_id are generated as "text_0", "text_1", etc.
+           - content is the base64-encoded representation of the UTF-8 encoded text.
+           - document_type is set to DocumentTypeEnum.TXT.
+           - metadata is constructed using helper functions (for source and content metadata),
+             with content_metadata's "type" set to "text".
+
+    Parameters
+    ----------
+    inputs : Union[pd.DataFrame, str, List[str]]
+        Either a DataFrame following the required structure, a single plain text string,
+        or a list of plain text strings.
+    markdown_headers : Optional[List[str]], default=None
+        List of markdown header prefixes to use as split points (e.g., ["#", "##", "###"]).
+        If None, uses the default headers from the schema.
+    max_chunk_size_tokens : Optional[int], default=None
+        Maximum number of tokens per chunk. Sections exceeding this limit will trigger
+        LLM enhancement if enabled. If None, uses the default from the schema.
+    enable_llm_enhancement : Optional[bool], default=None
+        Whether to use LLM to find logical split points for oversized sections.
+        If None, uses the default from the schema (False).
+    llm_endpoint : Optional[str], default=None
+        URL of the LLM API endpoint for enhancement. If None, uses the default from the schema.
+    llm_model_name : Optional[str], default=None
+        Name of the LLM model to use for enhancement. If None, uses the default from the schema.
+    llm_api_key_env_var : Optional[str], default=None
+        Name of the environment variable containing the LLM API key.
+        If None, uses the default from the schema.
+    split_source_types : Optional[List[str]], default=["text"]
+        List of source types to filter for structural splitting. If None or empty, defaults to ["text"].
+
+    Returns
+    -------
+    pd.DataFrame
+        A DataFrame with the processed documents, where text content has been split by markdown
+        headers while preserving hierarchical structure. The returned DataFrame retains the
+        original columns and updates the "metadata" field with hierarchical header information
+        in the "custom_content" field.
+
+    Raises
+    ------
+    Exception
+        Propagates any exceptions encountered during structural text splitting, with additional
+        context provided by the unified exception handler.
+
+    Examples
+    --------
+    >>> # Using a DataFrame:
+    >>> import pandas as pd
+    >>> df = pd.DataFrame({
+    ...     "source_name": ["doc1.md"],
+    ...     "source_id": ["doc1.md"],
+    ...     "content": ["<base64-encoded markdown>"],
+    ...     "document_type": ["text"],
+    ...     "metadata": [{
+    ...         "content": "# Title\\n\\nContent\\n\\n## Section\\n\\nMore content.",
+    ...         "content_metadata": {"type": "text"},
+    ...         "source_metadata": {"source_id": "doc1.md", "source_name": "doc1.md", "source_type": "md"},
+    ...         "audio_metadata": None,
+    ...         "image_metadata": None,
+    ...         "text_metadata": None,
+    ...         "raise_on_failure": False,
+    ...     }],
+    ... })
+    >>> transform_text_split_structural(
+    ...     inputs=df,
+    ...     markdown_headers=["#", "##", "###"],
+    ...     max_chunk_size_tokens=800,
+    ...     enable_llm_enhancement=False
+    ... )
+
+    >>> # Using a single markdown text string:
+    >>> transform_text_split_structural(
+    ...     inputs="# Title\\n\\nContent\\n\\n## Section\\n\\nMore content.",
+    ...     markdown_headers=["#", "##"],
+    ...     max_chunk_size_tokens=800
+    ... )
+
+    >>> # Using a list of markdown text strings:
+    >>> texts = ["# Doc 1\\n\\nContent 1.", "# Doc 2\\n\\nContent 2."]
+    >>> transform_text_split_structural(
+    ...     inputs=texts,
+    ...     markdown_headers=["#", "##", "###"],
+    ...     enable_llm_enhancement=True,
+    ...     llm_endpoint="https://integrate.api.nvidia.com/v1"
+    ... )
+    """
+    # If input is not a DataFrame, assume it is a string or list of strings and construct a DataFrame.
+    if not isinstance(inputs, pd.DataFrame):
+        if isinstance(inputs, str):
+            texts = [inputs]
+        elif isinstance(inputs, list) and all(isinstance(t, str) for t in inputs):
+            texts = inputs
+        else:
+            raise ValueError("inputs must be a DataFrame, a string, or a list of strings.")
+        # Convert each text string to a BytesIO object with UTF-8 encoding.
+        file_sources = [BytesIO(text.encode("utf-8")) for text in texts]
+        # Generate unique identifiers for source_name and source_id.
+        source_names = [f"text_{i}" for i in range(len(texts))]
+        source_ids = source_names.copy()
+        # For plain text, document type is set to DocumentTypeEnum.TXT.
+        doc_types = [DocumentTypeEnum.TXT for _ in texts]
+        inputs = build_dataframe_from_files(file_sources, source_names, source_ids, doc_types)
+
+    if not split_source_types:
+        split_source_types = ["text"]
+
+    # Build task configuration with only non-None values
+    task_config: Dict[str, any] = {
+        "split_source_types": split_source_types,
+    }
+
+    # Build transform configuration with only non-None values
+    config_kwargs = {
+        "markdown_headers_to_split_on": markdown_headers,
+        "max_chunk_size_tokens": max_chunk_size_tokens,
+        "enable_llm_enhancement": enable_llm_enhancement,
+        "llm_endpoint": llm_endpoint,
+        "llm_model_name": llm_model_name,
+        "llm_api_key_env_var": llm_api_key_env_var,
+    }
+    # Remove any keys with a None value.
+    config_kwargs = {k: v for k, v in config_kwargs.items() if v is not None}
+
+    transform_config: StructuralTextSplitterSchema = StructuralTextSplitterSchema(**config_kwargs)
+
+    result = transform_text_split_structural_internal(
         df_transform_ledger=inputs,
         task_config=task_config,
         transform_config=transform_config,
