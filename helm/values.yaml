@@ -276,7 +276,7 @@ nemoretriever-table-structure-v1:
 ## @param nim-vlm-image-captioning.fullnameOverride [default: "nim-vlm-image-captioning"] Override the full name of the deployment
 ## @param nim-vlm-image-captioning.customCommand [default: []] Custom command to run in the container
 ## @param nim-vlm-image-captioning.customArgs [default: []] Custom arguments to pass to the container command
-## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/meta/llama-3.2-11b-vision-instruct"] The container image repository
+## @param nim-vlm-image-captioning.image.repository [default: "nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1"] The container image repository
 ## @param nim-vlm-image-captioning.image.tag [default: "latest"] The container image tag
 ## @param nim-vlm-image-captioning.podSecurityContext [default: {}] Pod security context configuration
 ## @param nim-vlm-image-captioning.replicaCount [default: 1] Number of replicas to deploy
@@ -294,7 +294,7 @@ nim-vlm-image-captioning:
   customCommand: []
   customArgs: []
   image:
-    repository: nvcr.io/nim/meta/llama-3.2-11b-vision-instruct
+    repository: nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1
     tag: "1.1.1"
   podSecurityContext:
     runAsUser: 1000
@@ -856,8 +856,8 @@ prometheus:
 ## @param envVars.EMBEDDING_NIM_ENDPOINT [default: "http://nv-ingest-embedqa:8000/v1"] Endpoint for embedding service
 ## @param envVars.EMBEDDING_NIM_MODEL_NAME [default: "nvidia/llama-3.2-nv-embedqa-1b-v2"] Model name for embedding service
 ## @param envVars.MILVUS_ENDPOINT [default: "http://nv-ingest-milvus:19530"] Endpoint for Milvus vector database
-## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"] Endpoint for VLM caption service
-## @param envVars.VLM_CAPTION_MODEL_NAME [default: "meta/llama-3.2-11b-vision-instruct"] Model name for VLM caption service
+## @param envVars.VLM_CAPTION_ENDPOINT [default: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"] Endpoint for VLM caption service
+## @param envVars.VLM_CAPTION_MODEL_NAME [default: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"] Model name for VLM caption service
 ## @param envVars.AUDIO_GRPC_ENDPOINT [default: "nv-ingest-riva-nim:50051"] gRPC endpoint for audio service
 ## @param envVars.AUDIO_INFER_PROTOCOL [default: "grpc"] Protocol for audio service
 ## @param envVars.COMPONENTS_TO_READY_CHECK [default: "ALL"] Components to check during readiness probe
@@ -900,8 +900,8 @@ envVars:
   EMBEDDING_NIM_MODEL_NAME: "nvidia/llama-3.2-nv-embedqa-1b-v2"
   MILVUS_ENDPOINT: "http://nv-ingest-milvus:19530"
 
-  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
-  VLM_CAPTION_MODEL_NAME: "meta/llama-3.2-11b-vision-instruct"
+  VLM_CAPTION_ENDPOINT: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
+  VLM_CAPTION_MODEL_NAME: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
 
   AUDIO_GRPC_ENDPOINT: "nv-ingest-riva-nim:50051"
   AUDIO_INFER_PROTOCOL: "grpc"
