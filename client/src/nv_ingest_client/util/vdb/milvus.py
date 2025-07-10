@@ -624,8 +624,15 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
         field = meta_fields.iloc[0][col]
-        if isinstance(field, str) and field[0] == "[":
-            field = ast.literal_eval(field)
+        # catch any nan values
+        if pd.isna(field):
+            field = None
+        elif isinstance(field, str):
+            if field == "":
+                field = None
+            # this is specifically for lists
+            elif field[0] == "[":
+                field = ast.literal_eval(field)
         elif isinstance(field, (np.int32, np.int64)):
             field = int(field)
         elif isinstance(field, (np.float32, np.float64)):
