@@ -111,9 +111,6 @@ class OpenSearch(VDB):
             results.append(response)
         return results
 
-    def reindex(self, records: list, **kwargs):
-        pass
-
     def run(self, records):
         self.create_index()
         self.write_to_index(records)
