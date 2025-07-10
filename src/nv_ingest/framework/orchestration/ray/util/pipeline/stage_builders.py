@@ -500,38 +500,6 @@ def add_structural_text_splitter_stage(pipeline, default_cpu_count, stage_name="
 
     return stage_name
 
-
-# DEPRECATED: Use add_structural_text_splitter_stage instead
-# def add_llm_text_splitter_stage(pipeline, default_cpu_count, stage_name="llm_text_splitter"):
-#     """DEPRECATED: Use add_structural_text_splitter_stage instead.
-#     
-#     This function has been deprecated because it was misleadingly named.
-#     The functionality is now available as the structural text splitter,
-#     which better reflects its primary purpose of splitting by markdown headers.
-#     """
-#     llm_endpoint = os.getenv("LLM_SPLITTER_NIM_ENDPOINT", "https://integrate.api.nvidia.com/v1")
-#     model_name = os.getenv("LLM_SPLITTER_MODEL_NAME", "meta/llama-3.1-8b-instruct")
-#     api_key_env_var = os.getenv("LLM_SPLITTER_API_KEY_ENV_VAR", "NVIDIA_API_KEY")
-#
-#     config = LLMTextSplitterSchema(
-#         llm_endpoint=llm_endpoint,
-#         llm_model_name=model_name,
-#         llm_api_key_env_var=api_key_env_var,
-#     )
-#
-#     pipeline.add_stage(
-#         name=stage_name,
-#         stage_actor=llm_text_splitter_fn,
-#         config=config,
-#         min_replicas=0,
-#         max_replicas=int(max(1, (default_cpu_count // 14))),  # 7% of available CPU cores
-#         trace_id="llm_text_splitter",
-#         required_tasks=["split"],
-#     )
-#
-#     return stage_name
-
-
 def add_image_caption_stage(pipeline, default_cpu_count, stage_name="image_caption"):
     auth_token = os.environ.get(
         "NVIDIA_BUILD_API_KEY",
