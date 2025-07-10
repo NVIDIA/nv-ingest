@@ -4,20 +4,21 @@
 # Copyright (c) 2024, NVIDIA CORPORATION.
 
 import base64
+import inspect
 import io
+import logging
+from typing import Any
+from typing import Dict
+from typing import List
+from typing import Optional
 
 import pandas as pd
-from typing import Any, Dict, List, Optional
-import logging
-
-from nv_ingest_api.internal.extract.pdf.engines import (
-    adobe_extractor,
-    llama_parse_extractor,
-    nemoretriever_parse_extractor,
-    pdfium_extractor,
-    tika_extractor,
-    unstructured_io_extractor,
-)
+from nv_ingest_api.internal.extract.pdf.engines import adobe_extractor
+from nv_ingest_api.internal.extract.pdf.engines import llama_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import nemoretriever_parse_extractor
+from nv_ingest_api.internal.extract.pdf.engines import pdfium_extractor
+from nv_ingest_api.internal.extract.pdf.engines import tika_extractor
+from nv_ingest_api.internal.extract.pdf.engines import unstructured_io_extractor
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 
 # Import extraction functions for different engines.
@@ -43,6 +44,7 @@ def _work_extract_pdf(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log=None,
 ) -> Any:
@@ -52,16 +54,24 @@ def _work_extract_pdf(
 
     extract_method = extractor_config["extract_method"]
     extractor_fn = EXTRACTOR_LOOKUP.get(extract_method, pdfium_extractor)
-    return extractor_fn(
-        pdf_stream,
-        extract_text,
-        extract_images,
-        extract_infographics,
-        extract_tables,
-        extract_charts,
-        extractor_config,
-        execution_trace_log,
+
+    extractor_fn_args = dict(
+        pdf_stream=pdf_stream,
+        extract_text=extract_text,
+        extract_images=extract_images,
+        extract_infographics=extract_infographics,
+        extract_tables=extract_tables,
+        extract_charts=extract_charts,
+        extractor_config=extractor_config,
+        execution_trace_log=execution_trace_log,
     )
+
+    if "extract_page_as_image" in inspect.signature(extractor_fn).parameters:
+        extractor_fn_args["extract_page_as_image"] = extract_page_as_image
+    elif extract_page_as_image:
+        logger.warning(f"`extract_page_as_image` is set to True, but {extract_method} does not support it.")
+
+    return extractor_fn(**extractor_fn_args)
 
 
 @unified_exception_handler
@@ -97,6 +107,7 @@ def _orchestrate_row_extraction(
         extract_tables = params.pop("extract_tables", False)
         extract_charts = params.pop("extract_charts", False)
         extract_infographics = params.pop("extract_infographics", False)
+        extract_page_as_image = params.pop("extract_page_as_image", False)
         extract_method = params.get("extract_method", "pdfium")
     except KeyError as e:
         raise ValueError(f"Missing required extraction flag: {e}")
@@ -137,6 +148,7 @@ def _orchestrate_row_extraction(
         extract_text=extract_text,
         extract_images=extract_images,
         extract_infographics=extract_infographics,
+        extract_page_as_image=extract_page_as_image,
         extract_tables=extract_tables,
         extract_charts=extract_charts,
         extractor_config=extractor_config,

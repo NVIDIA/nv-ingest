@@ -4,11 +4,13 @@
 
 import base64
 import io
+from unittest.mock import MagicMock
+from unittest.mock import patch
+
+import nv_ingest_api.internal.extract.pdf.engines.pdf_helpers as module_under_test
 import pandas as pd
 import pytest
-from unittest.mock import patch, MagicMock
 from nv_ingest_api.internal.extract.pdf.engines.pdf_helpers import _orchestrate_row_extraction
-import nv_ingest_api.internal.extract.pdf.engines.pdf_helpers as module_under_test
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -38,6 +40,7 @@ def dummy_task_config():
             "extract_tables": True,
             "extract_charts": False,
             "extract_infographics": False,
+            "extract_page_as_image": False,
             "extract_method": "pdfium",
         },
         "method": "pdfium",
@@ -152,25 +155,26 @@ def test_work_extract_pdf_dispatches_to_correct_extractor(dummy_pdf_stream, meth
             extract_infographics=True,
             extract_tables=True,
             extract_charts=True,
+            extract_page_as_image=True,
             extractor_config=extractor_config,
             execution_trace_log={"step": "test"},
         )
 
         # Assert
         mock_extractor.assert_called_once_with(
-            dummy_pdf_stream,
-            True,
-            True,
-            True,
-            True,
-            True,
-            extractor_config,
-            {"step": "test"},
+            pdf_stream=dummy_pdf_stream,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extractor_config=extractor_config,
+            execution_trace_log={"step": "test"},
         )
         assert result == "mock_result"
 
 
-@patch(f"{MODULE_UNDER_TEST}.pdfium_extractor")
+@patch(f"{MODULE_UNDER_TEST}.pdfium_extractor", autospec=True)
 def test_work_extract_pdf_defaults_to_pdfium(mock_pdfium_extractor, dummy_pdf_stream):
     # Arrange
     mock_pdfium_extractor.return_value = "default_pdfium_result"
@@ -186,19 +190,21 @@ def test_work_extract_pdf_defaults_to_pdfium(mock_pdfium_extractor, dummy_pdf_st
         extract_infographics=False,
         extract_tables=False,
         extract_charts=False,
+        extract_page_as_image=False,
         extractor_config=extractor_config,
         execution_trace_log=None,
     )
 
     # Assert
     mock_pdfium_extractor.assert_called_once_with(
-        dummy_pdf_stream,
-        False,
-        False,
-        False,
-        False,
-        False,
-        extractor_config,
-        None,
+        pdf_stream=dummy_pdf_stream,
+        extract_text=False,
+        extract_images=False,
+        extract_infographics=False,
+        extract_tables=False,
+        extract_charts=False,
+        extract_page_as_image=False,
+        extractor_config=extractor_config,
+        execution_trace_log=None,
     )
     assert result == "default_pdfium_result"
