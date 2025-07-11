@@ -13,6 +13,7 @@ import json
 import os
 import numpy as np
 import ast
+import copy
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -488,12 +489,13 @@ def _format_sparse_embedding(sparse_vector: csr_array):
 
 
 def _record_dict(text, element, sparse_vector: csr_array = None):
-    element["metadata"].pop("content")
+    cp_element = copy.deepcopy(element)
+    cp_element["metadata"].pop("content")
     record = {
         "text": text,
-        "vector": element["metadata"].pop("embedding"),
-        "source": element["metadata"].pop("source_metadata"),
-        "content_metadata": element["metadata"],
+        "vector": cp_element["metadata"].pop("embedding"),
+        "source": cp_element["metadata"].pop("source_metadata"),
+        "content_metadata": cp_element["metadata"],
     }
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
