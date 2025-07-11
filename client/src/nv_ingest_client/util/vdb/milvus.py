@@ -11,6 +11,9 @@ import pandas as pd
 from functools import partial
 import json
 import os
+import numpy as np
+import ast
+import copy
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -231,7 +234,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
     schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=dense_dim)
     schema.add_field(field_name="source", datatype=DataType.JSON)
-    schema.add_field(field_name="content_metadata", datatype=DataType.JSON)
+    schema.add_field(field_name="content_metadata", datatype=DataType.JSON, nullable=True)
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
     elif sparse:
@@ -259,7 +262,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
 
 
 def create_nvingest_index_params(
-    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = True, local_index: bool = True
+    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = False, local_index: bool = True
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -374,7 +377,7 @@ def create_nvingest_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     recreate_meta: bool = False,
 ) -> CollectionSchema:
@@ -486,11 +489,13 @@ def _format_sparse_embedding(sparse_vector: csr_array):
 
 
 def _record_dict(text, element, sparse_vector: csr_array = None):
+    cp_element = copy.deepcopy(element)
+    cp_element["metadata"].pop("content")
     record = {
         "text": text,
-        "vector": element["metadata"]["embedding"],
-        "source": element["metadata"]["source_metadata"],
-        "content_metadata": element["metadata"]["content_metadata"],
+        "vector": cp_element["metadata"].pop("embedding"),
+        "source": cp_element["metadata"].pop("source_metadata"),
+        "content_metadata": cp_element["metadata"],
     }
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
@@ -520,7 +525,7 @@ def cleanup_records(
     cleaned_records = []
     for result in records:
         if result is not None:
-            if not isinstance(result, list):
+            if isinstance(result, dict):
                 result = [result]
             for element in result:
                 text = _pull_text(
@@ -567,7 +572,7 @@ def _pull_text(
     verify_emb = verify_embedding(element)
     if not text or not verify_emb:
         source_name = element["metadata"]["source_metadata"]["source_name"]
-        pg_num = element["metadata"]["content_metadata"].get("page_number")
+        pg_num = element["metadata"]["content_metadata"].get("page_number", None)
         doc_type = element["document_type"]
         if not verify_emb:
             logger.debug(f"failed to find embedding for entity: {source_name} page: {pg_num} type: {doc_type}")
@@ -578,8 +583,8 @@ def _pull_text(
     if text and len(text) > 65535:
         logger.warning(
             f"Text is too long, skipping. It is advised to use SplitTask, to make smaller chunk sizes."
-            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata']['source_name']} "
-            f"page_number: {element['metadata']['content_metadata']['page_number']}"
+            f"text_length: {len(text)}, file_name: {element['metadata']['source_metadata'].get('source_name', None)} "
+            f"page_number: {element['metadata']['content_metadata'].get('page_number', None)}"
         )
         text = None
     return text
@@ -620,7 +625,23 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
         logger.info(f"FOUND MORE THAN ONE metadata entry for {element_name}, will use first entry")
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
-        element["metadata"]["content_metadata"][col] = str(meta_fields.iloc[0][col])
+        field = meta_fields.iloc[0][col]
+        # catch any nan values
+        if pd.isna(field):
+            field = None
+        elif isinstance(field, str):
+            if field == "":
+                field = None
+            # this is specifically for lists
+            elif field[0] == "[":
+                field = ast.literal_eval(field)
+        elif isinstance(field, (np.int32, np.int64)):
+            field = int(field)
+        elif isinstance(field, (np.float32, np.float64)):
+            field = float(field)
+        elif isinstance(field, (np.bool_)):
+            field = bool(field)
+        element["metadata"][col] = field
 
 
 def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
@@ -747,7 +768,7 @@ def create_bm25_model(
     """
     all_text = []
     for result in records:
-        if not isinstance(result, list):
+        if isinstance(result, dict):
             result = [result]
         for element in result:
             text = _pull_text(
@@ -932,6 +953,9 @@ def dense_retrieval(
     dense_field: str = "vector",
     output_fields: List[str] = ["text"],
     _filter: str = "",
+    gpu_search: bool = False,
+    local_index: bool = False,
+    ef_param: int = 100,
 ):
     """
     This function takes the input queries and conducts a dense
@@ -963,6 +987,10 @@ def dense_retrieval(
     for query in queries:
         dense_embeddings.append(dense_model.get_query_embedding(query))
 
+    search_params = {}
+    if not gpu_search and not local_index:
+        search_params["params"] = {"ef": ef_param}
+
     results = client.search(
         collection_name=collection_name,
         data=dense_embeddings,
@@ -971,6 +999,7 @@ def dense_retrieval(
         output_fields=output_fields,
         filter=_filter,
         consistency_level=CONSISTENCY,
+        search_params=search_params,
     )
     return results
 
@@ -985,9 +1014,10 @@ def hybrid_retrieval(
     dense_field: str = "vector",
     sparse_field: str = "sparse",
     output_fields: List[str] = ["text"],
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     local_index: bool = False,
     _filter: str = "",
+    ef_param: int = 100,
 ):
     """
     This function takes the input queries and conducts a hybrid
@@ -1034,7 +1064,7 @@ def hybrid_retrieval(
         "metric_type": "L2",
     }
     if not gpu_search and not local_index:
-        s_param_1["params"] = {"ef": top_k}
+        s_param_1["params"] = {"ef": ef_param}
 
     # Create search requests for both vector types
     search_param_1 = {
@@ -1083,7 +1113,7 @@ def nvingest_retrieval(
     sparse_model_filepath: str = "bm25_model.json",
     model_name: str = None,
     output_fields: List[str] = ["text", "source", "content_metadata"],
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     nv_ranker: bool = False,
     nv_ranker_endpoint: str = None,
     nv_ranker_model_name: str = None,
@@ -1092,6 +1122,7 @@ def nvingest_retrieval(
     nv_ranker_top_k: int = 50,
     nv_ranker_max_batch_size: int = 64,
     _filter: str = "",
+    ef_param: int = 200,
     **kwargs,
 ):
     """
@@ -1153,7 +1184,7 @@ def nvingest_retrieval(
     from llama_index.embeddings.nvidia import NVIDIAEmbedding
 
     client_config = ClientConfigSchema()
-    nvidia_api_key = client_config.nvidia_build_api_key
+    nvidia_api_key = client_config.nvidia_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
@@ -1181,10 +1212,20 @@ def nvingest_retrieval(
             gpu_search=gpu_search,
             local_index=local_index,
             _filter=_filter,
+            ef_param=ef_param,
         )
     else:
         results = dense_retrieval(
-            queries, collection_name, client, embed_model, top_k, output_fields=output_fields, _filter=_filter
+            queries,
+            collection_name,
+            client,
+            embed_model,
+            top_k,
+            output_fields=output_fields,
+            _filter=_filter,
+            gpu_search=gpu_search,
+            local_index=local_index,
+            ef_param=ef_param,
         )
     if nv_ranker:
         rerank_results = []
@@ -1276,7 +1317,7 @@ def nv_rerank(
     # reranker = NVIDIARerank(base_url=reranker_endpoint, nvidia_api_key=nvidia_api_key, top_n=top_k)
     reranker_endpoint = reranker_endpoint if reranker_endpoint else client_config.nv_ranker_nim_endpoint
     model_name = model_name if model_name else client_config.nv_ranker_nim_model_name
-    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
     headers = {"accept": "application/json", "Content-Type": "application/json"}
     if nvidia_api_key:
         headers["Authorization"] = f"Bearer {nvidia_api_key}"
@@ -1324,7 +1365,11 @@ def recreate_elements(data):
 
 
 def pull_all_milvus(
-    collection_name: str, milvus_uri: str = "http://localhost:19530", write_dir: str = None, batch_size: int = 1000
+    collection_name: str,
+    milvus_uri: str = "http://localhost:19530",
+    write_dir: str = None,
+    batch_size: int = 1000,
+    include_embeddings: bool = False,
 ):
     """
     This function takes the input collection name and pulls all the records
@@ -1341,16 +1386,21 @@ def pull_all_milvus(
         Directory to write the records to. If None, the records will be returned as a list.
     batch_size : int, optional
         The number of records to pull in each batch. Defaults to 1000.
+    include_embeddings : bool, optional
+        Whether to include the embeddings in the output. Defaults to False.
     Returns
     -------
     List
         List of records/files with records from the collection.
     """
     client = MilvusClient(milvus_uri)
+    output_fields = ["source", "content_metadata", "text"]
+    if include_embeddings:
+        output_fields.append("vector")
     iterator = client.query_iterator(
         collection_name=collection_name,
         filter="pk >= 0",
-        output_fields=["source", "content_metadata", "text"],
+        output_fields=output_fields,
         batch_size=batch_size,
         consistency_level=CONSISTENCY,
     )
@@ -1400,7 +1450,7 @@ def embed_index_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     minio_endpoint: str = "localhost:9000",
     enable_text: bool = True,
@@ -1458,7 +1508,7 @@ def embed_index_collection(
         **kwargs: Additional keyword arguments for customization.
     """
     client_config = ClientConfigSchema()
-    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_build_api_key
+    nvidia_api_key = nvidia_api_key if nvidia_api_key else client_config.nvidia_api_key
     # required for NVIDIAEmbedding call if the endpoint is Nvidia build api.
     embedding_endpoint = embedding_endpoint if embedding_endpoint else client_config.embedding_nim_endpoint
     model_name = model_name if model_name else client_config.embedding_nim_model_name
@@ -1521,7 +1571,7 @@ def embed_index_collection(
 
 def reindex_collection(
     vdb_op: VDB = None,
-    current_collection_name: str = None,
+    collection_name: str = None,
     new_collection_name: str = None,
     write_dir: str = None,
     embedding_endpoint: str = None,
@@ -1531,7 +1581,7 @@ def reindex_collection(
     sparse: bool = False,
     recreate: bool = True,
     gpu_index: bool = True,
-    gpu_search: bool = True,
+    gpu_search: bool = False,
     dense_dim: int = 2048,
     minio_endpoint: str = "localhost:9000",
     enable_text: bool = True,
@@ -1562,7 +1612,7 @@ def reindex_collection(
 
     Parameters
     ----------
-        current_collection_name (str): The name of the current Milvus collection.
+        collection_name (str): The name of the current Milvus collection.
         new_collection_name (str, optional): The name of the new Milvus collection. Defaults to None.
         write_dir (str, optional): The directory to write the pulled records to. Defaults to None.
         embedding_endpoint (str, optional): The endpoint for the NVIDIA embedding service. Defaults to None.
@@ -1600,8 +1650,8 @@ def reindex_collection(
         kwargs = locals().copy()
         kwargs.pop("vdb_op", None)
         return vdb_op.reindex(**kwargs)
-    new_collection_name = new_collection_name if new_collection_name else current_collection_name
-    pull_results = pull_all_milvus(current_collection_name, milvus_uri, write_dir, query_batch_size)
+    new_collection_name = new_collection_name if new_collection_name else collection_name
+    pull_results = pull_all_milvus(collection_name, milvus_uri, write_dir, query_batch_size)
     embed_index_collection(
         pull_results,
         new_collection_name,
@@ -1680,7 +1730,7 @@ class Milvus(VDB):
         sparse: bool = False,
         recreate: bool = True,
         gpu_index: bool = True,
-        gpu_search: bool = True,
+        gpu_search: bool = False,
         dense_dim: int = 2048,
         minio_endpoint: str = "localhost:9000",
         enable_text: bool = True,

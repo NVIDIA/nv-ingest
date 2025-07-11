@@ -1,18 +1,39 @@
 {% extends "base.html" %}
- 
+
 
 
 {% block extrahead %}
  
     <script src="https://assets.adobedtm.com/5d4962a43b79/c1061d2c5e7b/launch-191c2462b890.min.js"></script>
- 
+
+{% endblock %}
+
+
+
+<!-- {% block outdated %}
+  You're not viewing the latest version.
+  <a href="{{ '../' ~ base_url }}"> 
+    <strong>Click here to go to latest.</strong>
+  </a>
+{% endblock %} -->
+
+
+
+{% block content %}
+
+    <div style="text-align: right;">
+        <a href="https://surveys.hotjar.com/4904bf71-6484-47a7-83ff-4715cceabdb5" id="openPopupButton">Is this page helpful?</a>
+    </div>
+
+    {{ super() }}
+
 {% endblock %}
 
 
 
 {% block footer %}
 
-{{ super() }}
+    {{ super() }}
 
     <script type="text/javascript">if (typeof _satellite !== "undefined") {_satellite.pageBottom();}</script>
  

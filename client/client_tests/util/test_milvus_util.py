@@ -242,11 +242,11 @@ def test_metadata_add(records, metadata):
         for element in record:
             add_metadata(element, metadata, "source_name", ["meta_a", "meta_b"])
 
-            assert "meta_a" in [*element["metadata"]["content_metadata"]]
-            assert "meta_b" in [*element["metadata"]["content_metadata"]]
+            assert "meta_a" in [*element["metadata"]]
+            assert "meta_b" in [*element["metadata"]]
             idx = element["metadata"]["source_metadata"]["source_name"].split("_")[1].split(".")[0]
-            assert element["metadata"]["content_metadata"]["meta_a"] == f"meta_a_{idx}"
-            assert element["metadata"]["content_metadata"]["meta_b"] == f"meta_b_{idx}"
+            assert element["metadata"]["meta_a"] == f"meta_a_{idx}"
+            assert element["metadata"]["meta_b"] == f"meta_b_{idx}"
 
 
 def test_metadata_import(metadata, tmp_path):
@@ -306,6 +306,46 @@ def test_pull_text_length_limit(caplog):
     assert "text_length: 65536" in caplog.records[0].message
     assert "file_name: test_file.txt" in caplog.records[0].message
     assert "page_number: 1" in caplog.records[0].message
+
+
+def test_pull_text_length_limit_without_page_number(caplog):
+    """Test that _pull_text handles text longer than 65535 characters correctly when page_number is missing."""
+    # Create a test element with text longer than 65535 characters and no page_number field
+    long_text = "x" * 65536  # Create text that exceeds the limit
+    test_element = {
+        "document_type": "text",
+        "metadata": {
+            "content": long_text,
+            "embedding": [0.1, 0.2, 0.3],  # Add a valid embedding
+            "source_metadata": {"source_name": "test_file_no_page.txt"},
+            "content_metadata": {"type": "text"},  # No page_number field
+        },
+    }
+
+    # Set up logging capture
+    caplog.set_level(logging.WARNING)
+
+    # Call _pull_text with the test element
+    result = _pull_text(
+        element=test_element,
+        enable_text=True,
+        enable_charts=True,
+        enable_tables=True,
+        enable_images=True,
+        enable_infographics=True,
+        enable_audio=True,
+    )
+
+    # Verify that None is returned
+    assert result is None
+
+    # Verify that a warning was logged
+    assert len(caplog.records) == 1
+    assert caplog.records[0].levelname == "WARNING"
+    assert "Text is too long" in caplog.records[0].message
+    assert "text_length: 65536" in caplog.records[0].message
+    assert "file_name: test_file_no_page.txt" in caplog.records[0].message
+    assert "page_number: None" in caplog.records[0].message
 
 
 @pytest.mark.parametrize(
