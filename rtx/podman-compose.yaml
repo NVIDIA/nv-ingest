@@ -173,14 +173,6 @@ services:
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
-    build:
-      context: ${NV_INGEST_ROOT:-.}
-      dockerfile: "./Dockerfile"
-      target: runtime
-      args:
-        DOWNLOAD_LLAMA_TOKENIZER: ${DOWNLOAD_LLAMA_TOKENIZER:-False}
-        HF_ACCESS_TOKEN: ${HF_ACCESS_TOKEN:-hfaccesstoken}
-        MODEL_PREDOWNLOAD_PATH: ${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
