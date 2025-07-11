@@ -17,13 +17,12 @@ classifiers = [
     "Operating System :: OS Independent",
 ]
 dependencies = [
-    "azure-storage-blob==12.24.0",
     "build>=1.2.2",
     "charset-normalizer>=3.4.1",
     "click>=8.1.8",
     "fsspec>=2025.2.0",
     "httpx>=0.28.1",
-    "openai~=1.82.0",
+    "llama-index-embeddings-nvidia==0.1.5",
     "pydantic>2.0.0",
     "pydantic-settings>2.0.0",
     "requests>=2.28.2",
