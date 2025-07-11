@@ -232,9 +232,9 @@ class YoloxModelInterfaceBase(ModelInterface):
                 formatted_batch_data = []
                 for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
                     input_array = np.array(b64_chunk, dtype=np.object_)
-                    thresholds = np.tile([self.conf_threshold, self.iou_threshold], (input_array.shape[0], 1)).astype(
-                        np.float32
-                    )
+                    current_batch_size = input_array.shape[0]
+                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
                     batched_inputs.append([input_array, thresholds])
                     formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
 
