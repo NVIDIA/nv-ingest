@@ -20,9 +20,8 @@ class VDB(ABC):
         pass
 
     @abstractmethod
-    def reindex(self, records: list, **kwargs):
+    def run(self, records):
         pass
 
-    @abstractmethod
-    def run(self, records):
+    def reindex(self, records: list, **kwargs):
         pass
