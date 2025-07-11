@@ -447,3 +447,59 @@ def display_markdown(
         markdown_table = "\n".join("| " + " | ".join(row) + " |" for row in data)
 
     return markdown_table
+
+
+def reorder_boxes(boxes, texts, confs, mode="top_left", dbscan_eps=10):
+    """
+    Reorders the boxes in reading order.
+    If mode is "center", the boxes are reordered using bbox center.
+    If mode is "top_left", the boxes are reordered using the top left corner.
+    If dbscan_eps is not 0, the boxes are reordered using DBSCAN clustering.
+
+    Args:
+        boxes (np array [n x 4 x 2]): The bounding boxes of the OCR results.
+        texts (np array [n]): The text of the OCR results.
+        confs (np array [n]): The confidence scores of the OCR results.
+        mode (str, optional): The mode to reorder the boxes. Defaults to "center".
+        dbscan_eps (float, optional): The epsilon parameter for DBSCAN. Defaults to 10.
+
+    Returns:
+        List[List[int, ...]]: The reordered bounding boxes.
+        List[str]: The reordered texts.
+        List[float]: The reordered confidence scores.
+    """
+    df = pd.DataFrame(
+        [[b, t, c] for b, t, c in zip(boxes, texts, confs)],
+        columns=["bbox", "text", "conf"],
+    )
+
+    if mode == "center":
+        df["x"] = df["bbox"].apply(lambda box: (box[0][0] + box[2][0]) / 2)
+        df["y"] = df["bbox"].apply(lambda box: (box[0][1] + box[2][1]) / 2)
+    elif mode == "top_left":
+        df["x"] = df["bbox"].apply(lambda box: (box[0][0]))
+        df["y"] = df["bbox"].apply(lambda box: (box[0][1]))
+
+    if dbscan_eps:
+        do_naive_sorting = False
+        try:
+            dbscan = DBSCAN(eps=dbscan_eps, min_samples=1)
+            dbscan.fit(df["y"].values[:, None])
+            df["cluster"] = dbscan.labels_
+            df["cluster_centers"] = df.groupby("cluster")["y"].transform("mean").astype(int)
+            df = df.sort_values(["cluster_centers", "x"], ascending=[True, True], ignore_index=True)
+        except ValueError:
+            do_naive_sorting = True
+    else:
+        do_naive_sorting = True
+
+    if do_naive_sorting:
+        df["y"] = np.round((df["y"] - df["y"].min()) // 5, 0)
+        df = df.sort_values(["y", "x"], ascending=[True, True], ignore_index=True)
+
+    bboxes = df["bbox"].values.tolist()
+    texts = df["text"].values.tolist()
+    confs = df["conf"].values.tolist()
+
+    return bboxes, texts, confs
+

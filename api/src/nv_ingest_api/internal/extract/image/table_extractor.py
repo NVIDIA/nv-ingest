@@ -94,6 +94,9 @@ def _run_inference(
             model_name="scene_text",
             stage_name="table_extraction",
             max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+            input_names=["input", "merge_levels"],
+            dtypes=["FP32", "BYTES"],
+            merge_level="word",
             trace_info=trace_info,
         )
 

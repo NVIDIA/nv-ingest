@@ -126,6 +126,8 @@ class OCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
+        merge_level = kwargs.pop("merge_level", "paragraph")
+
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC OCR model (batched).")
             processed: List[np.ndarray] = []
@@ -152,7 +154,8 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(dims, max_batch_size),
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
-                batches.append(batched_input)
+                merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
+                batches.append([batched_input, merge_levels])
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
             return batches, batch_data_list
 
@@ -178,7 +181,7 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                payload = {"input": input_chunk}
+                payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
 
@@ -304,18 +307,21 @@ class OCRModelInterface(ModelInterface):
             text_detections = item.get("text_detections", [])
             text_predictions = []
             bounding_boxes = []
+            conf_scores = []
             for td in text_detections:
                 text_predictions.append(td["text_prediction"]["text"])
                 bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
+                conf_scores.append(td["text_prediction"]["confidence"])
 
-            bounding_boxes, text_predictions = self._postprocess_ocr_response(
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
+                conf_scores,
                 dimensions,
                 img_index=item_idx,
             )
 
-            results.append([bounding_boxes, text_predictions])
+            results.append([bounding_boxes, text_predictions, conf_scores])
 
         return results
 
@@ -375,25 +381,29 @@ class OCRModelInterface(ModelInterface):
             texts_bytestr: bytes = response[1, i]
             text_predictions = json.loads(texts_bytestr.decode("utf8"))
 
-            # 3) Log the third element (extra data/metadata) if needed
-            extra_data_bytestr: bytes = response[2, i]
-            logger.debug(f"Ignoring extra_data for image {i}: {extra_data_bytestr}")
+            # 3) Parse confidence scores
+            confs_bytestr: bytes = response[2, i]
+            conf_scores = json.loads(confs_bytestr.decode("utf8"))
 
             # Some gRPC responses nest single-item lists; flatten them if needed
             if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
                 bounding_boxes = bounding_boxes[0]
             if isinstance(text_predictions, list) and len(text_predictions) == 1:
                 text_predictions = text_predictions[0]
+            if isinstance(conf_scores, list) and len(conf_scores) == 1:
+                conf_scores = conf_scores[0]
 
-            bounding_boxes, text_predictions = self._postprocess_ocr_response(
+            # 4) Postprocess
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
+                conf_scores,
                 dimensions,
                 img_index=i,
                 scale_coordinates=False,
             )
 
-            results.append([bounding_boxes, text_predictions])
+            results.append([bounding_boxes, text_predictions, conf_scores])
 
         return results
 
@@ -401,6 +411,7 @@ class OCRModelInterface(ModelInterface):
     def _postprocess_ocr_response(
         bounding_boxes: List[Any],
         text_predictions: List[str],
+        conf_scores: List[float],
         dims: Optional[List[Dict[str, Any]]] = None,
         img_index: int = 0,
         scale_coordinates: bool = True,
@@ -453,9 +464,10 @@ class OCRModelInterface(ModelInterface):
 
         bboxes: List[List[float]] = []
         texts: List[str] = []
+        confs: List[float] = []
 
         # Convert normalized coords back to actual pixel coords
-        for box, txt in zip(bounding_boxes, text_predictions):
+        for box, txt, conf in zip(bounding_boxes, text_predictions, conf_scores):
             if box == "nan":
                 continue
             points: List[List[float]] = []
@@ -469,5 +481,6 @@ class OCRModelInterface(ModelInterface):
                 points.append([x_original, y_original])
             bboxes.append(points)
             texts.append(txt)
+            confs.append(conf)
 
-        return bboxes, texts
+        return bboxes, texts, confs
