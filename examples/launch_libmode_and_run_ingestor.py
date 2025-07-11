@@ -50,7 +50,9 @@ def run_ingestor():
     )
 
     try:
-        results, _ = ingestor.ingest(show_progress=False, return_failures=True)
+        results, failures = ingestor.ingest(show_progress=False, return_failures=True)
+        if len(failures) > 0:
+            raise Exception(f"Ingestion failed: {failures}")
         logger.info("Ingestion completed successfully.")
     except Exception as e:
         logger.error(f"Ingestion failed: {e}")

@@ -241,7 +241,7 @@ services:
       # HTTP API
       - "7670:7670"
       # Simple Broker
-      - "7671:7671"
+      #- "7671:7671"
       # Ray Dashboards
       - "8265:8265"
     cap_add:
@@ -257,7 +257,7 @@ services:
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_EDGE_BUFFER_SIZE=64
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
-      #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
+      - INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
       #- MESSAGE_CLIENT_HOST=0.0.0.0

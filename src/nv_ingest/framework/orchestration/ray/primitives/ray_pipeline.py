@@ -23,6 +23,7 @@ import time
 
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
+from nv_ingest.framework.orchestration.ray.util.pipeline.mixins import SingletonStageMixin
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
 from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
@@ -541,6 +542,15 @@ class RayPipeline(PipelineInterface):
             schema_type = type(config)
             resolved_actor = wrap_callable_as_stage(resolved_actor, schema_type)
 
+        # Singleton stage check
+        if isinstance(resolved_actor, type) and issubclass(stage_actor, SingletonStageMixin):
+            if min_replicas != 1 or max_replicas != 1:
+                logger.warning(
+                    f"Stage '{name}' is a SingletonStageMixin but min/max replicas are not both 1. Clamping to 1."
+                )
+            min_replicas = 1
+            max_replicas = 1
+
         stage_info = StageInfo(
             name=name,
             callable=resolved_actor,
@@ -548,7 +558,7 @@ class RayPipeline(PipelineInterface):
             min_replicas=min_replicas,
             max_replicas=max_replicas,
         )
-        self.topology.add_stage(stage_info)
+        self.topology.add_stage(stage_info)  # Delegate
 
         return self
 

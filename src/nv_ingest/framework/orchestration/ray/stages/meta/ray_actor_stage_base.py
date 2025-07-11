@@ -232,14 +232,15 @@ class RayActorStage(ABC):
         pass  # Must be implemented by concrete subclasses
 
     def _processing_loop(self) -> None:
-        """Core processing routine executed in a dedicated background thread.
+        """
+        Core processing routine executed in a dedicated background thread.
 
         This loop performs the primary work of the actor:
         1.  Continuously attempts to retrieve a `control_message` from the
             `_input_queue`.
         2.  If a message is obtained, it's processed by the `on_data` method.
-        3.  If `on_data` yields a result (`updated_cm`), this result is
-            indefinitely retried to be `put` onto the `_output_queue`.
+        3.  If `on_data` yields one or more results (`updated_cm`), they are
+            retried until successfully `put` onto the `_output_queue`.
         4.  The loop continues as long as the `self._running` flag is `True`.
             This flag is typically controlled by external calls to `start()`
             and `stop()` methods of the actor.
@@ -254,9 +255,8 @@ class RayActorStage(ABC):
           sequence are caught, logged, and relevant error statistics are
           incremented. The loop then continues to the next iteration if
           `self._running` is still `True`.
-        - If `on_data` returns `None`, it's treated as a recoverable incident;
-          a warning is logged, stats are updated, and the loop continues.
-          No output is produced for that specific input message.
+        - If `on_data` returns an empty list, it's treated as a handled message
+          with no output. No warning or error is logged.
         - A critical failure in the `_output_queue.put` (e.g., `RayActorError`
           if the queue actor is dead) will currently lead to indefinite retries.
 
@@ -304,41 +304,43 @@ class RayActorStage(ABC):
                     self._active_processing = True
 
                     # Step 2: Process the retrieved message using subclass-specific logic.
-                    updated_cm = self.on_data(control_message)
+                    result = self.on_data(control_message)
+                    results_to_emit = result if isinstance(result, list) else [result]
 
                     # If there's a valid result and an output queue is configured, attempt to put.
-                    if self._output_queue is not None and updated_cm is not None:
+                    if results_to_emit and self._output_queue is not None:
                         object_ref_to_put = None  # Ensure var exists for the finally block
-                        try:
+                        owner_actor = self._output_queue.actor
+                        while results_to_emit:
+                            updated_cm = results_to_emit.pop()
+
                             # Get the handle of the queue actor to set it as the owner.
                             # This decouples the object's lifetime from this actor.
-                            owner_actor = self._output_queue.actor
-
                             # Put the object into Plasma, transferring ownership.
                             object_ref_to_put = ray.put(updated_cm, _owner=owner_actor)
 
                             # Now that the object is safely in Plasma, we can delete the large local copy.
                             del updated_cm
 
-                            # This loop will retry until the ObjectRef is put successfully or shutdown is initiated.
                             is_put_successful = False
-                            while not is_put_successful:
-                                try:
-                                    self._output_queue.put(object_ref_to_put)
-                                    self.stats["successful_queue_writes"] += 1
-                                    is_put_successful = True  # Exit retry loop on success
-                                except Exception as e_put:
-                                    self._logger.warning(
-                                        f"[{self._actor_id_str}] Output queue put failed (e.g., full, "
-                                        f"timeout, or actor error), retrying. Error: {e_put}"
-                                    )
-                                    self.stats["queue_full"] += 1
-                                    time.sleep(0.1)  # Brief pause before retrying
-                        finally:
-                            # After the operation, delete the local ObjectRef.
-                            # The primary reference is now held by the queue actor.
-                            if object_ref_to_put is not None:
-                                del object_ref_to_put
+                            try:
+                                while not is_put_successful:
+                                    try:
+                                        self._output_queue.put(object_ref_to_put)
+                                        self.stats["successful_queue_writes"] += 1
+                                        is_put_successful = True  # Exit retry loop on success
+                                    except Exception as e_put:
+                                        self._logger.warning(
+                                            f"[{self._actor_id_str}] Output queue put failed (e.g., full, "
+                                            f"timeout, or actor error), retrying. Error: {e_put}"
+                                        )
+                                        self.stats["queue_full"] += 1
+                                        time.sleep(0.1)  # Brief pause before retrying
+                            finally:
+                                # After the operation, delete the local ObjectRef.
+                                # The primary reference is now held by the queue actor.
+                                if object_ref_to_put is not None:
+                                    del object_ref_to_put
 
                     # Step 3: Increment "processed" count after successful processing and output (if any).
                     # This is the primary path for "successful processing".
