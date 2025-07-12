@@ -1,8 +1,17 @@
 from nv_ingest_client.util.vdb.adt_vdb import VDB
 
-def available_vdb_ops():
-    # Lazy import to avoid requiring pymilvus unless needed
-    from nv_ingest_client.util.vdb.milvus import Milvus
-    return {"milvus": Milvus}
+def get_vdb_op_cls(vdb_op: str):
+    """
+    Lazily import and return the VDB operation class for the given op string.
+    Returns the class if found, else raises ValueError.
+    """
 
-__all__ = ["VDB", "available_vdb_ops"]
+    available_vdb_ops = ["milvus"]
+
+    if vdb_op == "milvus":
+        from nv_ingest_client.util.vdb.milvus import Milvus
+        return Milvus
+    
+    raise ValueError(f"Invalid vdb_op: {vdb_op}. Available vdb_ops - {available_vdb_ops}.")
+
+__all__ = ["VDB", "get_vdb_op_cls"]
