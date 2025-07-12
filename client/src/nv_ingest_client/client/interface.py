@@ -940,3 +940,4 @@ class Ingestor:
         terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
 
         return len(self._job_states) - terminal_jobs
+    
