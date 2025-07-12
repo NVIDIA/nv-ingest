@@ -274,6 +274,7 @@ services:
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_EDGE_BUFFER_SIZE=64
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
+      - INGEST_DISABLE_DYNAMIC_SCALING=true
       #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
