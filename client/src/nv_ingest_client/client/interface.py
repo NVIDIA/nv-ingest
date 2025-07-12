@@ -51,8 +51,7 @@ from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
-from nv_ingest_client.util.vdb import VDB
-from nv_ingest_client.util.vdb import available_vdb_ops
+from nv_ingest_client.util.vdb import VDB, available_vdb_ops
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
@@ -820,10 +819,11 @@ class Ingestor:
         """
         vdb_op = kwargs.pop("vdb_op", "milvus")
         if isinstance(vdb_op, str):
-            vdb_op = available_vdb_ops.get(vdb_op, None)
-            if not vdb_op:
-                raise ValueError(f"Invalid op string: {vdb_op}, Supported ops: {available_vdb_ops.keys()}")
-            vdb_op = vdb_op(**kwargs)
+            ops = available_vdb_ops()
+            op_cls = ops.get(vdb_op, None)
+            if not op_cls:
+                raise ValueError(f"Invalid op string: {vdb_op}, Supported ops: {list(ops.keys())}")
+            vdb_op = op_cls(**kwargs)
         elif isinstance(vdb_op, VDB):
             vdb_op = vdb_op
         else:
