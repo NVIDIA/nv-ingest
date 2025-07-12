@@ -32,8 +32,8 @@ services:
       - NIM_OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4318
       - NIM_ENABLE_OTEL=true
       - NIM_TRITON_CPU_THREADS_PRE_PROCESSOR=1
-      - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=4
-      - OMP_NUM_THREADS=4
+      - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=2
+      - OMP_NUM_THREADS=2
       # Triton OpenTelemetry Settings
       - TRITON_OTEL_URL=http://otel-collector:4318/v1/traces
       - TRITON_OTEL_RATE=1
@@ -110,7 +110,7 @@ services:
     user: root
     environment:
       - NIM_HTTP_API_PORT=8000
-      - OMP_NUM_THREADS=32
+      - OMP_NUM_THREADS=8
       - NIM_TRITON_LOG_VERBOSE=1
         #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
@@ -134,6 +134,7 @@ services:
       - "8014:8002"
     environment:
       - NIM_HTTP_API_PORT=8000
+      - OMP_NUM_THREADS=1
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
