@@ -11,6 +11,7 @@ from math import floor
 from typing import Optional
 from typing import Tuple
 
+import cv2
 import numpy as np
 from PIL import Image
 from PIL import UnidentifiedImageError
@@ -128,6 +129,7 @@ def pad_image(
     target_height: int = DEFAULT_MAX_HEIGHT,
     background_color: int = 255,
     dtype=np.uint8,
+    how: str = "center",
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
     """
     Pads a NumPy array representing an image to the specified target dimensions.
@@ -135,6 +137,8 @@ def pad_image(
     If the target dimensions are smaller than the image dimensions, no padding will be applied
     in that dimension. If the target dimensions are larger, the image will be centered within the
     canvas of the specified target size, with the remaining space filled with white padding.
+
+    The padding can be done around the center (how="center"), or to the bottom right (how="bottom_right").
 
     Parameters
     ----------
@@ -144,6 +148,8 @@ def pad_image(
         The desired target width of the padded image. Defaults to DEFAULT_MAX_WIDTH.
     target_height : int, optional
         The desired target height of the padded image. Defaults to DEFAULT_MAX_HEIGHT.
+    how : str, optional
+        The method to pad the image. Defaults to "center".
 
     Returns
     -------
@@ -168,17 +174,23 @@ def pad_image(
     """
     height, width = array.shape[:2]
 
-    # Determine the padding needed, if any, while ensuring no padding is applied if the target is smaller
-    pad_height = max((target_height - height) // 2, 0)
-    pad_width = max((target_width - width) // 2, 0)
-
     # Determine final canvas size (may be equal to original if target is smaller)
     final_height = max(height, target_height)
     final_width = max(width, target_width)
 
     # Create the canvas and place the original image on it
     canvas = background_color * np.ones((final_height, final_width, array.shape[2]), dtype=dtype)
-    canvas[pad_height : pad_height + height, pad_width : pad_width + width] = array  # noqa: E203
+
+    # Determine the padding needed, if any, while ensuring no padding is applied if the target is smaller
+    if how == "center":
+        pad_height = max((target_height - height) // 2, 0)
+        pad_width = max((target_width - width) // 2, 0)
+
+        canvas[pad_height : pad_height + height, pad_width : pad_width + width] = array  # noqa: E203
+    elif how == "bottom_right":
+        pad_height, pad_width = 0, 0
+
+        canvas[:height, :width] = array  # noqa: E203
 
     return canvas, (pad_width, pad_height)
 
@@ -302,12 +314,12 @@ def normalize_image(
     return output_array
 
 
-def numpy_to_base64(array: np.ndarray) -> str:
+def numpy_to_base64(array: np.ndarray, quality: int = 100) -> str:
     """
-    Converts a NumPy array representing an image to a base64-encoded string.
+    Converts a NumPy array representing an image to a base64-encoded JPEG string using torchvision.
 
-    The function takes a NumPy array, converts it to a PIL image, and then encodes
-    the image as a PNG in a base64 string format. The input array is expected to be in
+    The function takes a NumPy array, converts it to a torch tensor, and then encodes
+    the image as a JPEG in a base64 string format. The input array is expected to be in
     a format that can be converted to a valid image, such as having a shape of (H, W, C)
     where C is the number of channels (e.g., 3 for RGB).
 
@@ -315,11 +327,14 @@ def numpy_to_base64(array: np.ndarray) -> str:
     ----------
     array : np.ndarray
         The input image as a NumPy array. Must have a shape compatible with image data.
+        Can be (H, W) for grayscale or (H, W, C) where C∈{1,3,4}. 4-channel images lose alpha.
+    quality : int, optional
+        JPEG quality (1-100), by default 100
 
     Returns
     -------
     str
-        The base64-encoded string representation of the input NumPy array as a PNG image.
+        The base64-encoded string representation of the input NumPy array as a JPEG image.
 
     Raises
     ------
@@ -335,28 +350,30 @@ def numpy_to_base64(array: np.ndarray) -> str:
     >>> isinstance(encoded_str, str)
     True
     """
-    # If the array represents a grayscale image, drop the redundant axis in
-    # (h, w, 1). PIL.Image.fromarray() expects an array of form (h, w) if it's
-    # a grayscale image.
+    # Handle grayscale images with shape (H, W, 1)
     if array.ndim == 3 and array.shape[2] == 1:
         array = np.squeeze(array, axis=2)
 
-    # Check if the array is valid and can be converted to an image
-    try:
-        # Convert the NumPy array to a PIL image
-        pil_image = Image.fromarray(array.astype(np.uint8))
-    except Exception as e:
-        raise ValueError(f"Failed to convert NumPy array to image: {e}")
+    # Convert to torch tensor with appropriate shape
+    if array.ndim == 2:  # grayscale
+        array = array.unsqueeze(0)  # (1, H, W)
+    elif array.ndim == 3:
+        if array.shape[2] == 4:  # drop alpha channel
+            array = array[..., :3]
+    else:
+        raise ValueError(f"Expected (H,W) or (H,W,C); got {array.shape}")
+
+    # Ensure uint8 dtype
+    if array.dtype != np.uint8:
+        array = array.astype(np.uint8)
 
     try:
-        # Convert the PIL image to a base64-encoded string
-        with BytesIO() as buffer:
-            pil_image.save(buffer, format="PNG")
-            base64_img = bytetools.base64frombytes(buffer.getvalue())
+        _, jpeg_bytes = cv2.imencode(".jpg", array, [cv2.IMWRITE_JPEG_QUALITY, quality])
+        jpeg_base64 = bytetools.base64frombytes(jpeg_bytes)
     except Exception as e:
-        raise RuntimeError(f"Failed to encode image to base64: {e}")
+        raise RuntimeError(f"Failed to encode JPEG: {e}")
 
-    return base64_img
+    return jpeg_base64
 
 
 def base64_to_numpy(base64_string: str) -> np.ndarray:

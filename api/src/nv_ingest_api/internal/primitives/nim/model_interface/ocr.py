@@ -11,15 +11,15 @@ from typing import Optional
 import numpy as np
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_ocr
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
 
 
-class PaddleOCRModelInterface(ModelInterface):
+class OCRModelInterface(ModelInterface):
     """
-    An interface for handling inference with a PaddleOCR model, supporting both gRPC and HTTP protocols.
+    An interface for handling inference with a OCR model, supporting both gRPC and HTTP protocols.
     """
 
     def name(self) -> str:
@@ -31,7 +31,7 @@ class PaddleOCRModelInterface(ModelInterface):
         str
             The name of the model interface.
         """
-        return "PaddleOCR"
+        return "OCR"
 
     def prepare_data_for_inference(self, data: Dict[str, Any]) -> Dict[str, Any]:
         """
@@ -126,11 +126,21 @@ class PaddleOCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
+        merge_level = kwargs.pop("merge_level", "paragraph")
+
         if protocol == "grpc":
-            logger.debug("Formatting input for gRPC PaddleOCR model (batched).")
+            logger.debug("Formatting input for gRPC OCR model (batched).")
             processed: List[np.ndarray] = []
+
+            max_length = max(max(img.shape[:2]) for img in images)
+
             for img in images:
-                arr, _dims = preprocess_image_for_paddle(img)
+                arr, _dims = preprocess_image_for_ocr(
+                    img,
+                    target_height=max_length,
+                    target_width=max_length,
+                    pad_how="bottom_right",
+                )
                 dims.append(_dims)
                 arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
@@ -144,12 +154,13 @@ class PaddleOCRModelInterface(ModelInterface):
                 chunk_list(dims, max_batch_size),
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
-                batches.append(batched_input)
+                merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
+                batches.append([batched_input, merge_levels])
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
             return batches, batch_data_list
 
         elif protocol == "http":
-            logger.debug("Formatting input for HTTP PaddleOCR model (batched).")
+            logger.debug("Formatting input for HTTP OCR model (batched).")
             if "base64_images" in data:
                 base64_list = data["base64_images"]
             else:
@@ -170,7 +181,7 @@ class PaddleOCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                payload = {"input": input_chunk}
+                payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
 
@@ -187,7 +198,7 @@ class PaddleOCRModelInterface(ModelInterface):
         Parameters
         ----------
         response : Any
-            The raw response from the PaddleOCR model.
+            The raw response from the OCR model.
         protocol : str
             The protocol used for inference, "grpc" or "http".
         data : dict of str -> Any, optional
@@ -209,24 +220,24 @@ class PaddleOCRModelInterface(ModelInterface):
         dims: Optional[List[Tuple[int, int]]] = data.get("image_dims") if data else None
 
         if protocol == "grpc":
-            logger.debug("Parsing output from gRPC PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_grpc_response(response, dims)
+            logger.debug("Parsing output from gRPC OCR model (batched).")
+            return self._extract_content_from_ocr_grpc_response(response, dims)
 
         elif protocol == "http":
-            logger.debug("Parsing output from HTTP PaddleOCR model (batched).")
-            return self._extract_content_from_paddle_http_response(response, dims)
+            logger.debug("Parsing output from HTTP OCR model (batched).")
+            return self._extract_content_from_ocr_http_response(response, dims)
 
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
     def process_inference_results(self, output: Any, **kwargs: Any) -> Any:
         """
-        Process inference results for the PaddleOCR model.
+        Process inference results for the OCR model.
 
         Parameters
         ----------
         output : Any
-            The raw output parsed from the PaddleOCR model.
+            The raw output parsed from the OCR model.
         **kwargs : Any
             Additional keyword arguments for customization.
 
@@ -238,7 +249,7 @@ class PaddleOCRModelInterface(ModelInterface):
         """
         return output
 
-    def _prepare_paddle_payload(self, base64_img: str) -> Dict[str, Any]:
+    def _prepare_ocr_payload(self, base64_img: str) -> Dict[str, Any]:
         """
         DEPRECATED by batch logic in format_input. Kept here if you need single-image direct calls.
 
@@ -250,7 +261,7 @@ class PaddleOCRModelInterface(ModelInterface):
         Returns
         -------
         dict of str -> Any
-            The payload in either legacy or new format for PaddleOCR's HTTP endpoint.
+            The payload in either legacy or new format for OCR's HTTP endpoint.
         """
         image_url = f"data:image/png;base64,{base64_img}"
 
@@ -259,18 +270,18 @@ class PaddleOCRModelInterface(ModelInterface):
 
         return payload
 
-    def _extract_content_from_paddle_http_response(
+    def _extract_content_from_ocr_http_response(
         self,
         json_response: Dict[str, Any],
         dimensions: List[Dict[str, Any]],
     ) -> List[Tuple[str, str]]:
         """
-        Extract content from the JSON response of a PaddleOCR HTTP API request.
+        Extract content from the JSON response of a OCR HTTP API request.
 
         Parameters
         ----------
         json_response : dict of str -> Any
-            The JSON response returned by the PaddleOCR endpoint.
+            The JSON response returned by the OCR endpoint.
         table_content_format : str or None
             The specified format for table content (e.g., 'simple' or 'pseudo_markdown').
         dimensions : list of dict, optional
@@ -296,22 +307,25 @@ class PaddleOCRModelInterface(ModelInterface):
             text_detections = item.get("text_detections", [])
             text_predictions = []
             bounding_boxes = []
+            conf_scores = []
             for td in text_detections:
                 text_predictions.append(td["text_prediction"]["text"])
                 bounding_boxes.append([[pt["x"], pt["y"]] for pt in td["bounding_box"]["points"]])
+                conf_scores.append(td["text_prediction"]["confidence"])
 
-            bounding_boxes, text_predictions = self._postprocess_paddle_response(
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
+                conf_scores,
                 dimensions,
                 img_index=item_idx,
             )
 
-            results.append([bounding_boxes, text_predictions])
+            results.append([bounding_boxes, text_predictions, conf_scores])
 
         return results
 
-    def _extract_content_from_paddle_grpc_response(
+    def _extract_content_from_ocr_grpc_response(
         self,
         response: np.ndarray,
         dimensions: List[Dict[str, Any]],
@@ -367,33 +381,41 @@ class PaddleOCRModelInterface(ModelInterface):
             texts_bytestr: bytes = response[1, i]
             text_predictions = json.loads(texts_bytestr.decode("utf8"))
 
-            # 3) Log the third element (extra data/metadata) if needed
-            extra_data_bytestr: bytes = response[2, i]
-            logger.debug(f"Ignoring extra_data for image {i}: {extra_data_bytestr}")
+            # 3) Parse confidence scores
+            confs_bytestr: bytes = response[2, i]
+            conf_scores = json.loads(confs_bytestr.decode("utf8"))
 
             # Some gRPC responses nest single-item lists; flatten them if needed
             if isinstance(bounding_boxes, list) and len(bounding_boxes) == 1:
                 bounding_boxes = bounding_boxes[0]
             if isinstance(text_predictions, list) and len(text_predictions) == 1:
                 text_predictions = text_predictions[0]
+            if isinstance(conf_scores, list) and len(conf_scores) == 1:
+                conf_scores = conf_scores[0]
 
-            bounding_boxes, text_predictions = self._postprocess_paddle_response(
+            # 4) Postprocess
+            bounding_boxes, text_predictions, conf_scores = self._postprocess_ocr_response(
                 bounding_boxes,
                 text_predictions,
+                conf_scores,
                 dimensions,
                 img_index=i,
+                scale_coordinates=False,
             )
 
-            results.append([bounding_boxes, text_predictions])
+            results.append([bounding_boxes, text_predictions, conf_scores])
 
         return results
 
     @staticmethod
-    def _postprocess_paddle_response(
+    def _postprocess_ocr_response(
         bounding_boxes: List[Any],
         text_predictions: List[str],
+        conf_scores: List[float],
         dims: Optional[List[Dict[str, Any]]] = None,
         img_index: int = 0,
+        scale_coordinates: bool = True,
+        shift_coordinates: bool = True,
     ) -> Tuple[List[Any], List[str]]:
         """
         Convert bounding boxes with normalized coordinates to pixel cooridnates by using
@@ -434,17 +456,18 @@ class PaddleOCRModelInterface(ModelInterface):
                 logger.warning("Image index out of range for stored dimensions. Using first image dims by default.")
                 img_index = 0
 
-        max_width = dims[img_index]["new_width"]
-        max_height = dims[img_index]["new_height"]
-        pad_width = dims[img_index].get("pad_width", 0)
-        pad_height = dims[img_index].get("pad_height", 0)
-        scale_factor = dims[img_index].get("scale_factor", 1.0)
+        max_width = dims[img_index]["new_width"] if scale_coordinates else 1.0
+        max_height = dims[img_index]["new_height"] if scale_coordinates else 1.0
+        pad_width = dims[img_index].get("pad_width", 0) if shift_coordinates else 0.0
+        pad_height = dims[img_index].get("pad_height", 0) if shift_coordinates else 0.0
+        scale_factor = dims[img_index].get("scale_factor", 1.0) if scale_coordinates else 1.0
 
         bboxes: List[List[float]] = []
         texts: List[str] = []
+        confs: List[float] = []
 
         # Convert normalized coords back to actual pixel coords
-        for box, txt in zip(bounding_boxes, text_predictions):
+        for box, txt, conf in zip(bounding_boxes, text_predictions, conf_scores):
             if box == "nan":
                 continue
             points: List[List[float]] = []
@@ -458,5 +481,6 @@ class PaddleOCRModelInterface(ModelInterface):
                 points.append([x_original, y_original])
             bboxes.append(points)
             texts.append(txt)
+            confs.append(conf)
 
-        return bboxes, texts
+        return bboxes, texts, confs
