@@ -131,7 +131,10 @@ class LazyLoadedList(collections.abc.Sequence):
             self._offsets = []
             self._len = 0
         except Exception as e:
-            logger.error(f"LazyLoadedList: Error building index for {self.filepath}: {e}", exc_info=True)
+            logger.error(
+                f"LazyLoadedList: Error building index for {self.filepath}: {e}",
+                exc_info=True,
+            )
             self._offsets = []
             self._len = 0
 
@@ -173,7 +176,10 @@ class LazyLoadedList(collections.abc.Sequence):
         except json.JSONDecodeError as e:
             raise ValueError(f"Error decoding JSON at indexed line for index {idx} in {self.filepath}: {e}") from e
         except Exception as e:
-            logger.error(f"Unexpected error in __getitem__ for index {idx} in {self.filepath}: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error in __getitem__ for index {idx} in {self.filepath}: {e}",
+                exc_info=True,
+            )
             raise
 
     def __repr__(self):
@@ -367,11 +373,18 @@ class Ingestor:
         return self
 
     def ingest(
-        self, show_progress: bool = False, return_failures: bool = False, save_to_disk: bool = False, **kwargs: Any
+        self,
+        show_progress: bool = False,
+        return_failures: bool = False,
+        save_to_disk: bool = False,
+        **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
-        Tuple[Union[List[List[Dict[str, Any]]], List[LazyLoadedList]], List[Tuple[str, str]]],
+        Tuple[
+            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
+            List[Tuple[str, str]],
+        ],
     ]:  # noqa: E501
         """
         Ingest documents by submitting jobs and fetching results concurrently.
@@ -937,4 +950,3 @@ class Ingestor:
         terminal_jobs = self.completed_jobs() + self.failed_jobs() + self.cancelled_jobs()
 
         return len(self._job_states) - terminal_jobs
-    
