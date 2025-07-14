@@ -146,14 +146,28 @@ def traceable_func(trace_name=None, dedupe=True):
     """
 
     def decorator_inject_trace_info(func):
+        # By checking the signature here, we avoid re-calculating it on every function call.
+        sig = inspect.signature(func)
+        supports_trace_info = "trace_info" in sig.parameters or any(
+            p.kind == inspect.Parameter.VAR_KEYWORD for p in sig.parameters.values()
+        )
+
         @functools.wraps(func)
         def wrapper_inject_trace_info(*args, **kwargs):
-            trace_info = kwargs.pop("trace_info", None)
+            trace_info = kwargs.get("trace_info")
+            created_trace_info = False
             if trace_info is None:
                 trace_info = {}
+                created_trace_info = True
+
+            # If we created trace_info, but the function doesn't support it,
+            # we should not pass it in.
+            if created_trace_info and supports_trace_info:
+                kwargs["trace_info"] = trace_info
+
             trace_prefix = trace_name if trace_name else func.__name__
 
-            arg_names = list(inspect.signature(func).parameters)
+            arg_names = list(sig.parameters)
             args_name_to_val = dict(zip(arg_names, args))
 
             # If `trace_name` is a formattable string, e.g., "pdf_extractor::{model_name}",
@@ -187,6 +201,11 @@ def traceable_func(trace_name=None, dedupe=True):
 
             trace_info[trace_entry_key] = ts_entry
 
+            # If the function doesn't support `trace_info`, we must remove it
+            # from kwargs if it was passed in from a parent decorated function.
+            if not supports_trace_info:
+                kwargs.pop("trace_info", None)
+
             # Call the decorated function
             result = func(*args, **kwargs)
 
@@ -199,3 +218,4 @@ def traceable_func(trace_name=None, dedupe=True):
         return wrapper_inject_trace_info
 
     return decorator_inject_trace_info
+
