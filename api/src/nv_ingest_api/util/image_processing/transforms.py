@@ -20,6 +20,9 @@ cv2.setNumThreads(1)
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
+# TODO: Remove this, tmp flag, Set to True to use PIL instead of OpenCV for PNG encoding
+USE_PIL = True
+
 logger = logging.getLogger(__name__)
 
 
@@ -428,9 +431,27 @@ def _encode_opencv_jpeg(array: np.ndarray, *, quality: int = 100) -> bytes:
     return buf.tobytes()
 
 
-def _encode_opencv_png(array: np.ndarray, *, compression: int = 3) -> bytes:
-    """NumPy array -> PNG bytes using OpenCV."""
-    ok, buf = cv2.imencode(".png", array, [cv2.IMWRITE_PNG_COMPRESSION, compression])
+def _encode_opencv_png(array: np.ndarray, *, compression: int = 6) -> bytes:
+    """NumPy array -> PNG bytes using OpenCV or PIL."""
+    # PIL path
+    if USE_PIL:
+        # Convert BGR back to RGB for PIL (since preprocessing converted RGB to BGR)
+        if array.ndim == 3 and array.shape[2] == 3:
+            array = cv2.cvtColor(array, cv2.COLOR_BGR2RGB)
+
+        buffered = BytesIO()
+        Image.fromarray(array).convert("RGB").save(buffered, format="PNG")
+        return buffered.getvalue()
+
+    # OpenCV path (existing code)
+    if array.ndim == 3 and array.shape[2] == 3:      # RGB → BGR for OpenCV
+        array = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
+
+    encode_params = [
+        cv2.IMWRITE_PNG_COMPRESSION, compression,
+        cv2.IMWRITE_PNG_STRATEGY,  cv2.IMWRITE_PNG_STRATEGY_DEFAULT,
+    ]
+    ok, buf = cv2.imencode(".png", array, encode_params)
     if not ok:
         raise RuntimeError("cv2.imencode(.png) failed")
     return buf.tobytes()
@@ -608,6 +629,10 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
 
     # Convert to numpy array
     img = np.array(img)
+    # Assert that 3-channel images are in RGB format after conversion
+    assert img.ndim <= 3, f"Image has unexpected number of dimensions: {img.ndim}"
+    assert img.ndim != 3 or img.shape[2] == 3, f"3-channel image should have 3 channels, got: {img.shape[2]}"
+
     return img
 
 
