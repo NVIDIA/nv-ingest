@@ -234,7 +234,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
     schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=dense_dim)
     schema.add_field(field_name="source", datatype=DataType.JSON)
-    schema.add_field(field_name="content_metadata", datatype=DataType.JSON, nullable=True)
+    schema.add_field(field_name="content_metadata", datatype=DataType.JSON, nullable=True if local_index else False)
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
     elif sparse:
