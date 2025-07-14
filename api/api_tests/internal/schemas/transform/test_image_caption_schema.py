@@ -13,7 +13,7 @@ def test_image_caption_extraction_schema_defaults():
     assert schema.api_key == "api_key"
     assert schema.endpoint_url.startswith("https://")
     assert schema.prompt.startswith("Caption")
-    assert schema.model_name.startswith("meta/")
+    assert schema.model_name.startswith("nvidia/")
     assert schema.raise_on_failure is False
 
 
