@@ -12,15 +12,14 @@ from typing import List
 from typing import Optional
 from typing import Tuple
 
-import cv2
+import backoff
 import numpy as np
-import packaging
+import json
 import pandas as pd
-import torch
-import torchvision
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_model_name
+import tritonclient.grpc as grpcclient
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
 
@@ -63,11 +62,6 @@ YOLOX_GRAPHIC_MIN_SCORE = 0.1
 YOLOX_GRAPHIC_FINAL_SCORE = 0.0
 YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE = 512_000
 
-# TODO(Devin): Legacy items aren't working right for me. Double check these.
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
-LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
-YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT = 1024
-YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH = 1024
 
 YOLOX_GRAPHIC_CLASS_LABELS = [
     "chart_title",
@@ -111,8 +105,6 @@ class YoloxModelInterfaceBase(ModelInterface):
 
     def __init__(
         self,
-        image_preproc_width: Optional[int] = None,
-        image_preproc_height: Optional[int] = None,
         nim_max_image_size: Optional[int] = None,
         num_classes: Optional[int] = None,
         conf_threshold: Optional[float] = None,
@@ -126,8 +118,6 @@ class YoloxModelInterfaceBase(ModelInterface):
         Parameters
         ----------
         """
-        self.image_preproc_width = image_preproc_width
-        self.image_preproc_height = image_preproc_height
         self.nim_max_image_size = nim_max_image_size
         self.num_classes = num_classes
         self.conf_threshold = conf_threshold
@@ -212,24 +202,24 @@ class YoloxModelInterfaceBase(ModelInterface):
             return chunks
 
         if protocol == "grpc":
-            logger.debug("Formatting input for gRPC Yolox model")
-            # Resize images for model input (Yolox expects 1024x1024).
-            resized_images = [
-                resize_image(image, (self.image_preproc_width, self.image_preproc_height)) for image in data["images"]
-            ]
-            # Chunk the resized images, the original images, and their shapes.
-            resized_chunks = chunk_list_geometrically(resized_images, max_batch_size)
-            original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
-            shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
+            b64_images = []
+            for image in data["images"]:
+                # Convert to uint8 if needed.
+                b64_images.append(numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT))
+                b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
+                original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+                shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
-            batched_inputs = []
-            formatted_batch_data = []
-            for r_chunk, orig_chunk, shapes in zip(resized_chunks, original_chunks, shape_chunks):
-                # Reorder axes from (B, H, W, C) to (B, C, H, W) as expected by the model.
-                input_array = np.einsum("bijk->bkij", r_chunk).astype(np.float32)
-                batched_inputs.append(input_array)
-                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
-            return batched_inputs, formatted_batch_data
+                batched_inputs = []
+                formatted_batch_data = []
+                for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
+                    input_array = np.array(b64_chunk, dtype=np.object_)
+                    current_batch_size = input_array.shape[0]
+                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+                    batched_inputs.append([input_array, thresholds])
+                    formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+                return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
@@ -337,32 +327,20 @@ class YoloxModelInterfaceBase(ModelInterface):
         list[dict]
             A list of annotation dictionaries for each image in the batch.
         """
-        original_image_shapes = kwargs.get("original_image_shapes", [])
-
         if protocol == "http":
             # For http, the output already has postprocessing applied. Skip to table/chart expansion.
             results = output
 
         elif protocol == "grpc":
+            results = []
             # For grpc, apply the same NIM postprocessing.
-            pred = postprocess_model_prediction(
-                output,
-                self.num_classes,
-                self.conf_threshold,
-                self.iou_threshold,
-                class_agnostic=False,
-            )
-            results = postprocess_results(
-                pred,
-                original_image_shapes,
-                self.image_preproc_width,
-                self.image_preproc_height,
-                self.class_labels,
-                min_score=self.min_score,
-            )
-
+            for out in output:
+                if isinstance(out, bytes):
+                    out = out.decode("utf-8")
+                if isinstance(out, dict):
+                    continue
+                results.append(json.loads(out))
         inference_results = self.postprocess_annotations(results, **kwargs)
-
         return inference_results
 
     def postprocess_annotations(self, annotation_dicts, **kwargs):
@@ -396,18 +374,13 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-page-elements model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_model_name: str = "nemoretriever-page-elements-v2"):
+    def __init__(self):
         """
         Initialize the yolox-page-elements model interface.
         """
-        if yolox_model_name.endswith("-v1"):
-            num_classes = YOLOX_PAGE_V1_NUM_CLASSES
-            final_score = YOLOX_PAGE_V1_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V1_CLASS_LABELS
-        else:
-            num_classes = YOLOX_PAGE_V2_NUM_CLASSES
-            final_score = YOLOX_PAGE_V2_FINAL_SCORE
-            class_labels = YOLOX_PAGE_V2_CLASS_LABELS
+        num_classes = YOLOX_PAGE_V2_NUM_CLASSES
+        final_score = YOLOX_PAGE_V2_FINAL_SCORE
+        class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
             image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -478,22 +451,11 @@ class YoloxGraphicElementsModelInterface(YoloxModelInterfaceBase):
     An interface for handling inference with yolox-graphic-elemenents model, supporting both gRPC and HTTP protocols.
     """
 
-    def __init__(self, yolox_version: Optional[str] = None):
+    def __init__(self):
         """
         Initialize the yolox-graphic-elements model interface.
         """
-        if yolox_version and (
-            packaging.version.Version(yolox_version) >= packaging.version.Version("1.2.0-rc5")  # gtc release
-        ):
-            image_preproc_width = YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-        else:
-            image_preproc_width = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_WIDTH
-            image_preproc_height = LEGACY_YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT
-
         super().__init__(
-            image_preproc_width=image_preproc_width,
-            image_preproc_height=image_preproc_height,
             nim_max_image_size=YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE,
             num_classes=YOLOX_GRAPHIC_NUM_CLASSES,
             conf_threshold=YOLOX_GRAPHIC_CONF_THRESHOLD,
@@ -598,144 +560,6 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
             inference_results.append(bbox_dict)
 
         return inference_results
-
-
-def postprocess_model_prediction(prediction, num_classes, conf_thre=0.7, nms_thre=0.45, class_agnostic=False):
-    # Convert numpy array to torch tensor
-    prediction = torch.from_numpy(prediction.copy())
-
-    # Compute box corners
-    box_corner = prediction.new(prediction.shape)
-    box_corner[:, :, 0] = prediction[:, :, 0] - prediction[:, :, 2] / 2
-    box_corner[:, :, 1] = prediction[:, :, 1] - prediction[:, :, 3] / 2
-    box_corner[:, :, 2] = prediction[:, :, 0] + prediction[:, :, 2] / 2
-    box_corner[:, :, 3] = prediction[:, :, 1] + prediction[:, :, 3] / 2
-    prediction[:, :, :4] = box_corner[:, :, :4]
-
-    output = [None for _ in range(len(prediction))]
-
-    for i, image_pred in enumerate(prediction):
-        # If no detections, continue to the next image
-        if not image_pred.size(0):
-            continue
-
-        # Ensure image_pred is 2D
-        if image_pred.ndim == 1:
-            image_pred = image_pred.unsqueeze(0)
-
-        # Get score and class with highest confidence
-        class_conf, class_pred = torch.max(image_pred[:, 5 : 5 + num_classes], 1, keepdim=True)
-
-        # Confidence mask
-        squeezed_conf = class_conf.squeeze(dim=1)
-        conf_mask = image_pred[:, 4] * squeezed_conf >= conf_thre
-
-        # Apply confidence mask
-        detections = torch.cat((image_pred[:, :5], class_conf, class_pred.float()), 1)
-        detections = detections[conf_mask]
-
-        if not detections.size(0):
-            continue
-
-        # Apply Non-Maximum Suppression (NMS)
-        if class_agnostic:
-            nms_out_index = torchvision.ops.nms(
-                detections[:, :4],
-                detections[:, 4] * detections[:, 5],
-                nms_thre,
-            )
-        else:
-            nms_out_index = torchvision.ops.batched_nms(
-                detections[:, :4],
-                detections[:, 4] * detections[:, 5],
-                detections[:, 6],
-                nms_thre,
-            )
-        detections = detections[nms_out_index]
-
-        # Append detections to output
-        output[i] = detections
-
-    return output
-
-
-def postprocess_results(
-    results, original_image_shapes, image_preproc_width, image_preproc_height, class_labels, min_score=0.0
-):
-    """
-    For each item (==image) in results, computes annotations in the form
-
-     {"table": [[0.0107, 0.0859, 0.7537, 0.1219, 0.9861], ...],
-      "figure": [...],
-      "title": [...]
-      }
-    where each list of 5 floats represents a bounding box in the format [x1, y1, x2, y2, confidence]
-
-    Keep only bboxes with high enough confidence.
-    """
-    out = []
-
-    for original_image_shape, result in zip(original_image_shapes, results):
-        annotation_dict = {label: [] for label in class_labels}
-
-        if result is None:
-            out.append(annotation_dict)
-            continue
-
-        try:
-            result = result.cpu().numpy()
-            scores = result[:, 4] * result[:, 5]
-            result = result[scores > min_score]
-
-            # ratio is used when image was padded
-            ratio = min(
-                image_preproc_width / original_image_shape[0],
-                image_preproc_height / original_image_shape[1],
-            )
-            bboxes = result[:, :4] / ratio
-
-            bboxes[:, [0, 2]] /= original_image_shape[1]
-            bboxes[:, [1, 3]] /= original_image_shape[0]
-            bboxes = np.clip(bboxes, 0.0, 1.0)
-
-            labels = result[:, 6]
-            scores = scores[scores > min_score]
-        except Exception as e:
-            raise ValueError(f"Error in postprocessing {result.shape} and {original_image_shape}: {e}")
-
-        for box, score, label in zip(bboxes, scores, labels):
-            # TODO(Devin): Sometimes we get back unexpected class labels?
-            if (label < 0) or (label >= len(class_labels)):
-                logger.warning(f"Invalid class label {label} found in postprocessing")
-                continue
-            else:
-                class_name = class_labels[int(label)]
-
-            annotation_dict[class_name].append([round(float(x), 4) for x in np.concatenate((box, [score]))])
-
-        out.append(annotation_dict)
-
-    return out
-
-
-def resize_image(image, target_img_size):
-    w, h, _ = np.array(image).shape
-
-    if target_img_size is not None:  # Resize + Pad
-        r = min(target_img_size[0] / w, target_img_size[1] / h)
-        image = cv2.resize(
-            image,
-            (int(h * r), int(w * r)),
-            interpolation=cv2.INTER_LINEAR,
-        ).astype(np.uint8)
-        image = np.pad(
-            image,
-            ((0, target_img_size[0] - image.shape[0]), (0, target_img_size[1] - image.shape[1]), (0, 0)),
-            mode="constant",
-            constant_values=114,
-        )
-
-    return image
 
 
 def expand_table_bboxes(annotation_dict, labels=None):
@@ -1383,14 +1207,16 @@ def get_bbox_dict_yolox_table(preds, shape, class_labels, threshold=0.1, delta=0
     return bbox_dict
 
 
-def get_yolox_model_name(yolox_http_endpoint, default_model_name="nemoretriever-page-elements-v2"):
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_yolox_model_name(yolox_grpc_endpoint, default_model_name="yolox"):
     try:
-        yolox_model_name = get_model_name(yolox_http_endpoint, default_model_name)
-        if not yolox_model_name:
-            logger.warning(
-                "Failed to obtain yolox-page-elements model name from the endpoint. "
-                f"Falling back to '{default_model_name}'."
-            )
+        client = grpcclient.InferenceServerClient(yolox_grpc_endpoint)
+        model_index = client.get_model_repository_index(as_json=True)
+        model_names = [x["name"] for x in model_index.get("models", [])]
+        if "yolox_ensemble" in model_names:
+            yolox_model_name = "yolox_ensemble"
+        else:
             yolox_model_name = default_model_name
     except Exception:
         logger.warning(
