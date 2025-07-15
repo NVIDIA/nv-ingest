@@ -99,10 +99,10 @@ def scale_image_to_encoding_size(
         reduction_step = initial_reduction
         new_size = original_size
         current_img = img_array.copy()
+        original_width, original_height = original_size
 
         while len(base64_image) > max_base64_size:
-            width, height = new_size
-            new_size = (int(width * reduction_step), int(height * reduction_step))
+            new_size = (int(original_width * reduction_step), int(original_height * reduction_step))
             if new_size[0] < 1 or new_size[1] < 1:
                 raise ValueError("Image cannot be resized further without becoming too small.")
 
@@ -432,21 +432,7 @@ def _encode_opencv_jpeg(array: np.ndarray, *, quality: int = 100) -> bytes:
 
 
 def _encode_opencv_png(array: np.ndarray, *, compression: int = 6) -> bytes:
-    """NumPy array -> PNG bytes using OpenCV or PIL."""
-    # PIL path
-    if USE_PIL:
-        # Convert BGR back to RGB for PIL (since preprocessing converted RGB to BGR)
-        if array.ndim == 3 and array.shape[2] == 3:
-            array = cv2.cvtColor(array, cv2.COLOR_BGR2RGB)
-
-        buffered = BytesIO()
-        Image.fromarray(array).convert("RGB").save(buffered, format="PNG")
-        return buffered.getvalue()
-
-    # OpenCV path (existing code)
-    if array.ndim == 3 and array.shape[2] == 3:      # RGB → BGR for OpenCV
-        array = cv2.cvtColor(array, cv2.COLOR_RGB2BGR)
-
+    """NumPy array -> PNG bytes using OpenCV"""
     encode_params = [
         cv2.IMWRITE_PNG_COMPRESSION, compression,
         cv2.IMWRITE_PNG_STRATEGY,  cv2.IMWRITE_PNG_STRATEGY_DEFAULT,
@@ -637,7 +623,7 @@ def base64_to_numpy(base64_string: str) -> np.ndarray:
 
 
 def scale_numpy_image(
-    img_arr: np.ndarray, scale_tuple: Optional[Tuple[int, int]] = None, interpolation=cv2.INTER_LANCZOS4
+    img_arr: np.ndarray, scale_tuple: Optional[Tuple[int, int]] = None, interpolation=Image.LANCZOS
 ) -> np.ndarray:
     """
     Scales a NumPy image array using OpenCV with aspect ratio preservation.
@@ -662,30 +648,11 @@ def scale_numpy_image(
         A NumPy array representing the scaled image data.
     """
     # Apply scaling using OpenCV if specified
+    # Using PIL for scaling as CV2 seems to lead to different results
+    # TODO: Remove when we move to YOLOX Ensemble Models
     if scale_tuple:
-        # Get current dimensions
-        current_height, current_width = img_arr.shape[:2]
-        target_width, target_height = scale_tuple
-
-        # Calculate scaling factor to maintain aspect ratio (similar to PIL's thumbnail)
-        scale_w = target_width / current_width
-        scale_h = target_height / current_height
-        scale_factor = min(scale_w, scale_h)
-
-        # Calculate new dimensions
-        new_width = int(current_width * scale_factor)
-        new_height = int(current_height * scale_factor)
-
-        # Validate dimensions before resizing
-        if new_width <= 0 or new_height <= 0:
-            raise ValueError(
-                f"Calculated dimensions are invalid: {new_width}x{new_height}. "
-                f"Original: {current_width}x{current_height}, target: {target_width}x{target_height}, "
-                f"scale_factor: {scale_factor}"
-            )
-
-        # Resize using OpenCV
-        img_arr = _resize_image_opencv(img_arr, (new_width, new_height), interpolation)
-
+        image = Image.fromarray(img_arr)
+        image.thumbnail(scale_tuple, interpolation)
+        img_arr = np.array(image)
     # Ensure we return a copy
     return img_arr.copy()

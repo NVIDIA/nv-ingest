@@ -176,11 +176,10 @@ def pdfium_pages_to_numpy(
     for idx, page in enumerate(pages):
         # Render the page as a bitmap with the specified scale and rotation
         page_bitmap = page.render(scale=scale, rotation=rotation)
-
-        # Convert the bitmap to a NumPy array using the existing function
         img_arr = convert_bitmap_to_corrected_numpy(page_bitmap)
-        # Apply scaling if specified
-        img_arr = scale_numpy_image(img_arr, scale_tuple)
+        # Apply scaling using the thumbnail approach if specified
+        if scale_tuple:
+            img_arr = scale_numpy_image(img_arr, scale_tuple)
         # Apply padding if specified
         if padding_tuple:
             img_arr, (pad_width, pad_height) = pad_image(
