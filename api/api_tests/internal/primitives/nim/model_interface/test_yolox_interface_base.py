@@ -75,22 +75,14 @@ class TestYoloxModelInterface(unittest.TestCase):
         self.postprocess_results_patcher = patch(f"{MODULE_UNDER_TEST}.postprocess_results")
         self.mock_postprocess_results = self.postprocess_results_patcher.start()
 
-        self.image_patcher = patch(f"{MODULE_UNDER_TEST}.Image")
-        self.mock_image = self.image_patcher.start()
-        self.mock_pil_image = MagicMock()
-        self.mock_image.fromarray.return_value = self.mock_pil_image
-        self.mock_pil_image.size = (200, 100)
+        # Mock numpy_to_base64 and scale_image_to_encoding_size functions
+        self.numpy_to_base64_patcher = patch(f"{MODULE_UNDER_TEST}.numpy_to_base64")
+        self.mock_numpy_to_base64 = self.numpy_to_base64_patcher.start()
+        self.mock_numpy_to_base64.return_value = "base64_encoded_data"
 
-        # Mock BytesIO and base64
-        self.bytesio_patcher = patch(f"{MODULE_UNDER_TEST}.io.BytesIO")
-        self.mock_bytesio = self.bytesio_patcher.start()
-        self.mock_buffer = MagicMock()
-        self.mock_bytesio.return_value = self.mock_buffer
-        self.mock_buffer.getvalue.return_value = b"test_image_data"
-
-        self.base64_patcher = patch(f"{MODULE_UNDER_TEST}.base64.b64encode")
-        self.mock_base64 = self.base64_patcher.start()
-        self.mock_base64.return_value = b"base64_encoded_data"
+        self.scale_image_patcher = patch(f"{MODULE_UNDER_TEST}.scale_image_to_encoding_size")
+        self.mock_scale_image = self.scale_image_patcher.start()
+        self.mock_scale_image.return_value = ("scaled_base64_data", (200, 100))
 
         # Mock log function
         self.log_patcher = patch(f"{MODULE_UNDER_TEST}.log")
@@ -104,9 +96,8 @@ class TestYoloxModelInterface(unittest.TestCase):
         self.scale_patcher.stop()
         self.postprocess_model_patcher.stop()
         self.postprocess_results_patcher.stop()
-        self.image_patcher.stop()
-        self.bytesio_patcher.stop()
-        self.base64_patcher.stop()
+        self.numpy_to_base64_patcher.stop()
+        self.scale_image_patcher.stop()
         self.log_patcher.stop()
 
     def test_initialization(self):
@@ -219,8 +210,10 @@ class TestYoloxModelInterface(unittest.TestCase):
 
         batches, batch_data = self.model_interface.format_input(input_data, protocol="http", max_batch_size=2)
 
-        # Check that Image.fromarray was called for each image
-        self.assertEqual(self.mock_image.fromarray.call_count, 2)
+        # Check that numpy_to_base64 was called for each image
+        self.assertEqual(self.mock_numpy_to_base64.call_count, 2)
+        # Check that scale_image_to_encoding_size was called for each image
+        self.assertEqual(self.mock_scale_image.call_count, 2)
 
         # Check batches
         self.assertEqual(len(batches), 1)  # Should be 1 batch with 2 images

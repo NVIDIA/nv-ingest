@@ -11,6 +11,9 @@ import pandas as pd
 from functools import partial
 import json
 import os
+import numpy as np
+import ast
+import copy
 
 import requests
 from nv_ingest_client.util.process_json_files import ingest_json_results_to_blob
@@ -77,7 +80,10 @@ def create_nvingest_meta_schema():
 
 
 def create_meta_collection(
-    schema: CollectionSchema, milvus_uri: str = "http://localhost:19530", collection_name: str = "meta", recreate=False
+    schema: CollectionSchema,
+    milvus_uri: str = "http://localhost:19530",
+    collection_name: str = "meta",
+    recreate=False,
 ):
     client = MilvusClient(milvus_uri)
     if client.has_collection(collection_name) and not recreate:
@@ -111,7 +117,11 @@ def write_meta_collection(
         "collection_name": collection_name,
         "vector": [0.0] * 2,
         "timestamp": str(creation_timestamp or datetime.datetime.now()),
-        "indexes": {"dense_index": dense_index, "dense_dimension": dense_dim, "sparse_index": sparse_index},
+        "indexes": {
+            "dense_index": dense_index,
+            "dense_dimension": dense_dim,
+            "sparse_index": sparse_index,
+        },
         "models": {
             "embedding_model": embedding_model or client_config.embedding_nim_model_name,
             "embedding_dim": dense_dim,
@@ -166,7 +176,13 @@ def grab_meta_collection_info(
     client = MilvusClient(milvus_uri)
     results = client.query_iterator(
         collection_name=meta_collection_name,
-        output_fields=["collection_name", "timestamp", "indexes", "models", "user_fields"],
+        output_fields=[
+            "collection_name",
+            "timestamp",
+            "indexes",
+            "models",
+            "user_fields",
+        ],
     )
     query_res = []
     res = results.next()
@@ -231,7 +247,11 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(field_name="pk", datatype=DataType.INT64, is_primary=True, auto_id=True)
     schema.add_field(field_name="vector", datatype=DataType.FLOAT_VECTOR, dim=dense_dim)
     schema.add_field(field_name="source", datatype=DataType.JSON)
-    schema.add_field(field_name="content_metadata", datatype=DataType.JSON)
+    schema.add_field(
+        field_name="content_metadata",
+        datatype=DataType.JSON,
+        nullable=True if local_index else False,
+    )
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
     elif sparse:
@@ -259,7 +279,10 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
 
 
 def create_nvingest_index_params(
-    sparse: bool = False, gpu_index: bool = True, gpu_search: bool = False, local_index: bool = True
+    sparse: bool = False,
+    gpu_index: bool = True,
+    gpu_search: bool = False,
+    local_index: bool = True,
 ) -> IndexParams:
     """
     Creates index params necessary to create an index for a collection. At a minimum,
@@ -420,7 +443,10 @@ def create_nvingest_collection(
     client = MilvusClient(milvus_uri)
     schema = create_nvingest_schema(dense_dim=dense_dim, sparse=sparse, local_index=local_index)
     index_params = create_nvingest_index_params(
-        sparse=sparse, gpu_index=gpu_index, gpu_search=gpu_search, local_index=local_index
+        sparse=sparse,
+        gpu_index=gpu_index,
+        gpu_search=gpu_search,
+        local_index=local_index,
     )
     create_collection(client, collection_name, schema, index_params, recreate=recreate)
     d_idx, s_idx = _get_index_types(index_params, sparse=sparse)
@@ -486,11 +512,13 @@ def _format_sparse_embedding(sparse_vector: csr_array):
 
 
 def _record_dict(text, element, sparse_vector: csr_array = None):
+    cp_element = copy.deepcopy(element)
+    cp_element["metadata"].pop("content")
     record = {
         "text": text,
-        "vector": element["metadata"]["embedding"],
-        "source": element["metadata"]["source_metadata"],
-        "content_metadata": element["metadata"]["content_metadata"],
+        "vector": cp_element["metadata"].pop("embedding"),
+        "source": cp_element["metadata"].pop("source_metadata"),
+        "content_metadata": cp_element["metadata"].pop("content_metadata"),
     }
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
@@ -524,10 +552,20 @@ def cleanup_records(
                 result = [result]
             for element in result:
                 text = _pull_text(
-                    element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+                    element,
+                    enable_text,
+                    enable_charts,
+                    enable_tables,
+                    enable_images,
+                    enable_infographics,
+                    enable_audio,
                 )
                 _insert_location_into_content_metadata(
-                    element, enable_charts, enable_tables, enable_images, enable_infographics
+                    element,
+                    enable_charts,
+                    enable_tables,
+                    enable_images,
+                    enable_infographics,
                 )
                 if meta_dataframe is not None and meta_source_field and meta_fields:
                     add_metadata(element, meta_dataframe, meta_source_field, meta_fields)
@@ -586,7 +624,11 @@ def _pull_text(
 
 
 def _insert_location_into_content_metadata(
-    element, enable_charts: bool, enable_tables: bool, enable_images: bool, enable_infographic: bool
+    element,
+    enable_charts: bool,
+    enable_tables: bool,
+    enable_images: bool,
+    enable_infographic: bool,
 ):
     location = max_dimensions = None
     if element["document_type"] == "structured":
@@ -620,7 +662,23 @@ def add_metadata(element, meta_dataframe, meta_source_field, meta_data_fields):
         logger.info(f"FOUND MORE THAN ONE metadata entry for {element_name}, will use first entry")
     meta_fields = df[meta_data_fields]
     for col in meta_data_fields:
-        element["metadata"]["content_metadata"][col] = str(meta_fields.iloc[0][col])
+        field = meta_fields.iloc[0][col]
+        # catch any nan values
+        if pd.isna(field):
+            field = None
+        elif isinstance(field, str):
+            if field == "":
+                field = None
+            # this is specifically for lists
+            elif field[0] == "[":
+                field = ast.literal_eval(field)
+        elif isinstance(field, (np.int32, np.int64)):
+            field = int(field)
+        elif isinstance(field, (np.float32, np.float64)):
+            field = float(field)
+        elif isinstance(field, (np.bool_)):
+            field = bool(field)
+        element["metadata"][col] = field
 
 
 def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
@@ -669,7 +727,11 @@ def write_records_minio(records, writer: RemoteBulkWriter) -> RemoteBulkWriter:
     return writer
 
 
-def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_uri: str = "http://localhost:19530"):
+def bulk_insert_milvus(
+    collection_name: str,
+    writer: RemoteBulkWriter,
+    milvus_uri: str = "http://localhost:19530",
+):
     """
     This function initialize the bulk ingest of all minio uploaded records, and checks for
     milvus task completion. Once the function is complete all records have been uploaded
@@ -690,7 +752,9 @@ def bulk_insert_milvus(collection_name: str, writer: RemoteBulkWriter, milvus_ur
     connections.connect(uri=milvus_uri)
     t_bulk_start = time.time()
     task_id = utility.do_bulk_insert(
-        collection_name=collection_name, files=writer.batch_files[0], consistency_level=CONSISTENCY
+        collection_name=collection_name,
+        files=writer.batch_files[0],
+        consistency_level=CONSISTENCY,
     )
     # list_bulk_insert_tasks = utility.list_bulk_insert_tasks(collection_name=collection_name)
     state = "Pending"
@@ -751,7 +815,13 @@ def create_bm25_model(
             result = [result]
         for element in result:
             text = _pull_text(
-                element, enable_text, enable_charts, enable_tables, enable_images, enable_infographics, enable_audio
+                element,
+                enable_text,
+                enable_charts,
+                enable_tables,
+                enable_images,
+                enable_infographics,
+                enable_audio,
             )
             if text:
                 all_text.append(text)
@@ -912,7 +982,10 @@ def write_to_nvingest_collection(
             secure=False,
         )
         text_writer = RemoteBulkWriter(
-            schema=schema, remote_path="/", connect_param=conn, file_type=BulkFileType.PARQUET
+            schema=schema,
+            remote_path="/",
+            connect_param=conn,
+            file_type=BulkFileType.PARQUET,
         )
         writer = write_records_minio(
             cleaned_records,
@@ -1305,7 +1378,12 @@ def nv_rerank(
     for idx, candidate in enumerate(candidates):
         map_candidates[idx] = candidate
         texts.append({"text": candidate["entity"]["text"]})
-    payload = {"model": model_name, "query": {"text": query}, "passages": texts, "truncate": truncate}
+    payload = {
+        "model": model_name,
+        "query": {"text": query},
+        "passages": texts,
+        "truncate": truncate,
+    }
     start = time.time()
     response = requests.post(f"{reranker_endpoint}", headers=headers, json=payload)
     logger.debug(f"RERANKER time: {time.time() - start}")
@@ -1526,7 +1604,14 @@ def embed_index_collection(
             with open(results_file, "r") as infile:
                 results = json.loads(infile.read())
                 embeddings = infer_microservice(
-                    results, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+                    results,
+                    model_name,
+                    embedding_endpoint,
+                    nvidia_api_key,
+                    intput_type,
+                    truncate,
+                    batch_size,
+                    grpc,
                 )
             for record, emb in zip(results, embeddings):
                 record["metadata"]["embedding"] = emb
@@ -1537,7 +1622,14 @@ def embed_index_collection(
     # running all at once
     else:
         embeddings = infer_microservice(
-            data, model_name, embedding_endpoint, nvidia_api_key, intput_type, truncate, batch_size, grpc
+            data,
+            model_name,
+            embedding_endpoint,
+            nvidia_api_key,
+            intput_type,
+            truncate,
+            batch_size,
+            grpc,
         )
         for record, emb in zip(data, embeddings):
             record["metadata"]["embedding"] = emb
