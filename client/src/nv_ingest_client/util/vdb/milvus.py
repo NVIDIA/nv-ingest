@@ -518,7 +518,7 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "text": text,
         "vector": cp_element["metadata"].pop("embedding"),
         "source": cp_element["metadata"].pop("source_metadata"),
-        "content_metadata": cp_element["metadata"],
+        "content_metadata": cp_element["metadata"].pop("content_metadata"),
     }
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
