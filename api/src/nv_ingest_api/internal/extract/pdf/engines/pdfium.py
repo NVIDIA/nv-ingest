@@ -28,6 +28,7 @@ from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
+    YOLOX_PAGE_IMAGE_FORMAT,
     YoloxPageElementsModelInterface,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
@@ -188,7 +189,7 @@ def _extract_page_element_images(
             if cropped is None:
                 continue
 
-            base64_img = numpy_to_base64(cropped)
+            base64_img = numpy_to_base64(cropped, format=YOLOX_PAGE_IMAGE_FORMAT)
 
             bbox_in_orig_coord = (
                 int(w1) - pad_width,

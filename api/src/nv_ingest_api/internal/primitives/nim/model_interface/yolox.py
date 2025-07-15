@@ -4,6 +4,7 @@
 
 
 import json
+import os
 import logging
 import warnings
 from math import log
@@ -20,12 +21,11 @@ import pandas as pd
 import torch
 import torchvision
 import tritonclient.grpc as grpcclient
+
 from nv_ingest_api.internal.primitives.nim import ModelInterface
 from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64
-
-
-cv2.setNumThreads(1)
 
 logger = logging.getLogger(__name__)
 
@@ -36,6 +36,7 @@ YOLOX_PAGE_MIN_SCORE = 0.1
 YOLOX_PAGE_NIM_MAX_IMAGE_SIZE = 512_000
 YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
+YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
 # yolox-page-elements-v1 contants
 YOLOX_PAGE_V1_NUM_CLASSES = 4
@@ -267,15 +268,17 @@ class YoloxModelInterfaceBase(ModelInterface):
                 # Convert to uint8 if needed.
                 if image.dtype != np.uint8:
                     image = (image * 255).astype(np.uint8)
-                # Convert the numpy array to base64
-                image_b64 = numpy_to_base64(image)
 
+                # Get original size directly from numpy array (width, height)
+                original_size = (image.shape[1], image.shape[0])
+                # Convert numpy array directly to base64 using OpenCV
+                image_b64 = numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT)
                 # Scale the image if necessary.
-                # scaled_image_b64, new_size = scale_image_to_encoding_size(
-                #    image_b64, max_base64_size=self.nim_max_image_size
-                # )
-                # if new_size != original_size:
-                #    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
+                scaled_image_b64, new_size = scale_image_to_encoding_size(
+                    image_b64, max_base64_size=self.nim_max_image_size
+                )
+                if new_size != original_size:
+                    logger.debug(f"Image was scaled from {original_size} to {new_size}.")
 
                 # content_list.append({"type": "image_url", "url": f"data:image/png;base64,{scaled_image_b64}"})
                 content_list.append({"type": "image_url", "url": f"data:image/png;base64,{image_b64}"})
