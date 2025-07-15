@@ -338,15 +338,33 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                         self._pause_event.wait()  # Block if paused
                         self._active_processing = True
 
-                    while True:
-                        try:
-                            self.output_queue.put(control_message)
-                            self.stats["successful_queue_writes"] += 1
-                            break
-                        except Exception:
-                            self._logger.warning("Output queue full, retrying put()...")
-                            self.stats["queue_full"] += 1
-                            time.sleep(0.1)
+                    object_ref_to_put = None
+                    try:
+                        # Get the handle of the queue actor to set it as the owner.
+                        owner_actor = self.output_queue.actor
+
+                        # Put the object into Plasma, transferring ownership.
+                        object_ref_to_put = ray.put(control_message, _owner=owner_actor)
+
+                        # Now that the object is safely in Plasma, delete the large local copy.
+                        del control_message
+
+                        # This loop will retry indefinitely until the ObjectRef is put successfully.
+                        is_put_successful = False
+                        while not is_put_successful:
+                            try:
+                                self.output_queue.put(object_ref_to_put)
+                                self.stats["successful_queue_writes"] += 1
+                                is_put_successful = True  # Exit retry loop on success
+                            except Exception:
+                                self._logger.warning("Output queue full, retrying put()...")
+                                self.stats["queue_full"] += 1
+                                time.sleep(0.1)
+                    finally:
+                        # After the operation, delete the local ObjectRef.
+                        # The primary reference is now held by the queue actor.
+                        if object_ref_to_put is not None:
+                            del object_ref_to_put
 
                 self.stats["processed"] += 1
                 self._message_count += 1

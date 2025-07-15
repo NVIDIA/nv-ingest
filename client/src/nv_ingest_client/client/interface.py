@@ -51,13 +51,26 @@ from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
-from nv_ingest_client.util.vdb import VDB
-from nv_ingest_client.util.vdb import available_vdb_ops
+from nv_ingest_client.util.vdb import VDB, get_vdb_op_cls
 from tqdm import tqdm
 
 logger = logging.getLogger(__name__)
 
 DEFAULT_JOB_QUEUE_ID = "ingest_task_queue"
+
+
+def get_max_filename_length(path="."):
+    return os.pathconf(path, "PC_NAME_MAX")
+
+
+def safe_filename(base_dir, filename, suffix=""):
+    max_name = os.pathconf(base_dir, "PC_NAME_MAX")
+    # Account for suffix (like ".jsonl") in the allowed length
+    allowed = max_name - len(suffix)
+    # If filename too long, truncate and append suffix
+    if len(filename) > allowed:
+        filename = filename[:allowed]
+    return filename + suffix
 
 
 def ensure_job_specs(func):
@@ -118,7 +131,10 @@ class LazyLoadedList(collections.abc.Sequence):
             self._offsets = []
             self._len = 0
         except Exception as e:
-            logger.error(f"LazyLoadedList: Error building index for {self.filepath}: {e}", exc_info=True)
+            logger.error(
+                f"LazyLoadedList: Error building index for {self.filepath}: {e}",
+                exc_info=True,
+            )
             self._offsets = []
             self._len = 0
 
@@ -160,7 +176,10 @@ class LazyLoadedList(collections.abc.Sequence):
         except json.JSONDecodeError as e:
             raise ValueError(f"Error decoding JSON at indexed line for index {idx} in {self.filepath}: {e}") from e
         except Exception as e:
-            logger.error(f"Unexpected error in __getitem__ for index {idx} in {self.filepath}: {e}", exc_info=True)
+            logger.error(
+                f"Unexpected error in __getitem__ for index {idx} in {self.filepath}: {e}",
+                exc_info=True,
+            )
             raise
 
     def __repr__(self):
@@ -354,11 +373,18 @@ class Ingestor:
         return self
 
     def ingest(
-        self, show_progress: bool = False, return_failures: bool = False, save_to_disk: bool = False, **kwargs: Any
+        self,
+        show_progress: bool = False,
+        return_failures: bool = False,
+        save_to_disk: bool = False,
+        **kwargs: Any,
     ) -> Union[
         List[List[Dict[str, Any]]],  # In-memory: List of (response['data'] for each doc)
         List[LazyLoadedList],  # Disk: List of proxies, one per original doc
-        Tuple[Union[List[List[Dict[str, Any]]], List[LazyLoadedList]], List[Tuple[str, str]]],
+        Tuple[
+            Union[List[List[Dict[str, Any]]], List[LazyLoadedList]],
+            List[Tuple[str, str]],
+        ],
     ]:  # noqa: E501
         """
         Ingest documents by submitting jobs and fetching results concurrently.
@@ -408,7 +434,9 @@ class Ingestor:
             try:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
-                jsonl_filepath = os.path.join(output_dir, f"{clean_source_basename}.results.jsonl")
+                file_name, file_ext = os.path.splitext(clean_source_basename)
+                file_suffix = f".{file_ext}.results.jsonl"
+                jsonl_filepath = safe_filename(output_dir, file_name, file_suffix)
 
                 num_items_saved = save_document_results_to_jsonl(
                     doc_data,
@@ -804,10 +832,8 @@ class Ingestor:
         """
         vdb_op = kwargs.pop("vdb_op", "milvus")
         if isinstance(vdb_op, str):
-            vdb_op = available_vdb_ops.get(vdb_op, None)
-            if not vdb_op:
-                raise ValueError(f"Invalid op string: {vdb_op}, Supported ops: {available_vdb_ops.keys()}")
-            vdb_op = vdb_op(**kwargs)
+            op_cls = get_vdb_op_cls(vdb_op)
+            vdb_op = op_cls(**kwargs)
         elif isinstance(vdb_op, VDB):
             vdb_op = vdb_op
         else:

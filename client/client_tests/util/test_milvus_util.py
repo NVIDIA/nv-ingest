@@ -242,11 +242,11 @@ def test_metadata_add(records, metadata):
         for element in record:
             add_metadata(element, metadata, "source_name", ["meta_a", "meta_b"])
 
-            assert "meta_a" in [*element["metadata"]["content_metadata"]]
-            assert "meta_b" in [*element["metadata"]["content_metadata"]]
+            assert "meta_a" in [*element["metadata"]]
+            assert "meta_b" in [*element["metadata"]]
             idx = element["metadata"]["source_metadata"]["source_name"].split("_")[1].split(".")[0]
-            assert element["metadata"]["content_metadata"]["meta_a"] == f"meta_a_{idx}"
-            assert element["metadata"]["content_metadata"]["meta_b"] == f"meta_b_{idx}"
+            assert element["metadata"]["meta_a"] == f"meta_a_{idx}"
+            assert element["metadata"]["meta_b"] == f"meta_b_{idx}"
 
 
 def test_metadata_import(metadata, tmp_path):
