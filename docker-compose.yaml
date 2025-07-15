@@ -21,6 +21,10 @@ services:
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=2048
+      - NIM_TRITON_CPU_THREADS_PRE_PROCESSOR=1
+      - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=2
+      - OMP_NUM_THREADS=2
       # NIM OpenTelemetry Settings
       - NIM_ENABLE_OTEL=0
       - NIM_OTEL_SERVICE_NAME=page-elements
@@ -53,6 +57,8 @@ services:
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=2048
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -75,6 +81,8 @@ services:
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
       - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=2048
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -95,6 +103,7 @@ services:
       - "8011:8002"
     user: root
     environment:
+      - OMP_NUM_THREADS=8
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
@@ -286,6 +295,7 @@ services:
       #- PADDLE_INFER_PROTOCOL=http
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
       # Self-hosted redis endpoints.
+      - YOLOX_PAGE_IMAGE_FORMAT=JPG # JPG is faster than PNG
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc

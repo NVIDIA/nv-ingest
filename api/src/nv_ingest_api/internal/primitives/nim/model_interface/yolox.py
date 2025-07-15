@@ -180,6 +180,7 @@ class YoloxModelInterfaceBase(ModelInterface):
 
         # Helper functions to chunk a list into sublists of length up to chunk_size.
         def chunk_list(lst: list, chunk_size: int) -> List[list]:
+            chunk_size = max(1, chunk_size)
             return [lst[i : i + chunk_size] for i in range(0, len(lst), chunk_size)]
 
         def chunk_list_geometrically(lst: list, max_size: int) -> List[list]:
@@ -187,30 +188,29 @@ class YoloxModelInterfaceBase(ModelInterface):
             chunks = []
             i = 0
             while i < len(lst):
-                chunk_size = min(2 ** int(log(len(lst) - i, 2)), max_size)
+                chunk_size = max(1, min(2 ** int(log(len(lst) - i, 2)), max_size))
                 chunks.append(lst[i : i + chunk_size])
                 i += chunk_size
             return chunks
 
         if protocol == "grpc":
-            b64_images = []
-            for image in data["images"]:
-                # Convert to uint8 if needed.
-                b64_images.append(numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT))
-                b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
-                original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
-                shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
+            logger.debug("Formatting input for gRPC Yolox Ensemble model")
+            b64_images = [numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT) for image in data["images"]]
+            b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
+            original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
+            shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
 
-                batched_inputs = []
-                formatted_batch_data = []
-                for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
-                    input_array = np.array(b64_chunk, dtype=np.object_)
-                    current_batch_size = input_array.shape[0]
-                    single_threshold_pair = [self.conf_threshold, self.iou_threshold]
-                    thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
-                    batched_inputs.append([input_array, thresholds])
-                    formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
-                return batched_inputs, formatted_batch_data
+            batched_inputs = []
+            formatted_batch_data = []
+            for b64_chunk, orig_chunk, shapes in zip(b64_chunks, original_chunks, shape_chunks):
+                input_array = np.array(b64_chunk, dtype=np.object_)
+                current_batch_size = input_array.shape[0]
+                single_threshold_pair = [self.conf_threshold, self.iou_threshold]
+                thresholds = np.tile(single_threshold_pair, (current_batch_size, 1)).astype(np.float32)
+                batched_inputs.append([input_array, thresholds])
+                formatted_batch_data.append({"images": orig_chunk, "original_image_shapes": shapes})
+
+            return batched_inputs, formatted_batch_data
 
         elif protocol == "http":
             logger.debug("Formatting input for HTTP Yolox model")
