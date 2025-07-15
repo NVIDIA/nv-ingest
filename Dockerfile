@@ -4,7 +4,7 @@
 # syntax=docker/dockerfile:1.3
 
 ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
-ARG BASE_IMG_TAG=jammy-20250415.1
+ARG BASE_IMG_TAG=jammy-20250619
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 

@@ -20,7 +20,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MODEL_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
       # NIM OpenTelemetry Settings
       - NIM_ENABLE_OTEL=0
       - NIM_OTEL_SERVICE_NAME=page-elements
@@ -52,7 +52,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MODEL_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
     deploy:
       resources:
         reservations:
@@ -74,7 +74,7 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MODEL_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
     deploy:
       resources:
         reservations:
@@ -178,7 +178,7 @@ services:
       - nemoretriever-parse
 
   vlm:
-    image: ${VLM_IMAGE:-nvcr.io/nim/meta/llama-3.2-11b-vision-instruct}:${VLM_TAG:-latest}
+    image: ${VLM_IMAGE:-nvcr.io/nim/nvidia/llama-3.1-nemotron-nano-vl-8b-v1}:${VLM_TAG:-latest}
     ports:
       - "8018:8000"
     user: root
@@ -226,7 +226,7 @@ services:
       - audio
 
   nv-ingest-ms-runtime:
-    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.3.0
+    image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
     build:
       context: ${NV_INGEST_ROOT:-.}
@@ -300,7 +300,7 @@ services:
       - YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT=http://table-structure:8000/v1/infer
       - YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL=grpc
       - VLM_CAPTION_ENDPOINT=http://vlm:8000/v1/chat/completions
-      - VLM_CAPTION_MODEL_NAME=meta/llama-3.2-11b-vision-instruct
+      - VLM_CAPTION_MODEL_NAME=nvidia/llama-3.1-nemotron-nano-vl-8b-v1
       - MODEL_PREDOWNLOAD_PATH=${MODEL_PREDOWNLOAD_PATH:-/workspace/models/}
       # "ready" check configuration.
       # 1. COMPONENTS_TO_READY_CHECK= to disable and readiness checking
