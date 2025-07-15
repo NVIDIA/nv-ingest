@@ -24,6 +24,7 @@ dependencies = [
     "fsspec>=2025.5.1",
     "universal_pathlib>=0.2.6",
     "ffmpeg-python==0.2.0",
+    "tritonclient",
 ]
 
 [project.urls]
