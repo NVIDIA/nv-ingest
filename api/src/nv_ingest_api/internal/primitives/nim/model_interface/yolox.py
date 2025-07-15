@@ -34,15 +34,6 @@ YOLOX_PAGE_IMAGE_PREPROC_HEIGHT = 1024
 YOLOX_PAGE_IMAGE_PREPROC_WIDTH = 1024
 YOLOX_PAGE_IMAGE_FORMAT = os.getenv("YOLOX_PAGE_IMAGE_FORMAT", "PNG")
 
-# yolox-page-elements-v1 contants
-YOLOX_PAGE_V1_NUM_CLASSES = 4
-YOLOX_PAGE_V1_FINAL_SCORE = {"table": 0.48, "chart": 0.48}
-YOLOX_PAGE_V1_CLASS_LABELS = [
-    "table",
-    "chart",
-    "title",
-]
-
 # yolox-page-elements-v2 contants
 YOLOX_PAGE_V2_NUM_CLASSES = 4
 YOLOX_PAGE_V2_FINAL_SCORE = {"table": 0.1, "chart": 0.01, "infographic": 0.01}
@@ -383,8 +374,6 @@ class YoloxPageElementsModelInterface(YoloxModelInterfaceBase):
         class_labels = YOLOX_PAGE_V2_CLASS_LABELS
 
         super().__init__(
-            image_preproc_width=YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
-            image_preproc_height=YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_PAGE_NIM_MAX_IMAGE_SIZE,
             num_classes=num_classes,
             conf_threshold=YOLOX_PAGE_CONF_THRESHOLD,
@@ -513,8 +502,6 @@ class YoloxTableStructureModelInterface(YoloxModelInterfaceBase):
         Initialize the yolox-graphic-elements model interface.
         """
         super().__init__(
-            image_preproc_width=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
-            image_preproc_height=YOLOX_TABLE_IMAGE_PREPROC_HEIGHT,
             nim_max_image_size=YOLOX_TABLE_NIM_MAX_IMAGE_SIZE,
             num_classes=YOLOX_TABLE_NUM_CLASSES,
             conf_threshold=YOLOX_TABLE_CONF_THRESHOLD,
