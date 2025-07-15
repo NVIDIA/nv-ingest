@@ -122,7 +122,7 @@ def test_dataloader_wav_chunking(temp_dir):
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
-        paths=[str(input_wav)], output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+        path=str(input_wav), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
     )
 
     # Collect all chunks
@@ -157,7 +157,7 @@ def test_dataloader_wav_content(temp_dir):
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
-        paths=[str(input_wav)], output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+        path=str(input_wav), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
     )
 
     # Test that each chunk can be read as valid WAV data
@@ -196,7 +196,7 @@ def test_dataloader_mp3_chunking(temp_dir):
     # Initialize DataLoader with MediaInterface
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
-        paths=[str(input_mp3)], output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+        path=str(input_mp3), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
     )
 
     # Collect all chunks
@@ -234,7 +234,7 @@ def test_dataloader_mp3_content(temp_dir):
     # Initialize DataLoader
     split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
     loader = DataLoader(
-        paths=[str(input_mp3)], output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+        path=str(input_mp3), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
     )
 
     # Test that each chunk can be read as valid MP3 data
@@ -253,3 +253,49 @@ def test_dataloader_mp3_content(temp_dir):
             int(chunk_info["streams"][0]["sample_rate"]) == original_sample_rate
         ), f"Chunk {i} should have the same sample rate as original"
         assert float(chunk_info["format"]["duration"]) > 0, f"Chunk {i} should have valid duration"
+
+
+def test_dataloader_getitem(temp_dir):
+    """Test that DataLoader.__getitem__ correctly retrieves chunks by index."""
+    # Create a WAV file that's 600MB
+    input_wav = temp_dir / "large_input.wav"
+    original_audio, sample_rate = create_test_wav(input_wav, file_size_mb=test_file_size_mb)
+
+    # Create output directory for chunks
+    chunks_dir = temp_dir / "chunks"
+    chunks_dir.mkdir(exist_ok=True)
+
+    actual_size_mb = input_wav.stat().st_size * 1e-6
+    # Initialize DataLoader
+    split_size_mb = math.ceil(actual_size_mb / 3)  # Should result in 3 chunks
+    loader = DataLoader(
+        path=str(input_wav), output_dir=str(chunks_dir), split_interval=split_size_mb, interface=MediaInterface()
+    )
+
+    # Test that we can access chunks by index
+    assert len(loader.files_completed) == 3, f"Expected 3 chunks, but got {len(loader.files_completed)}"
+
+    # Test accessing each chunk by index
+    for i in range(len(loader.files_completed)):
+        chunk_data = loader[i]
+        assert chunk_data is not None, f"Chunk {i} should not be None"
+        assert len(chunk_data) > 0, f"Chunk {i} should contain data"
+
+        # Verify the chunk data is valid WAV data
+        chunk_path = chunks_dir / f"test_getitem_chunk_{i}.wav"
+        with open(chunk_path, "wb") as f:
+            f.write(chunk_data)
+
+        # Check that the chunk is valid WAV data
+        with wave.open(str(chunk_path), "rb") as wav_file:
+            assert wav_file.getnchannels() == 1, f"Chunk {i} should be mono"
+            assert wav_file.getframerate() == sample_rate, f"Chunk {i} should have correct sample rate"
+            assert wav_file.getsampwidth() == 2, f"Chunk {i} should be 16-bit audio"
+
+    # Test that accessing out-of-bounds index raises an exception
+    with pytest.raises(Exception):
+        loader[999]  # Should raise an exception for invalid index
+
+    # Test that accessing negative index raises an exception
+    with pytest.raises(Exception):
+        loader[-4]  # Should raise an exception for negative index
