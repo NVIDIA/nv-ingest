@@ -20,9 +20,6 @@ cv2.setNumThreads(1)
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
-# TODO: Remove this, tmp flag, Set to True to use PIL instead of OpenCV for PNG encoding
-USE_PIL = True
-
 logger = logging.getLogger(__name__)
 
 
@@ -434,8 +431,10 @@ def _encode_opencv_jpeg(array: np.ndarray, *, quality: int = 100) -> bytes:
 def _encode_opencv_png(array: np.ndarray, *, compression: int = 6) -> bytes:
     """NumPy array -> PNG bytes using OpenCV"""
     encode_params = [
-        cv2.IMWRITE_PNG_COMPRESSION, compression,
-        cv2.IMWRITE_PNG_STRATEGY,  cv2.IMWRITE_PNG_STRATEGY_DEFAULT,
+        cv2.IMWRITE_PNG_COMPRESSION,
+        compression,
+        cv2.IMWRITE_PNG_STRATEGY,
+        cv2.IMWRITE_PNG_STRATEGY_DEFAULT,
     ]
     ok, buf = cv2.imencode(".png", array, encode_params)
     if not ok:
