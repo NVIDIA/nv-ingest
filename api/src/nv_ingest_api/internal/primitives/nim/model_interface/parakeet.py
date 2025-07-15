@@ -101,7 +101,7 @@ class ParakeetClient:
         segments, transcript = process_transcription_response(response)
         logger.debug("Processing Parakeet inference results (pass-through).")
 
-        return transcript
+        return segments, transcript
 
     def transcribe(
         self,

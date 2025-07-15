@@ -31,9 +31,16 @@ def _build_split_documents(row, chunks: List[str]) -> List[dict[str, Any]]:
         metadata = row.metadata if hasattr(row, "metadata") and isinstance(row.metadata, dict) else {}
         metadata = copy.deepcopy(metadata)
 
-        metadata["content"] = text
-
-        documents.append({"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())})
+        if row.document_type == ContentTypeEnum.AUDIO:
+            metadata["audio_metadata"]["audio_transcript"] = text
+            documents.append(
+                {"document_type": ContentTypeEnum.AUDIO.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
+        else:
+            metadata["content"] = text
+            documents.append(
+                {"document_type": ContentTypeEnum.TEXT.value, "metadata": metadata, "uuid": str(uuid.uuid4())}
+            )
 
     return documents
 
@@ -118,7 +125,7 @@ def transform_text_split_and_tokenize_internal(
     )
 
     # Filter to documents with text content.
-    text_type_condition = df_transform_ledger["document_type"] == ContentTypeEnum.TEXT
+    text_type_condition = df_transform_ledger["document_type"].isin([ContentTypeEnum.TEXT, ContentTypeEnum.AUDIO])
 
     normalized_meta_df = pd.json_normalize(df_transform_ledger["metadata"], errors="ignore")
     if "source_metadata.source_type" in normalized_meta_df.columns:
@@ -147,7 +154,14 @@ def transform_text_split_and_tokenize_internal(
 
     split_docs: List[Dict[str, Any]] = []
     for _, row in df_filtered.iterrows():
-        content: str = row["metadata"]["content"] if row["metadata"]["content"] is not None else ""
+        if row["document_type"] == ContentTypeEnum.AUDIO:
+            content: str = (
+                row["metadata"]["audio_metadata"]["audio_transcript"]
+                if row["metadata"]["audio_metadata"]["audio_transcript"] is not None
+                else ""
+            )
+        else:
+            content: str = row["metadata"]["content"] if row["metadata"]["content"] is not None else ""
         chunks: List[str] = _split_into_chunks(content, tokenizer_model, chunk_size, chunk_overlap)
         split_docs.extend(_build_split_documents(row, chunks))
 

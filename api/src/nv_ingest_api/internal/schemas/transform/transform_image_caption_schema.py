@@ -8,8 +8,8 @@ from pydantic import ConfigDict, BaseModel
 
 class ImageCaptionExtractionSchema(BaseModel):
     api_key: str = "api_key"
-    endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
+    endpoint_url: str = "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
     prompt: str = "Caption the content of this image:"
-    image_caption_model_name: str = "meta/llama-3.2-11b-vision-instruct"
+    model_name: str = "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
     raise_on_failure: bool = False
     model_config = ConfigDict(extra="forbid")

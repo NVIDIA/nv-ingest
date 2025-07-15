@@ -7,8 +7,8 @@ import os
 import signal
 import threading
 from abc import ABC, abstractmethod
-from collections import defaultdict
 from dataclasses import dataclass
+from types import FunctionType
 
 import psutil
 import uuid
@@ -24,6 +24,9 @@ import time
 from nv_ingest.framework.orchestration.ray.primitives.pipeline_topology import PipelineTopology, StageInfo
 from nv_ingest.framework.orchestration.ray.primitives.ray_stat_collector import RayStatsCollector
 from nv_ingest.framework.orchestration.ray.util.pipeline.pid_controller import PIDController, ResourceConstraintManager
+from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
+from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
+from nv_ingest_api.util.imports.dynamic_resolvers import resolve_callable_from_path
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +46,7 @@ class PipelineInterface(ABC):
         Parameters
         ----------
         monitor_poll_interval : float
-            Interval in seconds for monitoring poll (default: 5.0).
+            Interval in seconds for the monitoring poll (default: 5.0).
         scaling_poll_interval : float
             Interval in seconds for scaling decisions (default: 30.0).
         """
@@ -66,14 +69,13 @@ class ScalingConfig:
 
     dynamic_memory_scaling: bool = True
     dynamic_memory_threshold: float = 0.75
-    pid_kp: float = 0.1
-    pid_ki: float = 0.001
+    pid_kp: float = 0.2
+    pid_ki: float = 0.01
     pid_kd: float = 0.0
+    pid_ema_alpha: float = 0.1
     pid_target_queue_depth: int = 0
     pid_penalty_factor: float = 0.1
     pid_error_boost_factor: float = 1.5
-    pid_window_size: int = 10
-    rcm_estimated_edge_cost_mb: int = 5000
     rcm_memory_safety_buffer_fraction: float = 0.15
 
 
@@ -84,6 +86,7 @@ class FlushingConfig:
     queue_flush_interval_seconds: int = 600
     queue_flush_drain_timeout_seconds: int = 300
     quiet_period_threshold: int = 0
+    consecutive_quiet_cycles_for_flush: int = 3
 
 
 @dataclass
@@ -193,6 +196,18 @@ class RayPipeline(PipelineInterface):
         flushing_config: FlushingConfig = FlushingConfig(),
         stats_config: StatsConfig = StatsConfig(),
     ) -> None:
+        """
+        Initializes the RayPipeline.
+
+        Parameters
+        ----------
+        scaling_config : ScalingConfig, optional
+            Configuration for PID and resource constraint-based scaling, by default ScalingConfig().
+        flushing_config : FlushingConfig, optional
+            Configuration for queue flushing behavior, by default FlushingConfig().
+        stats_config : StatsConfig, optional
+            Configuration for the RayStatsCollector, by default StatsConfig().
+        """
         # Store config objects
         self.scaling_config = scaling_config
         self.flushing_config = flushing_config
@@ -214,7 +229,6 @@ class RayPipeline(PipelineInterface):
         # Use scaling_config for these
         self.dynamic_memory_scaling = self.scaling_config.dynamic_memory_scaling
         self.dynamic_memory_threshold = self.scaling_config.dynamic_memory_threshold
-        self.stage_memory_overhead: Dict[str, float] = {}
 
         # --- Background Threads ---
         self._scaling_thread: Optional[threading.Thread] = None
@@ -225,6 +239,8 @@ class RayPipeline(PipelineInterface):
         self.queue_flush_interval_seconds = self.flushing_config.queue_flush_interval_seconds
         self.queue_flush_drain_timeout_seconds = self.flushing_config.queue_flush_drain_timeout_seconds
         self.quiet_period_threshold = self.flushing_config.quiet_period_threshold
+        self.consecutive_quiet_cycles_for_flush = self.flushing_config.consecutive_quiet_cycles_for_flush
+        self._consecutive_quiet_cycles = 0
 
         # --- Instantiate Autoscaling Controllers ---
         # Use scaling_config
@@ -232,9 +248,7 @@ class RayPipeline(PipelineInterface):
             kp=self.scaling_config.pid_kp,
             ki=self.scaling_config.pid_ki,
             kd=self.scaling_config.pid_kd,
-            stage_cost_estimates={},  # Populated during build
             target_queue_depth=self.scaling_config.pid_target_queue_depth,
-            window_size=self.scaling_config.pid_window_size,
             penalty_factor=self.scaling_config.pid_penalty_factor,
             error_boost_factor=self.scaling_config.pid_error_boost_factor,
         )
@@ -254,7 +268,6 @@ class RayPipeline(PipelineInterface):
         self.constraint_manager = ResourceConstraintManager(
             max_replicas=1,  # Updated during build
             memory_threshold=absolute_memory_threshold_mb,
-            estimated_edge_cost_mb=self.scaling_config.rcm_estimated_edge_cost_mb,
             memory_safety_buffer_fraction=self.scaling_config.rcm_memory_safety_buffer_fraction,
         )
         logger.info("ResourceConstraintManager initialized using ScalingConfig.")
@@ -266,28 +279,51 @@ class RayPipeline(PipelineInterface):
             interval=self.stats_config.collection_interval_seconds,
             actor_timeout=self.stats_config.actor_timeout_seconds,
             queue_timeout=self.stats_config.queue_timeout_seconds,
+            ema_alpha=self.scaling_config.pid_ema_alpha,
         )
 
         logger.info("RayStatsCollector initialized using StatsConfig.")
 
-    # --- Accessor Methods for Stats Collector (and internal use) ---
+    # --- Accessor Methods for Stat Collector (and internal use) ---
 
     def __del__(self):
+        """Ensures the pipeline is stopped upon garbage collection."""
         try:
             self.stop()
         except Exception as e:
             logger.error(f"Exception during RayPipeline cleanup: {e}")
 
     def get_stages_info(self) -> List[StageInfo]:
-        """Returns a snapshot of the current stage information."""
+        """
+        Returns a snapshot of the current stage information.
+
+        Returns
+        -------
+        List[StageInfo]
+            A list of StageInfo objects from the topology.
+        """
         return self.topology.get_stages_info()
 
     def get_stage_actors(self) -> Dict[str, List[Any]]:
-        """Returns a snapshot of the current actors per stage."""
+        """
+        Returns a snapshot of the current actors per stage.
+
+        Returns
+        -------
+        Dict[str, List[Any]]
+            A dictionary mapping stage names to lists of actor handles.
+        """
         return self.topology.get_stage_actors()
 
     def get_edge_queues(self) -> Dict[str, Tuple[Any, int]]:
-        """Returns a snapshot of the current edge queues."""
+        """
+        Returns a snapshot of the current edge queues.
+
+        Returns
+        -------
+        Dict[str, Tuple[Any, int]]
+            A dictionary mapping queue names to tuples of (queue_handle, queue_size).
+        """
         return self.topology.get_edge_queues()
 
     def _configure_autoscalers(self) -> None:
@@ -306,9 +342,6 @@ class RayPipeline(PipelineInterface):
             # For now, let's store a dummy overhead in topology during build
             overhead_bytes = default_cost_bytes  # Simplification for now
             stage_overheads[stage.name] = overhead_bytes  # Store locally first
-            cost_mb = max(1, int(overhead_bytes / (1024 * 1024)))
-            # Update controller directly (or via dedicated method if preferred)
-            self.pid_controller.stage_cost_estimates[stage.name] = cost_mb
 
         # Update topology with collected overheads
         self.topology.set_stage_memory_overhead(stage_overheads)
@@ -317,7 +350,6 @@ class RayPipeline(PipelineInterface):
         self.constraint_manager.max_replicas = total_max_replicas
 
         logger.info(f"[Build-Configure] Autoscalers configured. Total Max Replicas: {total_max_replicas}")
-        logger.debug(f"[Build-Configure] PID stage cost estimates (MB): {self.pid_controller.stage_cost_estimates}")
 
     def _instantiate_initial_actors(self) -> None:
         """Instantiates initial actors and updates topology."""
@@ -344,9 +376,9 @@ class RayPipeline(PipelineInterface):
                         f" for '{stage.name}'"
                     )
                     try:
-                        actor = stage.callable.options(
-                            name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
-                        ).remote(config=stage.config)
+                        actor = stage.callable.options(name=actor_name, max_concurrency=1, max_restarts=0).remote(
+                            config=stage.config
+                        )
                         replicas.append(actor)
                     except Exception as e:
                         logger.error(f"[Build-Actors] Failed create actor '{actor_name}': {e}", exc_info=True)
@@ -359,7 +391,14 @@ class RayPipeline(PipelineInterface):
         logger.info("[Build-Actors] Initial actor instantiation complete.")
 
     def _create_and_wire_edges(self) -> List[ray.ObjectRef]:
-        """Creates queues, wires actors (using topology), and updates topology."""
+        """
+        Creates queues, wires actors (using topology), and updates topology.
+
+        Returns
+        -------
+        List[ray.ObjectRef]
+            A list of object references for the remote wiring calls.
+        """
         logger.info("[Build-Wiring] Creating and wiring edges...")
         wiring_refs = []
         new_edge_queues: Dict[str, Tuple[Any, int]] = {}
@@ -396,7 +435,14 @@ class RayPipeline(PipelineInterface):
 
     @staticmethod
     def _wait_for_wiring(wiring_refs: List[ray.ObjectRef]) -> None:
-        """Waits for remote wiring calls to complete. (Static, no changes needed)."""
+        """
+        Waits for remote wiring calls to complete.
+
+        Parameters
+        ----------
+        wiring_refs : List[ray.ObjectRef]
+            A list of object references for the wiring calls.
+        """
         if not wiring_refs:
             logger.debug("[Build-WaitWiring] No wiring calls.")
             return
@@ -411,6 +457,27 @@ class RayPipeline(PipelineInterface):
     def add_source(
         self, *, name: str, source_actor: Any, config: BaseModel, min_replicas: int = 1, max_replicas: int = 1
     ) -> "RayPipeline":
+        """
+        Adds a source stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the source stage.
+        source_actor : Any
+            The actor or callable for the source stage.
+        config : BaseModel
+            The configuration for the source stage.
+        min_replicas : int, optional
+            The minimum number of replicas for the source stage, by default 1.
+        max_replicas : int, optional
+            The maximum number of replicas for the source stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance.
+        """
         if min_replicas < 1:
             logger.warning(f"Source stage '{name}': min_replicas must be >= 1. Overriding.")
             min_replicas = 1
@@ -428,21 +495,87 @@ class RayPipeline(PipelineInterface):
         return self
 
     def add_stage(
-        self, *, name: str, stage_actor: Any, config: BaseModel, min_replicas: int = 0, max_replicas: int = 1
+        self,
+        *,
+        name: str,
+        stage_actor: Any,
+        config: BaseModel,
+        min_replicas: int = 0,
+        max_replicas: int = 1,
     ) -> "RayPipeline":
+        """
+        Adds a stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the stage.
+        stage_actor : Any
+            The actor or callable for the stage.
+        config : BaseModel
+            The configuration for the stage.
+        min_replicas : int, optional
+            The minimum number of replicas for the stage, by default 0.
+        max_replicas : int, optional
+            The maximum number of replicas for the stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance.
+        """
         if min_replicas < 0:
             logger.warning(f"Stage '{name}': min_replicas cannot be negative. Overriding to 0.")
             min_replicas = 0
+
+        resolved_actor = stage_actor
+
+        # Support module path (e.g., "mypkg.mymodule:my_lambda")
+        if isinstance(stage_actor, str):
+            resolved_actor = resolve_callable_from_path(
+                callable_path=stage_actor, signature_schema=ingest_stage_callable_signature
+            )
+
+        # Wrap callables
+        if isinstance(resolved_actor, FunctionType):
+            schema_type = type(config)
+            resolved_actor = wrap_callable_as_stage(resolved_actor, schema_type)
+
         stage_info = StageInfo(
-            name=name, callable=stage_actor, config=config, min_replicas=min_replicas, max_replicas=max_replicas
+            name=name,
+            callable=resolved_actor,
+            config=config,
+            min_replicas=min_replicas,
+            max_replicas=max_replicas,
         )
-        self.topology.add_stage(stage_info)  # Delegate
+        self.topology.add_stage(stage_info)
 
         return self
 
     def add_sink(
         self, *, name: str, sink_actor: Any, config: BaseModel, min_replicas: int = 1, max_replicas: int = 1
     ) -> "RayPipeline":
+        """
+        Adds a sink stage to the pipeline.
+
+        Parameters
+        ----------
+        name : str
+            The name of the sink stage.
+        sink_actor : Any
+            The actor or callable for the sink stage.
+        config : BaseModel
+            The configuration for the sink stage.
+        min_replicas : int, optional
+            The minimum number of replicas for the sink stage, by default 1.
+        max_replicas : int, optional
+            The maximum number of replicas for the sink stage, by default 1.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance.
+        """
         # Sink min_replicas can realistically be 0 if data drain is optional/best-effort? Let's allow 0.
         if min_replicas < 0:
             logger.warning(f"Sink stage '{name}': min_replicas cannot be negative. Overriding to 0.")
@@ -461,6 +594,23 @@ class RayPipeline(PipelineInterface):
 
     # --- Method for defining connections ---
     def make_edge(self, from_stage: str, to_stage: str, queue_size: int = 100) -> "RayPipeline":
+        """
+        Creates an edge between two stages in the pipeline.
+
+        Parameters
+        ----------
+        from_stage : str
+            The name of the source stage.
+        to_stage : str
+            The name of the destination stage.
+        queue_size : int, optional
+            The size of the queue between the stages, by default 100.
+
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance.
+        """
         try:
             self.topology.add_connection(from_stage, to_stage, queue_size)  # Delegate (includes validation)
         except ValueError as e:
@@ -470,7 +620,14 @@ class RayPipeline(PipelineInterface):
 
     # ----- Pipeline Build Process ---
     def build(self) -> Dict[str, List[Any]]:
-        """Builds the pipeline: configures, instantiates, wires, using topology."""
+        """
+        Builds the pipeline: configures, instantiates, wires, using topology.
+
+        Returns
+        -------
+        Dict[str, List[Any]]
+            A dictionary mapping stage names to lists of actor handles.
+        """
         logger.info("--- Starting Pipeline Build Process ---")
         try:
             if not self.topology.get_stages_info():
@@ -499,13 +656,25 @@ class RayPipeline(PipelineInterface):
     # --- Scaling Logic ---
     @staticmethod
     def _create_single_replica(stage_info: StageInfo) -> Any:
-        """Creates a single new Ray actor replica for the given stage."""
+        """
+        Creates a single new Ray actor replica for the given stage.
+
+        Parameters
+        ----------
+        stage_info : StageInfo
+            The stage information.
+
+        Returns
+        -------
+        Any
+            The new actor handle.
+        """
         actor_name = f"{stage_info.name}_{uuid.uuid4()}"
         logger.debug(f"[ScaleUtil] Creating new actor '{actor_name}' for stage '{stage_info.name}'")
         try:
-            new_actor = stage_info.callable.options(
-                name=actor_name, max_concurrency=10, max_restarts=0, lifetime="detached"
-            ).remote(config=stage_info.config)
+            new_actor = stage_info.callable.options(name=actor_name, max_concurrency=1, max_restarts=0).remote(
+                config=stage_info.config
+            )
 
             return new_actor
         except Exception as e:
@@ -518,7 +687,21 @@ class RayPipeline(PipelineInterface):
             raise RuntimeError(f"Actor creation failed for stage '{stage_info.name}' during scale up") from e
 
     def _get_wiring_refs_for_actor(self, actor: Any, stage_name: str) -> List[ray.ObjectRef]:
-        """Gets wiring futures for a single actor using topology for queues/connections."""
+        """
+        Gets wiring futures for a single actor using topology for queues/connections.
+
+        Parameters
+        ----------
+        actor : Any
+            The actor handle.
+        stage_name : str
+            The name of the stage.
+
+        Returns
+        -------
+        List[ray.ObjectRef]
+            A list of object references for the wiring calls.
+        """
         wiring_refs = []
 
         # Use topology accessors
@@ -546,7 +729,16 @@ class RayPipeline(PipelineInterface):
 
     @staticmethod
     def _start_actors(actors_to_start: List[Any], stage_name: str) -> None:
-        """Starts a list of actors if they have a 'start' method and waits for completion."""
+        """
+        Starts a list of actors if they have a 'start' method and waits for completion.
+
+        Parameters
+        ----------
+        actors_to_start : List[Any]
+            A list of actor handles.
+        stage_name : str
+            The name of the stage.
+        """
         start_refs = []
         for actor in actors_to_start:
             if hasattr(actor, "start"):
@@ -570,7 +762,18 @@ class RayPipeline(PipelineInterface):
             raise RuntimeError(f"Error confirming actor starts for stage '{stage_name}'") from e
 
     def _handle_scale_up(self, stage_info: StageInfo, current_count: int, target_count: int) -> None:
-        """Handles scaling up, interacting with topology."""
+        """
+        Handles scaling up, interacting with topology.
+
+        Parameters
+        ----------
+        stage_info : StageInfo
+            The stage information.
+        current_count : int
+            The current number of replicas.
+        target_count : int
+            The target number of replicas.
+        """
         stage_name = stage_info.name
         num_to_add = target_count - current_count
         logger.debug(f"[ScaleUp-{stage_name}] Scaling up from {current_count} to {target_count} (+{num_to_add}).")
@@ -634,8 +837,17 @@ class RayPipeline(PipelineInterface):
 
     def _handle_scale_down(self, stage_name: str, current_replicas: List[Any], target_count: int) -> None:
         """
-        Handles scaling down: initiates stop on actors, registers handles with
-        the topology for pending removal if stop was successfully initiated.
+        Handles scaling down: initiates stop on actors and marks them for removal
+        by the topology's garbage collection mechanism.
+
+        Parameters
+        ----------
+        stage_name : str
+            The name of the stage.
+        current_replicas : List[Any]
+            A list of actor handles.
+        target_count : int
+            The target number of replicas.
         """
         current_count = len(current_replicas)
         num_to_remove = current_count - target_count
@@ -643,59 +855,36 @@ class RayPipeline(PipelineInterface):
             f"[ScaleDown-{stage_name}] Scaling down from {current_count} to {target_count} (-{num_to_remove})."
         )
 
-        # Basic validation
         if num_to_remove <= 0:
-            logger.warning(f"[ScaleDown-{stage_name}] Invalid num_to_remove {num_to_remove}. Aborting.")
             return
 
-        # Identify actors to remove (last N)
+        # Select actors to remove (e.g., the most recently added)
         actors_to_remove = current_replicas[-num_to_remove:]
-        logger.debug(f"[ScaleDown-{stage_name}] Identified {len(actors_to_remove)} actors for removal.")
 
-        actors_to_register_map: Dict[str, List[Tuple[Any, ray.ObjectRef]]] = defaultdict(list)
-        stop_initiation_failures = 0
+        logger.info(f"[ScaleDown-{stage_name}] Selected {len(actors_to_remove)} actors for removal.")
 
+        # Signal each actor to stop and mark it for removal by the topology.
+        # The topology's cleanup thread will handle polling and final removal.
         for actor in actors_to_remove:
-            actor_id_str = str(actor)
             try:
-                # Call stop(), which now returns shutdown future
-                shutdown_future = actor.stop.remote()
-                actors_to_register_map[stage_name].append((actor, shutdown_future))
-                logger.debug(f"[ScaleDown-{stage_name}] Submitted stop() call for actor '{actor_id_str}'.")
+                actor.stop.remote()  # Signal the actor's loop to stop
+                self.topology.mark_actor_for_removal(stage_name, actor)
             except Exception as e:
-                logger.error(
-                    f"[ScaleDown-{stage_name}] Error submitting stop() for actor '{actor_id_str}': "
-                    f"{e}. Cannot register.",
-                    exc_info=False,
-                )
-                stop_initiation_failures += 1
+                logger.error(f"[ScaleDown-{stage_name}] Failed to initiate stop for actor {actor}: {e}")
 
-        # Register actors pending removal (with their shutdown futures)
-        if actors_to_register_map:
-            num_registered = sum(len(v) for v in actors_to_register_map.values())
-            logger.debug(
-                f"[ScaleDown-{stage_name}] Registering {num_registered} "
-                f"actor handles with topology for shutdown monitoring."
-            )
-            try:
-                self.topology.register_actors_pending_removal(actors_to_register_map)
-            except Exception as e:
-                logger.error(
-                    f"[ScaleDown-{stage_name}] CRITICAL - Failed to register actors pending removal with topology: {e}",
-                    exc_info=True,
-                )
-                self.topology.update_scaling_state(stage_name, "Error")
-        elif actors_to_remove:
-            logger.warning(f"[ScaleDown-{stage_name}] No actors successfully initiated stop for registration.")
-
-        total_attempted = len(actors_to_remove)
-        logger.debug(
-            f"[ScaleDown-{stage_name}] Scale down initiation process complete for {total_attempted} actors "
-            f"(Skipped/Failed Initiation: {stop_initiation_failures}). Topology cleanup will handle final removal."
-        )
+        logger.debug(f"[ScaleDown-{stage_name}] Scale down initiation complete for {len(actors_to_remove)} actors.")
 
     def _scale_stage(self, stage_name: str, new_replica_count: int) -> None:
-        """Orchestrates scaling using topology for state and info."""
+        """
+        Orchestrates scaling using topology for state and info.
+
+        Parameters
+        ----------
+        stage_name : str
+            The name of the stage.
+        new_replica_count : int
+            The new number of replicas.
+        """
         logger.debug(f"[ScaleStage-{stage_name}] Request for target count: {new_replica_count}")
 
         # --- Use Topology Accessors ---
@@ -736,47 +925,45 @@ class RayPipeline(PipelineInterface):
             self.topology.update_scaling_state(stage_name, "Error")  # Ensure error state
 
     def _is_pipeline_quiet(self) -> bool:
-        """Checks if pipeline is quiet using topology state and stats collector."""
+        """
+        Checks if pipeline is quiet using topology state and stats collector.
+
+        Returns
+        -------
+        bool
+            True if the pipeline is quiet, False otherwise.
+        """
+        return False  # TODO: disabled for debugging
 
         # Check topology state first
         if self.topology.get_is_flushing():
             logger.debug("Pipeline quiet check: False (Flush in progress via topology state)")
             return False
 
-        # Time check
-        time_since_last_flush = time.time() - self._last_queue_flush_time
-        if time_since_last_flush < self.queue_flush_interval_seconds:
-            return False
+        # Check stats collector for recent activity
+        latest_stats = self.stats_collector.get_latest_stats()
+        if not latest_stats:
+            logger.debug("Pipeline quiet check: True (No stats available, assuming quiet)")
+            return True  # No stats could mean it's idle
 
-        # Stats check (same as before)
-        current_stage_stats, global_in_flight, last_update_time, stats_were_successful = (
-            self.stats_collector.get_latest_stats()
-        )
-        last_update_age = time.time() - last_update_time
-        max_stats_age_for_quiet = max(10.0, self._stats_collection_interval_seconds * 2.5)
+        total_in_flight = latest_stats.get("total_items_in_flight", 0)
+        logger.debug(f"Pipeline quiet check: Total in-flight items: {total_in_flight}")
 
-        if not stats_were_successful:
-            logger.warning(f"Pipeline quiet check: False (Stats failed {last_update_age:.1f}s ago).")
-            return False
-
-        if last_update_age > max_stats_age_for_quiet:
-            logger.warning(
-                f"Pipeline quiet check: False (Stats too old: {last_update_age:.1f}s > {max_stats_age_for_quiet:.1f}s)."
-            )
-            return False
-
-        if not current_stage_stats:
-            logger.warning("Pipeline quiet check: False (No stats currently available).")
-            return False
-
-        # Activity check
-        is_quiet = global_in_flight <= self.quiet_period_threshold
-
-        return is_quiet
+        return total_in_flight <= self.quiet_period_threshold
 
     def _wait_for_pipeline_drain(self, timeout_seconds: int) -> bool:
         """
         Actively monitors pipeline drain using direct calls to the stats collector.
+
+        Parameters
+        ----------
+        timeout_seconds : int
+            The timeout in seconds.
+
+        Returns
+        -------
+        bool
+            True if the pipeline drained successfully, False otherwise.
         """
         start_time = time.time()
         logger.info(f"Waiting for pipeline drain (Timeout: {timeout_seconds}s)...")
@@ -832,7 +1019,14 @@ class RayPipeline(PipelineInterface):
                 time.sleep(sleep_duration)
 
     def _execute_queue_flush(self) -> bool:
-        """Executes queue flush, using topology for state and structure."""
+        """
+        Executes queue flush, using topology for state and structure.
+
+        Returns
+        -------
+        bool
+            True if the flush was successful, False otherwise.
+        """
         if self.topology.get_is_flushing() or self._stopping:  # Check topology state
             logger.warning("Queue flush requested but already in progress or pipeline is stopping. Ignoring.")
             return False
@@ -865,6 +1059,7 @@ class RayPipeline(PipelineInterface):
                                 source_actors_paused.append(actor)
                             except Exception as e:
                                 logger.error(f"Failed sending pause to {actor}: {e}")
+
             if pause_refs:
                 logger.debug(f"Waiting up to {pause_timeout}s for {len(pause_refs)} sources to pause...")
                 try:
@@ -969,7 +1164,14 @@ class RayPipeline(PipelineInterface):
         return overall_success
 
     def request_queue_flush(self, force: bool = False) -> None:
-        """Requests a queue flush, checking topology state."""
+        """
+        Requests a queue flush, checking topology state.
+
+        Parameters
+        ----------
+        force : bool, optional
+            Whether to force the flush, by default False.
+        """
         logger.info(f"Manual queue flush requested (force={force}).")
 
         if self.topology.get_is_flushing() or self._stopping:  # Check topology
@@ -986,7 +1188,21 @@ class RayPipeline(PipelineInterface):
     def _gather_controller_metrics(
         self, current_stage_stats: Dict[str, Dict[str, int]], global_in_flight: int
     ) -> Dict[str, Dict[str, Any]]:
-        """Gathers metrics using provided stats and topology."""
+        """
+        Gathers metrics using provided stats and topology.
+
+        Parameters
+        ----------
+        current_stage_stats : Dict[str, Dict[str, int]]
+            The current stage statistics.
+        global_in_flight : int
+            The global in-flight count.
+
+        Returns
+        -------
+        Dict[str, Dict[str, Any]]
+            A dictionary of metrics for the controllers.
+        """
         logger.debug("[ScalingMetrics] Gathering metrics for controllers...")
         current_stage_metrics = {}
 
@@ -1018,11 +1234,11 @@ class RayPipeline(PipelineInterface):
     def _get_current_global_memory(self) -> int:
         """
         Safely retrieves the current global system memory usage (used, not free) in MB.
-        Uses the previous measurement as a fallback only if the current read fails.
 
-        Returns:
-            int: Current global memory usage (RSS/used) in MB. Returns previous value
-                 or 0 if the read fails and no previous value exists.
+        Returns
+        -------
+        int
+            The current global memory usage (RSS/used) in MB.
         """
         try:
             # psutil.virtual_memory().used provides total RAM used by processes
@@ -1045,7 +1261,23 @@ class RayPipeline(PipelineInterface):
     def _calculate_scaling_adjustments(
         self, current_stage_metrics: Dict[str, Dict[str, Any]], global_in_flight: int, current_global_memory_mb: int
     ) -> Dict[str, int]:
-        """Runs controllers to get target replica counts using topology for edge count."""
+        """
+        Runs controllers to get target replica counts using topology for edge count.
+
+        Parameters
+        ----------
+        current_stage_metrics : Dict[str, Dict[str, Any]]
+            The current stage metrics.
+        global_in_flight : int
+            The global in-flight count.
+        current_global_memory_mb : int
+            The current global memory usage in MB.
+
+        Returns
+        -------
+        Dict[str, int]
+            A dictionary of target replica counts for the stages.
+        """
         logger.debug("[ScalingCalc] Calculating adjustments via PID and RCM...")
         # Get edge count from topology
         num_edges = len(self.topology.get_edge_queues())
@@ -1071,7 +1303,14 @@ class RayPipeline(PipelineInterface):
             return {name: metrics.get("replicas", 0) for name, metrics in current_stage_metrics.items()}
 
     def _apply_scaling_actions(self, final_adjustments: Dict[str, int]) -> None:
-        """Applies scaling by calling _scale_stage, using topology for validation."""
+        """
+        Applies scaling by calling _scale_stage, using topology for validation.
+
+        Parameters
+        ----------
+        final_adjustments : Dict[str, int]
+            A dictionary of target replica counts for the stages.
+        """
         stages_needing_action = []
         current_actors_map = self.topology.get_stage_actors()  # Snapshot
 
@@ -1138,8 +1377,9 @@ class RayPipeline(PipelineInterface):
         logger.debug(f"[ScalingApply] Summary: {completed} completed, {errors} errors, {timeouts} timeouts.")
 
     def _perform_scaling_and_maintenance(self) -> None:
-        """Orchestrates scaling/maintenance using topology and stats collector."""
-
+        """
+        Orchestrates scaling/maintenance using topology and stats collector.
+        """
         if self._stopping:
             logger.debug("Pipeline is stopping. Skipping scaling cycle.")
             return
@@ -1166,10 +1406,29 @@ class RayPipeline(PipelineInterface):
             logger.debug("--- Performing Scaling & Maintenance Cycle ---")
 
             if self._is_pipeline_quiet():
-                logger.info("[Drain] Pipeline quiet, initiating queue flush.")
-                flush_success = self._execute_queue_flush()
-                logger.info(f"[Drain] Automatic queue flush completed. Success: {flush_success}")
-                return
+                self._consecutive_quiet_cycles += 1
+                logger.debug(f"Pipeline is quiet. Consecutive quiet cycles: {self._consecutive_quiet_cycles}")
+                if self._consecutive_quiet_cycles >= self.consecutive_quiet_cycles_for_flush:
+                    logger.info(
+                        f"Pipeline has been quiet for {self._consecutive_quiet_cycles} cycles. "
+                        "Initiating queue flush."
+                    )
+                    if self._execute_queue_flush():
+                        self._last_queue_flush_time = time.time()
+                    self._consecutive_quiet_cycles = 0  # Reset after attempting flush
+                else:
+                    logger.debug(
+                        f"Pipeline is quiet, but waiting for {self.consecutive_quiet_cycles_for_flush} "
+                        "consecutive quiet cycles before flushing."
+                    )
+            else:
+                if self._consecutive_quiet_cycles > 0:
+                    logger.info(
+                        f"Pipeline is no longer quiet. Resetting consecutive quiet cycle count "
+                        f"from {self._consecutive_quiet_cycles} to 0."
+                    )
+                self._consecutive_quiet_cycles = 0
+                logger.debug("Queue flush interval reached, but pipeline is not quiet. Deferring.")
 
             # Fast return check if stopping occurred while flushing or checking flush status
             if self._stopping:
@@ -1212,7 +1471,14 @@ class RayPipeline(PipelineInterface):
 
     # --- Lifecycle Methods for Monitoring/Scaling Threads ---
     def _scaling_loop(self, interval: float) -> None:
-        """Main loop for the scaling thread."""
+        """
+        Main loop for the scaling thread.
+
+        Parameters
+        ----------
+        interval : float
+            The interval in seconds.
+        """
         logger.info(f"Scaling loop started. Interval: {interval}s")
         while self._scaling_monitoring:
             try:
@@ -1227,6 +1493,14 @@ class RayPipeline(PipelineInterface):
         logger.info("Scaling loop finished.")
 
     def _start_scaling(self, poll_interval: float = 10.0) -> None:
+        """
+        Starts the scaling thread.
+
+        Parameters
+        ----------
+        poll_interval : float, optional
+            The interval in seconds, by default 10.0.
+        """
         if not self._scaling_monitoring:
             self._scaling_monitoring = True
             self._scaling_thread = threading.Thread(target=self._scaling_loop, args=(poll_interval,), daemon=True)
@@ -1234,6 +1508,9 @@ class RayPipeline(PipelineInterface):
             logger.info(f"Scaling/Maintenance thread launched (Interval: {poll_interval}s).")
 
     def _stop_scaling(self) -> None:
+        """
+        Stops the scaling thread.
+        """
         if self._scaling_monitoring:
             logger.debug("Stopping scaling/maintenance thread...")
             self._scaling_monitoring = False
@@ -1246,77 +1523,103 @@ class RayPipeline(PipelineInterface):
 
     # --- Pipeline Start/Stop ---
     def start(self, monitor_poll_interval: float = 5.0, scaling_poll_interval: float = 30.0) -> None:
-        """Starts actors (via topology) and background threads."""
-        # Check topology for actors (indicates built)
-        if not self.topology.get_stage_actors():
+        """
+        Starts the pipeline actors and background monitoring threads.
+
+        Assumes the pipeline has already been built via the `build()` method.
+
+        Parameters
+        ----------
+        monitor_poll_interval : float, optional
+            This parameter is currently unused but is kept for interface compatibility.
+        scaling_poll_interval : float, optional
+            The interval in seconds for the autoscaling and maintenance thread to run, by default 30.0.
+        """
+        if not self.topology.get_all_actors():
             logger.error("Cannot start: Pipeline not built or has no actors.")
             return
 
         logger.info("Starting pipeline execution...")
-        start_refs = []
-        # Get actors from topology
-        actors_to_start = [actor for actors in self.topology.get_stage_actors().values() for actor in actors]
 
-        for actor in actors_to_start:
-            start_refs.append(actor.start.remote())
-
-        if start_refs:
-            logger.debug(f"Waiting for {len(start_refs)} actors to start...")
+        # Start all actors
+        actors_to_start = self.topology.get_all_actors()
+        start_futures = [actor.start.remote() for actor in actors_to_start]
+        if start_futures:
+            logger.debug(f"Waiting for {len(start_futures)} actors to start...")
             try:
-                ray.get(start_refs, timeout=60.0)
-                logger.info(f"{len(start_refs)} actors started.")
+                ray.get(start_futures, timeout=60.0)
+                logger.info(f"{len(start_futures)} actors started.")
             except Exception as e:
                 logger.error(f"Error/Timeout starting actors: {e}", exc_info=True)
                 self.stop()  # Attempt cleanup
-
                 raise RuntimeError("Pipeline start failed: actors did not start.") from e
 
+        # Start background threads
+        self.topology.start_cleanup_thread()
         self.stats_collector.start()
         self._start_scaling(poll_interval=scaling_poll_interval)
+
         logger.info("Pipeline started successfully.")
 
     def stop(self) -> None:
-        """Stops background threads and actors (via topology)."""
+        """
+        Stops the pipeline and all associated actors and threads.
+
+        This method performs a graceful shutdown by:
+        1.  Stopping the autoscaling and statistics collection threads.
+        2.  Signaling all actors to stop and waiting for confirmation.
+        3.  Stopping the topology cleanup thread.
+        4.  Clearing all runtime state from the topology.
+        """
         logger.info("Stopping pipeline...")
 
         if self._stopping:
+            logger.warning("Stop already in progress.")
             return
         self._stopping = True
 
-        # 1. Stop background threads first
-        with self._state_lock:
-            self._stop_scaling()
-            self.stats_collector.stop()
+        # 1. Stop background threads first to prevent new actions
+        self._stop_scaling()
+        self.stats_collector.stop()
 
-            # 2. Stop actors (using topology)
-            logger.debug("Stopping all stage actors...")
-            stop_refs_map: Dict[ray.ObjectRef, Any] = {}
+        # 2. Stop all actors and wait for them
+        logger.debug("Stopping all actors in the topology...")
+        all_actors = self.topology.get_all_actors()
+        if all_actors:
+            stop_futures = [actor.stop.remote() for actor in all_actors]
+            try:
+                ready, not_ready = ray.wait(stop_futures, num_returns=len(stop_futures), timeout=60.0)
+                if not_ready:
+                    logger.warning(
+                        f"Timeout waiting for {len(not_ready)} actors to stop. " f"Proceeding with shutdown."
+                    )
+                logger.info(f"{len(ready)} actors confirmed stop.")
+            except Exception as e:
+                logger.error(f"An unexpected error occurred during actor shutdown: {e}", exc_info=True)
 
-            # Get actors snapshot from topology
-            current_actors = {name: list(actors) for name, actors in self.topology.get_stage_actors().items()}
+        # 3. Stop the topology cleanup thread now that actors are stopped
+        self.topology.stop_cleanup_thread()
 
-            for stage_name, actors in current_actors.items():
-                for actor in actors:
-                    try:
-                        stop_refs_map[actor.stop.remote()] = actor
-                    except Exception as e:
-                        logger.warning(f"Error initiating stop for {actor} in {stage_name}: {e}. Skipping.")
+        # 4. Clear all state and references
+        logger.debug("Clearing pipeline topology runtime state.")
+        self.topology.clear_runtime_state()
 
-            if stop_refs_map:
-                stop_refs = list(stop_refs_map.keys())
-                logger.debug(f"Waiting up to 60s for {len(stop_refs)} actors to stop gracefully...")
-                try:
-                    ready, not_ready = ray.wait(stop_refs, num_returns=len(stop_refs), timeout=60.0)
-                    if not_ready:
-                        logger.warning(
-                            f"Timeout waiting for {len(not_ready)} actors to stop. Allowing Ray to clean up."
-                        )
-                    logger.info(f"{len(ready)} actors stopped via stop().")
-                except Exception as e:
-                    logger.error(f"Error during actor stop confirmation: {e}", exc_info=True)
+        self._stopping = False
+        logger.info("Pipeline stopped successfully.")
 
-            # Clear runtime state in topology
-            self.topology.clear_runtime_state()
-            del self.topology
+    def __enter__(self) -> "RayPipeline":
+        """
+        Enter the runtime context related to this object.
 
-            logger.info("Pipeline stopped.")
+        Returns
+        -------
+        RayPipeline
+            The pipeline instance.
+        """
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback) -> None:
+        """
+        Exit the runtime context related to this object.
+        """
+        self.stop()

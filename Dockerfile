@@ -3,8 +3,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # syntax=docker/dockerfile:1.3
 
-ARG BASE_IMG=ubuntu
-ARG BASE_IMG_TAG=22.04
+ARG BASE_IMG=nvcr.io/nvidia/base/ubuntu
+ARG BASE_IMG_TAG=jammy-20250619
 
 FROM $BASE_IMG:$BASE_IMG_TAG AS base
 

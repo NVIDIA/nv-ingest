@@ -76,7 +76,7 @@ class IngestTaskCaptionSchema(BaseModelNoExt):
     api_key: Optional[str] = None
     endpoint_url: Optional[str] = None
     prompt: Optional[str] = None
-    caption_model_name: Optional[str] = None
+    model_name: Optional[str] = None
 
 
 class IngestTaskFilterParamsSchema(BaseModelNoExt):
@@ -124,6 +124,7 @@ class IngestTaskAudioExtraction(BaseModelNoExt):
     function_id: Optional[str] = None
     use_ssl: Optional[bool] = None
     ssl_cert: Optional[str] = None
+    segment_audio: Optional[bool] = None
 
 
 class IngestTaskTableExtraction(BaseModelNoExt):
