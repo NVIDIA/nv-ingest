@@ -32,7 +32,7 @@ class TextEmbeddingTransformStage(RayActorStage):
     """
 
     def __init__(self, config: TextEmbeddingSchema) -> None:
-        super().__init__(config)
+        super().__init__(config, log_to_stdout=False)
         try:
             self.validated_config = config
             logger.info("TextEmbeddingTransformStage configuration validated successfully.")

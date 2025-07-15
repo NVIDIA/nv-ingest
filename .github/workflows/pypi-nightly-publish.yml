@@ -51,8 +51,8 @@ jobs:
             echo "VERSION=${{ github.event.inputs.VERSION }}" >> $GITHUB_ENV
           else
 
-            echo "Setting VERSION to $(date +'%y.%m.%d'). DEFAULT"
-            echo "VERSION=$(date +'%y.%m.%d')" >> $GITHUB_ENV
+            echo "Setting VERSION to $(date +'%Y.%m.%d'). DEFAULT"
+            echo "VERSION=$(date +'%Y.%m.%d')" >> $GITHUB_ENV
           fi
 
       - name: Checkout code
