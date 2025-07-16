@@ -9,89 +9,19 @@ import numpy as np
 # Import the module under test
 import nv_ingest_api.internal.primitives.nim.model_interface.yolox as model_interface_module
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
-    resize_image,
     expand_table_bboxes,
+    weighted_boxes_fusion,
     expand_chart_bboxes,
+    prefilter_boxes,
+    find_matching_box_fast,
 )
+
 
 MODULE_UNDER_TEST = f"{model_interface_module.__name__}"
 
 # flake8: noqa
 # pylint: skip-file
 # mypy: ignore-errors
-
-
-class TestResizeImage(unittest.TestCase):
-
-    def setUp(self):
-        # Create a sample image
-        self.sample_image = np.ones((100, 200, 3), dtype=np.uint8) * 255  # 100x200 white image
-
-        # Mock cv2 functions
-        self.cv2_resize_patcher = patch(f"{MODULE_UNDER_TEST}.cv2.resize")
-        self.mock_cv2_resize = self.cv2_resize_patcher.start()
-
-        # Make cv2.resize return a predictable resized image
-        def mock_resize(image, size, interpolation):
-            h, w = size
-            return np.ones((h, w, image.shape[2]), dtype=np.uint8) * 255
-
-        self.mock_cv2_resize.side_effect = mock_resize
-
-    def tearDown(self):
-        self.cv2_resize_patcher.stop()
-
-    def test_resize_image_without_target_size(self):
-        """Test resize_image without a target size (should return original image)."""
-        with patch(f"{MODULE_UNDER_TEST}.np.pad") as mock_pad:
-            result = resize_image(self.sample_image, None)
-
-            # Check that cv2.resize was not called
-            self.mock_cv2_resize.assert_not_called()
-
-            # Check that np.pad was not called
-            mock_pad.assert_not_called()
-
-            # Check that the result has the same dimensions as the input
-            self.assertEqual(result.shape, self.sample_image.shape)
-
-    def test_resize_image_padding(self):
-        """Test that resize_image correctly pads the image to target size."""
-        # For this test, we need to bypass the mock of cv2.resize to check padding
-        self.cv2_resize_patcher.stop()
-
-        # Create a small image
-        small_image = np.ones((50, 100, 3), dtype=np.uint8) * 255
-        target_size = (300, 400)  # height, width
-
-        # The image should be resized with ratio min(300/50, 400/100) = min(6, 4) = 4
-        # So the resized image before padding should be (50*4, 100*4) = (200, 400)
-        # Then it should be padded to (300, 400) with 100 pixels on the bottom
-
-        result = resize_image(small_image, target_size)
-
-        # Check the result has the target dimensions
-        self.assertEqual(result.shape[:2], target_size)
-
-        # Check that padding was applied correctly (should be 114 in the padding area)
-        # Top part should be white (255)
-        self.assertTrue(np.all(result[:200, :, :] == 255))
-        # Bottom part should be padding color (114)
-        self.assertTrue(np.all(result[200:, :, :] == 114))
-
-        # Restart the patcher for other tests
-        self.cv2_resize_patcher = patch(f"{MODULE_UNDER_TEST}.cv2.resize")
-        self.mock_cv2_resize = self.cv2_resize_patcher.start()
-
-    def test_resize_image_without_target_size(self):
-        """Test resize_image without a target size (should return original image)."""
-        result = resize_image(self.sample_image, None)
-
-        # Check that cv2.resize was not called
-        self.mock_cv2_resize.assert_not_called()
-
-        # Check that the result has the same dimensions as the input
-        self.assertEqual(result.shape, self.sample_image.shape)
 
 
 class TestExpandTableBboxes(unittest.TestCase):
