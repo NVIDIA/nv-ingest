@@ -80,7 +80,7 @@ class PipelineCreationSchema(BaseModel):
     # OCR settings
     ocr_http_endpoint: str = os.getenv("OCR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
     ocr_infer_protocol: str = os.getenv("OCR_INFER_PROTOCOL", "http")
-    ocr_model_name: str = os.getnev("OCR_MODEL_NAME", "paddle")
+    ocr_model_name: str = os.getenv("OCR_MODEL_NAME", "paddle")
 
     # Task queue settings
     REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
