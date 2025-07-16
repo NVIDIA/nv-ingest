@@ -118,7 +118,7 @@ def transform_text_split_and_tokenize_internal(
     hf_access_token: Optional[str] = params.get("hf_access_token", None)
     split_source_types: List[str] = params.get("split_source_types", ["text"])
 
-    logger.info(
+    logger.debug(
         f"Splitting text with tokenizer: {tokenizer_identifier}, "
         f"chunk_size: {chunk_size} tokens, "
         f"chunk_overlap: {chunk_overlap}"
