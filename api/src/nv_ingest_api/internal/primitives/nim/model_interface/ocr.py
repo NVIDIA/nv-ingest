@@ -4,6 +4,7 @@
 
 import json
 import logging
+import os
 from typing import Any
 from typing import Dict
 from typing import List
@@ -15,9 +16,15 @@ import numpy as np
 import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
-from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_ocr
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import (
+    multiprocessing_cache,
+)
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
+    preprocess_image_for_ocr,
+)
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
+    preprocess_image_for_paddle,
+)
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
@@ -199,7 +206,10 @@ class OCRModelInterface(ModelInterface):
                 if model_name == "paddle":
                     payload = {"input": input_chunk}
                 else:
-                    payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
+                    payload = {
+                        "input": input_chunk,
+                        "merge_levels": [merge_level] * len(input_chunk),
+                    }
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
 
@@ -208,7 +218,13 @@ class OCRModelInterface(ModelInterface):
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-    def parse_output(self, response: Any, protocol: str, data: Optional[Dict[str, Any]] = None, **kwargs: Any) -> Any:
+    def parse_output(
+        self,
+        response: Any,
+        protocol: str,
+        data: Optional[Dict[str, Any]] = None,
+        **kwargs: Any,
+    ) -> Any:
         """
         Parse the model's inference response for the given protocol. The parsing
         may handle batched outputs for multiple images.
@@ -509,17 +525,17 @@ class OCRModelInterface(ModelInterface):
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
 def get_ocr_model_name(ocr_grpc_endpoint, default_model_name="paddle"):
+    ocr_model_name = os.getenv("OCR_MODEL_NAME", None)
+    if ocr_model_name is not None:
+        return ocr_model_name
+
     try:
         client = grpcclient.InferenceServerClient(ocr_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)
         model_names = [x["name"] for x in model_index.get("models", [])]
         ocr_model_name = model_names[0]
-    except Exception as e:
-        with open("/workspace/data/ocr_model_name.txt", "w") as f:
-            f.write(str(e))
+    except Exception:
         logger.warning(f"Failed to get ocr model name after 30 seconds. Falling back to '{default_model_name}'.")
         ocr_model_name = default_model_name
 
-    with open("/workspace/data/ocr_model_name.txt", "w") as f:
-        f.write(ocr_model_name)
     return ocr_model_name
