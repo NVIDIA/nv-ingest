@@ -3,8 +3,18 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from enum import Enum
-from typing import Dict, Any, List, Literal, Optional
+from typing import Dict, Any, List, Optional
 from pydantic import BaseModel, Field, Extra, root_validator, field_validator
+
+
+class StageType(str, Enum):
+    """
+    The type of a pipeline stage.
+    """
+
+    SOURCE = "source"
+    STAGE = "stage"
+    SINK = "sink"
 
 
 class PipelinePhase(int, Enum):
@@ -14,9 +24,10 @@ class PipelinePhase(int, Enum):
 
     PRE_PROCESSING = 0
     EXTRACTION = 1
-    MUTATION = 2
-    TRANSFORM = 3
-    RESPONSE = 4
+    POST_PROCESSING = 2
+    MUTATION = 3
+    TRANSFORM = 4
+    RESPONSE = 5
 
 
 class ReplicaConfig(BaseModel):
@@ -75,7 +86,7 @@ class StageConfig(BaseModel):
     ----------
     name : str
         A unique name to identify the stage within the pipeline.
-    type : Literal["source", "stage", "sink"]
+    type : StageType
         The type of the stage, which determines how it's added to the RayPipeline.
     phase: PipelinePhase
         The logical phase of the stage in the pipeline.
@@ -94,7 +105,7 @@ class StageConfig(BaseModel):
     """
 
     name: str = Field(..., description="Unique name for the stage.")
-    type: Literal["source", "stage", "sink"] = Field("stage", description="Type of the stage.")
+    type: StageType = Field(StageType.STAGE, description="Type of the stage.")
     phase: PipelinePhase = Field(..., description="The logical phase of the stage.")
     actor: str = Field(..., description="Full import path to the stage's actor class or function.")
     enabled: bool = Field(True, description="Whether the stage is enabled.")

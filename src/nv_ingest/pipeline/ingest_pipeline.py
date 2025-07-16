@@ -2,17 +2,19 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-import logging
 import inspect
+import logging
 import math
-from typing import Any, Dict, List
+from typing import Dict, Any, List
 
 from pydantic import BaseModel
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
-from nv_ingest.pipeline.pipeline_schema import PipelineConfig
-from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
-from nv_ingest_api.util.imports.dynamic_resolvers import resolve_callable_from_path
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
+from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.pipeline.pipeline_schema import PipelineConfig, StageType
+from nv_ingest_api.util.imports.dynamic_resolvers import resolve_actor_class_from_path
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logger = logging.getLogger(__name__)
@@ -82,19 +84,41 @@ class IngestPipeline:
                 logger.info(f"Stage '{stage_config.name}' is disabled and will be skipped.")
                 continue
 
-            # Resolve the actor class from the provided path
-            actor_class = resolve_callable_from_path(
-                stage_config.actor, signature_schema=ingest_stage_callable_signature
-            )
+            # Determine the expected base class for the stage type
+            expected_base_class = {
+                StageType.SOURCE: RayActorSourceStage,
+                StageType.SINK: RayActorSinkStage,
+                StageType.STAGE: RayActorStage,
+            }.get(stage_config.type)
 
-            # Resolve the stage's config schema and create an instance of it
-            config_schema = self._resolve_config_schema(actor_class)
+            if not expected_base_class:
+                raise ValueError(f"Invalid stage type '{stage_config.type.value}' for stage '{stage_config.name}'")
+
+            # Resolve and validate the actor class using the unified resolver
+            actor_class = resolve_actor_class_from_path(stage_config.actor, expected_base_class)
+
+            # The CONFIG_SCHEMA is defined on the original class, not the factory.
+            # We must inspect the MRO to find it, similar to the resolver.
+            cls_to_inspect = None
+            if inspect.isclass(actor_class):
+                cls_to_inspect = actor_class
+            else:
+                for base in actor_class.__class__.__mro__:
+                    if (
+                        inspect.isclass(base)
+                        and issubclass(base, expected_base_class)
+                        and base is not expected_base_class
+                    ):
+                        cls_to_inspect = base
+                        break
+
+            config_schema = getattr(cls_to_inspect, "CONFIG_SCHEMA", None) if cls_to_inspect else None
             config_instance = config_schema(**stage_config.config) if config_schema else None
 
             # Determine the method to add the stage to the pipeline (add_stage or add_sink)
-            add_method = getattr(self._pipeline, f"add_{stage_config.type}", None)
+            add_method = getattr(self._pipeline, f"add_{stage_config.type.value}", None)
             if not add_method:
-                raise ValueError(f"Invalid stage type '{stage_config.type}' for stage '{stage_config.name}'")
+                raise ValueError(f"Invalid stage type '{stage_config.type.value}' for stage '{stage_config.name}'")
 
             # Resolve replica counts
             replicas = stage_config.replicas
@@ -120,22 +144,29 @@ class IngestPipeline:
                 max_replicas = max(1, max_replicas)
             max_replicas = max(min_replicas, max_replicas)
 
-            add_method(
-                name=stage_config.name,
-                stage_actor=actor_class,
-                config=config_instance,
-                min_replicas=min_replicas,
-                max_replicas=max_replicas,
-            )
-            logger.info(f"Added stage '{stage_config.name}' of type '{stage_config.type}' to the pipeline.")
+            # The keyword argument for the actor class depends on the stage type
+            actor_kwarg = f"{stage_config.type.value}_actor"
+
+            add_method_kwargs = {
+                "name": stage_config.name,
+                **{actor_kwarg: actor_class},
+                "config": config_instance,
+                "min_replicas": min_replicas,
+                "max_replicas": max_replicas,
+            }
+
+            add_method(**add_method_kwargs)
+
+            logger.info(f"Added stage '{stage_config.name}' of type '{stage_config.type.value}' to the pipeline.")
 
         # 2. Inject dependencies between phases before validation
         self._inject_phase_dependencies()
 
         # 3. Add all edges defined in the config
-        for edge_config in self._config.edges:
-            self._pipeline.make_edge(edge_config.from_stage, edge_config.to_stage, queue_size=edge_config.queue_size)
-            logger.info(f"Added edge from '{edge_config.from_stage}' to '{edge_config.to_stage}'.")
+        if self.config.edges:
+            for edge_config in self.config.edges:
+                self._pipeline.make_edge(edge_config.from_stage, edge_config.to_stage, edge_config.queue_size)
+                logger.info(f"Added edge from '{edge_config.from_stage}' to '{edge_config.to_stage}'.")
 
         # 4. Validate all dependencies
         self._validate_dependencies()

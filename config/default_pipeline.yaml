@@ -168,6 +168,8 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_percent_max: 1
+    runs_after:
+      - "chart_extractor"
 
   - name: "image_dedup"
     type: "stage"
@@ -193,6 +195,8 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_percent_max: 0.07
+    runs_after:
+      - "image_dedup"
 
   - name: "text_embedder"
     type: "stage"
@@ -234,6 +238,8 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_percent_max: 1
+    runs_after:
+      - "image_caption"
 
   - name: "embedding_storage"
     type: "stage"
@@ -247,7 +253,7 @@ stages:
       cpu_percent_max: 1
 
   - name: "broker_response"
-    type: "sink"
+    type: "stage"
     phase: 4  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
@@ -260,9 +266,6 @@ stages:
     replicas:
       cpu_count_min: 1
       cpu_count_max: 1
-    runs_after:
-      - "embedding_storage"
-      - "image_storage"
 
   # Telemetry and Drain
   - name: "otel_tracer"
@@ -280,8 +283,8 @@ stages:
 
   - name: "drain"
     type: "sink"
-    phase: 4  # RESPONSE
-    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.drain:Drain"
+    phase: 5
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:
       cpu_count_min: 1
