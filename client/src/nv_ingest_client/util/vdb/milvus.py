@@ -250,7 +250,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(
         field_name="content_metadata",
         datatype=DataType.JSON,
-        nullable=True if local_index else False,
+        nullable=True if not local_index else False,
     )
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
@@ -520,6 +520,8 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "source": cp_element["metadata"].pop("source_metadata"),
         "content_metadata": cp_element["metadata"].pop("content_metadata"),
     }
+    # need to grab the user defined fields and add them to the content_metadata
+    record["content_metadata"].update(cp_element["metadata"])
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
     return record
