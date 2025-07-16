@@ -702,6 +702,7 @@ class Ingestor:
         """
         extract_tables = kwargs.pop("extract_tables", True)
         extract_charts = kwargs.pop("extract_charts", True)
+        extract_page_as_image = kwargs.pop("extract_page_as_image", False)
 
         # Defaulting to False since enabling infographic extraction reduces throughput.
         # Users have to set to True if infographic extraction is required.
@@ -723,6 +724,7 @@ class Ingestor:
                 extract_tables=extract_tables,
                 extract_charts=extract_charts,
                 extract_infographics=extract_infographics,
+                extract_page_as_image=extract_page_as_image,
                 **kwargs,
             )
             task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))

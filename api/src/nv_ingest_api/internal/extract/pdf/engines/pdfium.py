@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
@@ -34,6 +35,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
 from nv_ingest_api.util.metadata.aggregators import (
+    construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,
     construct_text_metadata,
@@ -46,6 +48,7 @@ from nv_ingest_api.util.pdf.pdfium import (
     extract_image_like_objects_from_pdfium_page,
 )
 from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
 logger = logging.getLogger(__name__)
@@ -379,6 +382,7 @@ def pdfium_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
@@ -519,6 +523,24 @@ def pdfium_extractor(
                 )
                 extracted_data.extend(image_data)
 
+            # Full page image extraction
+            if extract_page_as_image:
+                page_text = _extract_page_text(page)
+                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
+                image_meta = construct_image_metadata_from_base64(
+                    base64_image,
+                    page_idx,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
+                )
+                extracted_data.append(image_meta)
+
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts or extract_infographics:
                 image, padding_offsets = pdfium_pages_to_numpy(
@@ -569,6 +591,7 @@ def pdfium_extractor(
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
+
             pages_for_tables.clear()
 
         # Wait for all asynchronous jobs to complete.
