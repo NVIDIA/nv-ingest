@@ -13,6 +13,7 @@ import pandas as pd
 
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_infographic_schema import (
     InfographicExtractorSchema,
 )
@@ -63,6 +64,7 @@ def _filter_infographic_images(
 def _update_infographic_metadata(
     base64_images: List[str],
     ocr_client: NimClient,
+    ocr_model_name: str,
     worker_pool_size: int = 8,  # Not currently used
     trace_info: Optional[Dict] = None,
 ) -> List[Tuple[str, Optional[Any], Optional[Any]]]:
@@ -97,17 +99,24 @@ def _update_infographic_metadata(
     # worker_pool_size is not used in current implementation.
     _ = worker_pool_size
 
-    try:
-        ocr_results = ocr_client.infer(
-            data=data_ocr,
+    infer_kwargs = dict(
+        stage_name="infographic_extraction",
+        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+        trace_info=trace_info,
+    )
+    if ocr_model_name == "paddle":
+        infer_kwargs.update(
+            model_name="paddle",
+        )
+    else:
+        infer_kwargs.update(
             model_name="scene_text",
-            stage_name="infographic_extraction",
-            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
-            trace_info=trace_info,
             input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
+    try:
+        ocr_results = ocr_client.infer(data_ocr, **infer_kwargs)
     except Exception as e:
         logger.error(f"Error calling ocr_client.infer: {e}", exc_info=True)
         raise
@@ -117,8 +126,12 @@ def _update_infographic_metadata(
 
     for idx, ocr_res in enumerate(ocr_results):
         original_index = valid_indices[idx]
-        # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes, conf_scores).
-        ocr_res = reorder_boxes(*ocr_res)
+
+        if ocr_model_name == "paddle":
+            logger.debug(f"OCR results for image {base64_images[original_index]}: {ocr_res}")
+        else:
+            # Each ocr_res is expected to be a tuple (text_predictions, bounding_boxes, conf_scores).
+            ocr_res = reorder_boxes(*ocr_res)
 
         results[original_index] = (base64_images[original_index], ocr_res[0], ocr_res[1])
 
@@ -221,6 +234,17 @@ def extract_infographic_data_from_image_internal(
         endpoint_config.auth_token,
     )
 
+    # Default model name
+    ocr_model_name = "scene_text"
+
+    # Get the grpc endpoint to determine the model if needed
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    if ocr_grpc_endpoint:
+        try:
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+        except Exception as e:
+            logger.warning("Failed to get ocr model name from the endpoint. %s", e)
+
     try:
         # Identify rows that meet the infographic criteria.
         mask = df_extraction_ledger.apply(_meets_infographic_criteria, axis=1)
@@ -237,6 +261,7 @@ def extract_infographic_data_from_image_internal(
         bulk_results = _update_infographic_metadata(
             base64_images=base64_images,
             ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             trace_info=execution_trace_log,
         )

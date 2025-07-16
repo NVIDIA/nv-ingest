@@ -19,6 +19,7 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChar
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -63,6 +64,7 @@ def _filter_valid_chart_images(
 def _run_chart_inference(
     yolox_client: Any,
     ocr_client: Any,
+    ocr_model_name: str,
     valid_arrays: List[np.ndarray],
     valid_images: List[str],
     trace_info: Dict,
@@ -75,26 +77,33 @@ def _run_chart_inference(
     data_yolox = {"images": valid_arrays}
     data_ocr = {"base64_images": valid_images}
 
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_yolox = executor.submit(
-            yolox_client.infer,
-            data=data_yolox,
-            model_name="yolox",
-            stage_name="chart_extraction",
-            max_batch_size=8,
-            trace_info=trace_info,
+    future_yolox_kwargs = dict(
+        data=data_yolox,
+        model_name="yolox",
+        stage_name="chart_extraction",
+        max_batch_size=8,
+        trace_info=trace_info,
+    )
+    future_ocr_kwargs = dict(
+        data=data_ocr,
+        stage_name="chart_extraction",
+        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+    )
+    if ocr_model_name == "paddle":
+        future_ocr_kwargs.update(
+            model_name="paddle",
         )
-        future_ocr = executor.submit(
-            ocr_client.infer,
-            data=data_ocr,
+    else:
+        future_ocr_kwargs.update(
             model_name="scene_text",
-            stage_name="chart_extraction",
-            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
-            trace_info=trace_info,
-            input_names=["input", "merge_levels"],
+            input_name=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
+        future_ocr = executor.submit(ocr_client.infer, **future_ocr_kwargs)
 
         try:
             yolox_results = future_yolox.result()
@@ -157,6 +166,7 @@ def _update_chart_metadata(
     base64_images: List[str],
     yolox_client: Any,
     ocr_client: Any,
+    ocr_model_name: str,
     trace_info: Dict,
     worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Optional[Dict]]]:
@@ -178,6 +188,7 @@ def _update_chart_metadata(
     yolox_results, ocr_results = _run_chart_inference(
         yolox_client=yolox_client,
         ocr_client=ocr_client,
+        ocr_model_name=ocr_model_name,
         valid_arrays=valid_arrays,
         valid_images=valid_images,
         trace_info=trace_info,
@@ -286,6 +297,17 @@ def extract_chart_data_from_image_internal(
         endpoint_config.auth_token,
     )
 
+    # Default model name
+    ocr_model_name = "scene_text"
+
+    # Get the grpc endpoint to determine the model if needed
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    if ocr_grpc_endpoint:
+        try:
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+        except Exception as e:
+            logger.warning("Failed to get ocr model name from the endpoint. %s", e)
+
     try:
         # 1) Identify rows that meet criteria in a single pass
         #    - metadata exists
@@ -327,6 +349,7 @@ def extract_chart_data_from_image_internal(
             base64_images=base64_images,
             yolox_client=yolox_client,
             ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             trace_info=execution_trace_log,
         )

@@ -16,6 +16,7 @@ import pandas as pd
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskTableExtraction
 from nv_ingest_api.internal.enums.common import TableFormatEnum
 from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.schemas.extract.extract_table_schema import TableExtractorSchema
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_table_structure_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import convert_ocr_response_to_psuedo_markdown
@@ -61,6 +62,7 @@ def _run_inference(
     enable_yolox: bool,
     yolox_client: Any,
     ocr_client: Any,
+    ocr_model_name: str,
     valid_arrays: List[np.ndarray],
     valid_images: List[str],
     trace_info: Optional[Dict] = None,
@@ -73,29 +75,37 @@ def _run_inference(
     data_ocr = {"base64_images": valid_images}
     if enable_yolox:
         data_yolox = {"images": valid_arrays}
-
-    with ThreadPoolExecutor(max_workers=2) as executor:
-        future_yolox = None
-        if enable_yolox:
-            future_yolox = executor.submit(
-                yolox_client.infer,
-                data=data_yolox,
-                model_name="yolox",
-                stage_name="table_extraction",
-                max_batch_size=8,
-                trace_info=trace_info,
-            )
-        future_ocr = executor.submit(
-            ocr_client.infer,
-            data=data_ocr,
-            model_name="scene_text",
+        future_yolox_kwargs = dict(
+            data=data_yolox,
+            model_name="yolox",
             stage_name="table_extraction",
-            max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+            max_batch_size=8,
             trace_info=trace_info,
+        )
+
+    future_ocr_kwargs = dict(
+        data=data_ocr,
+        stage_name="table_extraction",
+        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+        trace_info=trace_info,
+    )
+    if ocr_model_name == "paddle":
+        future_ocr_kwargs.update(
+            model_name="paddle",
+        )
+    else:
+        future_ocr_kwargs.update(
+            model_name="scene_text",
             input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="word",
         )
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        future_yolox = None
+        if enable_yolox:
+            future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
+        future_ocr = executor.submit(ocr_client.infer, **future_ocr_kwargs)
 
         if enable_yolox:
             try:
@@ -150,6 +160,7 @@ def _update_table_metadata(
     base64_images: List[str],
     yolox_client: Any,
     ocr_client: Any,
+    ocr_model_name: str,
     worker_pool_size: int = 8,  # Not currently used
     enable_yolox: bool = False,
     trace_info: Optional[Dict] = None,
@@ -181,6 +192,7 @@ def _update_table_metadata(
         enable_yolox=enable_yolox,
         yolox_client=yolox_client,
         ocr_client=ocr_client,
+        ocr_model_name=ocr_model_name,
         valid_arrays=valid_arrays,
         valid_images=valid_images,
         trace_info=trace_info,
@@ -271,6 +283,17 @@ def extract_table_data_from_image_internal(
         endpoint_config.auth_token,
     )
 
+    # Default model anme
+    ocr_model_name = "scene_text"
+
+    # Get the grpc endpoint to determine the model if needed
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    if ocr_grpc_endpoint:
+        try:
+            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
+        except Exception as e:
+            logger.warning("Failed to get model name from grpc endpoint: %s", str(e))
+
     try:
         # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
         def meets_criteria(row):
@@ -311,6 +334,7 @@ def extract_table_data_from_image_internal(
             base64_images=base64_images,
             yolox_client=yolox_client,
             ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             enable_yolox=enable_yolox,
             trace_info=execution_trace_log,

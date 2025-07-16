@@ -6,14 +6,80 @@ import logging
 from typing import Optional
 
 import backoff
+import cv2
 import numpy as np
 import requests
 
 from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
-from nv_ingest_api.util.image_processing.transforms import pad_image
+from nv_ingest_api.util.image_processing.transforms import pad_image, normalize_image
 from nv_ingest_api.util.string_processing import generate_url, remove_url_endpoints
 
 logger = logging.getLogger(__name__)
+
+
+def preprocess_image_for_paddle(array: np.ndarray, image_max_dimension: int = 960) -> np.ndarray:
+    """
+    Preprocesses an input image to be suitable for use with PaddleOCR by resizing, normalizing, padding,
+    and transposing it into the required format.
+
+    This function is intended for preprocessing images to be passed as input to PaddleOCR using GRPC.
+    It is not necessary when using the HTTP endpoint.
+
+    Steps:
+    -----
+    1. Resizes the image while maintaining aspect ratio such that its largest dimension is scaled to 960 pixels.
+    2. Normalizes the image using the `normalize_image` function.
+    3. Pads the image to ensure both its height and width are multiples of 32, as required by PaddleOCR.
+    4. Transposes the image from (height, width, channel) to (channel, height, width), the format expected by PaddleOCR.
+
+    Parameters:
+    ----------
+    array : np.ndarray
+        The input image array of shape (height, width, channels). It should have pixel values in the range [0, 255].
+
+    Returns:
+    -------
+    np.ndarray
+        A preprocessed image with the shape (channels, height, width) and normalized pixel values.
+        The image will be padded to have dimensions that are multiples of 32, with the padding color set to 0.
+
+    Notes:
+    -----
+    - The image is resized so that its largest dimension becomes 960 pixels, maintaining the aspect ratio.
+    - After normalization, the image is padded to the nearest multiple of 32 in both dimensions, which is
+      a requirement for PaddleOCR.
+    - The normalized pixel values are scaled between 0 and 1 before padding and transposing the image.
+    """
+    height, width = array.shape[:2]
+    scale_factor = image_max_dimension / max(height, width)
+    new_height = int(height * scale_factor)
+    new_width = int(width * scale_factor)
+    resized = cv2.resize(array, (new_width, new_height))
+
+    normalized = normalize_image(resized)
+
+    # PaddleOCR NIM (GRPC) requires input shapes to be multiples of 32.
+    new_height = (normalized.shape[0] + 31) // 32 * 32
+    new_width = (normalized.shape[1] + 31) // 32 * 32
+    padded, (pad_width, pad_height) = pad_image(
+        normalized, target_height=new_height, target_width=new_width, background_color=0, dtype=np.float32
+    )
+
+    # PaddleOCR NIM (GRPC) requires input to be (channel, height, width).
+    transposed = padded.transpose((2, 0, 1))
+
+    # Metadata can used for inverting transformations on the resulting bounding boxes.
+    metadata = {
+        "original_height": height,
+        "original_width": width,
+        "scale_factor": scale_factor,
+        "new_height": transposed.shape[1],
+        "new_width": transposed.shape[2],
+        "pad_height": pad_height,
+        "pad_width": pad_width,
+    }
+
+    return transposed, metadata
 
 
 def preprocess_image_for_ocr(

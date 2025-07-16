@@ -4,14 +4,20 @@
 
 import json
 import logging
-from typing import Any, List, Tuple
+from typing import Any
 from typing import Dict
+from typing import List
 from typing import Optional
+from typing import Tuple
 
+import backoff
 import numpy as np
+import tritonclient.grpc as grpcclient
 
 from nv_ingest_api.internal.primitives.nim import ModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.decorators import multiprocessing_cache
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_ocr
+from nv_ingest_api.internal.primitives.nim.model_interface.helpers import preprocess_image_for_paddle
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
 logger = logging.getLogger(__name__)
@@ -126,7 +132,8 @@ class OCRModelInterface(ModelInterface):
         images = data["image_arrays"]
         dims = data["image_dims"]
 
-        merge_level = kwargs.pop("merge_level", "paragraph")
+        model_name = kwargs.get("model_name", "paddle")
+        merge_level = kwargs.get("merge_level", "paragraph")
 
         if protocol == "grpc":
             logger.debug("Formatting input for gRPC OCR model (batched).")
@@ -135,12 +142,16 @@ class OCRModelInterface(ModelInterface):
             max_length = max(max(img.shape[:2]) for img in images)
 
             for img in images:
-                arr, _dims = preprocess_image_for_ocr(
-                    img,
-                    target_height=max_length,
-                    target_width=max_length,
-                    pad_how="bottom_right",
-                )
+                if model_name == "paddle":
+                    arr, _dims = preprocess_image_for_paddle(img)
+                else:
+                    arr, _dims = preprocess_image_for_ocr(
+                        img,
+                        target_height=max_length,
+                        target_width=max_length,
+                        pad_how="bottom_right",
+                    )
+
                 dims.append(_dims)
                 arr = arr.astype(np.float32)
                 arr = np.expand_dims(arr, axis=0)  # => shape (1, H, W, C)
@@ -154,8 +165,12 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(dims, max_batch_size),
             ):
                 batched_input = np.concatenate(proc_chunk, axis=0)
-                merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
-                batches.append([batched_input, merge_levels])
+
+                if model_name == "paddle":
+                    batches.append(batched_input)
+                else:
+                    merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
+                    batches.append([batched_input, merge_levels])
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
             return batches, batch_data_list
 
@@ -181,7 +196,10 @@ class OCRModelInterface(ModelInterface):
                 chunk_list(images, max_batch_size),
                 chunk_list(dims, max_batch_size),
             ):
-                payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
+                if model_name == "paddle":
+                    payload = {"input": input_chunk}
+                else:
+                    payload = {"input": input_chunk, "merge_levels": [merge_level] * len(input_chunk)}
                 batches.append(payload)
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
 
@@ -218,10 +236,11 @@ class OCRModelInterface(ModelInterface):
         """
         # Retrieve image dimensions if available
         dims: Optional[List[Tuple[int, int]]] = data.get("image_dims") if data else None
+        model_name: str = kwargs.get("model_name", "paddle")
 
         if protocol == "grpc":
             logger.debug("Parsing output from gRPC OCR model (batched).")
-            return self._extract_content_from_ocr_grpc_response(response, dims)
+            return self._extract_content_from_ocr_grpc_response(response, dims, model_name=model_name)
 
         elif protocol == "http":
             logger.debug("Parsing output from HTTP OCR model (batched).")
@@ -329,6 +348,7 @@ class OCRModelInterface(ModelInterface):
         self,
         response: np.ndarray,
         dimensions: List[Dict[str, Any]],
+        model_name: str = "paddle",
     ) -> List[Tuple[str, str]]:
         """
         Parse a gRPC response for one or more images. The response can have two possible shapes:
@@ -400,7 +420,7 @@ class OCRModelInterface(ModelInterface):
                 conf_scores,
                 dimensions,
                 img_index=i,
-                scale_coordinates=False,
+                scale_coordinates=True if model_name == "paddle" else False,
             )
 
             results.append([bounding_boxes, text_predictions, conf_scores])
@@ -484,3 +504,22 @@ class OCRModelInterface(ModelInterface):
             confs.append(conf)
 
         return bboxes, texts, confs
+
+
+@multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
+@backoff.on_predicate(backoff.expo, max_time=30)
+def get_ocr_model_name(ocr_grpc_endpoint, default_model_name="paddle"):
+    try:
+        client = grpcclient.InferenceServerClient(ocr_grpc_endpoint)
+        model_index = client.get_model_repository_index(as_json=True)
+        model_names = [x["name"] for x in model_index.get("models", [])]
+        ocr_model_name = model_names[0]
+    except Exception as e:
+        with open("/workspace/data/ocr_model_name.txt", "w") as f:
+            f.write(str(e))
+        logger.warning(f"Failed to get ocr model name after 30 seconds. Falling back to '{default_model_name}'.")
+        ocr_model_name = default_model_name
+
+    with open("/workspace/data/ocr_model_name.txt", "w") as f:
+        f.write(ocr_model_name)
+    return ocr_model_name
