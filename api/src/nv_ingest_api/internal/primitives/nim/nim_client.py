@@ -253,13 +253,6 @@ class NimClient:
         for input_name, input_data, dtype in zip(input_names, formatted_input, dtypes):
             input_tensors.append(grpcclient.InferInput(input_name, input_data.shape, datatype=dtype))
 
-        with open("/workspace/data/log", "a") as f:
-            f.write(str(output_names) + "\n")
-            f.write(str(dtypes) + "\n")
-            f.write(str(input_names) + "\n")
-            f.write(str(input_tensors) + "\n")
-            f.write(str(formatted_input) + "\n")
-
         for idx, input_data in enumerate(formatted_input):
             input_tensors[idx].set_data_from_numpy(input_data)
 
