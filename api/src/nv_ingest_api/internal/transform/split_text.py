@@ -150,6 +150,8 @@ def transform_text_split_and_tokenize_internal(
             os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")
         ) and (tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"):
             tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
+        elif tokenizer_identifier is None:
+            tokenizer_identifier = "intfloat/e5-large-unsupervised"
 
     tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
 
