@@ -118,6 +118,7 @@ class ExtractTaskSchema(BaseModel):
     extract_tables_method: str = "yolox"
     extract_charts: Optional[bool] = None  # Initially allow None to set a smart default
     extract_infographics: bool = False
+    extract_page_as_image: bool = False
     extract_audio_params: Optional[Dict[str, Any]] = None
     text_depth: str = "document"
     paddle_output_format: Optional[str] = None
@@ -219,6 +220,7 @@ class ExtractTask(Task):
         extract_images_params: Optional[Dict[str, Any]] = None,
         extract_tables_method: _Type_Extract_Tables_Method_PDF = "yolox",
         extract_infographics: bool = False,
+        extract_page_as_image: bool = False,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
         table_output_format: str = "pseudo_markdown",
@@ -242,6 +244,7 @@ class ExtractTask(Task):
         # {extract_tables: true, extract_charts: false} enables only the table extraction and disables chart extraction.
         self._extract_charts = extract_charts if extract_charts is not None else extract_tables
         self._extract_infographics = extract_infographics
+        self._extract_page_as_image = extract_page_as_image
         self._extract_text = extract_text
         self._text_depth = text_depth
         self._paddle_output_format = paddle_output_format
@@ -260,6 +263,7 @@ class ExtractTask(Task):
         info += f"  extract tables: {self._extract_tables}\n"
         info += f"  extract charts: {self._extract_charts}\n"
         info += f"  extract infographics: {self._extract_infographics}\n"
+        info += f"  extract page as image: {self._extract_page_as_image}\n"
         info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
@@ -283,6 +287,7 @@ class ExtractTask(Task):
             "extract_tables_method": self._extract_tables_method,
             "extract_charts": self._extract_charts,
             "extract_infographics": self._extract_infographics,
+            "extract_page_as_image": self._extract_page_as_image,
             "text_depth": self._text_depth,
             "table_output_format": self._table_output_format,
         }
