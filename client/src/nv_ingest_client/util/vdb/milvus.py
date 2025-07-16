@@ -599,7 +599,10 @@ def _pull_text(
         elif element["metadata"]["content_metadata"]["subtype"] == "infographic" and not enable_infographics:
             text = None
     elif element["document_type"] == "image" and enable_images:
-        text = element["metadata"]["image_metadata"]["caption"]
+        if element["metadata"]["content_metadata"]["subtype"] == "page_image":
+            text = element["metadata"]["image_metadata"]["text"]
+        else:
+            text = element["metadata"]["image_metadata"]["caption"]
     elif element["document_type"] == "audio" and enable_audio:
         text = element["metadata"]["audio_metadata"]["audio_transcript"]
     verify_emb = verify_embedding(element)
