@@ -11,9 +11,9 @@ FROM $BASE_IMG:$BASE_IMG_TAG AS base
 ARG RELEASE_TYPE="dev"
 ARG VERSION=""
 ARG VERSION_REV="0"
-ARG DOWNLOAD_LLAMA_TOKENIZER=""
+ARG DOWNLOAD_LLAMA_TOKENIZER="False"
 ARG HF_ACCESS_TOKEN=""
-ARG MODEL_PREDOWNLOAD_PATH=""
+ARG MODEL_PREDOWNLOAD_PATH="/workspace/models/"
 
 # Embed the `git rev-parse HEAD` as a Docker metadata label
 # Allows for linking container builds to git commits
