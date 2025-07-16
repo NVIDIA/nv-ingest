@@ -120,8 +120,7 @@ services:
       - CUDA_VISIBLE_DEVICES=0
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
-        #- NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - NGC_API_KEY=${STAGING_NIM_NGC_API_KEY}
+      - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-1}
       - OMP_NUM_THREADS=1
     deploy:
