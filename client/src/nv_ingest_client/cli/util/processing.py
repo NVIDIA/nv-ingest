@@ -480,6 +480,9 @@ def create_and_process_jobs(
                     future_response, trace_id = handle_future_result(future)
                     trace_ids[source_name] = trace_id
 
+                    print(f"FUTURE Response: {future_response}")
+                    breakpoint()
+
                     if output_directory:
                         save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
 
