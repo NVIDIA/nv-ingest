@@ -33,6 +33,7 @@ class NimClient:
         auth_token: Optional[str] = None,
         timeout: float = 120.0,
         max_retries: int = 5,
+        max_429_retries: int = 5,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -49,6 +50,10 @@ class NimClient:
             Authorization token for HTTP requests (default: None).
         timeout : float, optional
             Timeout for HTTP requests in seconds (default: 30.0).
+        max_retries : int, optional
+            The maximum number of retries for non-429 server-side errors (default: 5).
+        max_429_retries : int, optional
+            The maximum number of retries specifically for 429 errors (default: 10).
 
         Raises
         ------
@@ -62,6 +67,7 @@ class NimClient:
         self.auth_token = auth_token
         self.timeout = timeout  # Timeout for HTTP requests
         self.max_retries = max_retries
+        self.max_429_retries = max_429_retries
         self._grpc_endpoint, self._http_endpoint = endpoints
         self._max_batch_sizes = {}
         self._lock = threading.Lock()
@@ -138,7 +144,9 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=batch_data, **kwargs)
+        parsed_output = self.model_interface.parse_output(
+            response, protocol=self.protocol, data=batch_data, model_name=model_name, **kwargs
+        )
         return parsed_output, batch_data
 
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
@@ -167,8 +175,8 @@ class NimClient:
         try:
             # 1. Retrieve or default to the model's maximum batch size.
             batch_size = self._fetch_max_batch_size(model_name)
-            max_requested_batch_size = kwargs.get("max_batch_size", batch_size)
-            force_requested_batch_size = kwargs.get("force_max_batch_size", False)
+            max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
+            force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
             max_batch_size = (
                 min(batch_size, max_requested_batch_size)
                 if not force_requested_batch_size
@@ -180,7 +188,11 @@ class NimClient:
 
             # 3. Format the input based on protocol.
             formatted_batches, formatted_batch_data = self.model_interface.format_input(
-                data, protocol=self.protocol, max_batch_size=max_batch_size, model_name=model_name
+                data,
+                protocol=self.protocol,
+                max_batch_size=max_batch_size,
+                model_name=model_name,
+                **kwargs,
             )
 
             # Check for a custom maximum pool worker count, and remove it from kwargs.
@@ -237,19 +249,27 @@ class NimClient:
         np.ndarray
             The output of the model as a numpy array.
         """
+        if not isinstance(formatted_input, list):
+            formatted_input = [formatted_input]
 
         parameters = kwargs.get("parameters", {})
-        output_names = kwargs.get("outputs", ["output"])
-        dtype = kwargs.get("dtype", "FP32")
-        input_name = kwargs.get("input_name", "input")
+        output_names = kwargs.get("output_names", ["output"])
+        dtypes = kwargs.get("dtypes", ["FP32"])
+        input_names = kwargs.get("input_names", ["input"])
 
-        input_tensors = grpcclient.InferInput(input_name, formatted_input.shape, datatype=dtype)
-        input_tensors.set_data_from_numpy(formatted_input)
+        input_tensors = []
+        for input_name, input_data, dtype in zip(input_names, formatted_input, dtypes):
+            input_tensors.append(grpcclient.InferInput(input_name, input_data.shape, datatype=dtype))
+
+        for idx, input_data in enumerate(formatted_input):
+            input_tensors[idx].set_data_from_numpy(input_data)
 
         outputs = [grpcclient.InferRequestedOutput(output_name) for output_name in output_names]
+
         response = self.client.infer(
-            model_name=model_name, parameters=parameters, inputs=[input_tensors], outputs=outputs
+            model_name=model_name, parameters=parameters, inputs=input_tensors, outputs=outputs
         )
+
         logger.debug(f"gRPC inference response: {response}")
 
         if len(outputs) == 1:
@@ -281,6 +301,7 @@ class NimClient:
 
         base_delay = 2.0
         attempt = 0
+        retries_429 = 0
 
         while attempt < self.max_retries:
             try:
@@ -291,7 +312,21 @@ class NimClient:
 
                 # Check for server-side or rate-limit type errors
                 # e.g. 5xx => server error, 429 => too many requests
-                if status_code == 429 or status_code == 503 or (500 <= status_code < 600):
+                if status_code == 429:
+                    retries_429 += 1
+                    logger.warning(
+                        f"Received HTTP 429 (Too Many Requests) from {self.model_interface.name()}. "
+                        f"Attempt {retries_429} of {self.max_429_retries}."
+                    )
+                    if retries_429 >= self.max_429_retries:
+                        logger.error("Max retries for HTTP 429 exceeded.")
+                        response.raise_for_status()
+                    else:
+                        backoff_time = base_delay * (2**retries_429)
+                        time.sleep(backoff_time)
+                        continue  # Retry without incrementing the main attempt counter
+
+                if status_code == 503 or (500 <= status_code < 600):
                     logger.warning(
                         f"Received HTTP {status_code} ({response.reason}) from "
                         f"{self.model_interface.name()}. Attempt {attempt + 1} of {self.max_retries}."

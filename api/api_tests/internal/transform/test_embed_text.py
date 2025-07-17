@@ -146,6 +146,7 @@ def test_async_runner_happy_path(mock_handler):
         "passage",
         "END",
         False,
+        modalities=None,
     )
     assert result["embeddings"] == [[1, 2, 3], [4, 5, 6], [7, 8, 9]]
     assert result["info_msgs"] == [None, None, {"msg": "partial success"}]
@@ -239,6 +240,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        modalities=None,
     )
     mock_make_async_request.assert_any_call(
         prompts=["batch2_prompt"],
@@ -249,6 +251,7 @@ def test_async_request_handler_happy_path(mock_make_async_request):
         input_type="passage",
         truncate="END",
         filter_errors=False,
+        modalities=None,
     )
 
     # And we get both results combined in order

@@ -34,7 +34,7 @@ from pymilvus.bulk_writer import RemoteBulkWriter
 from pymilvus.milvus_client.index import IndexParams
 from pymilvus.model.sparse import BM25EmbeddingFunction
 from pymilvus.model.sparse.bm25.tokenizers import build_default_analyzer
-from pymilvus.orm.types import CONSISTENCY_STRONG
+from pymilvus.orm.types import CONSISTENCY_BOUNDED
 from scipy.sparse import csr_array
 from nv_ingest_client.util.transport import infer_microservice
 from nv_ingest_client.util.vdb.adt_vdb import VDB
@@ -42,7 +42,7 @@ from nv_ingest_client.util.vdb.adt_vdb import VDB
 
 logger = logging.getLogger(__name__)
 
-CONSISTENCY = CONSISTENCY_STRONG
+CONSISTENCY = CONSISTENCY_BOUNDED
 
 pandas_reader_map = {
     ".json": pd.read_json,
@@ -250,7 +250,7 @@ def create_nvingest_schema(dense_dim: int = 1024, sparse: bool = False, local_in
     schema.add_field(
         field_name="content_metadata",
         datatype=DataType.JSON,
-        nullable=True if local_index else False,
+        nullable=True if not local_index else False,
     )
     if sparse and local_index:
         schema.add_field(field_name="sparse", datatype=DataType.SPARSE_FLOAT_VECTOR)
@@ -325,6 +325,7 @@ def create_nvingest_index_params(
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )
@@ -520,6 +521,8 @@ def _record_dict(text, element, sparse_vector: csr_array = None):
         "source": cp_element["metadata"].pop("source_metadata"),
         "content_metadata": cp_element["metadata"].pop("content_metadata"),
     }
+    # need to grab the user defined fields and add them to the content_metadata
+    record["content_metadata"].update(cp_element["metadata"])
     if sparse_vector is not None:
         record["sparse"] = _format_sparse_embedding(sparse_vector)
     return record
@@ -599,7 +602,10 @@ def _pull_text(
         elif element["metadata"]["content_metadata"]["subtype"] == "infographic" and not enable_infographics:
             text = None
     elif element["document_type"] == "image" and enable_images:
-        text = element["metadata"]["image_metadata"]["caption"]
+        if element["metadata"]["content_metadata"]["subtype"] == "page_image":
+            text = element["metadata"]["image_metadata"]["text"]
+        else:
+            text = element["metadata"]["image_metadata"]["caption"]
     elif element["document_type"] == "audio" and enable_audio:
         text = element["metadata"]["audio_metadata"]["audio_transcript"]
     verify_emb = verify_embedding(element)

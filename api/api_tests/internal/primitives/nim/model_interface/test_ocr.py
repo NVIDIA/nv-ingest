@@ -9,17 +9,17 @@ import json
 import numpy as np
 
 # Import using the specified pattern
-import nv_ingest_api.internal.primitives.nim.model_interface.paddle as model_interface_module
-from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+import nv_ingest_api.internal.primitives.nim.model_interface.ocr as model_interface_module
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
 
 MODULE_UNDER_TEST = f"{model_interface_module.__name__}"
 
 
-class TestPaddleOCRModelInterface(unittest.TestCase):
+class TestOCRModelInterface(unittest.TestCase):
 
     def setUp(self):
         # Create an instance of the model interface
-        self.model_interface = PaddleOCRModelInterface()
+        self.model_interface = OCRModelInterface()
 
         # Mock the logger to prevent actual logging during tests
         self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
@@ -40,7 +40,6 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             {
                 "original_height": img.shape[0],
                 "original_width": img.shape[1],
-                "scale_factor": 0.8,
                 "new_height": 32,
                 "new_width": 64,
                 "pad_height": 2,
@@ -60,7 +59,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
     def test_name(self):
         """Test the name method."""
-        self.assertEqual(self.model_interface.name(), "PaddleOCR")
+        self.assertEqual(self.model_interface.name(), "OCR")
 
     def test_prepare_data_for_inference_single_image(self):
         """Test prepare_data_for_inference method with a single image."""
@@ -113,7 +112,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="grpc", max_batch_size=1)
 
-        # Check that preprocess_image_for_paddle was called
+        # Check that preprocess_image_for_ocr was called
         self.mock_preprocess.assert_called_once_with(img_array)
 
         # Check the format of the output
@@ -122,7 +121,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
         # The batch should be a numpy array with shape (1, 3, 32, 64)
         # where 1 is the batch size, 3 is channels, and 32x64 is the image dimensions
-        self.assertTrue(isinstance(batches[0], np.ndarray))
+        self.assertTrue(isinstance(batches[0][0], np.ndarray))
 
         # Check that image_dims was updated
         self.assertEqual(len(test_data["image_dims"]), 1)
@@ -135,7 +134,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="grpc", max_batch_size=2)
 
-        # Check that preprocess_image_for_paddle was called for each image
+        # Check that preprocess_image_for_ocr was called for each image
         self.assertEqual(self.mock_preprocess.call_count, len(img_arrays))
 
         # Check the format of the output
@@ -149,7 +148,11 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         """Test format_input method with HTTP protocol and a single image."""
         # Set up test data with image_arrays, empty image_dims, and base64_image
         img_array = np.zeros((100, 200, 3), dtype=np.uint8)
-        test_data = {"image_arrays": [img_array], "image_dims": [], "base64_image": self.sample_base64}
+        test_data = {
+            "image_arrays": [img_array],
+            "image_dims": [],
+            "base64_image": self.sample_base64,
+        }
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="http", max_batch_size=1)
 
@@ -174,7 +177,11 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         """Test format_input method with HTTP protocol and multiple images."""
         # Set up test data with multiple image arrays, empty image_dims, and base64_images
         img_arrays = [np.zeros((100, 200, 3), dtype=np.uint8) for _ in range(3)]
-        test_data = {"image_arrays": img_arrays, "image_dims": [], "base64_images": self.sample_base64_list}
+        test_data = {
+            "image_arrays": img_arrays,
+            "image_dims": [],
+            "base64_images": self.sample_base64_list,
+        }
 
         batches, batch_data = self.model_interface.format_input(test_data, protocol="http", max_batch_size=2)
 
@@ -205,7 +212,10 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
     def test_format_input_invalid_protocol(self):
         """Test format_input method with an invalid protocol."""
-        test_data = {"image_arrays": [np.zeros((100, 200, 3), dtype=np.uint8)], "image_dims": []}
+        test_data = {
+            "image_arrays": [np.zeros((100, 200, 3), dtype=np.uint8)],
+            "image_dims": [],
+        }
         with self.assertRaises(ValueError) as context:
             self.model_interface.format_input(test_data, protocol="invalid", max_batch_size=1)
 
@@ -219,7 +229,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
                 {
                     "text_detections": [
                         {
-                            "text_prediction": {"text": "Hello"},
+                            "text_prediction": {"text": "Hello", "confidence": 0.9},
                             "bounding_box": {
                                 "points": [
                                     {"x": 10, "y": 20},
@@ -230,7 +240,7 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
                             },
                         },
                         {
-                            "text_prediction": {"text": "World"},
+                            "text_prediction": {"text": "World", "confidence": 0.8},
                             "bounding_box": {
                                 "points": [
                                     {"x": 60, "y": 20},
@@ -252,13 +262,14 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
 
         # Each result should be a list with two elements: bounding boxes and text predictions
-        self.assertEqual(len(result[0]), 2)
-        bboxes, texts = result[0]
+        self.assertEqual(len(result[0]), 3)
+        bboxes, texts, conf_scores = result[0]
 
         # Check bounding boxes and text predictions
         self.assertEqual(len(bboxes), 2)  # Should have 2 bounding boxes
         self.assertEqual(len(texts), 2)  # Should have 2 text predictions
         self.assertEqual(texts, ["Hello", "World"])
+        self.assertEqual(len(conf_scores), 2)
 
     def test_parse_output_http_missing_data(self):
         """Test parse_output method with HTTP protocol and missing data."""
@@ -285,19 +296,17 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             ]
         )
 
-        data = {
-            "image_dims": [{"new_width": 100, "new_height": 200, "pad_width": 4, "pad_height": 2, "scale_factor": 0.8}]
-        }
+        data = {"image_dims": [{"new_width": 100, "new_height": 200, "pad_width": 4, "pad_height": 2}]}
 
-        # Mock the _extract_content_from_paddle_grpc_response method to isolate the test
-        with patch.object(self.model_interface, "_extract_content_from_paddle_grpc_response") as mock_extract:
+        # Mock the _extract_content_from_ocr_grpc_response method to isolate the test
+        with patch.object(self.model_interface, "_extract_content_from_ocr_grpc_response") as mock_extract:
             # Set a return value that matches the expected format
             mock_extract.return_value = [([[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]], ["Sample Text"])]
 
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -315,20 +324,23 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         # Shape (3, 2) for a batch of 2 images
         mock_response = np.array(
             [
-                # Bounding boxes for 2 images - must match the format expected by _postprocess_paddle_response
+                # Bounding boxes for 2 images - must match the format expected by _postprocess_ocr_response
                 [
                     json.dumps([[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]]).encode("utf8"),
                     json.dumps([[0.5, 0.6], [0.7, 0.6], [0.7, 0.8], [0.5, 0.8]]).encode("utf8"),
                 ],
                 # Text predictions for 2 images
-                [json.dumps(["Image 1 Text"]).encode("utf8"), json.dumps(["Image 2 Text"]).encode("utf8")],
+                [
+                    json.dumps(["Image 1 Text"]).encode("utf8"),
+                    json.dumps(["Image 2 Text"]).encode("utf8"),
+                ],
                 # Extra data for 2 images
                 [b"extra data 1", b"extra data 2"],
             ]
         )
 
-        # Mock the _extract_content_from_paddle_grpc_response method to isolate the test
-        with patch.object(self.model_interface, "_extract_content_from_paddle_grpc_response") as mock_extract:
+        # Mock the _extract_content_from_ocr_grpc_response method to isolate the test
+        with patch.object(self.model_interface, "_extract_content_from_ocr_grpc_response") as mock_extract:
             # Set a return value that matches the expected format
             mock_extract.return_value = [
                 ([[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]], ["Image 1 Text"]),
@@ -337,15 +349,25 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
 
             data = {
                 "image_dims": [
-                    {"new_width": 100, "new_height": 200, "pad_width": 4, "pad_height": 2, "scale_factor": 0.8},
-                    {"new_width": 120, "new_height": 240, "pad_width": 6, "pad_height": 3, "scale_factor": 0.9},
+                    {
+                        "new_width": 100,
+                        "new_height": 200,
+                        "pad_width": 4,
+                        "pad_height": 2,
+                    },
+                    {
+                        "new_width": 120,
+                        "new_height": 240,
+                        "pad_width": 6,
+                        "pad_height": 3,
+                    },
                 ]
             }
 
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 2)  # Should have 2 results (for 2 images)
@@ -371,19 +393,22 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
             ]
         )
 
-        data = {
-            "image_dims": [{"new_width": 100, "new_height": 200, "pad_width": 4, "pad_height": 2, "scale_factor": 0.8}]
-        }
+        data = {"image_dims": [{"new_width": 100, "new_height": 200, "pad_width": 4, "pad_height": 2}]}
 
-        # Mock the _extract_content_from_paddle_grpc_response method to isolate the test
-        with patch.object(self.model_interface, "_extract_content_from_paddle_grpc_response") as mock_extract:
+        # Mock the _extract_content_from_ocr_grpc_response method to isolate the test
+        with patch.object(self.model_interface, "_extract_content_from_ocr_grpc_response") as mock_extract:
             # Set a return value that matches the expected format
-            mock_extract.return_value = [([[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]], ["Single Image Text"])]
+            mock_extract.return_value = [
+                (
+                    [[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]],
+                    ["Single Image Text"],
+                )
+            ]
 
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -433,10 +458,10 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         result = self.model_interface.process_inference_results(test_output)
         self.assertEqual(result, test_output)
 
-    def test_prepare_paddle_payload(self):
-        """Test _prepare_paddle_payload method."""
+    def test_prepare_ocr_payload(self):
+        """Test _prepare_ocr_payload method."""
         test_base64 = "test_base64_string"
-        payload = self.model_interface._prepare_paddle_payload(test_base64)
+        payload = self.model_interface._prepare_ocr_payload(test_base64)
 
         # Check payload structure
         self.assertIn("input", payload)
@@ -444,72 +469,93 @@ class TestPaddleOCRModelInterface(unittest.TestCase):
         self.assertEqual(payload["input"][0]["type"], "image_url")
         self.assertEqual(payload["input"][0]["url"], f"data:image/png;base64,{test_base64}")
 
-    def test_postprocess_paddle_response(self):
-        """Test _postprocess_paddle_response static method."""
+    def test_postprocess_ocr_response(self):
+        """Test _postprocess_ocr_response static method."""
         # Set up test data
         bounding_boxes = [
             [[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]],
             [[0.5, 0.6], [0.7, 0.6], [0.7, 0.8], [0.5, 0.8]],
         ]
         text_predictions = ["Text 1", "Text 2"]
-        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20, "scale_factor": 0.5}]
+        conf_scores = [0.9, 0.8]
+        dims = [
+            {
+                "new_width": 100,
+                "new_height": 200,
+                "pad_width": 10,
+                "pad_height": 20,
+                "scale_factor": 0.5,
+            }
+        ]
 
-        bboxes, texts = PaddleOCRModelInterface._postprocess_paddle_response(
-            bounding_boxes, text_predictions, dims, img_index=0
+        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+            bounding_boxes, text_predictions, conf_scores, dims, img_index=0
         )
 
         # Check that bounding boxes were properly scaled
         self.assertEqual(len(bboxes), 2)
         self.assertEqual(len(texts), 2)
 
-        # Check the scaling calculation for the first point of the first bounding box
         x_expected = ((0.1 * 100) - 10) / 0.5
         y_expected = ((0.2 * 200) - 20) / 0.5
         self.assertAlmostEqual(bboxes[0][0][0], x_expected)
         self.assertAlmostEqual(bboxes[0][0][1], y_expected)
+        self.assertAlmostEqual(conf_scores[0], 0.9)
 
-    def test_postprocess_paddle_response_nan_box(self):
-        """Test _postprocess_paddle_response static method with 'nan' box."""
+    def test_postprocess_ocr_response_nan_box(self):
+        """Test _postprocess_ocr_response static method with 'nan' box."""
         # Set up test data with one valid box and one 'nan' box
-        bounding_boxes = [[[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]], "nan"]  # This should be skipped
+        bounding_boxes = [
+            [[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]],
+            "nan",
+        ]  # This should be skipped
         text_predictions = ["Text 1", "Text 2"]
-        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20, "scale_factor": 0.5}]
+        conf_scores = [0.9, 0.8]
+        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20}]
 
-        bboxes, texts = PaddleOCRModelInterface._postprocess_paddle_response(
-            bounding_boxes, text_predictions, dims, img_index=0
+        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+            bounding_boxes, text_predictions, conf_scores, dims, img_index=0
         )
 
         # Check that only the valid box was processed
         self.assertEqual(len(bboxes), 1)
         self.assertEqual(len(texts), 1)
         self.assertEqual(texts[0], "Text 1")
+        self.assertEqual(conf_scores[0], 0.9)
 
-    def test_postprocess_paddle_response_no_dims(self):
-        """Test _postprocess_paddle_response static method with no dims."""
+    def test_postprocess_ocr_response_no_dims(self):
+        """Test _postprocess_ocr_response static method with no dims."""
         bounding_boxes = [[[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]]]
         text_predictions = ["Text 1"]
+        conf_scores = [0.9]
 
         with self.assertRaises(ValueError) as context:
-            PaddleOCRModelInterface._postprocess_paddle_response(bounding_boxes, text_predictions, None)
+            OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, None)
 
         self.assertTrue("No image_dims provided" in str(context.exception))
 
-    def test_postprocess_paddle_response_index_out_of_range(self):
-        """Test _postprocess_paddle_response with img_index out of range."""
+    def test_postprocess_ocr_response_index_out_of_range(self):
+        """Test _postprocess_ocr_response with img_index out of range."""
         bounding_boxes = [[[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]]]
         text_predictions = ["Text 1"]
-        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20, "scale_factor": 0.5}]
+        conf_scores = [0.9]
+        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20}]
 
         # Mock the logger to check warning
         with patch(f"{MODULE_UNDER_TEST}.logger") as mock_logger:
-            bboxes, texts = PaddleOCRModelInterface._postprocess_paddle_response(
-                bounding_boxes, text_predictions, dims, img_index=1  # Out of range
+            bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
+                bounding_boxes,
+                text_predictions,
+                conf_scores,
+                dims,
+                img_index=1,  # Out of range
             )
 
             # Should use index 0 as fallback and log a warning
             mock_logger.warning.assert_called_once()
             self.assertEqual(len(bboxes), 1)
             self.assertEqual(len(texts), 1)
+            self.assertEqual(len(conf_scores), 1)
 
 
 if __name__ == "__main__":

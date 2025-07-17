@@ -55,7 +55,7 @@ def dummy_extractor_config():
             },
         },
         "text_depth": "page",
-        "paddle_output_format": "markdown",
+        "table_output_format": "markdown",
         "extract_images_method": "simple",
         "extract_images_params": {},
         "pdfium_config": {"workers_per_progress_engine": 2, "yolox_endpoints": ("grpc", "http")},
@@ -327,7 +327,7 @@ def test_extract_page_elements_happy_path2(
         extract_tables=True,
         extract_charts=False,
         extract_infographics=False,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
         auth_token="dummy_token",
@@ -371,7 +371,7 @@ def test_extract_page_elements_fallback_to_default_model(
         extract_tables=False,
         extract_charts=True,
         extract_infographics=False,
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", "http://dummy"),
         yolox_infer_protocol="http",
     )
@@ -402,7 +402,7 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
         extract_tables=False,
         extract_charts=False,
         extract_infographics=False,  # all False => should be skipped
-        paddle_output_format="latex",
+        table_output_format="latex",
         yolox_endpoints=("grpc://dummy", None),
         yolox_infer_protocol="http",
     )
@@ -413,6 +413,8 @@ def test_extract_page_elements_filters_by_flags(mock_extract_ensemble, mock_crea
     mock_client.close.assert_called_once()
 
 
+@patch(f"{MODULE_UNDER_TEST}.construct_image_metadata_from_base64")
+@patch(f"{MODULE_UNDER_TEST}.numpy_to_base64")
 @patch(f"{MODULE_UNDER_TEST}.construct_text_metadata")
 @patch(f"{MODULE_UNDER_TEST}._extract_page_images")
 @patch(f"{MODULE_UNDER_TEST}.pdfium_pages_to_numpy")
@@ -426,6 +428,8 @@ def test_pdfium_extractor_happy_path(
     mock_pages_to_numpy,
     mock_extract_images,
     mock_construct_text_metadata,
+    mock_numpy_to_base64,
+    mock_construct_image_metadata_from_base64,
     dummy_pdf_stream,
     dummy_extractor_config,
 ):
@@ -452,6 +456,8 @@ def test_pdfium_extractor_happy_path(
     mock_extract_images.return_value = ["image_meta"]
     mock_pages_to_numpy.return_value = ([MagicMock()], [MagicMock()])
     mock_extract_elements.return_value = ["table_chart_meta"]
+    mock_numpy_to_base64.return_value = "image_base64"
+    mock_construct_image_metadata_from_base64.return_value = "page_image_meta"
 
     # Call
     result = module_under_test.pdfium_extractor(
@@ -461,6 +467,7 @@ def test_pdfium_extractor_happy_path(
         extract_infographics=True,
         extract_tables=True,
         extract_charts=True,
+        extract_page_as_image=True,
         extractor_config=dummy_extractor_config,
         execution_trace_log=[],
     )
@@ -473,7 +480,7 @@ def test_pdfium_extractor_happy_path(
     mock_pages_to_numpy.assert_called()
     mock_extract_elements.assert_called()
     mock_doc.close.assert_called_once()
-    assert result == ["text_meta", "image_meta", "table_chart_meta"]
+    assert result == ["text_meta", "image_meta", "page_image_meta", "table_chart_meta"]
 
 
 @patch(f"{MODULE_UNDER_TEST}.extract_pdf_metadata")
@@ -482,45 +489,49 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
     with pytest.raises(ValueError, match="`extractor_config` must include a valid 'row_data' dictionary."):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={},
         )
 
     with pytest.raises(ValueError, match="The 'row_data' dictionary must contain the 'source_id' key."):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={"row_data": {}},
         )
 
     with pytest.raises(ValueError, match="Invalid text_depth: invalid_depth"):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={"row_data": {"source_id": "abc"}, "text_depth": "invalid_depth"},
         )
 
-    with pytest.raises(ValueError, match="Invalid paddle_output_format: invalid_format"):
+    with pytest.raises(ValueError, match="Invalid table_output_format: invalid_format"):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
-            extractor_config={"row_data": {"source_id": "abc"}, "paddle_output_format": "invalid_format"},
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
+            extractor_config={"row_data": {"source_id": "abc"}, "table_output_format": "invalid_format"},
         )
 
 
@@ -530,10 +541,11 @@ def test_pdfium_extractor_invalid_pdfium_config_raises(mock_pdf_doc, mock_extrac
     with pytest.raises(ValueError, match="`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance."):
         module_under_test.pdfium_extractor(
             io.BytesIO(),
-            True,
-            True,
-            True,
-            True,
-            True,
+            extract_text=True,
+            extract_images=True,
+            extract_infographics=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_page_as_image=True,
             extractor_config={"row_data": {"source_id": "abc"}, "pdfium_config": "not_a_dict"},
         )

@@ -16,9 +16,10 @@ import pandas as pd
 from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_version
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
-from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_paddle_output
+from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_ocr_output
 from nv_ingest_api.util.image_processing.table_and_chart import process_yolox_graphic_elements
-from nv_ingest_api.internal.primitives.nim.model_interface.paddle import PaddleOCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import OCRModelInterface
+from nv_ingest_api.internal.primitives.nim.model_interface.ocr import get_ocr_model_name
 from nv_ingest_api.internal.primitives.nim import NimClient
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import YoloxGraphicElementsModelInterface
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
@@ -62,7 +63,8 @@ def _filter_valid_chart_images(
 
 def _run_chart_inference(
     yolox_client: Any,
-    paddle_client: Any,
+    ocr_client: Any,
+    ocr_model_name: str,
     valid_arrays: List[np.ndarray],
     valid_images: List[str],
     trace_info: Dict,
@@ -70,28 +72,39 @@ def _run_chart_inference(
     """
     Run concurrent inference for chart extraction using YOLOX and Paddle.
 
-    Returns a tuple of (yolox_results, paddle_results).
+    Returns a tuple of (yolox_results, ocr_results).
     """
     data_yolox = {"images": valid_arrays}
-    data_paddle = {"base64_images": valid_images}
+    data_ocr = {"base64_images": valid_images}
+
+    future_yolox_kwargs = dict(
+        data=data_yolox,
+        model_name="yolox",
+        stage_name="chart_extraction",
+        max_batch_size=8,
+        trace_info=trace_info,
+    )
+    future_ocr_kwargs = dict(
+        data=data_ocr,
+        stage_name="chart_extraction",
+        max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+        trace_info=trace_info,
+    )
+    if ocr_model_name == "paddle":
+        future_ocr_kwargs.update(
+            model_name="paddle",
+        )
+    else:
+        future_ocr_kwargs.update(
+            model_name="scene_text",
+            input_names=["input", "merge_levels"],
+            dtypes=["FP32", "BYTES"],
+            merge_level="paragraph",
+        )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
-        future_yolox = executor.submit(
-            yolox_client.infer,
-            data=data_yolox,
-            model_name="yolox",
-            stage_name="chart_extraction",
-            max_batch_size=8,
-            trace_info=trace_info,
-        )
-        future_paddle = executor.submit(
-            paddle_client.infer,
-            data=data_paddle,
-            model_name="paddle",
-            stage_name="chart_extraction",
-            max_batch_size=1 if paddle_client.protocol == "grpc" else 2,
-            trace_info=trace_info,
-        )
+        future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
+        future_ocr = executor.submit(ocr_client.infer, **future_ocr_kwargs)
 
         try:
             yolox_results = future_yolox.result()
@@ -100,16 +113,16 @@ def _run_chart_inference(
             raise
 
         try:
-            paddle_results = future_paddle.result()
+            ocr_results = future_ocr.result()
         except Exception as e:
-            logger.error(f"Error calling paddle_client.infer: {e}", exc_info=True)
+            logger.error(f"Error calling ocr_client.infer: {e}", exc_info=True)
             raise
 
-    return yolox_results, paddle_results
+    return yolox_results, ocr_results
 
 
 def _validate_chart_inference_results(
-    yolox_results: Any, paddle_results: Any, valid_arrays: List[Any], valid_images: List[str]
+    yolox_results: Any, ocr_results: Any, valid_arrays: List[Any], valid_images: List[str]
 ) -> Tuple[List[Any], List[Any]]:
     """
     Ensure inference results are lists and have expected lengths.
@@ -117,21 +130,21 @@ def _validate_chart_inference_results(
     Raises:
       ValueError if results do not match expected types or lengths.
     """
-    if not (isinstance(yolox_results, list) and isinstance(paddle_results, list)):
-        raise ValueError("Expected list results from both yolox_client and paddle_client infer calls.")
+    if not (isinstance(yolox_results, list) and isinstance(ocr_results, list)):
+        raise ValueError("Expected list results from both yolox_client and ocr_client infer calls.")
 
     if len(yolox_results) != len(valid_arrays):
         raise ValueError(f"Expected {len(valid_arrays)} yolox results, got {len(yolox_results)}")
-    if len(paddle_results) != len(valid_images):
-        raise ValueError(f"Expected {len(valid_images)} paddle results, got {len(paddle_results)}")
-    return yolox_results, paddle_results
+    if len(ocr_results) != len(valid_images):
+        raise ValueError(f"Expected {len(valid_images)} ocr results, got {len(ocr_results)}")
+    return yolox_results, ocr_results
 
 
 def _merge_chart_results(
     base64_images: List[str],
     valid_indices: List[int],
     yolox_results: List[Any],
-    paddle_results: List[Any],
+    ocr_results: List[Any],
     initial_results: List[Tuple[str, Optional[Dict]]],
 ) -> List[Tuple[str, Optional[Dict]]]:
     """
@@ -140,10 +153,10 @@ def _merge_chart_results(
     For each valid image, processes the results from both inference calls and updates the
     corresponding entry in the results list.
     """
-    for idx, (yolox_res, paddle_res) in enumerate(zip(yolox_results, paddle_results)):
-        # Unpack paddle result into bounding boxes and text predictions.
-        bounding_boxes, text_predictions = paddle_res
-        yolox_elements = join_yolox_graphic_elements_and_paddle_output(yolox_res, bounding_boxes, text_predictions)
+    for idx, (yolox_res, ocr_res) in enumerate(zip(yolox_results, ocr_results)):
+        # Unpack ocr result into bounding boxes and text predictions.
+        bounding_boxes, text_predictions, _ = ocr_res
+        yolox_elements = join_yolox_graphic_elements_and_ocr_output(yolox_res, bounding_boxes, text_predictions)
         chart_content = process_yolox_graphic_elements(yolox_elements)
         original_index = valid_indices[idx]
         initial_results[original_index] = (base64_images[original_index], chart_content)
@@ -153,7 +166,8 @@ def _merge_chart_results(
 def _update_chart_metadata(
     base64_images: List[str],
     yolox_client: Any,
-    paddle_client: Any,
+    ocr_client: Any,
+    ocr_model_name: str,
     trace_info: Dict,
     worker_pool_size: int = 8,  # Not currently used.
 ) -> List[Tuple[str, Optional[Dict]]]:
@@ -172,28 +186,29 @@ def _update_chart_metadata(
     valid_images, valid_arrays, valid_indices, results = _filter_valid_chart_images(base64_images)
 
     # Run concurrent inference only for valid images.
-    yolox_results, paddle_results = _run_chart_inference(
+    yolox_results, ocr_results = _run_chart_inference(
         yolox_client=yolox_client,
-        paddle_client=paddle_client,
+        ocr_client=ocr_client,
+        ocr_model_name=ocr_model_name,
         valid_arrays=valid_arrays,
         valid_images=valid_images,
         trace_info=trace_info,
     )
 
     # Validate that the returned inference results are lists of the expected length.
-    yolox_results, paddle_results = _validate_chart_inference_results(
-        yolox_results, paddle_results, valid_arrays, valid_images
+    yolox_results, ocr_results = _validate_chart_inference_results(
+        yolox_results, ocr_results, valid_arrays, valid_images
     )
 
     # Merge the inference results into the results list.
-    return _merge_chart_results(base64_images, valid_indices, yolox_results, paddle_results, results)
+    return _merge_chart_results(base64_images, valid_indices, yolox_results, ocr_results, results)
 
 
 def _create_clients(
     yolox_endpoints: Tuple[str, str],
     yolox_protocol: str,
-    paddle_endpoints: Tuple[str, str],
-    paddle_protocol: str,
+    ocr_endpoints: Tuple[str, str],
+    ocr_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
     # Obtain yolox_version
@@ -214,9 +229,9 @@ def _create_clients(
         yolox_version = None  # Default to the latest version
 
     yolox_model_interface = YoloxGraphicElementsModelInterface(yolox_version=yolox_version)
-    paddle_model_interface = PaddleOCRModelInterface()
+    ocr_model_interface = OCRModelInterface()
 
-    logger.debug(f"Inference protocols: yolox={yolox_protocol}, paddle={paddle_protocol}")
+    logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")
 
     yolox_client = create_inference_client(
         endpoints=yolox_endpoints,
@@ -225,14 +240,14 @@ def _create_clients(
         infer_protocol=yolox_protocol,
     )
 
-    paddle_client = create_inference_client(
-        endpoints=paddle_endpoints,
-        model_interface=paddle_model_interface,
+    ocr_client = create_inference_client(
+        endpoints=ocr_endpoints,
+        model_interface=ocr_model_interface,
         auth_token=auth_token,
-        infer_protocol=paddle_protocol,
+        infer_protocol=ocr_protocol,
     )
 
-    return yolox_client, paddle_client
+    return yolox_client, ocr_client
 
 
 def extract_chart_data_from_image_internal(
@@ -275,13 +290,17 @@ def extract_chart_data_from_image_internal(
         return df_extraction_ledger, execution_trace_log
 
     endpoint_config = extraction_config.endpoint_config
-    yolox_client, paddle_client = _create_clients(
+    yolox_client, ocr_client = _create_clients(
         endpoint_config.yolox_endpoints,
         endpoint_config.yolox_infer_protocol,
-        endpoint_config.paddle_endpoints,
-        endpoint_config.paddle_infer_protocol,
+        endpoint_config.ocr_endpoints,
+        endpoint_config.ocr_infer_protocol,
         endpoint_config.auth_token,
     )
+
+    # Get the grpc endpoint to determine the model if needed
+    ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
+    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
 
     try:
         # 1) Identify rows that meet criteria in a single pass
@@ -323,7 +342,8 @@ def extract_chart_data_from_image_internal(
         bulk_results = _update_chart_metadata(
             base64_images=base64_images,
             yolox_client=yolox_client,
-            paddle_client=paddle_client,
+            ocr_client=ocr_client,
+            ocr_model_name=ocr_model_name,
             worker_pool_size=endpoint_config.workers_per_progress_engine,
             trace_info=execution_trace_log,
         )
@@ -344,8 +364,8 @@ def extract_chart_data_from_image_internal(
 
     finally:
         try:
-            if paddle_client is not None:
-                paddle_client.close()
+            if ocr_client is not None:
+                ocr_client.close()
             if yolox_client is not None:
                 yolox_client.close()
 

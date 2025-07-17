@@ -269,8 +269,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             self._logger.debug("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
                 self._logger.debug("Message is a BaseModel with response_code: %s", job.response_code)
-                if job.response_code != 0:
-                    self._logger.debug("Message response_code != 0, returning None")
+                if job.response_code not in (0, 2):
+                    self._logger.debug("Message received with unhandled response_code, returning None")
+                    return None
+                if job.response_code == 2:
+                    self._logger.debug("Message response_code == 2, returning None")
                     return None
                 job = json.loads(job.response)
             self._logger.debug("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
