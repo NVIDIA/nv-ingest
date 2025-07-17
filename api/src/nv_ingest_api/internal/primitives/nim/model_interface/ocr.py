@@ -178,6 +178,7 @@ class OCRModelInterface(ModelInterface):
                 else:
                     merge_levels = np.array([[merge_level] * len(batched_input)], dtype="object")
                     batches.append([batched_input, merge_levels])
+
                 batch_data_list.append({"image_arrays": orig_chunk, "image_dims": dims_chunk})
             return batches, batch_data_list
 
@@ -536,9 +537,7 @@ def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name="paddle"):
 
     # 2. If no gRPC endpoint is provided, fall back to the default immediately.
     if not ocr_grpc_endpoint:
-        logger.debug(
-            f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'."
-        )
+        logger.debug(f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'.")
         return default_model_name
 
     # 3. Attempt to query the gRPC endpoint to discover the model name.

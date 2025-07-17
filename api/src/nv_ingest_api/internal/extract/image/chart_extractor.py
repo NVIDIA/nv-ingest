@@ -96,7 +96,7 @@ def _run_chart_inference(
     else:
         future_ocr_kwargs.update(
             model_name="scene_text",
-            input_name=["input", "merge_levels"],
+            input_names=["input", "merge_levels"],
             dtypes=["FP32", "BYTES"],
             merge_level="paragraph",
         )
