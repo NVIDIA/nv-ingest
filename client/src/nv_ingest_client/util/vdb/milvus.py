@@ -325,6 +325,7 @@ def create_nvingest_index_params(
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false" if gpu_search else "true",
                 },
             )
