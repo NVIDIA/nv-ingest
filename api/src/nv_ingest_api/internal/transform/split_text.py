@@ -141,14 +141,19 @@ def transform_text_split_and_tokenize_internal(
 
     model_predownload_path = os.environ.get("MODEL_PREDOWNLOAD_PATH")
 
-    if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
-        tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
-    ):
-        tokenizer_identifier = os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/")
-    elif os.path.exists(os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")) and (
-        tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"
-    ):
-        tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
+    if model_predownload_path is not None:
+        if os.path.exists(os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/tokenizer.json")) and (
+            tokenizer_identifier is None or tokenizer_identifier == "meta-llama/Llama-3.2-1B"
+        ):
+            tokenizer_identifier = os.path.join(model_predownload_path, "llama-3.2-1b/tokenizer/")
+        elif os.path.exists(
+            os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/tokenizer.json")
+        ) and (tokenizer_identifier is None or tokenizer_identifier == "intfloat/e5-large-unsupervised"):
+            tokenizer_identifier = os.path.join(model_predownload_path, "e5-large-unsupervised/tokenizer/")
+
+    # Defaulto to intfloat/e5-large-unsupervised if no tokenizer predownloaded or specified
+    if tokenizer_identifier is None:
+        tokenizer_identifier = "intfloat/e5-large-unsupervised"
 
     tokenizer_model = AutoTokenizer.from_pretrained(tokenizer_identifier, token=hf_access_token)
 
