@@ -11,7 +11,7 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPip
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
-from nv_ingest.pipeline.pipeline_schema import PipelineConfig, StageConfig, StageType
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageConfig, StageType
 from nv_ingest_api.util.imports.dynamic_resolvers import resolve_actor_class_from_path
 from nv_ingest_api.util.introspection.class_inspect import find_pydantic_config_schema
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
@@ -29,7 +29,7 @@ class IngestPipeline:
 
     Attributes
     ----------
-    _config : PipelineConfig
+    _config : PipelineConfigSchema
         The declarative configuration for the pipeline.
     _pipeline : RayPipeline
         The underlying RayPipeline instance being constructed.
@@ -38,20 +38,20 @@ class IngestPipeline:
 
     """
 
-    def __init__(self, config: PipelineConfig, system_resource_probe: Optional[SystemResourceProbe] = None):
+    def __init__(self, config: PipelineConfigSchema, system_resource_probe: Optional[SystemResourceProbe] = None):
         """
         Initializes the IngestPipeline.
 
         Parameters
         ----------
-        config : PipelineConfig
+        config : PipelineConfigSchema
             The pipeline configuration object.
         system_resource_probe : Optional[SystemResourceProbe], optional
             A probe for system resources. If not provided, a default instance
             will be created. Defaults to None.
         """
         logger.debug(f"Initializing IngestPipeline for '{config.name}'.")
-        self._config: PipelineConfig = config
+        self._config: PipelineConfigSchema = config
         self._pipeline: RayPipeline = RayPipeline()
         self._system_resource_probe: SystemResourceProbe = system_resource_probe or SystemResourceProbe()
         self._is_built: bool = False

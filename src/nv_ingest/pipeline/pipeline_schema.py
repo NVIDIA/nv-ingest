@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 from enum import Enum
-from typing import Dict, Any, List, Optional
+from typing import Dict, Any, List, Optional, Set
 from pydantic import BaseModel, Field, Extra, root_validator, field_validator
 
 
@@ -142,7 +142,7 @@ class EdgeConfig(BaseModel):
         extra = Extra.forbid
 
 
-class PipelineConfig(BaseModel):
+class PipelineConfigSchema(BaseModel):
     """
     Root configuration model for an ingestion pipeline.
 
@@ -167,12 +167,15 @@ class PipelineConfig(BaseModel):
     edges: List[EdgeConfig] = Field(..., description="List of all edges connecting the stages.")
 
     @field_validator("stages", "edges")
-    @classmethod
     def check_not_empty(cls, v: list) -> list:
         """Validates that the list is not empty."""
         if not v:
-            raise ValueError("list must not be empty")
+            raise ValueError("must not be empty")
         return v
+
+    def get_phases(self) -> Set[PipelinePhase]:
+        """Returns a set of all unique phases in the pipeline."""
+        return {stage.phase for stage in self.stages}
 
     class Config:
         extra = Extra.forbid

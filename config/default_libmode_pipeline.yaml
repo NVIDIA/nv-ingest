@@ -1,0 +1,188 @@
+# Default Ingestion Pipeline Configuration for Library Mode
+# This file uses the defaults defined in PipelineCreationSchema in pipeline_runners.py
+
+name: "NVIngest default libmode pipeline"
+description: "This is the default ingestion pipeline for NVIngest in library mode"
+stages:
+  # Source
+  - name: "source_stage"
+    type: "source"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source:MessageBrokerTaskSourceStage"
+    config:
+      broker_client:
+        client_type: "simple"
+        host: "localhost"
+        port: 7671
+      task_queue: "ingest_task_queue"
+      poll_interval: 0.1
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+
+  # Pre-processing
+  - name: "metadata_injector"
+    type: "stage"
+    phase: 0  # PRE_PROCESSING
+    actor: "nv_ingest.framework.orchestration.ray.stages.injectors.metadata_injector:MetadataInjectionStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "source_stage"
+
+  # Primitive Extraction
+  - name: "pdf_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
+    config:
+      nemoretriever_parse_config:
+        auth_token: ""
+        nemoretriever_parse_endpoints: [ "", "https://integrate.api.nvidia.com/v1/chat/completions" ]
+        nemoretriever_parse_infer_protocol: "http"
+        nemoretriever_parse_model_name: "nvidia/nemoretriever-parse"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 16
+
+  - name: "audio_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor:AudioExtractorStage"
+    config:
+      audio_extraction_config:
+        audio_endpoints: [ "grpc.nvcf.nvidia.com:443", "" ]
+        function_id: "1598d209-5e27-4d3c-8079-4751568b1081"
+        audio_infer_protocol: "grpc"
+        auth_token: ""
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  # Transforms and Synthesis
+  - name: "text_splitter"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
+    config:
+      chunk_size: 512
+      chunk_overlap: 20
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 3
+
+  - name: "text_embedder"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
+    config:
+      api_key: ""
+      embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: "https://integrate.api.nvidia.com/v1"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+    runs_after:
+      - "text_splitter"
+
+  - name: "image_caption"
+    type: "stage"
+    phase: 3  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
+    config:
+      api_key: ""
+      endpoint_url: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
+      model_name: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      prompt: "Caption the content of this image:"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+
+  # Storage and Output
+  - name: "embedding_storage"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+
+  - name: "broker_response"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
+    config:
+      broker_client:
+        client_type: "simple"
+        host: "localhost"
+        port: 7671
+    replicas:
+      cpu_count_min: 1
+      cpu_count_max: 2
+
+  # Telemetry and Drain
+  - name: "otel_tracer"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
+    config:
+      otel_endpoint: "localhost:4317"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "broker_response"
+
+  - name: "drain"
+    type: "sink"
+    phase: 5
+    actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
+    config: {}
+    replicas:
+      cpu_count_min: 1
+      cpu_count_max: 1
+    runs_after:
+      - "otel_tracer"
+
+edges:
+  # Intake
+  - from: "source_stage"
+    to: "metadata_injector"
+    queue_size: 32
+
+  # Document Extractors
+  - from: "metadata_injector"
+    to: "pdf_extractor"
+    queue_size: 32
+  - from: "pdf_extractor"
+    to: "audio_extractor"
+    queue_size: 32
+  - from: "audio_extractor"
+    to: "text_splitter"
+    queue_size: 32
+
+  # Primitive Transforms
+  - from: "text_splitter"
+    to: "text_embedder"
+    queue_size: 32
+  - from: "text_embedder"
+    to: "image_caption"
+    queue_size: 32
+  - from: "image_caption"
+    to: "embedding_storage"
+    queue_size: 32
+
+  # Primitive Storage
+  - from: "embedding_storage"
+    to: "broker_response"
+    queue_size: 32
+
+  # Response and Telemetry
+  - from: "broker_response"
+    to: "otel_tracer"
+    queue_size: 32
+  - from: "otel_tracer"
+    to: "drain"
+    queue_size: 32

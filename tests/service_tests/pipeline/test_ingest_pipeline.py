@@ -6,12 +6,12 @@ import pytest
 from pydantic import ValidationError
 
 from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
-from nv_ingest.pipeline.pipeline_schema import PipelineConfig, StageConfig, EdgeConfig
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageConfig, EdgeConfig
 
 
 def test_dependency_on_non_existent_stage_raises_error():
     """Verify that a pipeline with a dependency on a non-existent stage fails validation."""
-    config = PipelineConfig(
+    config = PipelineConfigSchema(
         name="test_pipeline",
         description="A test pipeline",
         stages=[
@@ -27,7 +27,7 @@ def test_dependency_on_non_existent_stage_raises_error():
 
 def test_direct_circular_dependency_raises_error():
     """Verify that a direct circular dependency (A -> B -> A) is detected."""
-    config = PipelineConfig(
+    config = PipelineConfigSchema(
         name="test_pipeline",
         description="A test pipeline",
         stages=[
@@ -43,7 +43,7 @@ def test_direct_circular_dependency_raises_error():
 
 def test_indirect_circular_dependency_raises_error():
     """Verify that an indirect circular dependency (A -> B -> C -> A) is detected."""
-    config = PipelineConfig(
+    config = PipelineConfigSchema(
         name="test_pipeline",
         description="A test pipeline",
         stages=[
@@ -65,7 +65,7 @@ def test_valid_diamond_dependency_passes(monkeypatch):
         "nv_ingest.pipeline.ingest_pipeline.resolve_actor_class_from_path", lambda *args, **kwargs: object
     )
 
-    config = PipelineConfig(
+    config = PipelineConfigSchema(
         name="test_pipeline",
         description="A test pipeline",
         stages=[

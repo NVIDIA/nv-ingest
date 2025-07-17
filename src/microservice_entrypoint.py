@@ -7,13 +7,12 @@ import logging
 import os
 
 import click
-from pydantic import ValidationError
+import envyaml
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
-from nv_ingest_api.util.converters.containers import merge_dict
-from nv_ingest_api.util.logging.configuration import LogLevel
-from nv_ingest_api.util.logging.configuration import configure_logging
-from nv_ingest_api.util.schema.schema_validator import validate_schema
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
+from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config, dump_pipeline_to_graphviz
 
 _env_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
 if _env_log_level.upper() == "DEFAULT":
@@ -27,23 +26,21 @@ logger = logging.getLogger(__name__)
 
 @click.command()
 @click.option(
-    "--ingest_config_path",
+    "--pipeline-config-path",
     type=str,
-    envvar="NV_INGEST_CONFIG_PATH",
-    help="Path to the JSON configuration file.",
-    hidden=True,
+    default="config/default_pipeline.yaml",
+    envvar="NV_INGEST_PIPELINE_CONFIG_PATH",
+    help="Path to the YAML configuration file for the ingestion pipeline.",
 )
-@click.option("--edge_buffer_size", default=32, type=int, help="Batch size for the pipeline.")
 @click.option(
-    "--log_level",
+    "--log-level",
     type=click.Choice([level.value for level in LogLevel], case_sensitive=False),
-    default=os.environ.get("INGEST_LOG_LEVEL", "INFO"),
+    default=os.environ.get("INGEST_LOG_LEVEL", "DEFAULT"),
     show_default=True,
-    help="Override the log level (optional).",
+    help="Logging level for the application.",
 )
 def cli(
-    ingest_config_path: str,
-    edge_buffer_size: int,
+    pipeline_config_path: str,
     log_level: str,
 ):
     """
@@ -55,27 +52,28 @@ def cli(
         configure_logging(log_level)
         logger.info(f"Log level overridden by CLI to {log_level}")
 
-    cli_ingest_config = {}  # Placeholder for future CLI overrides
-
     try:
-        if ingest_config_path:
-            ingest_config = validate_schema(ingest_config_path, PipelineCreationSchema)
-        else:
-            ingest_config = {}
+        logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
+        raw_config = envyaml.load(pipeline_config_path)
+        pipeline_config = PipelineConfigSchema(**raw_config)
+        logger.info("Pipeline configuration loaded and validated.")
 
-        final_ingest_config = merge_dict(ingest_config, cli_ingest_config)
+        # Pretty print the pipeline structure to the log
+        logger.info("\n" + pretty_print_pipeline_config(pipeline_config))
 
-        validated_config = PipelineCreationSchema(**final_ingest_config)  # noqa
-        logger.info("Configuration loaded and validated.")
+        # Generate visualization
+        dump_pipeline_to_graphviz(pipeline_config, "./logs/running_pipeline.dot")
 
-    except ValidationError as e:
-        logger.error(f"Validation error: {e}")
-        click.echo(f"Validation error: {e}")
+    except FileNotFoundError:
+        logger.error(f"Configuration file not found at: {pipeline_config_path}")
+        raise
+    except Exception as e:
+        logger.error(f"Error parsing or validating YAML configuration: {e}")
         raise
 
-    logger.debug(f"Ingest Configuration:\n{json.dumps(final_ingest_config, indent=2)}")
+    logger.debug(f"Ingest Configuration:\n{json.dumps(pipeline_config.model_dump(), indent=2)}")
 
-    run_pipeline(validated_config)
+    run_pipeline(pipeline_config)
 
 
 if __name__ == "__main__":

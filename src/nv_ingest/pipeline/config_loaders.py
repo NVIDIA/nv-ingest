@@ -4,10 +4,10 @@
 
 from envyaml import EnvYAML
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfig
+from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 
 
-def load_pipeline_config(config_path: str) -> PipelineConfig:
+def load_pipeline_config(config_path: str) -> PipelineConfigSchema:
     """
     Loads a pipeline configuration file, substituting environment variables.
 
@@ -24,4 +24,4 @@ def load_pipeline_config(config_path: str) -> PipelineConfig:
     raw_config: EnvYAML = EnvYAML(yaml_file=config_path, include_environment=False, flatten=False)
 
     # Pydantic validates the loaded data against the schema
-    return PipelineConfig(**raw_config)
+    return PipelineConfigSchema(**raw_config)

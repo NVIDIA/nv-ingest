@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from nv_ingest.pipeline.pipeline_schema import (
     EdgeConfig,
-    PipelineConfig,
+    PipelineConfigSchema,
     PipelinePhase,
     ReplicaConfig,
     StageConfig,
@@ -191,7 +191,7 @@ def test_pipeline_config_valid():
         ],
         "edges": [{"from": "a", "to": "b"}],
     }
-    config = PipelineConfig(**config_data)
+    config = PipelineConfigSchema(**config_data)
     assert len(config.stages) == 2
     assert isinstance(config.stages[0], StageConfig)
     assert len(config.edges) == 1
@@ -201,28 +201,28 @@ def test_pipeline_config_valid():
 def test_pipeline_config_missing_stages_fails():
     """Tests that validation fails if 'stages' field is missing."""
     with pytest.raises(ValidationError):
-        PipelineConfig(edges=[{"from": "a", "to": "b"}])
+        PipelineConfigSchema(edges=[{"from": "a", "to": "b"}])
 
 
 def test_pipeline_config_missing_edges_fails():
     """Tests that validation fails if 'edges' field is missing."""
     with pytest.raises(ValidationError):
-        PipelineConfig(stages=[{"name": "a", "actor": "actor.a", "phase": 0}])
+        PipelineConfigSchema(stages=[{"name": "a", "actor": "actor.a", "phase": 0}])
 
 
 def test_pipeline_config_empty_stages_fails():
     """Tests that validation fails if 'stages' list is empty."""
     with pytest.raises(ValidationError):
-        PipelineConfig(stages=[], edges=[{"from": "a", "to": "b"}])
+        PipelineConfigSchema(stages=[], edges=[{"from": "a", "to": "b"}])
 
 
 def test_pipeline_config_empty_edges_fails():
     """Tests that validation fails if 'edges' list is empty."""
     with pytest.raises(ValidationError):
-        PipelineConfig(stages=[{"name": "a", "actor": "actor.a", "phase": 0}], edges=[])
+        PipelineConfigSchema(stages=[{"name": "a", "actor": "actor.a", "phase": 0}], edges=[])
 
 
 def test_pipeline_config_extra_fields_fails():
     """Tests that validation fails if extra fields are provided."""
     with pytest.raises(ValidationError):
-        PipelineConfig(stages=[], edges=[], extra_field="value")
+        PipelineConfigSchema(stages=[], edges=[], extra_field="value")
