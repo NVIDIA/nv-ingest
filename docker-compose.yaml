@@ -241,8 +241,8 @@ services:
     ports:
       # HTTP API
       - "7670:7670"
-      # Simple Broker
-      - "7671:7671"
+      # Simple Broker -- Uncomment if running SimpleBroker in the container
+      #- "7671:7671"
       # Ray Dashboards
       - "8265:8265"
     cap_add:
