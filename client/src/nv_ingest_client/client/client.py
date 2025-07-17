@@ -918,15 +918,12 @@ class NvIngestClient:
                     job_state.state = JobStateEnum.FAILED
                     raise  # Re-raise unexpected errors
 
-            elif response.response_code == 2:  # Job Not Ready (e.g., HTTP 202)
+            elif response.response_code == 2:  # Job Not Ready (e.g., HTTP 202, or r-2 from SimpleBroker)
                 # Raise TimeoutError to signal the calling retry loop in fetch_job_result
-                logger.debug(
-                    f"Job index {job_index} (Server ID: {server_job_id}) not ready (Response Code: 2). Signaling retry."
-                )
                 # Do not change job state here, remains SUBMITTED
                 raise TimeoutError(f"Job not ready: {response.response_reason}")
 
-            else:  # Failure from RestClient (response_code == 1, including 404, 400, 500, conn errors)
+            else:
                 # Log the failure reason from the ResponseSchema
                 error_msg = (
                     f"Terminal failure fetching result for client index {job_index} (Server ID: {server_job_id}). "
