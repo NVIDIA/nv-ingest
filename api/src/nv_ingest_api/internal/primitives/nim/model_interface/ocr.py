@@ -27,6 +27,8 @@ from nv_ingest_api.internal.primitives.nim.model_interface.helpers import (
 )
 from nv_ingest_api.util.image_processing.transforms import base64_to_numpy
 
+DEFAULT_OCR_MODEL_NAME = "paddle"
+
 logger = logging.getLogger(__name__)
 
 
@@ -525,7 +527,7 @@ class OCRModelInterface(ModelInterface):
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
-def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name="paddle"):
+def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name=DEFAULT_OCR_MODEL_NAME):
     """
     Determines the OCR model name by checking the environment, querying the gRPC endpoint,
     or falling back to a default.

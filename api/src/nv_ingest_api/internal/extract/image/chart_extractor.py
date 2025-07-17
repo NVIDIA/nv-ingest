@@ -298,8 +298,6 @@ def extract_chart_data_from_image_internal(
         endpoint_config.auth_token,
     )
 
-    # Default model name
-    ocr_model_name = "paddle"
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
     ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
