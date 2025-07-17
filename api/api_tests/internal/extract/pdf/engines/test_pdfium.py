@@ -531,7 +531,7 @@ def test_pdfium_extractor_invalid_config_raises(mock_pdf_doc, mock_extract_metad
             extract_tables=True,
             extract_charts=True,
             extract_page_as_image=True,
-            extractor_config={"row_data": {"source_id": "abc"}, "paddle_output_format": "invalid_format"},
+            extractor_config={"row_data": {"source_id": "abc"}, "table_output_format": "invalid_format"},
         )
 
 

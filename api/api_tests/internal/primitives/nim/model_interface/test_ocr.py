@@ -31,8 +31,8 @@ class TestOCRModelInterface(unittest.TestCase):
         # Make it return a predictable image array
         self.mock_base64_to_numpy.side_effect = lambda b64: np.zeros((100, 200, 3), dtype=np.uint8)
 
-        # Mock the preprocess_image_for_ocr function
-        self.preprocess_patcher = patch(f"{MODULE_UNDER_TEST}.preprocess_image_for_ocr")
+        # Mock the preprocess_image_for_paddle function
+        self.preprocess_patcher = patch(f"{MODULE_UNDER_TEST}.preprocess_image_for_paddle")
         self.mock_preprocess = self.preprocess_patcher.start()
         # Make it return a predictable processed array and metadata
         self.mock_preprocess.side_effect = lambda img, **kwargs: (
@@ -113,9 +113,7 @@ class TestOCRModelInterface(unittest.TestCase):
         batches, batch_data = self.model_interface.format_input(test_data, protocol="grpc", max_batch_size=1)
 
         # Check that preprocess_image_for_ocr was called
-        self.mock_preprocess.assert_called_once_with(
-            img_array, target_height=200, target_width=200, pad_how="bottom_right"
-        )
+        self.mock_preprocess.assert_called_once_with(img_array)
 
         # Check the format of the output
         self.assertEqual(len(batches), 1)  # Should have 1 batch
@@ -297,7 +295,7 @@ class TestOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -345,7 +343,7 @@ class TestOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 2)  # Should have 2 results (for 2 images)
@@ -381,7 +379,7 @@ class TestOCRModelInterface(unittest.TestCase):
             result = self.model_interface.parse_output(mock_response, protocol="grpc", data=data)
 
             # Verify that the method was called with the correct arguments
-            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"))
+            mock_extract.assert_called_once_with(mock_response, data.get("image_dims"), model_name="paddle")
 
             # Check the format of the result
             self.assertEqual(len(result), 1)  # Should have 1 result (for 1 image)
@@ -451,22 +449,16 @@ class TestOCRModelInterface(unittest.TestCase):
         ]
         text_predictions = ["Text 1", "Text 2"]
         conf_scores = [0.9, 0.8]
-        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20}]
+        dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20, "scale_factor": 0.5}]
 
-        bboxes, texts, conf_scores = OCRModelInterface._postprocess_ocr_response(
-            bounding_boxes,
-            text_predictions,
-            conf_scores,
-            dims,
-            img_index=0,
-        )
+        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, dims, img_index=0)
 
         # Check that bounding boxes were properly scaled
         self.assertEqual(len(bboxes), 2)
         self.assertEqual(len(texts), 2)
 
-        x_expected = (0.1 * 100) - 10
-        y_expected = (0.2 * 200) - 20
+        x_expected = ((0.1 * 100) - 10) / 0.5
+        y_expected = ((0.2 * 200) - 20) / 0.5
         self.assertAlmostEqual(bboxes[0][0][0], x_expected)
         self.assertAlmostEqual(bboxes[0][0][1], y_expected)
         self.assertAlmostEqual(conf_scores[0], 0.9)
@@ -479,9 +471,7 @@ class TestOCRModelInterface(unittest.TestCase):
         conf_scores = [0.9, 0.8]
         dims = [{"new_width": 100, "new_height": 200, "pad_width": 10, "pad_height": 20}]
 
-        bboxes, texts, conf_scores = OCRModelInterface._postprocess_ocr_response(
-            bounding_boxes, text_predictions, conf_scores, dims, img_index=0
-        )
+        bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, dims, img_index=0)
 
         # Check that only the valid box was processed
         self.assertEqual(len(bboxes), 1)
@@ -493,9 +483,10 @@ class TestOCRModelInterface(unittest.TestCase):
         """Test _postprocess_ocr_response static method with no dims."""
         bounding_boxes = [[[0.1, 0.2], [0.3, 0.2], [0.3, 0.4], [0.1, 0.4]]]
         text_predictions = ["Text 1"]
+        conf_scores = [0.9]
 
         with self.assertRaises(ValueError) as context:
-            OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, None)
+            OCRModelInterface._postprocess_ocr_response(bounding_boxes, text_predictions, conf_scores, None)
 
         self.assertTrue("No image_dims provided" in str(context.exception))
 
@@ -508,7 +499,7 @@ class TestOCRModelInterface(unittest.TestCase):
 
         # Mock the logger to check warning
         with patch(f"{MODULE_UNDER_TEST}.logger") as mock_logger:
-            bboxes, texts, conf_scores = OCRModelInterface._postprocess_ocr_response(
+            bboxes, texts, scores = OCRModelInterface._postprocess_ocr_response(
                 bounding_boxes, text_predictions, conf_scores, dims, img_index=1  # Out of range
             )
 
