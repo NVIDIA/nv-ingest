@@ -33,6 +33,7 @@ class NimClient:
         auth_token: Optional[str] = None,
         timeout: float = 120.0,
         max_retries: int = 5,
+        max_429_retries: int = 5,
     ):
         """
         Initialize the NimClient with the specified model interface, protocol, and server endpoints.
@@ -49,6 +50,10 @@ class NimClient:
             Authorization token for HTTP requests (default: None).
         timeout : float, optional
             Timeout for HTTP requests in seconds (default: 30.0).
+        max_retries : int, optional
+            The maximum number of retries for non-429 server-side errors (default: 5).
+        max_429_retries : int, optional
+            The maximum number of retries specifically for 429 errors (default: 10).
 
         Raises
         ------
@@ -62,6 +67,7 @@ class NimClient:
         self.auth_token = auth_token
         self.timeout = timeout  # Timeout for HTTP requests
         self.max_retries = max_retries
+        self.max_429_retries = max_429_retries
         self._grpc_endpoint, self._http_endpoint = endpoints
         self._max_batch_sizes = {}
         self._lock = threading.Lock()
@@ -297,6 +303,7 @@ class NimClient:
 
         base_delay = 2.0
         attempt = 0
+        retries_429 = 0
 
         while attempt < self.max_retries:
             try:
@@ -307,7 +314,21 @@ class NimClient:
 
                 # Check for server-side or rate-limit type errors
                 # e.g. 5xx => server error, 429 => too many requests
-                if status_code == 429 or status_code == 503 or (500 <= status_code < 600):
+                if status_code == 429:
+                    retries_429 += 1
+                    logger.warning(
+                        f"Received HTTP 429 (Too Many Requests) from {self.model_interface.name()}. "
+                        f"Attempt {retries_429} of {self.max_429_retries}."
+                    )
+                    if retries_429 >= self.max_429_retries:
+                        logger.error("Max retries for HTTP 429 exceeded.")
+                        response.raise_for_status()
+                    else:
+                        backoff_time = base_delay * (2**retries_429)
+                        time.sleep(backoff_time)
+                        continue  # Retry without incrementing the main attempt counter
+
+                if status_code == 503 or (500 <= status_code < 600):
                     logger.warning(
                         f"Received HTTP {status_code} ({response.reason}) from "
                         f"{self.model_interface.name()}. Attempt {attempt + 1} of {self.max_retries}."
