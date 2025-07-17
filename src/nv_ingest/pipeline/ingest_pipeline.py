@@ -4,9 +4,8 @@
 
 import logging
 import math
-from typing import Dict, Optional, Type
-
-from pydantic import ValidationError
+from typing import Dict, Optional, Type, List, Set
+import os
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
@@ -56,62 +55,60 @@ class IngestPipeline:
         self._pipeline: RayPipeline = RayPipeline()
         self._system_resource_probe: SystemResourceProbe = system_resource_probe or SystemResourceProbe()
         self._is_built: bool = False
+        self._built_stages: Set[str] = set()
 
-    def build(self) -> Dict[str, object]:
+    def build(self) -> None:
         """
         Builds the ingestion pipeline from the configuration.
 
-        This method iterates through all enabled stages and edges defined in the
-        configuration, resolves actor classes, validates configurations, calculates
-        resource allocations, and constructs the final Ray pipeline.
-
-        Returns
-        -------
-        Dict[str, object]
-            A dictionary of the built Ray actor handles, keyed by stage name.
+        This method constructs the RayPipeline by adding stages and edges as
+        defined in the pipeline configuration. It also validates dependencies
+        and ensures the pipeline is ready to be started.
 
         Raises
         ------
         ValueError
-            If a stage has an invalid type, a dependency is missing, or an actor
-            class cannot be resolved.
-        ValidationError
-            If a stage's configuration fails Pydantic validation.
-        AttributeError
-            If an actor class is missing or cannot be found.
+            If the pipeline configuration is invalid, such as containing
+            circular dependencies or references to non-existent stages.
         """
-        logger.info(f"Building ingestion pipeline '{self._config.name}'...")
-        total_cpus: float = self._system_resource_probe.get_effective_cores()
+        if self._is_built:
+            logger.warning("Pipeline is already built. Skipping build.")
+            return
 
-        # 1. Add all stages defined in the config
-        for stage_config in self._config.stages:
-            if not stage_config.enabled:
-                logger.info(f"Stage '{stage_config.name}' is disabled and will be skipped.")
-                continue
+        logger.info(f"Building pipeline '{self._config.name}'...")
 
-            try:
-                self._build_stage(stage_config, total_cpus)
-            except (ValueError, AttributeError, ValidationError) as e:
-                logger.error(f"Failed to build stage '{stage_config.name}': {e}", exc_info=True)
-                raise
-
-        # 2. Add all edges defined in the config
-        if self._config.edges:
-            for edge_config in self._config.edges:
-                self._pipeline.make_edge(edge_config.from_stage, edge_config.to_stage, edge_config.queue_size)
-                logger.info(f"Added edge from '{edge_config.from_stage}' to '{edge_config.to_stage}'.")
-
-        # 3. Validate all dependencies
+        # First, validate the overall structure and dependencies
         self._validate_dependencies()
 
-        # 4. Finalize the pipeline build and return the actors
-        built_actors = self._pipeline.build()
-        logger.info("Ingestion pipeline built successfully.")
+        # Then, build the stages
+        total_cpus = os.cpu_count() or 1
+        for stage_config in self._config.stages:
+            if not stage_config.enabled:
+                logger.info(f"Stage '{stage_config.name}' is disabled. Skipping.")
+                continue
+            self._build_stage(stage_config, total_cpus)
+
+        # Finally, add the edges
+        for edge_config in self._config.edges:
+            if not (edge_config.from_stage in self._built_stages and edge_config.to_stage in self._built_stages):
+                logger.warning(
+                    f"Skipping edge from '{edge_config.from_stage}' to '{edge_config.to_stage}' "
+                    f"because one or both stages are disabled or failed to build."
+                )
+                continue
+
+            self._pipeline.make_edge(
+                from_stage=edge_config.from_stage,
+                to_stage=edge_config.to_stage,
+                queue_size=edge_config.queue_size,
+            )
+
+        self._pipeline.build()
         self._is_built = True
-        return built_actors
+        logger.info(f"Pipeline '{self._config.name}' built successfully.")
 
     def _build_stage(self, stage_config: StageConfig, total_cpus: int) -> None:
-        """Helper method to build a single pipeline stage."""
+        """Builds and adds a single stage to the pipeline."""
         logger.debug(f"Building stage '{stage_config.name}'...")
         stage_type_enum = StageType(stage_config.type)
         expected_base_class: Optional[Type] = {
@@ -134,18 +131,17 @@ class IngestPipeline:
         replicas = stage_config.replicas
         min_replicas, max_replicas = 1, 1
         if replicas and total_cpus:
-            min_replicas = (
-                replicas.cpu_count_min
-                if replicas.cpu_count_min is not None
-                else math.floor(replicas.cpu_percent_min * total_cpus)
-            )
-            max_replicas = (
-                replicas.cpu_count_max
-                if replicas.cpu_count_max is not None
-                else math.floor(replicas.cpu_percent_max * total_cpus)
-            )
-            if max_replicas > 0:
-                max_replicas = max(1, max_replicas)
+            if replicas.cpu_count_min is not None:
+                min_replicas = replicas.cpu_count_min
+            elif replicas.cpu_percent_min is not None:
+                min_replicas = math.floor(replicas.cpu_percent_min * total_cpus)
+
+            if replicas.cpu_count_max is not None:
+                max_replicas = replicas.cpu_count_max
+            elif replicas.cpu_percent_max is not None:
+                max_replicas = math.ceil(replicas.cpu_percent_max * total_cpus)
+
+            # Ensure max_replicas is not less than min_replicas
             max_replicas = max(min_replicas, max_replicas)
 
         actor_kwarg = f"{stage_config.type.value}_actor"
@@ -157,26 +153,49 @@ class IngestPipeline:
             max_replicas=max_replicas,
         )
         logger.info(f"Added stage '{stage_config.name}' ({min_replicas}-{max_replicas} replicas) to the pipeline.")
+        self._built_stages.add(stage_config.name)
 
     def _validate_dependencies(self) -> None:
         """
-        Validates that all stage dependencies ('runs_after') are defined.
+        Validates stage dependencies, checking for undefined stages and circular dependencies.
 
         Raises
         ------
         ValueError
-            If a stage lists a dependency in `runs_after` that is not defined
-            in the pipeline configuration.
+            If a stage has an invalid dependency (points to a non-existent stage)
+            or if a circular dependency is detected among the stages.
         """
         all_stage_names = {s.name for s in self._config.stages}
-        for stage_config in self._config.stages:
-            if stage_config.runs_after:
-                for dep_name in stage_config.runs_after:
-                    if dep_name not in all_stage_names:
-                        raise ValueError(
-                            f"Stage '{stage_config.name}' has an invalid dependency: '{dep_name}'"
-                            f" is not a defined stage."
-                        )
+        dependency_graph = {s.name: s.runs_after for s in self._config.stages}
+
+        # First, check for dependencies on non-existent stages
+        for stage_name, deps in dependency_graph.items():
+            for dep_name in deps:
+                if dep_name not in all_stage_names:
+                    raise ValueError(
+                        f"Stage '{stage_name}' has an invalid dependency: '{dep_name}' is not a defined stage."
+                    )
+
+        # Second, check for circular dependencies using DFS
+        visiting = set()  # For nodes currently in the recursion stack for DFS
+        visited = set()  # For nodes that have been completely visited
+
+        for stage_name in all_stage_names:
+            if stage_name not in visited:
+                self._detect_cycle_util(stage_name, dependency_graph, visiting, visited)
+
+    def _detect_cycle_util(self, stage_name: str, graph: Dict[str, List[str]], visiting: set, visited: set) -> None:
+        """Utility function to detect cycles using DFS."""
+        visiting.add(stage_name)
+
+        for dependency in graph.get(stage_name, []):
+            if dependency in visiting:
+                raise ValueError(f"Circular dependency detected involving stage '{stage_name}' and '{dependency}'.")
+            if dependency not in visited:
+                self._detect_cycle_util(dependency, graph, visiting, visited)
+
+        visiting.remove(stage_name)
+        visited.add(stage_name)
 
     def start(self) -> None:
         """

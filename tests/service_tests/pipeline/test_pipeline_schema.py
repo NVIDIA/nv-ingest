@@ -183,6 +183,8 @@ def test_edge_config_extra_fields_fails():
 def test_pipeline_config_valid():
     """Tests that a valid PipelineConfig is parsed correctly."""
     config_data = {
+        "name": "test_pipeline",
+        "description": "A test pipeline",
         "stages": [
             {"name": "a", "actor": "actor.a", "phase": 0},
             {"name": "b", "actor": "actor.b", "phase": 1},
