@@ -298,15 +298,10 @@ def extract_chart_data_from_image_internal(
     )
 
     # Default model name
-    ocr_model_name = "scene_text"
-
+    ocr_model_name = "paddle"
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    if ocr_grpc_endpoint:
-        try:
-            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-        except Exception as e:
-            logger.warning("Failed to get ocr model name from the endpoint. %s", e)
+    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
 
     try:
         # 1) Identify rows that meet criteria in a single pass

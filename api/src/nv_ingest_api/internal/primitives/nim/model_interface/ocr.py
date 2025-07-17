@@ -524,11 +524,24 @@ class OCRModelInterface(ModelInterface):
 
 @multiprocessing_cache(max_calls=100)  # Cache results first to avoid redundant retries from backoff
 @backoff.on_predicate(backoff.expo, max_time=30)
-def get_ocr_model_name(ocr_grpc_endpoint, default_model_name="paddle"):
+def get_ocr_model_name(ocr_grpc_endpoint=None, default_model_name="paddle"):
+    """
+    Determines the OCR model name by checking the environment, querying the gRPC endpoint,
+    or falling back to a default.
+    """
+    # 1. Check for an explicit override from the environment variable first.
     ocr_model_name = os.getenv("OCR_MODEL_NAME", None)
     if ocr_model_name is not None:
         return ocr_model_name
 
+    # 2. If no gRPC endpoint is provided, fall back to the default immediately.
+    if not ocr_grpc_endpoint:
+        logger.debug(
+            f"No OCR gRPC endpoint provided. Falling back to default model name '{default_model_name}'."
+        )
+        return default_model_name
+
+    # 3. Attempt to query the gRPC endpoint to discover the model name.
     try:
         client = grpcclient.InferenceServerClient(ocr_grpc_endpoint)
         model_index = client.get_model_repository_index(as_json=True)

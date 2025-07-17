@@ -284,15 +284,10 @@ def extract_table_data_from_image_internal(
     )
 
     # Default model anme
-    ocr_model_name = "scene_text"
-
+    ocr_model_name = "paddle"
     # Get the grpc endpoint to determine the model if needed
     ocr_grpc_endpoint = endpoint_config.ocr_endpoints[0]
-    if ocr_grpc_endpoint:
-        try:
-            ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
-        except Exception as e:
-            logger.warning("Failed to get model name from grpc endpoint: %s", str(e))
+    ocr_model_name = get_ocr_model_name(ocr_grpc_endpoint)
 
     try:
         # 1) Identify rows that meet criteria (structured, subtype=table, table_metadata != None, content not empty)
