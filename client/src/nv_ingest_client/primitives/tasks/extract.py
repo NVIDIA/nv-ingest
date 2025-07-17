@@ -121,13 +121,15 @@ class ExtractTaskSchema(BaseModel):
     extract_page_as_image: bool = False
     extract_audio_params: Optional[Dict[str, Any]] = None
     text_depth: str = "document"
-    paddle_output_format: str = "pseudo_markdown"
+    paddle_output_format: Optional[str] = None
+    table_output_format: str = "pseudo_markdown"
 
     @model_validator(mode="after")
     @classmethod
     def set_default_extract_method(cls, values):
         document_type = values.document_type.lower()  # Ensure case-insensitive comparison
         extract_method = values.extract_method
+        paddle_output_format = values.paddle_output_format
 
         if document_type not in _DEFAULT_EXTRACTOR_MAP:
             raise ValueError(
@@ -137,6 +139,13 @@ class ExtractTaskSchema(BaseModel):
 
         if extract_method is None:
             values.extract_method = _DEFAULT_EXTRACTOR_MAP[document_type]
+
+        if paddle_output_format is not None:
+            logger.warning(
+                "`paddle_output_format` is deprecated and will be removed in a future release. "
+                "Please use `table_output_format` instead."
+            )
+            values.table_output_format = paddle_output_format
 
         return values
 
@@ -214,6 +223,7 @@ class ExtractTask(Task):
         extract_page_as_image: bool = False,
         text_depth: str = "document",
         paddle_output_format: str = "pseudo_markdown",
+        table_output_format: str = "pseudo_markdown",
     ) -> None:
         """
         Setup Extract Task Config
@@ -238,6 +248,7 @@ class ExtractTask(Task):
         self._extract_text = extract_text
         self._text_depth = text_depth
         self._paddle_output_format = paddle_output_format
+        self._table_output_format = table_output_format
 
     def __str__(self) -> str:
         """
@@ -256,7 +267,7 @@ class ExtractTask(Task):
         info += f"  extract images method: {self._extract_images_method}\n"
         info += f"  extract tables method: {self._extract_tables_method}\n"
         info += f"  text depth: {self._text_depth}\n"
-        info += f"  paddle_output_format: {self._paddle_output_format}\n"
+        info += f"  table_output_format: {self._table_output_format}\n"
 
         if self._extract_images_params:
             info += f"  extract images params: {self._extract_images_params}\n"
@@ -278,7 +289,7 @@ class ExtractTask(Task):
             "extract_infographics": self._extract_infographics,
             "extract_page_as_image": self._extract_page_as_image,
             "text_depth": self._text_depth,
-            "paddle_output_format": self._paddle_output_format,
+            "table_output_format": self._table_output_format,
         }
         if self._extract_images_params:
             extract_params.update(
