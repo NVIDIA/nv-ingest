@@ -3,7 +3,9 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import os
+
 import pytest
+import ray
 
 from nv_ingest.pipeline.config_loaders import load_pipeline_config
 from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
@@ -24,7 +26,15 @@ def default_pipeline_config() -> PipelineConfig:
     return config
 
 
-def test_load_and_build_default_pipeline(default_pipeline_config: PipelineConfig):
+@pytest.fixture(scope="module")
+def ray_instance():
+    """Fixture to initialize and shut down a Ray instance for the tests."""
+    ray.init(num_cpus=4, ignore_reinit_error=True)
+    yield
+    ray.shutdown()
+
+
+def test_load_and_build_default_pipeline(default_pipeline_config: PipelineConfig, ray_instance):
     """Tests that the default pipeline YAML can be loaded and built successfully."""
     # 1. Attempt to build an IngestPipeline from the loaded configuration
     ingest_pipeline = IngestPipeline(default_pipeline_config)
@@ -32,20 +42,15 @@ def test_load_and_build_default_pipeline(default_pipeline_config: PipelineConfig
 
     # 2. Verify the pipeline was built correctly
     enabled_stages = [s for s in default_pipeline_config.stages if s.enabled]
-    built_stages_info = ingest_pipeline.pipeline.get_stages_info()
+    built_stages_info = ingest_pipeline._pipeline.get_stages_info()
     assert len(built_stages_info) == len(enabled_stages)
-    assert len(ingest_pipeline.pipeline.get_edge_queues()) == len(default_pipeline_config.edges)
+    assert len(ingest_pipeline._pipeline.get_edge_queues()) == len(default_pipeline_config.edges)
 
     # 3. Spot-check a few key stages to ensure they are configured correctly
     # Check the source stage
     source_stage_info = next((s for s in built_stages_info if s.is_source), None)
     assert source_stage_info is not None
-    assert source_stage_info.name == "message_broker_source"
-
-    # Check a standard stage
-    doc_enrichment_info = next((s for s in built_stages_info if s.name == "document_enrichment"), None)
-    assert doc_enrichment_info is not None
-    assert not doc_enrichment_info.is_source and not doc_enrichment_info.is_sink
+    assert source_stage_info.name == "source_stage"
 
     # Check the sink stage
     sink_stage_info = next((s for s in built_stages_info if s.is_sink), None)

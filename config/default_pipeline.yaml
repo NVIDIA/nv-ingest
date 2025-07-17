@@ -49,7 +49,7 @@ stages:
         auth_token: $NGC_API_KEY|""
         nemoretriever_parse_endpoints: [
           $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|""
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
         ]
         nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
         nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
@@ -69,7 +69,7 @@ stages:
     config:
       audio_extraction_config:
         audio_endpoints: [
-          $AUDIO_GRPC_ENDPOINT|"",
+          $AUDIO_GRPC_ENDPOINT|"audio:50051",
           $AUDIO_HTTP_ENDPOINT|""
         ]
         function_id: $AUDIO_FUNCTION_ID|""
@@ -85,8 +85,11 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor:DocxExtractorStage"
     config:
       docx_extraction_config:
-        yolox_endpoints: [$YOLOX_GRPC_ENDPOINT|"", $YOLOX_HTTP_ENDPOINT|""]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|""
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -98,8 +101,11 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
     config:
       pptx_extraction_config:
-        yolox_endpoints: [$YOLOX_GRPC_ENDPOINT|"", $YOLOX_HTTP_ENDPOINT|""]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|""
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -111,8 +117,11 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor:ImageExtractorStage"
     config:
       image_extraction_config:
-        yolox_endpoints: [$YOLOX_GRPC_ENDPOINT|"", $YOLOX_HTTP_ENDPOINT|""]
-        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
+          $YOLOX_HTTP_ENDPOINT|""
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -133,8 +142,11 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
     config:
       endpoint_config:
-        paddle_endpoints: [$PADDLE_GRPC_ENDPOINT|"", $PADDLE_HTTP_ENDPOINT|""]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|http
+        paddle_endpoints: [
+          $PADDLE_GRPC_ENDPOINT|"graphic-elements:8001",
+          $PADDLE_HTTP_ENDPOINT|""
+        ]
+        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -147,15 +159,15 @@ stages:
     config:
       endpoint_config:
         yolox_endpoints: [
-          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"",
+          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"table-structure:8001",
           $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|""
         ]
-        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|grpc
         paddle_endpoints: [
-          $PADDLE_GRPC_ENDPOINT|"",
+          $PADDLE_GRPC_ENDPOINT|"paddle:8001",
           $PADDLE_HTTP_ENDPOINT|""
         ]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|http
+        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -168,12 +180,15 @@ stages:
     config:
       endpoint_config:
         yolox_endpoints: [
-          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"",
+          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"graphic-elements:8001",
           $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|""
         ]
-        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|http
-        paddle_endpoints: [$PADDLE_GRPC_ENDPOINT|"", $PADDLE_HTTP_ENDPOINT|""]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|http
+        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|grpc
+        paddle_endpoints: [
+          $PADDLE_GRPC_ENDPOINT|"paddle:8001",
+          $PADDLE_HTTP_ENDPOINT|""
+        ]
+        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -234,10 +249,9 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
-      endpoint_url: $VLM_CAPTION_ENDPOINT|"localhost:5000"
+      endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
       model_name: $VLM_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
-      vlm_infer_protocol: $VLM_INFER_PROTOCOL|http
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
