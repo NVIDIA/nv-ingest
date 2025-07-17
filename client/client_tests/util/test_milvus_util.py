@@ -365,6 +365,7 @@ def test_pull_text_length_limit_without_page_number(caplog):
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false",
                 }
             },
@@ -420,6 +421,7 @@ def test_pull_text_length_limit_without_page_number(caplog):
                     "intermediate_graph_degree": 128,
                     "graph_degree": 100,
                     "build_algo": "NN_DESCENT",
+                    "cache_dataset_on_device": "true",
                     "adapt_for_cpu": "false",
                 },
                 "sparse_index": {
