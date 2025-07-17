@@ -224,6 +224,7 @@ class OCRModelInterface(ModelInterface):
         response: Any,
         protocol: str,
         data: Optional[Dict[str, Any]] = None,
+        model_name: str = "paddle",
         **kwargs: Any,
     ) -> Any:
         """
@@ -253,7 +254,6 @@ class OCRModelInterface(ModelInterface):
         """
         # Retrieve image dimensions if available
         dims: Optional[List[Tuple[int, int]]] = data.get("image_dims") if data else None
-        model_name: str = kwargs.get("model_name", "paddle")
 
         if protocol == "grpc":
             logger.debug("Parsing output from gRPC OCR model (batched).")

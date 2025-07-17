@@ -144,7 +144,9 @@ class NimClient:
         else:
             raise ValueError("Invalid protocol specified. Must be 'grpc' or 'http'.")
 
-        parsed_output = self.model_interface.parse_output(response, protocol=self.protocol, data=batch_data, **kwargs)
+        parsed_output = self.model_interface.parse_output(
+            response, protocol=self.protocol, data=batch_data, model_name=model_name, **kwargs
+        )
         return parsed_output, batch_data
 
     def try_set_max_batch_size(self, model_name, model_version: str = ""):
