@@ -30,7 +30,6 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
     YOLOX_PAGE_IMAGE_FORMAT,
-    get_yolox_model_name,
     YoloxPageElementsModelInterface,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
@@ -58,7 +57,7 @@ logger = logging.getLogger(__name__)
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     yolox_client,
-    yolox_model_name: str = "yolox",
+    yolox_model_name: str = "yolox_ensemble",
     execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
@@ -106,10 +105,13 @@ def _extract_page_elements_using_image_ensemble(
         # Perform inference using the NimClient.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name=yolox_model_name,
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
             trace_info=execution_trace_log,
             stage_name="pdf_extraction",
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
         )
 
         # Process results: iterate over each image's inference output.
@@ -271,6 +273,7 @@ def _extract_page_elements(
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
+    yolox_model_name: str = "yolox_ensemble",
     execution_trace_log=None,
 ) -> list:
     """
@@ -304,6 +307,8 @@ def _extract_page_elements(
         Protocol to use for inference (either "http" or "grpc").
     auth_token : Optional[str], default=None
         Authentication token for the inference service.
+    yolox_model_name : str, default="yolox"
+        The name of the YOLOX model to use for inference.
     execution_trace_log : optional
         List for accumulating execution trace information.
 
@@ -316,17 +321,6 @@ def _extract_page_elements(
     yolox_client = None
 
     try:
-        # Default model name
-        yolox_model_name = "yolox"
-
-        # Get the HTTP endpoint to determine the model name if needed
-        yolox_http_endpoint = yolox_endpoints[1]
-        if yolox_http_endpoint:
-            try:
-                yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
-            except Exception as e:
-                logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
-
         # Create the model interface
         model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
 

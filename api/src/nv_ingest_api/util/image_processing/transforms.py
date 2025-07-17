@@ -209,6 +209,7 @@ def pad_image(
     target_height: int = DEFAULT_MAX_HEIGHT,
     background_color: int = 255,
     dtype=np.uint8,
+    how: str = "center",
 ) -> Tuple[np.ndarray, Tuple[int, int]]:
     """
     Pads a NumPy array representing an image to the specified target dimensions.
@@ -216,6 +217,8 @@ def pad_image(
     If the target dimensions are smaller than the image dimensions, no padding will be applied
     in that dimension. If the target dimensions are larger, the image will be centered within the
     canvas of the specified target size, with the remaining space filled with white padding.
+
+    The padding can be done around the center (how="center"), or to the bottom right (how="bottom_right").
 
     Parameters
     ----------
@@ -225,6 +228,8 @@ def pad_image(
         The desired target width of the padded image. Defaults to DEFAULT_MAX_WIDTH.
     target_height : int, optional
         The desired target height of the padded image. Defaults to DEFAULT_MAX_HEIGHT.
+    how : str, optional
+        The method to pad the image. Defaults to "center".
 
     Returns
     -------
@@ -249,17 +254,23 @@ def pad_image(
     """
     height, width = array.shape[:2]
 
-    # Determine the padding needed, if any, while ensuring no padding is applied if the target is smaller
-    pad_height = max((target_height - height) // 2, 0)
-    pad_width = max((target_width - width) // 2, 0)
-
     # Determine final canvas size (may be equal to original if target is smaller)
     final_height = max(height, target_height)
     final_width = max(width, target_width)
 
     # Create the canvas and place the original image on it
     canvas = background_color * np.ones((final_height, final_width, array.shape[2]), dtype=dtype)
-    canvas[pad_height : pad_height + height, pad_width : pad_width + width] = array  # noqa: E203
+
+    # Determine the padding needed, if any, while ensuring no padding is applied if the target is smaller
+    if how == "center":
+        pad_height = max((target_height - height) // 2, 0)
+        pad_width = max((target_width - width) // 2, 0)
+
+        canvas[pad_height : pad_height + height, pad_width : pad_width + width] = array  # noqa: E203
+    elif how == "bottom_right":
+        pad_height, pad_width = 0, 0
+
+        canvas[:height, :width] = array  # noqa: E203
 
     return canvas, (pad_width, pad_height)
 
