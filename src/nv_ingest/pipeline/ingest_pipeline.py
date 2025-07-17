@@ -5,9 +5,9 @@
 import inspect
 import logging
 import math
-from typing import Dict, Any, List
-
+from typing import Optional
 from pydantic import BaseModel
+
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
@@ -22,83 +22,64 @@ logger = logging.getLogger(__name__)
 
 class IngestPipeline:
     """
-    A high-level orchestrator for building and managing an ingestion pipeline
-    from a declarative YAML configuration.
+    A high-level builder for creating and configuring an ingestion pipeline from a PipelineConfig object.
 
     This class is responsible for:
-    1. Parsing a YAML file that defines the pipeline's stages, connections, and configurations.
-    2. Resolving all stage actors (classes or functions) from their import paths.
-    3. Constructing an underlying RayPipeline instance with the specified topology.
-    4. Providing a simple interface to start and stop the pipeline.
+    1. Parsing a `PipelineConfig` object.
+    2. Resolving and validating actor classes from import paths.
+    3. Validating stage configurations against Pydantic schemas.
+    4. Constructing a `RayPipeline` with the defined stages and edges.
+    5. Handling replica calculations based on CPU counts or percentages.
     """
 
-    def __init__(self, config: PipelineConfig, system_resource_probe: SystemResourceProbe = None):
+    def __init__(self, config: PipelineConfig, system_resource_probe: Optional[SystemResourceProbe] = None):
         """
-        Initializes the IngestPipeline with a configuration.
+        Initializes the IngestPipeline with a pipeline configuration.
 
-        Args:
-            config: The validated pipeline configuration object.
-            system_resource_probe: An optional probe for system resources.
+        Parameters
+        ----------
+        config : PipelineConfig
+            The pipeline configuration object.
+        system_resource_probe : SystemResourceProbe, optional
+            An optional probe for system resources. If not provided, a new one will be created.
         """
-        self._config: PipelineConfig = config
-        self._pipeline: RayPipeline = RayPipeline()
+        self._config = config
+        self._pipeline = RayPipeline()
         self._system_resource_probe = system_resource_probe or SystemResourceProbe()
-        logger.info("Ingestion pipeline initialized with config.")
 
-    @property
-    def config(self) -> PipelineConfig:
-        return self._config
+    def build(self) -> dict:
+        """
+        Builds the ingestion pipeline based on the provided configuration.
 
-    @property
-    def pipeline(self) -> RayPipeline:
-        """Returns the underlying RayPipeline instance."""
-        return self._pipeline
-
-    def _resolve_config_schema(self, actor_class: Any) -> Any:
+        Returns
+        -------
+        dict
+            A dictionary of the built Ray actors, keyed by stage name.
         """
-        Introspects the actor's __init__ to find its config schema.
-        """
-        try:
-            sig = inspect.signature(actor_class.__init__)
-            config_param = sig.parameters.get("config")
-            if config_param and issubclass(config_param.annotation, BaseModel):
-                return config_param.annotation
-        except (ValueError, TypeError):
-            # Handles built-ins or other non-introspectable callables
-            pass
-        return None
-
-    def build(self):
-        """
-        Builds the RayPipeline instance based on the loaded configuration.
-        """
-        logger.info("Building the ingestion pipeline...")
+        logger.info("Building ingestion pipeline from configuration...")
         total_cpus = self._system_resource_probe.get_effective_cores()
 
-        # Sort stages by phase for logical processing
-        sorted_stages = sorted(self._config.stages, key=lambda s: s.phase.value)
-
         # 1. Add all stages defined in the config
-        for stage_config in sorted_stages:
+        for stage_config in self._config.stages:
             if not stage_config.enabled:
                 logger.info(f"Stage '{stage_config.name}' is disabled and will be skipped.")
                 continue
 
             # Determine the expected base class for the stage type
+            stage_type_enum = StageType(stage_config.type)
             expected_base_class = {
                 StageType.SOURCE: RayActorSourceStage,
                 StageType.SINK: RayActorSinkStage,
                 StageType.STAGE: RayActorStage,
-            }.get(stage_config.type)
+            }.get(stage_type_enum)
 
             if not expected_base_class:
-                raise ValueError(f"Invalid stage type '{stage_config.type.value}' for stage '{stage_config.name}'")
+                raise ValueError(f"Invalid stage type '{stage_config.type}' for stage '{stage_config.name}'")
 
-            # Resolve and validate the actor class using the unified resolver
+            # Resolve and validate the actor class
             actor_class = resolve_actor_class_from_path(stage_config.actor, expected_base_class)
 
-            # The CONFIG_SCHEMA is defined on the original class, not the factory.
-            # We must inspect the MRO to find it, similar to the resolver.
+            # Inspect the MRO to find the user-defined class to inspect for the config schema
             cls_to_inspect = None
             if inspect.isclass(actor_class):
                 cls_to_inspect = actor_class
@@ -112,157 +93,112 @@ class IngestPipeline:
                         cls_to_inspect = base
                         break
 
-            config_schema = getattr(cls_to_inspect, "CONFIG_SCHEMA", None) if cls_to_inspect else None
+            # Introspect the actor's __init__ to find its config schema.
+            config_schema = None
+            if cls_to_inspect:
+                # Walk the MRO to find the class that defines the __init__ with the config
+                for cls in cls_to_inspect.__mro__:
+                    if "config" in getattr(cls.__init__, "__annotations__", {}):
+                        try:
+                            init_sig = inspect.signature(cls.__init__)
+                            config_param = init_sig.parameters.get("config")
+                            if (
+                                config_param
+                                and config_param.annotation is not BaseModel
+                                and issubclass(config_param.annotation, BaseModel)
+                            ):
+                                config_schema = config_param.annotation
+                                break  # Found the specific __init__, stop searching
+                        except (ValueError, TypeError):
+                            continue  # This class's __init__ is not what we want, check the next in MRO
+
             config_instance = config_schema(**stage_config.config) if config_schema else None
 
-            # Determine the method to add the stage to the pipeline (add_stage or add_sink)
+            # Determine the correct add_* method (add_source, add_stage, add_sink)
             add_method = getattr(self._pipeline, f"add_{stage_config.type.value}", None)
             if not add_method:
-                raise ValueError(f"Invalid stage type '{stage_config.type.value}' for stage '{stage_config.name}'")
+                raise AttributeError(f"Pipeline has no method 'add_{stage_config.type.value}'")
 
-            # Resolve replica counts
+            # Calculate replica counts
             replicas = stage_config.replicas
+            min_replicas, max_replicas = 1, 1  # Default values
+            if replicas and total_cpus:
+                min_replicas = (
+                    replicas.cpu_count_min
+                    if replicas.cpu_count_min is not None
+                    else math.floor(replicas.cpu_percent_min * total_cpus)
+                )
+                max_replicas = (
+                    replicas.cpu_count_max
+                    if replicas.cpu_count_max is not None
+                    else math.floor(replicas.cpu_percent_max * total_cpus)
+                )
+                if max_replicas > 0:
+                    max_replicas = max(1, max_replicas)
+                max_replicas = max(min_replicas, max_replicas)
 
-            # Min replicas
-            if replicas.cpu_count_min is not None:
-                min_replicas = replicas.cpu_count_min
-            elif replicas.cpu_percent_min is not None:
-                min_replicas = math.floor(replicas.cpu_percent_min * total_cpus)
-            else:
-                min_replicas = 1  # Default value
-
-            # Max replicas
-            if replicas.cpu_count_max is not None:
-                max_replicas = replicas.cpu_count_max
-            elif replicas.cpu_percent_max is not None:
-                max_replicas = math.floor(replicas.cpu_percent_max * total_cpus)
-            else:
-                max_replicas = total_cpus  # Default value
-
-            # Ensure max_replicas is at least 1 if not 0, and at least min_replicas
-            if max_replicas > 0:
-                max_replicas = max(1, max_replicas)
-            max_replicas = max(min_replicas, max_replicas)
-
-            # The keyword argument for the actor class depends on the stage type
+            # The keyword for the actor class depends on the stage type (e.g., source_actor)
             actor_kwarg = f"{stage_config.type.value}_actor"
 
-            add_method_kwargs = {
-                "name": stage_config.name,
+            add_method(
+                name=stage_config.name,
                 **{actor_kwarg: actor_class},
-                "config": config_instance,
-                "min_replicas": min_replicas,
-                "max_replicas": max_replicas,
-            }
-
-            add_method(**add_method_kwargs)
-
+                config=config_instance,
+                min_replicas=min_replicas,
+                max_replicas=max_replicas,
+            )
             logger.info(f"Added stage '{stage_config.name}' of type '{stage_config.type.value}' to the pipeline.")
 
-        # 2. Inject dependencies between phases before validation
-        self._inject_phase_dependencies()
-
-        # 3. Add all edges defined in the config
-        if self.config.edges:
-            for edge_config in self.config.edges:
+        # 2. Add all edges defined in the config
+        if self._config.edges:
+            for edge_config in self._config.edges:
                 self._pipeline.make_edge(edge_config.from_stage, edge_config.to_stage, edge_config.queue_size)
                 logger.info(f"Added edge from '{edge_config.from_stage}' to '{edge_config.to_stage}'.")
 
-        # 4. Validate all dependencies
+        # 3. Validate all dependencies
         self._validate_dependencies()
 
-        # 5. Finalize the pipeline build
-        self._pipeline.build()
+        # 4. Finalize the pipeline build and return the actors
+        built_actors = self._pipeline.build()
         logger.info("Ingestion pipeline built successfully.")
+        return built_actors
 
     def _inject_phase_dependencies(self):
         """
-        Automatically adds 'runs_after' dependencies between consecutive phases.
-
-        Ensures that every stage in a phase must run after all stages in the
-        immediately preceding phase.
+        Injects dependencies between stages based on their pipeline phase.
+        This ensures that stages in a later phase run after all stages in the preceding phase.
         """
-        logger.info("Injecting cross-phase dependencies...")
+        stages_by_phase = sorted(self._config.stages, key=lambda s: s.phase)
+        phase_map = {}
+        for stage in stages_by_phase:
+            if stage.phase not in phase_map:
+                phase_map[stage.phase] = []
+            phase_map[stage.phase].append(stage.name)
 
-        stages_by_phase: Dict[int, List[str]] = {}
-        for stage in self._config.stages:
-            if not stage.enabled:
-                continue
-            phase = stage.phase.value
-            if phase not in stages_by_phase:
-                stages_by_phase[phase] = []
-            stages_by_phase[phase].append(stage.name)
+        sorted_phases = sorted(phase_map.keys())
 
-        sorted_phases = sorted(stages_by_phase.keys())
-
-        for i in range(1, len(sorted_phases)):
-            current_phase_num = sorted_phases[i]
-            prev_phase_num = sorted_phases[i - 1]
-
-            prev_phase_stages = stages_by_phase[prev_phase_num]
-
-            for stage_config in self._config.stages:
-                if stage_config.phase.value == current_phase_num:
-                    # Add all stages from the previous phase as dependencies
-                    existing_deps = set(stage_config.runs_after)
-                    new_deps = existing_deps.union(prev_phase_stages)
-
-                    if len(new_deps) > len(existing_deps):
-                        logger.debug(
-                            f"Injecting dependencies for stage '{stage_config.name}': runs after {prev_phase_stages}"
-                        )
-                        stage_config.runs_after = sorted(list(new_deps))
+        for i in range(len(sorted_phases) - 1):
+            current_phase = sorted_phases[i]
+            next_phase = sorted_phases[i + 1]
+            for from_stage in phase_map[current_phase]:
+                for to_stage in phase_map[next_phase]:
+                    # Check if an explicit dependency already exists
+                    if not any(e.from_stage == from_stage and e.to_stage == to_stage for e in self._config.edges):
+                        self._pipeline.make_edge(from_stage, to_stage)
+                        logger.debug(f"Injected phase dependency from '{from_stage}' to '{to_stage}'.")
 
     def _validate_dependencies(self):
         """
-        Validates that all 'runs_after' constraints are satisfied by the pipeline graph.
+        Validates that all stage dependencies ('runs_after') are correctly configured in the pipeline edges.
         """
-        logger.info("Validating pipeline dependencies...")
-
-        # Build a simple adjacency list representation of the graph
-        adj = {stage.name: [] for stage in self._config.stages if stage.enabled}
-        for edge in self._config.edges:
-            if edge.from_stage in adj and edge.to_stage in adj:
-                adj[edge.from_stage].append(edge.to_stage)
-
-        # Define a helper for graph traversal (DFS)
-        def is_reachable(start: str, end: str) -> bool:
-            visited = set()
-            stack = [start]
-            while stack:
-                current = stack.pop()
-                if current == end:
-                    return True
-                if current not in visited:
-                    visited.add(current)
-                    for neighbor in adj.get(current, []):
-                        if neighbor not in visited:
-                            stack.append(neighbor)
-            return False
-
-        # Check each stage's dependencies
-        for stage in self._config.stages:
-            if not stage.enabled:
-                continue
-
-            for dependency in stage.runs_after:
-                # Ensure the dependency stage exists and is enabled
-                dependency_stage_config = next((s for s in self._config.stages if s.name == dependency), None)
-                if not dependency_stage_config or not dependency_stage_config.enabled:
-                    logger.warning(
-                        f"Stage '{stage.name}' has a dependency '{dependency}' which is missing or disabled. "
-                        f"Skipping validation for this dependency."
-                    )
-                    continue
-
-                if not is_reachable(dependency, stage.name):
-                    raise ValueError(
-                        f"Dependency validation failed: Stage '{stage.name}' is configured to run after "
-                        f"'{dependency}', but there is no valid path between them in the pipeline graph."
-                    )
-                logger.debug(f"Successfully validated that '{stage.name}' runs after '{dependency}'.")
-
-        logger.info("All pipeline dependencies are satisfied.")
+        all_stages = {s.name for s in self._config.stages}
+        for stage_config in self._config.stages:
+            if stage_config.runs_after:
+                for dep_name in stage_config.runs_after:
+                    if dep_name not in all_stages:
+                        raise ValueError(
+                            f"Stage '{stage_config.name}' has an invalid dependency '{dep_name}' which is not defined."
+                        )
 
     def start(self):
         """

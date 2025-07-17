@@ -106,7 +106,7 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
         super().__init__(config, log_to_stdout=False)
         self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
         self._logger.debug(
-            "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
+            "Initializing MessageBrokerTaskSourceStage with config: %s", config.model_dump()
         )  # Log validated config
 
         # Access validated configuration directly via self.config
