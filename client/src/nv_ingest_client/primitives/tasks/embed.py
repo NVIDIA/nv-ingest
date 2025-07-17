@@ -5,10 +5,15 @@
 # pylint: disable=too-many-arguments
 
 import logging
-from typing import Dict, Any, Type
+from typing import Any
+from typing import Dict
+from typing import Literal
 from typing import Optional
+from typing import Type
 
-from pydantic import BaseModel, ConfigDict, model_validator
+from pydantic import BaseModel
+from pydantic import ConfigDict
+from pydantic import model_validator
 
 from .task_base import Task
 
@@ -38,6 +43,11 @@ class EmbedTaskSchema(BaseModel):
     model_name: Optional[str] = None
     api_key: Optional[str] = None
     filter_errors: bool = False
+
+    text_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
+    image_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
+    structured_elements_modality: Optional[Literal["text", "image", "text_image"]] = None
+    audio_elements_modality: Optional[Literal["text"]] = None
 
     @model_validator(mode="before")
     def handle_deprecated_fields(cls: Type["EmbedTaskSchema"], values: Dict[str, Any]) -> Dict[str, Any]:
@@ -70,6 +80,7 @@ class EmbedTaskSchema(BaseModel):
         return values
 
     model_config = ConfigDict(extra="forbid")
+    model_config["protected_namespaces"] = ()
 
 
 class EmbedTask(Task):
@@ -88,6 +99,10 @@ class EmbedTask(Task):
         text: Optional[bool] = None,
         tables: Optional[bool] = None,
         filter_errors: bool = False,
+        text_elements_modality: Optional[str] = None,
+        image_elements_modality: Optional[str] = None,
+        structured_elements_modality: Optional[str] = None,
+        audio_elements_modality: Optional[str] = None,
     ) -> None:
         """
         Initialize the EmbedTask configuration.
@@ -122,6 +137,10 @@ class EmbedTask(Task):
         self._model_name: Optional[str] = model_name
         self._api_key: Optional[str] = api_key
         self._filter_errors: bool = filter_errors
+        self._text_elements_modality: Optional[bool] = text_elements_modality
+        self._image_elements_modality: Optional[bool] = image_elements_modality
+        self._structured_elements_modality: Optional[bool] = structured_elements_modality
+        self._audio_elements_modality: Optional[bool] = audio_elements_modality
 
     def __str__(self) -> str:
         """
@@ -142,6 +161,14 @@ class EmbedTask(Task):
         if self._api_key:
             info += "  api_key: [redacted]\n"
         info += f"  filter_errors: {self._filter_errors}\n"
+        if self._text_elements_modality:
+            info += f"  text_elements_modality: {self._text_elements_modality}\n"
+        if self._image_elements_modality:
+            info += f"  image_elements_modality: {self._image_elements_modality}\n"
+        if self._structured_elements_modality:
+            info += f"  structured_elements_modality: {self._structured_elements_modality}\n"
+        if self._audio_elements_modality:
+            info += f"  audio_elements_modality: {self._audio_elements_modality}\n"
         return info
 
     def to_dict(self) -> Dict[str, Any]:
@@ -164,5 +191,17 @@ class EmbedTask(Task):
 
         if self._api_key:
             task_properties["api_key"] = self._api_key
+
+        if self._text_elements_modality:
+            task_properties["text_elements_modality"] = self._text_elements_modality
+
+        if self._image_elements_modality:
+            task_properties["image_elements_modality"] = self._image_elements_modality
+
+        if self._structured_elements_modality:
+            task_properties["structured_elements_modality"] = self._structured_elements_modality
+
+        if self._audio_elements_modality:
+            task_properties["audio_elements_modality"] = self._audio_elements_modality
 
         return {"type": "embed", "task_properties": task_properties}
