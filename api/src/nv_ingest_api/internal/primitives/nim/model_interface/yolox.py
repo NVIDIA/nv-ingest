@@ -223,8 +223,7 @@ class YoloxModelInterfaceBase(ModelInterface):
                     if image.dtype != np.uint8:
                         image = (image * 255).astype(np.uint8)
                     # Convert the numpy array to base64
-                    b64_images.append(numpy_to_base64(image))
-
+                    b64_images.append(numpy_to_base64(image, format=YOLOX_PAGE_IMAGE_FORMAT))
                 b64_chunks = chunk_list_geometrically(b64_images, max_batch_size)
                 original_chunks = chunk_list_geometrically(data["images"], max_batch_size)
                 shape_chunks = chunk_list_geometrically(data["original_image_shapes"], max_batch_size)
