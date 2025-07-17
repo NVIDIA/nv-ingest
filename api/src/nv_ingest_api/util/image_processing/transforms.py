@@ -20,6 +20,9 @@ cv2.setNumThreads(1)
 DEFAULT_MAX_WIDTH = 1024
 DEFAULT_MAX_HEIGHT = 1280
 
+# Workaround for PIL.Image.DecompressionBombError
+Image.MAX_IMAGE_PIXELS = None
+
 logger = logging.getLogger(__name__)
 
 
