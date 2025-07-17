@@ -88,6 +88,7 @@ def _run_chart_inference(
         data=data_ocr,
         stage_name="chart_extraction",
         max_batch_size=1 if ocr_client.protocol == "grpc" else 2,
+        trace_info=trace_info,
     )
     if ocr_model_name == "paddle":
         future_ocr_kwargs.update(
