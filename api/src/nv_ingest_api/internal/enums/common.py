@@ -446,6 +446,8 @@ class TaskTypeEnum(str, Enum):
         Represents a task for extracting chart data.
     INFOGRAPHIC_DATA_EXTRACT : str
         Represents a task for extracting infographic data.
+    UDF : str
+        Represents a user-defined function task.
     """
 
     AUDIO_DATA_EXTRACT: str = "audio_data_extract"
@@ -460,6 +462,7 @@ class TaskTypeEnum(str, Enum):
     STORE_EMBEDDING: str = "store_embedding"
     STORE: str = "store"
     TABLE_DATA_EXTRACT: str = "table_data_extract"
+    UDF: str = "udf"
     VDB_UPLOAD: str = "vdb_upload"
 
 

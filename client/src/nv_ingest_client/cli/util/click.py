@@ -21,6 +21,7 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
@@ -29,6 +30,7 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks.udf import UDFTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
@@ -152,6 +154,7 @@ TaskType = Union[
     SplitTask,
     StoreEmbedTask,
     StoreTask,
+    UDFTask,
 ]
 
 
@@ -260,6 +263,10 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 task_options = check_schema(EmbedTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, EmbedTask(**task_options.model_dump()))]
+            elif task_id == "udf":
+                task_options = check_schema(UDFTaskSchema, options, task_id, json_options)
+                new_task_id = f"{task_id}"
+                new_task = [(new_task_id, UDFTask(**task_options.model_dump()))]
             else:
                 raise ValueError(f"Unsupported task type: {task_id}")
 

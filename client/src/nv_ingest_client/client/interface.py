@@ -40,6 +40,7 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
@@ -48,6 +49,7 @@ from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
+from nv_ingest_client.primitives.tasks.udf import UDFTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -815,6 +817,26 @@ class Ingestor:
         task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
         store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
+
+        return self
+
+    def udf(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a UDFTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the UDFTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        task_options = check_schema(UDFTaskSchema, kwargs, "udf", json.dumps(kwargs))
+        udf_task = UDFTask(**task_options.model_dump())
+        self._job_specs.add_task(udf_task)
 
         return self
 

@@ -89,8 +89,20 @@ def ingest_callable_signature(sig: inspect.Signature):
     if return_type is inspect.Signature.empty:
         raise TypeError("Return type must be annotated with IngestControlMessage")
 
-    if not issubclass(first_param, IngestControlMessage):
-        raise TypeError(f"Parameter must be IngestControlMessage, got {first_param}")
+    # Handle string annotations (forward references)
+    if isinstance(first_param, str):
+        if first_param != "IngestControlMessage":
+            raise TypeError(f"Parameter must be IngestControlMessage, got {first_param}")
+    else:
+        # Handle actual class annotations
+        if not issubclass(first_param, IngestControlMessage):
+            raise TypeError(f"Parameter must be IngestControlMessage, got {first_param}")
 
-    if not issubclass(return_type, IngestControlMessage):
-        raise TypeError(f"Return type must be IngestControlMessage, got {return_type}")
+    # Handle string annotations for return type
+    if isinstance(return_type, str):
+        if return_type != "IngestControlMessage":
+            raise TypeError(f"Return type must be IngestControlMessage, got {return_type}")
+    else:
+        # Handle actual class annotations
+        if not issubclass(return_type, IngestControlMessage):
+            raise TypeError(f"Return type must be IngestControlMessage, got {return_type}")

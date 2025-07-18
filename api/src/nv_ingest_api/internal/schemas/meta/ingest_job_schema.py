@@ -143,6 +143,11 @@ class IngestTaskInfographicExtraction(BaseModelNoExt):
     params: dict = Field(default_factory=dict)
 
 
+class IngestTaskUDFSchema(BaseModelNoExt):
+    udf_function: str
+    phase: int = Field(ge=1, le=5)
+
+
 class IngestTaskSchema(BaseModelNoExt):
     type: TaskTypeEnum
     task_properties: Union[
@@ -159,6 +164,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
+        IngestTaskUDFSchema,
     ]
     raise_on_failure: bool = False
 
@@ -190,6 +196,7 @@ class IngestTaskSchema(BaseModelNoExt):
             TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
             TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
             TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            TaskTypeEnum.UDF: IngestTaskUDFSchema,
         }
 
         expected_schema_cls = task_type_to_schema.get(task_type)

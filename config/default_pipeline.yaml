@@ -275,7 +275,7 @@ stages:
       cpu_count_min: 0
       cpu_count_max: 1
 
-  - name: "udf_stage"
+  - name: "udf_response_stage"
     type: "stage"
     phase: 4  # RESPONSE
     callable: "nv_ingest_api.internal.meta.udf:udf_stage_callable_fn"
@@ -301,7 +301,7 @@ stages:
       cpu_count_min: 1
       cpu_count_max: 2
     runs_after:
-      - "udf_stage"
+      - "udf_response_stage"
 
   # Telemetry and Drain
   - name: "otel_tracer"
@@ -391,9 +391,9 @@ edges:
     to: "embedding_storage"
     queue_size: 32
   - from: "embedding_storage"
-    to: "udf_stage"
+    to: "udf_response_stage"
     queue_size: 32
-  - from: "udf_stage"
+  - from: "udf_response_stage"
     to: "broker_response"
     queue_size: 32
 
@@ -407,6 +407,6 @@ edges:
 
 # Optional pipeline-wide settings
 pipeline:
-  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
+  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|true
   dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
   launch_simple_broker: false
