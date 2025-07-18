@@ -244,7 +244,14 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
             elif task_id == "caption":
                 task_options = check_schema(IngestTaskCaptionSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = [(new_task_id, CaptionTask(**task_options.model_dump()))]
+                # Extract individual parameters from API schema for CaptionTask constructor
+                caption_params = {
+                    "api_key": task_options.api_key,
+                    "endpoint_url": task_options.endpoint_url,
+                    "prompt": task_options.prompt,
+                    "model_name": task_options.model_name,
+                }
+                new_task = [(new_task_id, CaptionTask(**caption_params))]
             elif task_id == "dedup":
                 task_options = check_schema(DedupTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
@@ -252,12 +259,48 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
             elif task_id == "filter":
                 task_options = check_schema(IngestTaskFilterSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = [(new_task_id, FilterTask(**task_options.model_dump()))]
+                # Extract individual parameters from API schema for FilterTask constructor
+                filter_params = {
+                    "content_type": task_options.content_type,
+                    "min_size": task_options.params.min_size,
+                    "max_aspect_ratio": task_options.params.max_aspect_ratio,
+                    "min_aspect_ratio": task_options.params.min_aspect_ratio,
+                    "filter": task_options.params.filter,
+                }
+                new_task = [(new_task_id, FilterTask(**filter_params))]
             elif task_id == "embed":
                 task_options = check_schema(EmbedTaskSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, EmbedTask(**task_options.model_dump()))]
             elif task_id == "udf":
+                # Pre-process UDF task options to convert phase names to integers
+                if "phase" in options and isinstance(options["phase"], str):
+                    # Import PipelinePhase to convert phase names to integers
+                    from nv_ingest.pipeline.pipeline_schema import PipelinePhase
+
+                    # Convert phase string to integer using the same logic as UDFTask
+                    phase_str = options["phase"].upper()
+                    phase_aliases = {
+                        "PRE_PROCESSING": PipelinePhase.PRE_PROCESSING,
+                        "PREPROCESSING": PipelinePhase.PRE_PROCESSING,
+                        "PRE": PipelinePhase.PRE_PROCESSING,
+                        "EXTRACTION": PipelinePhase.EXTRACTION,
+                        "EXTRACT": PipelinePhase.EXTRACTION,
+                        "POST_PROCESSING": PipelinePhase.POST_PROCESSING,
+                        "POSTPROCESSING": PipelinePhase.POST_PROCESSING,
+                        "POST": PipelinePhase.POST_PROCESSING,
+                        "MUTATION": PipelinePhase.MUTATION,
+                        "MUTATE": PipelinePhase.MUTATION,
+                        "TRANSFORM": PipelinePhase.TRANSFORM,
+                        "RESPONSE": PipelinePhase.RESPONSE,
+                        "RESP": PipelinePhase.RESPONSE,
+                    }
+
+                    if phase_str in phase_aliases:
+                        options["phase"] = phase_aliases[phase_str].value
+                    else:
+                        raise ValueError(f"Invalid phase name: {options['phase']}")
+
                 task_options = check_schema(IngestTaskUDFSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, UDFTask(**task_options.model_dump()))]
