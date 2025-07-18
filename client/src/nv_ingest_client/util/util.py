@@ -8,20 +8,12 @@ import logging
 import os
 import time
 import typing
-from io import BytesIO
 from typing import Dict
 from typing import List
 
-import pypdfium2 as pdfium
-from docx import Document as DocxDocument
-
 from nv_ingest_api.util.exception_handlers.decorators import unified_exception_handler
 from nv_ingest_client.primitives.jobs.job_spec import JobSpec
-from nv_ingest_client.util.file_processing.extract import DocumentTypeEnum
-from nv_ingest_client.util.file_processing.extract import detect_encoding_and_read_text_file
 from nv_ingest_client.util.file_processing.extract import extract_file_content
-from nv_ingest_client.util.file_processing.extract import get_or_infer_file_type
-from pptx import Presentation
 
 logger = logging.getLogger(__name__)
 
@@ -41,73 +33,6 @@ class ClientConfigSchema:
             "https://ai.api.nvidia.com/v1/retrieval/nvidia/llama-3_2-nv-rerankqa-1b-v2/reranking",
         )
         self.nv_ranker_nim_model_name: str = os.getenv("RERANKER_NIM_MODEL_NAME", "nvidia/llama-3.2-nv-rerankqa-1b-v2")
-
-
-def estimate_page_count(file_path: str) -> int:
-    document_type = get_or_infer_file_type(file_path)
-
-    if document_type in [
-        DocumentTypeEnum.PDF,
-        DocumentTypeEnum.DOCX,
-        DocumentTypeEnum.PPTX,
-    ]:
-        return count_pages_for_documents(file_path, document_type)
-    elif document_type in [
-        DocumentTypeEnum.TXT,
-        DocumentTypeEnum.MD,
-        DocumentTypeEnum.HTML,
-    ]:
-        return count_pages_for_text(file_path)
-    elif document_type in [
-        DocumentTypeEnum.JPEG,
-        DocumentTypeEnum.BMP,
-        DocumentTypeEnum.PNG,
-        DocumentTypeEnum.SVG,
-    ]:
-        return 1  # Image types assumed to be 1 page
-    else:
-        return 0
-
-
-def count_pages_for_documents(file_path: str, document_type: DocumentTypeEnum) -> int:
-    try:
-        if document_type == DocumentTypeEnum.PDF:
-            doc = pdfium.PdfDocument(file_path)
-            return len(doc)
-        elif document_type == DocumentTypeEnum.DOCX:
-            doc = DocxDocument(file_path)
-            # Approximation, as word documents do not have a direct 'page count' attribute
-            return len(doc.paragraphs) // 15
-        elif document_type == DocumentTypeEnum.PPTX:
-            ppt = Presentation(file_path)
-            return len(ppt.slides)
-    except FileNotFoundError:
-        print(f"The file {file_path} was not found.")
-        return 0
-    except Exception as e:
-        print(f"An error occurred while processing {file_path}: {e}")
-        return 0
-
-
-def count_pages_for_text(file_path: str) -> int:
-    """
-    Estimates the page count for text files based on word count,
-    using the detect_encoding_and_read_text_file function for reading.
-    """
-    try:
-        with open(file_path, "rb") as file:  # Open file in binary mode
-            file_stream = BytesIO(file.read())  # Create BytesIO object from file content
-
-        content = detect_encoding_and_read_text_file(file_stream)  # Read and decode content
-        word_count = len(content.split())
-        pages_estimated = word_count / 300
-        return round(pages_estimated)
-    except FileNotFoundError:
-        logger.error(f"The file {file_path} was not found.")
-        return 0
-    except Exception as e:
-        logger.error(f"An error occurred while processing {file_path}: {e}")
-        return 0
 
 
 @unified_exception_handler

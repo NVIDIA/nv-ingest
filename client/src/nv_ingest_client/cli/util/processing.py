@@ -19,7 +19,6 @@ from typing import List
 from typing import Tuple
 
 from nv_ingest_client.util.processing import handle_future_result
-from nv_ingest_client.util.util import estimate_page_count
 from PIL import Image
 from tqdm import tqdm
 
@@ -457,7 +456,6 @@ def create_and_process_jobs(
     retry_job_ids: List[str] = []
     job_id_map: Dict[str, str] = {}
     retry_counts: Dict[str, int] = defaultdict(int)
-    file_page_counts: Dict[str, int] = {file: estimate_page_count(file) for file in files}
 
     start_time_ns: int = time.time_ns()
     with tqdm(total=total_files, desc="Processing files", unit="file") as pbar:
@@ -478,6 +476,13 @@ def create_and_process_jobs(
                 try:
                     future_response, trace_id = handle_future_result(future)
                     trace_ids[source_name] = trace_id
+
+                    file_page_counts: Dict[str, int] = {
+                        page["metadata"]["source_metadata"]["source_name"]: page["metadata"]["content_metadata"][
+                            "hierarchy"
+                        ]["page_count"]
+                        for page in future_response["data"]
+                    }
 
                     if output_directory:
                         save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
