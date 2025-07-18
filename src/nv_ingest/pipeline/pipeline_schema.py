@@ -4,7 +4,7 @@
 
 from enum import Enum
 from typing import Dict, Any, List, Optional, Set
-from pydantic import BaseModel, Field, Extra, root_validator, field_validator
+from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
 
 class StageType(str, Enum):
@@ -58,21 +58,20 @@ class ReplicaConfig(BaseModel):
         None, description="Maximum number of replicas as a percentage of total cores.", ge=0.0, le=1.0
     )
 
-    @root_validator(skip_on_failure=True)
-    def check_exclusive_min_max(cls, values: Dict[str, Any]) -> Dict[str, Any]:
+    @model_validator(mode="after")
+    def check_exclusive_min_max(self) -> "ReplicaConfig":
         """
         Validates that count and percent are not specified for min or max at the same time.
         """
-        if values.get("cpu_count_min") is not None and values.get("cpu_percent_min") is not None:
+        if self.cpu_count_min is not None and self.cpu_percent_min is not None:
             raise ValueError("Cannot specify both 'cpu_count_min' and 'cpu_percent_min'")
 
-        if values.get("cpu_count_max") is not None and values.get("cpu_percent_max") is not None:
+        if self.cpu_count_max is not None and self.cpu_percent_max is not None:
             raise ValueError("Cannot specify both 'cpu_count_max' and 'cpu_percent_max'")
 
-        return values
+        return self
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class StageConfig(BaseModel):
@@ -90,9 +89,14 @@ class StageConfig(BaseModel):
         The type of the stage, which determines how it's added to the RayPipeline.
     phase: PipelinePhase
         The logical phase of the stage in the pipeline.
-    actor : str
+    actor : Optional[str]
         The fully qualified import path to the actor class or function that
-        implements the stage's logic.
+        implements the stage's logic. Mutually exclusive with 'callable'.
+    callable : Optional[str]
+        The fully qualified import path to a callable function that
+        implements the stage's logic. Mutually exclusive with 'actor'.
+    task_filters: Optional[List[str]]
+        List of task types this callable stage should filter for. Only applies to callable stages.
     enabled : bool
         A flag to indicate whether the stage should be included in the pipeline.
         If False, the stage and its connected edges are ignored.
@@ -107,14 +111,30 @@ class StageConfig(BaseModel):
     name: str = Field(..., description="Unique name for the stage.")
     type: StageType = Field(StageType.STAGE, description="Type of the stage.")
     phase: PipelinePhase = Field(..., description="The logical phase of the stage.")
-    actor: str = Field(..., description="Full import path to the stage's actor class or function.")
+    actor: Optional[str] = Field(None, description="Full import path to the stage's actor class or function.")
+    callable: Optional[str] = Field(None, description="Full import path to a callable function for the stage.")
+    task_filters: Optional[List[str]] = Field(
+        None, description="List of task types this callable stage should filter for. Only applies to callable stages."
+    )
     enabled: bool = Field(True, description="Whether the stage is enabled.")
     config: Dict[str, Any] = Field({}, description="Configuration dictionary for the stage.")
     replicas: ReplicaConfig = Field(default_factory=ReplicaConfig, description="Replica configuration.")
     runs_after: List[str] = Field(default_factory=list, description="List of stages this stage must run after.")
 
-    class Config:
-        extra = Extra.forbid
+    @model_validator(mode="after")
+    def check_actor_or_callable(self) -> "StageConfig":
+        """
+        Validates that exactly one of 'actor' or 'callable' is specified.
+        """
+        if self.actor is None and self.callable is None:
+            raise ValueError("Either 'actor' or 'callable' must be specified")
+
+        if self.actor is not None and self.callable is not None:
+            raise ValueError("Cannot specify both 'actor' and 'callable' - they are mutually exclusive")
+
+        return self
+
+    model_config = ConfigDict(extra="forbid")
 
 
 class EdgeConfig(BaseModel):
@@ -138,8 +158,7 @@ class EdgeConfig(BaseModel):
     to_stage: str = Field(..., alias="to", description="The name of the destination stage.")
     queue_size: int = Field(100, gt=0, description="The size of the queue between stages.")
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class PipelineRuntimeConfig(BaseModel):
@@ -160,8 +179,7 @@ class PipelineRuntimeConfig(BaseModel):
     )
     launch_simple_broker: bool = Field(False, description="Launch a simple message broker for the pipeline.")
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")
 
 
 class PipelineConfigSchema(BaseModel):
@@ -204,5 +222,4 @@ class PipelineConfigSchema(BaseModel):
         """Returns a set of all unique phases in the pipeline."""
         return {stage.phase for stage in self.stages}
 
-    class Config:
-        extra = Extra.forbid
+    model_config = ConfigDict(extra="forbid")

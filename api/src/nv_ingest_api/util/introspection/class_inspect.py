@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import inspect
-from typing import Optional, Type
+from typing import Optional, Type, Union, Callable
 
 from pydantic import BaseModel
 
@@ -65,3 +65,81 @@ def find_pydantic_config_schema(
                 continue
 
     return None
+
+
+def find_pydantic_config_schema_for_callable(
+    callable_fn: Callable,
+    param_name: str = "stage_config",
+) -> Optional[Type[BaseModel]]:
+    """
+    Introspects a callable's signature to find a Pydantic model parameter.
+
+    This function is designed to find the specific Pydantic configuration model
+    for a pipeline callable function.
+
+    Parameters
+    ----------
+    callable_fn : Callable
+        The callable function to inspect.
+    param_name : str, optional
+        The name of the parameter to inspect for the Pydantic schema,
+        by default "stage_config".
+
+    Returns
+    -------
+    Optional[Type[BaseModel]]
+        The Pydantic BaseModel class if found, otherwise None.
+    """
+    try:
+        sig = inspect.signature(callable_fn)
+        config_param = sig.parameters.get(param_name)
+        if (
+            config_param
+            and config_param.annotation is not BaseModel
+            and hasattr(config_param.annotation, "__mro__")
+            and issubclass(config_param.annotation, BaseModel)
+        ):
+            return config_param.annotation
+    except (ValueError, TypeError):
+        # Function signature is not inspectable
+        pass
+
+    return None
+
+
+def find_pydantic_config_schema_unified(
+    target: Union[Type, Callable],
+    base_class_to_find: Optional[Type] = None,
+    param_name: str = "config",
+) -> Optional[Type[BaseModel]]:
+    """
+    Unified function to find Pydantic schema for either classes or callables.
+
+    Parameters
+    ----------
+    target : Union[Type, Callable]
+        The class or callable to inspect.
+    base_class_to_find : Optional[Type], optional
+        The specific base class to look for when resolving actor classes from proxies.
+        Only used for class inspection.
+    param_name : str, optional
+        The name of the parameter to inspect for the Pydantic schema.
+        For classes: defaults to "config"
+        For callables: should be "stage_config"
+
+    Returns
+    -------
+    Optional[Type[BaseModel]]
+        The Pydantic BaseModel class if found, otherwise None.
+    """
+    if callable(target) and not inspect.isclass(target):
+        # Handle callable function
+        return find_pydantic_config_schema_for_callable(target, param_name)
+    elif inspect.isclass(target) or hasattr(target, "__class__"):
+        # Handle class or proxy object
+        if base_class_to_find is None:
+            # If no base class specified, we can't use the original function
+            return None
+        return find_pydantic_config_schema(target, base_class_to_find, param_name)
+    else:
+        return None

@@ -11,9 +11,14 @@ from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPip
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
+from nv_ingest.framework.orchestration.ray.util.pipeline.tools import wrap_callable_as_stage
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageConfig, StageType
-from nv_ingest_api.util.imports.dynamic_resolvers import resolve_actor_class_from_path
-from nv_ingest_api.util.introspection.class_inspect import find_pydantic_config_schema
+from nv_ingest_api.util.imports.callable_signatures import ingest_stage_callable_signature
+from nv_ingest_api.util.imports.dynamic_resolvers import resolve_actor_class_from_path, resolve_callable_from_path
+from nv_ingest_api.util.introspection.class_inspect import (
+    find_pydantic_config_schema,
+    find_pydantic_config_schema_unified,
+)
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 
 logger = logging.getLogger(__name__)
@@ -124,9 +129,30 @@ class IngestPipelineBuilder:
         if not expected_base_class:
             raise ValueError(f"Invalid stage type '{stage_config.type}' for stage '{stage_config.name}'")
 
-        actor_class = resolve_actor_class_from_path(stage_config.actor, expected_base_class)
-        config_schema = find_pydantic_config_schema(actor_class, expected_base_class)
-        config_instance = config_schema(**stage_config.config) if config_schema else None
+        # Handle callable vs actor stage configurations
+        if stage_config.callable:
+            # Handle callable stage
+            callable_fn = resolve_callable_from_path(
+                stage_config.callable, signature_schema=ingest_stage_callable_signature
+            )
+            config_schema = find_pydantic_config_schema_unified(callable_fn, param_name="stage_config")
+
+            # For callable stages, we need a schema to wrap the callable
+            if not config_schema:
+                raise ValueError(
+                    f"Callable stage '{stage_config.name}' must have a Pydantic schema in its stage_config parameter"
+                )
+
+            # Wrap callable as a stage using wrap_callable_as_stage
+            actor_class = wrap_callable_as_stage(callable_fn, config_schema, required_tasks=stage_config.task_filters)
+
+            # For callable stages, the config instance is handled by wrap_callable_as_stage
+            config_instance = config_schema(**stage_config.config) if config_schema else None
+        else:
+            # Handle actor stage (existing logic)
+            actor_class = resolve_actor_class_from_path(stage_config.actor, expected_base_class)
+            config_schema = find_pydantic_config_schema(actor_class, expected_base_class)
+            config_instance = config_schema(**stage_config.config) if config_schema else None
 
         add_method = getattr(self._pipeline, f"add_{stage_config.type.value}", None)
         if not add_method:
