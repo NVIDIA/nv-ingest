@@ -47,6 +47,7 @@ services:
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -71,6 +72,7 @@ services:
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8006:8000"
       - "8007:8001"
