@@ -10,7 +10,6 @@ import importlib.util
 import logging
 import importlib
 import inspect
-import os
 from typing import Dict
 from typing import Optional
 from typing import Union
@@ -31,9 +30,11 @@ class UDFTaskSchema(BaseModel):
         "2. Import path: 'my_module.my_function'\n"
         "3. File path: '/path/to/file.py:my_function'",
     )
-    phase: Union[PipelinePhase, int] = Field(
+    phase: Union[PipelinePhase, int, str] = Field(
         PipelinePhase.RESPONSE,
-        description="Pipeline phase where this UDF should be executed. Defaults to RESPONSE phase.",
+        description="Pipeline phase where this UDF should be executed. "
+        "Can be specified as phase name (e.g., 'EXTRACTION', 'TRANSFORM') or numeric value. "
+        "Defaults to RESPONSE phase.",
     )
 
     model_config = ConfigDict(extra="forbid")
@@ -46,26 +47,59 @@ class UDFTaskSchema(BaseModel):
         if v is None:
             return v
 
-        # Check if it's a file path format (contains .py: pattern)
-        if ".py:" in v:
-            file_path, func_name = v.split(":", 1)
-            if not os.path.exists(file_path):
-                raise ValueError(f"UDF file path does not exist: {file_path}")
-            if not func_name.isidentifier():
-                raise ValueError(f"Invalid function name: {func_name}")
+        if not isinstance(v, str):
+            raise ValueError("udf_function must be a string")
 
-        # Check if it's an import path format (contains dots but no .py)
-        elif "." in v and not v.startswith("def "):
-            # Basic validation for import path format
-            parts = v.split(".")
-            if not all(part.isidentifier() for part in parts):
-                raise ValueError(f"Invalid import path format: {v}")
-
-        # Otherwise assume it's inline function string
-        elif not v.strip().startswith("def "):
-            raise ValueError("Inline UDF function must start with 'def'")
+        if not v.strip():
+            raise ValueError("udf_function cannot be empty")
 
         return v
+
+    @field_validator("phase")
+    @classmethod
+    def validate_phase(cls, v):
+        """Validate and convert phase to PipelinePhase enum."""
+        if isinstance(v, PipelinePhase):
+            return v
+
+        if isinstance(v, int):
+            try:
+                return PipelinePhase(v)
+            except ValueError:
+                valid_values = [phase.value for phase in PipelinePhase]
+                raise ValueError(f"Invalid phase number {v}. Valid values are: {valid_values}")
+
+        if isinstance(v, str):
+            # Convert string to uppercase and try to match enum name
+            phase_name = v.upper().strip()
+
+            # Handle common aliases and variations
+            phase_aliases = {
+                "EXTRACT": "EXTRACTION",
+                "PREPROCESS": "PRE_PROCESSING",
+                "PRE_PROCESS": "PRE_PROCESSING",
+                "PREPROCESSING": "PRE_PROCESSING",
+                "POSTPROCESS": "POST_PROCESSING",
+                "POST_PROCESS": "POST_PROCESSING",
+                "POSTPROCESSING": "POST_PROCESSING",
+                "MUTATE": "MUTATION",
+            }
+
+            # Apply alias if exists
+            if phase_name in phase_aliases:
+                phase_name = phase_aliases[phase_name]
+
+            try:
+                return PipelinePhase[phase_name]
+            except KeyError:
+                valid_names = [phase.name for phase in PipelinePhase]
+                valid_aliases = list(phase_aliases.keys())
+                raise ValueError(
+                    f"Invalid phase name '{v}'. Valid phase names are: {valid_names}. "
+                    f"Also supported aliases: {valid_aliases}"
+                )
+
+        raise ValueError(f"Phase must be a PipelinePhase enum, integer, or string, got {type(v)}")
 
 
 def _load_function_from_import_path(import_path: str):
@@ -172,11 +206,14 @@ class UDFTask(Task):
     def __init__(
         self,
         udf_function: str = None,
-        phase: Union[PipelinePhase, int] = PipelinePhase.RESPONSE,
+        phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
     ) -> None:
         super().__init__()
         self._udf_function = udf_function
-        self._phase = phase
+
+        # Use the schema validation to convert phase string to enum if needed
+        validated_data = UDFTaskSchema(udf_function=udf_function, phase=phase)
+        self._phase = validated_data.phase
         self._resolved_udf_function = None
 
     def __str__(self) -> str:
