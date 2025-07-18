@@ -23,14 +23,14 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
@@ -238,7 +238,7 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, StoreTask(**task_options.model_dump()))]
             elif task_id == "store_embedding":
-                task_options = check_schema(StoreEmbedTaskSchema, options, task_id, json_options)
+                task_options = check_schema(IngestTaskStoreEmbedSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, StoreEmbedTask(**task_options.model_dump()))]
             elif task_id == "caption":
@@ -269,7 +269,7 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 }
                 new_task = [(new_task_id, FilterTask(**filter_params))]
             elif task_id == "embed":
-                task_options = check_schema(EmbedTaskSchema, options, task_id, json_options)
+                task_options = check_schema(IngestTaskEmbedSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, EmbedTask(**task_options.model_dump()))]
             elif task_id == "udf":

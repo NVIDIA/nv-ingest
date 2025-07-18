@@ -38,18 +38,18 @@ from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
-from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
+from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -681,8 +681,14 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(EmbedTaskSchema, kwargs, "embed", json.dumps(kwargs))
-        embed_task = EmbedTask(**task_options.model_dump())
+        # Filter out deprecated parameters before API schema validation
+        # The EmbedTask constructor will handle these deprecated parameters with warnings
+        filtered_kwargs = {k: v for k, v in kwargs.items() if k not in ["text", "tables"]}
+
+        _ = check_schema(IngestTaskEmbedSchema, filtered_kwargs, "embed", json.dumps(filtered_kwargs))
+
+        # Pass original kwargs to EmbedTask constructor so it can handle deprecated parameters
+        embed_task = EmbedTask(**kwargs)
         self._job_specs.add_task(embed_task)
 
         return self
@@ -751,8 +757,27 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(IngestTaskFilterSchema, kwargs, "filter", json.dumps(kwargs))
-        filter_task = FilterTask(**task_options.model_dump())
+        # Restructure parameters to match API schema structure
+        params_fields = {"min_size", "max_aspect_ratio", "min_aspect_ratio", "filter"}
+        params = {k: v for k, v in kwargs.items() if k in params_fields}
+        top_level = {k: v for k, v in kwargs.items() if k not in params_fields}
+
+        # Build API schema structure
+        api_kwargs = top_level.copy()
+        if params:
+            api_kwargs["params"] = params
+
+        task_options = check_schema(IngestTaskFilterSchema, api_kwargs, "filter", json.dumps(api_kwargs))
+
+        # Extract individual parameters from API schema for FilterTask constructor
+        filter_params = {
+            "content_type": task_options.content_type,
+            "min_size": task_options.params.min_size,
+            "max_aspect_ratio": task_options.params.max_aspect_ratio,
+            "min_aspect_ratio": task_options.params.min_aspect_ratio,
+            "filter": task_options.params.filter,
+        }
+        filter_task = FilterTask(**filter_params)
         self._job_specs.add_task(filter_task)
 
         return self
@@ -793,8 +818,24 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
+        # Handle parameter name mapping: store_method -> method for API schema
+        if "store_method" in kwargs:
+            kwargs["method"] = kwargs.pop("store_method")
+
+        # Provide default method if not specified (matching client StoreTask behavior)
+        if "method" not in kwargs:
+            kwargs["method"] = "minio"
+
         task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
-        store_task = StoreTask(**task_options.model_dump())
+
+        # Map API schema fields back to StoreTask constructor parameters
+        store_params = {
+            "structured": task_options.structured,
+            "images": task_options.images,
+            "store_method": task_options.method,  # Map method back to store_method
+            "params": task_options.params,
+        }
+        store_task = StoreTask(**store_params)
         self._job_specs.add_task(store_task)
 
         return self
@@ -802,19 +843,19 @@ class Ingestor:
     @ensure_job_specs
     def store_embed(self, **kwargs: Any) -> "Ingestor":
         """
-        Adds a StoreTask to the batch job specification.
+        Adds a StoreEmbedTask to the batch job specification.
 
         Parameters
         ----------
         kwargs : dict
-            Parameters specific to the StoreTask.
+            Parameters specific to the StoreEmbedTask.
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreEmbedTaskSchema, kwargs, "store_embedding", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskStoreEmbedSchema, kwargs, "store_embedding", json.dumps(kwargs))
         store_task = StoreEmbedTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
@@ -898,7 +939,15 @@ class Ingestor:
             Returns self for chaining.
         """
         task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
-        caption_task = CaptionTask(**task_options.model_dump())
+
+        # Extract individual parameters from API schema for CaptionTask constructor
+        caption_params = {
+            "api_key": task_options.api_key,
+            "endpoint_url": task_options.endpoint_url,
+            "prompt": task_options.prompt,
+            "model_name": task_options.model_name,
+        }
+        caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
 
         return self

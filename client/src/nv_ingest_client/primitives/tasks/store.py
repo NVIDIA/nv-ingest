@@ -11,17 +11,13 @@ from typing import Dict
 from typing import Literal
 
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
 
 _DEFAULT_STORE_METHOD = "minio"
-
-
-class StoreEmbedTaskSchema:
-    class Config:
-        extra = "allow"
 
 
 class StoreTask(Task):
@@ -110,7 +106,17 @@ class StoreEmbedTask(Task):
         """
         super().__init__()
 
-        self._params = params or {}
+        # Handle None params by converting to empty dict for backward compatibility
+        if params is None:
+            params = {}
+
+        # Merge extra_params into params for API schema compatibility
+        merged_params = {**params, **extra_params}
+
+        # Use the API schema for validation
+        validated_data = IngestTaskStoreEmbedSchema(params=merged_params)
+
+        self._params = validated_data.params
         self._extra_params = extra_params
 
     def __str__(self) -> str:
