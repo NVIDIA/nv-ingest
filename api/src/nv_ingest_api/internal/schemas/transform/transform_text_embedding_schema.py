@@ -22,5 +22,9 @@ class TextEmbeddingSchema(BaseModel):
     input_type: str = Field(default="passage")
     raise_on_failure: bool = Field(default=False)
     truncate: str = Field(default="END")
+    text_elements_modality: str = Field(default="text")
+    image_elements_modality: str = Field(default="text")
+    structured_elements_modality: str = Field(default="text")
+    audio_elements_modality: str = Field(default="text")
 
     model_config = ConfigDict(extra="forbid")

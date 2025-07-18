@@ -24,6 +24,7 @@ import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YoloxPageElementsModelInterface,
@@ -32,6 +33,7 @@ from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
 from nv_ingest_api.util.metadata.aggregators import (
+    construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,
     construct_text_metadata,
@@ -44,6 +46,7 @@ from nv_ingest_api.util.pdf.pdfium import (
     extract_image_like_objects_from_pdfium_page,
 )
 from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
 logger = logging.getLogger(__name__)
@@ -261,7 +264,7 @@ def _extract_page_elements(
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
-    paddle_output_format: str,
+    table_output_format: str,
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
@@ -290,7 +293,7 @@ def _extract_page_elements(
         Flag indicating whether to extract charts.
     extract_infographics : bool
         Flag indicating whether to extract infographics.
-    paddle_output_format : str
+    table_output_format : str
         Format to use for table content.
     yolox_endpoints : Tuple[Optional[str], Optional[str]]
         A tuple containing the gRPC and HTTP endpoints for the YOLOX service.
@@ -337,7 +340,7 @@ def _extract_page_elements(
 
             # Set content format for tables
             if page_element.type_string == "table":
-                page_element.content_format = paddle_output_format
+                page_element.content_format = table_output_format
 
             # Construct metadata for the page element
             page_element_meta = construct_page_element_metadata(
@@ -370,6 +373,7 @@ def pdfium_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
@@ -393,13 +397,13 @@ def pdfium_extractor(
             f"Invalid text_depth: {text_depth_str}. Valid options: {list(TextTypeEnum.__members__.keys())}"
         )
 
-    # Validate and extract paddle_output_format
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    # Validate and extract table_output_format
+    table_output_format_str = extractor_config.get("table_output_format", "pseudo_markdown")
     try:
-        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+        table_output_format = TableFormatEnum[table_output_format_str.upper()]
     except KeyError:
         raise ValueError(
-            f"Invalid paddle_output_format: {paddle_output_format_str}. "
+            f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
 
@@ -510,6 +514,24 @@ def pdfium_extractor(
                 )
                 extracted_data.extend(image_data)
 
+            # Full page image extraction
+            if extract_page_as_image:
+                page_text = _extract_page_text(page)
+                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
+                image_meta = construct_image_metadata_from_base64(
+                    base64_image,
+                    page_idx,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
+                )
+                extracted_data.append(image_meta)
+
             # If we want tables or charts, rasterize the page and store it
             if extract_tables or extract_charts or extract_infographics:
                 image, padding_offsets = pdfium_pages_to_numpy(
@@ -529,7 +551,7 @@ def pdfium_extractor(
                         extract_tables,
                         extract_charts,
                         extract_infographics,
-                        paddle_output_format,
+                        table_output_format,
                         pdfium_config.yolox_endpoints,
                         pdfium_config.yolox_infer_protocol,
                         pdfium_config.auth_token,
@@ -551,13 +573,14 @@ def pdfium_extractor(
                 extract_tables,
                 extract_charts,
                 extract_infographics,
-                paddle_output_format,
+                table_output_format,
                 pdfium_config.yolox_endpoints,
                 pdfium_config.yolox_infer_protocol,
                 pdfium_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
+
             pages_for_tables.clear()
 
         # Wait for all asynchronous jobs to complete.
