@@ -12,7 +12,7 @@ stages:
     config:
       broker_client:
         client_type: "redis"
-        host: $MESSAGE_CLIENT_HOST|localhost
+        host: $MESSAGE_CLIENT_HOST|"redis"
         port: $MESSAGE_CLIENT_PORT|6379
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
@@ -42,20 +42,20 @@ stages:
         auth_token: $NGC_API_KEY|""
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
       nemoretriever_parse_config:
         auth_token: $NGC_API_KEY|""
         nemoretriever_parse_endpoints: [
           $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
-          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions"
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"http://nemoretriever-parse:8000/v1/chat/completions",
         ]
         nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
         nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
         yolox_endpoints: [
           $YOLOX_GRPC_ENDPOINT|"page-elements:8001",
-          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer"
+          $YOLOX_HTTP_ENDPOINT|"http://page-elements:8000/v1/infer",
         ]
         yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|grpc
     replicas:

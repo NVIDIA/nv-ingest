@@ -141,8 +141,6 @@ def _run_pipeline_process(
 def _launch_pipeline(
     pipeline_config: PipelineConfigSchema,
     block: bool,
-    disable_dynamic_scaling: bool = None,
-    dynamic_memory_threshold: float = None,
 ) -> Tuple[Union[RayPipeline, None], float]:
     logger.info("Starting pipeline setup")
 
@@ -306,8 +304,6 @@ def run_pipeline(
     pipeline, total_elapsed = _launch_pipeline(
         pipeline_config,
         block=block,
-        disable_dynamic_scaling=pipeline_config.pipeline.disable_dynamic_scaling,
-        dynamic_memory_threshold=pipeline_config.pipeline.dynamic_memory_threshold,
     )
 
     if block:

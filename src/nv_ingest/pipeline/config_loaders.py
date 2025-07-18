@@ -24,8 +24,16 @@ def load_pipeline_config(config_path: str) -> PipelineConfigSchema:
     # 2. Substitute all environment variable placeholders using the utility function
     substituted_content = substitute_env_vars_in_yaml_content(raw_content)
 
-    # 3. Parse the substituted content with PyYAML
-    processed_config = yaml.safe_load(substituted_content)
+    # 3. Parse the substituted content with PyYAML, with error handling
+    try:
+        processed_config = yaml.safe_load(substituted_content)
+    except yaml.YAMLError as e:
+        error_message = (
+            f"Failed to parse YAML after environment variable substitution. "
+            f"Error: {e}\n\n"
+            f"--- Substituted Content ---\n{substituted_content}\n---------------------------"
+        )
+        raise ValueError(error_message) from e
 
     # Pydantic validates the clean, substituted data against the schema
     return PipelineConfigSchema(**processed_config)

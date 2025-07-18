@@ -4,8 +4,14 @@ import re
 # This regex finds all forms of environment variables:
 # $VAR, ${VAR}, $VAR|default, and ${VAR|default}
 # It avoids matching escaped variables like $$.
+# Default values can be quoted or unquoted.
 _ENV_VAR_PATTERN = re.compile(
-    r"(?<!\$)\$(?:{(?P<braced>\w+)(?:\|(?P<braced_default>[^}]+))?}|(?P<named>\w+)(?:\|(?P<named_default>\S+))?)"
+    r"""(?<!\$)\$(?:
+        {(?P<braced>\w+)(?:\|(?P<braced_default>[^}]+))?}
+        |
+        (?P<named>\w+)(?:\|(?P<named_default>"[^"\\]*(?:\\.[^"\\]*)*"|'[^'\\]*(?:\\.[^'\\]*)*'|\S+))?
+    )""",
+    re.VERBOSE,
 )
 
 
@@ -19,7 +25,6 @@ def _replacer(match: re.Match) -> str:
     value = os.environ.get(var_name, default_val)
 
     if value is None:
-        # Return an empty string to match the old behavior for unset variables without defaults.
         return ""
     return value
 
