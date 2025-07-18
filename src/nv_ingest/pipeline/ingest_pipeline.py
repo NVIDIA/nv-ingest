@@ -7,7 +7,7 @@ import math
 from typing import Dict, Optional, Type, List, Set
 import os
 
-from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline
+from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import RayPipeline, ScalingConfig
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_sink_stage_base import RayActorSinkStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_source_stage_base import RayActorSourceStage
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
@@ -19,7 +19,7 @@ from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
 logger = logging.getLogger(__name__)
 
 
-class IngestPipeline:
+class IngestPipelineBuilder:
     """
     A high-level builder for creating and configuring an ingestion pipeline.
 
@@ -52,7 +52,11 @@ class IngestPipeline:
         """
         logger.debug(f"Initializing IngestPipeline for '{config.name}'.")
         self._config: PipelineConfigSchema = config
-        self._pipeline: RayPipeline = RayPipeline()
+        scaling_config = ScalingConfig(
+            dynamic_memory_scaling=not config.pipeline.disable_dynamic_scaling,
+            dynamic_memory_threshold=config.pipeline.dynamic_memory_threshold,
+        )
+        self._pipeline: RayPipeline = RayPipeline(scaling_config=scaling_config)
         self._system_resource_probe: SystemResourceProbe = system_resource_probe or SystemResourceProbe()
         self._is_built: bool = False
         self._built_stages: Set[str] = set()

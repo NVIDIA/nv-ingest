@@ -17,7 +17,6 @@
 # limitations under the License.
 
 import concurrent.futures
-import json
 import logging
 from typing import List, Tuple, Optional, Any
 
@@ -431,7 +430,6 @@ def pdfium_extractor(
 
     # Process pdfium_config
     pdfium_config_raw = extractor_config.get("pdfium_config", {})
-    logger.error(f"pdfium_config_raw: {json.dumps(pdfium_config_raw.model_dump(), indent=2)}")
     if isinstance(pdfium_config_raw, dict):
         pdfium_config = PDFiumConfigSchema(**pdfium_config_raw)
     elif isinstance(pdfium_config_raw, PDFiumConfigSchema):

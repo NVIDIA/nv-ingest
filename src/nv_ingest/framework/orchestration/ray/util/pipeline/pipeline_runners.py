@@ -18,11 +18,11 @@ import ray
 
 from nv_ingest.framework.orchestration.ray.primitives.ray_pipeline import (
     RayPipeline,
-    ScalingConfig,
     RayPipelineSubprocessInterface,
     RayPipelineInterface,
 )
-from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
+from nv_ingest.framework.orchestration.ray.stages.sources.message_broker_task_source import start_simple_message_broker
+from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
 
 logger = logging.getLogger(__name__)
@@ -30,10 +30,6 @@ logger = logging.getLogger(__name__)
 
 def str_to_bool(value: str) -> bool:
     return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-DISABLE_DYNAMIC_SCALING = str_to_bool(os.environ.get("INGEST_DISABLE_DYNAMIC_SCALING", "false"))
-DYNAMIC_MEMORY_THRESHOLD = float(os.environ.get("INGEST_DYNAMIC_MEMORY_THRESHOLD", 0.75))
 
 
 def redirect_os_fds(stdout: Optional[TextIO] = None, stderr: Optional[TextIO] = None):
@@ -176,19 +172,9 @@ def _launch_pipeline(
             },
         )
 
-    dynamic_memory_scaling = not DISABLE_DYNAMIC_SCALING
-    if disable_dynamic_scaling is not None:
-        dynamic_memory_scaling = not disable_dynamic_scaling
-
-    dynamic_memory_threshold = dynamic_memory_threshold if dynamic_memory_threshold else DYNAMIC_MEMORY_THRESHOLD
-
-    scaling_config = ScalingConfig(
-        dynamic_memory_scaling=dynamic_memory_scaling, dynamic_memory_threshold=dynamic_memory_threshold
-    )
-
     # Set up the ingestion pipeline
     start_abs = datetime.now()
-    ingest_pipeline = IngestPipeline(pipeline_config, scaling_config)
+    ingest_pipeline = IngestPipelineBuilder(pipeline_config)
     ingest_pipeline.build()
 
     # Record setup time
@@ -249,11 +235,9 @@ def run_pipeline(
         If True, blocks until the pipeline completes.
         If False, returns an interface to control the pipeline externally.
     disable_dynamic_scaling : Optional[bool], default=None
-        If True, disables dynamic memory scaling. Overrides global configuration if set.
-        If None, uses the default or globally defined behavior.
+        If provided, overrides the `disable_dynamic_scaling` setting from the pipeline config.
     dynamic_memory_threshold : Optional[float], default=None
-        The memory usage threshold (as a float between 0 and 1) that triggers autoscaling,
-        if dynamic scaling is enabled. Defaults to the globally configured value if None.
+        If provided, overrides the `dynamic_memory_threshold` setting from the pipeline config.
     run_in_subprocess : bool, default=False
         If True, launches the pipeline in a separate Python subprocess using `multiprocessing.Process`.
         If False, runs the pipeline in the current process.
@@ -279,7 +263,13 @@ def run_pipeline(
     Exception
         Any other exceptions raised during pipeline launch or configuration.
     """
-    logger.info(f"Pipeline config: {json.dumps(pipeline_config.model_dump(), indent=2)}")
+    if disable_dynamic_scaling is not None:
+        pipeline_config.pipeline.disable_dynamic_scaling = disable_dynamic_scaling
+    if dynamic_memory_threshold is not None:
+        pipeline_config.pipeline.dynamic_memory_threshold = dynamic_memory_threshold
+    if pipeline_config.pipeline.launch_simple_broker:
+        start_simple_message_broker({})
+
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
 
@@ -288,8 +278,8 @@ def run_pipeline(
             target=_run_pipeline_process,
             args=(
                 pipeline_config,
-                disable_dynamic_scaling,
-                dynamic_memory_threshold,
+                pipeline_config.pipeline.disable_dynamic_scaling,
+                pipeline_config.pipeline.dynamic_memory_threshold,
                 stdout,  # raw_stdout
                 stderr,  # raw_stderr
             ),
@@ -316,8 +306,8 @@ def run_pipeline(
     pipeline, total_elapsed = _launch_pipeline(
         pipeline_config,
         block=block,
-        disable_dynamic_scaling=disable_dynamic_scaling,
-        dynamic_memory_threshold=dynamic_memory_threshold,
+        disable_dynamic_scaling=pipeline_config.pipeline.disable_dynamic_scaling,
+        dynamic_memory_threshold=pipeline_config.pipeline.dynamic_memory_threshold,
     )
 
     if block:

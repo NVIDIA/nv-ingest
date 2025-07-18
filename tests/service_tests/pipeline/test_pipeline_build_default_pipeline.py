@@ -8,7 +8,7 @@ import pytest
 import ray
 
 from nv_ingest.pipeline.config_loaders import load_pipeline_config
-from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
+from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageType
 
 # Correctly import the utility from the top-level tests directory
@@ -40,7 +40,7 @@ def test_load_and_build_default_pipeline(pipeline_config_file: str, ray_instance
     assert isinstance(config, PipelineConfigSchema)
 
     # 2. Attempt to build an IngestPipeline from the loaded configuration
-    ingest_pipeline = IngestPipeline(config)
+    ingest_pipeline = IngestPipelineBuilder(config)
     try:
         ingest_pipeline.build()
 

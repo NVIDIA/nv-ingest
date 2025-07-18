@@ -142,6 +142,28 @@ class EdgeConfig(BaseModel):
         extra = Extra.forbid
 
 
+class PipelineRuntimeConfig(BaseModel):
+    """
+    Configuration for the pipeline's runtime behavior.
+
+    Attributes
+    ----------
+    disable_dynamic_scaling : bool
+        If True, disables the dynamic scaling of stage replicas.
+    dynamic_memory_threshold : float
+        The memory utilization threshold (0.0 to 1.0) for dynamic scaling decisions.
+    """
+
+    disable_dynamic_scaling: bool = Field(False, description="Disable dynamic scaling of stage replicas.")
+    dynamic_memory_threshold: float = Field(
+        0.75, ge=0.0, le=0.95, description="Memory utilization threshold for dynamic scaling."
+    )
+    launch_simple_broker: bool = Field(False, description="Launch a simple message broker for the pipeline.")
+
+    class Config:
+        extra = Extra.forbid
+
+
 class PipelineConfigSchema(BaseModel):
     """
     Root configuration model for an ingestion pipeline.
@@ -159,12 +181,17 @@ class PipelineConfigSchema(BaseModel):
         A list of all stage configurations in the pipeline.
     edges : List[EdgeConfig]
         A list of all edge configurations that define the pipeline's topology.
+    pipeline: Optional[PipelineRuntimeConfig] = Field(default_factory=PipelineRuntimeConfig,
+        description="Runtime configuration for the pipeline.")
     """
 
     name: str = Field(..., description="The name of the pipeline.")
     description: str = Field(..., description="A description of the pipeline.")
     stages: List[StageConfig] = Field(..., description="List of all stages in the pipeline.")
     edges: List[EdgeConfig] = Field(..., description="List of all edges connecting the stages.")
+    pipeline: Optional[PipelineRuntimeConfig] = Field(
+        default_factory=PipelineRuntimeConfig, description="Runtime configuration for the pipeline."
+    )
 
     @field_validator("stages", "edges")
     def check_not_empty(cls, v: list) -> list:

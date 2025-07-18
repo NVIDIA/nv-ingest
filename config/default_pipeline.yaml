@@ -386,3 +386,9 @@ edges:
   - from: "otel_tracer"
     to: "drain"
     queue_size: 32
+
+# Optional pipeline-wide settings
+pipeline:
+  disable_dynamic_scaling: false
+  dynamic_memory_threshold: 0.75
+  launch_simple_broker: false

@@ -5,7 +5,7 @@
 import pytest
 from pydantic import ValidationError
 
-from nv_ingest.pipeline.ingest_pipeline import IngestPipeline
+from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageConfig, EdgeConfig
 
 
@@ -20,7 +20,7 @@ def test_dependency_on_non_existent_stage_raises_error():
         ],
         edges=[EdgeConfig(**{"from": "stage_c", "to": "stage_a"})],
     )
-    pipeline = IngestPipeline(config)
+    pipeline = IngestPipelineBuilder(config)
     with pytest.raises(ValueError, match="'stage_b' is not a defined stage"):
         pipeline.build()
 
@@ -36,7 +36,7 @@ def test_direct_circular_dependency_raises_error():
         ],
         edges=[EdgeConfig(**{"from": "stage_a", "to": "stage_b"})],
     )
-    pipeline = IngestPipeline(config)
+    pipeline = IngestPipelineBuilder(config)
     with pytest.raises(ValueError, match="Circular dependency detected"):
         pipeline.build()
 
@@ -53,7 +53,7 @@ def test_indirect_circular_dependency_raises_error():
         ],
         edges=[EdgeConfig(**{"from": "stage_a", "to": "stage_b"})],
     )
-    pipeline = IngestPipeline(config)
+    pipeline = IngestPipelineBuilder(config)
     with pytest.raises(ValueError, match="Circular dependency detected"):
         pipeline.build()
 
@@ -82,7 +82,7 @@ def test_valid_diamond_dependency_passes(monkeypatch):
         ],
     )
     # This should build without raising an exception
-    pipeline = IngestPipeline(config)
+    pipeline = IngestPipelineBuilder(config)
     try:
         pipeline.build()
     except ValueError as e:
