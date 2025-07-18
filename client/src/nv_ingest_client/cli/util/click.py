@@ -22,12 +22,12 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import UDFTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
-from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.primitives.tasks.udf import UDFTaskSchema
@@ -232,7 +232,7 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
             options: Dict[str, Any] = parse_task_options(task_id, json_options)
 
             if task_id == "split":
-                task_options = check_schema(SplitTaskSchema, options, task_id, json_options)
+                task_options = check_schema(IngestTaskSplitSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, SplitTask(**task_options.model_dump()))]
             elif task_id == "extract":
@@ -248,7 +248,7 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, StoreEmbedTask(**task_options.model_dump()))]
             elif task_id == "caption":
-                task_options = check_schema(CaptionTaskSchema, options, task_id, json_options)
+                task_options = check_schema(IngestTaskCaptionSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, CaptionTask(**task_options.model_dump()))]
             elif task_id == "dedup":

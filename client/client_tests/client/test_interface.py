@@ -4,10 +4,14 @@
 
 # SPDX-FileCopyrightText: Copyright (c) 2024 NVIDIA CORPORATION & AFFILIATES. All rights reserved.
 
+# noqa
+# flake8: noqa
+
 import io
 import json
 import logging
 import os
+import sys
 import tempfile
 from concurrent.futures import Future
 from unittest.mock import ANY
@@ -33,7 +37,14 @@ from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.vdb.milvus import Milvus
 
+# Add path to tests directory for utilities
+sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tests"))
+from utilities_for_test import get_git_root
+
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
+
+# Get the git root for proper path resolution
+GIT_ROOT = get_git_root(__file__)
 
 
 @pytest.fixture
@@ -44,12 +55,26 @@ def mock_client():
 
 @pytest.fixture
 def documents():
-    return ["data/multimodal_test.pdf"]
+    if GIT_ROOT:
+        return [os.path.join(GIT_ROOT, "data", "multimodal_test.pdf")]
+    else:
+        # Fallback to relative path if git root not found
+        return ["data/multimodal_test.pdf"]
 
 
 @pytest.fixture
 def text_documents():
-    return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
+    if GIT_ROOT:
+        return [
+            os.path.join(GIT_ROOT, "data", "test.txt"),
+            os.path.join(GIT_ROOT, "data", "test.html"),
+            os.path.join(GIT_ROOT, "data", "test.json"),
+            os.path.join(GIT_ROOT, "data", "test.md"),
+            os.path.join(GIT_ROOT, "data", "test.sh"),
+        ]
+    else:
+        # Fallback to relative paths if git root not found
+        return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
 
 
 @pytest.fixture
@@ -181,12 +206,13 @@ def test_split_task_no_args(ingestor):
 
 
 def test_split_task_some_args(ingestor):
-    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42)
+    ingestor.split(tokenizer="intfloat/e5-large-unsupervised", chunk_size=42, chunk_overlap=20)
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, SplitTask)
     assert task._tokenizer == "intfloat/e5-large-unsupervised"
     assert task._chunk_size == 42
+    assert task._chunk_overlap == 20
 
 
 def test_store_task_no_args(ingestor):

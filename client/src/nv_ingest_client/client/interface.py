@@ -41,12 +41,12 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import UDFTask
-from nv_ingest_client.primitives.tasks.caption import CaptionTaskSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
-from nv_ingest_client.primitives.tasks.split import SplitTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
 from nv_ingest_client.primitives.tasks.udf import UDFTaskSchema
@@ -772,7 +772,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(SplitTaskSchema, kwargs, "split", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskSplitSchema, kwargs, "split", json.dumps(kwargs))
         extract_task = SplitTask(**task_options.model_dump())
         self._job_specs.add_task(extract_task)
 
@@ -897,7 +897,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(CaptionTaskSchema, kwargs, "caption", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
         caption_task = CaptionTask(**task_options.model_dump())
         self._job_specs.add_task(caption_task)
 
