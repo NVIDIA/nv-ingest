@@ -216,8 +216,11 @@ def extract_page_elements_from_images(
         # Perform inference in a single call. The NimClient handles batching internally.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=trace_info,
             stage_name="pdf_extraction",
         )
