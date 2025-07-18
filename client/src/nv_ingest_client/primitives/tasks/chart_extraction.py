@@ -55,4 +55,4 @@ class ChartExtractionTask(Task):
             "params": self._params,
         }
 
-        return {"task_type": "chart_extraction", "task_properties": task_properties}
+        return {"type": "chart_data_extract", "task_properties": task_properties}
