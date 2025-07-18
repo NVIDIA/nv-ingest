@@ -74,9 +74,7 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
     Supports three formats:
     1. Inline function string: 'def my_func(control_message): ...'
     2. Import path: 'my_module.my_function'
-    3. File path: '/path/to/file.py:my_function'
-
-    Returns the function as a string for execution.
+    3. File path: '/path/to/file.py:my_function' or '/path/to/file.py' (assumes 'process' function)
     """
     if udf_function_spec.strip().startswith("def "):
         # Already an inline function string
@@ -85,6 +83,19 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
     elif ".py:" in udf_function_spec:
         # File path format: /path/to/file.py:function_name
         file_path, function_name = udf_function_spec.split(":", 1)
+        func = _load_function_from_file_path(file_path, function_name)
+
+        # Get the source code of the function
+        try:
+            source = inspect.getsource(func)
+            return source
+        except (OSError, TypeError) as e:
+            raise ValueError(f"Could not get source code for function '{function_name}': {e}")
+
+    elif udf_function_spec.endswith(".py"):
+        # File path format without function name: /path/to/file.py (assumes 'process' function)
+        file_path = udf_function_spec
+        function_name = "process"  # Default function name
         func = _load_function_from_file_path(file_path, function_name)
 
         # Get the source code of the function
@@ -120,7 +131,7 @@ class UDFTask(Task):
     Supports three UDF function specification formats:
     1. Inline function string: 'def my_func(control_message): ...'
     2. Import path: 'my_module.my_function'
-    3. File path: '/path/to/file.py:my_function'
+    3. File path: '/path/to/file.py:my_function' or '/path/to/file.py' (assumes 'process' function)
     """
 
     def __init__(

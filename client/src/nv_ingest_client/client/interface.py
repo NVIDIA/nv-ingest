@@ -49,7 +49,6 @@ from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilt
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -933,8 +932,8 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(IngestTaskUDFSchema, kwargs, "udf", json.dumps(kwargs))
-        udf_task = UDFTask(**task_options.model_dump())
+        # Use UDFTask constructor directly - it handles phase conversion and API schema validation
+        udf_task = UDFTask(**kwargs)
         self._job_specs.add_task(udf_task)
 
         return self
