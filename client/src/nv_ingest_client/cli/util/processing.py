@@ -456,7 +456,6 @@ def create_and_process_jobs(
     retry_job_ids: List[str] = []
     job_id_map: Dict[str, str] = {}
     retry_counts: Dict[str, int] = defaultdict(int)
-    file_page_counts: Dict[str, int] = {}
 
     start_time_ns: int = time.time_ns()
     with tqdm(total=total_files, desc="Processing files", unit="file") as pbar:
