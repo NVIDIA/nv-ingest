@@ -21,7 +21,6 @@ def _replacer(match: re.Match) -> str:
     default_val = match.group("braced_default") or match.group("named_default")
 
     # Get value from environment, or use default.
-    # If no default is provided, it will be None.
     value = os.environ.get(var_name, default_val)
 
     if value is None:

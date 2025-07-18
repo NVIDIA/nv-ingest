@@ -389,6 +389,6 @@ edges:
 
 # Optional pipeline-wide settings
 pipeline:
-  disable_dynamic_scaling: false
-  dynamic_memory_threshold: 0.75
+  disable_dynamic_scaling: $INGEST_DISABLE_DYNAMIC_SCALING|false
+  dynamic_memory_threshold: $INGEST_DYNAMIC_MEMORY_THRESHOLD|0.75
   launch_simple_broker: false
