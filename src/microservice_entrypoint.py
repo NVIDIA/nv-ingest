@@ -13,7 +13,7 @@ from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import
 from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
 from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config, dump_pipeline_to_graphviz
 
-_env_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
+_env_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if _env_log_level.upper() == "DEFAULT":
     _env_log_level = "INFO"
 

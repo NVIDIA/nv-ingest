@@ -93,8 +93,6 @@ def kill_pipeline_process_group(pid: int):
 
 def _run_pipeline_process(
     pipeline_config: PipelineConfigSchema,
-    disable_dynamic_scaling: Optional[bool],
-    dynamic_memory_threshold: Optional[float],
     raw_stdout: Optional[TextIO] = None,
     raw_stderr: Optional[TextIO] = None,
 ):
@@ -130,8 +128,6 @@ def _run_pipeline_process(
         _launch_pipeline(
             pipeline_config,
             block=True,
-            disable_dynamic_scaling=disable_dynamic_scaling,
-            dynamic_memory_threshold=dynamic_memory_threshold,
         )
     except Exception as e:
         sys.__stderr__.write(f"Subprocess pipeline run failed: {e}\n")
@@ -276,8 +272,6 @@ def run_pipeline(
             target=_run_pipeline_process,
             args=(
                 pipeline_config,
-                pipeline_config.pipeline.disable_dynamic_scaling,
-                pipeline_config.pipeline.dynamic_memory_threshold,
                 stdout,  # raw_stdout
                 stderr,  # raw_stderr
             ),
