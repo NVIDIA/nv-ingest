@@ -42,14 +42,14 @@ from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -660,8 +660,23 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(DedupTaskSchema, kwargs, "dedup", json.dumps(kwargs))
-        dedup_task = DedupTask(**task_options.model_dump())
+        # Extract content_type and build params dict for API schema
+        content_type = kwargs.pop("content_type", "text")  # Default to "text" if not specified
+        params = kwargs  # Remaining parameters go into params dict
+
+        # Validate with API schema
+        api_options = {
+            "content_type": content_type,
+            "params": params,
+        }
+        task_options = check_schema(IngestTaskDedupSchema, api_options, "dedup", json.dumps(api_options))
+
+        # Extract individual parameters from API schema for DedupTask constructor
+        dedup_params = {
+            "content_type": task_options.content_type,
+            "filter": task_options.params.filter,
+        }
+        dedup_task = DedupTask(**dedup_params)
         self._job_specs.add_task(dedup_task)
 
         return self
@@ -735,9 +750,52 @@ class Ingestor:
                 extract_page_as_image=extract_page_as_image,
                 **kwargs,
             )
-            task_options = check_schema(ExtractTaskSchema, task_options, "extract", json.dumps(task_options))
 
-            extract_task = ExtractTask(**task_options.model_dump())
+            # Extract method from task_options for API schema
+            method = task_options.pop("extract_method", None)
+            if method is None:
+                # Let ExtractTask constructor handle default method selection
+                method = "pdfium"  # Default fallback
+
+            # Build params dict for API schema
+            params = {k: v for k, v in task_options.items() if k != "document_type"}
+
+            # Map document type to API schema expected values
+            # Handle common file extension to DocumentTypeEnum mapping
+            document_type_mapping = {
+                "txt": "text",
+                "md": "text",
+                "sh": "text",
+                "json": "text",
+                "jpg": "jpeg",
+                "jpeg": "jpeg",
+                "png": "png",
+                "pdf": "pdf",
+                "docx": "docx",
+                "pptx": "pptx",
+                "html": "html",
+                "bmp": "bmp",
+                "tiff": "tiff",
+                "svg": "svg",
+                "mp3": "mp3",
+                "wav": "wav",
+            }
+
+            # Use mapped document type for API schema validation
+            api_document_type = document_type_mapping.get(document_type.lower(), document_type)
+
+            # Validate with API schema
+            api_task_options = {
+                "document_type": api_document_type,
+                "method": method,
+                "params": params,
+            }
+
+            check_schema(IngestTaskExtractSchema, api_task_options, "extract", json.dumps(api_task_options))
+
+            # Create ExtractTask with mapped document type for API schema compatibility
+            extract_task_params = {"document_type": api_document_type, "extract_method": method, **params}
+            extract_task = ExtractTask(**extract_task_params)
             self._job_specs.add_task(extract_task, document_type=document_type)
 
         return self

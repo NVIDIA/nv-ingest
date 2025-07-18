@@ -18,19 +18,21 @@ from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
 from nv_ingest_client.primitives.tasks import FilterTask
+from nv_ingest_client.primitives.tasks import InfographicExtractionTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskInfographicExtraction
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
-from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
-from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
 from nv_ingest_client.util.util import generate_matching_files
 
 logger = logging.getLogger(__name__)
@@ -145,6 +147,7 @@ TaskType = Union[
     EmbedTask,
     ExtractTask,
     FilterTask,
+    InfographicExtractionTask,
     SplitTask,
     StoreEmbedTask,
     StoreTask,
@@ -230,9 +233,30 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, SplitTask(**task_options.model_dump()))]
             elif task_id == "extract":
-                task_options = check_schema(ExtractTaskSchema, options, task_id, json_options)
-                new_task_id = f"{task_id}_{task_options.document_type}"
-                new_task = [(new_task_id, ExtractTask(**task_options.model_dump()))]
+                # Map CLI parameters to API schema structure
+                method = options.pop("extract_method", None)
+                if method is None:
+                    method = "pdfium"  # Default fallback
+
+                # Build params dict for API schema
+                params = {k: v for k, v in options.items() if k != "document_type"}
+
+                # Validate with API schema
+                api_options = {
+                    "document_type": options.get("document_type"),
+                    "method": method,
+                    "params": params,
+                }
+                task_options = check_schema(IngestTaskExtractSchema, api_options, task_id, json_options)
+                new_task_id = f"{task_id}_{task_options.document_type.value}"
+
+                # Create ExtractTask with original CLI parameters
+                extract_task_params = {
+                    "document_type": task_options.document_type,
+                    "extract_method": task_options.method,
+                    **task_options.params,
+                }
+                new_task = [(new_task_id, ExtractTask(**extract_task_params))]
             elif task_id == "store":
                 task_options = check_schema(IngestTaskStoreSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
@@ -253,9 +277,14 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 }
                 new_task = [(new_task_id, CaptionTask(**caption_params))]
             elif task_id == "dedup":
-                task_options = check_schema(DedupTaskSchema, options, task_id, json_options)
+                task_options = check_schema(IngestTaskDedupSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
-                new_task = [(new_task_id, DedupTask(**task_options.model_dump()))]
+                # Extract individual parameters from API schema for DedupTask constructor
+                dedup_params = {
+                    "content_type": task_options.content_type,
+                    "filter": task_options.params.filter,
+                }
+                new_task = [(new_task_id, DedupTask(**dedup_params))]
             elif task_id == "filter":
                 task_options = check_schema(IngestTaskFilterSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
@@ -272,6 +301,10 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 task_options = check_schema(IngestTaskEmbedSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, EmbedTask(**task_options.model_dump()))]
+            elif task_id == "infographic":
+                task_options = check_schema(IngestTaskInfographicExtraction, options, task_id, json_options)
+                new_task_id = f"{task_id}"
+                new_task = [(new_task_id, InfographicExtractionTask(**task_options.model_dump()))]
             elif task_id == "udf":
                 # Pre-process UDF task options to convert phase names to integers
                 if "phase" in options and isinstance(options["phase"], str):
