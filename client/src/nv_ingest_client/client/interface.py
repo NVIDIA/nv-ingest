@@ -42,14 +42,14 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
 from nv_ingest_client.primitives.tasks.dedup import DedupTaskSchema
 from nv_ingest_client.primitives.tasks.embed import EmbedTaskSchema
 from nv_ingest_client.primitives.tasks.extract import ExtractTaskSchema
-from nv_ingest_client.primitives.tasks.filter import FilterTaskSchema
 from nv_ingest_client.primitives.tasks.store import StoreEmbedTaskSchema
-from nv_ingest_client.primitives.tasks.store import StoreTaskSchema
-from nv_ingest_client.primitives.tasks.udf import UDFTaskSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -751,7 +751,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(FilterTaskSchema, kwargs, "filter", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskFilterSchema, kwargs, "filter", json.dumps(kwargs))
         filter_task = FilterTask(**task_options.model_dump())
         self._job_specs.add_task(filter_task)
 
@@ -793,7 +793,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(StoreTaskSchema, kwargs, "store", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskStoreSchema, kwargs, "store", json.dumps(kwargs))
         store_task = StoreTask(**task_options.model_dump())
         self._job_specs.add_task(store_task)
 
@@ -834,7 +834,7 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(UDFTaskSchema, kwargs, "udf", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskUDFSchema, kwargs, "udf", json.dumps(kwargs))
         udf_task = UDFTask(**task_options.model_dump())
         self._job_specs.add_task(udf_task)
 

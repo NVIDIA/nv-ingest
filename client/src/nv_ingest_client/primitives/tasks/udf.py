@@ -14,92 +14,12 @@ from typing import Dict
 from typing import Optional
 from typing import Union
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
 from nv_ingest.pipeline.pipeline_schema import PipelinePhase
 
 from .task_base import Task
 
 logger = logging.getLogger(__name__)
-
-
-class UDFTaskSchema(BaseModel):
-    udf_function: Optional[str] = Field(
-        None,
-        description="UDF function specification. Supports three formats:\n"
-        "1. Inline function string: 'def my_func(control_message): ...'\n"
-        "2. Import path: 'my_module.my_function'\n"
-        "3. File path: '/path/to/file.py:my_function'",
-    )
-    phase: Union[PipelinePhase, int, str] = Field(
-        PipelinePhase.RESPONSE,
-        description="Pipeline phase where this UDF should be executed. "
-        "Can be specified as phase name (e.g., 'EXTRACTION', 'TRANSFORM') or numeric value. "
-        "Defaults to RESPONSE phase.",
-    )
-
-    model_config = ConfigDict(extra="forbid")
-    model_config["protected_namespaces"] = ()
-
-    @field_validator("udf_function")
-    @classmethod
-    def validate_udf_function(cls, v):
-        """Validate UDF function specification format."""
-        if v is None:
-            return v
-
-        if not isinstance(v, str):
-            raise ValueError("udf_function must be a string")
-
-        if not v.strip():
-            raise ValueError("udf_function cannot be empty")
-
-        return v
-
-    @field_validator("phase")
-    @classmethod
-    def validate_phase(cls, v):
-        """Validate and convert phase to PipelinePhase enum."""
-        if isinstance(v, PipelinePhase):
-            return v
-
-        if isinstance(v, int):
-            try:
-                return PipelinePhase(v)
-            except ValueError:
-                valid_values = [phase.value for phase in PipelinePhase]
-                raise ValueError(f"Invalid phase number {v}. Valid values are: {valid_values}")
-
-        if isinstance(v, str):
-            # Convert string to uppercase and try to match enum name
-            phase_name = v.upper().strip()
-
-            # Handle common aliases and variations
-            phase_aliases = {
-                "EXTRACT": "EXTRACTION",
-                "PREPROCESS": "PRE_PROCESSING",
-                "PRE_PROCESS": "PRE_PROCESSING",
-                "PREPROCESSING": "PRE_PROCESSING",
-                "POSTPROCESS": "POST_PROCESSING",
-                "POST_PROCESS": "POST_PROCESSING",
-                "POSTPROCESSING": "POST_PROCESSING",
-                "MUTATE": "MUTATION",
-            }
-
-            # Apply alias if exists
-            if phase_name in phase_aliases:
-                phase_name = phase_aliases[phase_name]
-
-            try:
-                return PipelinePhase[phase_name]
-            except KeyError:
-                valid_names = [phase.name for phase in PipelinePhase]
-                valid_aliases = list(phase_aliases.keys())
-                raise ValueError(
-                    f"Invalid phase name '{v}'. Valid phase names are: {valid_names}. "
-                    f"Also supported aliases: {valid_aliases}"
-                )
-
-        raise ValueError(f"Phase must be a PipelinePhase enum, integer, or string, got {type(v)}")
 
 
 def _load_function_from_import_path(import_path: str):
@@ -171,7 +91,7 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
         try:
             source = inspect.getsource(func)
             return source
-        except OSError as e:
+        except (OSError, TypeError) as e:
             raise ValueError(f"Could not get source code for function '{function_name}': {e}")
 
     elif "." in udf_function_spec:
@@ -182,7 +102,7 @@ def _resolve_udf_function(udf_function_spec: str) -> str:
         try:
             source = inspect.getsource(func)
             return source
-        except OSError as e:
+        except (OSError, TypeError) as e:
             raise ValueError(f"Could not get source code for function from '{udf_function_spec}': {e}")
 
     else:
@@ -205,16 +125,66 @@ class UDFTask(Task):
 
     def __init__(
         self,
-        udf_function: str = None,
+        udf_function: Optional[str] = None,
         phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
     ) -> None:
         super().__init__()
         self._udf_function = udf_function
 
-        # Use the schema validation to convert phase string to enum if needed
-        validated_data = UDFTaskSchema(udf_function=udf_function, phase=phase)
-        self._phase = validated_data.phase
+        # Convert phase to the appropriate format for API schema
+        converted_phase = self._convert_phase(phase)
+
+        # Use the API schema for validation
+        validated_data = IngestTaskUDFSchema(
+            udf_function=udf_function or "", phase=converted_phase  # API schema requires non-empty string
+        )
+        self._phase = PipelinePhase(validated_data.phase)  # Convert back to enum for internal use
         self._resolved_udf_function = None
+
+    def _convert_phase(self, phase: Union[PipelinePhase, int, str]) -> int:
+        """Convert phase to integer for API schema validation."""
+        if isinstance(phase, PipelinePhase):
+            return phase.value
+
+        if isinstance(phase, int):
+            try:
+                PipelinePhase(phase)  # Validate it's a valid phase number
+                return phase
+            except ValueError:
+                valid_values = [p.value for p in PipelinePhase]
+                raise ValueError(f"Invalid phase number {phase}. Valid values are: {valid_values}")
+
+        if isinstance(phase, str):
+            # Convert string to uppercase and try to match enum name
+            phase_name = phase.upper().strip()
+
+            # Handle common aliases and variations
+            phase_aliases = {
+                "EXTRACT": "EXTRACTION",
+                "PREPROCESS": "PRE_PROCESSING",
+                "PRE_PROCESS": "PRE_PROCESSING",
+                "PREPROCESSING": "PRE_PROCESSING",
+                "POSTPROCESS": "POST_PROCESSING",
+                "POST_PROCESS": "POST_PROCESSING",
+                "POSTPROCESSING": "POST_PROCESSING",
+                "MUTATE": "MUTATION",
+            }
+
+            # Apply alias if exists
+            if phase_name in phase_aliases:
+                phase_name = phase_aliases[phase_name]
+
+            try:
+                return PipelinePhase[phase_name].value
+            except KeyError:
+                valid_names = [p.name for p in PipelinePhase]
+                valid_aliases = list(phase_aliases.keys())
+                raise ValueError(
+                    f"Invalid phase name '{phase}'. Valid phase names are: {valid_names}. "
+                    f"Also supported aliases: {valid_aliases}"
+                )
+
+        raise ValueError(f"Phase must be a PipelinePhase enum, integer, or string, got {type(phase)}")
 
     def __str__(self) -> str:
         """
