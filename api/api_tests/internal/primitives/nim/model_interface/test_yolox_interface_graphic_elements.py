@@ -26,7 +26,6 @@ class TestYoloxGraphicElementsModelInterface(unittest.TestCase):
         # Mock constants
         self.constants_patcher = patch.multiple(
             MODULE_UNDER_TEST,
-            YOLOX_GRAPHIC_IMAGE_PREPROC_HEIGHT=1024,
             YOLOX_GRAPHIC_NIM_MAX_IMAGE_SIZE=1000000,
             YOLOX_GRAPHIC_NUM_CLASSES=5,
             YOLOX_GRAPHIC_CONF_THRESHOLD=0.5,
@@ -69,8 +68,6 @@ class TestYoloxGraphicElementsModelInterface(unittest.TestCase):
     def test_initialization(self):
         """Test initialization of YoloxGraphicElementsModelInterface."""
         # Check parent class initialization
-        self.assertEqual(self.model_interface.image_preproc_width, 1024)
-        self.assertEqual(self.model_interface.image_preproc_height, 1024)
         self.assertEqual(self.model_interface.nim_max_image_size, 1000000)
         self.assertEqual(self.model_interface.num_classes, 5)
         self.assertEqual(self.model_interface.conf_threshold, 0.5)

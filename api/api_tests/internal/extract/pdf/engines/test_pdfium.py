@@ -82,14 +82,12 @@ def test_extract_page_elements_happy_path(dummy_pages):
         result = _extract_page_elements_using_image_ensemble(
             dummy_pages,
             yolox_client=mock_yolox_client,
-            yolox_model_name="yolox",
             execution_trace_log=["dummy_trace"],
         )
 
         # Assert yolox_client called once
         mock_yolox_client.infer.assert_called_once_with(
             {"images": [dummy_pages[0][1], dummy_pages[1][1]]},
-            model_name="yolox",
             max_batch_size=module_under_test.YOLOX_MAX_BATCH_SIZE,
             trace_info=["dummy_trace"],
             stage_name="pdf_content_extractor",
@@ -114,7 +112,6 @@ def test_extract_page_elements_handles_timeout(dummy_pages):
             _extract_page_elements_using_image_ensemble(
                 dummy_pages,
                 yolox_client=mock_yolox_client,
-                yolox_model_name="yolox",
             )
         # Ensure _extract_page_element_images was never called
         mock_extract_images.assert_not_called()
@@ -297,15 +294,12 @@ def test_extract_page_images_happy_path(
 @patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
 @patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
-@patch(f"{MODULE_UNDER_TEST}.get_yolox_model_name")
 def test_extract_page_elements_happy_path2(
-    mock_get_model_name,
     mock_create_client,
     mock_extract_ensemble,
     mock_construct_metadata,
 ):
     # Setup dummy returns
-    mock_get_model_name.return_value = "custom_yolox"
     mock_client = MagicMock()
     mock_create_client.return_value = mock_client
     mock_element = MagicMock()
@@ -335,24 +329,19 @@ def test_extract_page_elements_happy_path2(
     )
 
     # Assertions
-    mock_get_model_name.assert_called_once_with("http://dummy")
     mock_create_client.assert_called_once()
-    mock_extract_ensemble.assert_called_once_with(
-        dummy_pages, mock_client, "custom_yolox", execution_trace_log=dummy_trace_log
-    )
+    mock_extract_ensemble.assert_called_once_with(dummy_pages, mock_client, execution_trace_log=dummy_trace_log)
     assert mock_construct_metadata.call_count == 2
     assert result == ["meta_0", "meta_1"]
     mock_client.close.assert_called_once()
 
 
 @patch(f"{MODULE_UNDER_TEST}.create_inference_client")
-@patch(f"{MODULE_UNDER_TEST}.get_yolox_model_name", side_effect=Exception("model error"))
 @patch(f"{MODULE_UNDER_TEST}._extract_page_elements_using_image_ensemble")
 @patch(f"{MODULE_UNDER_TEST}.construct_page_element_metadata")
 def test_extract_page_elements_fallback_to_default_model(
     mock_construct_metadata,
     mock_extract_ensemble,
-    mock_get_model_name,
     mock_create_client,
 ):
     # Fallback to 'yolox' if model name fetch fails
