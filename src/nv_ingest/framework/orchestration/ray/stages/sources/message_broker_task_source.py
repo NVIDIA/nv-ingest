@@ -509,6 +509,6 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     p = multiprocessing.Process(target=broker_server)
     p.daemon = False
     p.start()
-    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client['port']}")
+    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client.get('port', 7671)}")
 
     return p

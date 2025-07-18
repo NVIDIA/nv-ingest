@@ -1,5 +1,5 @@
 # Default Ingestion Pipeline Configuration for Library Mode
-# This file uses the defaults defined in PipelineCreationSchema in pipeline_runners.py
+# This file replicates the static pipeline defined in pipeline_builders.py
 
 name: "NVIngest default libmode pipeline"
 description: "This is the default ingestion pipeline for NVIngest in library mode"
@@ -12,8 +12,8 @@ stages:
     config:
       broker_client:
         client_type: "simple"
-        host: "localhost"
-        port: 7671
+        host: $MESSAGE_CLIENT_HOST|"0.0.0.0"
+        port: $MESSAGE_CLIENT_PORT|7671
       task_queue: "ingest_task_queue"
       poll_interval: 0.1
     replicas:
@@ -38,11 +38,26 @@ stages:
     phase: 1  # EXTRACTION
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pdf_extractor:PDFExtractorStage"
     config:
+      pdfium_config:
+        auth_token: $NGC_API_KEY|""
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
       nemoretriever_parse_config:
-        auth_token: ""
-        nemoretriever_parse_endpoints: [ "", "https://integrate.api.nvidia.com/v1/chat/completions" ]
-        nemoretriever_parse_infer_protocol: "http"
-        nemoretriever_parse_model_name: "nvidia/nemoretriever-parse"
+        auth_token: $NGC_API_KEY|""
+        nemoretriever_parse_endpoints: [
+          $NEMORETRIEVER_PARSE_GRPC_ENDPOINT|"",
+          $NEMORETRIEVER_PARSE_HTTP_ENDPOINT|"https://integrate.api.nvidia.com/v1/chat/completions"
+        ]
+        nemoretriever_parse_infer_protocol: $NEMORETRIEVER_PARSE_INFER_PROTOCOL|http
+        nemoretriever_parse_model_name: $NEMORETRIEVER_PARSE_MODEL_NAME|"nvidia/nemoretriever-parse"
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
     replicas:
       cpu_count_min: 0
       cpu_count_max: 16
@@ -53,13 +68,154 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.audio_extractor:AudioExtractorStage"
     config:
       audio_extraction_config:
-        audio_endpoints: [ "grpc.nvcf.nvidia.com:443", "" ]
-        function_id: "1598d209-5e27-4d3c-8079-4751568b1081"
-        audio_infer_protocol: "grpc"
-        auth_token: ""
+        audio_endpoints: [
+          $AUDIO_GRPC_ENDPOINT|"grpc.nvcf.nvidia.com:443",
+          $AUDIO_HTTP_ENDPOINT|""
+        ]
+        function_id: $AUDIO_FUNCTION_ID|"1598d209-5e27-4d3c-8079-4751568b1081"
+        audio_infer_protocol: $AUDIO_INFER_PROTOCOL|grpc
+        auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
       cpu_count_max: 2
+
+  - name: "docx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.docx_extractor:DocxExtractorStage"
+    config:
+      docx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|""
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "pptx_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.pptx_extractor:PPTXExtractorStage"
+    config:
+      pptx_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|""
+
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "image_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.image_extractor:ImageExtractorStage"
+    config:
+      image_extraction_config:
+        yolox_endpoints: [
+          $YOLOX_GRPC_ENDPOINT|"",
+          $YOLOX_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-page-elements-v2"
+        ]
+        yolox_infer_protocol: $YOLOX_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|""
+
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "html_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.html_extractor:HtmlExtractorStage"
+    config: {}
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "infographic_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
+    config:
+      endpoint_config:
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"",
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|http
+        auth_token: $NGC_API_KEY|""
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "table_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.table_extractor:TableExtractorStage"
+    config:
+      endpoint_config:
+        yolox_endpoints: [
+          $YOLOX_TABLE_STRUCTURE_GRPC_ENDPOINT|"",
+          $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-table-structure-v1"
+        ]
+        yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|"http"
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"",
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+        ]
+        ocr_infer_protocol: $PADDLE_INFER_PROTOCOL|"http"
+        auth_token: $NGC_API_KEY|""
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  - name: "chart_extractor"
+    type: "stage"
+    phase: 1  # EXTRACTION
+    actor: "nv_ingest.framework.orchestration.ray.stages.extractors.chart_extractor:ChartExtractorStage"
+    config:
+      endpoint_config:
+        yolox_endpoints: [
+          $YOLOX_GRAPHIC_ELEMENTS_GRPC_ENDPOINT|"",
+          $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/nvidia/nemoretriever-graphic-elements-v1"
+        ]
+        yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|"http"
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"",
+          $OCR_HTTP_ENDPOINT|"https://ai.api.nvidia.com/v1/cv/baidu/paddleocr"
+        ]
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|"http"
+        auth_token: $NGC_API_KEY|""
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+
+  # Post-processing / Mutators
+  - name: "image_filter"
+    type: "stage"
+    phase: 2  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "chart_extractor"
+
+  - name: "image_dedup"
+    type: "stage"
+    phase: 2  # MUTATION
+    actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "image_filter"
 
   # Transforms and Synthesis
   - name: "text_splitter"
@@ -72,15 +228,17 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_count_max: 3
+    runs_after:
+      - "image_dedup"
 
   - name: "text_embedder"
     type: "stage"
     phase: 3  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
     config:
-      api_key: ""
-      embedding_model: "nvidia/llama-3.2-nv-embedqa-1b-v2"
-      embedding_nim_endpoint: "https://integrate.api.nvidia.com/v1"
+      api_key: $NGC_API_KEY|""
+      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"https://integrate.api.nvidia.com/v1"
     replicas:
       cpu_count_min: 0
       cpu_count_max: 2
@@ -92,15 +250,25 @@ stages:
     phase: 3  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
-      api_key: ""
-      endpoint_url: "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
-      model_name: "nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      api_key: $NGC_API_KEY|""
+      endpoint_url: $VLM_CAPTION_ENDPOINT|"https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions"
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
 
   # Storage and Output
+  - name: "image_storage"
+    type: "stage"
+    phase: 4  # RESPONSE
+    actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 1
+    runs_after:
+      - "image_caption"
+
   - name: "embedding_storage"
     type: "stage"
     phase: 4  # RESPONSE
@@ -128,7 +296,7 @@ stages:
     phase: 4  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
-      otel_endpoint: "localhost:4317"
+      otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
@@ -160,6 +328,37 @@ edges:
     to: "audio_extractor"
     queue_size: 32
   - from: "audio_extractor"
+    to: "docx_extractor"
+    queue_size: 32
+  - from: "docx_extractor"
+    to: "pptx_extractor"
+    queue_size: 32
+  - from: "pptx_extractor"
+    to: "image_extractor"
+    queue_size: 32
+  - from: "image_extractor"
+    to: "html_extractor"
+    queue_size: 32
+  - from: "html_extractor"
+    to: "infographic_extractor"
+    queue_size: 32
+
+  # Primitive Extractors
+  - from: "infographic_extractor"
+    to: "table_extractor"
+    queue_size: 32
+  - from: "table_extractor"
+    to: "chart_extractor"
+    queue_size: 32
+  - from: "chart_extractor"
+    to: "image_filter"
+    queue_size: 32
+
+  # Primitive Mutators
+  - from: "image_filter"
+    to: "image_dedup"
+    queue_size: 32
+  - from: "image_dedup"
     to: "text_splitter"
     queue_size: 32
 
@@ -171,10 +370,13 @@ edges:
     to: "image_caption"
     queue_size: 32
   - from: "image_caption"
-    to: "embedding_storage"
+    to: "image_storage"
     queue_size: 32
 
   # Primitive Storage
+  - from: "image_storage"
+    to: "embedding_storage"
+    queue_size: 32
   - from: "embedding_storage"
     to: "broker_response"
     queue_size: 32

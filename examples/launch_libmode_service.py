@@ -6,8 +6,14 @@ import logging
 import os
 import sys
 
-from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
+
+from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
+from nv_ingest.pipeline.config_loaders import load_pipeline_config
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
+
+project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
 
 # Configure the logger
 logger = logging.getLogger(__name__)
@@ -20,14 +26,9 @@ configure_local_logging(local_log_level)
 
 
 def main():
-    # Possibly override config parameters
-    config_data = {}
-
-    # Filter out None values to let the schema defaults handle them
-    config_data = {key: value for key, value in config_data.items() if value is not None}
-
-    # Construct the pipeline configuration
-    ingest_config = PipelineCreationSchema(**config_data)
+    # Load the pipeline configuration from the YAML file
+    config_path = os.path.join(project_root, "./config/default_libmode_pipeline.yaml")
+    ingest_config = load_pipeline_config(config_path)
 
     try:
         _ = run_pipeline(

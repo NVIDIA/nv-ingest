@@ -2,9 +2,9 @@
 # All rights reserved.
 # SPDX-License-Identifier: Apache-2.0
 
-from envyaml import EnvYAML
-
+import yaml
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest_api.util.string_processing.yaml import substitute_env_vars_in_yaml_content
 
 
 def load_pipeline_config(config_path: str) -> PipelineConfigSchema:
@@ -17,11 +17,15 @@ def load_pipeline_config(config_path: str) -> PipelineConfigSchema:
     Returns:
         A validated PipelineConfig object.
     """
-    # EnvYAML loads the file and substitutes environment variables.
-    # We set include_environment=False to prevent it from adding all environment
-    # variables to the dictionary, which would cause Pydantic validation to fail.
-    # We set flatten=False to preserve the nested structure of the YAML.
-    raw_config: EnvYAML = EnvYAML(yaml_file=config_path, include_environment=False, flatten=False)
+    # 1. Read the raw YAML file content
+    with open(config_path, "r") as f:
+        raw_content = f.read()
 
-    # Pydantic validates the loaded data against the schema
-    return PipelineConfigSchema(**raw_config)
+    # 2. Substitute all environment variable placeholders using the utility function
+    substituted_content = substitute_env_vars_in_yaml_content(raw_content)
+
+    # 3. Parse the substituted content with PyYAML
+    processed_config = yaml.safe_load(substituted_content)
+
+    # Pydantic validates the clean, substituted data against the schema
+    return PipelineConfigSchema(**processed_config)

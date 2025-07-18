@@ -7,9 +7,8 @@ import logging
 import os
 
 import click
-import envyaml
 
-from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema
+from nv_ingest.pipeline.config_loaders import load_pipeline_config
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline
 from nv_ingest_api.util.logging.configuration import LogLevel, configure_logging
 from nv_ingest_api.util.string_processing.configuration import pretty_print_pipeline_config, dump_pipeline_to_graphviz
@@ -54,8 +53,7 @@ def cli(
 
     try:
         logger.info(f"Loading pipeline configuration from: {pipeline_config_path}")
-        raw_config = envyaml.load(pipeline_config_path)
-        pipeline_config = PipelineConfigSchema(**raw_config)
+        pipeline_config = load_pipeline_config(pipeline_config_path)
         logger.info("Pipeline configuration loaded and validated.")
 
         # Pretty print the pipeline structure to the log

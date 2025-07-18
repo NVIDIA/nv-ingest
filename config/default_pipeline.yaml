@@ -142,11 +142,11 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.extractors.infographic_extractor:InfographicExtractorStage"
     config:
       endpoint_config:
-        paddle_endpoints: [
-          $PADDLE_GRPC_ENDPOINT|"graphic-elements:8001",
-          $PADDLE_HTTP_ENDPOINT|""
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"graphic-elements:8001",
+          $OCR_HTTP_ENDPOINT|""
         ]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -163,11 +163,11 @@ stages:
           $YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT|""
         ]
         yolox_infer_protocol: $YOLOX_TABLE_STRUCTURE_INFER_PROTOCOL|grpc
-        paddle_endpoints: [
-          $PADDLE_GRPC_ENDPOINT|"paddle:8001",
-          $PADDLE_HTTP_ENDPOINT|""
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|""
         ]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -184,11 +184,11 @@ stages:
           $YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT|""
         ]
         yolox_infer_protocol: $YOLOX_GRAPHIC_ELEMENTS_INFER_PROTOCOL|grpc
-        paddle_endpoints: [
-          $PADDLE_GRPC_ENDPOINT|"paddle:8001",
-          $PADDLE_HTTP_ENDPOINT|""
+        ocr_endpoints: [
+          $OCR_GRPC_ENDPOINT|"ocr:8001",
+          $OCR_HTTP_ENDPOINT|""
         ]
-        paddle_infer_protocol: $PADDLE_INFER_PROTOCOL|grpc
+        ocr_infer_protocol: $OCR_INFER_PROTOCOL|grpc
         auth_token: $NGC_API_KEY|""
     replicas:
       cpu_count_min: 0
@@ -235,8 +235,8 @@ stages:
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
     config:
       api_key: $NGC_API_KEY|""
-      embedding_model: $EMBEDDING_NIM_ENDPOINT|""
-      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|""
+      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
     replicas:
       cpu_count_min: 0
       cpu_count_max: 2
@@ -250,7 +250,7 @@ stages:
     config:
       api_key: $NGC_API_KEY|""
       endpoint_url: $VLM_CAPTION_ENDPOINT|"http://vlm:8000/v1/chat/completions"
-      model_name: $VLM_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
+      model_name: $VLM_CAPTION_MODEL_NAME|"nvidia/llama-3.1-nemotron-nano-vl-8b-v1"
       prompt: "Caption the content of this image:"
     replicas:
       cpu_count_min: 0

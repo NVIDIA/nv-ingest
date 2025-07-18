@@ -17,6 +17,7 @@
 # limitations under the License.
 
 import concurrent.futures
+import json
 import logging
 from typing import List, Tuple, Optional, Any
 
@@ -430,12 +431,17 @@ def pdfium_extractor(
 
     # Process pdfium_config
     pdfium_config_raw = extractor_config.get("pdfium_config", {})
+    logger.error(f"pdfium_config_raw: {json.dumps(pdfium_config_raw.model_dump(), indent=2)}")
     if isinstance(pdfium_config_raw, dict):
         pdfium_config = PDFiumConfigSchema(**pdfium_config_raw)
     elif isinstance(pdfium_config_raw, PDFiumConfigSchema):
         pdfium_config = pdfium_config_raw
     else:
         raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
+    # Explicitly check for auth_token and log a warning if it's missing.
+    if not pdfium_config.auth_token:
+        logger.warning("auth_token is missing from the pdfium_config. NIM client may fail authentication.")
+
     # --- End extractor_config extraction ---
 
     logger.debug("Extracting PDF with pdfium backend.")
