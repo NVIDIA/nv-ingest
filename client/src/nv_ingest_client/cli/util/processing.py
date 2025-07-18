@@ -456,8 +456,6 @@ def create_and_process_jobs(
     retry_job_ids: List[str] = []
     job_id_map: Dict[str, str] = {}
     retry_counts: Dict[str, int] = defaultdict(int)
-    # TODO: Replace this logic ...
-    # file_page_counts: Dict[str, int] = {file: estimate_page_count(file) for file in files}
     file_page_counts: Dict[str, int] = {}
 
     start_time_ns: int = time.time_ns()
@@ -480,8 +478,12 @@ def create_and_process_jobs(
                     future_response, trace_id = handle_future_result(future)
                     trace_ids[source_name] = trace_id
 
-                    print(f"FUTURE Response: {future_response}")
-                    breakpoint()
+                    file_page_counts: Dict[str, int] = {
+                        page["metadata"]["source_metadata"]["source_name"]: page["metadata"]["content_metadata"][
+                            "hierarchy"
+                        ]["page_count"]
+                        for page in future_response["data"]
+                    }
 
                     if output_directory:
                         save_response_data(future_response, output_directory, images_to_disk=save_images_separately)
