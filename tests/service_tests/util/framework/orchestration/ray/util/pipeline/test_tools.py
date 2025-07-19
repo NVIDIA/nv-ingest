@@ -6,6 +6,7 @@
 import pytest
 import ray
 from pydantic import BaseModel
+import pandas as pd
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.tools import (
     wrap_callable_as_stage,
@@ -36,6 +37,7 @@ def test_stage_processes_message_with_model_config(ray_startup_and_shutdown):
     cfg = DummyConfig(foo=5, bar="quux")
     stage = Stage.remote(config=cfg)
     message = IngestControlMessage()
+    message.payload(pd.DataFrame())
     out = ray.get(stage.on_data.remote(message))
     assert out.get_metadata("bar") == "quux"
 
@@ -50,8 +52,9 @@ def test_stage_processes_message_with_dict_config(ray_startup_and_shutdown):
     Stage = wrap_callable_as_stage(fn, DummyConfig)
     cfg = {"foo": 7}
     stage = Stage.remote(config=cfg)
-    msg = IngestControlMessage()
-    out = ray.get(stage.on_data.remote(msg))
+    message = IngestControlMessage()
+    message.payload(pd.DataFrame())
+    out = ray.get(stage.on_data.remote(message))
 
     assert out is not None  # can't do "is msg" unless you handle object identity roundtripping
     assert out.get_metadata("result") == 7
@@ -64,6 +67,7 @@ def test_stage_returns_original_message_on_error(ray_startup_and_shutdown):
     Stage = wrap_callable_as_stage(fn, DummyConfig)
     stage = Stage.remote(config={"foo": 1})
     message = IngestControlMessage()
+    message.payload(pd.DataFrame())
     out = ray.get(stage.on_data.remote(message))
     # Out may be a copy, check some invariant
     assert isinstance(out, IngestControlMessage)
@@ -85,6 +89,7 @@ def test_stage_can_chain_calls(ray_startup_and_shutdown):
     stage1 = Stage1.remote(config={"foo": 42})
     stage2 = Stage2.remote(config={"foo": 0, "bar": "chained!"})
     message = IngestControlMessage()
+    message.payload(pd.DataFrame())
     out1 = ray.get(stage1.on_data.remote(message))
     out2 = ray.get(stage2.on_data.remote(out1))
 
