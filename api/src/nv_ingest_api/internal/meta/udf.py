@@ -31,7 +31,7 @@ def udf_stage_callable_fn(control_message: IngestControlMessage, stage_config: U
     IngestControlMessage
         The control message after processing all UDF tasks
     """
-    logger.info("Starting UDF stage processing")
+    logger.debug("Starting UDF stage processing")
 
     # Extract all UDF tasks from control message using free function
     try:
@@ -39,14 +39,14 @@ def udf_stage_callable_fn(control_message: IngestControlMessage, stage_config: U
     except ValueError:
         # No UDF tasks found
         if stage_config.ignore_empty_udf:
-            logger.info("No UDF tasks found, ignoring as configured")
+            logger.debug("No UDF tasks found, ignoring as configured")
             return control_message
         else:
             raise ValueError("No UDF tasks found in control message")
 
     # Process each UDF task sequentially
     for task_num, task_config in enumerate(all_task_configs, 1):
-        logger.info(f"Processing UDF task {task_num} of {len(all_task_configs)}")
+        logger.debug(f"Processing UDF task {task_num} of {len(all_task_configs)}")
 
         # Get UDF function string and function name from task properties
         udf_function_str = task_config.get("udf_function", "").strip()
@@ -55,7 +55,7 @@ def udf_stage_callable_fn(control_message: IngestControlMessage, stage_config: U
         # Skip empty UDF functions if configured to ignore them
         if not udf_function_str:
             if stage_config.ignore_empty_udf:
-                logger.info(f"UDF task {task_num} has empty function, skipping as configured")
+                logger.debug(f"UDF task {task_num} has empty function, skipping as configured")
                 continue
             else:
                 raise ValueError(f"UDF task {task_num} has empty function string")
@@ -95,7 +95,7 @@ def udf_stage_callable_fn(control_message: IngestControlMessage, stage_config: U
         if not isinstance(control_message, IngestControlMessage):
             raise ValueError(f"UDF task {task_num} must return an IngestControlMessage, got {type(control_message)}")
 
-        logger.info(f"UDF task {task_num} completed successfully")
+        logger.debug(f"UDF task {task_num} completed successfully")
 
-    logger.info(f"UDF stage processing completed. Processed {len(all_task_configs)} UDF tasks")
+    logger.debug(f"UDF stage processing completed. Processed {len(all_task_configs)} UDF tasks")
     return control_message
