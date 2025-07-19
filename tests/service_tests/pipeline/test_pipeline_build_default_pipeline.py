@@ -12,7 +12,7 @@ from nv_ingest.pipeline.ingest_pipeline import IngestPipelineBuilder
 from nv_ingest.pipeline.pipeline_schema import PipelineConfigSchema, StageType
 
 # Correctly import the utility from the top-level tests directory
-from tests.utilities_for_test import get_git_root
+from tests.utilities_for_test import get_project_root
 
 
 @pytest.fixture(scope="module")
@@ -33,8 +33,8 @@ def ray_instance():
 def test_load_and_build_default_pipeline(pipeline_config_file: str, ray_instance):
     """Tests that the default pipeline YAML can be loaded and built successfully."""
     # 1. Load the pipeline configuration
-    project_root = get_git_root(__file__)
-    assert project_root is not None, "Could not find the git repository root."
+    project_root = get_project_root(__file__)
+    assert project_root is not None, "Could not find the project root."
     config_path = os.path.join(project_root, pipeline_config_file)
     config = load_pipeline_config(config_path)
     assert isinstance(config, PipelineConfigSchema)

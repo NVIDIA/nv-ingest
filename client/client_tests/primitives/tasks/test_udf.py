@@ -13,10 +13,10 @@ from nv_ingest.pipeline.pipeline_schema import PipelinePhase
 
 # Add path to tests directory for utilities
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "..", "tests"))
-from utilities_for_test import get_git_root
+from utilities_for_test import get_project_root
 
-# Get the git root for proper path resolution
-GIT_ROOT = get_git_root(__file__)
+# Get the project root for proper path resolution
+PROJECT_ROOT = get_project_root(__file__)
 
 # Initialization and Property Setting
 
@@ -267,7 +267,7 @@ def test_udf_task_function_resolution_file_path():
 
 def test_udf_task_function_resolution_git_root():
     """Test UDFTask function resolution with file path using get_git_root."""
-    file_path = os.path.join(GIT_ROOT, "data", "random_udf.py:add_random_metadata")
+    file_path = os.path.join(PROJECT_ROOT, "data", "random_udf.py:add_random_metadata")
     task = UDFTask(udf_function=file_path, phase=PipelinePhase.EXTRACTION)
 
     # Test that the function can be resolved

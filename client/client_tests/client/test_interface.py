@@ -39,12 +39,12 @@ from nv_ingest_client.util.vdb.milvus import Milvus
 
 # Add path to tests directory for utilities
 sys.path.append(os.path.join(os.path.dirname(__file__), "..", "..", "..", "tests"))
-from utilities_for_test import get_git_root
+from utilities_for_test import get_project_root
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
-# Get the git root for proper path resolution
-GIT_ROOT = get_git_root(__file__)
+# Get the project root for proper path resolution
+PROJECT_ROOT = get_project_root(__file__)
 
 
 @pytest.fixture
@@ -55,25 +55,25 @@ def mock_client():
 
 @pytest.fixture
 def documents():
-    if GIT_ROOT:
-        return [os.path.join(GIT_ROOT, "data", "multimodal_test.pdf")]
+    if PROJECT_ROOT:
+        return [os.path.join(PROJECT_ROOT, "data", "multimodal_test.pdf")]
     else:
-        # Fallback to relative path if git root not found
+        # Fallback to relative path if project root not found
         return ["data/multimodal_test.pdf"]
 
 
 @pytest.fixture
 def text_documents():
-    if GIT_ROOT:
+    if PROJECT_ROOT:
         return [
-            os.path.join(GIT_ROOT, "data", "test.txt"),
-            os.path.join(GIT_ROOT, "data", "test.html"),
-            os.path.join(GIT_ROOT, "data", "test.json"),
-            os.path.join(GIT_ROOT, "data", "test.md"),
-            os.path.join(GIT_ROOT, "data", "test.sh"),
+            os.path.join(PROJECT_ROOT, "data", "test.txt"),
+            os.path.join(PROJECT_ROOT, "data", "test.html"),
+            os.path.join(PROJECT_ROOT, "data", "test.json"),
+            os.path.join(PROJECT_ROOT, "data", "test.md"),
+            os.path.join(PROJECT_ROOT, "data", "test.sh"),
         ]
     else:
-        # Fallback to relative paths if git root not found
+        # Fallback to relative paths if project root not found
         return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
 
 
