@@ -12,6 +12,9 @@ from pprint import pprint
 from typing import Union, List, Any, Dict
 
 import click
+
+from nv_ingest_api.internal.enums.common import PipelinePhase
+from nv_ingest_api.util.introspection.function_inspect import infer_udf_function_name
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.primitives.tasks import CaptionTask
 from nv_ingest_client.primitives.tasks import DedupTask
@@ -308,9 +311,6 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
             elif task_id == "udf":
                 # Pre-process UDF task options to convert phase names to integers
                 if "phase" in options and isinstance(options["phase"], str):
-                    # Import PipelinePhase to convert phase names to integers
-                    from nv_ingest.pipeline.pipeline_schema import PipelinePhase
-
                     # Convert phase string to integer using the same logic as UDFTask
                     phase_str = options["phase"].upper()
                     phase_aliases = {
@@ -334,18 +334,40 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                     else:
                         raise ValueError(f"Invalid phase name: {options['phase']}")
 
+                # Try to infer udf_function_name if not provided
+                if "udf_function_name" not in options or not options["udf_function_name"]:
+                    udf_function = options.get("udf_function", "")
+                    if udf_function:
+                        inferred_name = infer_udf_function_name(udf_function)
+                        if inferred_name:
+                            options["udf_function_name"] = inferred_name
+                            logger.info(f"Inferred UDF function name: {inferred_name}")
+                        else:
+                            raise ValueError(
+                                f"Could not infer UDF function name from '{udf_function}'. "
+                                "Please specify 'udf_function_name' explicitly."
+                            )
+
                 task_options = check_schema(IngestTaskUDFSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, UDFTask(**task_options.model_dump()))]
             else:
                 raise ValueError(f"Unsupported task type: {task_id}")
 
+            # Check for duplicate tasks - now allowing multiple tasks of the same type
             if new_task_id in validated_tasks:
-                raise ValueError(f"Duplicate task detected: {new_task_id}")
+                logger.debug(f"Multiple tasks detected for {new_task_id}, storing as list")
 
             logger.debug("Adding task: %s", new_task_id)
             for task_tuple in new_task:
-                validated_tasks[task_tuple[0]] = task_tuple[1]
+                if task_tuple[0] in validated_tasks:
+                    # Convert single task to list if needed, then append
+                    existing_task = validated_tasks[task_tuple[0]]
+                    if not isinstance(existing_task, list):
+                        validated_tasks[task_tuple[0]] = [existing_task]
+                    validated_tasks[task_tuple[0]].append(task_tuple[1])
+                else:
+                    validated_tasks[task_tuple[0]] = task_tuple[1]
         except ValueError as e:
             validation_errors.append(str(e))
 

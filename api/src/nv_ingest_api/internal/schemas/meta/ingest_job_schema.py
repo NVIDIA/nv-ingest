@@ -145,6 +145,7 @@ class IngestTaskInfographicExtraction(BaseModelNoExt):
 
 class IngestTaskUDFSchema(BaseModelNoExt):
     udf_function: str
+    udf_function_name: str
     phase: int = Field(ge=1, le=5)
 
 

@@ -10,14 +10,11 @@ import importlib.util
 import logging
 import importlib
 import inspect
-from typing import Dict
-from typing import Optional
-from typing import Union
+from typing import Dict, Optional, Union
 
+from nv_ingest_api.internal.enums.common import PipelinePhase
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskUDFSchema
-from nv_ingest.pipeline.pipeline_schema import PipelinePhase
-
-from .task_base import Task
+from nv_ingest_client.primitives.tasks.task_base import Task
 
 logger = logging.getLogger(__name__)
 
@@ -137,17 +134,21 @@ class UDFTask(Task):
     def __init__(
         self,
         udf_function: Optional[str] = None,
+        udf_function_name: Optional[str] = None,
         phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
     ) -> None:
         super().__init__()
         self._udf_function = udf_function
+        self._udf_function_name = udf_function_name
 
         # Convert phase to the appropriate format for API schema
         converted_phase = self._convert_phase(phase)
 
         # Use the API schema for validation
         validated_data = IngestTaskUDFSchema(
-            udf_function=udf_function or "", phase=converted_phase  # API schema requires non-empty string
+            udf_function=udf_function or "",
+            udf_function_name=udf_function_name or "",
+            phase=converted_phase,  # API schema requires non-empty string
         )
         self._phase = PipelinePhase(validated_data.phase)  # Convert back to enum for internal use
         self._resolved_udf_function = None
@@ -197,6 +198,27 @@ class UDFTask(Task):
 
         raise ValueError(f"Phase must be a PipelinePhase enum, integer, or string, got {type(phase)}")
 
+    @property
+    def udf_function(self) -> Optional[str]:
+        """
+        Returns the UDF function string or specification.
+        """
+        return self._udf_function
+
+    @property
+    def udf_function_name(self) -> Optional[str]:
+        """
+        Returns the UDF function name.
+        """
+        return self._udf_function_name
+
+    @property
+    def phase(self) -> PipelinePhase:
+        """
+        Returns the pipeline phase for this UDF task.
+        """
+        return self._phase
+
     def __str__(self) -> str:
         """
         Returns a string with the object's config and run time state
@@ -231,6 +253,9 @@ class UDFTask(Task):
             # Resolve the UDF function specification to function string
             resolved_function = self._resolve_udf_function()
             task_properties["udf_function"] = resolved_function
+
+        if self._udf_function_name:
+            task_properties["udf_function_name"] = self._udf_function_name
 
         # Convert phase to integer value for serialization
         if isinstance(self._phase, PipelinePhase):

@@ -386,6 +386,34 @@ class StatusEnum(str, Enum):
     SUCCESS: str = "success"
 
 
+class PipelinePhase(int, Enum):
+    """
+    The logical phase of a pipeline stage.
+
+    Attributes
+    ----------
+    PRE_PROCESSING : int
+        Pre-processing phase.
+    EXTRACTION : int
+        Extraction phase.
+    POST_PROCESSING : int
+        Post-processing phase.
+    MUTATION : int
+        Mutation phase.
+    TRANSFORM : int
+        Transform phase.
+    RESPONSE : int
+        Response phase.
+    """
+
+    PRE_PROCESSING = 0
+    EXTRACTION = 1
+    POST_PROCESSING = 2
+    MUTATION = 3
+    TRANSFORM = 4
+    RESPONSE = 5
+
+
 class TableFormatEnum(str, Enum):
     """
     Enum for representing table formats.

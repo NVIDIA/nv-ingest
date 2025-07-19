@@ -4,8 +4,9 @@
 
 import inspect
 import logging
+from typing import Any, Dict
 
-from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_task_by_type
+from nv_ingest_api.internal.primitives.ingest_control_message import IngestControlMessage, remove_all_tasks_by_type
 from nv_ingest_api.internal.schemas.meta.udf import UDFStageSchema
 from nv_ingest_api.util.imports.callable_signatures import ingest_callable_signature
 
@@ -14,94 +15,87 @@ logger = logging.getLogger(__name__)
 
 def udf_stage_callable_fn(control_message: IngestControlMessage, stage_config: UDFStageSchema) -> IngestControlMessage:
     """
-    Process an incoming IngestControlMessage by executing a user-defined function.
+    UDF stage callable function that processes UDF tasks in a control message.
 
-    This function:
-    1. Extracts the 'udf' task from the control message
-    2. Gets the UDF function string from the task or stage config
-    3. Evaluates the function string to create a callable
-    4. Validates the function signature
-    5. Applies the function to the control message
-    6. Returns the result
+    This function extracts all UDF tasks from the control message and executes them sequentially.
 
     Parameters
     ----------
     control_message : IngestControlMessage
-        The incoming message to process
+        The control message containing UDF tasks to process
     stage_config : UDFStageSchema
-        Configuration containing the UDF function string
+        Configuration for the UDF stage
 
     Returns
     -------
     IngestControlMessage
-        The processed control message
-
-    Raises
-    ------
-    ValueError
-        If no UDF function is provided or if the function signature is invalid
-    RuntimeError
-        If the UDF function execution fails
+        The control message after processing all UDF tasks
     """
-    logger.debug("Processing UDF stage")
+    logger.info("Starting UDF stage processing")
 
-    # Extract 'udf' task from control message
-    task_config = remove_task_by_type(control_message, "udf")
-
-    # Get UDF function string from task config
-    udf_function_str = task_config.get("udf_function") if task_config else None
-
-    if not udf_function_str:
+    # Extract all UDF tasks from control message using free function
+    try:
+        all_task_configs = remove_all_tasks_by_type(control_message, "udf")
+    except ValueError:
+        # No UDF tasks found
         if stage_config.ignore_empty_udf:
-            logger.debug(
-                "No UDF function provided in task config, but ignore_empty_udf is True. Returning message unchanged."
-            )
+            logger.info("No UDF tasks found, ignoring as configured")
             return control_message
         else:
-            error_msg = (
-                "No UDF function provided in task config. UDF tasks must include a 'udf_function' field, or "
-                "set ignore_empty_udf=True in stage config."
+            raise ValueError("No UDF tasks found in control message")
+
+    # Process each UDF task sequentially
+    for task_num, task_config in enumerate(all_task_configs, 1):
+        logger.info(f"Processing UDF task {task_num} of {len(all_task_configs)}")
+
+        # Get UDF function string and function name from task properties
+        udf_function_str = task_config.get("udf_function", "").strip()
+        udf_function_name = task_config.get("udf_function_name", "").strip()
+
+        # Skip empty UDF functions if configured to ignore them
+        if not udf_function_str:
+            if stage_config.ignore_empty_udf:
+                logger.info(f"UDF task {task_num} has empty function, skipping as configured")
+                continue
+            else:
+                raise ValueError(f"UDF task {task_num} has empty function string")
+
+        # Validate that function name is provided
+        if not udf_function_name:
+            raise ValueError(f"UDF task {task_num} missing required 'udf_function_name' property")
+
+        # Execute the UDF function string in a controlled namespace
+        namespace: Dict[str, Any] = {}
+        try:
+            exec(udf_function_str, namespace)
+        except Exception as e:
+            raise ValueError(f"UDF task {task_num} failed to execute: {str(e)}")
+
+        # Extract the specified function from the namespace
+        if udf_function_name in namespace and callable(namespace[udf_function_name]):
+            udf_function = namespace[udf_function_name]
+        else:
+            raise ValueError(
+                f"UDF task {task_num}: Specified UDF function '{udf_function_name}' not found or not callable"
             )
-            logger.error(error_msg)
-            raise ValueError(error_msg)
 
-    logger.debug(f"Evaluating UDF function: {udf_function_str[:100]}...")
+        # Validate the UDF function signature
+        try:
+            ingest_callable_signature(inspect.signature(udf_function))
+        except Exception as e:
+            raise ValueError(f"UDF task {task_num} has invalid function signature: {str(e)}")
 
-    # Create a controlled namespace for the UDF execution
-    namespace = {
-        "IngestControlMessage": IngestControlMessage,
-        "__builtins__": __builtins__,
-    }
+        # Execute the UDF function with the control message
+        try:
+            control_message = udf_function(control_message)
+        except Exception as e:
+            raise ValueError(f"UDF task {task_num} execution failed: {str(e)}")
 
-    try:
-        # Evaluate the function string to create a callable
-        exec(udf_function_str, namespace)
+        # Validate that the UDF function returned an IngestControlMessage
+        if not isinstance(control_message, IngestControlMessage):
+            raise ValueError(f"UDF task {task_num} must return an IngestControlMessage, got {type(control_message)}")
 
-        # Find the function in the namespace (assume it's the first callable that's not a built-in)
-        udf_function = None
-        for name, obj in namespace.items():
-            if callable(obj) and not name.startswith("__") and name != "IngestControlMessage":
-                udf_function = obj
-                break
+        logger.info(f"UDF task {task_num} completed successfully")
 
-        if udf_function is None:
-            raise ValueError("No callable function found in the UDF string")
-
-        # Validate the function signature
-        sig = inspect.signature(udf_function)
-        ingest_callable_signature(sig)
-
-        logger.debug(f"Executing UDF function: {udf_function.__name__}")
-
-        # Execute the UDF function
-        result = udf_function(control_message)
-
-        if not isinstance(result, IngestControlMessage):
-            raise RuntimeError(f"UDF function must return IngestControlMessage, got {type(result)}")
-
-        logger.debug("UDF stage processing completed successfully")
-        return result
-
-    except Exception as e:
-        logger.error(f"Error executing UDF function: {str(e)}")
-        raise RuntimeError(f"UDF execution failed: {str(e)}") from e
+    logger.info(f"UDF stage processing completed. Processed {len(all_task_configs)} UDF tasks")
+    return control_message

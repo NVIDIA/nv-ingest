@@ -169,6 +169,16 @@ Tasks and Options:
     - split_length (int): Segment length. No default.
     - split_overlap (int): Segment overlap. No default.
 \b
+- udf: Executes user-defined functions (UDFs) for custom processing logic.
+    Options:
+    - udf_function (str): UDF specification. Supports three formats:
+        1. Inline function: 'def my_func(control_message): ...'
+        2. Import path: 'my_module.my_function'
+        3. File path: '/path/to/file.py:function_name' or '/path/to/file.py' (assumes 'process' function)
+    - udf_function_name (str): Name of the function to execute from the UDF specification. Required.
+    - phase (str|int): Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
+     or numbers (1-4). Default: 'response'.
+\b
 Note: The 'extract_method' automatically selects the optimal method based on 'document_type' if not explicitly stated.
 """,
 )

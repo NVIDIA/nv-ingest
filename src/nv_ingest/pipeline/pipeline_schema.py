@@ -6,6 +6,8 @@ from enum import Enum
 from typing import Dict, Any, List, Optional, Set
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
+from api.src.nv_ingest_api.internal.enums.common import PipelinePhase
+
 
 class StageType(str, Enum):
     """
@@ -15,19 +17,6 @@ class StageType(str, Enum):
     SOURCE = "source"
     STAGE = "stage"
     SINK = "sink"
-
-
-class PipelinePhase(int, Enum):
-    """
-    The logical phase of a pipeline stage.
-    """
-
-    PRE_PROCESSING = 0
-    EXTRACTION = 1
-    POST_PROCESSING = 2
-    MUTATION = 3
-    TRANSFORM = 4
-    RESPONSE = 5
 
 
 class ReplicaConfig(BaseModel):

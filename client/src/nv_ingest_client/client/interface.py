@@ -27,6 +27,16 @@ from typing import Union
 from urllib.parse import urlparse
 
 import fsspec
+from nv_ingest_api.internal.enums.common import PipelinePhase
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
+from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
+from nv_ingest_api.util.introspection.function_inspect import infer_udf_function_name
 from nv_ingest_client.client.client import NvIngestClient
 from nv_ingest_client.client.util.processing import get_valid_filename
 from nv_ingest_client.client.util.processing import save_document_results_to_jsonl
@@ -41,14 +51,6 @@ from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import UDFTask
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskCaptionSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskDedupSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskEmbedSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskExtractSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskFilterSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskSplitSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreEmbedSchema
-from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskStoreSchema
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
 from nv_ingest_client.util.util import filter_function_kwargs
@@ -918,22 +920,51 @@ class Ingestor:
 
         return self
 
-    def udf(self, **kwargs: Any) -> "Ingestor":
+    def udf(
+        self,
+        udf_function: str,
+        udf_function_name: Optional[str] = None,
+        phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
+    ) -> "Ingestor":
         """
         Adds a UDFTask to the batch job specification.
 
         Parameters
         ----------
-        kwargs : dict
-            Parameters specific to the UDFTask.
+        udf_function : str
+            UDF specification. Supports three formats:
+            1. Inline function: 'def my_func(control_message): ...'
+            2. Import path: 'my_module.my_function'
+            3. File path: '/path/to/file.py:function_name'
+        udf_function_name : str, optional
+            Name of the function to execute from the UDF specification.
+            If not provided, will attempt to infer from udf_function.
+        phase : Union[PipelinePhase, int, str], optional
+            Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
+            or numbers (1-4). Default: 'response'.
 
         Returns
         -------
         Ingestor
             Returns self for chaining.
+
+        Raises
+        ------
+        ValueError
+            If udf_function_name cannot be inferred and is not provided explicitly.
         """
-        # Use UDFTask constructor directly - it handles phase conversion and API schema validation
-        udf_task = UDFTask(**kwargs)
+        # Try to infer udf_function_name if not provided
+        if udf_function_name is None:
+            udf_function_name = infer_udf_function_name(udf_function)
+            if udf_function_name is None:
+                raise ValueError(
+                    f"Could not infer UDF function name from '{udf_function}'. "
+                    "Please specify 'udf_function_name' explicitly."
+                )
+            logger.info(f"Inferred UDF function name: {udf_function_name}")
+
+        # Use UDFTask constructor with explicit parameters
+        udf_task = UDFTask(udf_function=udf_function, udf_function_name=udf_function_name, phase=phase)
         self._job_specs.add_task(udf_task)
 
         return self
