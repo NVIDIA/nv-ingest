@@ -780,6 +780,8 @@ redisDeployed: true
 ## @param redis.master.configmap [default: "protected-mode no"] Redis master configuration
 
 redis:
+  image:
+    tag: bitnami/redis:7.4.3-debian-12-r0
   auth:
     enabled: false
   replica:
