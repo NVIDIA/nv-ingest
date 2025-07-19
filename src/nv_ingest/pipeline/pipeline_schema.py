@@ -6,7 +6,7 @@ from enum import Enum
 from typing import Dict, Any, List, Optional, Set
 from pydantic import BaseModel, Field, field_validator, model_validator, ConfigDict
 
-from api.src.nv_ingest_api.internal.enums.common import PipelinePhase
+from nv_ingest_api.internal.enums.common import PipelinePhase
 
 
 class StageType(str, Enum):
