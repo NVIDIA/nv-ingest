@@ -35,7 +35,7 @@ class IngestTaskSplitSchema(BaseModelNoExt):
     tokenizer: Optional[str] = None
     chunk_size: Annotated[int, Field(gt=0)] = 1024
     chunk_overlap: Annotated[int, Field(ge=0)] = 150
-    params: dict
+    params: dict = Field(default_factory=dict)
 
     @field_validator("chunk_overlap")
     def check_chunk_overlap(cls, v, values, **kwargs):
@@ -47,7 +47,7 @@ class IngestTaskSplitSchema(BaseModelNoExt):
 class IngestTaskExtractSchema(BaseModelNoExt):
     document_type: DocumentTypeEnum
     method: str
-    params: dict
+    params: dict = Field(default_factory=dict)
 
     @field_validator("document_type", mode="before")
     @classmethod
@@ -61,14 +61,14 @@ class IngestTaskExtractSchema(BaseModelNoExt):
 
 
 class IngestTaskStoreEmbedSchema(BaseModelNoExt):
-    params: dict
+    params: dict = Field(default_factory=dict)
 
 
 class IngestTaskStoreSchema(BaseModelNoExt):
     structured: bool = True
     images: bool = False
     method: str
-    params: dict
+    params: dict = Field(default_factory=dict)
 
 
 # Captioning: All fields are optional and override default parameters.
@@ -143,6 +143,12 @@ class IngestTaskInfographicExtraction(BaseModelNoExt):
     params: dict = Field(default_factory=dict)
 
 
+class IngestTaskUDFSchema(BaseModelNoExt):
+    udf_function: str
+    udf_function_name: str
+    phase: int = Field(ge=1, le=5)
+
+
 class IngestTaskSchema(BaseModelNoExt):
     type: TaskTypeEnum
     task_properties: Union[
@@ -159,6 +165,7 @@ class IngestTaskSchema(BaseModelNoExt):
         IngestTaskTableExtraction,
         IngestTaskChartExtraction,
         IngestTaskInfographicExtraction,
+        IngestTaskUDFSchema,
     ]
     raise_on_failure: bool = False
 
@@ -190,6 +197,7 @@ class IngestTaskSchema(BaseModelNoExt):
             TaskTypeEnum.TABLE_DATA_EXTRACT: IngestTaskTableExtraction,
             TaskTypeEnum.CHART_DATA_EXTRACT: IngestTaskChartExtraction,
             TaskTypeEnum.INFOGRAPHIC_DATA_EXTRACT: IngestTaskInfographicExtraction,
+            TaskTypeEnum.UDF: IngestTaskUDFSchema,
         }
 
         expected_schema_cls = task_type_to_schema.get(task_type)

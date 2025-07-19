@@ -104,9 +104,9 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     # Use the updated config type hint
     def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
         super().__init__(config, log_to_stdout=False)
-        self.config: MessageBrokerTaskSourceConfig  # Add type hint for self.config
+        self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
         self._logger.debug(
-            "Initializing MessageBrokerTaskSourceStage with config: %s", config.dict()
+            "Initializing MessageBrokerTaskSourceStage with config: %s", config.model_dump()
         )  # Log validated config
 
         # Access validated configuration directly via self.config
@@ -509,6 +509,6 @@ def start_simple_message_broker(broker_client: dict) -> multiprocessing.Process:
     p = multiprocessing.Process(target=broker_server)
     p.daemon = False
     p.start()
-    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client['port']}")
+    logger.info(f"Started SimpleMessageBroker server in separate process on port {broker_client.get('port', 7671)}")
 
     return p

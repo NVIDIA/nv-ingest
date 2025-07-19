@@ -303,7 +303,7 @@ def test_add_task_post_submission(nv_ingest_client_with_jobs):
 def test_parameter_validation(nv_ingest_client_with_jobs):
     job_id = "12345678-1234-5678-1234-567812345678"
     task_type = TaskType.SPLIT
-    task_params = {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 128}
+    task_params = {"tokenizer": "intfloat/e5-large-unsupervised", "chunk_size": 128, "chunk_overlap": 64}
 
     nv_ingest_client_with_jobs.create_task(job_id, task_type, task_params)
     job_state = nv_ingest_client_with_jobs._job_states[job_id]

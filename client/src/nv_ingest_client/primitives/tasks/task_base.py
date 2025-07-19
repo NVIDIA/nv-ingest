@@ -27,6 +27,7 @@ class TaskType(Enum):
     STORE_EMBEDDING = auto()
     TABLE_DATA_EXTRACT = auto()
     TRANSFORM = auto()
+    UDF = auto()
     VDB_UPLOAD = auto()
 
 
@@ -71,75 +72,3 @@ class Task:
         tasks that are then submitted to the redis client
         """
         return {}
-
-
-# class ExtractUnstructuredTask(ExtractTask):
-#    """
-#    Object for document unstructured extraction task
-#    extract_method = ["unstructured_local", "unstructured_service"]
-#    """
-#
-#    def __init__(
-#            self,
-#            extract_method: ExtractTask._Type_Extract_Method,
-#            document_type: ExtractTask._TypeDocumentType,
-#            api_key: str,
-#            uri: str,
-#    ) -> None:
-#        """
-#        Setup Extract Task Config
-#        """
-#        super().__init__(extract_method, document_type)
-#        self._api_key = api_key
-#        self._uri = uri
-#
-#    def __str__(self) -> str:
-#        """
-#        Returns a string with the object's config and run time state
-#        """
-#        info = ""
-#        info += super().__str__()
-#        info += f"unstructured uri: {self._uri}\n"
-#        return info
-#
-#    def to_dict(self) -> Dict:
-#        """
-#        Convert to a dict for submission to redis (fixme)
-#        """
-#        unstructured_properties = {
-#            "api_key": self._api_key,
-#            "unstructured_url": self._uri,
-#        }
-#        task_desc = super().to_dict()
-#        task_desc["task_properties"]["params"].update(unstructured_properties)
-#        return task_desc
-
-
-# class ExtractLlamaParseTask(ExtractTask):
-#    """
-#    Object for document llama extraction task
-#    extract_method = ["llama_parse"]
-#    """
-#
-#    def __init__(
-#            self,
-#            extract_method: ExtractTask._Type_Extract_Method,
-#            document_type: ExtractTask._TypeDocumentType,
-#            api_key: str,
-#    ) -> None:
-#        """
-#        Setup Extract Task Config
-#        """
-#        super().__init__(extract_method, document_type)
-#        self._api_key = api_key
-#
-#    def to_dict(self) -> Dict:
-#        """
-#        Convert to a dict for submission to redis (fixme)
-#        """
-#        llama_parse_properties = {
-#            "api_key": self._api_key,
-#        }
-#        task_desc = super().to_dict()
-#        task_desc["task_properties"]["params"].update(llama_parse_properties)
-#        return task_desc

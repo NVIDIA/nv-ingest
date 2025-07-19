@@ -4,7 +4,8 @@
 
 import logging
 import uuid
-from typing import Callable, Optional, Union, Dict, List, Type
+import inspect
+from typing import Callable, Optional, Union, Dict, Type, List
 
 import ray
 from pydantic import BaseModel
@@ -13,6 +14,9 @@ from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base impo
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.primitives.tracing.tagging import traceable
 from nv_ingest_api.util.exception_handlers.decorators import nv_ingest_node_failure_try_except
+from nv_ingest_api.util.imports.callable_signatures import (
+    ingest_stage_callable_signature,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -54,6 +58,7 @@ def wrap_callable_as_stage(
     - Only `.remote(config)` and `.options(...)` (chained with `.remote(config)`) are supported.
       All other class/actor patterns will raise `NotImplementedError`.
     """
+    ingest_stage_callable_signature(inspect.signature(fn))
     trace_name = trace_id or fn.__name__
 
     def make_actor_class():
