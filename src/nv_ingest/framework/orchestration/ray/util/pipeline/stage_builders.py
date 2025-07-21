@@ -242,7 +242,7 @@ def add_table_extractor_stage(pipeline, default_cpu_count, stage_name="table_ext
         stage_actor=TableExtractorStage,
         config=table_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -271,7 +271,7 @@ def add_chart_extractor_stage(pipeline, default_cpu_count, stage_name="chart_ext
         stage_actor=ChartExtractorStage,
         config=chart_extractor_config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -295,7 +295,7 @@ def add_infographic_extractor_stage(pipeline, default_cpu_count, stage_name="inf
         stage_actor=InfographicExtractorStage,
         config=infographic_content_extractor_config,
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -317,7 +317,7 @@ def add_image_extractor_stage(pipeline, default_cpu_count, stage_name="image_ext
         stage_actor=ImageExtractorStage,
         config=image_extractor_config,
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -339,7 +339,7 @@ def add_docx_extractor_stage(pipeline, default_cpu_count, stage_name="docx_extra
         stage_actor=DocxExtractorStage,
         config=DocxExtractorSchema(**docx_extractor_config),
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -361,7 +361,7 @@ def add_pptx_extractor_stage(pipeline, default_cpu_count, stage_name="pptx_extra
         stage_actor=PPTXExtractorStage,
         config=PPTXExtractorSchema(**pptx_extractor_config),
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.14),
     )
 
     return stage_name
@@ -383,11 +383,7 @@ def add_audio_extractor_stage(pipeline, default_cpu_count, stage_name="audio_ext
     )
 
     pipeline.add_stage(
-        name=stage_name,
-        stage_actor=AudioExtractorStage,
-        config=audio_extractor_config,
-        min_replicas=0,
-        max_replicas=1,
+        name=stage_name, stage_actor=AudioExtractorStage, config=audio_extractor_config, min_replicas=0, max_replicas=1
     )
 
     return stage_name
@@ -400,7 +396,7 @@ def add_html_extractor_stage(pipeline, default_cpu_count, stage_name="html_extra
         stage_actor=HtmlExtractorStage,
         config=HtmlExtractorSchema(),
         min_replicas=0,
-        max_replicas=1,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.07),
     )
 
     return stage_name
@@ -630,3 +626,10 @@ def add_source_stage(pipeline, default_cpu_count, source_name="pipeline_source")
         start_simple_message_broker(source_config.broker_client.model_dump())
 
     return source_name
+
+
+def _get_max_replicas(default_cpu_count=None, percentage_of_cpu=0.14):
+    if default_cpu_count is None:
+        default_cpu_count = _system_resource_probe.get_cpu_count()
+
+    return int(max(1, (default_cpu_count * percentage_of_cpu)))

@@ -5,7 +5,7 @@
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from typing import Optional
 from typing import Tuple, Union
@@ -206,13 +206,15 @@ class NimClient:
             #    We enumerate the batches so that we can later reassemble results in order.
             results = [None] * len(formatted_batches)
             with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                futures = []
+                future_to_idx = {}
                 for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
                     future = executor.submit(
                         self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
                     )
-                    futures.append((idx, future))
-                for idx, future in futures:
+                    future_to_idx[future] = idx
+
+                for future in as_completed(future_to_idx.keys()):
+                    idx = future_to_idx[future]
                     results[idx] = future.result()
 
             # 5. Process the parsed outputs for each batch using its corresponding batch_data.
