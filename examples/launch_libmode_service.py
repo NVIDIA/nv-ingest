@@ -4,6 +4,7 @@
 
 import logging
 import os
+import sys
 
 from nv_ingest.framework.orchestration.ray.util.pipeline.pipeline_runners import run_pipeline, PipelineCreationSchema
 from nv_ingest_api.util.logging.configuration import configure_logging as configure_local_logging
@@ -11,7 +12,7 @@ from nv_ingest_api.util.logging.configuration import configure_logging as config
 # Configure the logger
 logger = logging.getLogger(__name__)
 
-local_log_level = os.getenv("INGEST_LOG_LEVEL", "INFO")
+local_log_level = os.getenv("INGEST_LOG_LEVEL", "DEFAULT")
 if local_log_level in ("DEFAULT",):
     local_log_level = "INFO"
 
@@ -29,7 +30,14 @@ def main():
     ingest_config = PipelineCreationSchema(**config_data)
 
     try:
-        _ = run_pipeline(ingest_config, block=True, disable_dynamic_scaling=True, run_in_subprocess=True)
+        _ = run_pipeline(
+            ingest_config,
+            block=True,
+            disable_dynamic_scaling=True,
+            run_in_subprocess=True,
+            stderr=sys.stderr,
+            stdout=sys.stdout,
+        )
     except KeyboardInterrupt:
         logger.info("Keyboard interrupt received. Shutting down...")
     except Exception as e:

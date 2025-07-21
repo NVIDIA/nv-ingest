@@ -72,23 +72,25 @@ class PipelineCreationSchema(BaseModel):
 
     # API keys
     ngc_api_key: str = os.getenv("NGC_API_KEY", "")
-    nvidia_build_api_key: str = os.getenv("NVIDIA_BUILD_API_KEY", "")
+    nvidia_api_key: str = os.getenv("NVIDIA_API_KEY", "")
 
     # Observability settings
     otel_exporter_otlp_endpoint: str = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "localhost:4317")
 
     # OCR settings
-    paddle_http_endpoint: str = os.getenv("PADDLE_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
-    paddle_infer_protocol: str = os.getenv("PADDLE_INFER_PROTOCOL", "http")
+    ocr_http_endpoint: str = os.getenv("OCR_HTTP_ENDPOINT", "https://ai.api.nvidia.com/v1/cv/baidu/paddleocr")
+    ocr_infer_protocol: str = os.getenv("OCR_INFER_PROTOCOL", "http")
+    ocr_model_name: str = os.getenv("OCR_MODEL_NAME", "paddle")
 
     # Task queue settings
     REDIS_INGEST_TASK_QUEUE: str = "ingest_task_queue"
 
     # Vision language model settings
     vlm_caption_endpoint: str = os.getenv(
-        "VLM_CAPTION_ENDPOINT", "https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions"
+        "VLM_CAPTION_ENDPOINT",
+        "https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
     )
-    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "meta/llama-3.2-11b-vision-instruct")
+    vlm_caption_model_name: str = os.getenv("VLM_CAPTION_MODEL_NAME", "nvidia/llama-3.1-nemotron-nano-vl-8b-v1")
 
     # YOLOX image processing settings
     yolox_graphic_elements_http_endpoint: str = os.getenv(
@@ -332,9 +334,9 @@ def run_pipeline(
     if run_in_subprocess:
         logger.info("Launching pipeline in Python subprocess using multiprocessing.")
         if (ingest_config.ngc_api_key is None or ingest_config.ngc_api_key == "") and (
-            ingest_config.nvidia_build_api_key is None or ingest_config.nvidia_build_api_key == ""
+            ingest_config.nvidia_api_key is None or ingest_config.nvidia_api_key == ""
         ):
-            logger.warning("NGC_API_KEY or NVIDIA_BUILD_API_KEY are not set. NIM Related functions will not work.")
+            logger.warning("NGC_API_KEY or NVIDIA_API_KEY are not set. NIM Related functions will not work.")
 
         ctx = multiprocessing.get_context("fork")
         process = ctx.Process(

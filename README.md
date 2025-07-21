@@ -95,11 +95,9 @@ uv venv --python 3.12 nvingest && \
   uv pip install nv-ingest==25.6.2 nv-ingest-api==25.6.2 nv-ingest-client==25.6.2
 ```
 
-Set your NVIDIA_BUILD_API_KEY and NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
+Set your NVIDIA_API_KEY. If you don't have a key, you can get one on [build.nvidia.com](https://org.ngc.nvidia.com/setup/api-keys). For instructions, refer to [Generate Your NGC Keys](/docs/docs/extraction/ngc-api-key.md).
 
 ```
-#Note: these should be the same value
-export NVIDIA_BUILD_API_KEY=nvapi-...
 export NVIDIA_API_KEY=nvapi-...
 ```
 
@@ -235,7 +233,7 @@ retrieved_docs = nvingest_retrieval(
 extract = retrieved_docs[0][0]["entity"]["text"]
 client = OpenAI(
   base_url = "https://integrate.api.nvidia.com/v1",
-  api_key = os.environ["NVIDIA_BUILD_API_KEY"]
+  api_key = os.environ["NVIDIA_API_KEY"]
 )
 
 prompt = f"Using the following content: {extract}\n\n Answer the user query: {queries[0]}"

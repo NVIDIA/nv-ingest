@@ -5,6 +5,7 @@
 import unittest
 from unittest.mock import patch, MagicMock
 import numpy as np
+import json
 
 # Import the module under test
 import nv_ingest_api.internal.primitives.nim.model_interface.yolox as module_under_test
@@ -43,8 +44,6 @@ class TestYoloxModelInterface(unittest.TestCase):
 
         # Test parameters for the model
         self.test_params = {
-            "image_preproc_width": 1024,
-            "image_preproc_height": 1024,
             "nim_max_image_size": 1000000,
             "num_classes": 80,
             "conf_threshold": 0.5,
@@ -61,36 +60,18 @@ class TestYoloxModelInterface(unittest.TestCase):
         self.logger_patcher = patch(f"{MODULE_UNDER_TEST}.logger")
         self.mock_logger = self.logger_patcher.start()
 
-        self.resize_patcher = patch(f"{MODULE_UNDER_TEST}.resize_image")
-        self.mock_resize = self.resize_patcher.start()
-        self.mock_resize.side_effect = lambda img, size: np.zeros((*size[::-1], 3), dtype=np.float32)
-
         self.scale_patcher = patch(f"{MODULE_UNDER_TEST}.scale_image_to_encoding_size")
         self.mock_scale = self.scale_patcher.start()
         self.mock_scale.side_effect = lambda img, max_base64_size: (img, (1024, 1024))
 
-        self.postprocess_model_patcher = patch(f"{MODULE_UNDER_TEST}.postprocess_model_prediction")
-        self.mock_postprocess_model = self.postprocess_model_patcher.start()
+        # Mock numpy_to_base64 and scale_image_to_encoding_size functions
+        self.numpy_to_base64_patcher = patch(f"{MODULE_UNDER_TEST}.numpy_to_base64")
+        self.mock_numpy_to_base64 = self.numpy_to_base64_patcher.start()
+        self.mock_numpy_to_base64.return_value = "base64_encoded_data"
 
-        self.postprocess_results_patcher = patch(f"{MODULE_UNDER_TEST}.postprocess_results")
-        self.mock_postprocess_results = self.postprocess_results_patcher.start()
-
-        self.image_patcher = patch(f"{MODULE_UNDER_TEST}.Image")
-        self.mock_image = self.image_patcher.start()
-        self.mock_pil_image = MagicMock()
-        self.mock_image.fromarray.return_value = self.mock_pil_image
-        self.mock_pil_image.size = (200, 100)
-
-        # Mock BytesIO and base64
-        self.bytesio_patcher = patch(f"{MODULE_UNDER_TEST}.io.BytesIO")
-        self.mock_bytesio = self.bytesio_patcher.start()
-        self.mock_buffer = MagicMock()
-        self.mock_bytesio.return_value = self.mock_buffer
-        self.mock_buffer.getvalue.return_value = b"test_image_data"
-
-        self.base64_patcher = patch(f"{MODULE_UNDER_TEST}.base64.b64encode")
-        self.mock_base64 = self.base64_patcher.start()
-        self.mock_base64.return_value = b"base64_encoded_data"
+        self.scale_image_patcher = patch(f"{MODULE_UNDER_TEST}.scale_image_to_encoding_size")
+        self.mock_scale_image = self.scale_image_patcher.start()
+        self.mock_scale_image.return_value = ("scaled_base64_data", (200, 100))
 
         # Mock log function
         self.log_patcher = patch(f"{MODULE_UNDER_TEST}.log")
@@ -100,13 +81,9 @@ class TestYoloxModelInterface(unittest.TestCase):
     def tearDown(self):
         # Stop all patchers
         self.logger_patcher.stop()
-        self.resize_patcher.stop()
         self.scale_patcher.stop()
-        self.postprocess_model_patcher.stop()
-        self.postprocess_results_patcher.stop()
-        self.image_patcher.stop()
-        self.bytesio_patcher.stop()
-        self.base64_patcher.stop()
+        self.numpy_to_base64_patcher.stop()
+        self.scale_image_patcher.stop()
         self.log_patcher.stop()
 
     def test_initialization(self):
@@ -114,8 +91,6 @@ class TestYoloxModelInterface(unittest.TestCase):
         model = TestableYoloxModelInterface(**self.test_params)
 
         # Check that parameters are correctly stored
-        self.assertEqual(model.image_preproc_width, self.test_params["image_preproc_width"])
-        self.assertEqual(model.image_preproc_height, self.test_params["image_preproc_height"])
         self.assertEqual(model.nim_max_image_size, self.test_params["nim_max_image_size"])
         self.assertEqual(model.num_classes, self.test_params["num_classes"])
         self.assertEqual(model.conf_threshold, self.test_params["conf_threshold"])
@@ -178,13 +153,23 @@ class TestYoloxModelInterface(unittest.TestCase):
         input_data = {"images": [self.image1, self.image2], "original_image_shapes": [(100, 200, 3), (150, 250, 3)]}
 
         batches, batch_data = self.model_interface.format_input(input_data, protocol="grpc", max_batch_size=2)
-
-        # Check that resize was called for each image
-        self.assertEqual(self.mock_resize.call_count, 2)
-
         # Check batches
-        self.assertEqual(len(batches), 1)  # Should be 1 batch with 2 images
-        self.assertIsInstance(batches[0], np.ndarray)
+        self.assertEqual(len(batches), 1)  # One batch expected
+        # Each batch element should be [encoded_images, thresholds]
+        encoded_images, thresholds = batches[0]
+
+        # Validate encoded images array
+        expected_encoded = np.array(["base64_encoded_data", "base64_encoded_data"], dtype=np.object_)
+        np.testing.assert_array_equal(encoded_images, expected_encoded)
+        self.assertEqual(encoded_images.dtype, np.object_)
+
+        # Validate thresholds array
+        expected_thresholds = np.array(
+            [[self.test_params["conf_threshold"], self.test_params["iou_threshold"]]] * 2,
+            dtype=np.float32,
+        )
+        np.testing.assert_array_equal(thresholds, expected_thresholds)
+        self.assertEqual(thresholds.dtype, np.float32)
 
         # Check batch_data
         self.assertEqual(len(batch_data), 1)
@@ -201,9 +186,6 @@ class TestYoloxModelInterface(unittest.TestCase):
 
         batches, batch_data = self.model_interface.format_input(input_data, protocol="grpc", max_batch_size=2)
 
-        # Check that resize was called for each image
-        self.assertEqual(self.mock_resize.call_count, 3)
-
         # Check batches (should be 2 batches: 2 images + 1 image)
         self.assertEqual(len(batches), 2)
 
@@ -219,8 +201,10 @@ class TestYoloxModelInterface(unittest.TestCase):
 
         batches, batch_data = self.model_interface.format_input(input_data, protocol="http", max_batch_size=2)
 
-        # Check that Image.fromarray was called for each image
-        self.assertEqual(self.mock_image.fromarray.call_count, 2)
+        # Check that numpy_to_base64 was called for each image
+        self.assertEqual(self.mock_numpy_to_base64.call_count, 2)
+        # Check that scale_image_to_encoding_size was called for each image
+        self.assertEqual(self.mock_scale_image.call_count, 2)
 
         # Check batches
         self.assertEqual(len(batches), 1)  # Should be 1 batch with 2 images
@@ -374,13 +358,10 @@ class TestYoloxModelInterface(unittest.TestCase):
 
     def test_process_inference_results_grpc(self):
         """Test process_inference_results with gRPC protocol."""
-        # For gRPC, further processing is needed
-        mock_output = np.array([[[1.0, 2.0, 3.0]]])
+        # For gRPC, the output should be an iterable of JSON-parseable strings
+        mock_detection = {"person": [[0.1, 0.2, 0.3, 0.4, 0.9]], "car": [[0.5, 0.6, 0.7, 0.8, 0.85]]}
+        mock_output = [json.dumps(mock_detection)]
         mock_shapes = [(100, 200, 3)]
-
-        # Set up mock returns for postprocessing functions
-        self.mock_postprocess_model.return_value = "processed_pred"
-        self.mock_postprocess_results.return_value = "processed_results"
 
         # Mock postprocess_annotations to return output unchanged
         self.model_interface.postprocess_annotations = MagicMock(return_value="final_results")
@@ -390,28 +371,53 @@ class TestYoloxModelInterface(unittest.TestCase):
         )
 
         # Check that postprocessing functions were called correctly
-        self.mock_postprocess_model.assert_called_once_with(
-            mock_output,
-            self.model_interface.num_classes,
-            self.model_interface.conf_threshold,
-            self.model_interface.iou_threshold,
-            class_agnostic=False,
-        )
-
-        self.mock_postprocess_results.assert_called_once_with(
-            "processed_pred",
-            mock_shapes,
-            self.model_interface.image_preproc_width,
-            self.model_interface.image_preproc_height,
-            self.model_interface.class_labels,
-            min_score=self.model_interface.min_score,
-        )
-
         # Check that postprocess_annotations was called with processed results
-        # Use ANY for kwargs since they might vary
         self.model_interface.postprocess_annotations.assert_called_once()
         args, kwargs = self.model_interface.postprocess_annotations.call_args
-        self.assertEqual(args[0], "processed_results")
+        self.assertEqual(args[0], [mock_detection])
+        self.assertEqual(kwargs.get("original_image_shapes"), mock_shapes)
+
+    def test_process_inference_results_grpc_with_bytes(self):
+        """Test process_inference_results with gRPC protocol using bytes output."""
+        # For gRPC, the output can also contain bytes that need to be decoded
+        mock_detection = {"person": [[0.1, 0.2, 0.3, 0.4, 0.9]], "car": [[0.5, 0.6, 0.7, 0.8, 0.85]]}
+        mock_output = [json.dumps(mock_detection).encode("utf-8")]
+        mock_shapes = [(100, 200, 3)]
+
+        # Mock postprocess_annotations to return output unchanged
+        self.model_interface.postprocess_annotations = MagicMock(return_value="final_results")
+
+        result = self.model_interface.process_inference_results(
+            mock_output, protocol="grpc", original_image_shapes=mock_shapes
+        )
+
+        # Check that postprocessing functions were called correctly
+        self.model_interface.postprocess_annotations.assert_called_once()
+        args, kwargs = self.model_interface.postprocess_annotations.call_args
+        self.assertEqual(args[0], [mock_detection])
+        self.assertEqual(kwargs.get("original_image_shapes"), mock_shapes)
+
+    def test_process_inference_results_grpc_with_dict(self):
+        """Test process_inference_results with gRPC protocol when output contains dict objects."""
+        # For gRPC, dict objects should be skipped during processing
+        mock_detection = {"person": [[0.1, 0.2, 0.3, 0.4, 0.9]]}
+        mock_output = [
+            {"should_be_skipped": "this dict"},  # This should be skipped
+            json.dumps(mock_detection),  # This should be processed
+        ]
+        mock_shapes = [(100, 200, 3)]
+
+        # Mock postprocess_annotations to return output unchanged
+        self.model_interface.postprocess_annotations = MagicMock(return_value="final_results")
+
+        result = self.model_interface.process_inference_results(
+            mock_output, protocol="grpc", original_image_shapes=mock_shapes
+        )
+
+        # Check that only the non-dict item was processed
+        self.model_interface.postprocess_annotations.assert_called_once()
+        args, kwargs = self.model_interface.postprocess_annotations.call_args
+        self.assertEqual(args[0], [mock_detection])
         self.assertEqual(kwargs.get("original_image_shapes"), mock_shapes)
 
     def test_transform_normalized_coordinates(self):

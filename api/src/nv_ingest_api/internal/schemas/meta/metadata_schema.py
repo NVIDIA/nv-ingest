@@ -46,6 +46,7 @@ class SourceMetadataSchema(BaseModelNoExt):
     summary: str = ""
     partition_id: int = -1
     access_level: Union[AccessLevelEnum, int] = AccessLevelEnum.UNKNOWN
+    custom_content: Optional[Dict[str, Any]] = None
 
     @field_validator("date_created", "last_modified")
     @classmethod
@@ -99,6 +100,7 @@ class ContentMetadataSchema(BaseModelNoExt):
     subtype: Union[ContentTypeEnum, str] = ""
     start_time: int = -1
     end_time: int = -1
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class TextMetadataSchema(BaseModelNoExt):
@@ -108,6 +110,7 @@ class TextMetadataSchema(BaseModelNoExt):
     language: LanguageEnum = "en"  # default to Unknown? Maybe do some kind of heuristic check
     text_location: tuple = (0, 0, 0, 0)
     text_location_max_dimensions: tuple = (0, 0, 0, 0)
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class ImageMetadataSchema(BaseModelNoExt):
@@ -120,6 +123,7 @@ class ImageMetadataSchema(BaseModelNoExt):
     uploaded_image_url: str = ""
     width: int = 0
     height: int = 0
+    custom_content: Optional[Dict[str, Any]] = None
 
     @field_validator("image_type")
     def validate_image_type(cls, v):
@@ -143,6 +147,7 @@ class TableMetadataSchema(BaseModelNoExt):
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class ChartMetadataSchema(BaseModelNoExt):
@@ -153,11 +158,13 @@ class ChartMetadataSchema(BaseModelNoExt):
     table_location: tuple = (0, 0, 0, 0)
     table_location_max_dimensions: tuple = (0, 0)
     uploaded_image_uri: str = ""
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class AudioMetadataSchema(BaseModelNoExt):
     audio_transcript: str = ""
     audio_type: str = ""
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 # TODO consider deprecating this in favor of info msg...
@@ -166,6 +173,7 @@ class ErrorMetadataSchema(BaseModelNoExt):
     status: StatusEnum
     source_id: str = ""
     error_msg: str
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 class InfoMessageMetadataSchema(BaseModelNoExt):
@@ -173,6 +181,7 @@ class InfoMessageMetadataSchema(BaseModelNoExt):
     status: StatusEnum
     message: str
     filter: bool
+    custom_content: Optional[Dict[str, Any]] = None
 
 
 # Main metadata schema
@@ -191,6 +200,7 @@ class MetadataSchema(BaseModelNoExt):
     info_message_metadata: Optional[InfoMessageMetadataSchema] = None
     debug_metadata: Optional[Dict[str, Any]] = None
     raise_on_failure: bool = False
+    custom_content: Optional[Dict[str, Any]] = None
 
     @model_validator(mode="before")
     @classmethod

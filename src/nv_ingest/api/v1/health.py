@@ -18,7 +18,7 @@ router = APIRouter()
 
 # List of ALL of the HTTP environment variable endpoints that should be checked
 READY_CHECK_ENV_VAR_MAP = {
-    "paddle": "PADDLE_HTTP_ENDPOINT",
+    "ocr": "OCR_HTTP_ENDPOINT",
     "yolox_graphic_elements": "YOLOX_GRAPHIC_ELEMENTS_HTTP_ENDPOINT",
     "yolox_page_elements": "YOLOX_HTTP_ENDPOINT",
     "yolox_table_structure": "YOLOX_TABLE_STRUCTURE_HTTP_ENDPOINT",

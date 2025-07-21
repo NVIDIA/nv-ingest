@@ -122,7 +122,7 @@ This can be used to describe images extracted from documents.
 
 !!! note
 
-    The default model used by `caption` is `meta/llama-3.2-11b-vision-instruct`.
+    The default model used by `caption` is `nvidia/llama-3.1-nemotron-nano-vl-8b-v1`.
 
 ```python
 ingestor = ingestor.caption()
@@ -132,8 +132,8 @@ To specify a different API endpoint, pass additional parameters to `caption`.
 
 ```python
 ingestor = ingestor.caption(
-    endpoint_url="https://ai.api.nvidia.com/v1/gr/meta/llama-3.2-11b-vision-instruct/chat/completions",
-    model_name="meta/llama-3.2-11b-vision-instruct",
+    endpoint_url="https://ai.api.nvidia.com/v1/gr/nvidia/llama-3.1-nemotron-nano-vl-8b-v1/chat/completions",
+    model_name="nvidia/llama-3.1-nemotron-nano-vl-8b-v1",
     api_key="nvapi-"
 )
 ```

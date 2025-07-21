@@ -269,8 +269,11 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
             self._logger.debug("Received message type: %s", type(job))
             if isinstance(job, BaseModel):
                 self._logger.debug("Message is a BaseModel with response_code: %s", job.response_code)
-                if job.response_code != 0:
-                    self._logger.debug("Message response_code != 0, returning None")
+                if job.response_code not in (0, 2):
+                    self._logger.debug("Message received with unhandled response_code, returning None")
+                    return None
+                if job.response_code == 2:
+                    self._logger.debug("Message response_code == 2, returning None")
                     return None
                 job = json.loads(job.response)
             self._logger.debug("Successfully fetched message with job_id: %s", job.get("job_id", "unknown"))
@@ -304,14 +307,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
 
         return control_message
 
-    def on_data(self, control_message: any) -> any:
-        """
-        Process the control message.
-        For this source stage, no additional processing is done, so simply return it.
-        """
-        self._logger.debug("on_data: Received control message for processing")
-        return control_message
-
     # In the processing loop, instead of checking a boolean, we wait on the event.
     def _processing_loop(self) -> None:
         """
@@ -336,7 +331,6 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                 self._active_processing = True
 
                 self._logger.debug("Control message received; processing data")
-                updated_cm = self.on_data(control_message)
 
                 # Block until not paused using the pause event.
                 if self.output_queue is not None:
@@ -347,15 +341,33 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
                         self._pause_event.wait()  # Block if paused
                         self._active_processing = True
 
-                    while True:
-                        try:
-                            self.output_queue.put(updated_cm)
-                            self.stats["successful_queue_writes"] += 1
-                            break
-                        except Exception:
-                            self._logger.warning("Output queue full, retrying put()...")
-                            self.stats["queue_full"] += 1
-                            time.sleep(0.1)
+                    object_ref_to_put = None
+                    try:
+                        # Get the handle of the queue actor to set it as the owner.
+                        owner_actor = self.output_queue.actor
+
+                        # Put the object into Plasma, transferring ownership.
+                        object_ref_to_put = ray.put(control_message, _owner=owner_actor)
+
+                        # Now that the object is safely in Plasma, delete the large local copy.
+                        del control_message
+
+                        # This loop will retry indefinitely until the ObjectRef is put successfully.
+                        is_put_successful = False
+                        while not is_put_successful:
+                            try:
+                                self.output_queue.put(object_ref_to_put)
+                                self.stats["successful_queue_writes"] += 1
+                                is_put_successful = True  # Exit retry loop on success
+                            except Exception:
+                                self._logger.warning("Output queue full, retrying put()...")
+                                self.stats["queue_full"] += 1
+                                time.sleep(0.1)
+                    finally:
+                        # After the operation, delete the local ObjectRef.
+                        # The primary reference is now held by the queue actor.
+                        if object_ref_to_put is not None:
+                            del object_ref_to_put
 
                 self.stats["processed"] += 1
                 self._message_count += 1

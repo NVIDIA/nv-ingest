@@ -18,24 +18,29 @@
 
 import concurrent.futures
 from concurrent.futures import ProcessPoolExecutor, as_completed
+import math
+import os
+import tempfile
 import logging
 from typing import List, Tuple, Optional, Any, Union
+from datetime import datetime
 
 import numpy as np
 import pandas as pd
 import pypdfium2 as libpdfium
-from datetime import datetime
 
+from nv_ingest_api.internal.enums.common import ContentTypeEnum
 from nv_ingest_api.internal.primitives.nim.default_values import YOLOX_MAX_BATCH_SIZE
 from nv_ingest_api.internal.primitives.nim.model_interface.yolox import (
     YOLOX_PAGE_IMAGE_PREPROC_WIDTH,
     YOLOX_PAGE_IMAGE_PREPROC_HEIGHT,
-    get_yolox_model_name,
     YoloxPageElementsModelInterface,
+    YOLOX_PAGE_IMAGE_FORMAT,
 )
 from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFiumConfigSchema
 from nv_ingest_api.internal.enums.common import TableFormatEnum, TextTypeEnum, AccessLevelEnum
 from nv_ingest_api.util.metadata.aggregators import (
+    construct_image_metadata_from_base64,
     construct_image_metadata_from_pdf_image,
     extract_pdf_metadata,
     construct_text_metadata,
@@ -48,6 +53,7 @@ from nv_ingest_api.util.pdf.pdfium import (
     extract_image_like_objects_from_pdfium_page,
 )
 from nv_ingest_api.util.pdf.pdfium import pdfium_pages_to_numpy
+from nv_ingest_api.util.image_processing import scale_image_to_encoding_size
 from nv_ingest_api.util.image_processing.transforms import numpy_to_base64, crop_image
 
 logger = logging.getLogger(__name__)
@@ -56,7 +62,6 @@ logger = logging.getLogger(__name__)
 def _extract_page_elements_using_image_ensemble(
     pages: List[Tuple[int, np.ndarray, Tuple[int, int]]],
     yolox_client,
-    yolox_model_name: str = "yolox",
     execution_trace_log: Optional[List] = None,
 ) -> List[Tuple[int, object]]:
     """
@@ -70,8 +75,6 @@ def _extract_page_elements_using_image_ensemble(
         and optional padding offset information.
     yolox_client : object
         A pre-configured client instance for the YOLOX inference service.
-    yolox_model_name : str, default="yolox"
-        The name of the YOLOX model to use for inference.
     execution_trace_log : Optional[List], default=None
         List for accumulating execution trace information.
 
@@ -100,11 +103,15 @@ def _extract_page_elements_using_image_ensemble(
 
         # Prepare the data payload with all images.
         data = {"images": original_images}
+
         # Perform inference using the NimClient.
         inference_results = yolox_client.infer(
             data,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             max_batch_size=YOLOX_MAX_BATCH_SIZE,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=execution_trace_log,
             stage_name="pdf_extraction",
         )
@@ -114,12 +121,11 @@ def _extract_page_elements_using_image_ensemble(
             inference_results, image_page_indices, original_images, padding_offsets
         ):
             _extract_page_element_images(
-                annotation_dict=annotation_dict,
-                original_image=original_image,
-                page_idx=page_index,
-                page_elements=page_elements,
-                padding_offset=padding_offset,
-                trace_info=execution_trace_log,
+                annotation_dict,
+                original_image,
+                page_index,
+                page_elements,
+                padding_offset,
             )
 
     except TimeoutError:
@@ -140,7 +146,6 @@ def _extract_page_element_images(
     page_idx,
     page_elements,
     padding_offset=(0, 0),
-    trace_info=None,
 ):
     """
     Handle the extraction of page elements from the inference results and run additional model inference.
@@ -188,7 +193,9 @@ def _extract_page_element_images(
             cropped = crop_image(original_image, (int(w1), int(h1), int(w2), int(h2)))
             if cropped is None:
                 continue
-            base64_img = numpy_to_base64(cropped)
+
+            base64_img = numpy_to_base64(cropped, format=YOLOX_PAGE_IMAGE_FORMAT)
+
             bbox_in_orig_coord = (
                 int(w1) - pad_width,
                 int(h1) - pad_height,
@@ -264,7 +271,7 @@ def _extract_page_elements(
     extract_tables: bool,
     extract_charts: bool,
     extract_infographics: bool,
-    paddle_output_format: str,
+    table_output_format: str,
     yolox_endpoints: Tuple[Optional[str], Optional[str]],
     yolox_infer_protocol: str = "http",
     auth_token: Optional[str] = None,
@@ -293,7 +300,7 @@ def _extract_page_elements(
         Flag indicating whether to extract charts.
     extract_infographics : bool
         Flag indicating whether to extract infographics.
-    paddle_output_format : str
+    table_output_format : str
         Format to use for table content.
     yolox_endpoints : Tuple[Optional[str], Optional[str]]
         A tuple containing the gRPC and HTTP endpoints for the YOLOX service.
@@ -314,19 +321,7 @@ def _extract_page_elements(
 
     try:
         # Default model name
-        yolox_model_name = "yolox"
-
-        # Get the HTTP endpoint to determine the model name if needed
-        yolox_http_endpoint = yolox_endpoints[1]
-        if yolox_http_endpoint:
-            try:
-                yolox_model_name = get_yolox_model_name(yolox_http_endpoint)
-            except Exception as e:
-                logger.warning(f"Failed to get YOLOX model name from endpoint: {e}. Using default.")
-
-        # Create the model interface
-        model_interface = YoloxPageElementsModelInterface(yolox_model_name=yolox_model_name)
-
+        model_interface = YoloxPageElementsModelInterface()
         # Create the inference client
         yolox_client = create_inference_client(
             yolox_endpoints,
@@ -337,7 +332,7 @@ def _extract_page_elements(
 
         # Extract page elements using the client
         page_element_results = _extract_page_elements_using_image_ensemble(
-            pages, yolox_client, yolox_model_name, execution_trace_log=execution_trace_log
+            pages, yolox_client, execution_trace_log=execution_trace_log
         )
 
         # Process each extracted element based on extraction flags
@@ -352,7 +347,7 @@ def _extract_page_elements(
 
             # Set content format for tables
             if page_element.type_string == "table":
-                page_element.content_format = paddle_output_format
+                page_element.content_format = table_output_format
 
             # Construct metadata for the page element
             page_element_meta = construct_page_element_metadata(
@@ -378,37 +373,72 @@ def _extract_page_elements(
     return extracted_page_elements
 
 
+
 # ------------------------------------------------------------------ #
-#  Render one page – now returns (page_idx, image, padding_offsets)  #
+#  Render a subset of pages in one process                           #
 # ------------------------------------------------------------------ #
-def _render_page_from_file(
+def _render_page_subset(
     pdf_source: Union[str, bytes],
-    page_idx: int,
+    page_indices: List[int],
     size: Tuple[int, int],
     execution_trace_log: Optional[List] = None,
-) -> Tuple[int, np.ndarray, Tuple[int, int]]:
+) -> List[Tuple[int, np.ndarray, Tuple[int, int]]]:
     """
-    Opens `pdf_source`, renders `page_idx`, and returns
-    (page_idx, image_array, padding_offsets).
+    Render a subset of pages specified by `page_indices`. Returns a list of
+    (page_idx, image_array, padding_offsets) keeping original page indices.
     """
-    doc = libpdfium.PdfDocument(pdf_source)
-    page = doc.get_page(page_idx)
+    if not page_indices:
+        return []
 
-    arrays, pads = pdfium_pages_to_numpy(
-        [page],
-        scale_tuple=size,
-        padding_tuple=size,
-        trace_info=execution_trace_log,
-    )
+    # Open the original PDF once in this process
+    src_doc = libpdfium.PdfDocument(pdf_source)
 
-    page.close()
-    doc.close()
-    return page_idx, arrays[0], pads[0]
+    # Create a new temporary PDF that contains only the required pages
+    tmp_doc = libpdfium.PdfDocument.new()
+    tmp_doc.import_pages(src_doc, page_indices)
+
+    src_doc.close()
+
+    images: List[Tuple[int, np.ndarray, Tuple[int, int]]] = []
+
+    for local_idx, orig_idx in enumerate(page_indices):
+        page = tmp_doc.get_page(local_idx)
+
+        arrays, pads = pdfium_pages_to_numpy(
+            [page],
+            scale_tuple=size,
+            padding_tuple=size,
+            trace_info=execution_trace_log,
+        )
+
+        page.close()
+        images.append((orig_idx, arrays[0], pads[0]))
+
+    tmp_doc.close()
+
+    return images
 
 
 # ------------------------------------------------------------------ #
 #  Render an entire PDF in parallel – keeps natural page order       #
 # ------------------------------------------------------------------ #
+
+# Helper to create subset PDF file path
+def _make_subset_pdf_path(src: Union[str, bytes], indices: List[int]) -> str:
+    """Return a temporary file path containing only the pages in indices."""
+    src_doc = libpdfium.PdfDocument(src)
+    subset_doc = libpdfium.PdfDocument.new()
+    subset_doc.import_pages(src_doc, indices)
+
+    tmp_file = tempfile.NamedTemporaryFile(suffix=".pdf", delete=False)
+    subset_doc.save(tmp_file.name)
+
+    tmp_file.close()
+    src_doc.close()
+    subset_doc.close()
+    return tmp_file.name
+
+
 def render_single_pdf_parallel(
     pdf_source: Union[str, bytes],
     size: Tuple[int, int],
@@ -424,19 +454,39 @@ def render_single_pdf_parallel(
     doc.close()
 
     max_workers = min(max_workers, page_count)
+
+    # Determine groups of pages for each worker to minimise PDF copies
+    chunk_size = math.ceil(page_count / max_workers)
+    page_groups: List[List[int]] = [list(range(i, min(i + chunk_size, page_count))) for i in range(0, page_count, chunk_size)]
+
     images: List[Tuple[np.ndarray, Tuple[int, int]]] = [None] * page_count
+    # Create subset paths for each group
+    subset_paths: List[str] = [_make_subset_pdf_path(pdf_source, grp) for grp in page_groups]
 
     if execution_trace_log is not None:
-        for idx in range(page_count):
-            execution_trace_log[f"trace::entry::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
+        for idx in range(len(subset_paths)):
+            execution_trace_log[f"trace::entry::pdf_extraction::render_single_pdf_parallel_{idx}"] = datetime.now()
 
-    with ProcessPoolExecutor(max_workers=max_workers) as pool:
-        futs = [pool.submit(_render_page_from_file, pdf_source, idx, size) for idx in range(page_count)]
-        for fut in as_completed(futs):
-            idx, img, pad = fut.result()
-            images[idx] = (img, pad)
-            if execution_trace_log is not None:
-                execution_trace_log[f"trace::exit::pdf_extraction::pdfium_pages_to_numpy_{idx}"] = datetime.now()
+    try:
+        with ProcessPoolExecutor(max_workers=max_workers) as pool:
+            futs = [
+                pool.submit(_render_page_subset, path, group, size, execution_trace_log)
+                for path, group in zip(subset_paths, page_groups)
+            ]
+
+            for fut in as_completed(futs):
+                subset_results = fut.result()
+                for idx, img, pad in subset_results:
+                    images[idx] = (img, pad)
+                if execution_trace_log is not None:
+                    execution_trace_log[f"trace::exit::pdf_extraction::render_single_pdf_parallel_{idx}"] = datetime.now()
+    finally:
+        # Cleanup temporary subset files
+        for path in subset_paths:
+            try:
+                os.remove(path)
+            except Exception:
+                pass
 
     return images
 
@@ -444,25 +494,11 @@ def render_single_pdf_parallel(
 def _get_pdf_source(pdf_stream: Any) -> Union[str, bytes]:
     """
     Handle pdf_stream as either a file path or a stream-like object.
-
-    Parameters
-    ----------
-    pdf_stream : Any
-        Either a file path string, bytes, or a file-like object with a read() method.
-
-    Returns
-    -------
-    Union[str, bytes]
-        A file path string or a byte buffer of the PDF content.
     """
     if isinstance(pdf_stream, str):
-        # pdf_stream is already a file path
         return pdf_stream
-
-    # pdf_stream is a stream/bytes, read into memory
     if hasattr(pdf_stream, "read"):
         return pdf_stream.read()
-
     return pdf_stream
 
 
@@ -473,6 +509,7 @@ def pdfium_extractor(
     extract_infographics: bool,
     extract_tables: bool,
     extract_charts: bool,
+    extract_page_as_image: bool,
     extractor_config: dict,
     execution_trace_log: Optional[List[Any]] = None,
 ) -> pd.DataFrame:
@@ -496,13 +533,13 @@ def pdfium_extractor(
             f"Invalid text_depth: {text_depth_str}. Valid options: {list(TextTypeEnum.__members__.keys())}"
         )
 
-    # Validate and extract paddle_output_format
-    paddle_output_format_str = extractor_config.get("paddle_output_format", "pseudo_markdown")
+    # Validate and extract table_output_format
+    table_output_format_str = extractor_config.get("table_output_format", "pseudo_markdown")
     try:
-        paddle_output_format = TableFormatEnum[paddle_output_format_str.upper()]
+        table_output_format = TableFormatEnum[table_output_format_str.upper()]
     except KeyError:
         raise ValueError(
-            f"Invalid paddle_output_format: {paddle_output_format_str}. "
+            f"Invalid table_output_format: {table_output_format_str}. "
             f"Valid options: {list(TableFormatEnum.__members__.keys())}"
         )
 
@@ -520,6 +557,7 @@ def pdfium_extractor(
         pdfium_config = pdfium_config_raw
     else:
         raise ValueError("`pdfium_config` must be a dictionary or a PDFiumConfigSchema instance.")
+    # --- End extractor_config extraction ---
 
     logger.debug("Extracting PDF with pdfium backend.")
     source_id = row_data["source_id"]
@@ -536,7 +574,6 @@ def pdfium_extractor(
     partition_id = base_source_metadata.get("partition_id", -1)
     access_level = base_source_metadata.get("access_level", AccessLevelEnum.UNKNOWN)
 
-    # Handle pdf_stream as either a file path or stream
     pdf_source = _get_pdf_source(pdf_stream)
     doc = libpdfium.PdfDocument(pdf_source)
     pdf_metadata = extract_pdf_metadata(doc, source_id)
@@ -569,12 +606,13 @@ def pdfium_extractor(
     extracted_data = []
     accumulated_text = []
 
-    # Prepare for table/chart extraction
+    # Prepare for table/chart/infographic extraction
     pages_for_tables = []  # Accumulate tuples of (page_idx, np_image)
     futures = []  # To track asynchronous table/chart extraction tasks
 
     logger.debug(f"Using {pdfium_config.workers_per_progress_engine} workers for table/chart/infographic extraction.")
-    # Pre-render all pages in parallel if needed for table/chart/infographic extraction
+
+    # Pre-render all pages in parallel if needed
     rendered_imgs: Optional[List[Tuple[np.ndarray, Tuple[int, int]]]] = None
     if extract_tables or extract_charts or extract_infographics:
         rendered_imgs = render_single_pdf_parallel(
@@ -625,7 +663,25 @@ def pdfium_extractor(
                 )
                 extracted_data.extend(image_data)
 
-            # If we want tables or charts, use pre-rendered image
+            # Full page image extraction
+            if extract_page_as_image:
+                page_text = _extract_page_text(page)
+                image, _ = pdfium_pages_to_numpy([page], scale_tuple=(16384, 16384), trace_info=execution_trace_log)
+                base64_image = numpy_to_base64(image[0])
+                if len(base64_image) > 2**24 - 1:
+                    base64_image, _ = scale_image_to_encoding_size(base64_image, max_base64_size=2**24 - 1)
+                image_meta = construct_image_metadata_from_base64(
+                    base64_image,
+                    page_idx,
+                    page_count,
+                    source_metadata,
+                    base_unified_metadata,
+                    subtype=ContentTypeEnum.PAGE_IMAGE,
+                    text=page_text,
+                )
+                extracted_data.append(image_meta)
+
+            # If we want tables, charts, or infographics, use pre-rendered images
             if extract_tables or extract_charts or extract_infographics:
                 image, padding_offsets = rendered_imgs[page_idx]
                 pages_for_tables.append((page_idx, image, padding_offsets))
@@ -641,7 +697,7 @@ def pdfium_extractor(
                         extract_tables,
                         extract_charts,
                         extract_infographics,
-                        paddle_output_format,
+                        table_output_format,
                         pdfium_config.yolox_endpoints,
                         pdfium_config.yolox_infer_protocol,
                         pdfium_config.auth_token,
@@ -663,13 +719,14 @@ def pdfium_extractor(
                 extract_tables,
                 extract_charts,
                 extract_infographics,
-                paddle_output_format,
+                table_output_format,
                 pdfium_config.yolox_endpoints,
                 pdfium_config.yolox_infer_protocol,
                 pdfium_config.auth_token,
                 execution_trace_log=execution_trace_log,
             )
             futures.append(future)
+
             pages_for_tables.clear()
 
         # Wait for all asynchronous jobs to complete.
