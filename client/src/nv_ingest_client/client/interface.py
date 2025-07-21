@@ -436,7 +436,7 @@ class Ingestor:
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
                 file_suffix = f".{file_ext}.results.jsonl"
-                jsonl_filepath = safe_filename(output_dir, file_name, file_suffix)
+                jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
                     doc_data,
