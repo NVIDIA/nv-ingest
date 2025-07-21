@@ -781,7 +781,8 @@ redisDeployed: true
 
 redis:
   image:
-    tag: 7.4.3-debian-12-r0
+    repository: redis
+    tag: 6.2-alpine
   auth:
     enabled: false
   replica:
