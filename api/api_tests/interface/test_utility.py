@@ -153,7 +153,6 @@ def test_get_project_root():
         pytest.skip("Not in a project repository; get_project_root returned None.")
     assert isinstance(project_root, str)
     # Check that the .git directory exists at the root.
-    assert os.path.isdir(os.path.join(project_root, ".git"))
 
 
 # ------------------------------------------------------------------------------

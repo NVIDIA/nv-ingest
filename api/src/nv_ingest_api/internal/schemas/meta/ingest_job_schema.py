@@ -147,6 +147,27 @@ class IngestTaskUDFSchema(BaseModelNoExt):
     udf_function: str
     udf_function_name: str
     phase: int = Field(ge=1, le=5)
+    run_before: bool = Field(default=False, description="Execute UDF before the target stage")
+    run_after: bool = Field(default=False, description="Execute UDF after the target stage")
+    target_stage: Optional[str] = Field(
+        default=None, description="Name of the stage to target (e.g., 'image_dedup', 'text_extract')"
+    )
+
+    @model_validator(mode="after")
+    def validate_stage_targeting(self):
+        """Validate that stage targeting configuration is consistent"""
+        # If using stage targeting, must specify target_stage and at least one timing
+        if self.run_before or self.run_after:
+            if not self.target_stage:
+                raise ValueError("target_stage must be specified when using run_before or run_after")
+            if not (self.run_before or self.run_after):
+                raise ValueError("At least one of run_before or run_after must be True when target_stage is specified")
+
+        # If target_stage is specified, must have timing
+        if self.target_stage and not (self.run_before or self.run_after):
+            raise ValueError("At least one of run_before or run_after must be True when target_stage is specified")
+
+        return self
 
 
 class IngestTaskSchema(BaseModelNoExt):

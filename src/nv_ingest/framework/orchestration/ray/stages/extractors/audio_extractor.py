@@ -17,6 +17,8 @@ from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
 
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+
 logger = logging.getLogger(__name__)
 
 
@@ -41,6 +43,7 @@ class AudioExtractorStage(RayActorStage):
             raise
 
     @traceable("audio_extractor")
+    @udf_intercept_hook("audio_extractor")
     @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(mp3|wav)$"})])
     @nv_ingest_node_failure_try_except(annotation_id="audio_extractor", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:

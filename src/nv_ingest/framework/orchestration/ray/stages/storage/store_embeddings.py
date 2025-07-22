@@ -16,6 +16,8 @@ from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
 
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
+
 logger = logging.getLogger(__name__)
 
 
@@ -40,6 +42,7 @@ class EmbeddingStorageStage(RayActorStage):
             raise
 
     @traceable("embedding_storage")
+    @udf_intercept_hook(stage_name="embedding_storage")
     @filter_by_task(required_tasks=["store_embedding"])
     @nv_ingest_node_failure_try_except(annotation_id="embedding_storage", raise_on_failure=False)
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:

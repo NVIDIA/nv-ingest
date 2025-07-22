@@ -95,7 +95,7 @@ def wrap_callable_as_stage(
 
         @traceable(trace_name)
         @nv_ingest_node_failure_try_except(annotation_id=trace_name, raise_on_failure=False)
-        @filter_by_task(required_tasks=required_tasks) if required_tasks else (lambda f: f)
+        @filter_by_task(required_tasks=required_tasks if required_tasks else [])
         def on_data(self, control_message):
             """
             Processes a control message using the wrapped function.

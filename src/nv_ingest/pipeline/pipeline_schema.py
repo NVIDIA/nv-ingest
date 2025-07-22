@@ -84,8 +84,9 @@ class StageConfig(BaseModel):
     callable : Optional[str]
         The fully qualified import path to a callable function that
         implements the stage's logic. Mutually exclusive with 'actor'.
-    task_filters: Optional[List[str]]
+    task_filters: Optional[List[Any]]
         List of task types this callable stage should filter for. Only applies to callable stages.
+        Supports both simple strings (e.g., "udf") and complex filters (e.g., ["udf", {"phase": 5}]).
     enabled : bool
         A flag to indicate whether the stage should be included in the pipeline.
         If False, the stage and its connected edges are ignored.
@@ -102,7 +103,7 @@ class StageConfig(BaseModel):
     phase: PipelinePhase = Field(..., description="The logical phase of the stage.")
     actor: Optional[str] = Field(None, description="Full import path to the stage's actor class or function.")
     callable: Optional[str] = Field(None, description="Full import path to a callable function for the stage.")
-    task_filters: Optional[List[str]] = Field(
+    task_filters: Optional[List[Any]] = Field(
         None, description="List of task types this callable stage should filter for. Only applies to callable stages."
     )
     enabled: bool = Field(True, description="Whether the stage is enabled.")

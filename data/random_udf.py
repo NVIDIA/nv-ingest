@@ -9,6 +9,17 @@ This module contains a UDF function that adds random metadata to ingestion data.
 # flake8: noqa
 
 
+def add_two_metadata(control_message: "IngestControlMessage") -> "IngestControlMessage":
+    import logging
+
+    logger = logging.getLogger(__name__)
+    logger.info("UDF: Adding two metadata to control message")
+    new_cm = add_random_metadata(control_message)
+    new_cm = add_random_metadata_2(new_cm)
+
+    return new_cm
+
+
 def add_random_metadata(control_message: "IngestControlMessage") -> "IngestControlMessage":
     """
     UDF function that adds a random number to each row's metadata.custom_content.udf_random

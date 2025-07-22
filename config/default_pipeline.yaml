@@ -197,7 +197,7 @@ stages:
   # Post-processing / Mutators
   - name: "image_filter"
     type: "stage"
-    phase: 2  # MUTATION
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
     replicas:
       cpu_count_min: 0
@@ -207,7 +207,7 @@ stages:
 
   - name: "image_dedup"
     type: "stage"
-    phase: 2  # MUTATION
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
     replicas:
       cpu_count_min: 0
@@ -218,7 +218,7 @@ stages:
   # Transforms and Synthesis
   - name: "text_splitter"
     type: "stage"
-    phase: 3  # TRANSFORM
+    phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
     config:
       chunk_size: 512
@@ -231,7 +231,7 @@ stages:
 
   - name: "text_embedder"
     type: "stage"
-    phase: 3  # TRANSFORM
+    phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
     config:
       api_key: $NGC_API_KEY|""
@@ -245,7 +245,7 @@ stages:
 
   - name: "image_caption"
     type: "stage"
-    phase: 3  # TRANSFORM
+    phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
@@ -259,7 +259,7 @@ stages:
   # Storage and Output
   - name: "image_storage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     replicas:
       cpu_count_min: 0
@@ -269,7 +269,7 @@ stages:
 
   - name: "embedding_storage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
     replicas:
       cpu_count_min: 0
@@ -277,9 +277,9 @@ stages:
 
   - name: "udf_response_stage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     callable: "nv_ingest_api.internal.meta.udf:udf_stage_callable_fn"
-    task_filters: ["udf"]
+    task_filters: [["udf", {"phase": 5}]]
     config:
       ignore_empty_udf: true
     replicas:
@@ -290,7 +290,7 @@ stages:
 
   - name: "broker_response"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
       broker_client:
@@ -306,7 +306,7 @@ stages:
   # Telemetry and Drain
   - name: "otel_tracer"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
       otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
