@@ -522,7 +522,7 @@ def add_text_embedding_stage(pipeline, default_cpu_count, stage_name="text_embed
         stage_actor=TextEmbeddingTransformStage,
         config=config,
         min_replicas=0,
-        max_replicas=2,
+        max_replicas=_get_max_replicas(default_cpu_count, percentage_of_cpu=0.20),
     )
 
     return stage_name
