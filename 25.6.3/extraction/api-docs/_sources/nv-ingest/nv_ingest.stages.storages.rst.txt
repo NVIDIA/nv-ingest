@@ -1,0 +1,29 @@
+nv\_ingest.stages.storages package
+==================================
+
+Submodules
+----------
+
+nv\_ingest.stages.storages.embedding\_storage\_stage module
+-----------------------------------------------------------
+
+.. automodule:: nv_ingest.stages.storages.embedding_storage_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.stages.storages.image\_storage\_stage module
+-------------------------------------------------------
+
+.. automodule:: nv_ingest.stages.storages.image_storage_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.stages.storages
+   :members:
+   :show-inheritance:
+   :undoc-members:

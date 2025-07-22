@@ -1,0 +1,58 @@
+nv\_ingest.stages package
+=========================
+
+Subpackages
+-----------
+
+.. toctree::
+   :maxdepth: 4
+
+   nv_ingest.stages.embeddings
+   nv_ingest.stages.extractors
+   nv_ingest.stages.filters
+   nv_ingest.stages.nim
+   nv_ingest.stages.storages
+   nv_ingest.stages.transforms
+
+Submodules
+----------
+
+nv\_ingest.stages.docx\_extractor\_stage module
+-----------------------------------------------
+
+.. automodule:: nv_ingest.stages.docx_extractor_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.stages.multiprocessing\_stage module
+-----------------------------------------------
+
+.. automodule:: nv_ingest.stages.multiprocessing_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.stages.pdf\_extractor\_stage module
+----------------------------------------------
+
+.. automodule:: nv_ingest.stages.pdf_extractor_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+nv\_ingest.stages.pptx\_extractor\_stage module
+-----------------------------------------------
+
+.. automodule:: nv_ingest.stages.pptx_extractor_stage
+   :members:
+   :show-inheritance:
+   :undoc-members:
+
+Module contents
+---------------
+
+.. automodule:: nv_ingest.stages
+   :members:
+   :show-inheritance:
+   :undoc-members:
