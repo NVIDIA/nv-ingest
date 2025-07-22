@@ -51,7 +51,13 @@ def documents():
 
 @pytest.fixture
 def text_documents():
-    return ["data/test.txt", "data/test.html", "data/test.json", "data/test.md", "data/test.sh"]
+    return [
+        "data/test.txt",
+        "data/test.html",
+        "data/test.json",
+        "data/test.md",
+        "data/test.sh",
+    ]
 
 
 @pytest.fixture
@@ -70,9 +76,9 @@ def workspace():
     doc1_path = os.path.join(test_workspace, "doc1.txt")
     with open(doc1_path, "w") as f:
         f.write("This is a test document.")
-    
+
     yield test_workspace, doc1_path
-    
+
     shutil.rmtree(test_workspace)
 
 
@@ -151,7 +157,12 @@ def test_extract_task_args_tables_and_charts_false(ingestor):
 
 
 def test_extract_task_some_args(ingestor):
-    ingestor.extract(extract_tables=True, extract_charts=True, extract_images=True, extract_infographics=True)
+    ingestor.extract(
+        extract_tables=True,
+        extract_charts=True,
+        extract_images=True,
+        extract_infographics=True,
+    )
 
     task = ingestor._job_specs.job_specs["pdf"][0]._tasks[0]
     assert isinstance(task, ExtractTask)
@@ -341,7 +352,10 @@ def test_ingest_return_failures(ingestor, mock_client):
     # Mock the main processing method to return both results and failures
     expected_results = [{"result": "success_1"}]
     expected_failures = [("job_id_2", "TimeoutError"), ("job_id_3", "Processing Error")]
-    mock_client.process_jobs_concurrently.return_value = (expected_results, expected_failures)
+    mock_client.process_jobs_concurrently.return_value = (
+        expected_results,
+        expected_failures,
+    )
 
     # Store expected arguments used in process_jobs_concurrently
     expected_job_queue_id = getattr(ingestor, "_job_queue_id", "default_queue")
@@ -387,7 +401,10 @@ def test_ingest_async(ingestor, mock_client):
     future2 = Future()
     future1.set_result("result_1")
     future2.set_result("result_2")
-    mock_client.submit_job_async.return_value = {future1: "job_id_1", future2: "job_id_2"}
+    mock_client.submit_job_async.return_value = {
+        future1: "job_id_1",
+        future2: "job_id_2",
+    }
 
     ingestor._job_states = {}
     ingestor._job_states["job_id_1"] = MagicMock(state=JobStateEnum.COMPLETED)
@@ -464,7 +481,10 @@ def test_files_with_remote_files(ingestor_without_doc):
         assert ingestor_without_doc._all_local is False
         assert ingestor_without_doc._job_specs is None
 
-        ingestor_without_doc._documents = [f"{temp_dir}/doc1.pdf", f"{temp_dir}/doc2.pdf"]
+        ingestor_without_doc._documents = [
+            f"{temp_dir}/doc1.pdf",
+            f"{temp_dir}/doc2.pdf",
+        ]
         ingestor_without_doc._all_local = True
         ingestor_without_doc._job_specs = BatchJobSpec(ingestor_without_doc._documents)
 
@@ -477,7 +497,14 @@ def test_files_with_remote_files(ingestor_without_doc):
 def test_all_tasks_adds_default_tasks(ingestor):
     ingestor.all_tasks()
 
-    task_classes = {ExtractTask, DedupTask, FilterTask, SplitTask, EmbedTask, StoreEmbedTask}
+    task_classes = {
+        ExtractTask,
+        DedupTask,
+        FilterTask,
+        SplitTask,
+        EmbedTask,
+        StoreEmbedTask,
+    }
     added_tasks = {
         type(task) for job_specs in ingestor._job_specs._file_type_to_job_spec.values() for task in job_specs[0]._tasks
     }
@@ -596,7 +623,11 @@ def create_jsonl_file(tmp_path):
                 for item in data:
                     f.write(json.dumps(item) + "\n")
         else:
-            default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
+            default_data = [
+                {"id": 1, "name": "Alice"},
+                {"id": 2, "name": "Bob"},
+                {"id": 3, "name": "Charlie"},
+            ]
             with open(filepath, "w", encoding="utf-8") as f:
                 for item in default_data:
                     f.write(json.dumps(item) + "\n")
@@ -606,7 +637,11 @@ def create_jsonl_file(tmp_path):
 
 
 def test_lazy_list_core_functionality(create_jsonl_file):
-    default_data = [{"id": 1, "name": "Alice"}, {"id": 2, "name": "Bob"}, {"id": 3, "name": "Charlie"}]
+    default_data = [
+        {"id": 1, "name": "Alice"},
+        {"id": 2, "name": "Bob"},
+        {"id": 3, "name": "Charlie"},
+    ]
     filepath = create_jsonl_file(data=default_data)
 
     lazy_list_prelen = LazyLoadedList(filepath, expected_len=3)
@@ -632,14 +667,14 @@ def test_save_to_disk_with_default_cleanup(workspace, monkeypatch):
     monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", MagicMock())
     _, doc1_path = workspace
     ingestor_instance = Ingestor(documents=[doc1_path])
-    
+
     dir_to_be_cleaned = None
     with ingestor_instance as ingestor:
         ingestor.save_to_disk()
         dir_to_be_cleaned = ingestor._output_config["output_directory"]
         assert dir_to_be_cleaned is not None, "Directory for cleanup should be set"
         assert os.path.exists(dir_to_be_cleaned), "Temp directory should exist inside context"
-    
+
     assert not os.path.exists(dir_to_be_cleaned), "Temp directory should be removed after exiting context"
 
 
@@ -648,7 +683,7 @@ def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
     test_workspace, doc1_path = workspace
     user_dir = os.path.join(test_workspace, "user_results")
     os.makedirs(user_dir, exist_ok=True)
-    
+
     ingestor_instance = Ingestor(documents=[doc1_path])
 
     with ingestor_instance as ingestor:
@@ -662,12 +697,15 @@ def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
 def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
-    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
 
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_purge_test")
     os.makedirs(results_dir)
-    
+
     dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
 
     def fake_processor(completion_callback=None, **kwargs):
@@ -694,7 +732,10 @@ def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
 def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch):
     mock_client = MagicMock(spec=NvIngestClient)
     mock_vdb_op = MagicMock(spec=VDB)
-    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", lambda *args, **kwargs: mock_client)
+    monkeypatch.setattr(
+        "nv_ingest_client.client.interface.NvIngestClient",
+        lambda *args, **kwargs: mock_client,
+    )
 
     test_workspace, doc1_path = workspace
     results_dir = os.path.join(test_workspace, "vdb_preserve_test")
