@@ -9,6 +9,7 @@ import json
 import logging
 import os
 import tempfile
+import shutil
 from concurrent.futures import Future
 from unittest.mock import ANY
 from unittest.mock import MagicMock
@@ -32,6 +33,7 @@ from nv_ingest_client.primitives.tasks import StoreEmbedTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.util.vdb.milvus import Milvus
+from nv_ingest_client.util.vdb import VDB
 
 MODULE_UNDER_TEST = f"{module_under_test.__name__}"
 
@@ -60,6 +62,18 @@ def ingestor(mock_client, documents):
 @pytest.fixture
 def ingestor_without_doc(mock_client):
     return Ingestor(client=mock_client)
+
+
+@pytest.fixture
+def workspace():
+    test_workspace = tempfile.mkdtemp(prefix="ingestor_pytest_")
+    doc1_path = os.path.join(test_workspace, "doc1.txt")
+    with open(doc1_path, "w") as f:
+        f.write("This is a test document.")
+    
+    yield test_workspace, doc1_path
+    
+    shutil.rmtree(test_workspace)
 
 
 def test_dedup_task_no_args(ingestor):
@@ -556,6 +570,7 @@ def test_save_to_disk_config_structure(ingestor, tmp_path):
 
     expected_config = {
         "output_directory": output_dir_str,
+        "cleanup": True,
     }
     assert ingestor._output_config == expected_config
 
@@ -611,3 +626,96 @@ def test_lazy_list_core_functionality(create_jsonl_file):
 
     assert lazy_list_ondemand.get_all_items() == default_data
     assert isinstance(lazy_list_ondemand.get_all_items(), list)
+
+
+def test_save_to_disk_with_default_cleanup(workspace, monkeypatch):
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", MagicMock())
+    _, doc1_path = workspace
+    ingestor_instance = Ingestor(documents=[doc1_path])
+    
+    dir_to_be_cleaned = None
+    with ingestor_instance as ingestor:
+        ingestor.save_to_disk()
+        dir_to_be_cleaned = ingestor._output_config["output_directory"]
+        assert dir_to_be_cleaned is not None, "Directory for cleanup should be set"
+        assert os.path.exists(dir_to_be_cleaned), "Temp directory should exist inside context"
+    
+    assert not os.path.exists(dir_to_be_cleaned), "Temp directory should be removed after exiting context"
+
+
+def test_save_to_disk_with_explicit_cleanup_true(workspace, monkeypatch):
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", MagicMock())
+    test_workspace, doc1_path = workspace
+    user_dir = os.path.join(test_workspace, "user_results")
+    os.makedirs(user_dir, exist_ok=True)
+    
+    ingestor_instance = Ingestor(documents=[doc1_path])
+
+    with ingestor_instance as ingestor:
+        ingestor.save_to_disk(output_directory=user_dir, cleanup=True)
+        assert ingestor._output_config["output_directory"] == user_dir
+        assert os.path.exists(user_dir), "User-provided directory should exist inside context"
+
+    assert not os.path.exists(user_dir), "User-provided directory should be removed when cleanup=True"
+
+
+def test_vdb_upload_with_purge_removes_result_files(workspace, monkeypatch):
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", lambda *args, **kwargs: mock_client)
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_purge_test")
+    os.makedirs(results_dir)
+    
+    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(dummy_result_filepath, "w") as f:
+                f.write('{"data": "some_embedding"}\n')
+            completion_callback(results_data=[{"data": "some_embedding"}], job_id="0")
+        return ([], [])
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=True)
+        ingestor.ingest(show_progress=False)
+
+        mock_vdb_op.run.assert_called_once()
+
+    assert not os.path.exists(dummy_result_filepath), "Result file should be purged after VDB upload"
+    assert os.path.exists(results_dir)
+
+
+def test_vdb_upload_without_purge_preserves_result_files(workspace, monkeypatch):
+    mock_client = MagicMock(spec=NvIngestClient)
+    mock_vdb_op = MagicMock(spec=VDB)
+    monkeypatch.setattr("nv_ingest_client.client.interface.NvIngestClient", lambda *args, **kwargs: mock_client)
+
+    test_workspace, doc1_path = workspace
+    results_dir = os.path.join(test_workspace, "vdb_preserve_test")
+    os.makedirs(results_dir)
+    dummy_result_filepath = os.path.join(results_dir, "doc1.txt.results.jsonl")
+
+    def fake_processor(completion_callback=None, **kwargs):
+        if completion_callback:
+            with open(dummy_result_filepath, "w") as f:
+                f.write('{"data": "some_embedding"}\n')
+            completion_callback(results_data=[{"data": "some_embedding"}], job_id="0")
+        return ([], [])
+
+    mock_client.process_jobs_concurrently.side_effect = fake_processor
+    mock_client._job_index_to_job_spec = {"0": MagicMock(source_name=doc1_path)}
+
+    with Ingestor(documents=[doc1_path]) as ingestor:
+        ingestor.save_to_disk(output_directory=results_dir, cleanup=False)
+        ingestor.vdb_upload(vdb_op=mock_vdb_op, purge_results_after_upload=False)
+        ingestor.ingest(show_progress=False)
+
+        mock_vdb_op.run.assert_called_once()
+
+    assert os.path.exists(dummy_result_filepath), "Result file should be preserved"
