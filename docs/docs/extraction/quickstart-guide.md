@@ -43,6 +43,20 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
     NGC_API_KEY=<key to download containers from NGC>
     NIM_NGC_API_KEY=<key to download model files after containers start>
     ```
+
+    !!! tip "Performance Optimization: Faster OCR"
+
+        For faster OCR performance, you can use the new NemoRetriever OCR container instead of the default PaddleOCR. Add these variables to your .env file:
+
+        ```
+        OCR_IMAGE=nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
+        OCR_TAG=1.0.0-rc1-latest-release-31712057
+        OCR_MODEL_NAME=scene_text
+        ```
+
+        Alternatively, you can modify the OCR service directly in your docker-compose.yaml file with these image tags.
+
+        Note: This OCR option is currently in preview and not yet the default.
    
 5. Make sure NVIDIA is set as your default container runtime before running the docker compose command with the command:
 
@@ -126,7 +140,7 @@ In the below examples, we are doing text, chart, table, and image extraction:
 
 - **extract_text** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to find and extract text from pages.
 - **extract_images** — Uses [PDFium](https://github.com/pypdfium2-team/pypdfium2/) to extract images.
-- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) for table extraction.
+- **extract_tables** — Uses [object detection family of NIMs](https://docs.nvidia.com/nim/ingestion/object-detection/latest/overview.html) to find tables and charts, and either [PaddleOCR NIM](https://build.nvidia.com/baidu/paddleocr/modelcard) or NemoRetriever OCR for table extraction.
 - **extract_charts** — Enables or disables chart extraction, also based on the object detection NIM family.
 
 
@@ -154,7 +168,7 @@ ingestor = (
         extract_tables=True,
         extract_charts=True,
         extract_images=True,
-        paddle_output_format="markdown",
+        table_output_format="markdown",
         extract_infographics=True,
         # extract_method="nemoretriever_parse", # Slower, but maximally accurate, especially for PDFs with pages that are scanned images
         text_depth="page"
