@@ -46,11 +46,11 @@ If you prefer, you can run on Kubernetes by using [our Helm chart](https://githu
 
     !!! tip "Performance Optimization: Faster OCR"
 
-        For faster OCR performance, you can use the new NemoRetriever OCR container instead of the default PaddleOCR. Add these variables to your .env file:
+    For faster OCR performance, you can use the new EA NemoRetriever OCR container instead of the default PaddleOCR. Set these values in your .env file:
 
         ```
-        OCR_IMAGE=nvcr.io/nvstaging/nim/nemoretriever-ocr-v1
-        OCR_TAG=1.0.0-rc1-latest-release-31712057
+        OCR_IMAGE=nvcr.io/nvidia/nemo-microservices/nemoretriever-ocr-v1
+        OCR_TAG=latest
         OCR_MODEL_NAME=scene_text
         ```
 
