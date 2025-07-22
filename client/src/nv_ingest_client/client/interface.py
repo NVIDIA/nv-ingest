@@ -237,6 +237,21 @@ class Ingestor:
         self._output_config = None
         self._created_temp_output_dir = None
 
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exc_type, exc_value, traceback):
+        if self._output_config and (self._output_config["cleanup"] is True):
+            dir_to_cleanup = self._output_config["output_directory"]
+            try:
+                shutil.rmtree(dir_to_cleanup)
+            except FileNotFoundError:
+                logger.warning(
+                    f"Directory to be cleaned up not found (might have been removed already): {dir_to_cleanup}"
+                )
+            except OSError as e:
+                logger.error(f"Error removing {dir_to_cleanup}: {e}")
+
     def _create_client(self, **kwargs) -> None:
         """
         Creates an instance of NvIngestClient if `_client` is not set.
@@ -436,7 +451,7 @@ class Ingestor:
                 output_dir = self._output_config["output_directory"]
                 clean_source_basename = get_valid_filename(os.path.basename(source_name))
                 file_name, file_ext = os.path.splitext(clean_source_basename)
-                file_suffix = f".{file_ext}.results.jsonl"
+                file_suffix = f".{file_ext.strip('.')}.results.jsonl"
                 jsonl_filepath = os.path.join(output_dir, safe_filename(output_dir, file_name, file_suffix))
 
                 num_items_saved = save_document_results_to_jsonl(
@@ -857,6 +872,7 @@ class Ingestor:
     def save_to_disk(
         self,
         output_directory: Optional[str] = None,
+        cleanup: bool = True,
     ) -> "Ingestor":
         if not output_directory:
             self._created_temp_output_dir = tempfile.mkdtemp(prefix="ingestor_results_")
@@ -864,6 +880,7 @@ class Ingestor:
 
         self._output_config = {
             "output_directory": output_directory,
+            "cleanup": cleanup,
         }
         ensure_directory_with_permissions(output_directory)
 
