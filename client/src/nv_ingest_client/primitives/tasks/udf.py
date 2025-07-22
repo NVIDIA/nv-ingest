@@ -135,22 +135,36 @@ class UDFTask(Task):
         self,
         udf_function: Optional[str] = None,
         udf_function_name: Optional[str] = None,
-        phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
+        phase: Union[PipelinePhase, int, str, None] = PipelinePhase.RESPONSE,
+        target_stage: Optional[str] = None,
+        run_before: bool = False,
+        run_after: bool = False,
     ) -> None:
         super().__init__()
         self._udf_function = udf_function
         self._udf_function_name = udf_function_name
+        self._target_stage = target_stage
+        self._run_before = run_before
+        self._run_after = run_after
 
         # Convert phase to the appropriate format for API schema
-        converted_phase = self._convert_phase(phase)
+        # If target_stage is provided and phase is None, don't convert phase
+        if target_stage is not None and phase is None:
+            converted_phase = None
+            self._phase = None  # Set to None when using target_stage
+        else:
+            converted_phase = self._convert_phase(phase)
+            self._phase = PipelinePhase(converted_phase)  # Convert back to enum for internal use
 
         # Use the API schema for validation
-        validated_data = IngestTaskUDFSchema(
+        _ = IngestTaskUDFSchema(
             udf_function=udf_function or "",
             udf_function_name=udf_function_name or "",
-            phase=converted_phase,  # API schema requires non-empty string
+            phase=converted_phase,
+            target_stage=target_stage,
+            run_before=run_before,
+            run_after=run_after,
         )
-        self._phase = PipelinePhase(validated_data.phase)  # Convert back to enum for internal use
         self._resolved_udf_function = None
 
     def _convert_phase(self, phase: Union[PipelinePhase, int, str]) -> int:
@@ -262,6 +276,13 @@ class UDFTask(Task):
             task_properties["phase"] = self._phase.value
         else:
             task_properties["phase"] = self._phase
+
+        # Add new stage targeting parameters
+        if self._target_stage:
+            task_properties["target_stage"] = self._target_stage
+
+        task_properties["run_before"] = self._run_before
+        task_properties["run_after"] = self._run_after
 
         return {
             "type": "udf",

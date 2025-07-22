@@ -7,7 +7,6 @@ import pandas as pd
 from typing import Any, Dict, Tuple, Optional
 import ray
 
-# Assume these imports come from your project:
 from nv_ingest.framework.orchestration.ray.stages.meta.ray_actor_stage_base import RayActorStage
 from nv_ingest.framework.util.flow_control import filter_by_task
 from nv_ingest_api.internal.extract.pdf.pdf_extractor import extract_primitives_from_pdf_internal
@@ -17,6 +16,8 @@ from nv_ingest_api.internal.schemas.extract.extract_pdf_schema import PDFExtract
 from nv_ingest_api.util.exception_handlers.decorators import (
     nv_ingest_node_failure_try_except,
 )
+
+from nv_ingest.framework.util.flow_control.udf_intercept import udf_intercept_hook
 
 logger = logging.getLogger(__name__)
 
@@ -51,8 +52,8 @@ class PDFExtractorStage(RayActorStage):
       4. Optionally, stores additional extraction info in the message metadata.
     """
 
-    def __init__(self, config: PDFExtractorSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: PDFExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             # Validate and store the PDF extractor configuration.
             self.validated_config = config
@@ -61,9 +62,10 @@ class PDFExtractorStage(RayActorStage):
             logger.exception(f"Error validating PDF extractor config: {e}")
             raise
 
-    @traceable("pdf_extraction")
-    @filter_by_task(required_tasks=[("extract", {"document_type": "pdf"})])
     @nv_ingest_node_failure_try_except(annotation_id="pdf_extractor", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=[("extract", {"document_type": "pdf"})])
     def on_data(self, control_message: Any) -> Any:
         """
         Process the control message by extracting PDF content.

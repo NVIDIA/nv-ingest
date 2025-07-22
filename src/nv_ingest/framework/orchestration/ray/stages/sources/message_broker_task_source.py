@@ -102,8 +102,8 @@ class MessageBrokerTaskSourceStage(RayActorSourceStage):
     """
 
     # Use the updated config type hint
-    def __init__(self, config: MessageBrokerTaskSourceConfig) -> None:
-        super().__init__(config, log_to_stdout=False)
+    def __init__(self, config: MessageBrokerTaskSourceConfig, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         self.config: MessageBrokerTaskSourceConfig  # Add a type hint for self.config
         self._logger.debug(
             "Initializing MessageBrokerTaskSourceStage with config: %s", config.model_dump()

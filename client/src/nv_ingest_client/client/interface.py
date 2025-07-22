@@ -43,6 +43,7 @@ from nv_ingest_client.client.util.processing import save_document_results_to_jso
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import CaptionTask
+from nv_ingest_client.primitives.tasks import ChartExtractionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
@@ -50,6 +51,7 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
+from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
@@ -1026,18 +1028,49 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
+        # Use the API schema for validation
+        check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
 
-        # Extract individual parameters from API schema for CaptionTask constructor
-        caption_params = {
-            "api_key": task_options.api_key,
-            "endpoint_url": task_options.endpoint_url,
-            "prompt": task_options.prompt,
-            "model_name": task_options.model_name,
-        }
-        caption_task = CaptionTask(**caption_params)
+        caption_task = CaptionTask(**kwargs)
         self._job_specs.add_task(caption_task)
+        return self
 
+    @ensure_job_specs
+    def chart_extract(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a ChartExtractionTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the ChartExtractionTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        chart_task = ChartExtractionTask(**kwargs)
+        self._job_specs.add_task(chart_task)
+        return self
+
+    @ensure_job_specs
+    def table_extract(self, **kwargs: Any) -> "Ingestor":
+        """
+        Adds a TableExtractionTask to the batch job specification.
+
+        Parameters
+        ----------
+        kwargs : dict
+            Parameters specific to the TableExtractionTask.
+
+        Returns
+        -------
+        Ingestor
+            Returns self for chaining.
+        """
+        table_task = TableExtractionTask()
+        self._job_specs.add_task(table_task)
         return self
 
     def _count_job_states(self, job_states: set[JobStateEnum]) -> int:

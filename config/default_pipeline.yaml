@@ -229,20 +229,6 @@ stages:
     runs_after:
       - "image_dedup"
 
-  - name: "text_embedder"
-    type: "stage"
-    phase: 4  # TRANSFORM
-    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
-    config:
-      api_key: $NGC_API_KEY|""
-      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
-      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
-    replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
-    runs_after:
-      - "text_splitter"
-
   - name: "image_caption"
     type: "stage"
     phase: 4  # TRANSFORM
@@ -255,6 +241,22 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
+    runs_after:
+      - "text_splitter"
+
+  - name: "text_embedder"
+    type: "stage"
+    phase: 4  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
+    config:
+      api_key: $NGC_API_KEY|""
+      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"http://embedding:8000/v1"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 4
+    runs_after:
+      - "image_caption"
 
   # Storage and Output
   - name: "image_storage"
@@ -274,19 +276,8 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
-
-  - name: "udf_response_stage"
-    type: "stage"
-    phase: 5  # RESPONSE
-    callable: "nv_ingest_api.internal.meta.udf:udf_stage_callable_fn"
-    task_filters: [["udf", {"phase": 5}]]
-    config:
-      ignore_empty_udf: true
-    replicas:
-      cpu_count_min: 0
-      cpu_count_max: 1
     runs_after:
-      - "embedding_storage"
+      - "text_embedder"
 
   - name: "broker_response"
     type: "stage"
@@ -301,7 +292,7 @@ stages:
       cpu_count_min: 1
       cpu_count_max: 2
     runs_after:
-      - "udf_response_stage"
+      - "embedding_storage"
 
   # Telemetry and Drain
   - name: "otel_tracer"
@@ -377,12 +368,12 @@ edges:
 
   # Primitive Transforms
   - from: "text_splitter"
-    to: "text_embedder"
-    queue_size: 32
-  - from: "text_embedder"
     to: "image_caption"
     queue_size: 32
   - from: "image_caption"
+    to: "text_embedder"
+    queue_size: 32
+  - from: "text_embedder"
     to: "image_storage"
     queue_size: 32
 
@@ -391,9 +382,6 @@ edges:
     to: "embedding_storage"
     queue_size: 32
   - from: "embedding_storage"
-    to: "udf_response_stage"
-    queue_size: 32
-  - from: "udf_response_stage"
     to: "broker_response"
     queue_size: 32
 

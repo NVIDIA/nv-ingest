@@ -4,6 +4,7 @@
 
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -33,8 +34,8 @@ class AudioExtractorStage(RayActorStage):
       3. Updates the message payload with the extracted text DataFrame.
     """
 
-    def __init__(self, config: AudioExtractorSchema) -> None:
-        super().__init__(config, log_to_stdout=False)
+    def __init__(self, config: AudioExtractorSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, log_to_stdout=False, stage_name=stage_name)
         try:
             self.validated_config = config
             self._logger.info("AudioExtractorStage configuration validated successfully.")
@@ -42,10 +43,10 @@ class AudioExtractorStage(RayActorStage):
             self._logger.exception(f"Error validating Audio Extractor config: {e}")
             raise
 
-    @traceable("audio_extractor")
-    @udf_intercept_hook("audio_extractor")
-    @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(mp3|wav)$"})])
     @nv_ingest_node_failure_try_except(annotation_id="audio_extractor", raise_on_failure=False)
+    @traceable()
+    @udf_intercept_hook()
+    @filter_by_task(required_tasks=[("extract", {"document_type": "regex:^(mp3|wav)$"})])
     def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
         """
         Process the control message by extracting text from audio.

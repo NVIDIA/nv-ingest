@@ -154,12 +154,18 @@ def execute_targeted_udfs(
     control_message: IngestControlMessage, stage_name: str, directive: str
 ) -> IngestControlMessage:
     """Execute UDFs that target this stage with the given directive."""
-    # Early exit if no UDF tasks exist
-    if not control_message.has_task("udf"):
+    # Early exit if no UDF tasks exist - check by task type, not task ID
+    udf_tasks_exist = any(task.type == "udf" for task in control_message.get_tasks())
+    if not udf_tasks_exist:
         return control_message
 
-    # Remove all UDF tasks and get them
-    all_udf_tasks = remove_all_tasks_by_type(control_message, "udf")
+    # Remove all UDF tasks and get them - handle case where no tasks found
+    try:
+        all_udf_tasks = remove_all_tasks_by_type(control_message, "udf")
+    except ValueError:
+        # No UDF tasks found - this can happen due to race conditions
+        logger.debug(f"No UDF tasks found for stage '{stage_name}' directive '{directive}'")
+        return control_message
 
     # Execute applicable UDFs and collect remaining ones
     remaining_tasks = []
@@ -241,7 +247,7 @@ def remove_task_by_id(control_message: IngestControlMessage, task_id: str) -> In
     return control_message
 
 
-def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_run_after: bool = True):
+def udf_intercept_hook(stage_name: Optional[str] = None, enable_run_before: bool = True, enable_run_after: bool = True):
     """
     Decorator that executes UDFs targeted at this stage.
 
@@ -250,19 +256,20 @@ def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_r
     specific stages using run_before or run_after directives.
 
     Args:
-        stage_name: Name of the stage (e.g., "image_dedup", "text_extract")
+        stage_name: Name of the stage (e.g., "image_dedup", "text_extract").
+                   If None, will attempt to use self.stage_name from the decorated method's instance.
         enable_run_before: Whether to execute UDFs with run_before=True (default: True)
         enable_run_after: Whether to execute UDFs with run_after=True (default: True)
 
     Examples:
-        # Full UDF support (before and after)
+        # Automatic stage name detection (recommended)
         @traceable("image_deduplication")
-        @udf_intercept_hook("image_dedup")
+        @udf_intercept_hook()  # Uses self.stage_name automatically
         @filter_by_task(required_tasks=["dedup"])
         def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
             return control_message
 
-        # Only run_before UDFs (e.g., for sink stages that don't return data)
+        # Explicit stage name (fallback/override)
         @traceable("data_sink")
         @udf_intercept_hook("data_sink", enable_run_after=False)
         @filter_by_task(required_tasks=["store"])
@@ -271,7 +278,7 @@ def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_r
 
         # Only run_after UDFs (e.g., for source stages)
         @traceable("data_source")
-        @udf_intercept_hook("data_source", enable_run_before=False)
+        @udf_intercept_hook(enable_run_before=False)  # Uses self.stage_name automatically
         def on_data(self, control_message: IngestControlMessage) -> IngestControlMessage:
             return control_message
     """
@@ -279,6 +286,26 @@ def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_r
     def decorator(func: Callable) -> Callable:
         @functools.wraps(func)
         def wrapper(*args: Any, **kwargs: Any) -> Any:
+            # Determine the stage name to use
+            resolved_stage_name = stage_name
+
+            # If no explicit stage_name provided, try to get it from self.stage_name
+            if resolved_stage_name is None and len(args) >= 1:
+                stage_instance = args[0]  # 'self' in method calls
+                if hasattr(stage_instance, "stage_name") and stage_instance.stage_name:
+                    resolved_stage_name = stage_instance.stage_name
+                    logger.debug(f"Using auto-detected stage name: '{resolved_stage_name}'")
+                else:
+                    logger.warning(
+                        "No stage_name provided and could not auto-detect from instance. Skipping UDF intercept."
+                    )
+                    return func(*args, **kwargs)
+            elif resolved_stage_name is None:
+                logger.warning(
+                    "No stage_name provided and no instance available for auto-detection. Skipping UDF intercept."
+                )
+                return func(*args, **kwargs)
+
             # Extract control_message from args (handle both self.method and function cases)
             control_message = None
             if len(args) >= 2 and hasattr(args[1], "get_tasks"):
@@ -292,7 +319,7 @@ def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_r
                 try:
                     # Execute UDFs that should run before this stage (if enabled)
                     if enable_run_before:
-                        control_message = execute_targeted_udfs(control_message, stage_name, "run_before")
+                        control_message = execute_targeted_udfs(control_message, resolved_stage_name, "run_before")
                         # Update args with modified control_message
                         if len(args) >= 2 and hasattr(args[1], "get_tasks"):
                             args_list[1] = control_message
@@ -304,12 +331,11 @@ def udf_intercept_hook(stage_name: str, enable_run_before: bool = True, enable_r
 
                     # Execute UDFs that should run after this stage (if enabled)
                     if enable_run_after and hasattr(result, "get_tasks"):  # Result is control_message
-                        result = execute_targeted_udfs(result, stage_name, "run_after")
+                        result = execute_targeted_udfs(result, resolved_stage_name, "run_after")
 
                     return result
-
                 except Exception as e:
-                    logger.error(f"Error in udf_intercept_hook decorator for stage '{stage_name}': {e}")
+                    logger.error(f"Error in udf_intercept_hook decorator for stage '{resolved_stage_name}': {e}")
                     # Continue with original function execution
                     return func(*args, **kwargs)
             else:

@@ -4,7 +4,7 @@
 
 import logging
 import time
-from typing import Any
+from typing import Any, Optional
 from pydantic import BaseModel
 import ray
 
@@ -22,9 +22,9 @@ class ThroughputMonitorStage(RayActorStage):
     It also adds the throughput as metadata on the control message before passing it on.
     """
 
-    def __init__(self, config: BaseModel) -> None:
+    def __init__(self, config: BaseModel, stage_name: Optional[str] = None) -> None:
         # Initialize base attributes (e.g., self._running, self.start_time) via the base class.
-        super().__init__(config)
+        super().__init__(config, stage_name=stage_name)
         self.count = 0
         self.last_emit_time = None  # Timestamp when the last throughput measure was emitted
 

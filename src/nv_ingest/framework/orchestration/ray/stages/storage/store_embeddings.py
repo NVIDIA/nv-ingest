@@ -3,6 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
+from typing import Optional
 
 import ray
 
@@ -32,8 +33,8 @@ class EmbeddingStorageStage(RayActorStage):
       3. Updates the message payload with the stored embeddings DataFrame.
     """
 
-    def __init__(self, config: EmbeddingStorageSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: EmbeddingStorageSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("EmbeddingStorageStage configuration validated successfully.")

@@ -259,7 +259,24 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                     "extract_method": task_options.method,
                     **task_options.params,
                 }
+
+                # Start with the main extract task
                 new_task = [(new_task_id, ExtractTask(**extract_task_params))]
+
+                # Add ChartExtractionTask if extract_charts is True
+                if task_options.params.get("extract_charts", False):
+                    from nv_ingest_client.primitives.tasks import ChartExtractionTask
+
+                    chart_task_id = "chart_data_extract"
+                    chart_params = {"params": {}}  # ChartExtractionTask takes params dict
+                    new_task.append((chart_task_id, ChartExtractionTask(chart_params)))
+
+                # Add TableExtractionTask if extract_tables is True
+                if task_options.params.get("extract_tables", False):
+                    from nv_ingest_client.primitives.tasks import TableExtractionTask
+
+                    table_task_id = "table_data_extract"
+                    new_task.append((table_task_id, TableExtractionTask()))
             elif task_id == "store":
                 task_options = check_schema(IngestTaskStoreSchema, options, task_id, json_options)
                 new_task_id = f"{task_id}"
@@ -309,6 +326,17 @@ def click_validate_task(ctx: click.Context, param: click.Parameter, value: List[
                 new_task_id = f"{task_id}"
                 new_task = [(new_task_id, InfographicExtractionTask(**task_options.model_dump()))]
             elif task_id == "udf":
+                # Validate mutual exclusivity of target_stage and phase
+                has_target_stage = "target_stage" in options and options["target_stage"] is not None
+                has_phase = "phase" in options and options["phase"] is not None
+
+                if has_target_stage and has_phase:
+                    raise ValueError(
+                        "UDF task cannot specify both 'target_stage' and 'phase'. Please specify only one."
+                    )
+                elif not has_target_stage and not has_phase:
+                    raise ValueError("UDF task must specify either 'target_stage' or 'phase'.")
+
                 # Pre-process UDF task options to convert phase names to integers
                 if "phase" in options and isinstance(options["phase"], str):
                     # Convert phase string to integer using the same logic as UDFTask

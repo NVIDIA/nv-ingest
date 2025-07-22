@@ -3,7 +3,7 @@
 # SPDX-License-Identifier: Apache-2.0
 
 import logging
-from typing import Dict, Any
+from typing import Dict, Any, Optional
 
 import pandas as pd
 import ray
@@ -31,8 +31,8 @@ class ImageStorageStage(RayActorStage):
     payload and updates the control message accordingly.
     """
 
-    def __init__(self, config: ImageStorageModuleSchema) -> None:
-        super().__init__(config)
+    def __init__(self, config: ImageStorageModuleSchema, stage_name: Optional[str] = None) -> None:
+        super().__init__(config, stage_name=stage_name)
         try:
             self.validated_config = config
             logger.info("ImageStorageStage configuration validated successfully.")

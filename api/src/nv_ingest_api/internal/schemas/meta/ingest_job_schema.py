@@ -146,7 +146,7 @@ class IngestTaskInfographicExtraction(BaseModelNoExt):
 class IngestTaskUDFSchema(BaseModelNoExt):
     udf_function: str
     udf_function_name: str
-    phase: int = Field(ge=1, le=5)
+    phase: Optional[int] = Field(default=None, ge=1, le=5)
     run_before: bool = Field(default=False, description="Execute UDF before the target stage")
     run_after: bool = Field(default=False, description="Execute UDF after the target stage")
     target_stage: Optional[str] = Field(
@@ -156,14 +156,21 @@ class IngestTaskUDFSchema(BaseModelNoExt):
     @model_validator(mode="after")
     def validate_stage_targeting(self):
         """Validate that stage targeting configuration is consistent"""
-        # If using stage targeting, must specify target_stage and at least one timing
+        # Must specify either phase or target_stage, but not both
+        has_phase = self.phase is not None
+        has_target_stage = self.target_stage is not None
+
+        if has_phase and has_target_stage:
+            raise ValueError("Cannot specify both 'phase' and 'target_stage'. Please specify only one.")
+        elif not has_phase and not has_target_stage:
+            raise ValueError("Must specify either 'phase' or 'target_stage'.")
+
+        # If using run_before or run_after, must specify target_stage
         if self.run_before or self.run_after:
             if not self.target_stage:
                 raise ValueError("target_stage must be specified when using run_before or run_after")
-            if not (self.run_before or self.run_after):
-                raise ValueError("At least one of run_before or run_after must be True when target_stage is specified")
 
-        # If target_stage is specified, must have timing
+        # If target_stage is specified, must have at least one timing
         if self.target_stage and not (self.run_before or self.run_after):
             raise ValueError("At least one of run_before or run_after must be True when target_stage is specified")
 
