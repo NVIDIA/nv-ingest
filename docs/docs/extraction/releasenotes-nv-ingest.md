@@ -7,6 +7,28 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
 
+
+## Release 25.7.0
+
+The NeMo Retriever extraction 25.7.0 release TODO, including the following:
+
+- TODO
+
+- New notebook for [Building a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
+
+
+
+### Breaking Changes
+
+There are no breaking changes in this version.
+
+### Upgrade
+
+QA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/main/helm/values.yaml).
+GA link: To upgrade the Helm Charts for this version, refer to [NV-Ingest Helm Charts](https://github.com/NVIDIA/nv-ingest/blob/release/TODO/helm/values.yaml).
+
+
+
 ## Release 25.6.3
 
 The NeMo Retriever extraction 25.6.3 release is a patch release 
