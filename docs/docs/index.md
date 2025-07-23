@@ -1,4 +1,4 @@
-# Overview of NVIDIA NeMo Retriever
+# What is NVIDIA NeMo Retriever
 
 NVIDIA NeMo Retriever is a collection of microservices 
 for building and scaling multimodal data extraction, embedding, and reranking pipelines 
