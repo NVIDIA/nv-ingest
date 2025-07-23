@@ -27,7 +27,6 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
         # Mock constants
         self.constants_patcher = patch.multiple(
             MODULE_UNDER_TEST,
-            YOLOX_TABLE_IMAGE_PREPROC_HEIGHT=1024,
             YOLOX_TABLE_NIM_MAX_IMAGE_SIZE=1000000,
             YOLOX_TABLE_NUM_CLASSES=3,
             YOLOX_TABLE_CONF_THRESHOLD=0.5,
@@ -70,8 +69,6 @@ class TestYoloxTableStructureModelInterface(unittest.TestCase):
     def test_initialization(self):
         """Test initialization of YoloxTableStructureModelInterface."""
         # Check parent class initialization
-        self.assertEqual(self.model_interface.image_preproc_width, 1024)
-        self.assertEqual(self.model_interface.image_preproc_height, 1024)
         self.assertEqual(self.model_interface.nim_max_image_size, 1000000)
         self.assertEqual(self.model_interface.num_classes, 3)
         self.assertEqual(self.model_interface.conf_threshold, 0.5)

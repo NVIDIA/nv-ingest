@@ -10,6 +10,7 @@ services:
 
   page-elements:
     image: ${YOLOX_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-page-elements-v2}:${YOLOX_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8000:8000"
       - "8001:8001"
@@ -20,7 +21,11 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${PAGE_ELEMENTS_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${PAGE_ELEMENTS_CUDA_MEMORY_POOL_MB:-2048}
+      - NIM_TRITON_CPU_THREADS_PRE_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_PRE_PROCESSOR:-2}
+      - NIM_TRITON_CPU_THREADS_POST_PROCESSOR=${PAGE_ELEMENTS_CPU_THREADS_POST_PROCESSOR:-1}
+      - OMP_NUM_THREADS=2
       # NIM OpenTelemetry Settings
       - NIM_ENABLE_OTEL=0
       - NIM_OTEL_SERVICE_NAME=page-elements
@@ -42,6 +47,7 @@ services:
 
   graphic-elements:
     image: ${YOLOX_GRAPHIC_ELEMENTS_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-graphic-elements-v1}:${YOLOX_GRAPHIC_ELEMENTS_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8003:8000"
       - "8004:8001"
@@ -52,7 +58,9 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${GRAPHIC_ELEMENTS_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${GRAPHIC_ELEMENTS_CUDA_MEMORY_POOL_MB:-2048}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -64,6 +72,7 @@ services:
 
   table-structure:
     image: ${YOLOX_TABLE_STRUCTURE_IMAGE:-nvcr.io/nim/nvidia/nemoretriever-table-structure-v1}:${YOLOX_TABLE_STRUCTURE_TAG:-latest}
+    shm_size: 16gb
     ports:
       - "8006:8000"
       - "8007:8001"
@@ -74,7 +83,9 @@ services:
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
       - CUDA_VISIBLE_DEVICES=0
-      - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${TABLE_STRUCTURE_BATCH_SIZE:-32}
+      - NIM_TRITON_CUDA_MEMORY_POOL_MB=${TABLE_STRUCTURE_CUDA_MEMORY_POOL_MB:-2048}
+      - OMP_NUM_THREADS=1
     deploy:
       resources:
         reservations:
@@ -95,6 +106,7 @@ services:
       - "8011:8002"
     user: root
     environment:
+      - OMP_NUM_THREADS=${OCR_OMP_NUM_THREADS:-8}
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
@@ -121,8 +133,9 @@ services:
       - NIM_HTTP_API_PORT=8000
       - NIM_TRITON_LOG_VERBOSE=1
       - NGC_API_KEY=${NIM_NGC_API_KEY:-${NGC_API_KEY:-ngcapikey}}
-      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-1}
+      - NIM_TRITON_MAX_BATCH_SIZE=${EMBEDDER_BATCH_SIZE:-30}
       - OMP_NUM_THREADS=1
+      - NIM_TRITON_PERFORMANCE_MODE=throughput
     deploy:
       resources:
         reservations:
@@ -249,6 +262,7 @@ services:
       - sys_nice
     environment:
       - ARROW_DEFAULT_MEMORY_POOL=system
+      - OMP_NUM_THREADS=1
       - AUDIO_GRPC_ENDPOINT=audio:50051
       - AUDIO_INFER_PROTOCOL=grpc
       - CUDA_VISIBLE_DEVICES=-1
@@ -257,6 +271,7 @@ services:
       - EMBEDDING_NIM_MODEL_NAME=${EMBEDDING_NIM_MODEL_NAME:-nvidia/llama-3.2-nv-embedqa-1b-v2}
       - INGEST_LOG_LEVEL=DEFAULT
       - INGEST_DYNAMIC_MEMORY_THRESHOLD=0.80
+      - INGEST_DISABLE_DYNAMIC_SCALING=${INGEST_DISABLE_DYNAMIC_SCALING:-false}
       #- INGEST_DISABLE_DYNAMIC_SCALING=true # Disable dynamic scaling and use static worker count
       #- INSTALL_AUDIO_EXTRACTION_DEPS=true
       # Message client for development
@@ -287,6 +302,7 @@ services:
       #- OCR_INFER_PROTOCOL=http
       - REDIS_INGEST_TASK_QUEUE=ingest_task_queue
       # Self-hosted redis endpoints.
+      - YOLOX_PAGE_IMAGE_FORMAT=JPEG # JPG is faster than PNG
       - YOLOX_GRPC_ENDPOINT=page-elements:8001
       - YOLOX_HTTP_ENDPOINT=http://page-elements:8000/v1/infer
       - YOLOX_INFER_PROTOCOL=grpc

@@ -6,6 +6,17 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 
     NeMo Retriever extraction is also known as NVIDIA Ingest and nv-ingest.
 
+
+## Release 25.6.3
+
+The NeMo Retriever extraction 25.6.3 release is a patch release 
+that updates the client's dependency on [pypdfium2](https://github.com/pypdfium2-team/pypdfium2) to the latest stable version.
+
+Only the release branch and the `nv-ingest-client` package have been updated in 25.6.3. 
+The previously released 25.6.2 container on NGC remains unchanged.
+
+
+
 ## Release 25.6.2
 
 The NeMo Retriever extraction 25.06 release focuses on accuracy improvements and feature expansions, including the following:

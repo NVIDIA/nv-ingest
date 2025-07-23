@@ -5,10 +5,10 @@
 import logging
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from typing import Any
 from typing import Optional
-from typing import Tuple
+from typing import Tuple, Union
 
 import numpy as np
 import requests
@@ -90,6 +90,10 @@ class NimClient:
 
     def _fetch_max_batch_size(self, model_name, model_version: str = "") -> int:
         """Fetch the maximum batch size from the Triton model configuration in a thread-safe manner."""
+
+        if model_name == "yolox_ensemble":
+            model_name = "yolox"
+
         if model_name in self._max_batch_sizes:
             return self._max_batch_sizes[model_name]
 
@@ -178,7 +182,7 @@ class NimClient:
             max_requested_batch_size = kwargs.pop("max_batch_size", batch_size)
             force_requested_batch_size = kwargs.pop("force_max_batch_size", False)
             max_batch_size = (
-                min(batch_size, max_requested_batch_size)
+                max(1, min(batch_size, max_requested_batch_size))
                 if not force_requested_batch_size
                 else max_requested_batch_size
             )
@@ -202,13 +206,15 @@ class NimClient:
             #    We enumerate the batches so that we can later reassemble results in order.
             results = [None] * len(formatted_batches)
             with ThreadPoolExecutor(max_workers=max_pool_workers) as executor:
-                futures = []
+                future_to_idx = {}
                 for idx, (batch, batch_data) in enumerate(zip(formatted_batches, formatted_batch_data)):
                     future = executor.submit(
                         self._process_batch, batch, batch_data=batch_data, model_name=model_name, **kwargs
                     )
-                    futures.append((idx, future))
-                for idx, future in futures:
+                    future_to_idx[future] = idx
+
+                for future in as_completed(future_to_idx.keys()):
+                    idx = future_to_idx[future]
                     results[idx] = future.result()
 
             # 5. Process the parsed outputs for each batch using its corresponding batch_data.
@@ -233,7 +239,9 @@ class NimClient:
 
         return all_results
 
-    def _grpc_infer(self, formatted_input: np.ndarray, model_name: str, **kwargs) -> np.ndarray:
+    def _grpc_infer(
+        self, formatted_input: Union[list, list[np.ndarray]], model_name: str, **kwargs
+    ) -> Union[list, list[np.ndarray]]:
         """
         Perform inference using the gRPC protocol.
 

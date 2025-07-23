@@ -13,7 +13,6 @@ from typing import Tuple
 import numpy as np
 import pandas as pd
 
-from nv_ingest_api.internal.primitives.nim.model_interface.helpers import get_version
 from nv_ingest_api.internal.schemas.extract.extract_chart_schema import ChartExtractorSchema
 from nv_ingest_api.internal.schemas.meta.ingest_job_schema import IngestTaskChartExtraction
 from nv_ingest_api.util.image_processing.table_and_chart import join_yolox_graphic_elements_and_ocr_output
@@ -79,10 +78,13 @@ def _run_chart_inference(
 
     future_yolox_kwargs = dict(
         data=data_yolox,
-        model_name="yolox",
+        model_name="yolox_ensemble",
         stage_name="chart_extraction",
-        max_batch_size=8,
+        input_names=["INPUT_IMAGES", "THRESHOLDS"],
+        dtypes=["BYTES", "FP32"],
+        output_names=["OUTPUT"],
         trace_info=trace_info,
+        max_batch_size=8,
     )
     future_ocr_kwargs = dict(
         data=data_ocr,
@@ -211,24 +213,7 @@ def _create_clients(
     ocr_protocol: str,
     auth_token: str,
 ) -> Tuple[NimClient, NimClient]:
-    # Obtain yolox_version
-    # Assuming that the grpc endpoint is at index 0
-    yolox_http_endpoint = yolox_endpoints[1]
-
-    try:
-        yolox_version = get_version(yolox_http_endpoint)
-        if not yolox_version:
-            logger.warning(
-                "Failed to obtain yolox-page-elements version from the endpoint. Falling back to the latest version."
-            )
-            yolox_version = None  # Default to the latest version
-    except Exception:
-        logger.warning(
-            "Failed to get yolox-page-elements version after 30 seconds. Falling back to the latest version."
-        )
-        yolox_version = None  # Default to the latest version
-
-    yolox_model_interface = YoloxGraphicElementsModelInterface(yolox_version=yolox_version)
+    yolox_model_interface = YoloxGraphicElementsModelInterface()
     ocr_model_interface = OCRModelInterface()
 
     logger.debug(f"Inference protocols: yolox={yolox_protocol}, ocr={ocr_protocol}")

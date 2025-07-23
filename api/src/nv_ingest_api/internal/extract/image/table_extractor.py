@@ -77,9 +77,12 @@ def _run_inference(
         data_yolox = {"images": valid_arrays}
         future_yolox_kwargs = dict(
             data=data_yolox,
-            model_name="yolox",
+            model_name="yolox_ensemble",
             stage_name="table_extraction",
             max_batch_size=8,
+            input_names=["INPUT_IMAGES", "THRESHOLDS"],
+            dtypes=["BYTES", "FP32"],
+            output_names=["OUTPUT"],
             trace_info=trace_info,
         )
 
@@ -102,11 +105,10 @@ def _run_inference(
         )
 
     with ThreadPoolExecutor(max_workers=2) as executor:
+        future_ocr = executor.submit(ocr_client.infer, **future_ocr_kwargs)
         future_yolox = None
         if enable_yolox:
             future_yolox = executor.submit(yolox_client.infer, **future_yolox_kwargs)
-        future_ocr = executor.submit(ocr_client.infer, **future_ocr_kwargs)
-
         if enable_yolox:
             try:
                 yolox_results = future_yolox.result()

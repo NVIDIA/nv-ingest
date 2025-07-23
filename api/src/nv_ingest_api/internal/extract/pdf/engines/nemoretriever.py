@@ -258,6 +258,9 @@ def nemoretriever_parse_extractor(
                     nemoretriever_parse_config.yolox_endpoints,
                     nemoretriever_parse_config.yolox_infer_protocol,
                     nemoretriever_parse_config.auth_token,
+                    input_names=["INPUT_IMAGES", "THRESHOLDS"],
+                    dtypes=["BYTES", "FP32"],
+                    output_names=["OUTPUT"],
                     execution_trace_log=execution_trace_log,
                 )
                 futures.append(future_yolox)
