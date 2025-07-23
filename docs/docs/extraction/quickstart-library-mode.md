@@ -1,9 +1,19 @@
 # Deploy Without Containers (Library Mode) for NeMo Retriever Extraction
 
-For small-scale workloads, such as workloads of fewer than 100 documents, you can use library mode setup. 
-Library mode depends on NIMs that are already self-hosted, or, by default, NIMs that are hosted on build.nvidia.com.
+[NeMo Retriever extraction](overview.md) is typically deployed as a cluster of containers for robust, scalable production use. 
 
-To get started using [NeMo Retriever extraction](overview.md) in library mode, you need the following:
+In addition, you can use library mode, which is intended for the following cases:
+
+- Local development
+- Experimentation and testing
+- Small-scale workloads, such as workloads of fewer than 100 documents
+
+
+By default, library mode depends on NIMs that are hosted on build.nvidia.com. 
+In library mode you launch the main pipeline service directly within a Python process, 
+while all other services (such as embedding and storage) are hosted remotely in the cloud.
+
+To get started using library mode, you need the following:
 
 - Linux operating systems (Ubuntu 22.04 or later recommended)
 - Python 3.12
@@ -228,6 +238,144 @@ After carefully examining the provided content, I'd like to point out the potent
 
 So, according to this whimsical analysis, both the **Giraffe** and the **Cat** are "responsible" for the typos, with the Giraffe possibly being the more egregious offender given the more blatant character substitution in its name.
 ```
+
+
+## Library Mode Communication and Advanced Examples
+
+Communication in library mode is handled through a simplified, 3-way handshake message broker called `SimpleBroker`.
+
+Attempting to run a library-mode process co-located with a Docker Compose deployment does not work by default. 
+The Docker Compose deployment typically creates a firewall rule or port mapping that captures traffic to port `7671`,
+which prevents the `SimpleBroker` from receiving messages. 
+Always ensure that you use library mode in isolation, without an active containerized deployment listening on the same port.
+
+
+### Example `launch_libmode_service.py`
+
+This example launches the pipeline service in a subprocess, 
+and keeps it running until it is interrupted (for example, by pressing `Ctrl+C`). 
+It listens for ingestion requests on port `7671` from an external client.
+
+```python
+def main():
+config_data = {}
+
+    config_data = {key: value for key, value in config_data.items() if value is not None}
+    ingest_config = PipelineCreationSchema(**config_data)
+
+    try:
+        _ = run_pipeline(
+            ingest_config,
+            block=True,
+            disable_dynamic_scaling=True,
+            run_in_subprocess=True,
+        )
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received. Shutting down...")
+    except Exception as e:
+        logger.error(f"Error running pipeline: {e}")
+```
+
+### Example `launch_libmode_and_run_ingestor.py`
+
+This example starts the pipeline service in-process, 
+and immediately runs an ingestion client against it in the same parent process.
+
+```python
+def run_ingestor():
+client = NvIngestClient(
+message_client_allocator=SimpleClient,
+message_client_port=7671,
+message_client_hostname="localhost"
+)
+
+    ingestor = (
+        Ingestor(client=client)
+        .files("./data/multimodal_test.pdf")
+        .extract(
+            extract_text=True,
+            extract_tables=True,
+            extract_charts=True,
+            extract_images=True,
+            paddle_output_format="markdown",
+            extract_infographics=False,
+            text_depth="page",
+        )
+        .split(chunk_size=1024, chunk_overlap=150)
+    )
+
+    try:
+        results, failures = ingestor.ingest(show_progress=False, return_failures=True)
+        logger.info("Ingestion completed successfully.")
+        if failures:
+            logger.warning(f"Ingestion completed with {len(failures)} failures:")
+            for i, failure in enumerate(failures):
+                logger.warning(f"  [{i}] {failure}")
+    except Exception as e:
+        logger.error(f"Ingestion failed: {e}")
+        raise
+
+    print("\nIngest done.")
+    print(f"Got {len(results)} results.")
+
+def main():
+config_data = {}
+config_data = {key: value for key, value in config_data.items() if value is not None}
+ingest_config = PipelineCreationSchema(**config_data)
+
+    try:
+        pipeline = run_pipeline(
+            ingest_config,
+            block=False,
+            disable_dynamic_scaling=True,
+            run_in_subprocess=True,
+        )
+        time.sleep(10)
+        run_ingestor()
+    except KeyboardInterrupt:
+        logger.info("Keyboard interrupt received. Shutting down...")
+    except Exception as e:
+        logger.error(f"Error running pipeline: {e}")
+    finally:
+        pipeline.stop()
+        logger.info("Shutting down pipeline...")
+
+if __name__ == "__main__":
+main()
+```
+
+
+
+## The `run_pipeline` Function Reference
+
+The `run_pipeline` function is the main entry point to start the Nemo Retriever Extraction pipeline. 
+It can run in-process or as a subprocess.
+
+The `run_pipeline` function accepts the following parameters.
+
+| Parameter                | Type                   | Default | Required? | Description                                     |
+|--------------------------|------------------------|---------|-----------|-------------------------------------------------|
+| ingest_config            | PipelineCreationSchema | —       | Yes       | A configuration object that specifies how the pipeline should be constructed. |
+| run_in_subprocess        | bool                   | False   | Yes       | `True` to launch the pipeline in a separate Python subprocess. `False` to run in the current process. |
+| block                    | bool                   | True    | Yes       | `True` to run the pipeline synchronously. The function returns after it finishes. `False` to return an interface for external pipeline control. |
+| disable_dynamic_scaling  | bool                   | None    | No        | `True` to disable autoscaling regardless of global settings. `None` to use the global default behavior. |
+| dynamic_memory_threshold | float                  | None    | No        | A value between `0.0` and `1.0`. If dynamic scaling is enabled, triggers autoscaling when memory usage crosses this threshold. |
+| stdout                   | TextIO                 | None    | No        | Redirect the subprocess `stdout` to a file or stream. If `None`, defaults to `/dev/null`. |
+| stderr                   | TextIO                 | None    | No        | Redirect subprocess `stderr` to a file or stream. If `None`, defaults to `/dev/null`. |
+
+
+The `run_pipeline` function returns the following values, depending on the parameters that you set:
+
+- **run_in_subprocess=False and block=True**  — The function returns a `float` that represents the elapsed time in seconds.
+- **run_in_subprocess=False and block=False** — The function returns a `RayPipelineInterface` object.
+- **run_in_subprocess=True  and block=True**  — The function returns `0.0`.
+- **run_in_subprocess=True  and block=False** — The function returns a `RayPipelineInterface` object.
+
+
+The `run_pipeline` throws the following errors:
+
+- **RuntimeError** — A subprocess failed to start, or exited with error.
+- **Exception** — Any other failure during pipeline setup or execution.
 
 
 
