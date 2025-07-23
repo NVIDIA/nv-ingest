@@ -18,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 def nv_ingest_node_failure_try_except(  # New name to distinguish
-    annotation_id: str,
+    annotation_id: Optional[str] = None,
     payload_can_be_empty: bool = False,
     raise_on_failure: bool = False,
     skip_processing_if_failed: bool = True,
@@ -29,7 +29,19 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
     failures by annotating an IngestControlMessage. Replaces the context
     manager approach for potentially simpler interaction with frameworks like Ray.
 
-    Parameters are the same as nv_ingest_node_failure_context_manager.
+    Parameters
+    ----------
+    annotation_id : Optional[str]
+        A unique identifier for annotation. If None, will attempt to auto-detect
+        from the stage instance's stage_name property.
+    payload_can_be_empty : bool, optional
+        If False, the message payload must not be null.
+    raise_on_failure : bool, optional
+        If True, exceptions are raised; otherwise, they are annotated.
+    skip_processing_if_failed : bool, optional
+        If True, skip processing if the message is already marked as failed.
+    forward_func : Optional[Callable[[Any], Any]]
+        If provided, a function to forward the message when processing is skipped.
     """
 
     def extract_message_and_prefix(args: Tuple) -> Tuple[Any, Tuple]:
@@ -53,6 +65,30 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 logger.debug(f"async_wrapper for {func_name}: Entering.")
+
+                # Determine the annotation_id to use
+                resolved_annotation_id = annotation_id
+
+                # If no explicit annotation_id provided, try to get it from self.stage_name
+                if resolved_annotation_id is None and len(args) >= 1:
+                    stage_instance = args[0]  # 'self' in method calls
+                    if hasattr(stage_instance, "stage_name") and stage_instance.stage_name:
+                        resolved_annotation_id = stage_instance.stage_name
+                        logger.debug(f"Using auto-detected annotation_id from stage_name: '{resolved_annotation_id}'")
+                    else:
+                        # Fallback to function name if no stage_name available
+                        resolved_annotation_id = func_name
+                        logger.debug(
+                            f"No stage_name available, using function name as annotation_id: '{resolved_annotation_id}'"
+                        )
+                elif resolved_annotation_id is None:
+                    # Fallback to function name if no annotation_id and no instance
+                    resolved_annotation_id = func_name
+                    logger.debug(
+                        "No annotation_id provided and no instance available, using function name: "
+                        f"'{resolved_annotation_id}'"
+                    )
+
                 try:
                     control_message, prefix = extract_message_and_prefix(args)
                 except ValueError as e:
@@ -93,7 +129,7 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
                         control_message=result if result is not None else control_message,
                         # Annotate result if func returns it, else original message
                         result=TaskResultStatus.SUCCESS,
-                        task_id=annotation_id,
+                        task_id=resolved_annotation_id,
                     )
                     logger.debug(f"async_wrapper for {func_name}: Success annotation done. Returning result.")
                     return result
@@ -109,7 +145,7 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
                         annotate_task_result(
                             control_message=control_message,
                             result=TaskResultStatus.FAILURE,
-                            task_id=annotation_id,
+                            task_id=resolved_annotation_id,
                             message=error_message,
                         )
                         logger.debug(f"async_wrapper for {func_name}: Failure annotation complete.")
@@ -118,7 +154,6 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
                         logger.exception(
                             f"async_wrapper for {func_name}: CRITICAL - Error during failure annotation: {anno_err}"
                         )
-
                     # Decide whether to raise or return annotated message
                     if raise_on_failure:
                         logger.debug(f"async_wrapper for {func_name}: Re-raising exception as configured.")
@@ -138,6 +173,33 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
             @functools.wraps(func)
             def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
                 logger.debug(f"sync_wrapper for {func_name}: Entering.")
+
+                # Determine the annotation_id to use
+                resolved_annotation_id = annotation_id
+
+                # If no explicit annotation_id provided, try to get it from self.stage_name
+                if resolved_annotation_id is None and len(args) >= 1:
+                    stage_instance = args[0]  # 'self' in method calls
+                    if hasattr(stage_instance, "stage_name") and stage_instance.stage_name:
+                        resolved_annotation_id = stage_instance.stage_name
+                        logger.debug(
+                            "Using auto-detected annotation_id from stage_name: " f"'{resolved_annotation_id}'"
+                        )
+                    else:
+                        # Fallback to function name if no stage_name available
+                        resolved_annotation_id = func_name
+                        logger.debug(
+                            "No stage_name available, using function name as annotation_id: "
+                            f"'{resolved_annotation_id}'"
+                        )
+                elif resolved_annotation_id is None:
+                    # Fallback to function name if no annotation_id and no instance
+                    resolved_annotation_id = func_name
+                    logger.debug(
+                        "No annotation_id provided and no instance available, using function name: "
+                        f"'{resolved_annotation_id}'"
+                    )
+
                 try:
                     control_message, prefix = extract_message_and_prefix(args)
                 except ValueError as e:
@@ -174,7 +236,7 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
                         control_message=result if result is not None else control_message,
                         # Annotate result or original message
                         result=TaskResultStatus.SUCCESS,
-                        task_id=annotation_id,
+                        task_id=resolved_annotation_id,
                     )
                     logger.debug(f"sync_wrapper for {func_name}: Success annotation done. Returning result.")
                     return result
@@ -190,7 +252,7 @@ def nv_ingest_node_failure_try_except(  # New name to distinguish
                         annotate_task_result(
                             control_message=control_message,
                             result=TaskResultStatus.FAILURE,
-                            task_id=annotation_id,
+                            task_id=resolved_annotation_id,
                             message=error_message,
                         )
                         logger.debug(f"sync_wrapper for {func_name}: Failure annotation complete.")
