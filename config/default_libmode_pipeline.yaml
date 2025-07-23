@@ -199,7 +199,7 @@ stages:
   # Post-processing / Mutators
   - name: "image_filter"
     type: "stage"
-    phase: 2  # MUTATION
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_filter:ImageFilterStage"
     replicas:
       cpu_count_min: 0
@@ -209,7 +209,7 @@ stages:
 
   - name: "image_dedup"
     type: "stage"
-    phase: 2  # MUTATION
+    phase: 3  # MUTATION
     actor: "nv_ingest.framework.orchestration.ray.stages.mutate.image_dedup:ImageDedupStage"
     replicas:
       cpu_count_min: 0
@@ -220,7 +220,7 @@ stages:
   # Transforms and Synthesis
   - name: "text_splitter"
     type: "stage"
-    phase: 3  # TRANSFORM
+    phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_splitter:TextSplitterStage"
     config:
       chunk_size: 512
@@ -231,23 +231,9 @@ stages:
     runs_after:
       - "image_dedup"
 
-  - name: "text_embedder"
-    type: "stage"
-    phase: 3  # TRANSFORM
-    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
-    config:
-      api_key: $NGC_API_KEY|""
-      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
-      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"https://integrate.api.nvidia.com/v1"
-    replicas:
-      cpu_count_min: 0
-      cpu_count_max: 2
-    runs_after:
-      - "text_splitter"
-
   - name: "image_caption"
     type: "stage"
-    phase: 3  # TRANSFORM
+    phase: 4  # TRANSFORM
     actor: "nv_ingest.framework.orchestration.ray.stages.transforms.image_caption:ImageCaptionTransformStage"
     config:
       api_key: $NGC_API_KEY|""
@@ -257,11 +243,27 @@ stages:
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
+    runs_after:
+      - "text_splitter"
+
+  - name: "text_embedder"
+    type: "stage"
+    phase: 4  # TRANSFORM
+    actor: "nv_ingest.framework.orchestration.ray.stages.transforms.text_embed:TextEmbeddingTransformStage"
+    config:
+      api_key: $NGC_API_KEY|""
+      embedding_model: $EMBEDDING_NIM_MODEL_NAME|"nvidia/llama-3.2-nv-embedqa-1b-v2"
+      embedding_nim_endpoint: $EMBEDDING_NIM_ENDPOINT|"https://integrate.api.nvidia.com/v1"
+    replicas:
+      cpu_count_min: 0
+      cpu_count_max: 2
+    runs_after:
+      - "image_caption"
 
   # Storage and Output
   - name: "image_storage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.image_storage:ImageStorageStage"
     replicas:
       cpu_count_min: 0
@@ -271,15 +273,17 @@ stages:
 
   - name: "embedding_storage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.storage.store_embeddings:EmbeddingStorageStage"
     replicas:
       cpu_count_min: 0
       cpu_count_max: 1
+    runs_after:
+      - "text_embedder"
 
   - name: "udf_stage"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     callable: "nv_ingest_api.internal.meta.udf:udf_stage_callable_fn"
     task_filters: ["udf"]
     config:
@@ -292,7 +296,7 @@ stages:
 
   - name: "broker_response"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.message_broker_task_sink:MessageBrokerTaskSinkStage"
     config:
       broker_client:
@@ -306,7 +310,7 @@ stages:
   # Telemetry and Drain
   - name: "otel_tracer"
     type: "stage"
-    phase: 4  # RESPONSE
+    phase: 5  # RESPONSE
     actor: "nv_ingest.framework.orchestration.ray.stages.telemetry.otel_tracer:OpenTelemetryTracerStage"
     config:
       otel_endpoint: $OTEL_EXPORTER_OTLP_ENDPOINT|"http://localhost:4317"
@@ -318,7 +322,7 @@ stages:
 
   - name: "drain"
     type: "sink"
-    phase: 5
+    phase: 6
     actor: "nv_ingest.framework.orchestration.ray.stages.sinks.default_drain:DefaultDrainSink"
     config: {}
     replicas:
@@ -377,12 +381,12 @@ edges:
 
   # Primitive Transforms
   - from: "text_splitter"
-    to: "text_embedder"
-    queue_size: 32
-  - from: "text_embedder"
     to: "image_caption"
     queue_size: 32
   - from: "image_caption"
+    to: "text_embedder"
+    queue_size: 32
+  - from: "text_embedder"
     to: "image_storage"
     queue_size: 32
 

@@ -43,7 +43,6 @@ from nv_ingest_client.client.util.processing import save_document_results_to_jso
 from nv_ingest_client.primitives import BatchJobSpec
 from nv_ingest_client.primitives.jobs import JobStateEnum
 from nv_ingest_client.primitives.tasks import CaptionTask
-from nv_ingest_client.primitives.tasks import ChartExtractionTask
 from nv_ingest_client.primitives.tasks import DedupTask
 from nv_ingest_client.primitives.tasks import EmbedTask
 from nv_ingest_client.primitives.tasks import ExtractTask
@@ -51,7 +50,6 @@ from nv_ingest_client.primitives.tasks import FilterTask
 from nv_ingest_client.primitives.tasks import SplitTask
 from nv_ingest_client.primitives.tasks import StoreTask
 from nv_ingest_client.primitives.tasks import StoreEmbedTask
-from nv_ingest_client.primitives.tasks import TableExtractionTask
 from nv_ingest_client.primitives.tasks import UDFTask
 from nv_ingest_client.util.processing import check_schema
 from nv_ingest_client.util.system import ensure_directory_with_permissions
@@ -926,7 +924,10 @@ class Ingestor:
         self,
         udf_function: str,
         udf_function_name: Optional[str] = None,
-        phase: Union[PipelinePhase, int, str] = PipelinePhase.RESPONSE,
+        phase: Optional[Union[PipelinePhase, int, str]] = None,
+        target_stage: Optional[str] = None,
+        run_before: bool = False,
+        run_after: bool = False,
     ) -> "Ingestor":
         """
         Adds a UDFTask to the batch job specification.
@@ -943,7 +944,13 @@ class Ingestor:
             If not provided, will attempt to infer from udf_function.
         phase : Union[PipelinePhase, int, str], optional
             Pipeline phase to execute UDF. Accepts phase names ('extract', 'split', 'embed', 'response')
-            or numbers (1-4). Default: 'response'.
+            or numbers (1-4). Cannot be used with target_stage.
+        target_stage : str, optional
+            Specific stage name to target for UDF execution. Cannot be used with phase.
+        run_before : bool, optional
+            If True and target_stage is specified, run UDF before the target stage. Default: False.
+        run_after : bool, optional
+            If True and target_stage is specified, run UDF after the target stage. Default: False.
 
         Returns
         -------
@@ -953,8 +960,16 @@ class Ingestor:
         Raises
         ------
         ValueError
-            If udf_function_name cannot be inferred and is not provided explicitly.
+            If udf_function_name cannot be inferred and is not provided explicitly,
+            or if both phase and target_stage are specified, or if neither is specified.
         """
+        # Validate mutual exclusivity of phase and target_stage
+        if phase is not None and target_stage is not None:
+            raise ValueError("Cannot specify both 'phase' and 'target_stage'. Please specify only one.")
+        elif phase is None and target_stage is None:
+            # Default to response phase for backward compatibility
+            phase = PipelinePhase.RESPONSE
+
         # Try to infer udf_function_name if not provided
         if udf_function_name is None:
             udf_function_name = infer_udf_function_name(udf_function)
@@ -966,7 +981,14 @@ class Ingestor:
             logger.info(f"Inferred UDF function name: {udf_function_name}")
 
         # Use UDFTask constructor with explicit parameters
-        udf_task = UDFTask(udf_function=udf_function, udf_function_name=udf_function_name, phase=phase)
+        udf_task = UDFTask(
+            udf_function=udf_function,
+            udf_function_name=udf_function_name,
+            phase=phase,
+            target_stage=target_stage,
+            run_before=run_before,
+            run_after=run_after,
+        )
         self._job_specs.add_task(udf_task)
 
         return self
@@ -1028,49 +1050,18 @@ class Ingestor:
         Ingestor
             Returns self for chaining.
         """
-        # Use the API schema for validation
-        check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
+        task_options = check_schema(IngestTaskCaptionSchema, kwargs, "caption", json.dumps(kwargs))
 
-        caption_task = CaptionTask(**kwargs)
+        # Extract individual parameters from API schema for CaptionTask constructor
+        caption_params = {
+            "api_key": task_options.api_key,
+            "endpoint_url": task_options.endpoint_url,
+            "prompt": task_options.prompt,
+            "model_name": task_options.model_name,
+        }
+        caption_task = CaptionTask(**caption_params)
         self._job_specs.add_task(caption_task)
-        return self
 
-    @ensure_job_specs
-    def chart_extract(self, **kwargs: Any) -> "Ingestor":
-        """
-        Adds a ChartExtractionTask to the batch job specification.
-
-        Parameters
-        ----------
-        kwargs : dict
-            Parameters specific to the ChartExtractionTask.
-
-        Returns
-        -------
-        Ingestor
-            Returns self for chaining.
-        """
-        chart_task = ChartExtractionTask(**kwargs)
-        self._job_specs.add_task(chart_task)
-        return self
-
-    @ensure_job_specs
-    def table_extract(self, **kwargs: Any) -> "Ingestor":
-        """
-        Adds a TableExtractionTask to the batch job specification.
-
-        Parameters
-        ----------
-        kwargs : dict
-            Parameters specific to the TableExtractionTask.
-
-        Returns
-        -------
-        Ingestor
-            Returns self for chaining.
-        """
-        table_task = TableExtractionTask()
-        self._job_specs.add_task(table_task)
         return self
 
     def _count_job_states(self, job_states: set[JobStateEnum]) -> int:

@@ -1,6 +1,6 @@
 # User-Defined Functions (UDFs) Guide
 
-User-Defined Functions (UDFs) allow you to inject custom processing logic into the NV-Ingest pipeline at specific phases. This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
+User-Defined Functions (UDFs) allow you to inject custom processing logic into the NV-Ingest pipeline at specific stages. This guide covers how to write, validate, and submit UDFs using both the CLI and the Python client interface.
 
 ## Quickstart
 
@@ -29,14 +29,20 @@ def my_custom_processor(control_message: IngestControlMessage) -> IngestControlM
 
 ### 2. Submit via CLI
 
-Save your function to a file and submit it:
+Save your function to a file and submit it to run before a specific pipeline stage:
 
 ```bash
-# Submit UDF for the "response" phase
+# Submit UDF to run before the text embedding stage
 nv-ingest-cli \
     --doc /path/to/document.pdf \
     --output-directory ./output \
-    --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "phase": "response"}'
+    --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "target_stage": "text_embedder", "run_before": true}'
+
+# Submit UDF to run after the text embedding stage
+nv-ingest-cli \
+    --doc /path/to/document.pdf \
+    --output-directory ./output \
+    --task 'udf:{"udf_function": "my_file.py:my_custom_processor", "target_stage": "text_embedder", "run_after": true}'
 ```
 
 ### 3. Submit via Python Client
@@ -48,9 +54,16 @@ client = NvIngestClient()
 client.add_document("/path/to/document.pdf")
 client.udf(
     udf_function="my_file.py:my_custom_processor",
-    phase="response"
+    target_stage="text_embedder",
+    run_before=True
 )
-results = client.ingest()
+
+# Submit UDF to run after the text embedding stage
+client.udf(
+    udf_function="my_file.py:my_custom_processor",
+    target_stage="text_embedder",
+    run_after=True
+)
 ```
 
 ---
@@ -205,6 +218,61 @@ def enhance_metadata(control_message: IngestControlMessage) -> IngestControlMess
 
 > **📖 For detailed metadata schema documentation, see:** [metadata_documentation.md](metadata_documentation.md)
 
+### UDF Targeting
+
+UDFs can be executed at different stages of the pipeline by specifying the `target_stage` parameter. The following stages are available in the default pipeline configuration:
+
+#### Available Pipeline Stages
+
+**Pre processing Stages (Phase 0):**
+- `metadata_injector` - Metadata injection stage
+
+**Extraction Stages (Phase 1):**
+- `pdf_extractor` - PDF content extraction
+- `audio_extractor` - Audio content extraction  
+- `docx_extractor` - DOCX document extraction
+- `pptx_extractor` - PowerPoint presentation extraction
+- `image_extractor` - Image content extraction
+- `html_extractor` - HTML document extraction
+- `infographic_extractor` - Infographic content extraction
+- `table_extractor` - Table structure extraction
+- `chart_extractor` - Chart and graphic extraction
+
+**Mutation Stages (Phase 3):**
+- `image_filter` - Image filtering and validation
+- `image_dedup` - Image deduplication
+
+**Transform Stages (Phase 4):**
+- `text_splitter` - Text chunking and splitting
+- `image_caption` - Image captioning and description
+- `text_embedder` - Text embedding generation
+
+**Storage Stages (Phase 5):**
+- `image_storage` - Image storage and management
+- `embedding_storage` - Embedding storage and indexing
+- `broker_response` - Response message handling
+- `otel_tracer` - OpenTelemetry tracing
+
+> **Note:** For the complete and up-to-date list of pipeline stages, see the [default_pipeline.yaml](../../../config/default_pipeline.yaml) configuration file.
+
+#### Target Stage Selection Examples
+
+```bash
+# CLI examples for different target stages
+nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:validate_input", "target_stage": "pdf_extractor", "run_before": true}'
+nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:extract_custom", "target_stage": "text_embedder", "run_after": true}'
+nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:enhance_output", "target_stage": "embedding_storage", "run_before": true}'
+```
+
+```python
+# Python client examples
+ingestor = Ingestor()
+
+ingestor.udf(udf_function="processor.py:validate_input", target_stage="pdf_extractor", run_before=True
+    ).udf(udf_function="processor.py:extract_custom", target_stage="text_embedder", run_after=True
+    ).udf(udf_function="processor.py:enhance_output", target_stage="embedding_storage", run_before=True)
+```
+
 ### UDF Function Requirements
 
 #### Signature Requirements
@@ -257,35 +325,6 @@ def my_udf(control_message: IngestControlMessage) -> IngestControlMessage:
     return control_message
 ```
 
-### Pipeline Phases
-
-UDFs can be executed at different phases of the pipeline:
-
-| Phase | Value | Description | Use Cases |
-|-------|-------|-------------|-----------|
-| `pre_processing` | 0 | Before content extraction | Input validation, preprocessing |
-| `extraction` | 1 | During content extraction | Custom extraction logic |
-| `post_processing` | 2 | After extraction, before mutation | Content validation, filtering |
-| `mutation` | 3 | Content transformation phase | Content modification, enhancement |
-| `transform` | 4 | Embedding and analysis phase | Feature extraction, analysis |
-| `response` | 5 | Final processing before output | Output formatting, final metadata |
-
-#### Phase Selection Examples
-
-```bash
-# CLI examples for different phases
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:validate_input", "phase": "pre_processing"}'
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:extract_custom", "phase": "extraction"}'  
-nv-ingest-cli --doc file.pdf --task 'udf:{"udf_function": "processor.py:enhance_output", "phase": "response"}'
-```
-
-```python
-# Python client examples
-client.udf(udf_function="processor.py:validate_input", phase="pre_processing")
-client.udf(udf_function="processor.py:extract_custom", phase="extraction")
-client.udf(udf_function="processor.py:enhance_output", phase="response")
-```
-
 ### UDF Function Specification Formats
 
 #### File Path with Function Name
@@ -314,202 +353,16 @@ def advanced_processor(control_message: IngestControlMessage) -> IngestControlMe
 --task 'udf:{"udf_function": "my_package.processors:advanced_processor"}'
 ```
 
-### Advanced Examples
+### Error Handling
 
-#### Content Filtering UDF
-```python
-def filter_short_content(control_message: IngestControlMessage) -> IngestControlMessage:
-    """Remove content that's too short to be useful."""
-    df = control_message.payload()
-    
-    # Filter out rows with content shorter than 50 characters
-    mask = df['content'].str.len() >= 50
-    filtered_df = df[mask].copy()
-    
-    control_message.payload(filtered_df)
-    return control_message
-```
+The NV-Ingest system automatically catches all exceptions that occur within UDF execution. If your UDF fails for any reason, the system will:
 
-#### Content Enhancement UDF
-```python
-import re
-from datetime import datetime
+1. Annotate the job with appropriate error information
+2. Mark the job as failed
+3. Return the failed job to you with error details
+4. Failures that are not caught by the system, or unhandled exceptions (segfaults) from acceleration libraries may leave the pipeline in an unstable state 
 
-def enhance_document_metadata(control_message: IngestControlMessage) -> IngestControlMessage:
-    """Add custom metadata based on content analysis."""
-    df = control_message.payload()
-    
-    for idx, row in df.iterrows():
-        content = row['content']
-        metadata = row['metadata']
-        
-        # Extract email addresses
-        emails = re.findall(r'\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Z|a-z]{2,}\b', content)
-        
-        # Extract phone numbers (simple pattern)
-        phones = re.findall(r'\b\d{3}-\d{3}-\d{4}\b', content)
-        
-        # Add custom metadata
-        if 'debug_metadata' not in metadata:
-            metadata['debug_metadata'] = {}
-            
-        metadata['debug_metadata'].update({
-            'extracted_emails': emails,
-            'extracted_phones': phones,
-            'content_length': len(content),
-            'word_count': len(content.split()),
-            'processing_timestamp': datetime.now().isoformat(),
-            'contains_contact_info': len(emails) > 0 or len(phones) > 0
-        })
-        
-        df.at[idx, 'metadata'] = metadata
-    
-    control_message.payload(df)
-    return control_message
-```
-
-#### Multi-Phase Processing
-```python
-# Phase 1: Validation (pre_processing)
-def validate_documents(control_message: IngestControlMessage) -> IngestControlMessage:
-    """Validate document structure and add validation metadata."""
-    df = control_message.payload()
-    
-    for idx, row in df.iterrows():
-        metadata = row['metadata']
-        
-        # Add validation metadata
-        if 'debug_metadata' not in metadata:
-            metadata['debug_metadata'] = {}
-            
-        metadata['debug_metadata']['validation'] = {
-            'has_content': len(row['content'].strip()) > 0,
-            'has_source_file': bool(row.get('source_file')),
-            'metadata_complete': 'source_metadata' in metadata,
-            'validated_at': datetime.now().isoformat()
-        }
-        
-        df.at[idx, 'metadata'] = metadata
-    
-    control_message.payload(df)
-    return control_message
-
-# Phase 2: Final Processing (response)
-def finalize_output(control_message: IngestControlMessage) -> IngestControlMessage:
-    """Add final metadata and prepare for output."""
-    df = control_message.payload()
-    
-    for idx, row in df.iterrows():
-        metadata = row['metadata']
-        
-        # Add final processing metadata
-        if 'debug_metadata' not in metadata:
-            metadata['debug_metadata'] = {}
-            
-        metadata['debug_metadata']['final_processing'] = {
-            'pipeline_complete': True,
-            'final_content_length': len(row['content']),
-            'completed_at': datetime.now().isoformat()
-        }
-        
-        df.at[idx, 'metadata'] = metadata
-    
-    control_message.payload(df)
-    return control_message
-```
-
-### Error Handling and Best Practices
-
-#### Robust Error Handling
-```python
-import logging
-
-logger = logging.getLogger(__name__)
-
-def robust_processor(control_message: IngestControlMessage) -> IngestControlMessage:
-    """Example of robust UDF with proper error handling."""
-    try:
-        df = control_message.payload()
-        
-        for idx, row in df.iterrows():
-            try:
-                # Your processing logic here
-                content = row['content']
-                metadata = row['metadata']
-                
-                # Safe metadata access
-                if isinstance(metadata, dict):
-                    if 'debug_metadata' not in metadata:
-                        metadata['debug_metadata'] = {}
-                    
-                    metadata['debug_metadata']['processed'] = True
-                    df.at[idx, 'metadata'] = metadata
-                else:
-                    logger.warning(f"Row {idx}: metadata is not a dict, skipping")
-                    
-            except Exception as row_error:
-                logger.error(f"Error processing row {idx}: {row_error}")
-                # Continue processing other rows
-                continue
-        
-        control_message.payload(df)
-        
-    except Exception as e:
-        logger.error(f"Critical error in UDF: {e}")
-        # Return original message if processing fails
-        
-    return control_message
-```
-
-#### Performance Best Practices
-
-1. **Minimize DataFrame copies:**
-```python
-# ✅ Good - modify in place
-def efficient_processor(control_message: IngestControlMessage) -> IngestControlMessage:
-    df = control_message.payload()
-    
-    # Use .at[] for single value assignment
-    for idx, row in df.iterrows():
-        df.at[idx, 'new_field'] = compute_value(row)
-    
-    control_message.payload(df)
-    return control_message
-```
-
-2. **Use vectorized operations when possible:**
-```python
-# ✅ Good - vectorized operation
-def vectorized_processor(control_message: IngestControlMessage) -> IngestControlMessage:
-    df = control_message.payload()
-    
-    # Vectorized string operation
-    df['content_length'] = df['content'].str.len()
-    
-    control_message.payload(df)
-    return control_message
-```
-
-3. **Cache expensive computations:**
-```python
-from functools import lru_cache
-
-@lru_cache(maxsize=128)
-def expensive_computation(text):
-    # Some expensive processing
-    return result
-
-def cached_processor(control_message: IngestControlMessage) -> IngestControlMessage:
-    df = control_message.payload()
-    
-    for idx, row in df.iterrows():
-        # Use cached computation
-        result = expensive_computation(row['content'])
-        df.at[idx, 'computed_field'] = result
-    
-    control_message.payload(df)
-    return control_message
-```
+You do not need to implement extensive error handling within your UDF - focus on your core processing logic and let the system handle failures gracefully.
 
 ### Debugging and Testing
 
@@ -564,7 +417,7 @@ if __name__ == "__main__":
 nv-ingest-cli \
     --doc /path/to/document.pdf \
     --output-directory ./output \
-    --task 'udf:{"udf_function": "path/to/udf.py:function_name"}'
+    --task 'udf:{"udf_function": "path/to/udf.py:function_name", "target_stage": "text_extractor", "run_before": true}'
 ```
 
 #### Multiple UDFs
@@ -572,50 +425,11 @@ nv-ingest-cli \
 nv-ingest-cli \
     --doc /path/to/document.pdf \
     --output-directory ./output \
-    --task 'udf:{"udf_function": "validator.py:validate_input", "phase": "pre_processing"}' \
-    --task 'udf:{"udf_function": "enhancer.py:enhance_content", "phase": "response"}'
-```
-
-### Python Client Reference
-
-#### Basic Usage
-```python
-from nv_ingest_client.client import NvIngestClient
-
-client = NvIngestClient()
-client.add_document("/path/to/document.pdf")
-client.udf(
-    udf_function="/path/to/processor.py:my_function"
-)
-results = client.ingest()
-```
-
-#### Advanced Usage with Multiple UDFs
-```python
-client = NvIngestClient()
-client.add_document("/path/to/document.pdf")
-
-# Add validation UDF
-client.udf(
-    udf_function="validators.py:validate_structure", 
-    phase="pre_processing"
-)
-
-# Add enhancement UDF  
-client.udf(
-    udf_function="enhancers.py:add_metadata",
-    phase="response"
-)
-
-# Process with progress tracking
-results = client.ingest(show_progress=True)
+    --task 'udf:{"udf_function": "validator.py:validate_input", "target_stage": "text_extractor", "run_before": true}' \
+    --task 'udf:{"udf_function": "enhancer.py:enhance_content", "target_stage": "text_embedder", "run_after": true}'
 ```
 
 ---
-
-## Performance and Caching
-
-The NV-Ingest system includes automatic LRU caching for UDF functions. Identical UDF code is compiled and validated only once, then cached for subsequent use. This provides significant performance benefits for repeated UDF usage without requiring any changes to your UDF code.
 
 ## Conclusion
 
