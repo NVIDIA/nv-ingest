@@ -13,9 +13,11 @@ This documentation contains the release notes for [NeMo Retriever extraction](ov
 The NeMo Retriever extraction 25.7.0 release TODO, including the following:
 
 - TODO
+- TODO
 
 - New notebook for [Building a Custom Vector Database Operator](https://github.com/NVIDIA/nv-ingest/blob/main/examples/building_vdb_operator.ipynb).
-
+- New documentation about how to [Add User-defined Stages to Your NeMo Retriever Extraction Pipeline](user-defined-stages.md).
+- Expanded documentation about how to use [Library Mode](quickstart-library-mode.md).
 
 
 ### Breaking Changes
