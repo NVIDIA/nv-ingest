@@ -57,6 +57,7 @@ from nv_ingest_api.internal.schemas.transform.transform_image_filter_schema impo
 from nv_ingest_api.internal.schemas.transform.transform_text_embedding_schema import TextEmbeddingSchema
 from nv_ingest_api.internal.schemas.transform.transform_text_splitter_schema import TextSplitterSchema
 from nv_ingest_api.util.system.hardware_info import SystemResourceProbe
+from nv_ingest.framework.orchestration.ray.util.env_config import DYNAMIC_MEMORY_THRESHOLD
 
 logger = logging.getLogger(__name__)
 
@@ -178,7 +179,7 @@ def add_pdf_extractor_stage(pipeline, default_cpu_count, stage_name="pdf_extract
     total_memory_mb = psutil.virtual_memory().total / (1024**2)
 
     # Allocate up to 75% of memory to this stage, using a 10GB high watermark per worker.
-    allocatable_memory_for_stage_mb = total_memory_mb * 0.75
+    allocatable_memory_for_stage_mb = total_memory_mb * DYNAMIC_MEMORY_THRESHOLD
     memory_based_replicas = int(allocatable_memory_for_stage_mb / 10_000.0)
 
     # Cap the number of replicas by the number of available CPU cores.
