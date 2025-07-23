@@ -173,6 +173,7 @@ services:
   nv-ingest-ms-runtime:
     image: nvcr.io/nvidia/nemo-microservices/nv-ingest:25.6.2
     shm_size: 40gb # Should be at minimum 30% of assigned memory per Ray documentation
+    pids_limit: -1
     volumes:
       - ${DATASET_ROOT:-./data}:/workspace/data
     ports:
