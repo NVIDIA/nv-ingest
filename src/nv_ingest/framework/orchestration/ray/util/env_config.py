@@ -7,12 +7,12 @@ logger = logging.getLogger(__name__)
 def str_to_bool(value: str) -> bool:
     """
     Convert string to boolean value.
-    
+
     Parameters
     ----------
     value : str
         String value to convert
-        
+
     Returns
     -------
     bool
@@ -24,7 +24,7 @@ def str_to_bool(value: str) -> bool:
 def get_env_var(name: str, default, var_type=None):
     """
     Get environment variable with type conversion and default value.
-    
+
     Parameters
     ----------
     name : str
@@ -33,7 +33,7 @@ def get_env_var(name: str, default, var_type=None):
         Default value if environment variable is not set
     var_type : type, optional
         Type to convert to. If None, infers from default value type
-        
+
     Returns
     -------
     Any
@@ -42,19 +42,22 @@ def get_env_var(name: str, default, var_type=None):
     value = os.environ.get(name)
     if value is None:
         return default
-    
+
     # Determine type from default if not explicitly provided
     target_type = var_type or type(default)
-    
+
     # Handle boolean conversion specially
     if target_type is bool:
         return str_to_bool(value)
-    
+
     # For other types, use direct conversion
     try:
         return target_type(value)
     except (ValueError, TypeError) as e:
-        logger.warning(f"Failed to convert environment variable {name}='{value}' to {target_type.__name__}. Using default: {default}")
+        logger.warning(
+            f"Failed to convert environment variable {name}='{value}' to \
+                  {target_type.__name__}. Using default: {default}, error: {e}"
+        )
         return default
 
 
@@ -67,4 +70,6 @@ DYNAMIC_MEMORY_EMA_ALPHA = get_env_var("INGEST_DYNAMIC_MEMORY_EMA_ALPHA", 0.1, f
 DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH = get_env_var("INGEST_DYNAMIC_MEMORY_TARGET_QUEUE_DEPTH", 0, int)
 DYNAMIC_MEMORY_PENALTY_FACTOR = get_env_var("INGEST_DYNAMIC_MEMORY_PENALTY_FACTOR", 0.1, float)
 DYNAMIC_MEMORY_ERROR_BOOST_FACTOR = get_env_var("INGEST_DYNAMIC_MEMORY_ERROR_BOOST_FACTOR", 1.5, float)
-DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION = get_env_var("INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION", 0.15, float) 
+DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION = get_env_var(
+    "INGEST_DYNAMIC_MEMORY_RCM_MEMORY_SAFETY_BUFFER_FRACTION", 0.15, float
+)
